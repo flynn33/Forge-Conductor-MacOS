@@ -127,3 +127,9 @@ You may use, copy, modify, and redistribute this software under that license.
 Developers may use the software under the Apache 2.0 license, but must **fork** this repository or **copy** it into a **new repository** they control. Outside developers are **not** allowed to submit pull requests or otherwise alter this repository. **No pull requests will be approved.**
 
 Full policy: [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Sponsors
+
+Support development of Forge Conductor and related projects:
+
+**[Sponsor @flynn33 on GitHub](https://github.com/sponsors/flynn33)**
