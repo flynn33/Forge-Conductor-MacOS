@@ -1,8 +1,16 @@
-# Forge-Conductor (Swift)
+# Forge Conductor (macOS)
 
 Native **Swift** control plane and MCP server for **local models in [LM Studio](https://lmstudio.ai)** on macOS.
 
 This project is **not** Claude Code orchestration, CCDT, or `~/.claude/local-mcp`.
+
+| | |
+|---|---|
+| **Version** | 0.5.3 |
+| **License** | [Apache License 2.0](LICENSE) |
+| **Platform** | macOS 26+ |
+| **Wiki** | [Project wiki](https://github.com/flynn33/Forge-Conductor-MacOS/wiki) |
+| **Contributions** | **Closed** — see [CONTRIBUTING.md](CONTRIBUTING.md) |
 
 ### How LM Studio connects
 
@@ -36,7 +44,7 @@ No manual LM Studio configuration-file edit or restart is required. Selecting wh
 ## Quick start
 
 ```bash
-cd /Users/jim.daley/Forge-Conductor
+cd /path/to/Forge-Conductor-MacOS
 # Reproducible native app build, bundle staging, and launch:
 ./script/build_and_run.sh --verify
 
@@ -77,6 +85,8 @@ The LaunchAgent manager is the single owner of the loopback dashboard port. Open
 State: `~/.forge-conductor` (`FORGE_CONDUCTOR_HOME` override).  
 LM Studio MCP config: `~/.lmstudio/mcp.json`.
 
+More detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and the [project wiki](https://github.com/flynn33/Forge-Conductor-MacOS/wiki).
+
 ## Design principles
 
 1. OOP modules + DI via `ForgeApp.bootstrap`.
@@ -101,3 +111,19 @@ forge-conductor manager run [--open]
 forge-conductor manager start|stop|restart|status
 forge-conductor version
 ```
+
+## License
+
+Copyright 2026 Jim Daley.
+
+Licensed under the **Apache License, Version 2.0**. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+You may use, copy, modify, and redistribute this software under that license.
+
+## Contribution policy
+
+**No outside contributors are invited.**
+
+Developers may use the software under the Apache 2.0 license, but must **fork** this repository or **copy** it into a **new repository** they control. Outside developers are **not** allowed to submit pull requests or otherwise alter this repository. **No pull requests will be approved.**
+
+Full policy: [CONTRIBUTING.md](CONTRIBUTING.md).
