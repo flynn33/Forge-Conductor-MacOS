@@ -23,6 +23,7 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         self.authorization = authorization ?? ToolAuthorizationService(paths: app.paths, config: app.config)
         self.packs = packs ?? [
             AgentToolPack(),
+            MemoryToolPack(),
             FilesystemToolPack(),
             GitToolPack(),
             ShellToolPack(),
@@ -125,6 +126,7 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         "fs_write", "fs_edit", "fs_mkdir", "fs_delete", "fs_move",
         "git_add", "git_commit", "pdf_write", "pdf_from_file",
         "agent_run_start", "agent_run_complete", "shell_exec",
+        "memory_set", "memory_delete",
     ]
 
     private func dispatch(name: String, arguments: [String: Any], clientID: ClientID) throws -> ToolResult {

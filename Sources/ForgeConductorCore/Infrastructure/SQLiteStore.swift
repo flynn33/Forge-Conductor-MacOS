@@ -218,13 +218,18 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
 
     // MARK: - Memory notes
 
+    /// Maximum key length accepted by MCP memory tools (UTF-8 bytes).
+    public static let memoryKeyMaxBytes = 512
+    /// Maximum body length accepted by MCP memory tools (UTF-8 bytes).
+    public static let memoryBodyMaxBytes = 512 * 1024
+    /// Soft cap on list/search result rows.
+    public static let memoryQueryDefaultLimit = 50
+    public static let memoryQueryMaxLimit = 200
+
     public func memorySet(key: String, body: String, tags: [String] = []) throws {
         let ts = ISO8601.string(from: clock.now())
-        let tagsJSON = (try? JSONSupport.string(from: ["tags": tags])) ?? "[]"
-        // store tags as JSON array string
         let tagsArr = try JSONSerialization.data(withJSONObject: tags)
         let tagsStr = String(data: tagsArr, encoding: .utf8) ?? "[]"
-        _ = tagsJSON
         try withStatement(
             """
             INSERT INTO memory_notes(key, body, tags_json, created_at, updated_at)
@@ -242,10 +247,16 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
     }
 
     public func memoryGet(key: String) throws -> String? {
-        try withStatement("SELECT body FROM memory_notes WHERE key = ?") { stmt in
+        try memoryGetNote(key: key)?.body
+    }
+
+    public func memoryGetNote(key: String) throws -> MemoryNote? {
+        try withStatement(
+            "SELECT key, body, tags_json, created_at, updated_at FROM memory_notes WHERE key = ?"
+        ) { stmt in
             bind(stmt, 1, key)
             guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
-            return String(cString: sqlite3_column_text(stmt, 0))
+            return mapMemoryNote(stmt)
         }
     }
 
@@ -255,6 +266,114 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
             try stepDone(stmt)
         }
         return changes() > 0
+    }
+
+    /// List durable notes, newest updates first.
+    /// - Parameters:
+    ///   - prefix: Optional key prefix filter (e.g. `project/`).
+    ///   - tag: Optional exact tag match (JSON array contains).
+    ///   - includeSystem: When false (default), hides `agent_run/` and `agent_active/` keys.
+    ///   - limit: Max rows (clamped to `memoryQueryMaxLimit`).
+    public func memoryList(
+        prefix: String? = nil,
+        tag: String? = nil,
+        includeSystem: Bool = false,
+        limit: Int = SQLiteStore.memoryQueryDefaultLimit
+    ) throws -> [MemoryNote] {
+        let capped = min(max(limit, 1), Self.memoryQueryMaxLimit)
+        var sql = """
+        SELECT key, body, tags_json, created_at, updated_at
+        FROM memory_notes WHERE 1=1
+        """
+        if prefix != nil { sql += " AND key LIKE ? ESCAPE '\\'" }
+        if !includeSystem {
+            sql += " AND key NOT LIKE 'agent\\_run/%' ESCAPE '\\' AND key NOT LIKE 'agent\\_active/%' ESCAPE '\\'"
+        }
+        sql += " ORDER BY updated_at DESC LIMIT ?"
+
+        return try withStatement(sql) { stmt in
+            var i: Int32 = 1
+            if let prefix {
+                bind(stmt, i, escapeLikePrefix(prefix) + "%")
+                i += 1
+            }
+            sqlite3_bind_int(stmt, i, Int32(capped))
+            var out: [MemoryNote] = []
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                let note = mapMemoryNote(stmt)
+                if let tag, !note.tags.contains(tag) { continue }
+                out.append(note)
+            }
+            return out
+        }
+    }
+
+    /// Case-insensitive substring search over key, body, and tags_json.
+    public func memorySearch(
+        query: String,
+        includeSystem: Bool = false,
+        limit: Int = SQLiteStore.memoryQueryDefaultLimit
+    ) throws -> [MemoryNote] {
+        let capped = min(max(limit, 1), Self.memoryQueryMaxLimit)
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !needle.isEmpty else { return [] }
+
+        var sql = """
+        SELECT key, body, tags_json, created_at, updated_at
+        FROM memory_notes
+        WHERE (key LIKE ? ESCAPE '\\' OR body LIKE ? ESCAPE '\\' OR tags_json LIKE ? ESCAPE '\\')
+        """
+        if !includeSystem {
+            sql += " AND key NOT LIKE 'agent\\_run/%' ESCAPE '\\' AND key NOT LIKE 'agent\\_active/%' ESCAPE '\\'"
+        }
+        sql += " ORDER BY updated_at DESC LIMIT ?"
+
+        let pattern = "%" + escapeLikePrefix(needle) + "%"
+        return try withStatement(sql) { stmt in
+            bind(stmt, 1, pattern)
+            bind(stmt, 2, pattern)
+            bind(stmt, 3, pattern)
+            sqlite3_bind_int(stmt, 4, Int32(capped))
+            var out: [MemoryNote] = []
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                out.append(mapMemoryNote(stmt))
+            }
+            return out
+        }
+    }
+
+    public func memoryCount(includeSystem: Bool = false) throws -> Int {
+        var sql = "SELECT COUNT(*) FROM memory_notes WHERE 1=1"
+        if !includeSystem {
+            sql += " AND key NOT LIKE 'agent\\_run/%' ESCAPE '\\' AND key NOT LIKE 'agent\\_active/%' ESCAPE '\\'"
+        }
+        return try queryInt(sql) ?? 0
+    }
+
+    private func mapMemoryNote(_ stmt: OpaquePointer) -> MemoryNote {
+        let key = String(cString: sqlite3_column_text(stmt, 0))
+        let body = String(cString: sqlite3_column_text(stmt, 1))
+        let tagsJSON = textCol(stmt, 2) ?? "[]"
+        let created = textCol(stmt, 3) ?? ""
+        let updated = textCol(stmt, 4) ?? ""
+        let tags = Self.decodeTags(tagsJSON)
+        return MemoryNote(key: key, body: body, tags: tags, createdAt: created, updatedAt: updated)
+    }
+
+    private static func decodeTags(_ json: String) -> [String] {
+        guard let data = json.data(using: .utf8),
+              let arr = try? JSONSerialization.jsonObject(with: data) as? [String] else {
+            return []
+        }
+        return arr
+    }
+
+    /// Escape `%` and `_` for SQLite LIKE with ESCAPE '\\'.
+    private func escapeLikePrefix(_ raw: String) -> String {
+        raw
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "%", with: "\\%")
+            .replacingOccurrences(of: "_", with: "\\_")
     }
 
     // MARK: - Audit
