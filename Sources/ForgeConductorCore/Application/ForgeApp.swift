@@ -9,7 +9,7 @@ import Foundation
 /// Composition root for the Forge-Conductor application.
 /// All layers hang off this object; suitable for CLI, MCP stdio, and future Xcode shell.
 public final class ForgeApp: @unchecked Sendable {
-    public static let version = "0.5.3"
+    public static let version = "0.6.0"
     public static let productName = "Forge-Conductor"
 
     public let paths: AppPaths
