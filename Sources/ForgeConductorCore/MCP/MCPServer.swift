@@ -203,6 +203,11 @@ public final class MCPServer: @unchecked Sendable {
         "pdf_write": "Write a PDF from markdown-ish text (stdlib, no pandoc).",
         "pdf_from_file": "Convert a local markdown/text file to PDF.",
         "search_text": "Recursive text search (grep).",
+        "memory_set": "Store a durable key/value note in Forge local memory (survives chat sessions).",
+        "memory_get": "Read a durable memory note by key.",
+        "memory_list": "List durable memory notes (optional prefix/tag; hides agent system keys by default).",
+        "memory_delete": "Delete a durable memory note by key.",
+        "memory_search": "Search durable memory notes by substring in key/body/tags.",
     ]
 
     private static func schema(for name: String) -> [String: Any] {
@@ -292,6 +297,49 @@ public final class MCPServer: @unchecked Sendable {
                     "path": ["type": "string"] as [String: Any],
                 ] as [String: Any],
                 "required": ["pattern"],
+            ]
+        case "memory_set":
+            return [
+                "type": "object",
+                "properties": [
+                    "key": ["type": "string"] as [String: Any],
+                    "body": ["type": "string"] as [String: Any],
+                    "content": ["type": "string", "description": "Alias of body"] as [String: Any],
+                    "tags": [
+                        "type": "array",
+                        "items": ["type": "string"] as [String: Any],
+                    ] as [String: Any],
+                ] as [String: Any],
+                "required": ["key", "body"],
+            ]
+        case "memory_get", "memory_delete":
+            return [
+                "type": "object",
+                "properties": ["key": ["type": "string"] as [String: Any]] as [String: Any],
+                "required": ["key"],
+            ]
+        case "memory_list":
+            return [
+                "type": "object",
+                "properties": [
+                    "prefix": ["type": "string"] as [String: Any],
+                    "tag": ["type": "string"] as [String: Any],
+                    "include_system": ["type": "boolean"] as [String: Any],
+                    "include_body": ["type": "boolean"] as [String: Any],
+                    "limit": ["type": "integer"] as [String: Any],
+                ] as [String: Any],
+                "required": [] as [String],
+            ]
+        case "memory_search":
+            return [
+                "type": "object",
+                "properties": [
+                    "query": ["type": "string"] as [String: Any],
+                    "include_system": ["type": "boolean"] as [String: Any],
+                    "include_body": ["type": "boolean"] as [String: Any],
+                    "limit": ["type": "integer"] as [String: Any],
+                ] as [String: Any],
+                "required": ["query"],
             ]
         default:
             return object.merging(["properties": [:] as [String: Any], "additionalProperties": true]) { _, n in n }

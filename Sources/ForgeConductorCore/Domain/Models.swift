@@ -47,6 +47,46 @@ public struct SessionID: Hashable, Sendable, Codable {
     public init(_ rawValue: String = UUID().uuidString) { self.rawValue = rawValue }
 }
 
+// MARK: - Durable memory notes (SQLite-backed MCP memory tools)
+
+/// One durable key/value memory note stored in `memory_notes`.
+/// Survives MCP process restarts and LM Studio chat sessions when `FORGE_CONDUCTOR_HOME` is stable.
+public struct MemoryNote: Sendable, Equatable, Codable {
+    public var key: String
+    public var body: String
+    public var tags: [String]
+    public var createdAt: String
+    public var updatedAt: String
+
+    public init(key: String, body: String, tags: [String], createdAt: String, updatedAt: String) {
+        self.key = key
+        self.body = body
+        self.tags = tags
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+
+    public func asDictionary(includeBody: Bool = true) -> [String: Any] {
+        var dict: [String: Any] = [
+            "key": key,
+            "tags": tags,
+            "created_at": createdAt,
+            "updated_at": updatedAt,
+        ]
+        if includeBody {
+            dict["body"] = body
+        } else {
+            dict["body_chars"] = body.utf8.count
+        }
+        return dict
+    }
+
+    /// Internal agent-session keys written by `AgentSessionService` (hidden from list/search by default).
+    public static func isSystemKey(_ key: String) -> Bool {
+        key.hasPrefix("agent_run/") || key.hasPrefix("agent_active/")
+    }
+}
+
 // MARK: - Session
 
 public enum SessionStatus: String, Sendable, Codable, CaseIterable {
