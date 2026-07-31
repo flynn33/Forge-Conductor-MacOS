@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		00969EC47C1147019BE707F7 /* Application/Tools/GitToolPack.swift in Sources */ = {isa = PBXBuildFile; fileRef = C04061BB23AF4A38A9CB5E37 /* Application/Tools/GitToolPack.swift */; };
+		B2C3D4E5F6478910ABCDEF01 /* Application/Tools/MemoryToolPack.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6478910ABCDEF /* Application/Tools/MemoryToolPack.swift */; };
+		D4E5F6478910ABCDEF012345 /* MemoryToolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3D4E5F6478910ABCDEF0123 /* MemoryToolTests.swift */; };
 		0416992DBD6A4B9681B14CBA /* Application/Tools/FilesystemToolPack.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D4BD0D46A1941B0B9910B95 /* Application/Tools/FilesystemToolPack.swift */; };
 		04909C5C6162489C822ACDF8 /* Domain/JSONSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48084286F8604927B071F96E /* Domain/JSONSupport.swift */; };
 		059276DFEFAB405B96BE06DB /* TelemetryContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B01A224BD24C4ACB82BEBC22 /* TelemetryContractTests.swift */; };
@@ -247,6 +249,8 @@
 		7A3C91E4B2D8475FA601C8D2 /* ProcessRunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessRunnerTests.swift; sourceTree = "<group>"; };
 		71B8394E645744CA95295445 /* Manager/ManagerInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Manager/ManagerInstaller.swift; sourceTree = "<group>"; };
 		72D50D46B1984FF2B6BF8D6E /* Application/Tools/SearchToolPack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/Tools/SearchToolPack.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6478910ABCDEF /* Application/Tools/MemoryToolPack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/Tools/MemoryToolPack.swift; sourceTree = "<group>"; };
+		C3D4E5F6478910ABCDEF0123 /* MemoryToolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryToolTests.swift; sourceTree = "<group>"; };
 		7511244EB2D44640BC537C62 /* Application/Tools/ShellToolPack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/Tools/ShellToolPack.swift; sourceTree = "<group>"; };
 		7B15433D13D546E5AF16797C /* Telemetry/ForgeCollector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Telemetry/ForgeCollector.swift; sourceTree = "<group>"; };
 		7C5888E334664CABBE2EFD3B /* MCP/MCPServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCP/MCPServer.swift; sourceTree = "<group>"; };
@@ -400,6 +404,7 @@
 				M1A2C3H4H5O6S7T80001 /* Tests/ForgeConductorTests/MachHostMetricsTests.swift */,
 				D877BE270568474B80C7C6C6 /* Tests/ForgeConductorTests/RigParityTests.swift */,
 				C3924BE1C7E0465FA1120AB1 /* CoreTests.swift */,
+				C3D4E5F6478910ABCDEF0123 /* MemoryToolTests.swift */,
 				265D3B7C54284D4EA03907D6 /* NativeAppSmokeTests.swift */,
 				BC5B94490ED44827A946FAE1 /* AppConfigAndDoctorTests.swift */,
 				0F3DAC4CB0444F49BDF1EA12 /* DashboardTests.swift */,
@@ -523,6 +528,7 @@
 				E5D3E45C0B1249139A62A46E /* Telemetry/Collectors/RAMCollector.swift */,
 				F541EDBDE03E4D6E97FA4775 /* Manager/ManagerSettingsNormalizer.swift */,
 				72D50D46B1984FF2B6BF8D6E /* Application/Tools/SearchToolPack.swift */,
+				A1B2C3D4E5F6478910ABCDEF /* Application/Tools/MemoryToolPack.swift */,
 				9D37A78AC81D4FC1B26676A5 /* Application/Tools/DocsToolPack.swift */,
 				4839CFA5F74546D7977D6D26 /* Application/Tools/AgentToolPack.swift */,
 				7511244EB2D44640BC537C62 /* Application/Tools/ShellToolPack.swift */,
@@ -765,6 +771,7 @@
 				M1A2C3H4H5O6S7T80002 /* Tests/ForgeConductorTests/MachHostMetricsTests.swift in Sources */,
 				E0BF8863B70C425BAA29F709 /* Tests/ForgeConductorTests/RigParityTests.swift in Sources */,
 				6F2939D4C25B407F8C821D2C /* CoreTests.swift in Sources */,
+				D4E5F6478910ABCDEF012345 /* MemoryToolTests.swift in Sources */,
 				6A671BB52B0442448386BF1D /* NativeAppSmokeTests.swift in Sources */,
 				71BC2A7CFC5A405C931B32CE /* AppConfigAndDoctorTests.swift in Sources */,
 				DD727970A2024C819CED8EC6 /* DashboardTests.swift in Sources */,
@@ -849,6 +856,7 @@
 				0C4FCCCF23A04C9BA07B57E9 /* Telemetry/Collectors/RAMCollector.swift in Sources */,
 				E7404E46B60249E3A1977931 /* Manager/ManagerSettingsNormalizer.swift in Sources */,
 				F6A2250578D64F81A696F2C2 /* Application/Tools/SearchToolPack.swift in Sources */,
+				B2C3D4E5F6478910ABCDEF01 /* Application/Tools/MemoryToolPack.swift in Sources */,
 				2A5383E1908548668DF6B9CD /* Application/Tools/DocsToolPack.swift in Sources */,
 				3BE62DA23098478A9BB9D875 /* Application/Tools/AgentToolPack.swift in Sources */,
 				6CF3EF5A3E444B1AA818FA43 /* Application/Tools/ShellToolPack.swift in Sources */,
