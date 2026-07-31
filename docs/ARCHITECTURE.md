@@ -103,4 +103,4 @@ resolve executable
 swift test                           # full Core/CLI acceptance suite
 ```
 
-Version: `0.5.3`
+Version: `0.6.0`

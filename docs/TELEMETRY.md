@@ -43,4 +43,4 @@ service listener frames, multi-event SSE).
 
 ## Version
 
-`0.5.3`
+`0.6.0`

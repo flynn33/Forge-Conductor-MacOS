@@ -6,7 +6,8 @@ This project is **not** Claude Code orchestration, CCDT, or `~/.claude/local-mcp
 
 | | |
 |---|---|
-| **Version** | 0.5.3 |
+| **Version** | **0.6.0** |
+| **Changelog** | [CHANGELOG.md](CHANGELOG.md) |
 | **License** | [Apache License 2.0](LICENSE) |
 | **Platform** | macOS 26+ |
 | **Wiki** | [Project wiki](https://github.com/flynn33/Forge-Conductor-MacOS/wiki) |
@@ -83,16 +84,33 @@ The LaunchAgent manager is the single owner of the loopback dashboard port. Open
 | **CLI** | install / doctor / serve / manager |
 
 State: `~/.forge-conductor` (`FORGE_CONDUCTOR_HOME` override).  
-LM Studio MCP config: `~/.lmstudio/mcp.json`.
+LM Studio MCP config: `~/.lmstudio/mcp.json`.  
+Durable memory notes: SQLite `memory_notes` (see [docs/DURABLE-MEMORY.md](docs/DURABLE-MEMORY.md)).
 
 More detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and the [project wiki](https://github.com/flynn33/Forge-Conductor-MacOS/wiki).
+
+## What's new in 0.6.0
+
+Minor release: **durable memory MCP tools** so local models can keep project state
+across LM Studio chat sessions.
+
+| Tool | Purpose |
+|------|---------|
+| `memory_set` | Store or update a key/value note (optional tags) |
+| `memory_get` | Read a note by key |
+| `memory_list` | List notes (prefix/tag; system agent keys hidden by default) |
+| `memory_delete` | Delete a note by key |
+| `memory_search` | Search notes by substring |
+
+Notes live under `FORGE_CONDUCTOR_HOME` and survive model reloads and new chats.
+Full release notes: **[CHANGELOG.md](CHANGELOG.md)**.
 
 ## Design principles
 
 1. OOP modules + DI via `ForgeApp.bootstrap`.
 2. Apple-native stack (Foundation, SQLite3, Network, Metal) — no Node/Python core.
 3. **LM Studio is the host** for local models; Forge is the MCP tool server + rig.
-4. Durable sessions in SQLite for local-model agent runs.
+4. Durable sessions **and** durable memory notes in SQLite for local-model agent runs.
 5. SwiftPM acceptance tests and native GUI compilation gate release builds; Xcode remains the distribution/signing project.
 
 Current build, test, static-analysis, orphan-file, and attribution evidence is
@@ -109,8 +127,15 @@ forge-conductor agents
 forge-conductor serve                 # MCP stdio (LM Studio client)
 forge-conductor manager run [--open]
 forge-conductor manager start|stop|restart|status
-forge-conductor version
+forge-conductor version               # prints 0.6.0 (and related build info)
 ```
+
+## Changelog
+
+See **[CHANGELOG.md](CHANGELOG.md)** for the full version history.
+
+- **0.6.0** — Durable memory MCP tools (`memory_*`), marketing version bump
+- **0.5.x** — LM Studio deploy path, agents, tool packs, rig / manager
 
 ## License
 
