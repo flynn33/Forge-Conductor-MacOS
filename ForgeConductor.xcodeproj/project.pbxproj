@@ -96,6 +96,10 @@
 		BCE4C8C612C7497A932DC072 /* Domain/ManagerModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 832B2AEFCE0347A68D1B57D1 /* Domain/ManagerModels.swift */; };
 		BCE7E7EFAC9543DA983A32C8 /* Telemetry/SystemCollector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11385C57373B496EB2A46576 /* Telemetry/SystemCollector.swift */; };
 		C09B0FF17406447198480623 /* Tests/ForgeConductorTests/LiveCollectorEvidenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CBB1969B51942D4AEB24B4A /* Tests/ForgeConductorTests/LiveCollectorEvidenceTests.swift */; };
+		C07A00000000000000000005 /* Domain/HandoffPacket.swift in Sources */ = {isa = PBXBuildFile; fileRef = C07A00000000000000000001 /* Domain/HandoffPacket.swift */; };
+		C07A00000000000000000006 /* Application/ContextContinuityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C07A00000000000000000002 /* Application/ContextContinuityService.swift */; };
+		C07A00000000000000000007 /* Application/Tools/ContinuityToolPack.swift in Sources */ = {isa = PBXBuildFile; fileRef = C07A00000000000000000003 /* Application/Tools/ContinuityToolPack.swift */; };
+		C07A00000000000000000008 /* ContinuityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C07A00000000000000000004 /* ContinuityTests.swift */; };
 		C19C076DC1F64B8095B9DA08 /* Infrastructure/PDFWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2816E9045FAC4378B1E07EB2 /* Infrastructure/PDFWriter.swift */; };
 		C27BE4D322F94BFFB2F7AD4A /* ForgeConductorApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DAF4B988CFC444C9ECEE909 /* ForgeConductorApp.swift */; };
 		C7FDD24D724A40A3A4A7D70A /* MCP/MCPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C5888E334664CABBE2EFD3B /* MCP/MCPServer.swift */; };
@@ -297,6 +301,10 @@
 		BC5B94490ED44827A946FAE1 /* AppConfigAndDoctorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfigAndDoctorTests.swift; sourceTree = "<group>"; };
 		BEB01AEF03DC4E58828F710D /* Infrastructure/ResourceBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Infrastructure/ResourceBundle.swift; sourceTree = "<group>"; };
 		C04061BB23AF4A38A9CB5E37 /* Application/Tools/GitToolPack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/Tools/GitToolPack.swift; sourceTree = "<group>"; };
+		C07A00000000000000000001 /* Domain/HandoffPacket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/HandoffPacket.swift; sourceTree = "<group>"; };
+		C07A00000000000000000002 /* Application/ContextContinuityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/ContextContinuityService.swift; sourceTree = "<group>"; };
+		C07A00000000000000000003 /* Application/Tools/ContinuityToolPack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/Tools/ContinuityToolPack.swift; sourceTree = "<group>"; };
+		C07A00000000000000000004 /* ContinuityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContinuityTests.swift; sourceTree = "<group>"; };
 		C3689FC96B684814A7AE95D7 /* Resources/TelemetryStatic/style.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; path = Resources/TelemetryStatic/style.css; sourceTree = "<group>"; };
 		C3924BE1C7E0465FA1120AB1 /* CoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreTests.swift; sourceTree = "<group>"; };
 		CBF6683CFA4442B5B33A543A /* Telemetry/ProcessDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Telemetry/ProcessDiscovery.swift; sourceTree = "<group>"; };
@@ -393,6 +401,7 @@
 		64BB9664134D41DE87CE4C03 /* Tests/ForgeConductorTests */ = {
 			isa = PBXGroup;
 			children = (
+				C07A00000000000000000004 /* ContinuityTests.swift */,
 				A0FC00000000000000000007 /* LMStudioConnectorReliabilityTests.swift */,
 				A0FC00000000000000000009 /* DashboardSecurityTests.swift */,
 				1CBB1969B51942D4AEB24B4A /* Tests/ForgeConductorTests/LiveCollectorEvidenceTests.swift */,
@@ -498,6 +507,9 @@
 		EF8AADDA82404E2F8ED4A976 /* ForgeConductorCore */ = {
 			isa = PBXGroup;
 			children = (
+				C07A00000000000000000001 /* Domain/HandoffPacket.swift */,
+				C07A00000000000000000002 /* Application/ContextContinuityService.swift */,
+				C07A00000000000000000003 /* Application/Tools/ContinuityToolPack.swift */,
 				A0FC00000000000000000001 /* Domain/LMStudioConnector.swift */,
 				A0FC00000000000000000003 /* Dashboard/DashboardHTTPRequest.swift */,
 				A0FC00000000000000000005 /* Application/ToolAuthorizationService.swift */,
@@ -760,6 +772,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C07A00000000000000000008 /* ContinuityTests.swift in Sources */,
 				A0FC00000000000000000008 /* LMStudioConnectorReliabilityTests.swift in Sources */,
 				A0FC0000000000000000000A /* DashboardSecurityTests.swift in Sources */,
 				C09B0FF17406447198480623 /* Tests/ForgeConductorTests/LiveCollectorEvidenceTests.swift in Sources */,
@@ -829,6 +842,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C07A00000000000000000005 /* Domain/HandoffPacket.swift in Sources */,
+				C07A00000000000000000006 /* Application/ContextContinuityService.swift in Sources */,
+				C07A00000000000000000007 /* Application/Tools/ContinuityToolPack.swift in Sources */,
 				A0FC00000000000000000002 /* Domain/LMStudioConnector.swift in Sources */,
 				A0FC00000000000000000004 /* Dashboard/DashboardHTTPRequest.swift in Sources */,
 				A0FC00000000000000000006 /* Application/ToolAuthorizationService.swift in Sources */,
@@ -1031,7 +1047,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.6.0;
+				MARKETING_VERSION = 0.7.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.uitests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
@@ -1066,7 +1082,7 @@
 					"@executable_path",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.6.0;
+				MARKETING_VERSION = 0.7.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.app";
 				PRODUCT_NAME = "Forge Conductor";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1101,7 +1117,7 @@
 					"@executable_path",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.6.0;
+				MARKETING_VERSION = 0.7.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.app";
 				PRODUCT_NAME = "Forge Conductor";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1127,7 +1143,7 @@
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.6.0;
+				MARKETING_VERSION = 0.7.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.core";
 				PRODUCT_NAME = ForgeConductorCore;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1247,7 +1263,7 @@
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.6.0;
+				MARKETING_VERSION = 0.7.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.core";
 				PRODUCT_NAME = ForgeConductorCore;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1269,7 +1285,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.6.0;
+				MARKETING_VERSION = 0.7.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.uitests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;

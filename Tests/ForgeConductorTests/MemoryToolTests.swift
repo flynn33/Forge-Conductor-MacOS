@@ -20,10 +20,36 @@ final class MemoryToolTests: XCTestCase {
 
     func testMemoryToolsAreRegistered() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
         let names = Set(app.tools.toolNames)
         for need in ["memory_set", "memory_get", "memory_list", "memory_delete", "memory_search"] {
             XCTAssertTrue(names.contains(need), "missing tool \(need)")
         }
+
+        let server = MCPServer(app: app, clientID: ClientID("memory-continuity-schema"))
+        let response = server.handle([
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/list",
+        ])
+        let result = response?["result"] as? [String: Any]
+        let descriptors = result?["tools"] as? [[String: Any]] ?? []
+        let byName = Dictionary(uniqueKeysWithValues: descriptors.compactMap { descriptor in
+            (descriptor["name"] as? String).map { ($0, descriptor) }
+        })
+        XCTAssertTrue(MCPServeVerifier.requiredProductTools.isSubset(of: Set(byName.keys)))
+        for name in MCPServeVerifier.requiredProductTools {
+            XCTAssertFalse((byName[name]?["description"] as? String ?? "").isEmpty, name)
+            let schema = byName[name]?["inputSchema"] as? [String: Any]
+            XCTAssertEqual(schema?["type"] as? String, "object", name)
+        }
+        let memorySetSchema = byName["memory_set"]?["inputSchema"] as? [String: Any]
+        let memorySetProperties = memorySetSchema?["properties"] as? [String: Any]
+        XCTAssertNotNil(memorySetProperties?["body"])
+        XCTAssertNotNil(memorySetProperties?["content"])
+        let checkpointSchema = byName["session_checkpoint"]?["inputSchema"] as? [String: Any]
+        let checkpointProperties = checkpointSchema?["properties"] as? [String: Any]
+        XCTAssertNotNil(checkpointProperties?["summary"])
     }
 
     func testMemorySetGetListSearchDeleteRoundTrip() throws {
@@ -109,8 +135,9 @@ final class MemoryToolTests: XCTestCase {
         XCTAssertEqual(get.payload["body"] as? String, "Ship durable memory MCP")
     }
 
-    func testSystemAgentKeysHiddenFromDefaultList() throws {
+    func testAgentAndContinuitySystemKeysHiddenFromDefaultMemoryQueries() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
         let client = ClientID("sys-client")
 
         // Agent session writes agent_run/* system keys.
@@ -127,6 +154,13 @@ final class MemoryToolTests: XCTestCase {
             arguments: ["key": "user/note", "body": "visible"],
             clientID: client
         )
+        let handoff = try app.tools.call(
+            name: "session_handoff",
+            arguments: ["goal": "Verify memory and continuity coexistence"],
+            clientID: client
+        )
+        XCTAssertTrue(handoff.ok, "\(handoff.payload)")
+        let handoffID = try XCTUnwrap(handoff.payload["handoff_id"] as? String)
 
         let listDefault = try app.tools.call(
             name: "memory_list",
@@ -138,6 +172,20 @@ final class MemoryToolTests: XCTestCase {
         let keys = notes.compactMap { $0["key"] as? String }
         XCTAssertTrue(keys.contains("user/note"))
         XCTAssertFalse(keys.contains(where: { $0.hasPrefix("agent_run/") }))
+        XCTAssertFalse(keys.contains(where: { $0.hasPrefix("continuity/") }))
+        XCTAssertEqual(listDefault.payload["total"] as? Int, 1)
+
+        let searchDefault = try app.tools.call(
+            name: "memory_search",
+            arguments: ["query": handoffID],
+            clientID: client
+        )
+        XCTAssertTrue(searchDefault.ok)
+        XCTAssertEqual(searchDefault.payload["count"] as? Int, 0)
+
+        let status = try app.tools.call(name: "forge_status", arguments: [:], clientID: client)
+        XCTAssertTrue(status.ok)
+        XCTAssertEqual(status.payload["memory_note_count"] as? Int, 1)
 
         let listAll = try app.tools.call(
             name: "memory_list",
@@ -147,6 +195,35 @@ final class MemoryToolTests: XCTestCase {
         let allNotes = listAll.payload["notes"] as? [[String: Any]] ?? []
         let allKeys = allNotes.compactMap { $0["key"] as? String }
         XCTAssertTrue(allKeys.contains(where: { $0.hasPrefix("agent_run/") }))
+        XCTAssertTrue(allKeys.contains("continuity/latest"))
+        XCTAssertTrue(allKeys.contains("continuity/resume_ready"))
+
+        let searchAll = try app.tools.call(
+            name: "memory_search",
+            arguments: ["query": handoffID, "include_system": true],
+            clientID: client
+        )
+        XCTAssertTrue(searchAll.ok)
+        let matchingKeys = (searchAll.payload["notes"] as? [[String: Any]] ?? [])
+            .compactMap { $0["key"] as? String }
+        XCTAssertTrue(matchingKeys.contains("continuity/latest"))
+        XCTAssertTrue(matchingKeys.contains("continuity/resume_ready"))
+    }
+
+    func testTelemetrySeparatesMemoryAndContinuityToolPacks() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let snapshot = ForgeCollector(
+            paths: app.paths,
+            store: app.store,
+            catalog: app.catalog,
+            toolNames: { app.tools.toolNames }
+        ).collect()
+        let packs = Set(snapshot.mcpPacks.map(\.pack))
+        XCTAssertTrue(packs.contains("memory"), "\(snapshot.mcpPacks)")
+        XCTAssertTrue(packs.contains("continuity"), "\(snapshot.mcpPacks)")
+        XCTAssertEqual(snapshot.mcpTools.first(where: { $0.name == "memory_set" })?.pack, "memory")
+        XCTAssertEqual(snapshot.mcpTools.first(where: { $0.name == "context_get" })?.pack, "continuity")
     }
 
     func testMemoryAvailableWithoutAgentSession() throws {

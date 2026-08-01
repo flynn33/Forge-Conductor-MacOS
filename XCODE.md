@@ -3,7 +3,8 @@
 ## Open
 
 ```bash
-open /Users/jim.daley/Forge-Conductor/ForgeConductor.xcworkspace
+cd /path/to/Forge-Conductor-MacOS
+open ForgeConductor.xcworkspace
 ```
 
 The workspace intentionally contains the single canonical Xcode project. Using
@@ -24,7 +25,7 @@ The CLI uses `@executable_path` so the framework must sit next to the binary whe
 ## Build / Test
 
 ```bash
-cd /Users/jim.daley/Forge-Conductor
+cd /path/to/Forge-Conductor-MacOS
 
 xcodebuild -project ForgeConductor.xcodeproj \
   -scheme ForgeConductor \

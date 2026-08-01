@@ -10,25 +10,33 @@ import Darwin
 final class RealtimeStreamTests: XCTestCase {
     func testHostStreamAdvancesWithoutSnapshotAPI() {
         let engine = RealtimeMetricsEngine()
-        engine.start(targetHz: 30)
-        defer { engine.stop() }
-
+        let requiredSamples = 8
+        let delivered = expectation(description: "realtime samples delivered")
+        delivered.expectedFulfillmentCount = requiredSamples
         var samples: [TimeInterval] = []
         let lock = NSLock()
         let id = engine.addListener { m in
             lock.lock()
             samples.append(m.ts)
+            let shouldFulfill = samples.count <= requiredSamples
             lock.unlock()
+            if shouldFulfill {
+                delivered.fulfill()
+            }
         }
-        defer { engine.removeListener(id) }
+        engine.start(targetHz: 30)
+        defer {
+            engine.stop()
+            engine.removeListener(id)
+        }
 
-        Thread.sleep(forTimeInterval: 0.45)
+        wait(for: [delivered], timeout: 2.0)
         lock.lock()
         let count = samples.count
         let unique = Set(samples.map { Int($0 * 100) })
         lock.unlock()
 
-        XCTAssertGreaterThanOrEqual(count, 8, "tiered engine must push many samples; got \(count)")
+        XCTAssertGreaterThanOrEqual(count, requiredSamples, "tiered engine must push many samples; got \(count)")
         XCTAssertGreaterThanOrEqual(unique.count, 5, "timestamps must advance; unique=\(unique.count)")
         XCTAssertTrue(engine.isRunning)
         XCTAssertGreaterThanOrEqual(engine.targetSampleHz, 20)
@@ -42,8 +50,9 @@ final class RealtimeStreamTests: XCTestCase {
 
         let app = try ForgeApp.bootstrap(home: home)
         defer { app.shutdown() }
-        app.telemetry.startBackgroundRefresh(intervalSec: 0.5)
 
+        let requiredFrames = 8
+        let delivered = expectation(description: "continuous telemetry frames delivered")
         var frames = 0
         var lastTs: TimeInterval = 0
         let lock = NSLock()
@@ -51,17 +60,22 @@ final class RealtimeStreamTests: XCTestCase {
             lock.lock()
             frames += 1
             lastTs = frame.updated
+            let reachedRequiredFrames = frames == requiredFrames
             lock.unlock()
+            if reachedRequiredFrames {
+                delivered.fulfill()
+            }
         }
         defer { app.telemetry.removeListener(id) }
+        app.telemetry.startBackgroundRefresh(intervalSec: 0.5)
 
-        Thread.sleep(forTimeInterval: 0.45)
+        wait(for: [delivered], timeout: 2.0)
         lock.lock()
         let frameCount = frames
         let ts = lastTs
         lock.unlock()
 
-        XCTAssertGreaterThanOrEqual(frameCount, 8, "listeners must receive continuous frames; got \(frameCount)")
+        XCTAssertGreaterThanOrEqual(frameCount, requiredFrames, "listeners must receive continuous frames; got \(frameCount)")
         XCTAssertGreaterThan(ts, 0)
 
         let a = app.telemetry.currentFrame().system.ts

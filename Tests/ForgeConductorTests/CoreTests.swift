@@ -195,6 +195,111 @@ final class CoreTests: XCTestCase {
         let r = try app.tools.call(name: "fs_read", arguments: ["path": path], clientID: ClientID("t2"))
         XCTAssertTrue(r.ok)
         XCTAssertEqual(r.payload["content"] as? String, "hello forge")
+        XCTAssertEqual(r.payload["total_lines"] as? Int, 1)
+        XCTAssertEqual(r.payload["has_more"] as? Bool, false)
+    }
+
+    func testFSReadHonorsLineOffsetAndLength() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let path = tempHome.appendingPathComponent("windowed.txt").path
+        let body = (1...10).map { "line-\($0)" }.joined(separator: "\n")
+        let w = try app.tools.call(
+            name: "fs_write",
+            arguments: ["path": path, "content": body],
+            clientID: ClientID("fs-window")
+        )
+        XCTAssertTrue(w.ok)
+
+        let r = try app.tools.call(
+            name: "fs_read",
+            arguments: ["path": path, "offset": 3, "length": 2],
+            clientID: ClientID("fs-window")
+        )
+        XCTAssertTrue(r.ok, "\(r.payload)")
+        XCTAssertEqual(r.payload["content"] as? String, "line-3\nline-4")
+        XCTAssertEqual(r.payload["total_lines"] as? Int, 10)
+        XCTAssertEqual(r.payload["start_line"] as? Int, 3)
+        XCTAssertEqual(r.payload["end_line"] as? Int, 4)
+        XCTAssertEqual(r.payload["has_more"] as? Bool, true)
+        XCTAssertEqual(r.payload["next_offset"] as? Int, 5)
+
+        let pastEOF = try app.tools.call(
+            name: "fs_read",
+            arguments: ["path": path, "offset": 50, "length": 10],
+            clientID: ClientID("fs-window-eof")
+        )
+        XCTAssertTrue(pastEOF.ok, "\(pastEOF.payload)")
+        XCTAssertEqual(pastEOF.payload["content"] as? String, "")
+        XCTAssertEqual(pastEOF.payload["has_more"] as? Bool, false)
+    }
+
+    func testFSReadHandlesEmptyFileAndMaximumLength() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+
+        let emptyPath = tempHome.appendingPathComponent("empty.txt").path
+        _ = try app.tools.call(
+            name: "fs_write",
+            arguments: ["path": emptyPath, "content": ""],
+            clientID: ClientID("fs-empty-write")
+        )
+        let empty = try app.tools.call(
+            name: "fs_read",
+            arguments: ["path": emptyPath],
+            clientID: ClientID("fs-empty-read")
+        )
+        XCTAssertTrue(empty.ok, "\(empty.payload)")
+        XCTAssertEqual(empty.payload["content"] as? String, "")
+        XCTAssertEqual(empty.payload["total_lines"] as? Int, 0)
+        XCTAssertEqual(empty.payload["line_count"] as? Int, 0)
+        XCTAssertEqual(empty.payload["note"] as? String, "File is empty.")
+
+        let boundedPath = tempHome.appendingPathComponent("bounded.txt").path
+        _ = try app.tools.call(
+            name: "fs_write",
+            arguments: ["path": boundedPath, "content": "one\ntwo\nthree"],
+            clientID: ClientID("fs-bounded-write")
+        )
+        let maximum = try app.tools.call(
+            name: "fs_read",
+            arguments: ["path": boundedPath, "offset": 1, "length": Int.max],
+            clientID: ClientID("fs-bounded-read")
+        )
+        XCTAssertTrue(maximum.ok, "\(maximum.payload)")
+        XCTAssertEqual(maximum.payload["content"] as? String, "one\ntwo\nthree")
+        XCTAssertEqual(maximum.payload["end_line"] as? Int, 3)
+        XCTAssertEqual(maximum.payload["has_more"] as? Bool, false)
+    }
+
+    func testIdenticalToolCallLoopSoftHandoffThenHardBlock() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let path = tempHome.appendingPathComponent("loop.txt").path
+        _ = try app.tools.call(
+            name: "fs_write",
+            arguments: ["path": path, "content": "stable"],
+            clientID: ClientID("loop-setup")
+        )
+        let client = ClientID("loop-client")
+        let args: [String: Any] = ["path": path, "offset": 1, "length": 1]
+        var softHandoffID: String?
+        for i in 1...8 {
+            let r = try app.tools.call(name: "fs_read", arguments: args, clientID: client)
+            XCTAssertTrue(r.ok, "call \(i) should succeed: \(r.payload)")
+            if i == 4 {
+                XCTAssertEqual(r.payload["handoff_required"] as? Bool, true)
+                softHandoffID = r.payload["handoff_id"] as? String
+                XCTAssertNotNil(softHandoffID)
+            } else {
+                XCTAssertNil(r.payload["handoff_required"], "call \(i)")
+            }
+        }
+        let blocked = try app.tools.call(name: "fs_read", arguments: args, clientID: client)
+        XCTAssertFalse(blocked.ok)
+        XCTAssertEqual(blocked.payload["code"] as? String, "identical_call_loop")
+        XCTAssertEqual(blocked.payload["handoff_required"] as? Bool, true)
+        XCTAssertEqual(blocked.payload["handoff_id"] as? String, softHandoffID)
     }
 
     func testPDFWrite() throws {

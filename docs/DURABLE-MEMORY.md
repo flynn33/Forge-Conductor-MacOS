@@ -19,8 +19,9 @@ LM Studio chat sessions, model reloads, and MCP process restarts.
 - Available **without** an agent session (session lifecycle allow-list).
 - Still available **during** agent sessions even if the agent’s `tools_primary`
   list omits memory tools.
-- `agent_run/*` and `agent_active/*` keys used by agent sessions are **hidden**
-  from `memory_list` / `memory_search` unless `include_system: true`.
+- `agent_run/*`, `agent_active/*`, and `continuity/*` keys used by agent sessions
+  and handoff pointers are **hidden** from `memory_list` / `memory_search` and
+  `memory_note_count` unless `include_system: true`.
 - Bodies are redacted in audit logs (`body` / `content` / `value`).
 
 ## Suggested key layout
@@ -44,7 +45,7 @@ session/<date>
 Build and test from this repo:
 
 ```bash
-cd /Users/jimdaley/GitHub/forge-conductor-macos
+cd /path/to/Forge-Conductor-MacOS
 swift test --filter MemoryToolTests
 ```
 

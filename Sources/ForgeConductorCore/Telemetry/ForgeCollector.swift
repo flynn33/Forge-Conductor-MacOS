@@ -484,6 +484,7 @@ public final class ForgeCollector: ForgeMetricsCollecting, @unchecked Sendable {
         [
             "forge_status", "agent_list", "agent_get", "agent_context", "agent_recommend",
             "agent_run_start", "agent_run_status", "agent_run_complete",
+            "session_checkpoint", "session_handoff", "context_get", "context_list",
             "fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "fs_delete", "fs_move",
             "shell_exec", "git_status", "git_diff", "git_log", "git_add", "git_commit",
             "pdf_write", "pdf_from_file", "search_text",
@@ -493,13 +494,14 @@ public final class ForgeCollector: ForgeMetricsCollecting, @unchecked Sendable {
 
     private func packForTool(_ name: String) -> String {
         if name.hasPrefix("agent_") { return "agents" }
+        if name.hasPrefix("session_") || name.hasPrefix("context_") { return "continuity" }
+        if name.hasPrefix("memory_") { return "memory" }
         if name.hasPrefix("fs_") { return "filesystem" }
         if name.hasPrefix("git_") { return "git" }
         if name.hasPrefix("pdf_") { return "docs" }
         if name.hasPrefix("shell_") { return "shell" }
         if name.hasPrefix("forge_") { return "forge" }
         if name.hasPrefix("search_") { return "search" }
-        if name.hasPrefix("memory_") { return "memory" }
         return "other"
     }
 

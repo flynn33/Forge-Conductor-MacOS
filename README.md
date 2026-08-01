@@ -6,7 +6,7 @@ This project is **not** Claude Code orchestration, CCDT, or `~/.claude/local-mcp
 
 | | |
 |---|---|
-| **Version** | **0.6.0** |
+| **Version** | **0.7.0** |
 | **Changelog** | [CHANGELOG.md](CHANGELOG.md) |
 | **License** | [Apache License 2.0](LICENSE) |
 | **Platform** | macOS 26+ |
@@ -48,6 +48,8 @@ No manual LM Studio configuration-file edit or restart is required. Selecting wh
 cd /path/to/Forge-Conductor-MacOS
 # Reproducible native app build, bundle staging, and launch:
 ./script/build_and_run.sh --verify
+# Build and stage the app without launching or touching the live Forge home:
+./script/build_and_run.sh --build-only
 
 # Full Core/CLI/connector acceptance suite:
 swift test
@@ -86,23 +88,27 @@ The LaunchAgent manager is the single owner of the loopback dashboard port. Open
 State: `~/.forge-conductor` (`FORGE_CONDUCTOR_HOME` override).  
 LM Studio MCP config: `~/.lmstudio/mcp.json`.  
 Durable memory notes: SQLite `memory_notes` (see [docs/DURABLE-MEMORY.md](docs/DURABLE-MEMORY.md)).
+Context and agent handoffs: SQLite `context_handoffs` with rebuildable JSON/Markdown projections (see [docs/CONTEXT-AGENT-CONTINUITY.md](docs/CONTEXT-AGENT-CONTINUITY.md)).
 
 More detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and the [project wiki](https://github.com/flynn33/Forge-Conductor-MacOS/wiki).
 
-## What's new in 0.6.0
+## What's new in 0.7.0
 
-Minor release: **durable memory MCP tools** so local models can keep project state
-across LM Studio chat sessions.
+Minor release: **context and agent continuity** over the existing LM Studio stdio
+MCP connection. Forge can checkpoint work, prepare a new-chat handoff, restore the
+latest packet, and reattach durable agent sessions without a new sidecar or HTTP
+dependency.
 
 | Tool | Purpose |
 |------|---------|
-| `memory_set` | Store or update a key/value note (optional tags) |
-| `memory_get` | Read a note by key |
-| `memory_list` | List notes (prefix/tag; system agent keys hidden by default) |
-| `memory_delete` | Delete a note by key |
-| `memory_search` | Search notes by substring |
+| `session_checkpoint` | Soft-save task context while work continues |
+| `session_handoff` | Finalize a resume-ready packet for a new chat |
+| `context_get` | Load the latest or a selected handoff packet |
+| `context_list` | List recent handoff packets |
 
-Notes live under `FORGE_CONDUCTOR_HOME` and survive model reloads and new chats.
+The durable `memory_*` tools introduced in 0.6 remain available. Continuity adds
+authoritative SQLite packets, rebuildable file projections, agent reattachment,
+and a repeated-call budget that soft-handoffs on call 4 and blocks call 9.
 Full release notes: **[CHANGELOG.md](CHANGELOG.md)**.
 
 ## Design principles
@@ -110,11 +116,12 @@ Full release notes: **[CHANGELOG.md](CHANGELOG.md)**.
 1. OOP modules + DI via `ForgeApp.bootstrap`.
 2. Apple-native stack (Foundation, SQLite3, Network, Metal) — no Node/Python core.
 3. **LM Studio is the host** for local models; Forge is the MCP tool server + rig.
-4. Durable sessions **and** durable memory notes in SQLite for local-model agent runs.
+4. Durable sessions, memory notes, and context/agent handoffs in SQLite for local-model agent runs.
 5. SwiftPM acceptance tests and native GUI compilation gate release builds; Xcode remains the distribution/signing project.
 
-Current build, test, static-analysis, orphan-file, and attribution evidence is
-recorded in [`docs/AUDIT-2026-07-23.md`](docs/AUDIT-2026-07-23.md).
+Current 0.7 build and test evidence is recorded in
+[`docs/AUDIT-2026-08-01.md`](docs/AUDIT-2026-08-01.md). Earlier audit records remain
+available under `docs/`.
 
 ## CLI
 
@@ -127,14 +134,15 @@ forge-conductor agents
 forge-conductor serve                 # MCP stdio (LM Studio client)
 forge-conductor manager run [--open]
 forge-conductor manager start|stop|restart|status
-forge-conductor version               # prints 0.6.0 (and related build info)
+forge-conductor version               # prints 0.7.0 (and related build info)
 ```
 
 ## Changelog
 
 See **[CHANGELOG.md](CHANGELOG.md)** for the full version history.
 
-- **0.6.0** — Durable memory MCP tools (`memory_*`), marketing version bump
+- **0.7.0** — Context and agent continuity (`session_*`, `context_*`), resume-ready handoffs
+- **0.6.0** — Durable memory MCP tools (`memory_*`)
 - **0.5.x** — LM Studio deploy path, agents, tool packs, rig / manager
 
 ## License

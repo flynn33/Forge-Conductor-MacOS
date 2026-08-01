@@ -11,12 +11,15 @@ import XCTest
 /// `xcodebuild -scheme ForgeConductor -destination 'platform=macOS' test`
 final class ForgeConductorUITests: XCTestCase {
     var app: XCUIApplication!
+    var testHome: URL!
 
     override func setUpWithError() throws {
         continueAfterFailure = false
+        testHome = FileManager.default.temporaryDirectory
+            .appendingPathComponent("forge-conductor-ui-\(UUID().uuidString)", isDirectory: true)
         app = XCUIApplication()
         app.launchArguments += ["--uitesting"]
-        // Avoid fighting a user-started manager on a fixed port during UI tests.
+        app.launchEnvironment["FORGE_CONDUCTOR_HOME"] = testHome.path
         app.launchEnvironment["FORGE_SKIP_PS"] = "1"
         app.launch()
     }
@@ -24,6 +27,10 @@ final class ForgeConductorUITests: XCTestCase {
     override func tearDownWithError() throws {
         app?.terminate()
         app = nil
+        if let testHome {
+            try? FileManager.default.removeItem(at: testHome)
+        }
+        testHome = nil
     }
 
     func testAppLaunchesAndShowsTitle() throws {

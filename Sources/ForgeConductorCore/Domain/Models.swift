@@ -81,9 +81,11 @@ public struct MemoryNote: Sendable, Equatable, Codable {
         return dict
     }
 
-    /// Internal agent-session keys written by `AgentSessionService` (hidden from list/search by default).
+    /// Internal agent-session and continuity pointer keys (hidden from list/search by default).
     public static func isSystemKey(_ key: String) -> Bool {
-        key.hasPrefix("agent_run/") || key.hasPrefix("agent_active/")
+        key.hasPrefix("agent_run/")
+            || key.hasPrefix("agent_active/")
+            || key.hasPrefix("continuity/")
     }
 }
 

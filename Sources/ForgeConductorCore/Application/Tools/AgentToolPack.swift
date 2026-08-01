@@ -70,8 +70,9 @@ public struct AgentToolPack: ToolPackHandling {
 
     private func forgeStatus(clientID: ClientID, app: ForgeApp) throws -> ToolResult {
         let presence = try app.store.presenceRecords()
-        let openSessions = try app.store.sessionList(status: .open)
+        let openSessions = try app.store.sessionList().filter(\.status.isOpen)
         let memoryCount = (try? app.store.memoryCount(includeSystem: false)) ?? 0
+        let continuity = (try? app.continuity.statusSummary()) ?? [:]
         return .success([
             "ok": true,
             "version": ForgeApp.version,
@@ -83,6 +84,8 @@ public struct AgentToolPack: ToolPackHandling {
             "memory_note_count": memoryCount,
             "presence_count": presence.count,
             "open_sessions": openSessions.count,
+            "open_session_ids": openSessions.map(\.id.rawValue),
+            "continuity": continuity,
             "pid": ProcessInfo.processInfo.processIdentifier,
         ])
     }
