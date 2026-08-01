@@ -6,18 +6,21 @@
 
 import Foundation
 import SQLite3
+import Darwin
 
 /// Normalizes SQLite adapter failures into stable, user-readable error categories.
 public enum StoreError: Error, LocalizedError, Equatable {
     case openFailed(String)
     case execFailed(String)
     case notFound(String)
+    case conflict(String)
 
     public var errorDescription: String? {
         switch self {
         case .openFailed(let s): "SQLite open failed: \(s)"
         case .execFailed(let s): "SQLite error: \(s)"
         case .notFound(let s): s
+        case .conflict(let s): s
         }
     }
 }
@@ -26,6 +29,8 @@ public enum StoreError: Error, LocalizedError, Equatable {
 public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unchecked Sendable {
     private var db: OpaquePointer?
     private let lock = NSLock()
+    private static let processInitializationLock = NSLock()
+    private static let initializationLockTimeout: TimeInterval = 5
     public let path: URL
     private let clock: any Clock
 
@@ -39,24 +44,67 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
             at: path.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
-        var handle: OpaquePointer?
-        let flags = SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
-        guard sqlite3_open_v2(path.path, &handle, flags, nil) == SQLITE_OK, let handle else {
-            let msg = handle.map { String(cString: sqlite3_errmsg($0)) } ?? "unknown"
-            if let handle { sqlite3_close(handle) }
-            throw StoreError.openFailed(msg)
+        try Self.withInitializationFileLock(databasePath: path) {
+            var handle: OpaquePointer?
+            let flags = SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
+            guard sqlite3_open_v2(path.path, &handle, flags, nil) == SQLITE_OK, let handle else {
+                let msg = handle.map { String(cString: sqlite3_errmsg($0)) } ?? "unknown"
+                if let handle { sqlite3_close(handle) }
+                throw StoreError.openFailed(msg)
+            }
+            db = handle
+            do {
+                // GUI manager + MCP serve share one home. Without a busy timeout, a locked
+                // store can stall serve startup long enough for LM Studio's ~60s plugin timeout.
+                try exec("PRAGMA busy_timeout=3000;")
+                try exec("PRAGMA journal_mode=WAL;")
+                try exec("PRAGMA foreign_keys=ON;")
+                try migrate()
+            } catch {
+                sqlite3_close(handle)
+                db = nil
+                throw error
+            }
         }
-        db = handle
-        try exec("PRAGMA journal_mode=WAL;")
-        try exec("PRAGMA foreign_keys=ON;")
-        // GUI manager + MCP serve share one home. Without a busy timeout, a locked
-        // store can stall serve startup long enough for LM Studio's ~60s plugin timeout.
-        try exec("PRAGMA busy_timeout=3000;")
-        try migrate()
     }
 
     deinit {
         close()
+    }
+
+    private static func withInitializationFileLock<T>(
+        databasePath: URL,
+        _ body: () throws -> T
+    ) throws -> T {
+        let processDeadline = Date().addingTimeInterval(initializationLockTimeout)
+        guard processInitializationLock.lock(before: processDeadline) else {
+            throw StoreError.openFailed("timed out waiting for process initialization lock")
+        }
+        defer { processInitializationLock.unlock() }
+
+        let lockURL = databasePath.appendingPathExtension("initialization.lock")
+        let mode = mode_t(S_IRUSR | S_IWUSR)
+        let descriptor = lockURL.path.withCString {
+            Darwin.open($0, O_CREAT | O_RDWR, mode)
+        }
+        guard descriptor >= 0 else {
+            throw StoreError.openFailed("cannot open initialization lock: \(String(cString: strerror(errno)))")
+        }
+        defer { _ = Darwin.close(descriptor) }
+
+        let deadline = Date().addingTimeInterval(initializationLockTimeout)
+        while Darwin.lockf(descriptor, F_TLOCK, 0) != 0 {
+            let code = errno
+            guard code == EACCES || code == EAGAIN else {
+                throw StoreError.openFailed("cannot lock initialization: \(String(cString: strerror(code)))")
+            }
+            guard Date() < deadline else {
+                throw StoreError.openFailed("timed out waiting for database initialization lock")
+            }
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        defer { _ = Darwin.lockf(descriptor, F_ULOCK, 0) }
+        return try body()
     }
 
     /// Explicit close for tests that delete the home directory after bootstrap.
@@ -72,6 +120,17 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
     // MARK: - Schema
 
     public func migrate() throws {
+        try exec("BEGIN IMMEDIATE;")
+        do {
+            try migrateLockedDatabase()
+            try exec("COMMIT;")
+        } catch {
+            try? exec("ROLLBACK;")
+            throw error
+        }
+    }
+
+    private func migrateLockedDatabase() throws {
         try exec("""
         CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS memory_notes (
@@ -108,12 +167,204 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
             duration_ms INTEGER,
             error TEXT
         );
+        CREATE TABLE IF NOT EXISTS context_handoffs (
+            id TEXT PRIMARY KEY,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            source TEXT NOT NULL,
+            resume_ready INTEGER NOT NULL DEFAULT 0,
+            packet_json TEXT NOT NULL,
+            client_id TEXT,
+            write_sequence INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_context_handoffs_updated
+            ON context_handoffs(updated_at DESC);
+        """)
+        if try !tableHasColumn(table: "context_handoffs", column: "write_sequence") {
+            try exec(
+                "ALTER TABLE context_handoffs ADD COLUMN write_sequence INTEGER NOT NULL DEFAULT 0;"
+            )
+        }
+        if try !tableHasColumn(table: "context_handoffs", column: "client_id") {
+            try exec("ALTER TABLE context_handoffs ADD COLUMN client_id TEXT;")
+        }
+        try exec("""
+        UPDATE context_handoffs
+        SET write_sequence = rowid
+        WHERE write_sequence = 0;
+        CREATE INDEX IF NOT EXISTS idx_context_handoffs_sequence
+            ON context_handoffs(write_sequence DESC);
+        CREATE INDEX IF NOT EXISTS idx_context_handoffs_client_sequence
+            ON context_handoffs(client_id, write_sequence DESC);
         """)
         let version: Int = try queryInt("SELECT version FROM schema_version LIMIT 1") ?? 0
         if version == 0 {
-            try exec("INSERT INTO schema_version(version) VALUES (2);")
-        } else if version < 2 {
-            try exec("UPDATE schema_version SET version = 2;")
+            try exec("INSERT INTO schema_version(version) VALUES (5);")
+        } else if version < 5 {
+            try exec("UPDATE schema_version SET version = 5;")
+        }
+    }
+
+    // MARK: - Context handoffs
+
+    public func handoffUpsert(_ packet: HandoffPacket) throws {
+        let json = try JSONSupport.string(from: packet.asDictionary())
+        let noteTimestamp = ISO8601.string(from: clock.now())
+        try withTransaction {
+            try withStatementUnlocked(
+                """
+                INSERT INTO context_handoffs(
+                    id, created_at, updated_at, source, resume_ready, packet_json, client_id, write_sequence
+                )
+                SELECT ?, ?, ?, ?, ?, ?, ?, COALESCE(MAX(write_sequence), 0) + 1
+                FROM context_handoffs
+                WHERE true
+                ON CONFLICT(id) DO UPDATE SET
+                    updated_at=excluded.updated_at,
+                    source=excluded.source,
+                    resume_ready=excluded.resume_ready,
+                    packet_json=excluded.packet_json,
+                    client_id=excluded.client_id,
+                    write_sequence=excluded.write_sequence
+                """
+            ) { stmt in
+                bind(stmt, 1, packet.id)
+                bind(stmt, 2, packet.createdAt)
+                bind(stmt, 3, packet.updatedAt)
+                bind(stmt, 4, packet.source.rawValue)
+                sqlite3_bind_int(stmt, 5, packet.resumeReady ? 1 : 0)
+                bind(stmt, 6, json)
+                bind(stmt, 7, packet.clientID)
+                try stepDone(stmt)
+            }
+            try memorySetUnlocked(
+                key: "continuity/latest",
+                body: packet.id,
+                tags: ["continuity", "latest"],
+                timestamp: noteTimestamp
+            )
+            if packet.resumeReady {
+                try memorySetUnlocked(
+                key: "continuity/resume_ready",
+                body: packet.id,
+                    tags: ["continuity", "resume"],
+                    timestamp: noteTimestamp
+                )
+            }
+        }
+    }
+
+    public func handoffGet(id: String) throws -> HandoffPacket? {
+        try withStatement(
+            "SELECT id, packet_json FROM context_handoffs WHERE id = ?"
+        ) { stmt in
+            bind(stmt, 1, id)
+            guard sqlite3_step(stmt) == SQLITE_ROW,
+                  let rowID = textCol(stmt, 0),
+                  let cstr = sqlite3_column_text(stmt, 1) else { return nil }
+            let text = String(cString: cstr)
+            guard let data = text.data(using: .utf8),
+                  let obj = try? JSONSupport.object(from: data),
+                  let packet = HandoffPacket.fromDictionary(obj),
+                  packet.id == rowID else { return nil }
+            return packet
+        }
+    }
+
+    public func handoffLatest(
+        resumeReadyOnly: Bool = false,
+        clientID: String? = nil
+    ) throws -> HandoffPacket? {
+        var predicates: [String] = []
+        if resumeReadyOnly { predicates.append("resume_ready = 1") }
+        if clientID != nil { predicates.append("client_id = ?") }
+        let whereClause = predicates.isEmpty ? "" : " WHERE \(predicates.joined(separator: " AND "))"
+        let sql = "SELECT id, packet_json FROM context_handoffs\(whereClause) ORDER BY write_sequence DESC LIMIT 1"
+        return try withStatement(sql) { stmt in
+            if let clientID { bind(stmt, 1, clientID) }
+            guard sqlite3_step(stmt) == SQLITE_ROW,
+                  let rowID = textCol(stmt, 0),
+                  let cstr = sqlite3_column_text(stmt, 1) else { return nil }
+            let text = String(cString: cstr)
+            guard let data = text.data(using: .utf8),
+                  let obj = try? JSONSupport.object(from: data),
+                  let packet = HandoffPacket.fromDictionary(obj),
+                  packet.id == rowID else { return nil }
+            return packet
+        }
+    }
+
+    public func handoffList(limit: Int = 20) throws -> [HandoffPacket] {
+        let lim = max(1, min(limit, 100))
+        return try handoffList(sql: "SELECT id, packet_json FROM context_handoffs ORDER BY write_sequence DESC LIMIT \(lim)")
+    }
+
+    public func handoffListAll() throws -> [HandoffPacket] {
+        try handoffList(sql: "SELECT id, packet_json FROM context_handoffs ORDER BY write_sequence DESC")
+    }
+
+    private func handoffList(sql: String) throws -> [HandoffPacket] {
+        try withStatement(sql) { stmt in
+            var out: [HandoffPacket] = []
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                guard let rowID = textCol(stmt, 0),
+                      let cstr = sqlite3_column_text(stmt, 1) else { continue }
+                let text = String(cString: cstr)
+                guard let data = text.data(using: .utf8),
+                      let obj = try? JSONSupport.object(from: data),
+                      let packet = HandoffPacket.fromDictionary(obj),
+                      packet.id == rowID else { continue }
+                out.append(packet)
+            }
+            return out
+        }
+    }
+
+    /// Rebuilds pointer notes from authoritative handoff rows. Used at bootstrap
+    /// after legacy migration or recovery from an interrupted older-version write.
+    public func handoffRepairPointers() throws {
+        let timestamp = ISO8601.string(from: clock.now())
+        try withTransaction {
+            let latestID = try handoffIDUnlocked(resumeReadyOnly: false)
+            let resumeID = try handoffIDUnlocked(resumeReadyOnly: true)
+            try replaceContinuityPointerUnlocked(
+                key: "continuity/latest",
+                id: latestID,
+                tags: ["continuity", "latest"],
+                timestamp: timestamp
+            )
+            try replaceContinuityPointerUnlocked(
+                key: "continuity/resume_ready",
+                id: resumeID,
+                tags: ["continuity", "resume"],
+                timestamp: timestamp
+            )
+        }
+    }
+
+    private func handoffIDUnlocked(resumeReadyOnly: Bool) throws -> String? {
+        let predicate = resumeReadyOnly ? " WHERE resume_ready = 1" : ""
+        return try withStatementUnlocked(
+            "SELECT id FROM context_handoffs\(predicate) ORDER BY write_sequence DESC LIMIT 1"
+        ) { statement in
+            guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+            return textCol(statement, 0)
+        }
+    }
+
+    private func replaceContinuityPointerUnlocked(
+        key: String,
+        id: String?,
+        tags: [String],
+        timestamp: String
+    ) throws {
+        if let id {
+            try memorySetUnlocked(key: key, body: id, tags: tags, timestamp: timestamp)
+            return
+        }
+        try withStatementUnlocked("DELETE FROM memory_notes WHERE key = ?") { statement in
+            bind(statement, 1, key)
+            try stepDone(statement)
         }
     }
 
@@ -138,12 +389,99 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
     }
 
     public func sessionGet(id: SessionID) throws -> AgentSession? {
-        try withStatement(
+        lock.lock()
+        defer { lock.unlock() }
+        return try sessionGetUnlocked(id: id)
+    }
+
+    private func sessionGetUnlocked(id: SessionID) throws -> AgentSession? {
+        try withStatementUnlocked(
             "SELECT id, agent_id, client_id, status, summary, created_at, updated_at FROM agent_sessions WHERE id = ?"
         ) { stmt in
             bind(stmt, 1, id.rawValue)
             guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
             return mapSession(stmt)
+        }
+    }
+
+    public func sessionReattach(
+        id: SessionID,
+        expectedClientID: ClientID?,
+        clientID: ClientID,
+        bindingBody: String,
+        agentID: String,
+        supersedeSummary: String
+    ) throws -> AgentSession {
+        lock.lock()
+        defer { lock.unlock() }
+        try execUnlocked("BEGIN IMMEDIATE;")
+        do {
+            guard let existing = try sessionGetUnlocked(id: id) else {
+                throw StoreError.notFound("Unknown agent session: \(id.rawValue)")
+            }
+            guard existing.status.isOpen else {
+                throw StoreError.notFound("Agent session is not open: \(id.rawValue)")
+            }
+            guard existing.clientID == expectedClientID else {
+                throw StoreError.conflict(
+                    "Agent session ownership changed while reattaching: \(id.rawValue)"
+                )
+            }
+
+            let timestamp = ISO8601.string(from: clock.now())
+            try withStatementUnlocked(
+                """
+                UPDATE agent_sessions
+                SET status='closed', summary=?, updated_at=?
+                WHERE client_id=? AND id<>? AND status IN ('open','active','running','started')
+                """
+            ) { statement in
+                bind(statement, 1, supersedeSummary)
+                bind(statement, 2, timestamp)
+                bind(statement, 3, clientID.rawValue)
+                bind(statement, 4, id.rawValue)
+                try stepDone(statement)
+            }
+
+            if existing.clientID != clientID {
+                try withStatementUnlocked(
+                    """
+                    UPDATE agent_sessions SET client_id=?, updated_at=?
+                    WHERE id=? AND status IN ('open','active','running','started')
+                    """
+                ) { statement in
+                    bind(statement, 1, clientID.rawValue)
+                    bind(statement, 2, timestamp)
+                    bind(statement, 3, id.rawValue)
+                    try stepDone(statement)
+                    guard changesUnlocked() == 1 else {
+                        throw StoreError.conflict(
+                            "Agent session changed while reattaching: \(id.rawValue)"
+                        )
+                    }
+                }
+            }
+
+            if let expectedClientID, expectedClientID != clientID {
+                try withStatementUnlocked("DELETE FROM memory_notes WHERE key = ?") { statement in
+                    bind(statement, 1, "agent_active/\(expectedClientID.rawValue)")
+                    try stepDone(statement)
+                }
+            }
+            try memorySetUnlocked(
+                key: "agent_active/\(clientID.rawValue)",
+                body: bindingBody,
+                tags: ["agent_active", agentID],
+                timestamp: timestamp
+            )
+            guard let attached = try sessionGetUnlocked(id: id) else {
+                throw StoreError.notFound("Agent session missing after attach: \(id.rawValue)")
+            }
+            try execUnlocked("COMMIT;")
+            return attached
+        } catch {
+            try? execUnlocked("ROLLBACK;")
+            throw error
         }
     }
 
@@ -168,7 +506,7 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
 
     public func sessionTouch(id: SessionID) throws -> Bool {
         let ts = ISO8601.string(from: clock.now())
-        try withStatement(
+        return try withStatement(
             """
             UPDATE agent_sessions SET updated_at=?
             WHERE id=? AND status IN ('open','active','running','started')
@@ -177,8 +515,8 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
             bind(stmt, 1, ts)
             bind(stmt, 2, id.rawValue)
             try stepDone(stmt)
+            return changesUnlocked() > 0
         }
-        return changes() > 0
     }
 
     public func sessionList(agentID: String? = nil, status: SessionStatus? = nil) throws -> [AgentSession] {
@@ -228,9 +566,21 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
 
     public func memorySet(key: String, body: String, tags: [String] = []) throws {
         let ts = ISO8601.string(from: clock.now())
+        lock.lock()
+        defer { lock.unlock() }
+        try memorySetUnlocked(key: key, body: body, tags: tags, timestamp: ts)
+    }
+
+    private func memorySetUnlocked(
+        key: String,
+        body: String,
+        tags: [String],
+        timestamp: String
+    ) throws {
+        // store tags as JSON array string
         let tagsArr = try JSONSerialization.data(withJSONObject: tags)
         let tagsStr = String(data: tagsArr, encoding: .utf8) ?? "[]"
-        try withStatement(
+        try withStatementUnlocked(
             """
             INSERT INTO memory_notes(key, body, tags_json, created_at, updated_at)
             VALUES(?,?,?,?,?)
@@ -240,8 +590,8 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
             bind(stmt, 1, key)
             bind(stmt, 2, body)
             bind(stmt, 3, tagsStr)
-            bind(stmt, 4, ts)
-            bind(stmt, 5, ts)
+            bind(stmt, 4, timestamp)
+            bind(stmt, 5, timestamp)
             try stepDone(stmt)
         }
     }
@@ -264,15 +614,15 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
         try withStatement("DELETE FROM memory_notes WHERE key = ?") { stmt in
             bind(stmt, 1, key)
             try stepDone(stmt)
+            return changesUnlocked() > 0
         }
-        return changes() > 0
     }
 
     /// List durable notes, newest updates first.
     /// - Parameters:
     ///   - prefix: Optional key prefix filter (e.g. `project/`).
     ///   - tag: Optional exact tag match (JSON array contains).
-    ///   - includeSystem: When false (default), hides `agent_run/` and `agent_active/` keys.
+    ///   - includeSystem: When false (default), hides internal agent and continuity keys.
     ///   - limit: Max rows (clamped to `memoryQueryMaxLimit`).
     public func memoryList(
         prefix: String? = nil,
@@ -287,7 +637,9 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
         """
         if prefix != nil { sql += " AND key LIKE ? ESCAPE '\\'" }
         if !includeSystem {
-            sql += " AND key NOT LIKE 'agent\\_run/%' ESCAPE '\\' AND key NOT LIKE 'agent\\_active/%' ESCAPE '\\'"
+            sql += " AND key NOT LIKE 'agent\\_run/%' ESCAPE '\\'"
+            sql += " AND key NOT LIKE 'agent\\_active/%' ESCAPE '\\'"
+            sql += " AND key NOT LIKE 'continuity/%' ESCAPE '\\'"
         }
         sql += " ORDER BY updated_at DESC LIMIT ?"
 
@@ -324,7 +676,9 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
         WHERE (key LIKE ? ESCAPE '\\' OR body LIKE ? ESCAPE '\\' OR tags_json LIKE ? ESCAPE '\\')
         """
         if !includeSystem {
-            sql += " AND key NOT LIKE 'agent\\_run/%' ESCAPE '\\' AND key NOT LIKE 'agent\\_active/%' ESCAPE '\\'"
+            sql += " AND key NOT LIKE 'agent\\_run/%' ESCAPE '\\'"
+            sql += " AND key NOT LIKE 'agent\\_active/%' ESCAPE '\\'"
+            sql += " AND key NOT LIKE 'continuity/%' ESCAPE '\\'"
         }
         sql += " ORDER BY updated_at DESC LIMIT ?"
 
@@ -345,7 +699,9 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
     public func memoryCount(includeSystem: Bool = false) throws -> Int {
         var sql = "SELECT COUNT(*) FROM memory_notes WHERE 1=1"
         if !includeSystem {
-            sql += " AND key NOT LIKE 'agent\\_run/%' ESCAPE '\\' AND key NOT LIKE 'agent\\_active/%' ESCAPE '\\'"
+            sql += " AND key NOT LIKE 'agent\\_run/%' ESCAPE '\\'"
+            sql += " AND key NOT LIKE 'agent\\_active/%' ESCAPE '\\'"
+            sql += " AND key NOT LIKE 'continuity/%' ESCAPE '\\'"
         }
         return try queryInt(sql) ?? 0
     }
@@ -518,6 +874,10 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
     private func exec(_ sql: String) throws {
         lock.lock()
         defer { lock.unlock() }
+        try execUnlocked(sql)
+    }
+
+    private func execUnlocked(_ sql: String) throws {
         guard let db else { throw StoreError.openFailed("nil db") }
         var err: UnsafeMutablePointer<CChar>?
         if sqlite3_exec(db, sql, nil, nil, &err) != SQLITE_OK {
@@ -527,9 +887,7 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
         }
     }
 
-    private func changes() -> Int {
-        lock.lock()
-        defer { lock.unlock() }
+    private func changesUnlocked() -> Int {
         guard let db else { return 0 }
         return Int(sqlite3_changes(db))
     }
@@ -541,9 +899,22 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
         }
     }
 
+    private func tableHasColumn(table: String, column: String) throws -> Bool {
+        try withStatement("PRAGMA table_info(\(table))") { stmt in
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                if textCol(stmt, 1) == column { return true }
+            }
+            return false
+        }
+    }
+
     private func withStatement<T>(_ sql: String, body: (OpaquePointer) throws -> T) throws -> T {
         lock.lock()
         defer { lock.unlock() }
+        return try withStatementUnlocked(sql, body: body)
+    }
+
+    private func withStatementUnlocked<T>(_ sql: String, body: (OpaquePointer) throws -> T) throws -> T {
         guard let db else { throw StoreError.openFailed("nil db") }
         var stmt: OpaquePointer?
         if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) != SQLITE_OK {
@@ -552,6 +923,20 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
         guard let stmt else { throw StoreError.execFailed("nil statement") }
         defer { sqlite3_finalize(stmt) }
         return try body(stmt)
+    }
+
+    private func withTransaction<T>(_ body: () throws -> T) throws -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        try execUnlocked("BEGIN IMMEDIATE;")
+        do {
+            let value = try body()
+            try execUnlocked("COMMIT;")
+            return value
+        } catch {
+            try? execUnlocked("ROLLBACK;")
+            throw error
+        }
     }
 
     private func stepDone(_ stmt: OpaquePointer) throws {

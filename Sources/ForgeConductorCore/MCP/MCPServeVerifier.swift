@@ -5,15 +5,34 @@
 // Why: Deployment must fail closed before registering a binary that a host cannot use.
 
 import Foundation
+import Darwin
 
 /// Verifies a Forge binary can speak MCP stdio (initialize + tools/list).
 /// Used after Deploy so product path failures are caught before the operator opens LM Studio.
 public enum MCPServeVerifier {
+    public static let minimumToolCount = 20
+    private static let maximumOutputBytes = 4 * 1_024 * 1_024
+    public static let requiredContinuityTools: Set<String> = [
+        "session_checkpoint",
+        "session_handoff",
+        "context_get",
+        "context_list",
+    ]
+    public static let requiredMemoryTools: Set<String> = [
+        "memory_set",
+        "memory_get",
+        "memory_list",
+        "memory_delete",
+        "memory_search",
+    ]
+    public static let requiredProductTools = requiredContinuityTools.union(requiredMemoryTools)
+
     public struct Result: Sendable, Equatable {
         public var ok: Bool
         public var protocolVersion: String?
         public var serverName: String?
         public var toolCount: Int
+        public var toolNames: [String]
         public var detail: String
         public var durationMs: Int
 
@@ -22,6 +41,7 @@ public enum MCPServeVerifier {
             protocolVersion: String?,
             serverName: String?,
             toolCount: Int,
+            toolNames: [String] = [],
             detail: String,
             durationMs: Int
         ) {
@@ -29,6 +49,7 @@ public enum MCPServeVerifier {
             self.protocolVersion = protocolVersion
             self.serverName = serverName
             self.toolCount = toolCount
+            self.toolNames = toolNames
             self.detail = detail
             self.durationMs = durationMs
         }
@@ -49,6 +70,7 @@ public enum MCPServeVerifier {
                 protocolVersion: nil,
                 serverName: nil,
                 toolCount: 0,
+                toolNames: [],
                 detail: "not executable: \(binary.path)",
                 durationMs: 0
             )
@@ -57,8 +79,9 @@ public enum MCPServeVerifier {
         let proc = Process()
         proc.executableURL = binary
         proc.arguments = ["serve"]
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
         proc.environment = [
-            "HOME": FileManager.default.homeDirectoryForCurrentUser.path,
+            "HOME": home.path,
             "PATH": "/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin",
             "FORGE_CONDUCTOR_HOME": home.path,
             "FORGE_MCP_ROLE": connectorRole.rawValue,
@@ -73,6 +96,8 @@ public enum MCPServeVerifier {
         proc.standardError = stderr
 
         try proc.run()
+        setNonblocking(stdout.fileHandleForReading)
+        setNonblocking(stderr.fileHandleForReading)
 
         // LM Studio client shape (NDJSON).
         let initMsg =
@@ -87,13 +112,12 @@ public enum MCPServeVerifier {
 
         let deadline = Date().addingTimeInterval(timeoutSec)
         var outData = Data()
+        var errData = Data()
         var frames: [[String: Any]] = []
         while Date() < deadline {
-            let chunk = stdout.fileHandleForReading.availableData
-            if !chunk.isEmpty {
-                outData.append(chunk)
-                frames = decodeFrames(outData)
-            }
+            drain(stdout.fileHandleForReading, into: &outData, limit: maximumOutputBytes)
+            drain(stderr.fileHandleForReading, into: &errData, limit: 64 * 1_024)
+            frames = decodeFrames(outData)
             if proc.isRunning == false { break }
             // Do not terminate on the initialize capability's "tools" key;
             // wait for the complete tools/list response (id 2).
@@ -105,35 +129,78 @@ public enum MCPServeVerifier {
         if proc.isRunning {
             proc.terminate()
         }
-        proc.waitUntilExit()
-        let errTail = String(data: stderr.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        let terminationDeadline = Date().addingTimeInterval(1)
+        while proc.isRunning, Date() < terminationDeadline {
+            drain(stdout.fileHandleForReading, into: &outData, limit: maximumOutputBytes)
+            drain(stderr.fileHandleForReading, into: &errData, limit: 64 * 1_024)
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        if proc.isRunning {
+            _ = Darwin.kill(proc.processIdentifier, SIGKILL)
+            let killDeadline = Date().addingTimeInterval(1)
+            while proc.isRunning, Date() < killDeadline {
+                Thread.sleep(forTimeInterval: 0.01)
+            }
+        }
+        drain(stdout.fileHandleForReading, into: &outData, limit: maximumOutputBytes)
+        drain(stderr.fileHandleForReading, into: &errData, limit: 64 * 1_024)
+        let errTail = String(data: errData, encoding: .utf8) ?? ""
         let ms = Int(Date().timeIntervalSince(start) * 1000)
 
         // Accept only standards-compliant newline-delimited MCP output. This
         // deliberately prevents Forge's verifier from self-certifying LSP-style
         // Content-Length responses that LM Studio rejects.
-        if frames.isEmpty { frames = decodeFrames(outData) }
+        frames = decodeFrames(outData)
+        let ndjsonOnly = isValidNDJSON(outData)
         var protocolVersion: String?
         var serverName: String?
         var toolCount = 0
+        var toolNames: [String] = []
+        var envelopeOK = false
+        var descriptorsOK = false
         if let initialize = frames.first(where: { numericID($0["id"]) == 1 }),
+           initialize["jsonrpc"] as? String == "2.0",
+           initialize["error"] == nil,
            let result = initialize["result"] as? [String: Any] {
             protocolVersion = result["protocolVersion"] as? String
             serverName = (result["serverInfo"] as? [String: Any])?["name"] as? String
+            envelopeOK = true
         }
         if let list = frames.first(where: { numericID($0["id"]) == 2 }),
+           list["jsonrpc"] as? String == "2.0",
+           list["error"] == nil,
            let result = list["result"] as? [String: Any],
            let tools = result["tools"] as? [[String: Any]] {
             toolCount = tools.count
+            toolNames = tools.compactMap { $0["name"] as? String }.sorted()
+            let uniqueNames = Set(toolNames)
+            descriptorsOK = toolNames.count == toolCount
+                && uniqueNames.count == toolCount
+                && tools.allSatisfy { descriptor in
+                    guard let name = descriptor["name"] as? String, !name.isEmpty,
+                          let description = descriptor["description"] as? String, !description.isEmpty,
+                          let schema = descriptor["inputSchema"] as? [String: Any] else {
+                        return false
+                    }
+                    return schema["type"] as? String == "object"
+                }
         }
 
         let identityOK = serverName == connectorRole.serverID
-        let ok = protocolVersion != nil && toolCount >= 10 && identityOK
+        let protocolOK = protocolVersion.map(MCPServer.supportedProtocolVersions.contains) ?? false
+        let missingRequiredTools = Self.requiredProductTools.subtracting(toolNames).sorted()
+        let ok = ndjsonOnly
+            && envelopeOK
+            && protocolOK
+            && toolCount >= minimumToolCount
+            && descriptorsOK
+            && identityOK
+            && missingRequiredTools.isEmpty
         var detail: String
         if ok {
             detail = "initialize ok protocol=\(protocolVersion ?? "?") tools=\(toolCount) in \(ms)ms"
         } else {
-            detail = "handshake incomplete role=\(connectorRole.rawValue) server=\(serverName ?? "nil") tools=\(toolCount) protocol=\(protocolVersion ?? "nil") stderr=\(errTail.prefix(200))"
+            detail = "handshake incomplete role=\(connectorRole.rawValue) server=\(serverName ?? "nil") tools=\(toolCount) ndjson=\(ndjsonOnly) envelope=\(envelopeOK) descriptors=\(descriptorsOK) missing_required=\(missingRequiredTools.joined(separator: ",")) protocol=\(protocolVersion ?? "nil") stderr=\(errTail.prefix(200))"
         }
 
         return Result(
@@ -141,6 +208,7 @@ public enum MCPServeVerifier {
             protocolVersion: protocolVersion,
             serverName: serverName,
             toolCount: toolCount,
+            toolNames: toolNames,
             detail: detail,
             durationMs: ms
         )
@@ -160,6 +228,42 @@ public enum MCPServeVerifier {
             }
         }
         return messages
+    }
+
+    private static func isValidNDJSON(_ data: Data) -> Bool {
+        let lines = data.split(separator: 0x0A, omittingEmptySubsequences: true)
+        guard !lines.isEmpty else { return false }
+        return lines.allSatisfy { line in
+            guard let object = try? JSONSupport.object(from: line) else { return false }
+            return object["jsonrpc"] as? String == "2.0"
+        }
+    }
+
+    private static func setNonblocking(_ handle: FileHandle) {
+        let descriptor = handle.fileDescriptor
+        let flags = Darwin.fcntl(descriptor, F_GETFL)
+        if flags >= 0 {
+            _ = Darwin.fcntl(descriptor, F_SETFL, flags | O_NONBLOCK)
+        }
+    }
+
+    private static func drain(_ handle: FileHandle, into data: inout Data, limit: Int) {
+        guard data.count < limit else { return }
+        let descriptor = handle.fileDescriptor
+        var buffer = [UInt8](repeating: 0, count: min(16_384, limit - data.count))
+        while !buffer.isEmpty {
+            let count = buffer.withUnsafeMutableBytes { bytes in
+                Darwin.read(descriptor, bytes.baseAddress, bytes.count)
+            }
+            if count > 0 {
+                data.append(buffer, count: count)
+                if data.count >= limit { return }
+                buffer = [UInt8](repeating: 0, count: min(16_384, limit - data.count))
+                continue
+            }
+            if count < 0, errno == EINTR { continue }
+            return
+        }
     }
 }
 

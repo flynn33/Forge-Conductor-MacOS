@@ -35,7 +35,7 @@ let package = Package(
         ),
         .testTarget(
             name: "ForgeConductorTests",
-            dependencies: ["ForgeConductorCore"],
+            dependencies: ["ForgeConductorCore", "ForgeConductorCLI"],
             path: "Tests/ForgeConductorTests",
             resources: [
                 .process("Fixtures"),

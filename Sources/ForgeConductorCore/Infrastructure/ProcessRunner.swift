@@ -231,12 +231,18 @@ public final class ProcessRunner: @unchecked Sendable {
 
         final class TerminationBox: @unchecked Sendable {
             private let lock = NSLock()
+            private var completed = false
             private var status: Int32?
 
-            func store(_ status: Int32) {
+            /// Records the first terminal outcome. The return value identifies the
+            /// caller responsible for balancing the termination dispatch group.
+            func complete(status: Int32?) -> Bool {
                 lock.lock()
+                defer { lock.unlock() }
+                guard !completed else { return false }
+                completed = true
                 self.status = status
-                lock.unlock()
+                return true
             }
 
             func load() -> Int32? {
@@ -261,19 +267,25 @@ public final class ProcessRunner: @unchecked Sendable {
             errBox.stopCallbacks(on: errHandle)
         }
 
-        try process.run()
-        let processIdentifier = process.processIdentifier
-
         let terminationGroup = DispatchGroup()
         let terminationBox = TerminationBox()
         var timedOut = false
         terminationGroup.enter()
-        DispatchQueue.global().async {
-            process.waitUntilExit()
-            // Foundation guarantees terminationStatus is valid after waitUntilExit returns.
-            terminationBox.store(process.terminationStatus)
-            terminationGroup.leave()
+        process.terminationHandler = { terminatedProcess in
+            if terminationBox.complete(status: terminatedProcess.terminationStatus) {
+                terminationGroup.leave()
+            }
         }
+        do {
+            try process.run()
+        } catch {
+            process.terminationHandler = nil
+            if terminationBox.complete(status: nil) {
+                terminationGroup.leave()
+            }
+            throw error
+        }
+        let processIdentifier = process.processIdentifier
 
         func confirmedStatus(waiting seconds: TimeInterval) -> Int32? {
             if seconds == .infinity {

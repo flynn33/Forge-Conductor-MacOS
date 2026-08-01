@@ -95,7 +95,11 @@ public final class AppModel: ObservableObject {
             self.version = ForgeApp.version
             self.deployController = AppDeployController(app: forgeApp)
             telemetryBinding.attach(app: forgeApp)
-            attachToOrStartManager(app: forgeApp)
+            if CommandLine.arguments.contains("--uitesting") {
+                managerMessage = "Manager disabled during UI tests"
+            } else {
+                attachToOrStartManager(app: forgeApp)
+            }
             loadSettingsFromConfig()
             refreshLMStudioPluginStatus()
             refreshDiagnosticsPreview()

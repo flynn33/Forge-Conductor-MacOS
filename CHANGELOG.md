@@ -6,6 +6,46 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 for marketing versions (`MAJOR.MINOR.PATCH`).
 
+## [0.7.0] — 2026-08-01
+
+### Added
+
+- **Context and agent continuity MCP tools** on the existing stdio server:
+  - `session_checkpoint` — soft-save task context while work continues
+  - `session_handoff` — finalize a resume-ready packet for a new chat
+  - `context_get` — load the latest or a selected handoff packet
+  - `context_list` — list recent handoff packets
+- SQLite `context_handoffs` storage as the authoritative handoff record, with
+  rebuildable JSON, `LATEST`, and `current-task.md` projections.
+- Transactional durable-memory pointers at `continuity/latest` and
+  `continuity/resume_ready`; these internal keys are hidden from default memory
+  list, search, and count results.
+- Agent-session snapshots and compare-and-swap reattachment so an open durable
+  run can transfer safely to the resumed MCP client.
+- Repeated-call context budget: the fourth identical non-continuity call writes
+  a soft resume-ready handoff; the ninth is blocked after persisting the handoff.
+- Process-level deployment verification for the complete continuity and durable-
+  memory product tool surfaces.
+- Continuity integration, recovery, multi-process, MCP, loop-budget, and
+  new-chat process tests.
+
+### Changed
+
+- `fs_read` supports 1-based `offset` plus `length`/`limit` pagination and returns
+  line-window metadata to prevent accidental full-file reread loops.
+- `forge_status` reports continuity state while retaining `memory_note_count`.
+- Tool auditing redacts continuity narrative, resume, decision, blocker, and
+  working-set fields in addition to durable-memory bodies.
+- Marketing version **0.6.0 → 0.7.0**.
+
+### Notes
+
+- Continuity uses the same primary/fallback mcpBridge deployment path as the
+  existing tool packs; it does not add an HTTP service or sidecar.
+- Opening a new LM Studio chat remains an operator/host action. The handoff
+  packet and returned resume seed provide the Phase 1 bootstrap.
+- Durable `memory_*` tools and their 0.6 behavior remain intact.
+
 ## [0.6.0] — 2026-07-31
 
 ### Added
@@ -53,5 +93,6 @@ for marketing versions (`MAJOR.MINOR.PATCH`).
 See [`docs/AUDIT-2026-07-27.md`](docs/AUDIT-2026-07-27.md) and related audits for
 0.5.x verification evidence.
 
-[0.6.0]: https://github.com/flynn33/Forge-Conductor-MacOS/compare/v0.5.3...HEAD
-[0.5.3]: https://github.com/flynn33/Forge-Conductor-MacOS/releases/tag/v0.5.3
+[0.7.0]: https://github.com/flynn33/Forge-Conductor-MacOS/compare/6fe03e0...main
+[0.6.0]: https://github.com/flynn33/Forge-Conductor-MacOS/commit/6fe03e0626273ced4211ed4e1bbef8c70cfb36b8
+[0.5.3]: https://github.com/flynn33/Forge-Conductor-MacOS/commit/90fc5757dbf7acf629e16184c5347760dbff4a47

@@ -123,9 +123,11 @@ public final class AgentSessionService: SessionManaging, @unchecked Sendable {
     }
 
     public func status(sessionID: SessionID, clientID: ClientID?) throws -> [String: Any] {
-        let session = try store.sessionGet(id: sessionID)
-        if let clientID {
-            _ = try rehydrate(clientID: clientID)
+        var session = try store.sessionGet(id: sessionID)
+        var reattached = false
+        if let clientID, session?.status.isOpen == true {
+            reattached = try attach(sessionID: sessionID, clientID: clientID)
+            session = try store.sessionGet(id: sessionID)
         }
         if let session, session.status.isOpen {
             _ = try? store.sessionTouch(id: sessionID)
@@ -152,6 +154,7 @@ public final class AgentSessionService: SessionManaging, @unchecked Sendable {
             "must_complete": mustComplete,
             "idle_sec": idleSec as Any,
             "abandon_risk": abandonRisk,
+            "reattached": reattached,
             "reminder": reminder as Any,
             "active_binding": binding.map { b in
                 [
@@ -256,15 +259,91 @@ public final class AgentSessionService: SessionManaging, @unchecked Sendable {
         getBinding(clientID: clientID)
     }
 
+    @discardableResult
+    public func attach(sessionID: SessionID, clientID: ClientID) throws -> Bool {
+        guard let session = try store.sessionGet(id: sessionID), session.status.isOpen else {
+            return false
+        }
+        if session.clientID == clientID,
+           getBinding(clientID: clientID)?.sessionID == sessionID {
+            return false
+        }
+
+        let supersedeSummary = try JSONSupport.string(from: [
+            "event": "superseded",
+            "ok_to_reuse": true,
+            "message": "Closed because an existing agent session was reattached",
+            "reattached_session_id": sessionID.rawValue,
+        ])
+        var goal = ""
+        var cwd: String?
+        var toolsPrimary: [String] = []
+        var toolsForbidden: [String] = []
+        var outputSchema: [String] = []
+        var doneDefinition: [String] = []
+        if let runBody = try store.memoryGet(key: "agent_run/\(sessionID.rawValue)"),
+           let run = try? JSONSupport.object(from: Data(runBody.utf8)) {
+            goal = run["goal"] as? String ?? ""
+            cwd = run["cwd"] as? String
+            outputSchema = run["output_schema"] as? [String] ?? []
+        }
+        if let spec = catalog.get(session.agentID) {
+            toolsPrimary = spec.tools
+            toolsForbidden = spec.toolsForbidden
+            if outputSchema.isEmpty { outputSchema = spec.outputSchema }
+            doneDefinition = spec.doneDefinition
+        }
+
+        let previousClient = session.clientID
+        let binding = ActiveBinding(
+            sessionID: sessionID,
+            agentID: session.agentID,
+            goal: goal,
+            toolsPrimary: toolsPrimary,
+            toolsForbidden: toolsForbidden,
+            outputSchema: outputSchema,
+            doneDefinition: doneDefinition,
+            cwd: cwd
+        )
+        let body = try bindingBody(binding)
+        _ = try store.sessionReattach(
+            id: sessionID,
+            expectedClientID: previousClient,
+            clientID: clientID,
+            bindingBody: body,
+            agentID: session.agentID,
+            supersedeSummary: supersedeSummary
+        )
+        if let previousClient, previousClient != clientID {
+            removeMemoryBinding(clientID: previousClient, sessionID: sessionID)
+        }
+        setMemoryBinding(clientID: clientID, binding: binding)
+        diagnostics.info("agent_session_reattached", [
+            "agent_id": session.agentID,
+            "session_id": sessionID.rawValue,
+            "client_id": clientID.rawValue,
+        ])
+        return previousClient != clientID
+    }
+
     public func rehydrate(clientID: ClientID) throws -> ActiveBinding? {
-        if let b = getBinding(clientID: clientID) { return b }
+        if let binding = getBinding(clientID: clientID) {
+            if let session = try store.sessionGet(id: binding.sessionID),
+               session.status.isOpen,
+               session.clientID == clientID {
+                return binding
+            }
+            try clearBinding(clientID: clientID, sessionID: binding.sessionID)
+        }
         // From memory note
         if let body = try store.memoryGet(key: "agent_active/\(clientID.rawValue)"),
            let data = body.data(using: .utf8),
            let obj = try? JSONSupport.object(from: data),
            obj["cleared"] as? Bool != true,
            let sid = obj["session_id"] as? String {
-            if let sess = try store.sessionGet(id: SessionID(sid)), sess.status.isOpen {
+            if let sess = try store.sessionGet(id: SessionID(sid)),
+               sess.status.isOpen,
+               sess.clientID == clientID {
                 let binding = ActiveBinding(
                     sessionID: SessionID(sid),
                     agentID: obj["agent_id"] as? String ?? sess.agentID,
@@ -354,8 +433,13 @@ public final class AgentSessionService: SessionManaging, @unchecked Sendable {
     // MARK: - Binding storage
 
     private func setBinding(clientID: ClientID, binding: ActiveBinding) throws {
+        let body = try bindingBody(binding)
+        try store.memorySet(key: "agent_active/\(clientID.rawValue)", body: body, tags: ["agent_active", binding.agentID])
         setMemoryBinding(clientID: clientID, binding: binding)
-        let body = try JSONSupport.string(from: [
+    }
+
+    private func bindingBody(_ binding: ActiveBinding) throws -> String {
+        try JSONSupport.string(from: [
             "session_id": binding.sessionID.rawValue,
             "agent_id": binding.agentID,
             "goal": binding.goal,
@@ -365,16 +449,19 @@ public final class AgentSessionService: SessionManaging, @unchecked Sendable {
             "done_definition": binding.doneDefinition,
             "cwd": binding.cwd as Any,
         ].compactNSNull())
-        try store.memorySet(key: "agent_active/\(clientID.rawValue)", body: body, tags: ["agent_active", binding.agentID])
     }
 
     private func clearBinding(clientID: ClientID, sessionID: SessionID) throws {
+        removeMemoryBinding(clientID: clientID, sessionID: sessionID)
+        _ = try store.memoryDelete(key: "agent_active/\(clientID.rawValue)")
+    }
+
+    private func removeMemoryBinding(clientID: ClientID, sessionID: SessionID) {
         lock.lock()
         if memoryBindings[clientID.rawValue]?.sessionID == sessionID {
             memoryBindings.removeValue(forKey: clientID.rawValue)
         }
         lock.unlock()
-        _ = try store.memoryDelete(key: "agent_active/\(clientID.rawValue)")
     }
 
     private func getBinding(clientID: ClientID) -> ActiveBinding? {

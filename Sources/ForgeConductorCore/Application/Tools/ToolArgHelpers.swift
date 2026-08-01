@@ -16,9 +16,9 @@ public enum ToolArgHelpers {
 
     public static func int(_ args: [String: Any], _ key: String) -> Int? {
         if let i = args[key] as? Int { return i }
-        if let d = args[key] as? Double { return Int(d) }
+        if let d = args[key] as? Double { return Int(exactly: d) }
         if let s = args[key] as? String { return Int(s) }
-        if let n = args[key] as? NSNumber { return n.intValue }
+        if let n = args[key] as? NSNumber { return Int(exactly: n.doubleValue) }
         return nil
     }
 

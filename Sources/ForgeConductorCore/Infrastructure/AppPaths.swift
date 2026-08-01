@@ -39,11 +39,19 @@ public final class AppPaths: @unchecked Sendable {
     public var managerLog: URL { logsDir.appendingPathComponent("manager.log") }
     public var managerState: URL { home.appendingPathComponent("manager-state.json") }
 
+    /// Durable project memory (markdown) for cross-chat continuity.
+    public var memoryDir: URL { home.appendingPathComponent("memory", isDirectory: true) }
+    public var memoryHandoffsDir: URL { memoryDir.appendingPathComponent("handoffs", isDirectory: true) }
+    public var memoryContinuityLock: URL { memoryDir.appendingPathComponent(".continuity.lock") }
+    public var memoryCurrentTask: URL { memoryDir.appendingPathComponent("current-task.md") }
+    public var memoryIndex: URL { memoryDir.appendingPathComponent("INDEX.md") }
+
     @discardableResult
     public func ensureLayout() throws -> URL {
         let fm = FileManager.default
         for dir in [
             home, agentsDir, cacheDir, logsDir, dashboardDir, exportsDir,
+            memoryDir, memoryHandoffsDir,
             cacheDir.appendingPathComponent("browser", isDirectory: true),
         ] {
             try fm.createDirectory(at: dir, withIntermediateDirectories: true)

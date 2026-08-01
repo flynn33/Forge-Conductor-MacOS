@@ -9,7 +9,7 @@ Forge Conductor is a native macOS orchestration server for local models hosted b
 3. The Apple-native stack is Foundation, SwiftUI, AppKit, Combine, Metal, Network, IOKit, Mach, SQLite3, and FileManager. The runtime does not require Node or Python.
 4. Framework features are exposed through modular `ToolPackHandling` implementations and stable MCP tool names.
 5. Primary and fallback LM Studio connectors are independent processes with typed identities and aggregate health.
-6. Persistent sessions and active bindings survive process restarts.
+6. Persistent sessions, active bindings, memory notes, and context handoffs survive process restarts.
 
 ## Package products
 
@@ -42,6 +42,7 @@ ForgeApp.bootstrap(home:)
   -> SQLiteStore migration
   -> AuditService + DiagnosticLog
   -> AgentCatalog + AgentSessionService
+  -> ContextContinuityService
   -> LM Studio installer/verifier/deploy services
   -> ToolAuthorizationService -> ToolRouter -> modular tool packs
   -> TelemetryService
@@ -89,18 +90,20 @@ resolve executable
 
 `~/.forge-conductor` (or `FORGE_CONDUCTOR_HOME`) contains:
 
-- `store.sqlite` for sessions, bindings, audit index, and presence
+- `store.sqlite` for sessions, bindings, handoff packets, durable memory, audit index, and presence
 - `audit.jsonl` for append-only tool audit
 - `logs/*.jsonl` for categorized diagnostics
 - `agents/*.md` for replaceable playbook modules
+- `memory/handoffs/*` and `memory/current-task.md` as rebuildable continuity projections
 - `config.json` for local configuration
 
 ## Build and run
 
 ```bash
 ./script/build_and_run.sh            # build, stage app bundle, launch
+./script/build_and_run.sh --build-only # build and stage without launching
 ./script/build_and_run.sh --verify   # launch and verify the exact GUI process
 swift test                           # full Core/CLI acceptance suite
 ```
 
-Version: `0.6.0`
+Version: `0.7.0`

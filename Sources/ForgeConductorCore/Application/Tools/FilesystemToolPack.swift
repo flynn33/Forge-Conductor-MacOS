@@ -46,8 +46,85 @@ public struct FilesystemToolPack: ToolPackHandling {
               let text = String(data: data, encoding: .utf8) else {
             return .failure(code: "not_found", message: "Not a readable file: \(url.path)")
         }
-        return .success(["path": url.path, "content": text, "size": data.count])
+
+        // Line-based windowing. Models often request offset/length (or limit) for
+        // large files. Ignoring those args returns the whole file every time and
+        // can trap the host model in an identical fs_read loop.
+        let lines: [String] = text.isEmpty
+            ? []
+            : text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        let totalLines = lines.count
+        let requestedOffset = ToolArgHelpers.int(args, "offset")
+            ?? ToolArgHelpers.int(args, "start_line")
+        let requestedLength = ToolArgHelpers.int(args, "length")
+            ?? ToolArgHelpers.int(args, "limit")
+            ?? ToolArgHelpers.int(args, "max_lines")
+
+        let startLine: Int
+        let endLine: Int
+        if let requestedOffset {
+            // 1-based inclusive start. offset past EOF → empty window, not a full re-read.
+            startLine = max(1, requestedOffset)
+            let count = max(0, requestedLength ?? Self.defaultWindowLines)
+            if startLine > totalLines || count == 0 {
+                endLine = startLine - 1
+            } else {
+                let remainingLines = totalLines - startLine + 1
+                let windowCount = min(count, remainingLines)
+                endLine = startLine + windowCount - 1
+            }
+        } else if let requestedLength {
+            startLine = 1
+            let count = max(0, requestedLength)
+            endLine = count == 0 ? 0 : min(totalLines, count)
+        } else {
+            startLine = 1
+            endLine = totalLines
+        }
+
+        let content: String
+        if startLine > totalLines || endLine < startLine {
+            content = ""
+        } else {
+            content = lines[(startLine - 1)..<endLine].joined(separator: "\n")
+        }
+
+        let hasMore = endLine < totalLines
+        var payload: [String: Any] = [
+            "path": url.path,
+            "content": content,
+            "size": data.count,
+            "total_lines": totalLines,
+            "start_line": startLine,
+            "end_line": max(endLine, startLine - 1),
+            "line_count": max(0, endLine - startLine + 1),
+            "has_more": hasMore,
+        ]
+        if hasMore {
+            payload["next_offset"] = endLine + 1
+            payload["note"] =
+                "Partial read (lines \(startLine)–\(endLine) of \(totalLines)). " +
+                "Continue with offset=\(endLine + 1) (1-based) and a new length. " +
+                "Do not repeat the same offset/length."
+        } else if totalLines == 0 {
+            payload["note"] = "File is empty."
+        } else if startLine > totalLines {
+            payload["note"] =
+                "offset \(startLine) is past end of file (\(totalLines) lines). " +
+                "Stop paginating this path."
+        } else if startLine == 1 {
+            payload["note"] =
+                "Complete file contents (\(totalLines) lines). " +
+                "Do not re-read this path unless the file changes."
+        } else {
+            payload["note"] =
+                "Reached end of file at line \(totalLines). Stop paginating this path."
+        }
+        return .success(payload)
     }
+
+    /// Default line window when offset is provided without length/limit.
+    private static let defaultWindowLines = 200
 
     private func fsWrite(_ args: [String: Any]) throws -> ToolResult {
         guard let path = ToolArgHelpers.string(args, "path"),

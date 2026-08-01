@@ -22,6 +22,18 @@ final class ProcessRunnerTests: XCTestCase {
         XCTAssertFalse(failure.timedOut)
     }
 
+    func testLaunchFailureDoesNotPoisonTheNextRun() throws {
+        let runner = fastRunner()
+
+        XCTAssertThrowsError(
+            try runner.run(executable: "/forge-conductor-tests/missing-executable")
+        )
+
+        let recovery = try runner.run(executable: "/usr/bin/true", timeoutSec: 1)
+        XCTAssertEqual(recovery.exitCode, 0)
+        XCTAssertFalse(recovery.timedOut)
+    }
+
     func testTimeoutTerminatesChildAndReturnsConfirmedStatus() throws {
         let started = ContinuousClock.now
         let result = try fastRunner().run(
@@ -132,6 +144,28 @@ final class ProcessRunnerTests: XCTestCase {
         }
 
         XCTAssertEqual(failures.values, [])
+    }
+
+    func testRapidExitNotificationsAreNotLostUnderLoad() {
+        let runner = fastRunner()
+        let failures = FailureBox()
+        let started = ContinuousClock.now
+
+        DispatchQueue.concurrentPerform(iterations: 48) { index in
+            do {
+                let result = try runner.run(executable: "/usr/bin/true", timeoutSec: 1)
+                if result.exitCode != 0 || result.timedOut {
+                    failures.append(
+                        "rapid \(index): \(result.exitCode), timeout=\(result.timedOut)"
+                    )
+                }
+            } catch {
+                failures.append("rapid \(index) threw \(error)")
+            }
+        }
+
+        XCTAssertEqual(failures.values, [])
+        XCTAssertLessThan(started.duration(to: .now), .seconds(5))
     }
 }
 

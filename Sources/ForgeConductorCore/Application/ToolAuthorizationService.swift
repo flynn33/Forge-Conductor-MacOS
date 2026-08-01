@@ -201,8 +201,9 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
     private static let sessionLifecycleTools: Set<String> = [
         "forge_status", "agent_list", "agent_get", "agent_context", "agent_recommend",
         "agent_run_start", "agent_run_status", "agent_run_complete",
-        // Durable memory must remain available without (and during) agent sessions.
+        // Durable memory remains available without and during agent sessions.
         "memory_set", "memory_get", "memory_list", "memory_delete", "memory_search",
+        "session_checkpoint", "session_handoff", "context_get", "context_list",
     ]
 
     private static let requiresActiveSession: Set<String> = [
@@ -217,6 +218,8 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
 public enum ToolAuditSanitizer {
     private static let sensitiveKeys: Set<String> = [
         "command", "content", "old", "new", "report", "goal", "body", "value",
+        "narrative", "summary", "resume_seed", "blockers", "next_actions",
+        "decisions", "key_files", "cwd", "project_slug", "project", "chat_label", "chat", "status",
     ]
 
     public static func sanitize(_ arguments: [String: Any]) -> [String: Any] {

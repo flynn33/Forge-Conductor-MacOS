@@ -186,7 +186,11 @@ public final class MCPServer: @unchecked Sendable {
         "agent_run_start": "Start a durable specialist session (supersedes prior open sessions).",
         "agent_run_status": "Status of an agent session; reminds host to complete open runs.",
         "agent_run_complete": "Close a session with a report matching output_schema.",
-        "fs_read": "Read a UTF-8 text file.",
+        "session_checkpoint": "Soft-save context + open agent sessions for continuity (continue working).",
+        "session_handoff": "Finalize context/agent handoff for a new chat; returns resume_seed. Prefer before context is full.",
+        "context_get": "Load latest (or id) handoff packet — call first in every new chat bootstrap.",
+        "context_list": "List recent context handoff packets.",
+        "fs_read": "Read a UTF-8 text file. Optional 1-based line window: offset (start line) + length/limit (line count). Response includes total_lines, start_line, end_line, has_more, next_offset. Do not re-call with the same offset when content was returned.",
         "fs_write": "Write a UTF-8 text file.",
         "fs_edit": "Replace occurrences of old with new in a file.",
         "fs_list": "List directory entries.",
@@ -205,7 +209,7 @@ public final class MCPServer: @unchecked Sendable {
         "search_text": "Recursive text search (grep).",
         "memory_set": "Store a durable key/value note in Forge local memory (survives chat sessions).",
         "memory_get": "Read a durable memory note by key.",
-        "memory_list": "List durable memory notes (optional prefix/tag; hides agent system keys by default).",
+        "memory_list": "List durable memory notes (optional prefix/tag; hides internal agent and continuity keys by default).",
         "memory_delete": "Delete a durable memory note by key.",
         "memory_search": "Search durable memory notes by substring in key/body/tags.",
     ]
@@ -244,7 +248,65 @@ public final class MCPServer: @unchecked Sendable {
                 "properties": ["task": ["type": "string"] as [String: Any]] as [String: Any],
                 "required": ["task"],
             ]
-        case "fs_read", "fs_list", "fs_delete", "fs_mkdir":
+        case "session_checkpoint", "session_handoff":
+            return [
+                "type": "object",
+                "properties": [
+                    "goal": ["type": "string"] as [String: Any],
+                    "status": ["type": "string"] as [String: Any],
+                    "project_slug": ["type": "string"] as [String: Any],
+                    "cwd": ["type": "string"] as [String: Any],
+                    "narrative": ["type": "string"] as [String: Any],
+                    "summary": ["type": "string", "description": "Alias for narrative"] as [String: Any],
+                    "next_actions": ["type": "array", "items": ["type": "string"] as [String: Any]] as [String: Any],
+                    "blockers": ["type": "array", "items": ["type": "string"] as [String: Any]] as [String: Any],
+                    "key_files": ["type": "array", "items": ["type": "string"] as [String: Any]] as [String: Any],
+                    "decisions": ["type": "array", "items": ["type": "string"] as [String: Any]] as [String: Any],
+                    "chat_label": ["type": "string"] as [String: Any],
+                    "handoff_id": ["type": "string", "description": "Update an existing packet"] as [String: Any],
+                    "resume_seed": ["type": "string"] as [String: Any],
+                ] as [String: Any],
+                "required": [] as [String],
+            ]
+        case "context_get":
+            return [
+                "type": "object",
+                "properties": [
+                    "handoff_id": ["type": "string"] as [String: Any],
+                    "id": ["type": "string"] as [String: Any],
+                    "resume_ready": ["type": "boolean", "description": "Prefer latest resume-ready packet"] as [String: Any],
+                ] as [String: Any],
+                "required": [] as [String],
+            ]
+        case "context_list":
+            return [
+                "type": "object",
+                "properties": [
+                    "limit": ["type": "integer"] as [String: Any],
+                ] as [String: Any],
+                "required": [] as [String],
+            ]
+        case "fs_read":
+            return [
+                "type": "object",
+                "properties": [
+                    "path": ["type": "string"] as [String: Any],
+                    "offset": [
+                        "type": "integer",
+                        "description": "1-based start line for a partial read",
+                    ] as [String: Any],
+                    "length": [
+                        "type": "integer",
+                        "description": "Number of lines to return (alias: limit)",
+                    ] as [String: Any],
+                    "limit": [
+                        "type": "integer",
+                        "description": "Alias for length — number of lines to return",
+                    ] as [String: Any],
+                ] as [String: Any],
+                "required": ["path"],
+            ]
+        case "fs_list", "fs_delete", "fs_mkdir":
             return [
                 "type": "object",
                 "properties": ["path": ["type": "string"] as [String: Any]] as [String: Any],

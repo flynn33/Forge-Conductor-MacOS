@@ -48,6 +48,7 @@ final class ProductPathReliabilityTests: XCTestCase {
         XCTAssertTrue(names.contains("forge_status"))
         XCTAssertTrue(names.contains("agent_list"))
         XCTAssertTrue(names.contains("shell_exec"))
+        XCTAssertTrue(MCPServeVerifier.requiredProductTools.isSubset(of: names))
     }
 
     func testForgeStatusToolCall() throws {
@@ -117,5 +118,133 @@ final class ProductPathReliabilityTests: XCTestCase {
         let recent = log.recent(limit: 50)
         let events = Set(recent.map(\.event))
         XCTAssertTrue(events.contains("deploy_begin") || events.contains("deploy_binary_missing") || events.contains("deploy_smoke_pre_failed") || events.contains("deploy_failed") || !recent.isEmpty)
+    }
+
+    func testProcessVerifierRejectsMissingContinuityTool() throws {
+        let tmp = try makeVerifierTemp()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        var names = Array(MCPServeVerifier.requiredProductTools.subtracting(["context_get"]))
+        while names.count < MCPServeVerifier.minimumToolCount {
+            names.append("fixture_tool_\(names.count)")
+        }
+        let binary = try makeVerifierExecutable(
+            in: tmp,
+            serverName: "forge-conductor",
+            toolNames: names
+        )
+
+        let result = try MCPServeVerifier.verify(
+            binary: binary,
+            home: tmp.appendingPathComponent("home", isDirectory: true),
+            timeoutSec: 1
+        )
+        XCTAssertFalse(result.ok)
+        XCTAssertTrue(result.detail.contains("context_get"), result.detail)
+    }
+
+    func testProcessVerifierRejectsMissingMemoryTool() throws {
+        let tmp = try makeVerifierTemp()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        var names = Array(MCPServeVerifier.requiredProductTools.subtracting(["memory_search"]))
+        while names.count < MCPServeVerifier.minimumToolCount {
+            names.append("fixture_tool_\(names.count)")
+        }
+        let binary = try makeVerifierExecutable(
+            in: tmp,
+            serverName: "forge-conductor",
+            toolNames: names
+        )
+
+        let result = try MCPServeVerifier.verify(
+            binary: binary,
+            home: tmp.appendingPathComponent("home", isDirectory: true),
+            timeoutSec: 1
+        )
+        XCTAssertFalse(result.ok)
+        XCTAssertTrue(result.detail.contains("memory_search"), result.detail)
+    }
+
+    func testProcessVerifierRejectsNonNDJSONPrefix() throws {
+        let tmp = try makeVerifierTemp()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        var names = Array(MCPServeVerifier.requiredProductTools)
+        while names.count < MCPServeVerifier.minimumToolCount {
+            names.append("fixture_tool_\(names.count)")
+        }
+        let binary = try makeVerifierExecutable(
+            in: tmp,
+            serverName: "forge-conductor",
+            toolNames: names,
+            prefix: "Content-Length: 10\n"
+        )
+
+        let result = try MCPServeVerifier.verify(
+            binary: binary,
+            home: tmp.appendingPathComponent("home", isDirectory: true),
+            timeoutSec: 1
+        )
+        XCTAssertFalse(result.ok)
+        XCTAssertTrue(result.detail.contains("ndjson=false"), result.detail)
+    }
+
+    func testProcessVerifierTimeoutIsBoundedForSilentChild() throws {
+        let tmp = try makeVerifierTemp()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let binary = tmp.appendingPathComponent("silent-server")
+        try Data("#!/bin/sh\ncat >/dev/null\nexec /bin/sleep 30\n".utf8).write(to: binary)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: binary.path)
+
+        let started = Date()
+        let result = try MCPServeVerifier.verify(
+            binary: binary,
+            home: tmp.appendingPathComponent("home", isDirectory: true),
+            timeoutSec: 0.2
+        )
+        XCTAssertFalse(result.ok)
+        XCTAssertLessThan(Date().timeIntervalSince(started), 2.5)
+    }
+
+    private func makeVerifierTemp() throws -> URL {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("forge-verifier-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        return tmp
+    }
+
+    private func makeVerifierExecutable(
+        in directory: URL,
+        serverName: String,
+        toolNames: [String],
+        prefix: String = ""
+    ) throws -> URL {
+        let initialize: [String: Any] = [
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": [
+                "protocolVersion": "2025-11-25",
+                "serverInfo": ["name": serverName, "version": ForgeApp.version],
+            ] as [String: Any],
+        ]
+        let descriptors: [[String: Any]] = toolNames.map { name in
+            [
+                "name": name,
+                "description": "Fixture tool \(name)",
+                "inputSchema": ["type": "object", "properties": [:] as [String: Any]],
+            ]
+        }
+        let tools: [String: Any] = [
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": ["tools": descriptors],
+        ]
+        let output = prefix
+            + (try JSONSupport.string(from: initialize)) + "\n"
+            + (try JSONSupport.string(from: tools)) + "\n"
+        let shellQuoted = output.replacingOccurrences(of: "'", with: "'\"'\"'")
+        let script = "#!/bin/sh\ncat >/dev/null\nprintf '%s' '\(shellQuoted)'\n"
+        let binary = directory.appendingPathComponent("fixture-server")
+        try Data(script.utf8).write(to: binary)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: binary.path)
+        return binary
     }
 }

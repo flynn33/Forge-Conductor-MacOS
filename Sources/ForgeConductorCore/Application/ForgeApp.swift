@@ -9,7 +9,7 @@ import Foundation
 /// Composition root for the Forge-Conductor application.
 /// All layers hang off this object; suitable for CLI, MCP stdio, and future Xcode shell.
 public final class ForgeApp: @unchecked Sendable {
-    public static let version = "0.6.0"
+    public static let version = "0.7.0"
     public static let productName = "Forge-Conductor"
 
     public let paths: AppPaths
@@ -19,6 +19,7 @@ public final class ForgeApp: @unchecked Sendable {
     public let diagnostics: DiagnosticLog
     public let catalog: AgentCatalog
     public let sessions: AgentSessionService
+    public let continuity: ContextContinuityService
     public let clock: any Clock
     public let lmStudioDeploy: LMStudioDeployService
 
@@ -40,6 +41,7 @@ public final class ForgeApp: @unchecked Sendable {
         diagnostics: DiagnosticLog,
         catalog: AgentCatalog,
         sessions: AgentSessionService,
+        continuity: ContextContinuityService,
         clock: any Clock,
         lmStudioDeploy: LMStudioDeployService
     ) {
@@ -50,6 +52,7 @@ public final class ForgeApp: @unchecked Sendable {
         self.diagnostics = diagnostics
         self.catalog = catalog
         self.sessions = sessions
+        self.continuity = continuity
         self.clock = clock
         self.lmStudioDeploy = lmStudioDeploy
     }
@@ -81,6 +84,13 @@ public final class ForgeApp: @unchecked Sendable {
             clock: clock,
             idleTTL: idleTTL
         )
+        let continuity = ContextContinuityService(
+            paths: paths,
+            store: store,
+            sessions: sessions,
+            diagnostics: diagnostics,
+            clock: clock
+        )
 
         let deploy = LMStudioDeployService(paths: paths, diagnostics: diagnostics, store: store)
         let app = ForgeApp(
@@ -91,6 +101,7 @@ public final class ForgeApp: @unchecked Sendable {
             diagnostics: diagnostics,
             catalog: catalog,
             sessions: sessions,
+            continuity: continuity,
             clock: clock,
             lmStudioDeploy: deploy
         )
@@ -124,7 +135,7 @@ public final class ForgeApp: @unchecked Sendable {
     }
 
     public func statusSnapshotModel() throws -> AppStatusSnapshot {
-        let open = try store.sessionList(status: .open)
+        let open = try store.sessionList().filter(\.status.isOpen)
         let presence = try store.presenceRecords()
         let auditRows = try audit.recent(limit: 20)
         let cfg = config.model
