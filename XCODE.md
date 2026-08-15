@@ -50,9 +50,16 @@ xcodebuild -project ForgeConductor.xcodeproj \
   test
 ```
 
-Debug app and UI-test targets use “Sign to Run Locally” so a development
-certificate is not required. Release distribution still requires the
-appropriate Apple signing identity and notarization.
+The app and `ForgeConductorCore` enable **Hardened Runtime** (`ENABLE_HARDENED_RUNTIME = YES`)
+and sign with **Apple Development** / team `2Y25RTLZET`. That is required for Archive
+and distribution. Entitlements live at
+`Sources/ForgeConductorApp/Resources/ForgeConductor.entitlements`.
+
+Do not set `CODE_SIGN_IDENTITY[sdk=macosx*] = -` on the app target: that forces
+ad-hoc signing and Notary/App Store reject the archive as missing Hardened Runtime.
+
+One unit test (`testProductionSignatureValidatorPreservesValidTeamSignedAppWhenAvailable`)
+skips when no team-signed app is present. That is expected on this machine.
 
 ## After building from Xcode
 

@@ -43,25 +43,25 @@ public final class MCPServer: @unchecked Sendable {
             "deployment_id": deploymentID,
         ])
         // Best-effort presence; never block MCP handshake on a locked GUI store.
-        try? app.store.presenceUpsert(
-            clientID: presenceID,
-            hostKind: role.hostKind,
-            pid: ProcessInfo.processInfo.processIdentifier,
-            cwd: FileManager.default.currentDirectoryPath
-        )
+        refreshPresence()
 
-        var lastPresence = Date.distantPast
+        // Idle stdio sessions receive no host messages. Heartbeat on a timer so
+        // the dashboard does not treat a live-but-quiet serve as gone.
+        let heartbeat = DispatchSource.makeTimerSource(queue: DispatchQueue(label: "forge.mcp.presence"))
+        heartbeat.schedule(deadline: .now() + 10, repeating: 10)
+        heartbeat.setEventHandler { [weak self] in
+            self?.refreshPresence()
+        }
+        heartbeat.resume()
+        defer { heartbeat.cancel() }
+
+        var lastPresence = Date()
         let reader = MCPStreamReader(handle: input)
         while let message = try reader.readMessage() {
             // Refresh presence while the stdio session is active (dashboard TTL ~45s).
             let now = Date()
             if now.timeIntervalSince(lastPresence) >= 15 {
-                try? app.store.presenceUpsert(
-                    clientID: presenceID,
-                    hostKind: role.hostKind,
-                    pid: ProcessInfo.processInfo.processIdentifier,
-                    cwd: FileManager.default.currentDirectoryPath
-                )
+                refreshPresence()
                 lastPresence = now
             }
             let response = handle(message)
@@ -165,6 +165,15 @@ public final class MCPServer: @unchecked Sendable {
 
     private var presenceID: String {
         "\(clientID.rawValue):\(role.rawValue)"
+    }
+
+    private func refreshPresence() {
+        try? app.store.presenceUpsert(
+            clientID: presenceID,
+            hostKind: role.hostKind,
+            pid: ProcessInfo.processInfo.processIdentifier,
+            cwd: FileManager.default.currentDirectoryPath
+        )
     }
 
     private func toolDescriptors() -> [[String: Any]] {

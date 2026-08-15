@@ -16,6 +16,12 @@ tools:
   - git_diff
   - git_add
   - git_commit
+  - session_checkpoint
+  - session_handoff
+  - context_get
+  - memory_set
+  - memory_get
+  - memory_search
 tools_forbidden:
   - git_push
 when_to_use:
@@ -25,10 +31,12 @@ when_not_to_use:
   - Pure exploration of unknown code (use explore)
   - Commit gate / audit only (use precommit-audit)
 first_moves:
+  - context_get then session_checkpoint with cwd/goal
   - fs_read surrounding code and tests
   - Minimal fs_edit / fs_write
   - shell_exec relevant tests or build when possible
   - git_diff to verify scope
+  - session_checkpoint after each meaningful unit
   - agent_run_complete with full report
 done_definition:
   - Change applied on disk

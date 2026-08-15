@@ -1568,7 +1568,162 @@ final class ContinuityTests: XCTestCase {
         }
 
         let latest = try app.continuity.get()
-        XCTAssertEqual(latest["found"] as? Bool, false)
+        // Runtime auto-checkpoint may persist progress; it must not look like a loop handoff.
+        if latest["found"] as? Bool == true {
+            XCTAssertEqual(latest["resume_ready"] as? Bool, false)
+        }
+    }
+
+    func testAutoCheckpointDoesNotStealModelPacketIdentity() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let modelClient = ClientID("model-author")
+        let created = try app.tools.call(
+            name: "session_checkpoint",
+            arguments: [
+                "goal": "Keep the model as author",
+                "status": "exploration-complete",
+                "cwd": tempHome.path,
+                "next_actions": ["Await user direction"],
+                "narrative": "Exploration finished",
+            ],
+            clientID: modelClient
+        )
+        let handoffID = try XCTUnwrap(created.payload["handoff_id"] as? String)
+
+        let smoke = ClientID("diagnostic-smoke")
+        for index in 0..<ContinuityAutomation.checkpointEveryTools {
+            let result = try app.tools.call(
+                name: "fs_write",
+                arguments: [
+                    "path": tempHome.appendingPathComponent("ident-\(index).txt").path,
+                    "content": "n=\(index)",
+                ],
+                clientID: smoke
+            )
+            XCTAssertTrue(result.ok, "\(result.payload)")
+        }
+
+        let packet = try XCTUnwrap(app.store.handoffGet(id: handoffID))
+        XCTAssertEqual(packet.source, .model)
+        XCTAssertEqual(packet.clientID, modelClient.rawValue)
+        XCTAssertEqual(packet.status, "exploration-complete")
+        XCTAssertEqual(packet.nextActions, ["Await user direction"])
+        XCTAssertEqual(packet.narrative, "Exploration finished")
+        XCTAssertFalse(packet.resumeReady)
+    }
+
+    func testRuntimeAutoCheckpointPersistsWithoutModelCall() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let client = ClientID("auto-checkpoint")
+        for index in 0..<ContinuityAutomation.checkpointEveryTools {
+            let path = tempHome.appendingPathComponent("auto-\(index).txt").path
+            let result = try app.tools.call(
+                name: "fs_write",
+                arguments: ["path": path, "content": "n=\(index)"],
+                clientID: client
+            )
+            XCTAssertTrue(result.ok, "\(result.payload)")
+        }
+        let latest = try app.continuity.get()
+        XCTAssertEqual(latest["found"] as? Bool, true)
+        let packet = try XCTUnwrap(latest["payload"] as? [String: Any] ?? latest["packet"] as? [String: Any])
+        let source = (packet["meta"] as? [String: Any])?["source"] as? String
+        XCTAssertEqual(source, HandoffSource.auto.rawValue)
+        XCTAssertEqual(latest["resume_ready"] as? Bool, false)
+    }
+
+    func testContextGetAdoptsWorkspaceForShellWithoutNewAgent() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let original = ClientID("adopt-original")
+        _ = try app.tools.call(
+            name: "session_checkpoint",
+            arguments: [
+                "goal": "Build Jamf Technician",
+                "cwd": tempHome.path,
+                "project_slug": "jamf-technician",
+            ],
+            clientID: original
+        )
+
+        let resumed = ClientID("adopt-resumed")
+        let got = try app.tools.call(name: "context_get", arguments: [:], clientID: resumed)
+        XCTAssertTrue(got.ok)
+        XCTAssertEqual(got.payload["found"] as? Bool, true)
+
+        let shell = try app.tools.call(
+            name: "shell_exec",
+            arguments: ["command": "pwd", "cwd": tempHome.path],
+            clientID: resumed
+        )
+        XCTAssertTrue(shell.ok, "\(shell.payload)")
+        XCTAssertEqual(shell.payload["code"] as? String, nil)
+    }
+
+    func testRuntimeHandoffBlocksProjectToolsUntilContextGet() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let client = ClientID("auto-handoff-block")
+        var last: ToolResult?
+        for index in 0..<ContinuityAutomation.handoffEveryTools {
+            last = try app.tools.call(
+                name: "fs_write",
+                arguments: [
+                    "path": tempHome.appendingPathComponent("handoff-\(index).txt").path,
+                    "content": "n=\(index)",
+                ],
+                clientID: client
+            )
+            XCTAssertTrue(last?.ok == true, "write \(index) \(last?.payload ?? [:])")
+        }
+        XCTAssertEqual(last?.payload["handoff_required"] as? Bool, true)
+        XCTAssertEqual(last?.payload["auto_continuity"] as? String, "handoff")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: app.paths.memoryNextChat.path))
+
+        let blocked = try app.tools.call(
+            name: "fs_write",
+            arguments: [
+                "path": tempHome.appendingPathComponent("blocked.txt").path,
+                "content": "must not write",
+            ],
+            clientID: client
+        )
+        XCTAssertFalse(blocked.ok)
+        XCTAssertEqual(blocked.payload["code"] as? String, "context_budget_exceeded")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: tempHome.appendingPathComponent("blocked.txt").path))
+
+        let resumed = ClientID("auto-handoff-resumed")
+        let got = try app.tools.call(name: "context_get", arguments: [:], clientID: client)
+        XCTAssertEqual(got.payload["context_budget_cleared"] as? Bool, true)
+        _ = try app.tools.call(name: "context_get", arguments: [:], clientID: resumed)
+
+        let after = try app.tools.call(
+            name: "fs_write",
+            arguments: [
+                "path": tempHome.appendingPathComponent("after-resume.txt").path,
+                "content": "ok",
+            ],
+            clientID: client
+        )
+        XCTAssertTrue(after.ok, "\(after.payload)")
+    }
+
+    func testReadOnlyHomePathIsAllowedWithoutAgentSession() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let projects = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("LM Studio Projects", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: projects.path) else {
+            throw XCTSkip("LM Studio Projects folder not present on this Mac")
+        }
+        let result = try app.tools.call(
+            name: "fs_list",
+            arguments: ["path": projects.path],
+            clientID: ClientID("home-read")
+        )
+        XCTAssertTrue(result.ok, "\(result.payload)")
     }
 }
 

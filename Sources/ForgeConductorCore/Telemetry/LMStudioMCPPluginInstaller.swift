@@ -205,9 +205,11 @@ public enum LMStudioMCPPluginInstaller {
             return false
         }
         let leaf = (command as NSString).lastPathComponent
-        let isCLI = leaf == "forge-conductor"
-        let isApp = leaf == "Forge Conductor" || command.contains("Forge Conductor.app/")
-        guard isCLI || isApp else { return false }
+        let isKnownBinary = leaf == "forge-conductor"
+            || leaf == "forge-conductor-app"
+            || leaf == "Forge Conductor"
+            || command.contains("Forge Conductor.app/")
+        guard isKnownBinary else { return false }
         guard args.contains("serve") else { return false }
         guard FileManager.default.isExecutableFile(atPath: command) else { return false }
         if let expectedDeploymentID, deploymentID != expectedDeploymentID { return false }

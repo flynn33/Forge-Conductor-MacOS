@@ -157,7 +157,79 @@ public final class ContextContinuityService: @unchecked Sendable {
                 "context_list",
             ],
             "note": "New chat bootstrap: call context_get over stdio MCP (forge-conductor).",
+            "auto": [
+                "checkpoint_every_tools": ContinuityAutomation.checkpointEveryTools,
+                "handoff_every_tools": ContinuityAutomation.handoffEveryTools,
+                "note": "Forge writes checkpoints and handoffs from tool progress; the model does not have to call session_*.",
+            ],
         ]
+    }
+
+    /// Runtime checkpoint/handoff inferred from tool progress (not a model call).
+    public func autoPersist(
+        clientID: ClientID,
+        reason: String,
+        finalize: Bool,
+        inferred: [String: Any]
+    ) throws -> HandoffPacket {
+        let persisted = try mutateAndPersist {
+            var args = inferred
+            if let latest = try store.handoffLatest(clientID: clientID.rawValue)
+                ?? store.handoffLatest(resumeReadyOnly: false) {
+                args["handoff_id"] = latest.id
+                // Runtime inference fills blanks only. A model/budget packet already
+                // has the structured task; overwriting it would drop operator state.
+                if !latest.goal.isEmpty { args.removeValue(forKey: "goal") }
+                if latest.cwd?.isEmpty == false { args.removeValue(forKey: "cwd") }
+                if !latest.nextActions.isEmpty { args.removeValue(forKey: "next_actions") }
+                if !latest.blockers.isEmpty { args.removeValue(forKey: "blockers") }
+                if !latest.keyFiles.isEmpty { args.removeValue(forKey: "key_files") }
+                if !latest.decisions.isEmpty { args.removeValue(forKey: "decisions") }
+                if !latest.narrative.isEmpty { args.removeValue(forKey: "narrative") }
+                if latest.projectSlug?.isEmpty == false { args.removeValue(forKey: "project_slug") }
+            }
+            // Soft auto-checkpoints must not invent a status. Forcing
+            // "in_progress" is what made an exploration packet look like a live resume.
+            if finalize, args["status"] == nil {
+                args["status"] = "handoff_ready"
+            }
+            var packet = try buildPacket(
+                arguments: args,
+                clientID: clientID,
+                source: .auto,
+                finalize: finalize,
+                preserveAuthorIdentity: true
+            )
+            if packet.goal.isEmpty {
+                packet.goal = finalize ? "Auto-handoff: \(reason)" : "Auto-checkpoint: \(reason)"
+            }
+            if finalize {
+                let note = "Runtime continuity: \(reason)"
+                if packet.narrative.isEmpty {
+                    packet.narrative = note
+                } else if !packet.narrative.contains(note) {
+                    packet.narrative = String(
+                        "\(packet.narrative)\n\n\(note)".prefix(HandoffPacket.maxNarrativeChars)
+                    )
+                }
+            }
+            if finalize {
+                packet.resumeReady = true
+                if !packet.resumeSeedIsCustom {
+                    packet.resumeSeed = packet.defaultResumeSeed()
+                }
+            }
+            return packet
+        }
+        diagnostics.info(finalize ? "auto_handoff_persist" : "auto_checkpoint_persist", [
+            "handoff_id": persisted.packet.id,
+            "client_id": clientID.rawValue,
+            "reason": reason,
+        ], category: .general)
+        if finalize {
+            try? writeNextChatHint(persisted.packet)
+        }
+        return persisted.packet
     }
 
     /// Auto-checkpoint used by budget policy (identical tool-loop / pressure).
@@ -201,7 +273,26 @@ public final class ContextContinuityService: @unchecked Sendable {
             "client_id": clientID.rawValue,
             "reason": reason,
         ], category: .tools)
+        try? writeNextChatHint(packet)
         return packet
+    }
+
+    private func writeNextChatHint(_ packet: HandoffPacket) throws {
+        let seed = packet.resumeSeed.isEmpty ? packet.defaultResumeSeed() : packet.resumeSeed
+        let body = """
+        # Next chat
+
+        Forge handed this work off. LM Studio cannot be opened to a new GUI chat from here.
+
+        1. Start a **new** LM Studio chat with the Forge-Conductor preset and both MCP servers enabled.
+        2. Call `context_get` (handoff id `\(packet.id)`).
+        3. Continue from the packet. Do not keep using the previous chat — its project tools are blocked.
+
+        ## Resume seed
+
+        \(seed)
+        """
+        try body.write(to: paths.memoryNextChat, atomically: true, encoding: .utf8)
     }
 
     // MARK: - Build / persist
@@ -210,7 +301,8 @@ public final class ContextContinuityService: @unchecked Sendable {
         arguments: [String: Any],
         clientID: ClientID,
         source: HandoffSource,
-        finalize: Bool
+        finalize: Bool,
+        preserveAuthorIdentity: Bool = false
     ) throws -> HandoffPacket {
         let now = ISO8601.string(from: clock.now())
         let existingID = ToolArgHelpers.string(arguments, "handoff_id")
@@ -227,17 +319,26 @@ public final class ContextContinuityService: @unchecked Sendable {
             }
             base = prior
             base.updatedAt = now
-            base.source = source
+            if !(preserveAuthorIdentity && !finalize) {
+                base.source = source
+            }
         } else if let latest = try store.handoffLatest(clientID: clientID.rawValue), !latest.resumeReady {
             // Continue the calling MCP client's open packet when no id is supplied.
             base = latest
             base.updatedAt = now
-            base.source = source
+            if !(preserveAuthorIdentity && !finalize) {
+                base.source = source
+            }
         } else {
             base.createdAt = now
             base.updatedAt = now
         }
-        base.clientID = clientID.rawValue
+        if preserveAuthorIdentity, existingID != nil || (base.clientID?.isEmpty == false) {
+            // Keep the author of an existing packet. Diagnostic/smoke clients
+            // must not become the resume identity.
+        } else {
+            base.clientID = clientID.rawValue
+        }
 
         if let goal = ToolArgHelpers.string(arguments, "goal"), !goal.isEmpty { base.goal = goal }
         if let status = ToolArgHelpers.string(arguments, "status"), !status.isEmpty { base.status = status }

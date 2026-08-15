@@ -386,6 +386,23 @@ final class MCPProcessTelemetryRegressionTests: XCTestCase {
         )
     }
 
+    func testAssemblerOmitsLMStudioHostAndModelBackendCards() {
+        let cards = assembler(alivePIDs: [14, 13, 21]).build(
+            presence: [],
+            live: [
+                process(pid: 14, label: "LM Studio", hostKind: "lm-studio-host"),
+                process(pid: 13, label: "llama-server", hostKind: "model-backend"),
+                process(pid: 21, label: "forge-conductor", hostKind: "mcp-stdio"),
+            ],
+            configured: connectorConfigurations(),
+            audit: []
+        )
+
+        XCTAssertFalse(cards.contains { $0.hostKind == "lm-studio-host" })
+        XCTAssertFalse(cards.contains { $0.hostKind == "model-backend" })
+        XCTAssertEqual(cards.filter(\.live).map(\.role), ["primary"])
+    }
+
     func testLivePrimaryDoesNotSuppressFallbackConfigurationWithSharedCommand() {
         let cards = assembler(alivePIDs: [21]).build(
             presence: [],

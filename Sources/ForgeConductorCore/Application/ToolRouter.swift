@@ -70,6 +70,21 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         // participates, including authorization denials, so policy failures cannot
         // evade the context-budget circuit breaker indefinitely.
         let isContinuity = ContinuityToolPack().toolNames.contains(name)
+        if !isContinuity,
+           !ContinuityAutomation.resumeTools.contains(name),
+           app.continuityAutomation.isBlocked(clientID) {
+            let blocked = contextBudgetBlockResult(clientID: clientID)
+            return recordAndReturn(
+                blocked,
+                tool: name,
+                arguments: routedArguments,
+                clientID: clientID,
+                start: start,
+                status: "error",
+                auditError: blocked.payload["code"] as? String,
+                mutating: false
+            )
+        }
         let loopCount = isContinuity
             ? 0
             : recordIdenticalCall(tool: name, arguments: routedArguments, clientID: clientID)
@@ -162,6 +177,15 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
                 authorizationDenialCode: nil
             )
         }
+        if !isContinuity {
+            finalResult = applyRuntimeContinuity(
+                finalResult,
+                tool: name,
+                arguments: routedArguments,
+                clientID: clientID,
+                succeeded: result.ok
+            )
+        }
 
         let status = finalResult.ok ? "ok" : "error"
         return recordAndReturn(
@@ -171,7 +195,7 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
             clientID: clientID,
             start: start,
             status: status,
-            auditError: finalResult.ok ? nil : (finalResult.payload["message"] as? String),
+            auditError: finalResult.ok ? nil : Self.errorSummary(finalResult),
             mutating: Self.mutatingTools.contains(name)
         )
     }
@@ -212,6 +236,7 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
                 clientID: clientID,
                 reason: "identical_call_loop tool=\(tool) count=\(loopCount)\(denialReason)"
             )
+            app.continuityAutomation.markBlocked(clientID: clientID, packet: packet)
             var payload: [String: Any] = [
                 "ok": false,
                 "code": "identical_call_loop",
@@ -305,6 +330,76 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         "memory_set", "memory_delete",
         "session_checkpoint", "session_handoff",
     ]
+
+    private func applyRuntimeContinuity(
+        _ result: ToolResult,
+        tool: String,
+        arguments: [String: Any],
+        clientID: ClientID,
+        succeeded: Bool
+    ) -> ToolResult {
+        guard let observation = app.continuityAutomation.observe(
+            tool: tool,
+            arguments: arguments,
+            clientID: clientID,
+            succeeded: succeeded
+        ) else {
+            return result
+        }
+        var payload = result.payload
+        payload["auto_continuity"] = observation.finalize ? "handoff" : "checkpoint"
+        payload["auto_handoff_id"] = observation.packet.id
+        if observation.finalize {
+            payload["handoff_required"] = true
+            payload["handoff_id"] = observation.packet.id
+            payload["resume_seed"] = observation.packet.resumeSeed.isEmpty
+                ? observation.packet.defaultResumeSeed()
+                : observation.packet.resumeSeed
+            payload["continuity_note"] =
+                "Context budget: Forge auto-saved handoff \(observation.packet.id). " +
+                "Further project tools are blocked on this client until context_get in a new chat."
+        }
+        return ToolResult(ok: result.ok, payload: payload, isError: result.isError)
+    }
+
+    private func contextBudgetBlockResult(clientID: ClientID) -> ToolResult {
+        let prior = app.continuityAutomation.blockState(clientID)
+        let payload: [String: Any] = [
+            "ok": false,
+            "code": "context_budget_exceeded",
+            "message":
+                "This chat has been handed off. Start a new LM Studio chat with Forge MCP enabled, " +
+                "then call context_get. Further filesystem/shell/git tools are blocked here.",
+            "retryable": false,
+            "handoff_required": true,
+            "handoff_id": prior.handoffID as Any,
+            "resume_seed": prior.resumeSeed as Any,
+        ]
+        return ToolResult(ok: false, payload: payload, isError: true)
+    }
+
+    private static func errorSummary(_ result: ToolResult) -> String {
+        if let message = result.payload["message"] as? String, !message.isEmpty {
+            return message
+        }
+        if let code = result.payload["code"] as? String, !code.isEmpty {
+            return code
+        }
+        if let exit = result.payload["exit_code"] {
+            var summary = "exit_code=\(exit)"
+            if result.payload["timed_out"] as? Bool == true {
+                summary += " timed_out=true"
+            }
+            if let stderr = result.payload["stderr"] as? String {
+                let trimmed = stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty {
+                    summary += " stderr=\(trimmed.prefix(240))"
+                }
+            }
+            return summary
+        }
+        return "error"
+    }
 
     private func dispatch(name: String, arguments: [String: Any], clientID: ClientID) throws -> ToolResult {
         for pack in packs {

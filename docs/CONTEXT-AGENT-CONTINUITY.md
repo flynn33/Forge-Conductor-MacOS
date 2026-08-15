@@ -1,6 +1,8 @@
-# Context & Agent Continuity (v0.7.0)
+# Context & Agent Continuity (v0.8.0)
 
 ## Summary
+
+Operator walkthrough: [USER-GUIDE.md](../USER-GUIDE.md).
 
 Forge Conductor owns **context handoff** and **agent session continuity** for LM Studio chats. Both ship over the existing **stdio MCP** server (`serve`). Deploy remains **Deploy to LM Studio** (primary + fallback mcpBridge). No HTTP dependency for agent resume.
 
@@ -47,10 +49,11 @@ them from SQLite after an interrupted or older-version write.
 
 1. **Model** — calls checkpoint/handoff tools
 2. **Budget** — ToolRouter tracks canonical consecutive tool fingerprints. The fourth identical call writes a soft handoff signal; the ninth is blocked with `identical_call_loop`. Continuity calls do not count toward the loop.
+3. **Runtime (0.8.0)** — `ContinuityAutomation` counts progress tools (`fs_*`, `shell_exec`, git, memory_set, agent_run_*). Every 5 progress tools (or 3 minutes) Forge writes a checkpoint. Every 20 progress tools (or 12 minutes) it writes a resume-ready handoff, writes `memory/NEXT-CHAT.md`, and **blocks** further filesystem/shell/git tools on that MCP client until `context_get`. LM Studio has no API to open a GUI chat; the hard block is the enforcement. `lms chat` is a separate CLI session, not the GUI.
 
-## Phase 2 (later)
+## Phase 2
 
-Optional LM Studio host automation to open a new chat. Memory remains in Forge stdio tools; not required for Phase 1.
+Runtime continuity is implemented in-process. Opening a new LM Studio chat is still a host action; Forge returns `resume_seed` when a handoff is required.
 
 ## Bootstrap (new chat)
 
