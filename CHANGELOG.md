@@ -6,6 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 for marketing versions (`MAJOR.MINOR.PATCH`).
 
+## [0.8.0] — 2026-08-14
+
+### Added
+
+- **Hard context budget** — after auto-handoff (20 progress tools) or a hard identical-call loop, further filesystem/shell/git tools on that MCP client return `context_budget_exceeded` until `context_get`. Writes `memory/NEXT-CHAT.md`. LM Studio has no API to open a GUI chat; this is the enforcement.
+- **Runtime continuity** — Forge checkpoints and handoffs from tool progress.
+  The model no longer has to remember `session_checkpoint` / `session_handoff`.
+  Default: checkpoint every 5 progress tools, handoff every 20 or 12 minutes.
+- **Workspace resume** — latest handoff `cwd` / `key_files` become implicit roots.
+  `context_get` adopts them for the calling client.
+- **Home read-only paths** — `fs_list` / `fs_read` / `fs_glob` / `search_text` may
+  read under the interactive user's home (excluding Library, ssh, and similar).
+- Idle MCP **presence heartbeat** every 10s so a quiet serve stays live on the dashboard.
+- Snapshot now reports real `presence` rows and `primary_alive` / `fallback_alive`.
+- `shell_exec` failures persist `exit_code` / stderr in the audit error field.
+
+### Changed
+
+- Implement playbook includes continuity and memory tools.
+- Manager heartbeat age is 0 while the manager process is alive (no longer the
+  stale `manager-state.json` mtime capped at 120s).
+- Soft auto-checkpoints no longer change a model packet's source, status, or
+  client id, and no longer append diagnostic lines to the narrative.
+- MCP server cards omit LM Studio host helpers and model backends.
+
 ## [0.7.0] — 2026-08-01
 
 ### Added

@@ -268,7 +268,7 @@ final class G1G10AcceptanceTests: XCTestCase {
 
     func testG3_VersionIsDefined() {
         XCTAssertFalse(ForgeApp.version.isEmpty)
-        XCTAssertEqual(ForgeApp.version, "0.7.0")
+        XCTAssertEqual(ForgeApp.version, "0.8.0")
     }
 
     func testG9_ResolvePrefersExplicitBinary() {

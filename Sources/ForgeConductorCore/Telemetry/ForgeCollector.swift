@@ -192,6 +192,7 @@ public final class ForgeCollector: ForgeMetricsCollecting, @unchecked Sendable {
             home: paths.home.path,
             runtime: "swift-native",
             presenceCount: mcpAssembler.reconciledPresenceCount(presence),
+            presence: presence,
             mcpServers: mcpServers,
             mcpTools: toolsAndPacks.tools,
             mcpPacks: toolsAndPacks.packs,
@@ -247,9 +248,14 @@ public final class ForgeCollector: ForgeMetricsCollecting, @unchecked Sendable {
             configuredRoleCount: validConfiguredRoleCount(configuredMCPServers)
         ))
 
-        let heartbeatAge = managerAlive
-            ? managerState?.fileAgeSec.map { min($0, 120) }
-            : nil
+        let heartbeatAge = managerAlive ? 0 : nil
+        let stdio = procs.mcpProcesses.filter { ProcessDiscovery.isForgeMCPStdioHostKind($0.hostKind) }
+        let primaryAlive = stdio.contains {
+            $0.hostKind == LMStudioConnectorRole.primary.hostKind
+        }
+        let fallbackAlive = stdio.contains {
+            $0.hostKind == LMStudioConnectorRole.fallback.hostKind
+        }
 
         return OrchestrationStatus(
             home: paths.home.path,
@@ -265,7 +271,9 @@ public final class ForgeCollector: ForgeMetricsCollecting, @unchecked Sendable {
             heartbeatSource: managerAlive ? "swift-manager" : (mcpExt > 0 ? "live-ps" : "none"),
             serviceActive: managerState?.serviceActive,
             httpListening: managerState?.httpListening,
-            managerStateRaw: managerState?.state
+            managerStateRaw: managerState?.state,
+            primaryAlive: primaryAlive,
+            fallbackAlive: fallbackAlive
         )
     }
 
@@ -595,6 +603,9 @@ struct MCPServerCardAssembler {
         // the role and stable client identity needed to correlate audit activity.
         for process in live where !emittedLivePIDs.contains(process.pid) {
             emittedLivePIDs.insert(process.pid)
+            if process.hostKind == "lm-studio-host" || process.hostKind == "model-backend" {
+                continue
+            }
             let processIsStdio = ProcessDiscovery.isForgeMCPStdioHostKind(
                 process.hostKind
             )

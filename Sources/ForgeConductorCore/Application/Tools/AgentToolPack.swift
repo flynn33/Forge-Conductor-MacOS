@@ -86,6 +86,7 @@ public struct AgentToolPack: ToolPackHandling {
             "open_sessions": openSessions.count,
             "open_session_ids": openSessions.map(\.id.rawValue),
             "continuity": continuity,
+            "auto_continuity": app.continuityAutomation.snapshot(for: clientID),
             "pid": ProcessInfo.processInfo.processIdentifier,
         ])
     }

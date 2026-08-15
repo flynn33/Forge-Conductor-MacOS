@@ -33,11 +33,18 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
     private let paths: AppPaths
     private let config: ConfigStore
     private let fileManager: FileManager
+    public weak var workspace: WorkspaceRootProviding?
 
-    public init(paths: AppPaths, config: ConfigStore, fileManager: FileManager = .default) {
+    public init(
+        paths: AppPaths,
+        config: ConfigStore,
+        fileManager: FileManager = .default,
+        workspace: WorkspaceRootProviding? = nil
+    ) {
         self.paths = paths
         self.config = config
         self.fileManager = fileManager
+        self.workspace = workspace
     }
 
     public func authorize(
@@ -62,19 +69,27 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
                 )
             }
         } else if Self.requiresActiveSession.contains(tool) {
-            return .denied(
-                code: "active_session_required",
-                message: "Tool '\(tool)' requires agent_run_start with an explicit workspace cwd"
-            )
+            let extras = workspace?.additionalRoots(for: clientID) ?? []
+            if extras.isEmpty {
+                return .denied(
+                    code: "active_session_required",
+                    message: "Tool '\(tool)' requires agent_run_start with an explicit workspace cwd"
+                )
+            }
         }
 
-        let roots = authorizedRoots(binding: binding)
+        let roots = authorizedRoots(binding: binding, clientID: clientID)
         let base = binding.flatMap(\.cwd).map(ToolArgHelpers.resolvePath) ?? roots.first ?? paths.home
         var normalized = arguments
 
+        let readOnly = Self.readOnlyPathTools.contains(tool)
         for access in pathAccesses(tool: tool, arguments: arguments, base: base) {
             let candidate = canonicalURL(access.url)
-            guard let containingRoot = roots.first(where: { contains(candidate, root: $0) }) else {
+            var containingRoot = roots.first(where: { contains(candidate, root: $0) })
+            if containingRoot == nil, readOnly, isPermittedHomeRead(candidate) {
+                containingRoot = homeReadRoot(for: candidate)
+            }
+            guard let containingRoot else {
                 return .denied(
                     code: "path_outside_allowed_roots",
                     message: "Path is outside the active workspace roots: \(candidate.path)"
@@ -156,14 +171,33 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
         }
     }
 
-    private func authorizedRoots(binding: ActiveBinding?) -> [URL] {
+    private func authorizedRoots(binding: ActiveBinding?, clientID: ClientID) -> [URL] {
         let configured = config.model.allowedRoots.map(ToolArgHelpers.resolvePath)
         let bindingRoot = binding.flatMap(\.cwd).map(ToolArgHelpers.resolvePath)
-        return ([paths.home] + configured + [bindingRoot].compactMap { $0 })
+        let extra = workspace?.additionalRoots(for: clientID) ?? []
+        return ([paths.home] + configured + [bindingRoot].compactMap { $0 } + extra)
             .map(canonicalURL)
             .reduce(into: [URL]()) { roots, root in
                 if !roots.contains(root) { roots.append(root) }
             }
+    }
+
+    /// Read-only access under the interactive user's home, excluding secret/system trees.
+    private func isPermittedHomeRead(_ url: URL) -> Bool {
+        let home = fileManager.homeDirectoryForCurrentUser.resolvingSymlinksInPath().standardizedFileURL
+        guard contains(url, root: home) else { return false }
+        let relative = url.pathComponents.dropFirst(home.pathComponents.count).map { $0.lowercased() }
+        guard let first = relative.first else { return false }
+        return !Self.deniedHomePrefixes.contains(first)
+    }
+
+    private func homeReadRoot(for url: URL) -> URL {
+        let home = fileManager.homeDirectoryForCurrentUser.resolvingSymlinksInPath().standardizedFileURL
+        let extras = url.pathComponents.dropFirst(home.pathComponents.count)
+        if let first = extras.first {
+            return home.appendingPathComponent(first).standardizedFileURL
+        }
+        return home
     }
 
     private func resolve(_ raw: String, relativeTo base: URL) -> URL {
@@ -212,6 +246,15 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
 
     private static let cwdTools: Set<String> = [
         "git_status", "git_diff", "git_log", "git_add", "git_commit", "shell_exec",
+    ]
+
+    private static let readOnlyPathTools: Set<String> = [
+        "fs_read", "fs_list", "fs_glob", "search_text",
+    ]
+
+    private static let deniedHomePrefixes: Set<String> = [
+        "library", ".ssh", ".gnupg", ".aws", ".config", ".trash",
+        "applications",
     ]
 }
 

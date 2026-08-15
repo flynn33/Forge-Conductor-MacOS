@@ -6,7 +6,8 @@ This project is **not** Claude Code orchestration, CCDT, or `~/.claude/local-mcp
 
 | | |
 |---|---|
-| **Version** | **0.7.0** |
+| **Version** | **0.8.0** |
+| **User guide** | [USER-GUIDE.md](USER-GUIDE.md) |
 | **Changelog** | [CHANGELOG.md](CHANGELOG.md) |
 | **License** | [Apache License 2.0](LICENSE) |
 | **Platform** | macOS 26+ |

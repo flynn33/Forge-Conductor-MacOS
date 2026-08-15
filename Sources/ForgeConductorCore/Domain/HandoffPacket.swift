@@ -11,6 +11,7 @@ public enum HandoffSource: String, Sendable, Codable, Equatable {
     case model
     case budget
     case user
+    case auto
 }
 
 /// Snapshot of an open (or recently open) specialist agent for resume.

@@ -13,6 +13,7 @@ public struct ForgeSnapshot: Sendable, Equatable {
     public var home: String
     public var runtime: String
     public var presenceCount: Int
+    public var presence: [PresenceRecord]
     public var mcpServers: [MCPServerCard]
     public var mcpTools: [ToolCard]
     public var mcpPacks: [ToolPackSummary]
@@ -31,6 +32,7 @@ public struct ForgeSnapshot: Sendable, Equatable {
         home: String,
         runtime: String,
         presenceCount: Int,
+        presence: [PresenceRecord] = [],
         mcpServers: [MCPServerCard],
         mcpTools: [ToolCard],
         mcpPacks: [ToolPackSummary],
@@ -48,6 +50,7 @@ public struct ForgeSnapshot: Sendable, Equatable {
         self.home = home
         self.runtime = runtime
         self.presenceCount = presenceCount
+        self.presence = presence
         self.mcpServers = mcpServers
         self.mcpTools = mcpTools
         self.mcpPacks = mcpPacks
@@ -70,6 +73,7 @@ public struct ForgeSnapshot: Sendable, Equatable {
             home: home,
             runtime: "swift-native-realtime",
             presenceCount: 0,
+            presence: [],
             mcpServers: [],
             mcpTools: [],
             mcpPacks: [],
@@ -91,7 +95,7 @@ public struct ForgeSnapshot: Sendable, Equatable {
             "home": home,
             "runtime": runtime,
             "presence_count": presenceCount,
-            "presence": [] as [[String: Any]], // raw rows not needed by native UI
+            "presence": presence.map { $0.asDictionary() },
             "mcp_servers": mcpServers.map { $0.asDictionary() },
             "mcp_tools": mcpTools.map { $0.asDictionary() },
             "mcp_packs": mcpPacks.map { $0.asDictionary() },
@@ -220,6 +224,8 @@ public struct OrchestrationStatus: Sendable, Equatable {
     public var serviceActive: Bool?
     public var httpListening: Bool?
     public var managerStateRaw: String?
+    public var primaryAlive: Bool
+    public var fallbackAlive: Bool
 
     public init(
         home: String,
@@ -235,7 +241,9 @@ public struct OrchestrationStatus: Sendable, Equatable {
         heartbeatSource: String,
         serviceActive: Bool?,
         httpListening: Bool?,
-        managerStateRaw: String?
+        managerStateRaw: String?,
+        primaryAlive: Bool = false,
+        fallbackAlive: Bool = false
     ) {
         self.home = home
         self.mode = mode
@@ -251,6 +259,8 @@ public struct OrchestrationStatus: Sendable, Equatable {
         self.serviceActive = serviceActive
         self.httpListening = httpListening
         self.managerStateRaw = managerStateRaw
+        self.primaryAlive = primaryAlive
+        self.fallbackAlive = fallbackAlive
     }
 
     public static func empty(home: String) -> OrchestrationStatus {
@@ -268,7 +278,9 @@ public struct OrchestrationStatus: Sendable, Equatable {
             heartbeatSource: "none",
             serviceActive: nil,
             httpListening: nil,
-            managerStateRaw: nil
+            managerStateRaw: nil,
+            primaryAlive: false,
+            fallbackAlive: false
         )
     }
 
@@ -287,8 +299,8 @@ public struct OrchestrationStatus: Sendable, Equatable {
             "manager_alive": managerAlive,
             "manager_pid": managerPID as Any,
             "manager_state": managerState,
-            "primary_alive": false,
-            "fallback_alive": false,
+            "primary_alive": primaryAlive,
+            "fallback_alive": fallbackAlive,
             "watchdog_alive": false,
             "orchestrator_alive": false,
             "serve_count": serveCount,

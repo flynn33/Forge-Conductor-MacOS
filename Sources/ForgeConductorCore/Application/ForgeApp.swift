@@ -9,7 +9,7 @@ import Foundation
 /// Composition root for the Forge-Conductor application.
 /// All layers hang off this object; suitable for CLI, MCP stdio, and future Xcode shell.
 public final class ForgeApp: @unchecked Sendable {
-    public static let version = "0.7.0"
+    public static let version = "0.8.0"
     public static let productName = "Forge-Conductor"
 
     public let paths: AppPaths
@@ -20,12 +20,20 @@ public final class ForgeApp: @unchecked Sendable {
     public let catalog: AgentCatalog
     public let sessions: AgentSessionService
     public let continuity: ContextContinuityService
+    public let continuityAutomation: ContinuityAutomation
     public let clock: any Clock
     public let lmStudioDeploy: LMStudioDeployService
 
     /// Self-referential adapters are lazy, non-optional services. Bootstrap
     /// initializes both before publishing the composition root to callers.
-    public private(set) lazy var tools = ToolRouter(app: self)
+    public private(set) lazy var tools: ToolRouter = {
+        let authorization = ToolAuthorizationService(
+            paths: paths,
+            config: config,
+            workspace: continuityAutomation
+        )
+        return ToolRouter(app: self, authorization: authorization)
+    }()
     public private(set) lazy var telemetry = TelemetryService(
         paths: paths,
         store: store,
@@ -42,6 +50,7 @@ public final class ForgeApp: @unchecked Sendable {
         catalog: AgentCatalog,
         sessions: AgentSessionService,
         continuity: ContextContinuityService,
+        continuityAutomation: ContinuityAutomation,
         clock: any Clock,
         lmStudioDeploy: LMStudioDeployService
     ) {
@@ -53,6 +62,7 @@ public final class ForgeApp: @unchecked Sendable {
         self.catalog = catalog
         self.sessions = sessions
         self.continuity = continuity
+        self.continuityAutomation = continuityAutomation
         self.clock = clock
         self.lmStudioDeploy = lmStudioDeploy
     }
@@ -91,6 +101,13 @@ public final class ForgeApp: @unchecked Sendable {
             diagnostics: diagnostics,
             clock: clock
         )
+        let continuityAutomation = ContinuityAutomation(
+            store: store,
+            sessions: sessions,
+            continuity: continuity,
+            diagnostics: diagnostics,
+            clock: clock
+        )
 
         let deploy = LMStudioDeployService(paths: paths, diagnostics: diagnostics, store: store)
         let app = ForgeApp(
@@ -102,6 +119,7 @@ public final class ForgeApp: @unchecked Sendable {
             catalog: catalog,
             sessions: sessions,
             continuity: continuity,
+            continuityAutomation: continuityAutomation,
             clock: clock,
             lmStudioDeploy: deploy
         )

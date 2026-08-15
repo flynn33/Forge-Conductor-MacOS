@@ -44,6 +44,7 @@ public final class AppPaths: @unchecked Sendable {
     public var memoryHandoffsDir: URL { memoryDir.appendingPathComponent("handoffs", isDirectory: true) }
     public var memoryContinuityLock: URL { memoryDir.appendingPathComponent(".continuity.lock") }
     public var memoryCurrentTask: URL { memoryDir.appendingPathComponent("current-task.md") }
+    public var memoryNextChat: URL { memoryDir.appendingPathComponent("NEXT-CHAT.md") }
     public var memoryIndex: URL { memoryDir.appendingPathComponent("INDEX.md") }
 
     @discardableResult
