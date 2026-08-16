@@ -20,10 +20,10 @@ public struct ContinuityObservation: Sendable {
 
 /// Server-side continuity: checkpoint and handoff without a model tool call.
 public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Sendable {
-    public static let checkpointEveryTools = 5
-    public static let handoffEveryTools = 20
-    public static let checkpointIntervalSec: TimeInterval = 180
-    public static let handoffIntervalSec: TimeInterval = 720
+    public static let checkpointEveryTools = 50
+    public static let handoffEveryTools = 200
+    public static let checkpointIntervalSec: TimeInterval = 1_800
+    public static let handoffIntervalSec: TimeInterval = 7_200
 
     private let store: SQLiteStore
     private let sessions: AgentSessionService
