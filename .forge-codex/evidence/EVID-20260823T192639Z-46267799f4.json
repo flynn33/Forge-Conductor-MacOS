@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 1580,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T192639Z-46267799f4.stdout.txt",
+      "sha256": "ccd303c6b89989cf5eaa52ed832e5b863b7ecc71386692030b8761ceb9dd5519"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T192639Z-46267799f4.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "command": "curl --fail --silent --show-error http://127.0.0.1:7788/api/health",
+  "ended_at": "2026-08-23T19:26:39.395309+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T192639Z-46267799f4",
+  "kind": "p04-paused-window-end",
+  "related_findings": [],
+  "related_gates": [
+    "G04"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T19:26:39.384889+00:00",
+  "timed_out": false
+}

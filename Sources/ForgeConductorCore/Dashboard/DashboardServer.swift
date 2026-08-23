@@ -166,8 +166,14 @@ public final class DashboardServer: @unchecked Sendable {
         sigTerm.setEventHandler { sem.signal() }
         sigInt.resume()
         sigTerm.resume()
+        defer {
+            sigInt.setEventHandler {}
+            sigTerm.setEventHandler {}
+            sigInt.cancel()
+            sigTerm.cancel()
+            stop()
+        }
         sem.wait()
-        stop()
     }
 
     // MARK: - Connection

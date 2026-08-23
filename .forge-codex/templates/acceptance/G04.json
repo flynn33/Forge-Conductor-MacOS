@@ -1,0 +1,33 @@
+{
+  "commands": [],
+  "criteria_results": [
+    {
+      "criterion": "Metal resource construction is shared or justified",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "hidden/static draw count reaches zero after quiescence",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "no high-frequency buffer allocation path",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "open-close release test passes",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "Release Metal/performance evidence meets budget",
+      "evidence": [],
+      "passed": false
+    }
+  ],
+  "gate_id": "G04",
+  "instructions": "Replace placeholders only with command-backed artifacts and SHA-256 values. The validator rejects absent evidence.",
+  "schema_version": 1
+}

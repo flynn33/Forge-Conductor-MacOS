@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 961287,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T194253Z-44ca4b7694.stdout.txt",
+      "sha256": "a6a19720b3c8f8860aa6d7aa418a9ece5156c63494d887f47173352b226dbf5b"
+    },
+    {
+      "bytes": 145,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T194253Z-44ca4b7694.stderr.txt",
+      "sha256": "ee1ed7429d1c28ec5493f767cdadda467f2c701656bb180ad7f1e64f867c6c35"
+    }
+  ],
+  "command": "/usr/bin/leaks 41175",
+  "ended_at": "2026-08-23T19:42:56.430476+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 1,
+  "id": "EVID-20260823T194253Z-44ca4b7694",
+  "kind": "live-leak-growth-check",
+  "related_findings": [],
+  "related_gates": [
+    "G05"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T19:42:53.954612+00:00",
+  "timed_out": false
+}

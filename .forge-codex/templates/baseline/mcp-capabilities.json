@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "captured_at": null,
+  "server_identity": null,
+  "transports": [],
+  "initialize_transcript_artifact": null,
+  "tools": [],
+  "resources": [],
+  "prompts": [],
+  "errors": [],
+  "compatibility_tests": []
+}

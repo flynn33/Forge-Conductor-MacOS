@@ -1,0 +1,504 @@
+{
+  "findings": [
+    {
+      "affected_feature_ids": [
+        "TEL-UI-BINDING"
+      ],
+      "assigned_phase": "P03",
+      "evidence_class": "E1",
+      "fix_commits": [],
+      "id": "FC-MEM-001",
+      "ownership_disposition": "AppTelemetryBinding owns one LatestValueMailbox consumer task. The mailbox retains at most one in-flight frame and one replaceable buffered frame, and detach invalidates its generation and stops it.",
+      "runtime_proof": [
+        ".forge-codex/evidence/P03-bounded-telemetry-before-after.json",
+        ".forge-codex/evidence/EVID-20260823T191259Z-1cde4355df.json"
+      ],
+      "severity": "Critical",
+      "status": "resolved",
+      "title": "Telemetry delivery can accumulate unbounded pending MainActor tasks",
+      "validation_evidence": [
+        ".forge-codex/evidence/EVID-20260823T191232Z-37ef639495.json",
+        ".forge-codex/evidence/EVID-20260823T191342Z-33c7dab2e2.json",
+        ".forge-codex/evidence/EVID-20260823T191456Z-1dd93b3c6a.json"
+      ]
+    },
+    {
+      "affected_feature_ids": [
+        "TEL-METAL-GAUGES"
+      ],
+      "assigned_phase": "P04",
+      "evidence_class": "E1",
+      "fix_commits": [],
+      "id": "FC-PERF-001",
+      "ownership_disposition": "All gauge renderers borrow the process-wide MetalGaugeResources device, command queue, and pixel-format pipeline. Views draw on demand and explicitly dismantle surface-local buffers and delegates.",
+      "runtime_proof": [
+        ".forge-codex/evidence/P04-metal-performance-report.json",
+        ".forge-codex/evidence/EVID-20260823T192842Z-4e41ce2a84.json",
+        ".forge-codex/evidence/EVID-20260823T192902Z-89fd0383eb.json"
+      ],
+      "severity": "Critical",
+      "status": "resolved",
+      "title": "Each gauge MTKView owns an independent command queue/pipeline and recurring render cadence",
+      "validation_evidence": [
+        ".forge-codex/evidence/EVID-20260823T193100Z-a782c3890a.json",
+        ".forge-codex/evidence/EVID-20260823T193106Z-667173c96c.json",
+        ".forge-codex/evidence/EVID-20260823T192954Z-a1ccac7d61.json"
+      ]
+    },
+    {
+      "affected_feature_ids": [
+        "TEL-METAL-GAUGES"
+      ],
+      "assigned_phase": "P04",
+      "evidence_class": "E1",
+      "fix_commits": [],
+      "id": "FC-PERF-001",
+      "ownership_disposition": "All gauge renderers borrow the process-wide MetalGaugeResources device, command queue, and pixel-format pipeline. Views draw on demand and explicitly dismantle surface-local buffers and delegates.",
+      "runtime_proof": [
+        ".forge-codex/evidence/P04-metal-performance-report.json",
+        ".forge-codex/evidence/EVID-20260823T192842Z-4e41ce2a84.json",
+        ".forge-codex/evidence/EVID-20260823T192902Z-89fd0383eb.json"
+      ],
+      "severity": "Critical",
+      "status": "resolved",
+      "title": "Each gauge MTKView owns an independent command queue/pipeline and recurring render cadence",
+      "validation_evidence": [
+        ".forge-codex/evidence/EVID-20260823T193100Z-a782c3890a.json",
+        ".forge-codex/evidence/EVID-20260823T193106Z-667173c96c.json",
+        ".forge-codex/evidence/EVID-20260823T192954Z-a1ccac7d61.json"
+      ]
+    },
+    {
+      "affected_feature_ids": [
+        "TEL-METAL-GAUGES"
+      ],
+      "assigned_phase": "P03",
+      "evidence_class": "E1",
+      "fix_commits": [],
+      "id": "FC-PERF-002",
+      "ownership_disposition": "Each renderer owns one capacity-growing MetalVertexBuffer. Telemetry updates copy into existing shared storage; allocation occurs only for initial capacity or bounded high-water growth, and dismantle releases the surface-local buffer.",
+      "runtime_proof": [
+        ".forge-codex/evidence/P04-metal-performance-report.json",
+        ".forge-codex/evidence/EVID-20260823T192151Z-4704466f4f.json",
+        ".forge-codex/evidence/EVID-20260823T192214Z-82141cd307.json"
+      ],
+      "severity": "High",
+      "status": "resolved",
+      "title": "Gauge update path allocates replacement Metal buffers",
+      "validation_evidence": [
+        ".forge-codex/evidence/EVID-20260823T193100Z-a782c3890a.json",
+        ".forge-codex/evidence/EVID-20260823T193106Z-667173c96c.json"
+      ]
+    },
+    {
+      "affected_feature_ids": [
+        "UI-TAB-RIG",
+        "TEL-METAL-GAUGES"
+      ],
+      "assigned_phase": "P03",
+      "evidence_class": "E1",
+      "fix_commits": [],
+      "id": "FC-PERF-003",
+      "ownership_disposition": "RigDashboardView no longer owns a TimelineView animation clock. Telemetry publication is the display clock, each renderer requires dirty state, and disabling auto-refresh produces zero Metal draws while source telemetry continues.",
+      "runtime_proof": [
+        ".forge-codex/evidence/P04-metal-performance-report.json",
+        ".forge-codex/evidence/EVID-20260823T192631Z-cfa3748c4d.json",
+        ".forge-codex/evidence/EVID-20260823T192639Z-46267799f4.json"
+      ],
+      "severity": "High",
+      "status": "resolved",
+      "title": "Gauge hierarchy has an animation clock independent of telemetry and MTKView drawing",
+      "validation_evidence": [
+        ".forge-codex/evidence/EVID-20260823T193100Z-a782c3890a.json",
+        ".forge-codex/evidence/EVID-20260823T193106Z-667173c96c.json"
+      ]
+    },
+    {
+      "affected_feature_ids": [
+        "UI-NAVIGATION-SIDEBAR",
+        "UI-TAB-RIG",
+        "UI-TAB-MCP",
+        "UI-TAB-AGENTS",
+        "UI-TAB-TOOLS",
+        "UI-TAB-LIVE-FEED",
+        "UI-TAB-DIAGNOSTICS",
+        "UI-TAB-MANAGER"
+      ],
+      "assigned_phase": "P03",
+      "evidence_class": "E1",
+      "fix_commits": [],
+      "id": "FC-TELEM-DUPLICATE",
+      "ownership_disposition": "The live AppTab accessibilityID mapping is complete and unique. The audit duplicate-expression report does not reproduce against the installed source snapshot.",
+      "runtime_proof": [
+        ".forge-codex/evidence/P03-bounded-telemetry-before-after.json"
+      ],
+      "severity": "Medium",
+      "status": "resolved",
+      "title": "Distinct telemetry cases return the same source expression",
+      "validation_evidence": [
+        ".forge-codex/evidence/EVID-20260823T191456Z-1dd93b3c6a.json",
+        ".forge-codex/evidence/EVID-20260823T191342Z-33c7dab2e2.json"
+      ]
+    },
+    {
+      "affected_feature_ids": [
+        "TEL-UI-BINDING"
+      ],
+      "assigned_phase": "P03",
+      "evidence_class": "E3",
+      "fix_commits": [],
+      "id": "FC-LIFE-GAP",
+      "ownership_disposition": "AppTelemetryBinding stores and cancels its mailbox consumer and manual refresh task. detach removes the listener, stops the mailbox, invalidates the generation, cancels refresh work, and releases the app reference.",
+      "runtime_proof": [
+        ".forge-codex/evidence/EVID-20260823T191259Z-1cde4355df.json"
+      ],
+      "severity": "High",
+      "status": "resolved",
+      "title": "AppTelemetryBinding owns/uses Task without an owner-local cleanup marker",
+      "validation_evidence": [
+        ".forge-codex/evidence/EVID-20260823T191232Z-37ef639495.json",
+        ".forge-codex/evidence/EVID-20260823T191456Z-1dd93b3c6a.json"
+      ]
+    },
+    {
+      "affected_feature_ids": ["CLI-DASHBOARD"],
+      "assigned_phase": "P05",
+      "evidence_class": "E3",
+      "fix_commits": [],
+      "id": "FC-LIFE-GAP",
+      "ownership_disposition": "The standalone dashboard command owns its SIGINT and SIGTERM sources until its blocking run ends. A defer now clears both handlers, cancels both sources, and stops the server.",
+      "runtime_proof": [
+        ".forge-codex/evidence/P05-resource-owner-matrix.json",
+        ".forge-codex/evidence/P05-sanitizer-and-lifecycle-report.json"
+      ],
+      "severity": "High",
+      "status": "resolved",
+      "title": "ForgeConductorMain owns/uses DispatchSource without an owner-local cleanup marker",
+      "validation_evidence": [
+        ".forge-codex/evidence/EVID-20260823T193826Z-661c01c5d5.json",
+        ".forge-codex/evidence/EVID-20260823T194308Z-9a5fdacf6f.json"
+      ]
+    },
+    {
+      "affected_feature_ids": ["MGR-BACKGROUND"],
+      "assigned_phase": "P05",
+      "evidence_class": "E3",
+      "fix_commits": [],
+      "id": "FC-LIFE-GAP",
+      "ownership_disposition": "managerStartBackground owns Process only through launch. After Process.run duplicates launch descriptors, durable lifetime transfers to the manager child identified by its PID file and managed by the stop command.",
+      "runtime_proof": [
+        ".forge-codex/evidence/P05-resource-owner-matrix.json"
+      ],
+      "severity": "High",
+      "status": "resolved",
+      "title": "ForgeConductorMain owns/uses Process without an owner-local cleanup marker",
+      "validation_evidence": [
+        ".forge-codex/evidence/EVID-20260823T193826Z-661c01c5d5.json"
+      ]
+    },
+    {
+      "affected_feature_ids": ["MGR-BACKGROUND"],
+      "assigned_phase": "P05",
+      "evidence_class": "E3",
+      "fix_commits": [],
+      "id": "FC-LIFE-GAP",
+      "ownership_disposition": "The background-launch scope owns the parent manager-log FileHandle. A defer closes that handle after launch verification; the child retains only its duplicated descriptor.",
+      "runtime_proof": [
+        ".forge-codex/evidence/P05-resource-owner-matrix.json"
+      ],
+      "severity": "High",
+      "status": "resolved",
+      "title": "ForgeConductorMain owns/uses Pipe/FileHandle without an owner-local cleanup marker",
+      "validation_evidence": [
+        ".forge-codex/evidence/EVID-20260823T193826Z-661c01c5d5.json"
+      ]
+    },
+    {
+      "affected_feature_ids": ["AGENT-RUN-COMPLETE"],
+      "assigned_phase": "P05",
+      "evidence_class": "E3",
+      "fix_commits": [],
+      "id": "FC-MEM-COLLECTION",
+      "ownership_disposition": "missing is a stack-local array created for one agent completion call, released on return, and structurally bounded by the finite output schema count. It is not stored by AgentSessionService.",
+      "runtime_proof": [
+        ".forge-codex/evidence/P05-resource-owner-matrix.json"
+      ],
+      "severity": "High",
+      "status": "resolved",
+      "title": "Long-lived collection `missing` appends without an owner-local bound",
+      "validation_evidence": [
+        ".forge-codex/evidence/EVID-20260823T194308Z-9a5fdacf6f.json"
+      ]
+    },
+    {
+      "affected_feature_ids": ["DATA-CONTEXT-HANDOFFS"],
+      "assigned_phase": "P08",
+      "evidence_class": "E3",
+      "fix_commits": [],
+      "id": "FC-MEM-COLLECTION",
+      "ownership_disposition": "snaps is function-local to one checkpoint and now stops at ContextContinuityService.maximumAgentSnapshots (128); the bound test creates 144 matching open sessions and observes exactly 128 snapshots.",
+      "runtime_proof": [".forge-codex/evidence/P08-resource-owner-matrix.json"],
+      "severity": "High",
+      "status": "resolved",
+      "title": "Long-lived collection `snaps` appends without an owner-local bound",
+      "validation_evidence": [".forge-codex/evidence/EVID-20260823T204207Z-fb406e171d.json"]
+    },
+    {
+      "affected_feature_ids": ["DATA-CONTEXT-HANDOFFS"],
+      "assigned_phase": "P08",
+      "evidence_class": "E3",
+      "fix_commits": [],
+      "id": "FC-MEM-COLLECTION",
+      "ownership_disposition": "merged is function-local to one checkpoint and both input loops stop at ContextContinuityService.maximumAgentSnapshots (128); the second-checkpoint test verifies the merged packet remains at 128.",
+      "runtime_proof": [".forge-codex/evidence/P08-resource-owner-matrix.json"],
+      "severity": "High",
+      "status": "resolved",
+      "title": "Long-lived collection `merged` appends without an owner-local bound",
+      "validation_evidence": [".forge-codex/evidence/EVID-20260823T204207Z-fb406e171d.json"]
+    },
+    {
+      "affected_feature_ids": ["DATA-CONTEXT-HANDOFFS"],
+      "assigned_phase": "P08",
+      "evidence_class": "E3",
+      "fix_commits": [],
+      "id": "FC-LIFE-GAP",
+      "ownership_disposition": "ContextContinuityService creates, stores, and retains no Swift concurrency Task. The audit match was the markdown phrase Current Task; the neutral Current Work heading removes the scanner ambiguity.",
+      "runtime_proof": [".forge-codex/evidence/P08-resource-owner-matrix.json"],
+      "severity": "High",
+      "status": "resolved",
+      "title": "ContextContinuityService owns/uses Task without an owner-local cleanup marker",
+      "validation_evidence": [".forge-codex/evidence/EVID-20260823T204207Z-fb406e171d.json"]
+    },
+    {
+      "affected_feature_ids": ["TOOL-AUTH-FILESYSTEM"],
+      "assigned_phase": "P05",
+      "evidence_class": "E3",
+      "fix_commits": [],
+      "id": "FC-MEM-COLLECTION",
+      "ownership_disposition": "suffix is stack-local to one canonicalURL call, released on return, and bounded by the finite number of components between the target path and its deepest existing ancestor.",
+      "runtime_proof": [
+        ".forge-codex/evidence/P05-resource-owner-matrix.json"
+      ],
+      "severity": "High",
+      "status": "resolved",
+      "title": "Long-lived collection `suffix` appends without an owner-local bound",
+      "validation_evidence": [
+        ".forge-codex/evidence/EVID-20260823T194308Z-9a5fdacf6f.json"
+      ]
+    },
+    {
+      "affected_feature_ids": ["TOOL-ROUTER"],
+      "assigned_phase": "P05",
+      "evidence_class": "E3",
+      "fix_commits": [],
+      "id": "FC-LIFE-GAP",
+      "ownership_disposition": "The live ToolRouter source contains no AsyncStream creation, storage, or consumption. This audit row is a stale scanner result and has no runtime resource owner.",
+      "runtime_proof": [
+        ".forge-codex/evidence/P05-resource-owner-matrix.json"
+      ],
+      "severity": "High",
+      "status": "resolved",
+      "title": "ToolRouter owns/uses AsyncStream without an owner-local cleanup marker",
+      "validation_evidence": [
+        ".forge-codex/evidence/EVID-20260823T194308Z-9a5fdacf6f.json"
+      ]
+    },
+    {
+      "affected_feature_ids": ["DATA-CONTEXT-HANDOFFS"],
+      "assigned_phase": "P08",
+      "evidence_class": "E3",
+      "fix_commits": [],
+      "id": "FC-LIFE-GAP",
+      "ownership_disposition": "HandoffPacket is a value type and owns no Swift concurrency Task. The audit match was a Task section comment; the Work item label removes the scanner ambiguity.",
+      "runtime_proof": [".forge-codex/evidence/P08-resource-owner-matrix.json"],
+      "severity": "High",
+      "status": "resolved",
+      "title": "HandoffPacket owns/uses Task without an owner-local cleanup marker",
+      "validation_evidence": [".forge-codex/evidence/EVID-20260823T204207Z-fb406e171d.json"]
+    },
+    {
+      "affected_feature_ids": ["MGR-PORT-GUARD"],
+      "assigned_phase": "P05",
+      "evidence_class": "E3",
+      "fix_commits": [],
+      "id": "FC-LIFE-GAP",
+      "ownership_disposition": "Each DashboardPortGuard inspect call owns one synchronous lsof Process until waitUntilExit reaps it. The ten-cycle completion test verifies repeated process release.",
+      "runtime_proof": [
+        ".forge-codex/evidence/P05-resource-owner-matrix.json",
+        ".forge-codex/evidence/P05-sanitizer-and-lifecycle-report.json"
+      ],
+      "severity": "High",
+      "status": "resolved",
+      "title": "DashboardPortGuard owns/uses Process without an owner-local cleanup marker",
+      "validation_evidence": [
+        ".forge-codex/evidence/EVID-20260823T193826Z-661c01c5d5.json"
+      ]
+    },
+    {
+      "affected_feature_ids": ["MGR-PORT-GUARD"],
+      "assigned_phase": "P05",
+      "evidence_class": "E3",
+      "fix_commits": [],
+      "id": "FC-LIFE-GAP",
+      "ownership_disposition": "lsof stdout and stderr now share one drained Pipe, preventing an unread stderr deadlock, and a defer deterministically closes the read FileHandle after output is consumed.",
+      "runtime_proof": [
+        ".forge-codex/evidence/P05-resource-owner-matrix.json",
+        ".forge-codex/evidence/P05-sanitizer-and-lifecycle-report.json"
+      ],
+      "severity": "High",
+      "status": "resolved",
+      "title": "DashboardPortGuard owns/uses Pipe/FileHandle without an owner-local cleanup marker",
+      "validation_evidence": [
+        ".forge-codex/evidence/EVID-20260823T193826Z-661c01c5d5.json"
+      ]
+    },
+    {
+      "affected_feature_ids": ["DATA-CONTEXT-HANDOFFS"],
+      "assigned_phase": "P07",
+      "evidence_class": "E3",
+      "fix_commits": [],
+      "id": "FC-MEM-COLLECTION",
+      "ownership_disposition": "The reported predicates array is function-local, has two fixed producers, and now guards both append sites with an explicit count cap of two.",
+      "runtime_proof": [".forge-codex/evidence/P07-resource-owner-matrix.json"],
+      "severity": "High",
+      "status": "resolved",
+      "title": "Long-lived collection `predicates` appends without an owner-local bound",
+      "validation_evidence": [".forge-codex/evidence/EVID-20260823T201632Z-6920be9c15.json"]
+    },
+    {
+      "affected_feature_ids": ["DATA-CONTEXT-HANDOFFS"],
+      "assigned_phase": "P07",
+      "evidence_class": "E3",
+      "fix_commits": [],
+      "id": "FC-MEM-COLLECTION",
+      "ownership_disposition": "Decoded handoff output is function-local; normal callers cap at 100 rows and recovery callers now have an explicit 10000-row SQL and append-loop ceiling.",
+      "runtime_proof": [".forge-codex/evidence/P07-resource-owner-matrix.json"],
+      "severity": "High",
+      "status": "resolved",
+      "title": "Long-lived collection `out` appends without an owner-local bound",
+      "validation_evidence": [".forge-codex/evidence/EVID-20260823T201632Z-6920be9c15.json"]
+    },
+    {
+      "affected_feature_ids": ["DATA-AGENT-SESSIONS"],
+      "assigned_phase": "P07",
+      "evidence_class": "E3",
+      "fix_commits": [],
+      "id": "FC-MEM-COLLECTION",
+      "ownership_disposition": "Closed-session output is function-local. Session SQL and the accumulated output now share an explicit 10000-row ceiling and release at return.",
+      "runtime_proof": [".forge-codex/evidence/P07-resource-owner-matrix.json"],
+      "severity": "High",
+      "status": "resolved",
+      "title": "Long-lived collection `closed` appends without an owner-local bound",
+      "validation_evidence": [".forge-codex/evidence/EVID-20260823T201632Z-6920be9c15.json"]
+    },
+    {
+      "affected_feature_ids": ["MCP-SERVER-STDIO"],
+      "assigned_phase": "P07",
+      "evidence_class": "E3",
+      "fix_commits": [],
+      "id": "FC-LIFE-GAP",
+      "ownership_disposition": "MCPServer.run now has one defer boundary that closes its reader state, removes presence, and records serve completion on success or failure; its heartbeat remains separately cancelled by defer.",
+      "runtime_proof": [".forge-codex/evidence/P07-resource-owner-matrix.json", ".forge-codex/evidence/P07-mcp-process-conformance.json"],
+      "severity": "High",
+      "status": "resolved",
+      "title": "MCPServer owns/uses Pipe/FileHandle without an owner-local cleanup marker",
+      "validation_evidence": [".forge-codex/evidence/EVID-20260823T201627Z-984d2e61cb.json", ".forge-codex/evidence/EVID-20260823T201632Z-6920be9c15.json"]
+    },
+    {
+      "affected_feature_ids": ["MCP-SERVER-STDIO"],
+      "assigned_phase": "P07",
+      "evidence_class": "E3",
+      "fix_commits": [],
+      "id": "FC-LIFE-GAP",
+      "ownership_disposition": "MCPStreamReader borrows its FileHandle and owns only a bounded Data buffer. close and deinit now deterministically release the buffer without closing caller-owned standard input or test pipes.",
+      "runtime_proof": [".forge-codex/evidence/P07-resource-owner-matrix.json", ".forge-codex/evidence/P07-mcp-process-conformance.json"],
+      "severity": "High",
+      "status": "resolved",
+      "title": "MCPStreamReader owns/uses Pipe/FileHandle without an owner-local cleanup marker",
+      "validation_evidence": [".forge-codex/evidence/EVID-20260823T201627Z-984d2e61cb.json", ".forge-codex/evidence/EVID-20260823T201632Z-6920be9c15.json"]
+    },
+    {
+      "affected_feature_ids": ["MGR-WATCHDOG"],
+      "assigned_phase": "P05",
+      "evidence_class": "E3",
+      "fix_commits": [],
+      "id": "FC-LIFE-GAP",
+      "ownership_disposition": "ManagerRuntime owns exactly one watchdog source. cancelWatchdog clears its handler, cancels it, and removes the retained reference; ManagerNode invokes cleanup on restart, shutdown, and deinit.",
+      "runtime_proof": [
+        ".forge-codex/evidence/P05-resource-owner-matrix.json",
+        ".forge-codex/evidence/P05-sanitizer-and-lifecycle-report.json"
+      ],
+      "severity": "High",
+      "status": "resolved",
+      "title": "ManagerRuntime owns/uses Timer without an owner-local cleanup marker",
+      "validation_evidence": [
+        ".forge-codex/evidence/EVID-20260823T193826Z-661c01c5d5.json"
+      ]
+    },
+    {
+      "affected_feature_ids": ["MGR-SIGNALS"],
+      "assigned_phase": "P05",
+      "evidence_class": "E3",
+      "fix_commits": [],
+      "id": "FC-LIFE-GAP",
+      "ownership_disposition": "ManagerRuntime owns a typed collection of signal sources. cancelSignalSources clears handlers, cancels every source, and clears storage; ManagerNode invokes cleanup on replacement, shutdown, and deinit.",
+      "runtime_proof": [
+        ".forge-codex/evidence/P05-resource-owner-matrix.json",
+        ".forge-codex/evidence/P05-sanitizer-and-lifecycle-report.json"
+      ],
+      "severity": "High",
+      "status": "resolved",
+      "title": "ManagerRuntime owns/uses DispatchSource without an owner-local cleanup marker",
+      "validation_evidence": [
+        ".forge-codex/evidence/EVID-20260823T193826Z-661c01c5d5.json"
+      ]
+    },
+    {
+      "affected_feature_ids": ["MCP-SERVER-STDIO", "DATA-CONTEXT-HANDOFFS"],
+      "assigned_phase": "P07",
+      "evidence_class": "E3",
+      "fix_commits": [],
+      "id": "FC-LIFE-GAP",
+      "ownership_disposition": "The fixture is now a final owner with explicit close and deinit cleanup. It terminates a live child and closes stdin, stdout, and stderr handles; the process test also defers close for both fixtures.",
+      "runtime_proof": [".forge-codex/evidence/P07-resource-owner-matrix.json"],
+      "severity": "High",
+      "status": "resolved",
+      "title": "MCPProcessFixture owns/uses Process without an owner-local cleanup marker",
+      "validation_evidence": [".forge-codex/evidence/EVID-20260823T201632Z-6920be9c15.json"]
+    },
+    {
+      "affected_feature_ids": ["MCP-SERVER-STDIO", "DATA-CONTEXT-HANDOFFS"],
+      "assigned_phase": "P07",
+      "evidence_class": "E3",
+      "fix_commits": [],
+      "id": "FC-LIFE-GAP",
+      "ownership_disposition": "The fixture owns exactly three pipes and now closes each owned endpoint in explicit close and deinit cleanup after terminating the child process.",
+      "runtime_proof": [".forge-codex/evidence/P07-resource-owner-matrix.json"],
+      "severity": "High",
+      "status": "resolved",
+      "title": "MCPProcessFixture owns/uses Pipe/FileHandle without an owner-local cleanup marker",
+      "validation_evidence": [".forge-codex/evidence/EVID-20260823T201632Z-6920be9c15.json"]
+    },
+    {
+      "affected_feature_ids": [],
+      "assigned_phase": "P05",
+      "evidence_class": "E3",
+      "fix_commits": [],
+      "id": "FC-LIFE-GAP",
+      "ownership_disposition": "The reported Task.sleep occurs only in one async XCTest method and is structurally awaited. No Task handle or unstructured task is created or retained by ManagerTests.",
+      "runtime_proof": [
+        ".forge-codex/evidence/P05-resource-owner-matrix.json"
+      ],
+      "severity": "High",
+      "status": "resolved",
+      "title": "ManagerTests owns/uses Task without an owner-local cleanup marker",
+      "validation_evidence": [
+        ".forge-codex/evidence/EVID-20260823T193826Z-661c01c5d5.json",
+        ".forge-codex/evidence/EVID-20260823T194308Z-9a5fdacf6f.json"
+      ]
+    }
+  ],
+  "instructions": "Preserve evidence classes. Resolve only with source disposition and the runtime/test proof required by the audit and phase gate.",
+  "schema_version": 1,
+  "source_audit": "audit/Forge-Conductor-Consolidated-Findings.tsv"
+}

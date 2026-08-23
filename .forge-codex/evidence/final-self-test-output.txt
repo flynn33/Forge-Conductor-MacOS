@@ -1,0 +1,39 @@
+Spreadsheet runtime warmup failed during python startup
+Traceback (most recent call last):
+  File "/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/patches/warm_spreadsheet_runtime_on_startup.py", line 26, in warm_spreadsheet_runtime_on_startup
+  File "/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/spreadsheet_warmup.py", line 785, in warm_spreadsheet_runtime
+  File "/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/spreadsheet_warmup.py", line 720, in _warm_feature_flows
+  File "/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/spreadsheet_warmup.py", line 704, in _warm_collaboration_flows
+  File "/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/generated/interface/models.py", line 32317, in hydrate_crdt_from_proto
+  File "/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/rpc/remote.py", line 749, in __call__
+  File "/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/rpc/client.py", line 150, in call
+artifact_tool.rpc.client.RemoteError: hydrateCrdtFromProto requires an empty collaborative document.
+Traceback (most recent call last):
+  File [35m"/mnt/data/Forge-Conductor-Codex-Autonomous-Repair-Package/tests/run_self_tests.py"[0m, line [35m27[0m, in [35m<module>[0m
+    [31mrun[0m[1;31m([sys.executable, package / "scripts/validate_package.py", "--root", package])[0m
+    [31m~~~[0m[1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  File [35m"/mnt/data/Forge-Conductor-Codex-Autonomous-Repair-Package/tests/run_self_tests.py"[0m, line [35m24[0m, in [35mrun[0m
+    raise RuntimeError(f"Command failed ({completed.returncode}): {argv}\n{completed.stdout}")
+[1;35mRuntimeError[0m: [35mCommand failed (1): ['/opt/pyvenv/bin/python', PosixPath('/mnt/data/Forge-Conductor-Codex-Autonomous-Repair-Package/scripts/validate_package.py'), '--root', PosixPath('/mnt/data/Forge-Conductor-Codex-Autonomous-Repair-Package')]
+Spreadsheet runtime warmup failed during python startup
+Traceback (most recent call last):
+  File "/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/patches/warm_spreadsheet_runtime_on_startup.py", line 26, in warm_spreadsheet_runtime_on_startup
+  File "/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/spreadsheet_warmup.py", line 785, in warm_spreadsheet_runtime
+  File "/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/spreadsheet_warmup.py", line 720, in _warm_feature_flows
+  File "/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/spreadsheet_warmup.py", line 704, in _warm_collaboration_flows
+  File "/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/generated/interface/models.py", line 32317, in hydrate_crdt_from_proto
+  File "/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/rpc/remote.py", line 749, in __call__
+  File "/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/rpc/client.py", line 150, in call
+artifact_tool.rpc.client.RemoteError: hydrateCrdtFromProto requires an empty collaborative document.
+{
+  "valid": false,
+  "checks": 148,
+  "errors": [
+    "required:schemas/run-state.schema.json: schemas/run-state.schema.json",
+    "required:schemas/handoff.schema.json: schemas/handoff.schema.json",
+    "required:schemas/memory-record.schema.json: schemas/memory-record.schema.json",
+    "authorship-attribution-scan: Spreadsheet runtime warmup failed during python startup\nTraceback (most recent call last):\n  File \"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/patches/warm_spreadsheet_runtime_on_startup.py\", line 26, in warm_spreadsheet_runtime_on_startup\n  File \"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/spreadsheet_warmup.py\", line 772, in warm_spreadsheet_runtime\n  File \"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/rpc/connection.py\", line 37, in get_or_create_client\n  File \"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/rpc/daemon.py\", line 124, in start_daemon\nTimeoutError: Timed out waiting for artifact tool daemon socket. Set ARTIFACT_TOOL_RPC_DAEMON_STARTUP_TIMEOUT_S=<seconds> to increase the limit.\nPACKAGE_VALIDATION.json:704: \"detail\": \"Spreadsheet runtime warmup failed during python startup\\nTraceback (most recent call last):\\n  File \\\"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/patches/warm_spreadsheet_runtime_on_startup.py\\\", line 26, in warm_spreadsheet_runtime_on_startup\\n  File \\\"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/spreadsheet_warmup.py\\\", line 785, in warm_spreadsheet_runtime\\n  File \\\"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/spreadsheet_warmup.py\\\", line 72\nPACKAGE_VALIDATION.json:728: \"authorship-attribution-scan: Spreadsheet runtime warmup failed during python startup\\nTraceback (most recent call last):\\n  File \\\"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/patches/warm_spreadsheet_runtime_on_startup.py\\\", line 26, in warm_spreadsheet_runtime_on_startup\\n  File \\\"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/spreadsheet_warmup.py\\\", line 785, in warm_spreadsheet_runtime\\n  File \\\"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/spreadsheet_w\nevidence/package-validator-run.txt:15: \"authorship-attribution-scan: Spreadsheet runtime warmup failed during python startup\\nTraceback (most recent call last):\\n  File \\\"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/patches/warm_spreadsheet_runtime_on_startup.py\\\", line 26, in warm_spreadsheet_runtime_on_startup\\n  File \\\"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/spreadsheet_warmup.py\\\", line 785, in warm_spreadsheet_runtime\\n  File \\\"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/spreadsheet_w\nevidence/installed-runtime-self-test.json:40: \"output\": \"Spreadsheet runtime warmup failed during python startup\\nTraceback (most recent call last):\\n  File \\\"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/patches/warm_spreadsheet_runtime_on_startup.py\\\", line 26, in warm_spreadsheet_runtime_on_startup\\n  File \\\"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/spreadsheet_warmup.py\\\", line 785, in warm_spreadsheet_runtime\\n  File \\\"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/spreadsheet_warmup.py\\\", line 72\nevidence/installed-runtime-self-test.json:40: \"output\": \"Spreadsheet runtime warmup failed during python startup\\nTraceback (most recent call last):\\n  File \\\"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/patches/warm_spreadsheet_runtime_on_startup.py\\\", line 26, in warm_spreadsheet_runtime_on_startup\\n  File \\\"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/spreadsheet_warmup.py\\\", line 785, in warm_spreadsheet_runtime\\n  File \\\"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/spreadsheet_warmup.py\\\", line 72\nevidence/clean-install-test.txt:115: \"authorship-attribution-scan: Spreadsheet runtime warmup failed during python startup\\nTraceback (most recent call last):\\n  File \\\"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/patches/warm_spreadsheet_runtime_on_startup.py\\\", line 26, in warm_spreadsheet_runtime_on_startup\\n  File \\\"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/spreadsheet_warmup.py\\\", line 785, in warm_spreadsheet_runtime\\n  File \\\"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/spreadsheet_w"
+  ],
+  "report": "/mnt/data/Forge-Conductor-Codex-Autonomous-Repair-Package/PACKAGE_VALIDATION.json"
+}
+[0m

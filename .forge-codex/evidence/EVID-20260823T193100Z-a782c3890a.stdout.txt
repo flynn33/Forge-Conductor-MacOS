@@ -1,0 +1,59 @@
+{
+  "checks": [
+    {
+      "name": "one-shared-command-queue-construction",
+      "passed": true
+    },
+    {
+      "name": "one-shared-pipeline-construction",
+      "passed": true
+    },
+    {
+      "name": "buffer-allocation-only-in-capacity-growth-owner",
+      "passed": true
+    },
+    {
+      "name": "persistent-buffer-reuses-capacity",
+      "passed": true
+    },
+    {
+      "name": "metal-views-are-paused",
+      "passed": true
+    },
+    {
+      "name": "metal-views-use-needs-display",
+      "passed": true
+    },
+    {
+      "name": "all-renderers-reject-static-draws",
+      "passed": true
+    },
+    {
+      "name": "all-renderers-have-explicit-dismantle",
+      "passed": true
+    },
+    {
+      "name": "surface-lifetime-is-counted",
+      "passed": true
+    },
+    {
+      "name": "rig-has-no-independent-timeline-clock",
+      "passed": true
+    },
+    {
+      "name": "auto-refresh-propagates-to-binding",
+      "passed": true
+    }
+  ],
+  "metal_files": [
+    "Sources/ForgeConductorApp/Metal/LoadTraceRenderer.swift",
+    "Sources/ForgeConductorApp/Metal/MetalGaugeKit.swift",
+    "Sources/ForgeConductorApp/Metal/MetalGaugeResources.swift",
+    "Sources/ForgeConductorApp/Metal/MetalLoadChart.swift",
+    "Sources/ForgeConductorApp/Metal/MetalMeterView.swift",
+    "Sources/ForgeConductorApp/Metal/MultiSeriesLoadRenderer.swift"
+  ],
+  "phase": "P04",
+  "schema_version": 1,
+  "valid": true
+}

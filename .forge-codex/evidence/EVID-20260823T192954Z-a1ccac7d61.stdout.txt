@@ -1,0 +1,284 @@
+<?xml version="1.0"?>
+
+<trace-toc>
+    <run number="1">
+        <info>
+            <target>
+                <device uuid="396E8AE2-4B0B-51E2-AE11-498395ED5AA1" model="MacBook Pro" name="MBP16-M4P" os-version="26.6.2 (25G83)" platform="macOS"/>
+                <process type="attached" return-exit-status="0" name="Forge Conductor" pid="41175" termination-reason="exit(0)"/>
+                <environment>
+                    <item key="HOMEBREW_REPOSITORY" value="/opt/homebrew"/>
+                    <item key="SECURITYSESSIONID" value="186ba"/>
+                    <item key="MANPATH" value="/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/share/man:/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/usr/share/man:/Applications/Xcode.app/Contents/Developer/usr/share/man:/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/share/man:"/>
+                    <item key="ZSH_TMUX_AUTOSTART" value="false"/>
+                    <item key="CODEX_PERMISSION_PROFILE" value=":danger-full-access"/>
+                    <item key="OLDPWD" value="/Users/jimdaley/GitHub/Forge-Conductor-MacOS"/>
+                    <item key="main_stack" value=""/>
+                    <item key="PWD" value="/Users/jimdaley/GitHub/Forge-Conductor-MacOS"/>
+                    <item key="ZSH_TMUX_AUTOSTARTED" value="true"/>
+                    <item key="__CFBundleIdentifier" value="com.forge-conductor.app"/>
+                    <item key="GIT_PAGER" value="cat"/>
+                    <item key="FPATH" value="/Users/jimdaley/.grok/completions/zsh:/opt/homebrew/share/zsh/site-functions:/Users/jimdaley/.grok/completions/zsh:/opt/homebrew/share/zsh/site-functions:/usr/local/share/zsh/site-functions:/usr/share/zsh/site-functions:/usr/share/zsh/5.9/functions"/>
+                    <item key="DISABLE_AUTO_UPDATE" value="true"/>
+                    <item key="COLORTERM" value=""/>
+                    <item key="LIBRARY_PATH" value="/usr/local/lib"/>
+                    <item key="MCP_BEARER_TOKEN" value="Vz4PCIDTu_DdHJ7Ik6Js_hlPCQegsrgbeWe9W6zXVUY"/>
+                    <item key="HOMEBREW_CELLAR" value="/opt/homebrew/Cellar"/>
+                    <item key="CODEX_SHELL" value="1"/>
+                    <item key="LC_CTYPE" value="C.UTF-8"/>
+                    <item key="executable_file" value="0x1a0100000e,0x66d9c08"/>
+                    <item key="NO_COLOR" value="1"/>
+                    <item key="PAGER" value="cat"/>
+                    <item key="_" value="/usr/bin/open"/>
+                    <item key="OSLogRateLimit" value="64"/>
+                    <item key="__CF_USER_TEXT_ENCODING" value="0x1F5:0x0:0x0"/>
+                    <item key="SDKROOT" value="/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"/>
+                    <item key="NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S" value="9230e2bd8b24b7ac7a0ba6774c64bf0d78ecdabbdd91d0ed627b02a587bae2df"/>
+                    <item key="HOME" value="/Users/jimdaley"/>
+                    <item key="SSH_AUTH_SOCK" value="/var/run/com.apple.launchd.SF2cEjpPJD/Listeners"/>
+                    <item key="CODEX_INTERNAL_ORIGINATOR_OVERRIDE" value="Codex Desktop"/>
+                    <item key="security_config" value="0x0"/>
+                    <item key="COMMAND_MODE" value="unix2003"/>
+                    <item key="CODEX_THREAD_ID" value="01a02eac-eec3-7f81-85cb-5b8320e47322"/>
+                    <item key="XPC_SERVICE_NAME" value="application.com.forge-conductor.app.107846655.107846664.A5EBE5F5-562A-46BB-ADE9-8F89246C5B20"/>
+                    <item key="TMPDIR" value="/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/"/>
+                    <item key="GH_PAGER" value="cat"/>
+                    <item key="PATH" value="/Users/jimdaley/.grok/bin:/Users/jimdaley/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Library/TeX/texbin:/Users/jimdaley/.codex/tmp/arg0/codex-arg0BbwyLJ:/Users/jimdaley/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/Users/jimdaley/.grok/bin:/Users/jimdaley/.local/bin:/Users/jimdaley/.lmstudio/bin:/Users/jimdaley/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources:/Users/jimdaley/.lmstudio/bin"/>
+                    <item key="LANG" value="C.UTF-8"/>
+                    <item key="FORGE_BUILD_CONFIGURATION" value="release"/>
+                    <item key="CODEX_CI" value="1"/>
+                    <item key="HOMEBREW_PREFIX" value="/opt/homebrew"/>
+                    <item key="USER" value="jimdaley"/>
+                    <item key="ptr_munge" value=""/>
+                    <item key="TERM" value="dumb"/>
+                    <item key="executable_cdhash" value="af620c72f64dc73aa97c8ad2e08b9422bca0e3e9"/>
+                    <item key="LaunchInstanceID" value="1B6E08EA-020F-4DB5-BD4D-476E8C64778D"/>
+                    <item key="SHELL" value="/bin/zsh"/>
+                    <item key="XPC_FLAGS" value="1"/>
+                    <item key="dyld_file" value="0x1a0100000e,0xfffffff000a9547"/>
+                    <item key="RUST_LOG" value="warn"/>
+                    <item key="CODEX_SESSION_ID" value="01a02eac-eec3-7f81-85cb-5b8320e47322"/>
+                    <item key="INFOPATH" value="/opt/homebrew/share/info:/opt/homebrew/share/info:"/>
+                    <item key="th_port" value=""/>
+                    <item key="SHLVL" value="2"/>
+                    <item key="LOGNAME" value="jimdaley"/>
+                    <item key="MallocNanoZone" value="0"/>
+                    <item key="CPATH" value="/usr/local/include"/>
+                    <item key="LC_ALL" value="C.UTF-8"/>
+                    <item key="LOG_FORMAT" value="json"/>
+                    <item key="executable_boothash" value="7506fe34f384dc59b937e12aa93cdeb72c195979"/>
+                </environment>
+            </target>
+            <summary>
+                <start-date>2026-08-23T14:29:03.896-05:00</start-date>
+                <end-date>2026-08-23T14:29:09.632-05:00</end-date>
+                <duration>5.735807</duration>
+                <end-reason>Time limit reached</end-reason>
+                <instruments-version>26.0 (17C52)</instruments-version>
+                <template-name>Metal System Trace</template-name>
+                <recording-mode>Deferred</recording-mode>
+                <time-limit>5 seconds</time-limit>
+                <intruments-recording-settings>
+                    <instrument name="Hangs">
+                        <array>
+                            <dictionary>
+                                <key name="Reporting Threshold">Include Brief Unresponsiveness (&gt;100 ms)</key>
+                            </dictionary>
+                        </array>
+                    </instrument>
+                    <instrument name="Metal Application">
+                        <array>
+                            <dictionary>
+                                <key name="GPU">
+                                    <value>Counter Set: (null)</value>
+                                    <value>Shader Timeline: Disabled</value>
+                                    <value>Induced GPU Performance State: Default</value>
+                                </key>
+                            </dictionary>
+                        </array>
+                    </instrument>
+                </intruments-recording-settings>
+            </summary>
+        </info>
+        <processes>
+            <process name="testmanagerd" pid="6539" path="/usr/libexec/testmanagerd"/>
+            <process name="xcodebuild" pid="41438" path="/Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild"/>
+            <process name="ThemeWidgetControlViewService" pid="79188" path="/System/Library/Frameworks/AppKit.framework/Versions/C/XPCServices/ThemeWidgetControlViewService.xpc/Contents/MacOS/ThemeWidgetControlViewService"/>
+            <process name="DockHelper" pid="80409" path="/System/Library/CoreServices/Dock.app/Contents/XPCServices/DockHelper.xpc/Contents/MacOS/DockHelper"/>
+            <process name="SimStreamProcessorService" pid="92282" path="/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/Resources/SimStreamProcessorServices.simdeviceio/Contents/XPCServices/SimStreamProcessorService.xpc/Contents/MacOS/SimStreamProcessorService"/>
+            <process name="SimMetalHost" pid="98764" path="/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/Resources/SimRenderingServices.simdeviceio/Contents/XPCServices/SimMetalHost.xpc/Contents/MacOS/SimMetalHost"/>
+            <process name="com.apple.CoreSimulator.CoreSimulatorService" pid="2647" path="/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/XPCServices/com.apple.CoreSimulator.CoreSimulatorService.xpc/Contents/MacOS/com.apple.CoreSimulator.CoreSimulatorService"/>
+            <process name="ChatGPT" pid="669" path="/Applications/ChatGPT.app/Contents/MacOS/ChatGPT"/>
+            <process name="SimMetalHost" pid="98762" path="/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/Resources/SimRenderingServices.simdeviceio/Contents/XPCServices/SimMetalHost.xpc/Contents/MacOS/SimMetalHost"/>
+            <process name="Spotlight" pid="884" path="/System/Library/CoreServices/Spotlight.app/Contents/MacOS/Spotlight"/>
+            <process name="ThemeWidgetControlViewService" pid="38833" path="/System/Library/Frameworks/AppKit.framework/Versions/C/XPCServices/ThemeWidgetControlViewService.xpc/Contents/MacOS/ThemeWidgetControlViewService"/>
+            <process name="Notes" pid="675" path="/System/Applications/Notes.app/Contents/MacOS/Notes"/>
+            <process name="Messages" pid="673" path="/System/Applications/Messages.app/Contents/MacOS/Messages"/>
+            <process name="avconferenced" pid="804" path="/usr/libexec/avconferenced"/>
+            <process name="Finder" pid="684" path="/System/Library/CoreServices/Finder.app/Contents/MacOS/Finder"/>
+            <process name="Terminal" pid="679" path="/System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal"/>
+            <process name="WeatherMenu" pid="974" path="/System/Applications/Weather.app/Contents/Library/LoginItems/WeatherMenu.app/Contents/MacOS/WeatherMenu"/>
+            <process name="AccessibilityVisualsAgent" pid="647" path="/System/Library/PrivateFrameworks/AccessibilitySupport.framework/Versions/A/Resources/AccessibilityVisualsAgent.app/Contents/MacOS/AccessibilityVisualsAgent"/>
+            <process name="ThemeWidgetControlViewService" pid="1258" path="/System/Library/Frameworks/AppKit.framework/Versions/C/XPCServices/ThemeWidgetControlViewService.xpc/Contents/MacOS/ThemeWidgetControlViewService"/>
+            <process name="LinkedNotesUIService" pid="80408" path="/System/Library/Frameworks/PaperKit.framework/Contents/LinkedNotesUIService.app/Contents/MacOS/LinkedNotesUIService"/>
+            <process name="com.apple.SafariPlatformSupport.Helper" pid="1260" path="/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper"/>
+            <process name="TouchBarServer" pid="26720" path="/usr/libexec/TouchBarServer"/>
+            <process name="WallpaperImageExtension" pid="735" path="/System/Library/ExtensionKit/Extensions/WallpaperImageExtension.appex/Contents/MacOS/WallpaperImageExtension"/>
+            <process name="SkyComputerUseService" pid="1059" path="/Users/jimdaley/.codex/computer-use/Codex Computer Use.app/Contents/MacOS/SkyComputerUseService"/>
+            <process name="SimMetalHost" pid="98763" path="/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/Resources/SimRenderingServices.simdeviceio/Contents/XPCServices/SimMetalHost.xpc/Contents/MacOS/SimMetalHost"/>
+            <process name="com.apple.dt.instruments.dtsecurity" pid="41483" path="com.apple.dt.ins"/>
+            <process name="ControlStrip" pid="26725" path="/System/Library/CoreServices/ControlStrip.app/Contents/MacOS/ControlStrip"/>
+            <process name="naturallanguaged" pid="1213" path="/usr/libexec/naturallanguaged"/>
+            <process name="com.apple.dock.extra" pid="830" path="/System/Library/CoreServices/Dock.app/Contents/XPCServices/com.apple.dock.extra.xpc/Contents/MacOS/com.apple.dock.extra"/>
+            <process name="AccessibilityUIServer" pid="687" path="/System/Library/CoreServices/AccessibilityUIServer.app/Contents/MacOS/AccessibilityUIServer"/>
+            <process name="TextInputMenuAgent" pid="977" path="/System/Library/CoreServices/TextInputMenuAgent.app/Contents/MacOS/TextInputMenuAgent"/>
+            <process name="Codex (Service)" pid="876" path="/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/151.0.7922.170/Helpers/Codex (Service).app/Contents/MacOS/Codex (Service)"/>
+            <process name="ThemeWidgetControlViewService" pid="77907" path="/System/Library/Frameworks/AppKit.framework/Versions/C/XPCServices/ThemeWidgetControlViewService.xpc/Contents/MacOS/ThemeWidgetControlViewService"/>
+            <process name="OverSight" pid="982" path="/Applications/OverSight.app/Contents/MacOS/OverSight"/>
+            <process name="logioptionsplus_agent" pid="972" path="/Library/Application Support/Logitech.localized/LogiOptionsPlus/logioptionsplus_agent.app/Contents/MacOS/logioptionsplus_agent"/>
+            <process name="VTEncoderXPCService" pid="1220" path="/System/Library/Frameworks/VideoToolbox.framework/Versions/A/XPCServices/VTEncoderXPCService.xpc/Contents/MacOS/VTEncoderXPCService"/>
+            <process name="ThemeWidgetControlViewService" pid="1552" path="/System/Library/Frameworks/AppKit.framework/Versions/C/XPCServices/ThemeWidgetControlViewService.xpc/Contents/MacOS/ThemeWidgetControlViewService"/>
+            <process name="kernel.release.t6041" pid="0" path="/System/Library/Kernels/kernel.release.t6041"/>
+            <process name="com.apple.appkit.xpc.openAndSavePanelService" pid="1028" path="/System/Library/Frameworks/AppKit.framework/Versions/C/XPCServices/com.apple.appkit.xpc.openAndSavePanelService.xpc/Contents/MacOS/com.apple.appkit.xpc.openAndSavePanelService"/>
+            <process name="coreautha" pid="27076" path="/System/Library/Frameworks/LocalAuthentication.framework/Support/coreautha.bundle/Contents/MacOS/coreautha"/>
+            <process name="FollowUpUI" pid="19613" path="/System/Library/PrivateFrameworks/CoreFollowUp.framework/Versions/A/Resources/FollowUpUI.app/Contents/MacOS/FollowUpUI"/>
+            <process name="loginwindow" pid="405" path="/System/Library/CoreServices/loginwindow.app/Contents/MacOS/loginwindow"/>
+            <process name="DisplayLinkUserAgent" pid="992" path="/Applications/DisplayLink Manager.app/Contents/MacOS/DisplayLinkUserAgent"/>
+            <process name="CursorUIViewService" pid="893" path="/System/Library/PrivateFrameworks/TextInputUIMacHelper.framework/Versions/A/XPCServices/CursorUIViewService.xpc/Contents/MacOS/CursorUIViewService"/>
+            <process name="replayd" pid="724" path="/usr/libexec/replayd"/>
+            <process name="xctrace" pid="41464" path="/Applications/Xcode.app/Contents/Developer/usr/bin/xctrace"/>
+            <process name="Forge Conductor" pid="41175" path="/Users/jimdaley/GitHub/Forge-Conductor-MacOS/dist/Forge Conductor.app/Contents/MacOS/Forge Conductor"/>
+            <process name="WindowServer" pid="402" path="/System/Library/PrivateFrameworks/SkyLight.framework/Versions/A/Resources/WindowServer"/>
+            <process name="com.apple.Safari.SandboxBroker" pid="958" path="/System/Volumes/Preboot/Cryptexes/App/System/Applications/Safari.app/Contents/XPCServices/com.apple.Safari.SandboxBroker.xpc/Contents/MacOS/com.apple.Safari.SandboxBroker"/>
+            <process name="DTServiceHub" pid="41477" path="/Applications/Xcode.app/Contents/SharedFrameworks/DVTInstrumentsFoundation.framework/Versions/A/Resources/DTServiceHub"/>
+            <process name="NotificationCenter" pid="761" path="/System/Library/CoreServices/NotificationCenter.app/Contents/MacOS/NotificationCenter"/>
+            <process name="UserNotificationCenter" pid="92560" path="/System/Library/CoreServices/UserNotificationCenter.app/Contents/MacOS/UserNotificationCenter"/>
+            <process name="mediaanalysisd" pid="778" path="/System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd"/>
+            <process name="ControlCenter" pid="681" path="/System/Library/CoreServices/ControlCenter.app/Contents/MacOS/ControlCenter"/>
+            <process name="storagekitd" pid="590" path="storagekitd"/>
+            <process name="TextInputSwitcher" pid="986" path="/System/Library/CoreServices/TextInputSwitcher.app/Contents/MacOS/TextInputSwitcher"/>
+            <process name="com.apple.WebKit.GPU" pid="957" path="/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU"/>
+            <process name="MTLAssetUpgraderD" pid="1001" path="/usr/libexec/MTLAssetUpgraderD"/>
+            <process name="iconservicesagent" pid="701" path="/System/Library/CoreServices/iconservicesagent"/>
+            <process name="SimRenderServer" pid="98761" path="/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/Resources/SimRenderingServices.simdeviceio/Contents/XPCServices/SimRenderServer.xpc/Contents/MacOS/SimRenderServer"/>
+            <process name="Safari" pid="667" path="/System/Volumes/Preboot/Cryptexes/App/System/Applications/Safari.app/Contents/MacOS/Safari"/>
+        </processes>
+        <data>
+            <table codes="&quot;0x2b,0x65&quot;" schema="kdebug"/>
+            <table codes="&quot;33,0x11&quot;" schema="kdebug-strings" target="SINGLE"/>
+            <table codes="&quot;0x1f,0x05&quot;" schema="kdebug-strings" target="SINGLE"/>
+            <table codes="&quot;0x85,0x1&quot; &quot;0x85,0x2&quot; &quot;0x85,0x8&quot; &quot;0x85,0x30&quot; &quot;0x85,0xc0&quot; &quot;0x85,0xc1&quot; &quot;0x31,0xca&quot;" schema="kdebug-strings"/>
+            <table codes="&quot;0x85,0x12&quot;" schema="kdebug"/>
+            <table codes="&quot;0x85,0xAF&quot; &quot;0x34,0x11&quot; &quot;0x34,0x0f&quot;" schema="kdebug"/>
+            <table codes="&quot;0x85,0x80&quot;" schema="kdebug"/>
+            <table codes="&quot;0x85,0x3&quot; &quot;0x85,0x90&quot; &quot;0x85,0xA9&quot;" schema="kdebug"/>
+            <table codes="&quot;0x2b,0xdc&quot;" schema="kdebug" target="SINGLE"/>
+            <table codes="&quot;0x2d,*&quot;" schema="kdebug" callstack="user" target="SINGLE"/>
+            <table schema="ca-client-present-request"/>
+            <table schema="metal-shader-profiler-intervals" target-pid="SINGLE"/>
+            <table schema="metal-residency-set-usage-event"/>
+            <table schema="displayed-surfaces-interval" target-pid="SINGLE"/>
+            <table schema="display-compositor-events-interval"/>
+            <table track-id-base="2000" schema="metal-object-dependency-chain-display"/>
+            <table codes="&quot;0x07,0x00&quot;" schema="kdebug" target="SINGLE"/>
+            <table codes="&quot;0x1,0x25&quot;" schema="kdebug" target="SINGLE"/>
+            <table codes="&quot;0x85,0x92&quot; &quot;0x85,0x93&quot; &quot;0x85,0xae&quot;" schema="kdebug"/>
+            <table schema="metal-application-encoders-list" target-pid="SINGLE"/>
+            <table codes="&quot;0x31,0xb0&quot; &quot;0x31,0xd0&quot;" schema="kdebug"/>
+            <table codes="&quot;0x07,0x00&quot; &quot;0x1f,0x05&quot;" schema="kdebug" target="SINGLE"/>
+            <table codes="&quot;0x1f,0x7&quot;" schema="kdebug" target="SINGLE"/>
+            <table codes="&quot;0x2b,0xd8&quot;" schema="kdebug" target="SINGLE"/>
+            <table codes="&quot;33,0x11&quot;" schema="kdebug" target="SINGLE"/>
+            <table codes="&quot;0x31,0xca&quot;" schema="kdebug" target="SINGLE"/>
+            <table schema="display-surface-queue"/>
+            <table codes="&quot;0x34,0x11&quot; &quot;0x34,0x0f&quot;" schema="kdebug"/>
+            <table codes="&quot;0x85,0xc2&quot;" schema="kdebug"/>
+            <table schema="metal-driver-event-per-thread-intervals" target-pid="SINGLE"/>
+            <table schema="metal-object-label"/>
+            <table callstack="user" target="SINGLE" schema="time-sample" sample-rate-micro-seconds="1000" all-thread-states="NO"/>
+            <table codes="&quot;0x2b,0x2b&quot;" schema="kdebug"/>
+            <table schema="metal-gpu-execution-points"/>
+            <table codes="&quot;0x85,0x30&quot;" schema="kdebug" callstack="user"/>
+            <table codes="&quot;0x85,0xc0&quot; &quot;0x85,0xc1&quot; &quot;0x31,0xca&quot;" schema="kdebug"/>
+            <table codes="&quot;0x85,0x2&quot;" schema="kdebug" callstack="user"/>
+            <table codes="&quot;0x85,0x1&quot; &quot;0x85,0x8&quot;" schema="kdebug" callstack="user"/>
+            <table codes="&quot;0x85,0x9&quot; &quot;0x85,0x18&quot;" schema="kdebug" callstack="user"/>
+            <table codes="&quot;0x85,0x20&quot; &quot;0x31,0x80&quot;" schema="kdebug"/>
+            <table codes="&quot;0x2b,0x87&quot;" schema="kdebug" target="SINGLE"/>
+            <table schema="metal-gpu-info"/>
+            <table schema="dyld-library-load" target-pid="SINGLE"/>
+            <table enable-priority-inversion-detection="0" target-pid="SINGLE" message-type="Fault" schema="os-log" category="&quot;Hang Risk&quot; &quot;Severe Hang Risk&quot; CFNetwork Contacts CoreML" subsystem="&quot;com.apple.runtime-issues&quot;"/>
+            <table track-id-base="2000" schema="metal-object-dependency-chain-gpu"/>
+            <table schema="process-info"/>
+            <table schema="metal-visual-highlight-chain-gpu"/>
+            <table schema="ca-client-presented-handler"/>
+            <table schema="runloop-events" target-pid="SINGLE"/>
+            <table schema="metal-residency-set-interval"/>
+            <table schema="metal-driver-intervals" target-pid="SINGLE"/>
+            <table schema="time-info"/>
+            <table schema="graphics-compiler-activity-intervals" target-pid="SINGLE"/>
+            <table schema="metal-application-command-buffer-submissions" target-pid="SINGLE"/>
+            <table shader-profiler="0" counter-profile="0" schema="gpu-counter-info" counter-device="0"/>
+            <table schema="gpu-shader-profiler-sample"/>
+            <table requested-consistent-state="0" schema="gpu-performance-state-info"/>
+            <table schema="device-display-info"/>
+            <table schema="metal-command-buffer-completed"/>
+            <table target-pid="SINGLE" schema="hang-risks" detect-priority-inversions="0"/>
+            <table schema="metal-wired-sysmem-level-interval"/>
+            <table subsystem="&quot;com.apple.Metal.AGXSignposts&quot;" schema="os-signpost-arg" category="ShaderTimeline"/>
+            <table schema="metal-current-allocated-size" target-pid="SINGLE"/>
+            <table schema="metal-ar-events"/>
+            <table schema="metal-application-intervals" target-pid="SINGLE"/>
+            <table content="metal-connection-chains" schema="visual-chain" target-pid="SINGLE"/>
+            <table requested-consistent-state="0" schema="gpu-performance-state-intervals"/>
+            <table schema="gpu-aps-stream"/>
+            <table schema="display-vsyncs-interval"/>
+            <table schema="device-thermal-state-intervals"/>
+            <table schema="metal-driver-event-intervals" target-pid="SINGLE"/>
+            <table schema="metal-visual-highlight-chain-app"/>
+            <table hangs-threshold="100" schema="potential-hangs" target-pid="SINGLE"/>
+            <table schema="metal-shader-profiler-shader-list" target-pid="SINGLE"/>
+            <table content="metal-connections" schema="visual-connection" target-pid="SINGLE"/>
+            <table schema="display-events-interval"/>
+            <table schema="gpu-shader-profiler-interval"/>
+            <table schema="thread-info"/>
+            <table schema="metal-visual-highlight-chain-display"/>
+            <table schema="display-compositor-interval" target-pid="SINGLE"/>
+            <table schema="tick"/>
+            <table schema="tick" frequency="10"/>
+            <table schema="tick" frequency="1"/>
+            <table schema="life-cycle-period" target-pid="SINGLE"/>
+            <table target-pid="SINGLE" context-switch-sampling="0" high-frequency-sampling="0" schema="time-profile" needs-kernel-callstack="0" record-waiting-threads="0"/>
+            <table track-id-base="1000" schema="metal-object-dependency-chain-app"/>
+            <table subsystem="&quot;com.apple.Metal.AGXSignposts&quot;" schema="os-signpost" category="ShaderTimeline"/>
+            <table subsystem="&quot;com.apple.ConditionInducer.LowSeverity&quot;" schema="os-signpost" category="InduceCondition"/>
+            <table subsystem="&quot;com.apple.coreanimation&quot;" schema="os-signpost" category="&quot;CAMetalLayer.Stalls&quot;"/>
+            <table subsystem="&quot;com.apple.coreanimation&quot;" schema="os-signpost" category="CAMetalLayer"/>
+            <table requested-consistent-state="0" schema="gpu-performance-device-state-intervals"/>
+            <table schema="device-gpu-info"/>
+            <table schema="metal-gpu-state-intervals"/>
+            <table schema="mps-hw-intervals" target-pid="SINGLE"/>
+            <table schema="ca-client-buffer-wait-interval"/>
+            <table schema="gpu-counter-value"/>
+            <table shader-profiler="0" counter-profile="0" schema="metal-gpu-counter-profile" counter-device="0"/>
+            <table track-id-base="2000" schema="metal-object-dependency-chain-driver"/>
+            <table schema="metal-io-surface-access"/>
+            <table schema="metal-command-buffer-error"/>
+            <table schema="metal-residency-set-resource-event"/>
+            <table schema="metal-application-event-interval" target-pid="SINGLE"/>
+            <table schema="metal-gpu-counter-intervals"/>
+            <table schema="displayed-surfaces-per-second"/>
+            <table schema="display-surface-swap"/>
+            <table schema="metal-gpu-submission-to-command-buffer-id"/>
+            <table schema="metal-known-compositor-process"/>
+            <table schema="metal-gpu-intervals" target-pid="SINGLE"/>
+            <table schema="metal-command-buffer-frame-assignment"/>
+            <table schema="metal-visual-highlight-chain-driver"/>
+            <table schema="metal-command-buffer-to-accelerator-id"/>
+            <table schema="metal-resource-allocations" target-pid="SINGLE"/>
+            <table schema="metal-kernel-resource-allocations" target-pid="SINGLE"/>
+            <table codes="&quot;0x85,0x92&quot; &quot;0x85,0x93&quot; &quot;0x85,0xae&quot; &quot;0x06,0x1b&quot; &quot;0x2b,0x24&quot;" schema="kdebug"/>
+        </data>
+        <tracks/>
+    </run>
+</trace-toc>

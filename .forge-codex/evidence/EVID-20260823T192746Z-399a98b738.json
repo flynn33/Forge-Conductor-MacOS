@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 1576,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T192746Z-399a98b738.stdout.txt",
+      "sha256": "9e717e9ee222468433d7ce1cc6782555fcc2231168b03157d71f800ec25aaac0"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T192746Z-399a98b738.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "command": "curl --fail --silent --show-error http://127.0.0.1:7788/api/health",
+  "ended_at": "2026-08-23T19:27:46.399455+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T192746Z-399a98b738",
+  "kind": "p04-gauge-scene-reclose",
+  "related_findings": [],
+  "related_gates": [
+    "G04"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T19:27:46.388657+00:00",
+  "timed_out": false
+}

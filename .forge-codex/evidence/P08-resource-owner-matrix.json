@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "phase": "P08",
+  "owners": [
+    {
+      "owner": "ContinuityStateEngine",
+      "resources": ["rollover operation", "canonical handoff", "transition journal"],
+      "bound": "one nonterminal operation per project; one handoff per operation; eight state rows plus creation",
+      "release": "predecessorSealed removes the operation from the active query while retaining an auditable terminal record"
+    },
+    {
+      "owner": "ContinuityCoordinator",
+      "resources": ["host adapter calls"],
+      "bound": "one serialized actor loop per request; create is reconciled by idempotency key and bootstrap is replay-safe",
+      "release": "all awaited calls return before the request completes; no unstructured work is retained"
+    },
+    {
+      "owner": "ContextContinuityService.snapshotAgents",
+      "resources": ["snaps", "seen"],
+      "bound": "function-local output stops at maximumAgentSnapshots=128",
+      "release": "released at function return; 144-open-session test observes 128 output rows"
+    },
+    {
+      "owner": "ContextContinuityService.mergeOpenAgentSnapshots",
+      "resources": ["merged", "seen", "currentBySession"],
+      "bound": "both merge loops stop at maximumAgentSnapshots=128 and input snapshots are already bounded",
+      "release": "released at function return; repeated checkpoint test observes 128 merged rows"
+    },
+    {
+      "owner": "ContinuityHandoff",
+      "resources": ["structured handoff lists", "encoded payload"],
+      "bound": "each list is capped at 128 and the canonical encoded document at 131072 bytes",
+      "release": "value lifetime only; durable copy belongs to the project repository"
+    },
+    {
+      "owner": "P08 MCP process harness",
+      "resources": ["two sequential server processes", "stdin", "stdout", "stderr"],
+      "bound": "one process and three streams at a time",
+      "release": "close waits, terminates or kills on timeout, and closes every stream in finally blocks"
+    }
+  ]
+}

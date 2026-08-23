@@ -10,14 +10,27 @@ import Network
 /// Low-level HTTP response writer for the loopback control surface.
 /// Extracted from DashboardServer so route handlers stay free of socket details.
 public final class HTTPResponder: @unchecked Sendable {
+    public static let maximumLiveStreams = 32
     /// Retain live SSE sessions until they close (otherwise ARC ends the stream after 1 frame).
     private let streamLock = NSLock()
     private var liveStreams: [ObjectIdentifier: SSEStreamSession] = [:]
+    private var reservedStreamSlots = 0
 
     public init() {}
 
+    private func reserveStreamCapacity() -> Bool {
+        streamLock.lock()
+        defer { streamLock.unlock() }
+        guard liveStreams.count + reservedStreamSlots < Self.maximumLiveStreams else {
+            return false
+        }
+        reservedStreamSlots += 1
+        return true
+    }
+
     fileprivate func retainStream(_ session: SSEStreamSession) {
         streamLock.lock()
+        reservedStreamSlots = max(0, reservedStreamSlots - 1)
         liveStreams[ObjectIdentifier(session)] = session
         streamLock.unlock()
     }
@@ -126,7 +139,16 @@ public final class HTTPResponder: @unchecked Sendable {
         telemetry: TelemetryService,
         targetHz: Double = 20,
         maxDurationSec: TimeInterval = 3600
-    ) -> SSEStreamSession {
+    ) -> SSEStreamSession? {
+        guard reserveStreamCapacity() else {
+            respond(
+                connection,
+                status: 503,
+                body: "SSE stream capacity reached",
+                contentType: "text/plain"
+            )
+            return nil
+        }
         let session = SSEStreamSession(
             connection: connection,
             telemetry: telemetry,
@@ -146,6 +168,7 @@ public final class HTTPResponder: @unchecked Sendable {
 ///
 /// **Must be retained** by `HTTPResponder` for the life of the stream.
 public final class SSEStreamSession: @unchecked Sendable {
+    public static let maximumPendingFrames = 1
     private let connection: NWConnection
     private let telemetry: TelemetryService
     private weak var responder: HTTPResponder?
@@ -246,7 +269,11 @@ public final class SSEStreamSession: @unchecked Sendable {
             lock.unlock()
             return
         }
-        sendChain.append((data, countsAsEvent))
+        if sending, sendChain.count >= Self.maximumPendingFrames {
+            sendChain[sendChain.count - 1] = (data, countsAsEvent)
+        } else {
+            sendChain.append((data, countsAsEvent))
+        }
         let kick = !sending
         if kick { sending = true }
         lock.unlock()

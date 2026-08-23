@@ -1,0 +1,34 @@
+{
+  "artifacts": [
+    {
+      "bytes": 1013,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T191440Z-4b9a17e878.stdout.txt",
+      "sha256": "8368391820270448bda3b054c91e9c21561cfdef8b6de99da63644f4ac1387d7"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T191440Z-4b9a17e878.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "command": ".forge-codex/scripts/check_p03_telemetry.py",
+  "ended_at": "2026-08-23T19:14:40.870695+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 1,
+  "id": "EVID-20260823T191440Z-4b9a17e878",
+  "kind": "p03-source-and-mapping-invariants",
+  "related_findings": [
+    "FC-MEM-001",
+    "FC-TELEM-DUPLICATE"
+  ],
+  "related_gates": [
+    "G03"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T19:14:40.824410+00:00",
+  "timed_out": false
+}

@@ -16,30 +16,40 @@ import Foundation
 ///   for edge/HTTP compatibility.
 public final class TelemetryService: TelemetryProviding, @unchecked Sendable {
     public static let runtimeIdentifier = "swift-native-realtime"
+    public static let maximumListeners = 128
     public let paths: AppPaths
     public let realtimeEngine: any RealtimeMetricsStreaming
 
     private let forgeCollector: any ForgeMetricsCollecting
+    private let runtimeDiagnostics: RuntimeDiagnostics
+    private let resourcePolicy: ResourcePolicy
+    private let pressureMonitor = ResourcePressureMonitor()
     private let lock = NSLock()
     private var history: [HistoryPoint] = []
-    private let historyMax = 900
+    private var pressureLevel: ResourcePressureLevel = .nominal
     /// Latest live frame (host always current; forge last composed).
     private var liveFrame: TelemetrySnapshot?
     private var forgeTimer: DispatchSourceTimer?
     private let forgeQueue = DispatchQueue(label: "forge.telemetry.forge", qos: .utility)
     private var listeners: [UUID: (TelemetrySnapshot) -> Void] = [:]
+    private var listenerOrder: [UUID] = []
     private var systemListenerID: UUID?
     private var lastForge: ForgeSnapshot?
+    private var presentationSequence: UInt64 = 0
 
     public init(
         paths: AppPaths,
         store: SQLiteStore,
         catalog: AgentCatalog,
         toolNames: @escaping () -> [String] = { [] },
-        realtimeEngine: (any RealtimeMetricsStreaming)? = nil
+        realtimeEngine: (any RealtimeMetricsStreaming)? = nil,
+        runtimeDiagnostics: RuntimeDiagnostics = RuntimeDiagnostics.shared,
+        resourcePolicy: ResourcePolicy = .current
     ) {
         self.paths = paths
         self.realtimeEngine = realtimeEngine ?? RealtimeMetricsEngine()
+        self.runtimeDiagnostics = runtimeDiagnostics
+        self.resourcePolicy = resourcePolicy
         self.forgeCollector = ForgeCollector(
             paths: paths,
             store: store,
@@ -52,11 +62,15 @@ public final class TelemetryService: TelemetryProviding, @unchecked Sendable {
         paths: AppPaths,
         systemCollector: any SystemMetricsCollecting,
         forgeCollector: any ForgeMetricsCollecting,
-        realtimeEngine: (any RealtimeMetricsStreaming)? = nil
+        realtimeEngine: (any RealtimeMetricsStreaming)? = nil,
+        runtimeDiagnostics: RuntimeDiagnostics = RuntimeDiagnostics.shared,
+        resourcePolicy: ResourcePolicy = .current
     ) {
         self.paths = paths
         self.realtimeEngine = realtimeEngine ?? RealtimeMetricsEngine(systemCollector: systemCollector)
         self.forgeCollector = forgeCollector
+        self.runtimeDiagnostics = runtimeDiagnostics
+        self.resourcePolicy = resourcePolicy
     }
 
     // MARK: - Lifecycle
@@ -88,6 +102,11 @@ public final class TelemetryService: TelemetryProviding, @unchecked Sendable {
 
         // Seed a live frame immediately so listeners/SSE never wait for a snapshot poll.
         recomposeForgeAndPublish()
+        pressureMonitor.start { [weak self] level in
+            self?.applyMemoryPressure(level)
+        }
+        runtimeDiagnostics.set(.activeLongLivedTasks, to: 2)
+        runtimeDiagnostics.set(.activeSubscriptions, to: 1)
     }
 
     public func stopBackgroundRefresh() {
@@ -96,31 +115,72 @@ public final class TelemetryService: TelemetryProviding, @unchecked Sendable {
             systemListenerID = nil
         }
         realtimeEngine.stop()
+        pressureMonitor.stop()
         lock.lock()
         forgeTimer?.cancel()
         forgeTimer = nil
         lock.unlock()
+        runtimeDiagnostics.set(.activeLongLivedTasks, to: 0)
+        runtimeDiagnostics.set(.activeSubscriptions, to: 0)
     }
 
     @discardableResult
     public func addListener(_ block: @escaping (TelemetrySnapshot) -> Void) -> UUID {
         let id = UUID()
         lock.lock()
+        if listeners.count >= Self.maximumListeners, let oldest = listenerOrder.first {
+            listeners.removeValue(forKey: oldest)
+            listenerOrder.removeFirst()
+        }
         listeners[id] = block
+        listenerOrder.append(id)
+        let count = listeners.count
         lock.unlock()
+        runtimeDiagnostics.set(.telemetryListenerCount, to: count)
         return id
     }
 
     public func removeListener(_ id: UUID) {
         lock.lock()
         listeners[id] = nil
+        listenerOrder.removeAll { $0 == id }
+        let count = listeners.count
         lock.unlock()
+        runtimeDiagnostics.set(.telemetryListenerCount, to: count)
+    }
+
+    var listenerCount: Int {
+        lock.lock(); defer { lock.unlock() }
+        return listeners.count
+    }
+
+    public var resourceLimits: ResourceLimits {
+        lock.lock(); defer { lock.unlock() }
+        return resourcePolicy.limits(for: pressureLevel)
+    }
+
+    /// Applies a pressure tier immediately and trims optional in-memory history.
+    @discardableResult
+    public func applyMemoryPressure(_ level: ResourcePressureLevel) -> Int {
+        lock.lock()
+        pressureLevel = level
+        let limit = resourcePolicy.limits(for: level).telemetryHistoryPoints
+        if history.count > limit {
+            history.removeFirst(history.count - limit)
+        }
+        let retained = history.count
+        lock.unlock()
+        runtimeDiagnostics.set(.telemetryHistorySize, to: retained)
+        return retained
     }
 
     // MARK: - Live stream core
 
     private func onSystemSample(_ system: SystemMetrics) {
+        runtimeDiagnostics.increment(.telemetryEventsProduced)
         lock.lock()
+        presentationSequence &+= 1
+        let sequence = presentationSequence
         let forge = lastForge ?? ForgeSnapshot.empty(home: paths.home.path)
         let point = HistoryPoint(
             ts: system.ts,
@@ -132,7 +192,8 @@ public final class TelemetryService: TelemetryProviding, @unchecked Sendable {
             orch: forge.orchestration.health
         )
         history.append(point)
-        while history.count > historyMax { history.removeFirst() }
+        let historyMax = resourcePolicy.limits(for: pressureLevel).telemetryHistoryPoints
+        if history.count > historyMax { history.removeFirst(history.count - historyMax) }
         let hist = Array(history.suffix(300))
         let frame = TelemetrySnapshot(
             system: system,
@@ -143,14 +204,21 @@ public final class TelemetryService: TelemetryProviding, @unchecked Sendable {
         )
         liveFrame = frame
         let cbs = Array(listeners.values)
+        let historyCount = history.count
         lock.unlock()
+        let signpost = RuntimeSignposts.beginTelemetryPresentation(sequence: sequence)
+        runtimeDiagnostics.increment(.telemetrySnapshotsPublished)
+        runtimeDiagnostics.set(.telemetryHistorySize, to: historyCount)
         for cb in cbs { cb(frame) }
+        RuntimeSignposts.endTelemetryPresentation(signpost, sequence: sequence)
     }
 
     private func recomposeForgeAndPublish() {
         let forge = forgeCollector.collect()
         let system = realtimeEngine.latestSystem
         lock.lock()
+        presentationSequence &+= 1
+        let sequence = presentationSequence
         lastForge = forge
         history.append(
             HistoryPoint(
@@ -163,7 +231,8 @@ public final class TelemetryService: TelemetryProviding, @unchecked Sendable {
                 orch: forge.orchestration.health
             )
         )
-        while history.count > historyMax { history.removeFirst() }
+        let historyMax = resourcePolicy.limits(for: pressureLevel).telemetryHistoryPoints
+        if history.count > historyMax { history.removeFirst(history.count - historyMax) }
         let hist = Array(history.suffix(300))
         let frame = TelemetrySnapshot(
             system: system,
@@ -174,8 +243,13 @@ public final class TelemetryService: TelemetryProviding, @unchecked Sendable {
         )
         liveFrame = frame
         let cbs = Array(listeners.values)
+        let historyCount = history.count
         lock.unlock()
+        let signpost = RuntimeSignposts.beginTelemetryPresentation(sequence: sequence)
+        runtimeDiagnostics.increment(.telemetrySnapshotsPublished)
+        runtimeDiagnostics.set(.telemetryHistorySize, to: historyCount)
         for cb in cbs { cb(frame) }
+        RuntimeSignposts.endTelemetryPresentation(signpost, sequence: sequence)
     }
 
     // MARK: - Current live frame (edge / tests)
@@ -241,6 +315,7 @@ public final class TelemetryService: TelemetryProviding, @unchecked Sendable {
         d["sample_hz_measured"] = realtimeEngine.measuredSampleHz
         d["stream"] = "realtime"
         d["stream_running"] = realtimeEngine.isRunning
+        d["runtime_diagnostics"] = runtimeDiagnostics.snapshot().asDictionary()
         return d
     }
 

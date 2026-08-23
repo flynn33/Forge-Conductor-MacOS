@@ -1,0 +1,1 @@
+.forge-codex/scripts/profile_macos.sh: line 84: 32250 Killed: 9               xcrun xctrace record --template "$TEMPLATE" --time-limit "${DURATION}s" --output "$OUT" --attach "$EXECUTABLE"

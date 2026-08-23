@@ -1,0 +1,59 @@
+{
+  "commands": [
+    {"command": "swift test --no-parallel --filter 'ResourcePolicyTests|ProcessRunnerTests|RealtimeStreamTests|LifecycleOwnershipTests'", "exit_code": 0, "evidence": ".forge-codex/evidence/EVID-20260823T195742Z-533a0ffc8a.json"},
+    {"command": "swift test --no-parallel -Xswiftc -strict-concurrency=complete -Xswiftc -warnings-as-errors", "exit_code": 0, "evidence": ".forge-codex/evidence/EVID-20260823T195808Z-9893a6484a.json"},
+    {"command": ".forge-codex/scripts/check_p06_resources.py", "exit_code": 0, "evidence": ".forge-codex/evidence/EVID-20260823T195911Z-2c43d9837a.json"}
+  ],
+  "criteria_results": [
+    {
+      "criterion": "all long-lived collections declare/enforce limits",
+      "evidence": [
+        {"path": ".forge-codex/evidence/P06-resource-policy-inventory.json", "sha256": "e62cc92dbd5fb54145ed84db6a14ac476c69ef5ae3aa5d243a54a0bf0bd5e400"},
+        {"path": "Sources/ForgeConductorCore/Infrastructure/ResourcePolicy.swift", "sha256": "de54eb94b38a2741721426185ddd02d7f2418cf7ca6971e1a424078c666c013c"},
+        {"path": ".forge-codex/evidence/EVID-20260823T195911Z-2c43d9837a.stdout.txt", "sha256": "49a317b61a5aa822cb9f4ffcb3f06ea3aa1e6973b6848e9fb077d76c65260a12"}
+      ],
+      "passed": true
+    },
+    {
+      "criterion": "memory-pressure behavior passes",
+      "evidence": [
+        {"path": "Sources/ForgeConductorCore/Infrastructure/ResourcePolicy.swift", "sha256": "de54eb94b38a2741721426185ddd02d7f2418cf7ca6971e1a424078c666c013c"},
+        {"path": "Sources/ForgeConductorCore/Telemetry/TelemetryService.swift", "sha256": "87473a08ca767716bb04731fb0f0b693ce33383629460082593469d96c5eb4ef"},
+        {"path": "Tests/ForgeConductorTests/ResourcePolicyTests.swift", "sha256": "65625e6160a4fbf2cc26d9b5b699a01b756b0969ca999d328d40dacb105307d9"},
+        {"path": ".forge-codex/evidence/EVID-20260823T195742Z-533a0ffc8a.stdout.txt", "sha256": "f2c7ea913587a567ef0c6d2cb11ec08bc1951725ed4117439b52c6186c8b9753"}
+      ],
+      "passed": true
+    },
+    {
+      "criterion": "subprocess output/logs are bounded",
+      "evidence": [
+        {"path": "Sources/ForgeConductorCore/Infrastructure/ProcessRunner.swift", "sha256": "b61c03729e0ba2838dea6e2d2254fe9983a04839d799d3dae015fe501b2bb9dc"},
+        {"path": "Sources/ForgeConductorCore/Infrastructure/DiagnosticLog.swift", "sha256": "0c8d42e315cacd4734a7014671ed7e4a9c317fbeea019f68887adb37f29bc5d0"},
+        {"path": "Tests/ForgeConductorTests/ProcessRunnerTests.swift", "sha256": "de91e6892a0f3a74ef56dec304163b82dd80b572ae66c0f7a496bbd834562fe4"},
+        {"path": ".forge-codex/evidence/P06-bounded-state-report.json", "sha256": "b05db8ae7a98a3d3d556712b78cca923b279e61315317ebdad7016438c46255c"}
+      ],
+      "passed": true
+    },
+    {
+      "criterion": "main-actor blocking scan and tests pass",
+      "evidence": [
+        {"path": "Sources/ForgeConductorApp/AppModel.swift", "sha256": "643b86a1f414bf4108465143bb902da0210f819f315e7490c5a6746bf7fe6e3e"},
+        {"path": ".forge-codex/evidence/EVID-20260823T195911Z-2c43d9837a.stdout.txt", "sha256": "49a317b61a5aa822cb9f4ffcb3f06ea3aa1e6973b6848e9fb077d76c65260a12"},
+        {"path": ".forge-codex/evidence/EVID-20260823T195808Z-9893a6484a.stdout.txt", "sha256": "55308297342628a613b88b2f4e53ed5169aa123109d37c84d82fe4474ff957e7"}
+      ],
+      "passed": true
+    },
+    {
+      "criterion": "project/session release reaches bounded steady state",
+      "evidence": [
+        {"path": "Tests/ForgeConductorTests/ResourcePolicyTests.swift", "sha256": "65625e6160a4fbf2cc26d9b5b699a01b756b0969ca999d328d40dacb105307d9"},
+        {"path": ".forge-codex/evidence/P06-bounded-state-report.json", "sha256": "b05db8ae7a98a3d3d556712b78cca923b279e61315317ebdad7016438c46255c"},
+        {"path": ".forge-codex/evidence/EVID-20260823T195742Z-533a0ffc8a.stdout.txt", "sha256": "f2c7ea913587a567ef0c6d2cb11ec08bc1951725ed4117439b52c6186c8b9753"}
+      ],
+      "passed": true
+    }
+  ],
+  "gate_id": "G06",
+  "instructions": "Recorded adaptive absolute resource ceilings, pressure handling, bounded process/log state, detached UI process work, and repeated release proof.",
+  "schema_version": 1
+}

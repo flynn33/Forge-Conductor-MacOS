@@ -1,0 +1,10 @@
+{
+  "adapters": [],
+  "autonomous_rollover_proven": false,
+  "captured_at": null,
+  "required_plugin_built": false,
+  "schema_version": 1,
+  "selected_adapter": null,
+  "test_evidence": [],
+  "uses_private_ui_automation": false
+}

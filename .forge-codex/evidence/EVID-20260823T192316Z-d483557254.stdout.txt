@@ -1,0 +1,21 @@
+Building for debugging...
+[0/3] Write swift-version--58304C5D6DBC2206.txt
+[1/4] Write sources
+[3/6] Compiling ForgeConductorApp AppModel.swift
+[4/6] Emitting module ForgeConductorApp
+[5/17] Compiling ForgeConductorApp AgentsView.swift
+[6/17] Compiling ForgeConductorApp ManagerSettingsView.swift
+[7/17] Compiling ForgeConductorApp ToolsView.swift
+[8/17] Compiling ForgeConductorApp ForgeConductorApp.swift
+[9/17] Compiling ForgeConductorApp TelemetryDashboardView.swift
+[10/17] Compiling ForgeConductorApp LiveFeedView.swift
+[11/17] Compiling ForgeConductorApp DiagnosticsView.swift
+[12/17] Compiling ForgeConductorApp MCPServersView.swift
+[13/17] Compiling ForgeConductorApp ContentView.swift
+[14/17] Compiling ForgeConductorApp AppSidebarView.swift
+[15/17] Compiling ForgeConductorApp RigDashboardView.swift
+[15/18] Write Objects.LinkFileList
+[16/18] Linking forge-conductor-app
+[17/18] Applying forge-conductor-app
+Build of product 'forge-conductor-app' complete! (2.68s)
+Forge Conductor launched from /Users/jimdaley/GitHub/Forge-Conductor-MacOS/dist/Forge Conductor.app

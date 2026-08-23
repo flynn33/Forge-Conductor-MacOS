@@ -1,0 +1,15 @@
+Test Suite 'Selected tests' started at 2026-08-23 16:21:10.990.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-23 16:21:10.991.
+Test Suite 'ReleaseStressTests' started at 2026-08-23 16:21:10.991.
+Test Case '-[ForgeConductorTests.ReleaseStressTests testDeterministicReleaseStressAndResourceBudgets]' started.
+Test Case '-[ForgeConductorTests.ReleaseStressTests testDeterministicReleaseStressAndResourceBudgets]' passed (2.517 seconds).
+Test Suite 'ReleaseStressTests' passed at 2026-08-23 16:21:13.509.
+	 Executed 1 test, with 0 failures (0 unexpected) in 2.517 (2.518) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-08-23 16:21:13.509.
+	 Executed 1 test, with 0 failures (0 unexpected) in 2.517 (2.518) seconds
+Test Suite 'Selected tests' passed at 2026-08-23 16:21:13.509.
+	 Executed 1 test, with 0 failures (0 unexpected) in 2.517 (2.518) seconds
+◇ Test run started.
+↳ Testing Library Version: 1501
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

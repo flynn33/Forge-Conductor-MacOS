@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "gate_id": "G08",
+  "instructions": "Command-backed P08 continuity evidence.",
+  "criteria_results": [
+    {
+      "criterion": "handoff schema and compactness pass",
+      "passed": true,
+      "evidence": [
+        {"path": ".forge-codex/evidence/P08-continuity-report.json", "sha256": "86b23e437872b191570bf864250f76bfc29523ea49520cb75e2ea3ec98644f4b"},
+        {"path": ".forge-codex/evidence/EVID-20260823T204207Z-fb406e171d.json", "sha256": "88076e6dbb4f16e617b0ba3c25655991494a8aecb4aaeb0bccc658a1ccfb791b"}
+      ]
+    },
+    {
+      "criterion": "all transition crash points recover",
+      "passed": true,
+      "evidence": [
+        {"path": ".forge-codex/evidence/P08-continuity-report.json", "sha256": "86b23e437872b191570bf864250f76bfc29523ea49520cb75e2ea3ec98644f4b"},
+        {"path": ".forge-codex/evidence/EVID-20260823T204207Z-fb406e171d.json", "sha256": "88076e6dbb4f16e617b0ba3c25655991494a8aecb4aaeb0bccc658a1ccfb791b"}
+      ]
+    },
+    {
+      "criterion": "idempotency and exact acknowledgment pass",
+      "passed": true,
+      "evidence": [
+        {"path": ".forge-codex/evidence/P08-mcp-process-conformance.json", "sha256": "e18ee8d25baf6b3d38169e72d64046b78fe04ec150bc10bc6aba042786b20015"},
+        {"path": ".forge-codex/evidence/EVID-20260823T203838Z-4f3fba0ee5.json", "sha256": "e9c3a5836f9e3117bd07d129d01b60e0c1a733373ee854a7a696a93918124b4f"}
+      ]
+    },
+    {
+      "criterion": "context budget fallback passes",
+      "passed": true,
+      "evidence": [
+        {"path": ".forge-codex/evidence/P08-continuity-report.json", "sha256": "86b23e437872b191570bf864250f76bfc29523ea49520cb75e2ea3ec98644f4b"},
+        {"path": ".forge-codex/evidence/EVID-20260823T204207Z-fb406e171d.json", "sha256": "88076e6dbb4f16e617b0ba3c25655991494a8aecb4aaeb0bccc658a1ccfb791b"}
+      ]
+    },
+    {
+      "criterion": "continuity MCP conformance passes",
+      "passed": true,
+      "evidence": [
+        {"path": ".forge-codex/evidence/P08-mcp-process-conformance.json", "sha256": "e18ee8d25baf6b3d38169e72d64046b78fe04ec150bc10bc6aba042786b20015"},
+        {"path": ".forge-codex/evidence/EVID-20260823T204247Z-4561e060f3.json", "sha256": "6b40dc22f5e9ba3787794353232a1ad664509ebb520dcb5cc007be0600c91844"}
+      ]
+    }
+  ],
+  "commands": [
+    {"command": "swift test --jobs 4 --filter ContinuityCoordinatorTests", "exit_code": 0, "evidence": ".forge-codex/evidence/EVID-20260823T204207Z-fb406e171d.json"},
+    {"command": "python3 .forge-codex/scripts/check_p08_continuity.py --binary .build/release/forge-conductor --output .forge-codex/evidence/P08-mcp-process-conformance.json", "exit_code": 0, "evidence": ".forge-codex/evidence/EVID-20260823T203838Z-4f3fba0ee5.json"},
+    {"command": "swift test --jobs 4 -Xswiftc -strict-concurrency=complete -Xswiftc -warnings-as-errors", "exit_code": 0, "evidence": ".forge-codex/evidence/EVID-20260823T204247Z-4561e060f3.json"},
+    {"command": "python3 .forge-codex/scripts/check_p08_completion.py", "exit_code": 0, "evidence": ".forge-codex/evidence/EVID-20260823T204429Z-dafc744afc.json"},
+    {"command": "python3 .forge-codex/scripts/scan_attribution.py --root .", "exit_code": 0, "evidence": ".forge-codex/evidence/EVID-20260823T204436Z-f892521a49.json"},
+    {"command": "python3 .forge-codex/scripts/scan_secrets.py --root .", "exit_code": 0, "evidence": ".forge-codex/evidence/EVID-20260823T204436Z-c106089676.json"}
+  ]
+}

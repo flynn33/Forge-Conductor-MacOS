@@ -1,0 +1,18 @@
+{
+  "focused_tests": 7,
+  "ok": true,
+  "phase": "P07",
+  "process_checks": [
+    "cancellation",
+    "initialize",
+    "legacy_compatibility",
+    "pagination",
+    "process_restart_durability",
+    "redaction",
+    "tool_schemas",
+    "tools_list",
+    "typed_error"
+  ],
+  "resolved_findings": 7,
+  "strict_tests": 256
+}

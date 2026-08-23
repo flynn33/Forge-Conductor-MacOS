@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "phase": "P08",
+  "status": "passed",
+  "implementation": {
+    "state_machine": "Eight durable states use transactional compare-and-set transitions and a checksummed transition journal.",
+    "handoff": "Canonical schema 1.0 handoffs are checksummed, semantically validated, list-bounded, and limited to 131072 encoded bytes.",
+    "recovery": "The handoff is durable before checkpointPreparing; every recorded intent is replayed after restart through idempotent host reconciliation.",
+    "acknowledgement": "The project, operation, handoff, successor, and adapter are validated before state changes; repeated exact acknowledgments are idempotent.",
+    "budget": "Provider-exact, serialized-size estimate, and provider-overflow inputs map to normal, checkpoint, rollover, and emergency actions.",
+    "mcp": "Seven additive continuity tools expose memory-only fallback, pending handoff retrieval, external acknowledgment, resume, and status without claiming unsupported host creation."
+  },
+  "crash_points": [
+    "checkpointPreparing",
+    "checkpointPersisted",
+    "successorRequested",
+    "createSideEffect",
+    "successorCreated",
+    "successorBootstrapping",
+    "bootstrapSideEffect",
+    "successorAcknowledged",
+    "predecessorSealed"
+  ],
+  "limits": {
+    "handoff_encoded_bytes": 131072,
+    "handoff_list_items": 128,
+    "agent_snapshots": 128,
+    "nonterminal_operations_per_project": 1
+  },
+  "qualification": {
+    "focused_tests": ".forge-codex/evidence/EVID-20260823T204207Z-fb406e171d.json",
+    "focused_result": "5 tests, 0 failures",
+    "process_conformance": ".forge-codex/evidence/EVID-20260823T203838Z-4f3fba0ee5.json",
+    "strict_full_suite": ".forge-codex/evidence/EVID-20260823T204247Z-4561e060f3.json",
+    "strict_full_suite_result": "261 tests, 2 environment skips, 0 failures"
+  }
+}

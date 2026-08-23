@@ -1,0 +1,22 @@
+{
+  "attempts": [],
+  "created_at": "1970-01-01T00:00:00Z",
+  "current_work": null,
+  "decisions": [],
+  "evidence": [],
+  "gates": {},
+  "handoffs": [],
+  "issues": [],
+  "last_event_sequence": 0,
+  "phases": {},
+  "repository": {
+    "branch": null,
+    "commit": null,
+    "dirty": false,
+    "root": ""
+  },
+  "run_id": "00000000-0000-0000-0000-000000000000",
+  "schema_version": 1,
+  "status": "active",
+  "updated_at": "1970-01-01T00:00:00Z"
+}

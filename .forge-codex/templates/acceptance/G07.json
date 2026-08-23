@@ -1,0 +1,38 @@
+{
+  "commands": [],
+  "criteria_results": [
+    {
+      "criterion": "existing MCP compatibility passes",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "memory MCP conformance passes",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "project isolation and restart durability pass",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "migration/integrity/recovery pass",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "search/page/payload/cache budgets pass",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "redaction/security tests pass",
+      "evidence": [],
+      "passed": false
+    }
+  ],
+  "gate_id": "G07",
+  "instructions": "Replace placeholders only with command-backed artifacts and SHA-256 values. The validator rejects absent evidence.",
+  "schema_version": 1
+}

@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 1583,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T190504Z-695abfb997.stdout.txt",
+      "sha256": "27a0939f7a0047ae94fb4c7c9e03dbcb0cab639a23930aa29b500a72317a6309"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T190504Z-695abfb997.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "command": "curl --fail --silent --show-error http://127.0.0.1:7788/api/health",
+  "ended_at": "2026-08-23T19:05:04.968165+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T190504Z-695abfb997",
+  "kind": "p02-runtime-diagnostics-status",
+  "related_findings": [],
+  "related_gates": [
+    "G02"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T19:05:04.943802+00:00",
+  "timed_out": false
+}

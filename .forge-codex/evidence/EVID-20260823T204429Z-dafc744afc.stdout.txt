@@ -1,0 +1,19 @@
+{
+  "crash_points": 9,
+  "focused_tests": 5,
+  "ok": true,
+  "phase": "P08",
+  "process_checks": [
+    "active_session_swap",
+    "durable_handoff_restart",
+    "exact_acknowledgement_rejection",
+    "idempotent_acknowledgement",
+    "memory_only_capability_fallback",
+    "predecessor_seal",
+    "rejected_acknowledgement_no_mutation",
+    "tool_inventory",
+    "tool_schemas"
+  ],
+  "resolved_findings": 4,
+  "strict_tests": 261
+}

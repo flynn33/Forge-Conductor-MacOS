@@ -24,6 +24,8 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
     public static let handoffEveryTools = 200
     public static let checkpointIntervalSec: TimeInterval = 1_800
     public static let handoffIntervalSec: TimeInterval = 7_200
+    static let maxTrackedClients = 128
+    static let maxImplicitRootsPerClient = 16
 
     private let store: SQLiteStore
     private let sessions: AgentSessionService
@@ -99,7 +101,10 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
         lock.lock()
         defer { lock.unlock() }
         var current = state[clientID.rawValue] ?? ClientState()
-        current.implicitRoots = uniqued(current.implicitRoots + urls)
+        current.implicitRoots = Array(
+            uniqued(current.implicitRoots + urls).suffix(Self.maxImplicitRootsPerClient)
+        )
+        makeRoomForClientIfNeeded(clientID.rawValue)
         state[clientID.rawValue] = current
     }
 
@@ -145,6 +150,7 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
             || current.lastCheckpointAt.map({ now.timeIntervalSince($0) >= Self.checkpointIntervalSec }) == true
         let handoffDue = sinceHandoff >= Self.handoffEveryTools
             || current.lastHandoffAt.map({ now.timeIntervalSince($0) >= Self.handoffIntervalSec }) == true
+        makeRoomForClientIfNeeded(clientID.rawValue)
         state[clientID.rawValue] = current
         lock.unlock()
 
@@ -215,6 +221,7 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
         current.blocked = true
         current.lastHandoffID = packet.id
         current.lastResumeSeed = packet.resumeSeed.isEmpty ? packet.defaultResumeSeed() : packet.resumeSeed
+        makeRoomForClientIfNeeded(clientID.rawValue)
         state[clientID.rawValue] = current
     }
 
@@ -243,6 +250,18 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
             "handoff_id": current?.lastHandoffID as Any,
             "implicit_roots": (current?.implicitRoots ?? []).map(\.path),
         ]
+    }
+
+    var trackedClientCount: Int {
+        lock.lock(); defer { lock.unlock() }
+        return state.count
+    }
+
+    private func makeRoomForClientIfNeeded(_ key: String) {
+        guard state[key] == nil, state.count >= Self.maxTrackedClients else { return }
+        if let victim = state.keys.filter({ $0 != key }).sorted().first {
+            state.removeValue(forKey: victim)
+        }
     }
 
     private func inferredArguments(

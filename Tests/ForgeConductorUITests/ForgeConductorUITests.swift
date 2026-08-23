@@ -115,4 +115,22 @@ final class ForgeConductorUITests: XCTestCase {
             "Navigation should reappear after using the toolbar toggle"
         )
     }
+
+    func testHundredGaugeNavigationCyclesQuiesce() throws {
+        let rig = app.buttons["tab-rig"]
+        let mcp = app.buttons["tab-mcp"]
+        XCTAssertTrue(rig.waitForExistence(timeout: 8))
+        XCTAssertTrue(mcp.waitForExistence(timeout: 8))
+
+        for cycle in 0..<100 {
+            mcp.click()
+            XCTAssertTrue(app.descendants(matching: .any)["detail-mcp"].waitForExistence(timeout: 2))
+            rig.click()
+            XCTAssertTrue(
+                app.descendants(matching: .any)["detail-rig"].waitForExistence(timeout: 2),
+                "Gauge screen did not return on cycle \(cycle)"
+            )
+        }
+        XCTAssertTrue(app.windows.firstMatch.exists)
+    }
 }

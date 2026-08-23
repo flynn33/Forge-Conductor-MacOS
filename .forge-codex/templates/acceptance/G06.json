@@ -1,0 +1,33 @@
+{
+  "commands": [],
+  "criteria_results": [
+    {
+      "criterion": "all long-lived collections declare/enforce limits",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "memory-pressure behavior passes",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "subprocess output/logs are bounded",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "main-actor blocking scan and tests pass",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "project/session release reaches bounded steady state",
+      "evidence": [],
+      "passed": false
+    }
+  ],
+  "gate_id": "G06",
+  "instructions": "Replace placeholders only with command-backed artifacts and SHA-256 values. The validator rejects absent evidence.",
+  "schema_version": 1
+}

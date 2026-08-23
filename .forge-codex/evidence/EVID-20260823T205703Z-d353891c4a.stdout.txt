@@ -1,0 +1,10 @@
+{
+  "adapter": "forge.native-session-host",
+  "external_checks": 9,
+  "ok": true,
+  "phase": "P09",
+  "plugin_tests": 4,
+  "private_ui_violations": 0,
+  "selected_mode": "B",
+  "strict_tests": 265
+}

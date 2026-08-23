@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-08-23T18:43:12Z",
+  "server_identity": {
+    "name": "forge-conductor",
+    "version": "0.8.0",
+    "protocol_version": "2025-11-25",
+    "capabilities": {"tools": {"listChanged": false}}
+  },
+  "transports": [
+    {
+      "kind": "stdio",
+      "framing": ["newline-delimited JSON", "Content-Length"],
+      "source": "Sources/ForgeConductorCore/MCP/MCPServer.swift"
+    }
+  ],
+  "initialize_transcript_artifact": ".forge-codex/evidence/EVID-20260823T184311Z-0dccfacc9f.stdout.txt",
+  "initialize_transcript_sha256": "332c4bc6124e9792eaf8d9aad109c79948ddff52f0cd56c228ad1abe01f4781b",
+  "request_fixture": ".forge-codex/state/baseline/mcp-baseline-requests.ndjson",
+  "tools": [
+    "agent_context",
+    "agent_get",
+    "agent_list",
+    "agent_recommend",
+    "agent_run_complete",
+    "agent_run_start",
+    "agent_run_status",
+    "context_get",
+    "context_list",
+    "forge_status",
+    "fs_delete",
+    "fs_edit",
+    "fs_glob",
+    "fs_list",
+    "fs_mkdir",
+    "fs_move",
+    "fs_read",
+    "fs_write",
+    "git_add",
+    "git_commit",
+    "git_diff",
+    "git_log",
+    "git_status",
+    "memory_delete",
+    "memory_get",
+    "memory_list",
+    "memory_search",
+    "memory_set",
+    "pdf_from_file",
+    "pdf_write",
+    "search_text",
+    "session_checkpoint",
+    "session_handoff",
+    "shell_exec"
+  ],
+  "tool_count": 34,
+  "resources": [],
+  "prompts": [],
+  "errors": [],
+  "compatibility_tests": [
+    "MCPProtocolAndDiagnosticsTests",
+    "MemoryToolTests.testMemoryToolsAreRegistered",
+    "ContinuityTests",
+    "p01-mcp-protocol-baseline"
+  ]
+}

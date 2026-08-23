@@ -81,6 +81,41 @@ final class MCPProtocolAndDiagnosticsTests: XCTestCase {
         XCTAssertTrue(md.contains("unit_test_event") || md.contains("Timeline"))
     }
 
+    func testDiagnosticLogRedactsPrivateFieldsBeforePersistenceAndExport() throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("forge-redaction-test-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let paths = AppPaths(home: tmp)
+        try paths.ensureLayout()
+        let log = DiagnosticLog(paths: paths)
+        let privatePath = "/Users/private/Project/secret.txt"
+        let privateGoal = "private customer remediation details"
+        log.info("redaction_boundary", [
+            "path": privatePath,
+            "goal": privateGoal,
+            "operation_id": "operation-17",
+            "count": "3",
+        ], category: .diagnostics)
+
+        let record = try XCTUnwrap(log.recent(limit: 1).first)
+        XCTAssertTrue(record.fields["path"]?.hasPrefix("<redacted:") == true)
+        XCTAssertTrue(record.fields["goal"]?.hasPrefix("<redacted:") == true)
+        XCTAssertEqual(record.fields["operation_id"], "operation-17")
+        XCTAssertEqual(record.fields["count"], "3")
+
+        let persisted = try String(contentsOf: paths.masterDiagnostics, encoding: .utf8)
+        XCTAssertFalse(persisted.contains(privatePath))
+        XCTAssertFalse(persisted.contains(privateGoal))
+
+        let exported = try log.export(to: tmp.appendingPathComponent("export", isDirectory: true))
+        let exportText = try String(contentsOf: exported.jsonURL, encoding: .utf8)
+        XCTAssertFalse(exportText.contains(tmp.path))
+        XCTAssertFalse(exportText.contains(privatePath))
+        XCTAssertFalse(exportText.contains(privateGoal))
+    }
+
     func testRealtimeEngineIsContinuousNotTwoSecondSnapshot() {
         XCTAssertGreaterThanOrEqual(RealtimeMetricsEngine.defaultTargetHz, 20)
         XCTAssertLessThan(1.0 / RealtimeMetricsEngine.defaultTargetHz, 0.1)

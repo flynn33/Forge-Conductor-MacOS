@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 282,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T205330Z-dd887aaee2.stdout.txt",
+      "sha256": "4559de4743c5923418848c4a26ee6c374048893574cfc56cba69bd27e34348ca"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T205330Z-dd887aaee2.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "command": "python3 .forge-codex/scripts/check_private_ui_automation.py",
+  "ended_at": "2026-08-23T20:53:30.425408+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T205330Z-dd887aaee2",
+  "kind": "p09-private-ui-automation-scan",
+  "related_findings": [],
+  "related_gates": [
+    "G09"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T20:53:30.347598+00:00",
+  "timed_out": false
+}

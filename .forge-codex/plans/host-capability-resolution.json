@@ -1,0 +1,37 @@
+{
+  "compatibility_rule": "External MCP-only clients retain memory and handoff support even when automatic chat creation is unavailable in that client. Forge-native host mode must provide complete autonomous rollover.",
+  "prohibited": [
+    "AppleScript UI driving",
+    "Accessibility keystroke automation",
+    "screen scraping",
+    "private or reverse-engineered host endpoints",
+    "claiming MCP alone created an external chat"
+  ],
+  "required_capabilities": [
+    "create_session",
+    "bootstrap_handoff",
+    "acknowledge_handoff",
+    "reconcile_idempotency",
+    "report_or_estimate_context_budget",
+    "cancel",
+    "recover"
+  ],
+  "resolution_order": [
+    {
+      "action": "reuse_existing_adapter",
+      "condition": "all required capabilities are implemented through documented APIs and integration tests pass",
+      "order": 1
+    },
+    {
+      "action": "build_supported_external_adapter",
+      "condition": "a documented external host API supplies the required capabilities",
+      "order": 2
+    },
+    {
+      "action": "build_ForgeNativeSessionHostPlugin",
+      "condition": "no external adapter satisfies the full contract",
+      "order": 3
+    }
+  ],
+  "schema_version": 1
+}

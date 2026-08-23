@@ -1,0 +1,905 @@
+{
+  "checks": [
+    {
+      "detail": "VERSION",
+      "name": "required:VERSION",
+      "passed": true
+    },
+    {
+      "detail": "CODEX_EXECUTION_PROMPT.md",
+      "name": "required:CODEX_EXECUTION_PROMPT.md",
+      "passed": true
+    },
+    {
+      "detail": "docs/EXECUTION_CONTRACT.md",
+      "name": "required:docs/EXECUTION_CONTRACT.md",
+      "passed": true
+    },
+    {
+      "detail": "docs/EVIDENCE_RULES.md",
+      "name": "required:docs/EVIDENCE_RULES.md",
+      "passed": true
+    },
+    {
+      "detail": "docs/DECISION_POLICY.md",
+      "name": "required:docs/DECISION_POLICY.md",
+      "passed": true
+    },
+    {
+      "detail": "docs/FAIL_FORWARD_POLICY.md",
+      "name": "required:docs/FAIL_FORWARD_POLICY.md",
+      "passed": true
+    },
+    {
+      "detail": "docs/FEATURE_PRESERVATION.md",
+      "name": "required:docs/FEATURE_PRESERVATION.md",
+      "passed": true
+    },
+    {
+      "detail": "docs/PHASE_PLAYBOOK.md",
+      "name": "required:docs/PHASE_PLAYBOOK.md",
+      "passed": true
+    },
+    {
+      "detail": "architecture/TARGET_ARCHITECTURE.md",
+      "name": "required:architecture/TARGET_ARCHITECTURE.md",
+      "passed": true
+    },
+    {
+      "detail": "architecture/TELEMETRY_BACKPRESSURE.md",
+      "name": "required:architecture/TELEMETRY_BACKPRESSURE.md",
+      "passed": true
+    },
+    {
+      "detail": "architecture/GAUGE_RENDERING.md",
+      "name": "required:architecture/GAUGE_RENDERING.md",
+      "passed": true
+    },
+    {
+      "detail": "architecture/PROJECT_MEMORY_MCP.md",
+      "name": "required:architecture/PROJECT_MEMORY_MCP.md",
+      "passed": true
+    },
+    {
+      "detail": "architecture/CONTINUITY_AND_ROLLOVER.md",
+      "name": "required:architecture/CONTINUITY_AND_ROLLOVER.md",
+      "passed": true
+    },
+    {
+      "detail": "architecture/HOST_ADAPTER_PLUGIN.md",
+      "name": "required:architecture/HOST_ADAPTER_PLUGIN.md",
+      "passed": true
+    },
+    {
+      "detail": "specifications/MCP_TOOL_CONTRACTS.md",
+      "name": "required:specifications/MCP_TOOL_CONTRACTS.md",
+      "passed": true
+    },
+    {
+      "detail": "specifications/CONTINUITY_STATE_MACHINE.md",
+      "name": "required:specifications/CONTINUITY_STATE_MACHINE.md",
+      "passed": true
+    },
+    {
+      "detail": "specifications/COMPLETION_GATES.md",
+      "name": "required:specifications/COMPLETION_GATES.md",
+      "passed": true
+    },
+    {
+      "detail": "plans/phases.json",
+      "name": "required:plans/phases.json",
+      "passed": true
+    },
+    {
+      "detail": "plans/gates.json",
+      "name": "required:plans/gates.json",
+      "passed": true
+    },
+    {
+      "detail": "plans/resource-budgets.json",
+      "name": "required:plans/resource-budgets.json",
+      "passed": true
+    },
+    {
+      "detail": "schemas/run-state.schema.json",
+      "name": "required:schemas/run-state.schema.json",
+      "passed": true
+    },
+    {
+      "detail": "schemas/handoff.schema.json",
+      "name": "required:schemas/handoff.schema.json",
+      "passed": true
+    },
+    {
+      "detail": "schemas/memory-record.schema.json",
+      "name": "required:schemas/memory-record.schema.json",
+      "passed": true
+    },
+    {
+      "detail": "scripts/statectl.py",
+      "name": "required:scripts/statectl.py",
+      "passed": true
+    },
+    {
+      "detail": "scripts/feature_inventory.py",
+      "name": "required:scripts/feature_inventory.py",
+      "passed": true
+    },
+    {
+      "detail": "scripts/verify_completion.py",
+      "name": "required:scripts/verify_completion.py",
+      "passed": true
+    },
+    {
+      "detail": "scripts/scan_attribution.py",
+      "name": "required:scripts/scan_attribution.py",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:PACKAGE_VALIDATION.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:audit/Forge-Conductor-Audit-Evidence.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/installed-runtime-self-test.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/portability-scan.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/source-archive-snapshot.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:plans/audit-remediation-matrix.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:plans/gates.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:plans/host-capability-resolution.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:plans/phases.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:plans/resource-budgets.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:plans/test-flows.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:schemas/handoff.schema.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:schemas/memory-record.schema.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:schemas/run-state.schema.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/acceptance/G02.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/acceptance/G03.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/acceptance/G04.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/acceptance/G05.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/acceptance/G06.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/acceptance/G07.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/acceptance/G08.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/acceptance/G09.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/acceptance/G10.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/acceptance/G11.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/baseline/characterization-tests.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/baseline/mcp-capabilities.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/baseline/persistence-inventory.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/environment.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/feature-baseline.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/findings-resolution.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/host-capability-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/run-state.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/source-risk-scan.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/acceptance/G02.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/acceptance/G03.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/acceptance/G04.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/acceptance/G05.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/acceptance/G06.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/acceptance/G07.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/acceptance/G08.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/acceptance/G09.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/acceptance/G10.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/acceptance/G11.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/baseline/characterization-tests.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/baseline/mcp-capabilities.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/baseline/persistence-inventory.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/evidence-index.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/feature-baseline-runtime-completion.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/findings-resolution.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/host-capability-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/plugin-manifest.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/run-state.json",
+      "passed": true
+    },
+    {
+      "detail": "['P00', 'P01', 'P02', 'P03', 'P04', 'P05', 'P06', 'P07', 'P08', 'P09', 'P10', 'P11', 'P12']",
+      "name": "phase-ids-unique",
+      "passed": true
+    },
+    {
+      "detail": "['G00', 'G01', 'G02', 'G03', 'G04', 'G05', 'G06', 'G07', 'G08', 'G09', 'G10', 'G11', 'G12']",
+      "name": "gate-ids-unique",
+      "passed": true
+    },
+    {
+      "detail": "G00",
+      "name": "phase-gate:P00->G00",
+      "passed": true
+    },
+    {
+      "detail": "P00",
+      "name": "phase-dependency:P01->P00",
+      "passed": true
+    },
+    {
+      "detail": "G01",
+      "name": "phase-gate:P01->G01",
+      "passed": true
+    },
+    {
+      "detail": "P01",
+      "name": "phase-dependency:P02->P01",
+      "passed": true
+    },
+    {
+      "detail": "G02",
+      "name": "phase-gate:P02->G02",
+      "passed": true
+    },
+    {
+      "detail": "P02",
+      "name": "phase-dependency:P03->P02",
+      "passed": true
+    },
+    {
+      "detail": "G03",
+      "name": "phase-gate:P03->G03",
+      "passed": true
+    },
+    {
+      "detail": "P02",
+      "name": "phase-dependency:P04->P02",
+      "passed": true
+    },
+    {
+      "detail": "G04",
+      "name": "phase-gate:P04->G04",
+      "passed": true
+    },
+    {
+      "detail": "P02",
+      "name": "phase-dependency:P05->P02",
+      "passed": true
+    },
+    {
+      "detail": "G05",
+      "name": "phase-gate:P05->G05",
+      "passed": true
+    },
+    {
+      "detail": "P03",
+      "name": "phase-dependency:P06->P03",
+      "passed": true
+    },
+    {
+      "detail": "P04",
+      "name": "phase-dependency:P06->P04",
+      "passed": true
+    },
+    {
+      "detail": "P05",
+      "name": "phase-dependency:P06->P05",
+      "passed": true
+    },
+    {
+      "detail": "G06",
+      "name": "phase-gate:P06->G06",
+      "passed": true
+    },
+    {
+      "detail": "P01",
+      "name": "phase-dependency:P07->P01",
+      "passed": true
+    },
+    {
+      "detail": "P02",
+      "name": "phase-dependency:P07->P02",
+      "passed": true
+    },
+    {
+      "detail": "G07",
+      "name": "phase-gate:P07->G07",
+      "passed": true
+    },
+    {
+      "detail": "P07",
+      "name": "phase-dependency:P08->P07",
+      "passed": true
+    },
+    {
+      "detail": "G08",
+      "name": "phase-gate:P08->G08",
+      "passed": true
+    },
+    {
+      "detail": "P08",
+      "name": "phase-dependency:P09->P08",
+      "passed": true
+    },
+    {
+      "detail": "G09",
+      "name": "phase-gate:P09->G09",
+      "passed": true
+    },
+    {
+      "detail": "P03",
+      "name": "phase-dependency:P10->P03",
+      "passed": true
+    },
+    {
+      "detail": "P04",
+      "name": "phase-dependency:P10->P04",
+      "passed": true
+    },
+    {
+      "detail": "P05",
+      "name": "phase-dependency:P10->P05",
+      "passed": true
+    },
+    {
+      "detail": "P06",
+      "name": "phase-dependency:P10->P06",
+      "passed": true
+    },
+    {
+      "detail": "P07",
+      "name": "phase-dependency:P10->P07",
+      "passed": true
+    },
+    {
+      "detail": "P08",
+      "name": "phase-dependency:P10->P08",
+      "passed": true
+    },
+    {
+      "detail": "P09",
+      "name": "phase-dependency:P10->P09",
+      "passed": true
+    },
+    {
+      "detail": "G10",
+      "name": "phase-gate:P10->G10",
+      "passed": true
+    },
+    {
+      "detail": "P10",
+      "name": "phase-dependency:P11->P10",
+      "passed": true
+    },
+    {
+      "detail": "G11",
+      "name": "phase-gate:P11->G11",
+      "passed": true
+    },
+    {
+      "detail": "P11",
+      "name": "phase-dependency:P12->P11",
+      "passed": true
+    },
+    {
+      "detail": "G12",
+      "name": "phase-gate:P12->G12",
+      "passed": true
+    },
+    {
+      "detail": "G00",
+      "name": "completion-gate:G00",
+      "passed": true
+    },
+    {
+      "detail": "G01",
+      "name": "completion-gate:G01",
+      "passed": true
+    },
+    {
+      "detail": "G02",
+      "name": "completion-gate:G02",
+      "passed": true
+    },
+    {
+      "detail": "G03",
+      "name": "completion-gate:G03",
+      "passed": true
+    },
+    {
+      "detail": "G04",
+      "name": "completion-gate:G04",
+      "passed": true
+    },
+    {
+      "detail": "G05",
+      "name": "completion-gate:G05",
+      "passed": true
+    },
+    {
+      "detail": "G06",
+      "name": "completion-gate:G06",
+      "passed": true
+    },
+    {
+      "detail": "G07",
+      "name": "completion-gate:G07",
+      "passed": true
+    },
+    {
+      "detail": "G08",
+      "name": "completion-gate:G08",
+      "passed": true
+    },
+    {
+      "detail": "G09",
+      "name": "completion-gate:G09",
+      "passed": true
+    },
+    {
+      "detail": "G10",
+      "name": "completion-gate:G10",
+      "passed": true
+    },
+    {
+      "detail": "G11",
+      "name": "completion-gate:G11",
+      "passed": true
+    },
+    {
+      "detail": "G12",
+      "name": "completion-gate:G12",
+      "passed": true
+    },
+    {
+      "detail": "[]",
+      "name": "phase-dag-acyclic",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/feature_inventory.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/make_handoff.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/record_command.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/run_gate.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/scan_attribution.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/scan_secrets.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/select_next_work.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/source_risk_scan.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/statectl.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/validate_acceptance.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/validate_package.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/verify_completion.py",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:scripts/bootstrap.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:scripts/collect_memgraph.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:scripts/doctor.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:scripts/initialize_run.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:scripts/install_into_repo.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:scripts/profile_macos.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:scripts/run_codex_autonomously.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:scripts/run_gates.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:scripts/run_self_tests.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:scripts/test_all.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:state/gate-handlers/G00.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:state/gate-handlers/G01.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:state/gate-handlers/G02.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:state/gate-handlers/G03.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:state/gate-handlers/G04.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:state/gate-handlers/G05.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:state/gate-handlers/G06.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:state/gate-handlers/G07.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:state/gate-handlers/G08.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:state/gate-handlers/G09.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:state/gate-handlers/G10.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:state/gate-handlers/G11.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:templates/build_and_run.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:templates/flow-handler.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:templates/gate-handlers/G00.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:templates/gate-handlers/G01.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:templates/gate-handlers/G02.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:templates/gate-handlers/G03.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:templates/gate-handlers/G04.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:templates/gate-handlers/G05.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:templates/gate-handlers/G06.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:templates/gate-handlers/G07.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:templates/gate-handlers/G08.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:templates/gate-handlers/G09.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:templates/gate-handlers/G10.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:templates/gate-handlers/G11.sh",
+      "passed": true
+    },
+    {
+      "detail": "Authorship-attribution scan passed for /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex",
+      "name": "authorship-attribution-scan",
+      "passed": true
+    },
+    {
+      "detail": "Secret scan passed for /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex",
+      "name": "secret-scan",
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex",
+  "schema_version": 1,
+  "valid": true,
+  "validated_at": "2026-08-23T18:37:04.431563+00:00",
+  "warnings": []
+}

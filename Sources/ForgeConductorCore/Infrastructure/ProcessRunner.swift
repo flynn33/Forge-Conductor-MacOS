@@ -44,16 +44,23 @@ public enum ProcessRunnerError: Error, Equatable, Sendable, LocalizedError {
 public final class ProcessRunner: @unchecked Sendable {
     private let terminationGraceSec: TimeInterval
     private let forcedTerminationGraceSec: TimeInterval
+    private let maximumRetainedOutputBytes: Int
 
     public init() {
         terminationGraceSec = 0.5
         forcedTerminationGraceSec = 1.0
+        maximumRetainedOutputBytes = ResourcePolicy.current.nominalLimits.processOutputBytesPerStream
     }
 
     /// Internal timing seam keeps timeout-path tests fast without changing production bounds.
-    init(terminationGraceSec: TimeInterval, forcedTerminationGraceSec: TimeInterval) {
+    init(
+        terminationGraceSec: TimeInterval,
+        forcedTerminationGraceSec: TimeInterval,
+        maximumRetainedOutputBytes: Int = ResourcePolicy.current.nominalLimits.processOutputBytesPerStream
+    ) {
         self.terminationGraceSec = max(0, terminationGraceSec)
         self.forcedTerminationGraceSec = max(0, forcedTerminationGraceSec)
+        self.maximumRetainedOutputBytes = max(0, maximumRetainedOutputBytes)
     }
 
     public func run(
@@ -251,8 +258,9 @@ public final class ProcessRunner: @unchecked Sendable {
                 return status
             }
         }
-        let outBox = BufferBox(limit: maximumOutputBytes)
-        let errBox = BufferBox(limit: maximumOutputBytes)
+        let boundedOutputBytes = min(max(0, maximumOutputBytes), maximumRetainedOutputBytes)
+        let outBox = BufferBox(limit: boundedOutputBytes)
+        let errBox = BufferBox(limit: boundedOutputBytes)
         let outHandle = outPipe.fileHandleForReading
         let errHandle = errPipe.fileHandleForReading
 
@@ -286,6 +294,18 @@ public final class ProcessRunner: @unchecked Sendable {
             throw error
         }
         let processIdentifier = process.processIdentifier
+        let runtimeDiagnostics = RuntimeDiagnostics.shared
+        let operation = UInt64(UInt32(bitPattern: processIdentifier))
+        runtimeDiagnostics.increment(.processLaunches)
+        runtimeDiagnostics.adjust(.childProcesses, by: 1)
+        runtimeDiagnostics.adjust(.processReaders, by: 2)
+        let processSignpost = RuntimeSignposts.processLaunch(operation: operation)
+        defer {
+            runtimeDiagnostics.adjust(.processReaders, by: -2)
+            runtimeDiagnostics.adjust(.childProcesses, by: -1)
+            runtimeDiagnostics.increment(.processExits)
+            RuntimeSignposts.processExit(processSignpost, operation: operation)
+        }
 
         func confirmedStatus(waiting seconds: TimeInterval) -> Int32? {
             if seconds == .infinity {

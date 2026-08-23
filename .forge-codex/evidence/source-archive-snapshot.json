@@ -1,0 +1,11 @@
+{
+  "archive": "Forge-Conductor-MacOS-main.zip",
+  "bytes": 12734666,
+  "entries": 471,
+  "present": true,
+  "schema_version": 1,
+  "sha256": "07a0ea359ad93930c5b29d7e368cfe8fdee226f60248b5cd3c19c675372c270e",
+  "swift_entries": 224,
+  "swift_line_count": 30447,
+  "swift_source_entries_excluding_macosx": 112
+}

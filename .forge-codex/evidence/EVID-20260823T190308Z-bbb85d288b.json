@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 243,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T190308Z-bbb85d288b.stdout.txt",
+      "sha256": "09d876dc7b7663e934b418b914cd3718df809ec7461b2f642a7b4f58a0504933"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T190308Z-bbb85d288b.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "command": "xcrun xctrace record --template 'Time Profiler' --time-limit 2s --no-prompt --output /tmp/forge-conductor-xctrace-control.eWkbe5/control.trace --launch -- /bin/sleep 1",
+  "ended_at": "2026-08-23T19:03:14.604589+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T190308Z-bbb85d288b",
+  "kind": "p02-xctrace-control",
+  "related_findings": [],
+  "related_gates": [
+    "G02"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T19:03:08.110645+00:00",
+  "timed_out": false
+}

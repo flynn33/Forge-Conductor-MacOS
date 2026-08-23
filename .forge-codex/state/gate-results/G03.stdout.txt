@@ -1,0 +1,31 @@
+{
+  "criteria_results": [
+    {
+      "criterion": "maximum pending presentation state <= 2 logical slots",
+      "passed": true,
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Telemetry/LatestValueMailbox.swift#93cbd7228b64a502432363046ba06160b485accd7fe36acca10f3ddb2a58d70a; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T191259Z-1cde4355df.stdout.txt#db98c76101a8a1fb8ce10485c445af21f246ab4fc505c65a4de73e362e9da12d; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P03-bounded-telemetry-before-after.json#fc9e48d224f27d224fa57d54d2366f12b8f562fe77ff934a0dc52287dc5ec45c"
+    },
+    {
+      "criterion": "no per-update unstructured main-actor task path",
+      "passed": true,
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorApp/AppTelemetryBinding.swift#557e19d3ef5135b0fdd4ef5121a25d21a35c4c19ed678776564473cb136fb8cb; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T193356Z-c8231b937d.stdout.txt#83c3308c29b3eec08df13d52811ffbe8b48108735261c0d514cccc6ec187356e"
+    },
+    {
+      "criterion": "latest value converges under producer pressure",
+      "passed": true,
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/LatestValueMailboxTests.swift#9d4007b7bff2d01d6d0a9b4870cb51c546a7c994b26f28735cb8b86c0bc7b737; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T191232Z-37ef639495.stdout.txt#6fc2325dfab870b9de902f4eb36f1c221e8059ca41af3f6247c280d377fcf369"
+    },
+    {
+      "criterion": "stale generation and post-stop delivery tests pass",
+      "passed": true,
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/LatestValueMailboxTests.swift#9d4007b7bff2d01d6d0a9b4870cb51c546a7c994b26f28735cb8b86c0bc7b737; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T191232Z-37ef639495.stdout.txt#6fc2325dfab870b9de902f4eb36f1c221e8059ca41af3f6247c280d377fcf369"
+    },
+    {
+      "criterion": "telemetry mapping/unit tests pass",
+      "passed": true,
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorApp/AppModel.swift#3c0249108c0a9bdd2b7d075dd5414bb3158f266840d10e10b7560e63e71e4e9a; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T193356Z-c8231b937d.stdout.txt#83c3308c29b3eec08df13d52811ffbe8b48108735261c0d514cccc6ec187356e; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T193106Z-667173c96c.stdout.txt#33b97a5b76d0b7835f2e54e092c68a9415fc5272e387321a23984bc385eed12a"
+    }
+  ],
+  "valid": true,
+  "errors": []
+}

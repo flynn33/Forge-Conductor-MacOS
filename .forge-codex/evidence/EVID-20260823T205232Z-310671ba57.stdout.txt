@@ -1,0 +1,21 @@
+Test Suite 'Selected tests' started at 2026-08-23 15:52:43.711.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-23 15:52:43.711.
+Test Suite 'NativeSessionHostPluginTests' started at 2026-08-23 15:52:43.711.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testCancellationDeadlineMalformedAndStreamingBounds]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testCancellationDeadlineMalformedAndStreamingBounds]' passed (0.021 seconds).
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testFullAutonomousRolloverPersistsOnlyCompactIdentifiers]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testFullAutonomousRolloverPersistsOnlyCompactIdentifiers]' passed (0.042 seconds).
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testManifestRegistryAndCapabilities]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testManifestRegistryAndCapabilities]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testRateLimitRetryIdempotencyAndConcurrentProjects]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testRateLimitRetryIdempotencyAndConcurrentProjects]' passed (0.006 seconds).
+Test Suite 'NativeSessionHostPluginTests' passed at 2026-08-23 15:52:43.782.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.070 (0.070) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-08-23 15:52:43.782.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.070 (0.070) seconds
+Test Suite 'Selected tests' passed at 2026-08-23 15:52:43.782.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.070 (0.071) seconds
+◇ Test run started.
+↳ Testing Library Version: 1501
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

@@ -1,0 +1,36 @@
+{
+  "artifacts": [
+    {
+      "bytes": 11713,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P08-mcp-process-conformance.json",
+      "sha256": "e18ee8d25baf6b3d38169e72d64046b78fe04ec150bc10bc6aba042786b20015"
+    },
+    {
+      "bytes": 11713,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T203838Z-4f3fba0ee5.stdout.txt",
+      "sha256": "e18ee8d25baf6b3d38169e72d64046b78fe04ec150bc10bc6aba042786b20015"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T203838Z-4f3fba0ee5.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "command": "python3 .forge-codex/scripts/check_p08_continuity.py --binary .build/release/forge-conductor --output .forge-codex/evidence/P08-mcp-process-conformance.json",
+  "ended_at": "2026-08-23T20:38:39.237090+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T203838Z-4f3fba0ee5",
+  "kind": "p08-mcp-process-conformance",
+  "related_findings": [],
+  "related_gates": [
+    "G08"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T20:38:38.771620+00:00",
+  "timed_out": false
+}

@@ -1,0 +1,31 @@
+{
+  "criteria_results": [
+    {
+      "criterion": "handoff schema and compactness pass",
+      "passed": true,
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P08-continuity-report.json#86b23e437872b191570bf864250f76bfc29523ea49520cb75e2ea3ec98644f4b; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T204207Z-fb406e171d.json#88076e6dbb4f16e617b0ba3c25655991494a8aecb4aaeb0bccc658a1ccfb791b"
+    },
+    {
+      "criterion": "all transition crash points recover",
+      "passed": true,
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P08-continuity-report.json#86b23e437872b191570bf864250f76bfc29523ea49520cb75e2ea3ec98644f4b; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T204207Z-fb406e171d.json#88076e6dbb4f16e617b0ba3c25655991494a8aecb4aaeb0bccc658a1ccfb791b"
+    },
+    {
+      "criterion": "idempotency and exact acknowledgment pass",
+      "passed": true,
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P08-mcp-process-conformance.json#e18ee8d25baf6b3d38169e72d64046b78fe04ec150bc10bc6aba042786b20015; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T203838Z-4f3fba0ee5.json#e9c3a5836f9e3117bd07d129d01b60e0c1a733373ee854a7a696a93918124b4f"
+    },
+    {
+      "criterion": "context budget fallback passes",
+      "passed": true,
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P08-continuity-report.json#86b23e437872b191570bf864250f76bfc29523ea49520cb75e2ea3ec98644f4b; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T204207Z-fb406e171d.json#88076e6dbb4f16e617b0ba3c25655991494a8aecb4aaeb0bccc658a1ccfb791b"
+    },
+    {
+      "criterion": "continuity MCP conformance passes",
+      "passed": true,
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P08-mcp-process-conformance.json#e18ee8d25baf6b3d38169e72d64046b78fe04ec150bc10bc6aba042786b20015; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T204247Z-4561e060f3.json#6b40dc22f5e9ba3787794353232a1ad664509ebb520dcb5cc007be0600c91844"
+    }
+  ],
+  "valid": true,
+  "errors": []
+}

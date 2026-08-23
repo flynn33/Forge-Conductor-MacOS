@@ -1,0 +1,33 @@
+{
+  "commands": [],
+  "criteria_results": [
+    {
+      "criterion": "every baseline feature preserved/additive/migrated",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "all old fixtures migrate and reopen",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "MCP golden snapshots compatible",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "UI commands/settings/accessibility tests pass",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "no unknown or untested affected feature",
+      "evidence": [],
+      "passed": false
+    }
+  ],
+  "gate_id": "G10",
+  "instructions": "Replace placeholders only with command-backed artifacts and SHA-256 values. The validator rejects absent evidence.",
+  "schema_version": 1
+}

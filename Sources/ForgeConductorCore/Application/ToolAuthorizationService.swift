@@ -237,7 +237,14 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
         "agent_run_start", "agent_run_status", "agent_run_complete",
         // Durable memory remains available without and during agent sessions.
         "memory_set", "memory_get", "memory_list", "memory_delete", "memory_search",
+        "project_memory.initialize", "project_memory.remember", "project_memory.remember_batch",
+        "project_memory.search", "project_memory.get", "project_memory.update",
+        "project_memory.forget", "project_memory.list_recent", "project_memory.link",
+        "project_memory.export", "project_memory.import", "project_memory.status",
         "session_checkpoint", "session_handoff", "context_get", "context_list",
+        "continuity.checkpoint", "continuity.prepare_handoff",
+        "continuity.get_pending_handoff", "continuity.acknowledge_handoff",
+        "continuity.resume", "continuity.status", "continuity.request_rollover",
     ]
 
     private static let requiresActiveSession: Set<String> = [

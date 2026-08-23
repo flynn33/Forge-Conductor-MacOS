@@ -1,0 +1,45 @@
+{
+  "flows": [
+    {
+      "description": "Produce representative telemetry while deliberately blocking the main actor for a bounded interval; verify mailbox depth and latest convergence.",
+      "id": "FLOW-TELEMETRY-STALL",
+      "release_boundary": "after producer stop and presentation bridge stop"
+    },
+    {
+      "description": "Open gauge screen, stabilize, navigate away/minimize/occlude, and measure draw callbacks/resource ownership.",
+      "id": "FLOW-GAUGE-HIDDEN",
+      "release_boundary": "after scene detach and scheduler quiescence"
+    },
+    {
+      "description": "Repeat gauge screen open/close at least 100 deterministic iterations.",
+      "id": "FLOW-GAUGE-CYCLE",
+      "release_boundary": "after each close and final autorelease drain"
+    },
+    {
+      "description": "Open, use, close, and switch projects repeatedly with memory and telemetry active.",
+      "id": "FLOW-PROJECT-CYCLE",
+      "release_boundary": "project context stop"
+    },
+    {
+      "description": "Start, stream, cancel, fail, and exit child processes repeatedly with large stdout/stderr fixtures.",
+      "id": "FLOW-PROCESS-CYCLE",
+      "release_boundary": "supervisor reports reaped and readers closed"
+    },
+    {
+      "description": "Populate/search/update/export a bounded large corpus across multiple project identities.",
+      "id": "FLOW-MEMORY-STRESS",
+      "release_boundary": "queries complete, caches purge, project closes"
+    },
+    {
+      "description": "Inject crash/failure at every continuity transition and prove eventual single-successor resume.",
+      "id": "FLOW-ROLLOVER-MATRIX",
+      "release_boundary": "predecessor sealed and successor acknowledged"
+    },
+    {
+      "description": "Terminate and relaunch during active project, memory write, and rollover states.",
+      "id": "FLOW-APP-RELAUNCH",
+      "release_boundary": "recovery reaches stable active state"
+    }
+  ],
+  "schema_version": 1
+}

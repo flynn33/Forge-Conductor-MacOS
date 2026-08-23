@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 2616,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T201609Z-581a87dcb8.stdout.txt",
+      "sha256": "efa16cd515cd149f4643773ec3d9f1f879703aff3d4a91bc3081bdcfe1d70bc3"
+    },
+    {
+      "bytes": 7451,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T201609Z-581a87dcb8.stderr.txt",
+      "sha256": "b6dbac4d135cc43dadfdd0e3c24438450ed6ae54f93a0618bb96913a9b8b869e"
+    }
+  ],
+  "command": "swift test --filter ProjectMemoryTests --jobs 4",
+  "ended_at": "2026-08-23T20:16:22.947608+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T201609Z-581a87dcb8",
+  "kind": "test",
+  "related_findings": [],
+  "related_gates": [
+    "G07"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T20:16:09.704615+00:00",
+  "timed_out": false
+}

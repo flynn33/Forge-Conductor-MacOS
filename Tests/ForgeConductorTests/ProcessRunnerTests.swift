@@ -78,6 +78,23 @@ final class ProcessRunnerTests: XCTestCase {
         XCTAssertTrue(result.stderrTruncated)
     }
 
+    func testCallerCannotRaiseTheOwnerOutputCeiling() throws {
+        let runner = ProcessRunner(
+            terminationGraceSec: 0.05,
+            forcedTerminationGraceSec: 0.5,
+            maximumRetainedOutputBytes: 32
+        )
+        let result = try runner.run(
+            executable: "/usr/bin/printf",
+            arguments: [String(repeating: "x", count: 256)],
+            timeoutSec: 1,
+            maximumOutputBytes: .max
+        )
+
+        XCTAssertEqual(result.stdout.utf8.count, 32)
+        XCTAssertTrue(result.stdoutTruncated)
+    }
+
     func testDirectChildExitDoesNotWaitForDescendantPipeEOF() throws {
         let started = ContinuousClock.now
         let result = try fastRunner().run(

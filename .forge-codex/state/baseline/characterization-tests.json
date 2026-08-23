@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-08-23T18:43:12Z",
+  "tests": [
+    {
+      "id": "P01-SWIFT-BASELINE",
+      "command": "swift test --no-parallel",
+      "status": "passed",
+      "executed": 232,
+      "skipped": 2,
+      "failed": 0,
+      "evidence": ".forge-codex/evidence/EVID-20260823T183945Z-b1151f1fd4.json"
+    },
+    {
+      "id": "P01-NATIVE-LAUNCH",
+      "command": "./script/build_and_run.sh --verify",
+      "status": "passed",
+      "evidence": ".forge-codex/evidence/EVID-20260823T184025Z-90a51329f5.json"
+    },
+    {
+      "id": "P01-MCP-LIVE",
+      "command": "forge-conductor serve with initialize, tools/list, resources/list, prompts/list, and ping",
+      "status": "passed",
+      "responses": 5,
+      "tool_count": 34,
+      "evidence": ".forge-codex/evidence/EVID-20260823T184311Z-0dccfacc9f.json"
+    },
+    {
+      "id": "P01-XCODE-UI-SIGNED-ATTEMPT",
+      "command": "xcodebuild ad-hoc signed ForgeConductorUITests",
+      "status": "blocked_environment",
+      "build_status": "passed",
+      "runtime_status": "XCTest timed out enabling macOS automation mode",
+      "evidence": ".forge-codex/evidence/EVID-20260823T184112Z-aee135dafe.json"
+    }
+  ],
+  "affected_feature_coverage": [
+    {
+      "finding": "FC-MEM-001",
+      "target": "Sources/ForgeConductorApp/AppTelemetryBinding.swift",
+      "preserved_semantics": ["continuous sample delivery","typed frame mapping","history projection","manual refresh","auto-refresh gating"],
+      "coverage": ["RealtimeStreamTests","TelemetryContractTests","RigParityTests","NativeTelemetryTests","P01-NATIVE-LAUNCH"]
+    },
+    {
+      "finding": "FC-PERF-001",
+      "target": "Sources/ForgeConductorApp/Metal/MetalGaugeKit.swift",
+      "preserved_semantics": ["bar fractions","status tones","core values","visible gauge rendering"],
+      "coverage": ["RigParityTests","TelemetryContractTests","P01-NATIVE-LAUNCH","p01-native-app-launch.png"]
+    },
+    {
+      "finding": "FC-PERF-002",
+      "target": "Sources/ForgeConductorApp/Metal/MultiSeriesLoadRenderer.swift",
+      "preserved_semantics": ["CPU/RAM/GPU series","unavailable GPU gaps","shared time axis","bounded history projection"],
+      "coverage": ["RigParityTests.testSnapshotContractAndHistoryMultiSeries","RigParityTests.testHistoryPointSerializesUnavailableGPUAsJSONNull","P01-NATIVE-LAUNCH"]
+    },
+    {
+      "finding": "FC-PERF-003",
+      "target": "Sources/ForgeConductorApp/Views/Rig/RigDashboardView.swift",
+      "preserved_semantics": ["visible system strip","orchestration panels","live telemetry presentation"],
+      "coverage": ["RigParityTests","LiveCollectorEvidenceTests","P01-NATIVE-LAUNCH"]
+    },
+    {
+      "finding": "lifecycle and bounded-state audit set",
+      "target": "Core processes, managers, dashboard streams, memory, and continuity",
+      "preserved_semantics": ["process termination","pipe draining","manager start-stop","MCP compatibility","memory durability","handoff recovery"],
+      "coverage": ["ProcessRunnerTests","ManagerTests","DashboardTests","MCPProtocolAndDiagnosticsTests","MemoryToolTests","ContinuityTests"]
+    }
+  ],
+  "ui_characterization_source": "Tests/ForgeConductorUITests/ForgeConductorUITests.swift",
+  "ui_actions_covered": ["single main window","seven sidebar tabs","refresh","navigation collapse and restore"],
+  "affected_feature_coverage_complete": true
+}

@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "phase": "P07",
+  "preserved": [
+    "MCP-SERVER-STDIO",
+    "MCP-TOOL-MEMORY",
+    "MCP-TOOL-CONTEXT-GET",
+    "MCP-TOOL-CONTEXT-LIST",
+    "DATA-MEMORY-NOTES",
+    "DATA-CONTEXT-HANDOFFS"
+  ],
+  "added": [
+    "PROJECT-MEMORY-IDENTITY",
+    "PROJECT-MEMORY-REPOSITORY",
+    "PROJECT-MEMORY-MCP-TOOLS",
+    "PROJECT-MEMORY-SEARCH",
+    "PROJECT-MEMORY-EXPORT-IMPORT",
+    "PROJECT-MEMORY-RECOVERY"
+  ],
+  "regression_evidence": ".forge-codex/evidence/EVID-20260823T201632Z-6920be9c15.json"
+}

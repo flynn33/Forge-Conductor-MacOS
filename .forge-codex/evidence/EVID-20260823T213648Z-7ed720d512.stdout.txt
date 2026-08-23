@@ -1,0 +1,10 @@
+{
+  "lowest_executed_policy_tier": "constrained",
+  "metal_errors": 0,
+  "native_ui_cycles": 100,
+  "ok": true,
+  "phase": "P11",
+  "release_stress_tests": 1,
+  "resident_slope_bytes_per_sample": 0,
+  "trace_count": 3
+}

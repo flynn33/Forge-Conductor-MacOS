@@ -1,0 +1,6 @@
+Starting recording with the Time Profiler template. Attaching to: Forge Conductor (76113). Time limit: 15.0 s
+Ctrl-C to stop the recording
+Reached specified time limit, ending recording...
+Recording completed. Saving output file...
+Output file saved as: 20260823T213156Z-P11-GAUGE-STRESS-Time_Profiler.trace
+/Users/jimdaley/Documents/RavenForge/Forge-Conductor-MacOS/Forge-Conductor-Repair-Evidence/aba90ab1-be80-4cc5-aa0b-23dd54d4a24d/p11/20260823T213156Z-P11-GAUGE-STRESS-Time_Profiler.trace

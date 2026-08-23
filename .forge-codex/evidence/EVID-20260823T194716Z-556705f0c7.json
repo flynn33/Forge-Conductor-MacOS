@@ -1,0 +1,41 @@
+{
+  "artifacts": [
+    {
+      "bytes": 4895,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P05-resource-owner-matrix.json",
+      "sha256": "16a2f2d0b63d4c53ba46006afdf85254fa580de2b5426c7e4a662503e5d3eeda"
+    },
+    {
+      "bytes": 1701,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P05-sanitizer-and-lifecycle-report.json",
+      "sha256": "05eb6fb9771d6a10566af837ab27fec90b9c80485f0e5f4301bffd5e6752e63a"
+    },
+    {
+      "bytes": 206,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T194716Z-556705f0c7.stdout.txt",
+      "sha256": "b06cf027ca8e7ffe3ae4ee6c76d88b3f8f7d27f57c7a0d4b7b25a6995818775b"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T194716Z-556705f0c7.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "command": ".forge-codex/scripts/check_p05_lifecycle.py",
+  "ended_at": "2026-08-23T19:47:16.543630+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T194716Z-556705f0c7",
+  "kind": "lifecycle-acceptance-check",
+  "related_findings": [],
+  "related_gates": [
+    "G05"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T19:47:16.503051+00:00",
+  "timed_out": false
+}

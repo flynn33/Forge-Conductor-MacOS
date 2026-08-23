@@ -1128,6 +1128,7 @@ final class ContinuityTests: XCTestCase {
         try FileManager.default.createDirectory(at: processHome, withIntermediateDirectories: true)
         let primary = try launchMCPFixture(binary: binary, home: processHome, role: "primary")
         let fallback = try launchMCPFixture(binary: binary, home: processHome, role: "fallback")
+        defer { primary.close(); fallback.close() }
 
         try sendMCPHandoff(primary, id: 2, goal: "Primary process handoff")
         try sendMCPHandoff(fallback, id: 2, goal: "Fallback process handoff")
@@ -1796,11 +1797,27 @@ private final class LockedFailureMessages: @unchecked Sendable {
     }
 }
 
-private struct MCPProcessFixture {
+private final class MCPProcessFixture {
     var process: Process
     var input: Pipe
     var output: Pipe
     var error: Pipe
+
+    init(process: Process, input: Pipe, output: Pipe, error: Pipe) {
+        self.process = process
+        self.input = input
+        self.output = output
+        self.error = error
+    }
+
+    func close() {
+        if process.isRunning { process.terminate() }
+        try? input.fileHandleForWriting.close()
+        try? output.fileHandleForReading.close()
+        try? error.fileHandleForReading.close()
+    }
+
+    deinit { close() }
 }
 
 private enum MCPProcessFixtureError: Error {

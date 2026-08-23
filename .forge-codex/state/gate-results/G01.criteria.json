@@ -1,0 +1,44 @@
+{
+  "criteria_results": [
+    {
+      "criterion": "feature-baseline.json validates",
+      "passed": true,
+      "evidence": [
+        {
+          "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/feature-baseline.json",
+          "sha256": "39ff9c4014ad0e558568991aa641a47ee55470898bee2639fb81573193fc0f49"
+        }
+      ]
+    },
+    {
+      "criterion": "existing MCP surfaces captured",
+      "passed": true,
+      "evidence": [
+        {
+          "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/baseline/mcp-capabilities.json",
+          "sha256": "0e33ddd69eeb132495ec5e51261f137bd27d6ceab45f2b52d71cc9c7b0e3b1c8"
+        }
+      ]
+    },
+    {
+      "criterion": "persistence/settings/commands/scenes inventoried",
+      "passed": true,
+      "evidence": [
+        {
+          "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/baseline/persistence-inventory.json",
+          "sha256": "5594d83e67dc3c763cd5717ad37fc0d98638c56fe65de30daaa38a127b000e72"
+        }
+      ]
+    },
+    {
+      "criterion": "all behavior-changing targets have characterization coverage",
+      "passed": true,
+      "evidence": [
+        {
+          "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/baseline/characterization-tests.json",
+          "sha256": "3ef672d6e16cdef77acdaf87834171387bfa538f7dc33573c366bf74581eb313"
+        }
+      ]
+    }
+  ]
+}

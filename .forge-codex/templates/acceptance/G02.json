@@ -1,0 +1,28 @@
+{
+  "commands": [],
+  "criteria_results": [
+    {
+      "criterion": "diagnostic counters and signposts build",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "logs redact private content",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "baseline reproducer artifacts recorded",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "before traces captured on capable macOS host",
+      "evidence": [],
+      "passed": false
+    }
+  ],
+  "gate_id": "G02",
+  "instructions": "Replace placeholders only with command-backed artifacts and SHA-256 values. The validator rejects absent evidence.",
+  "schema_version": 1
+}

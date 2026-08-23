@@ -1,0 +1,2445 @@
+{
+  "discovery_commands": [
+    {
+      "command": "swift package describe --type json",
+      "exit_code": 0,
+      "output": "{\n  \"dependencies\" : [\n\n  ],\n  \"manifest_display_name\" : \"ForgeConductor\",\n  \"name\" : \"ForgeConductor\",\n  \"path\" : \"/Users/jimdaley/GitHub/Forge-Conductor-MacOS\",\n  \"platforms\" : [\n    {\n      \"name\" : \"macos\",\n      \"version\" : \"26.0\"\n    }\n  ],\n  \"products\" : [\n    {\n      \"name\" : \"ForgeConductorCore\",\n      \"targets\" : [\n        \"ForgeConductorCore\"\n      ],\n      \"type\" : {\n        \"library\" : [\n          \"automatic\"\n        ]\n      }\n    },\n    {\n      \"name\" : \"forge-conductor\",\n      \"targets\" : [\n        \"ForgeConductorCLI\"\n      ],\n      \"type\" : {\n        \"executable\" : null\n      }\n    },\n    {\n      \"name\" : \"forge-conductor-app\",\n      \"targets\" : [\n        \"ForgeConductorApp\"\n      ],\n      \"type\" : {\n        \"executable\" : null\n      }\n    }\n  ],\n  \"swift_languages_versions\" : [\n    \"5\"\n  ],\n  \"targets\" : [\n    {\n      \"c99name\" : \"ForgeConductorTests\",\n      \"module_type\" : \"SwiftTarget\",\n      \"name\" : \"ForgeConductorTests\",\n      \"path\" : \"Tests/ForgeConductorTests\",\n      \"resources\" : [\n        {\n          \"path\" : \"/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/Fixtures/telemetry_contract_keys.json\",\n          \"rule\" : {\n            \"process\" : {\n\n            }\n          }\n        }\n      ],\n      \"sources\" : [\n        \"AppConfigAndDoctorTests.swift\",\n        \"ContinuityTests.swift\",\n        \"CoreTests.swift\",\n        \"DashboardSecurityTests.swift\",\n        \"DashboardTests.swift\",\n        \"ForgeProcessEntryTests.swift\",\n        \"G1G10AcceptanceTests.swift\",\n        \"HTTPTestHelpers.swift\",\n        \"LMStudioConnectorReliabilityTests.swift\",\n        \"LiveCollectorEvidenceTests.swift\",\n        \"MCPProtocolAndDiagnosticsTests.swift\",\n        \"MachHostMetricsTests.swift\",\n        \"ManagerTests.swift\",\n        \"MemoryToolTests.swift\",\n        \"NativeAppSmokeTests.swift\",\n        \"NativeTelemetryTests.swift\",\n        \"ProcessRunnerTests.swift\",\n        \"ProductPathReliabilityTests.swift\",\n        \"RealtimeStreamTests.swift\",\n        \"RigParityTests.swift\",\n        \"TelemetryContractTests.swift\"\n      ],\n      \"target_dependencies\" : [\n        \"ForgeConductorCore\",\n        \"ForgeConductorCLI\"\n      ],\n      \"type\" : \"test\"\n    },\n    {\n      \"c99name\" : \"ForgeConductorCore\",\n      \"module_type\" : \"SwiftTarget\",\n      \"name\" : \"ForgeConductorCore\",\n      \"path\" : \"Sources/ForgeConductorCore\",\n      \"product_memberships\" : [\n        \"ForgeConductorCore\",\n        \"forge-conductor\",\n        \"forge-conductor-app\"\n      ],\n      \"resources\" : [\n        {\n          \"path\" : \"/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Resources/Agents/debug.md\",\n          \"rule\" : {\n            \"process\" : {\n\n            }\n          }\n        },\n        {\n          \"path\" : \"/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Resources/Agents/docs.md\",\n          \"rule\" : {\n            \"process\" : {\n\n            }\n          }\n        },\n        {\n          \"path\" : \"/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Resources/Agents/explore.md\",\n          \"rule\" : {\n            \"process\" : {\n\n            }\n          }\n        },\n        {\n          \"path\" : \"/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Resources/Agents/implement.md\",\n          \"rule\" : {\n            \"process\" : {\n\n            }\n          }\n        },\n        {\n          \"path\" : \"/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Resources/Agents/plan.md\",\n          \"rule\" : {\n            \"process\" : {\n\n            }\n          }\n        },\n        {\n          \"path\" : \"/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Resources/Agents/precommit-audit.md\",\n          \"rule\" : {\n            \"process\" : {\n\n            }\n          }\n        },\n        {\n          \"path\" : \"/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Resources/Agents/research.md\",\n          \"rule\" : {\n            \"process\" : {\n\n            }\n          }\n        },\n        {\n          \"path\" : \"/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Resources/Agents/review.md\",\n          \"rule\" : {\n            \"process\" : {\n\n            }\n          }\n        },\n        {\n          \"path\" : \"/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Resources/Agents/security.md\",\n          \"rule\" : {\n            \"process\" : {\n\n            }\n          }\n        },\n        {\n          \"path\" : \"/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Resources/Agents/test.md\",\n          \"rule\" : {\n            \"process\" : {\n\n            }\n          }\n        },\n        {\n          \"path\" : \"/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Resources/TelemetryStatic/app.js\",\n          \"rule\" : {\n            \"process\" : {\n\n            }\n          }\n        },\n        {\n          \"path\" : \"/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Resources/TelemetryStatic/index.html\",\n          \"rule\" : {\n            \"process\" : {\n\n            }\n          }\n        },\n        {\n          \"path\" : \"/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Resources/TelemetryStatic/style.css\",\n          \"rule\" : {\n            \"process\" : {\n\n            }\n          }\n        },\n        {\n          \"path\" : \"/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Resources/TelemetryStatic/tools-catalog.js\",\n          \"rule\" : {\n            \"process\" : {\n\n            }\n          }\n        }\n      ],\n      \"sources\" : [\n        \"Application/AgentCatalog.swift\",\n        \"Application/AgentSessionService.swift\",\n        \"Application/ContextContinuityService.swift\",\n        \"Application/ContinuityAutomation.swift\",\n        \"Application/ForgeApp.swift\",\n        \"Application/ForgeProcessEntry.swift\",\n        \"Application/ToolAuthorizationService.swift\",\n        \"Application/ToolRouter.swift\",\n        \"Application/Tools/AgentToolPack.swift\",\n        \"Application/Tools/ContinuityToolPack.swift\",\n        \"Application/Tools/DocsToolPack.swift\",\n        \"Application/Tools/FilesystemToolPack.swift\",\n        \"Application/Tools/GitToolPack.swift\",\n        \"Application/Tools/MemoryToolPack.swift\",\n        \"Application/Tools/SearchToolPack.swift\",\n        \"Application/Tools/ShellToolPack.swift\",\n        \"Application/Tools/ToolArgHelpers.swift\",\n        \"Dashboard/DashboardHTML.swift\",\n        \"Dashboard/DashboardHTTPRequest.swift\",\n        \"Dashboard/DashboardServer.swift\",\n        \"Dashboard/HTTPResponder.swift\",\n        \"Dashboard/ManagerRoutes.swift\",\n        \"Dashboard/OperationalRoutes.swift\",\n        \"Dashboard/TelemetryRoutes.swift\",\n        \"Domain/AppConfig.swift\",\n        \"Domain/DoctorModels.swift\",\n        \"Domain/ForgeSnapshot.swift\",\n        \"Domain/HandoffPacket.swift\",\n        \"Domain/JSONSupport.swift\",\n        \"Domain/LMStudioConnector.swift\",\n        \"Domain/ManagerModels.swift\",\n        \"Domain/Models.swift\",\n        \"Domain/Protocols.swift\",\n        \"Infrastructure/AppPaths.swift\",\n        \"Infrastructure/AuditService.swift\",\n        \"Infrastructure/ConfigStore.swift\",\n        \"Infrastructure/DashboardPortGuard.swift\",\n        \"Infrastructure/DiagnosticLog.swift\",\n        \"Infrastructure/PDFWriter.swift\",\n        \"Infrastructure/ProcessRunner.swift\",\n        \"Infrastructure/ResourceBundle.swift\",\n        \"Infrastructure/SQLiteStore.swift\",\n        \"MCP/MCPServeVerifier.swift\",\n        \"MCP/MCPServer.swift\",\n        \"Manager/ManagerDashboardClient.swift\",\n        \"Manager/ManagerInstaller.swift\",\n        \"Manager/ManagerNode.swift\",\n        \"Manager/ManagerPIDFile.swift\",\n        \"Manager/ManagerRuntime.swift\",\n        \"Manager/ManagerSettingsNormalizer.swift\",\n        \"Telemetry/Collectors/CPUCollector.swift\",\n        \"Telemetry/Collectors/CPUFrequencyEstimator.swift\",\n        \"Telemetry/Collectors/DiskIOCollector.swift\",\n        \"Telemetry/Collectors/DiskVolumeCollector.swift\",\n        \"Telemetry/Collectors/GPUCollector.swift\",\n        \"Telemetry/Collectors/IOKitPropertyWalk.swift\",\n        \"Telemetry/Collectors/PowerSourcesCollector.swift\",\n        \"Telemetry/Collectors/ProcessMetricsCollector.swift\",\n        \"Telemetry/Collectors/RAMCollector.swift\",\n        \"Telemetry/ForgeCollector.swift\",\n        \"Telemetry/LMStudioDeployService.swift\",\n        \"Telemetry/LMStudioEnvironment.swift\",\n        \"Telemetry/LMStudioMCPPluginInstaller.swift\",\n        \"Telemetry/Models/ForgeUIModels.swift\",\n        \"Telemetry/Models/TelemetryModels.swift\",\n        \"Telemetry/ProcessDiscovery.swift\",\n        \"Telemetry/RealtimeMetricsEngine.swift\",\n        \"Telemetry/SystemCollector.swift\",\n        \"Telemetry/TelemetryService.swift\"\n      ],\n      \"type\" : \"library\"\n    },\n    {\n      \"c99name\" : \"ForgeConductorCLI\",\n      \"module_type\" : \"SwiftTarget\",\n      \"name\" : \"ForgeConductorCLI\",\n      \"path\" : \"Sources/ForgeConductorCLI\",\n      \"product_memberships\" : [\n        \"forge-conductor\"\n      ],\n      \"sources\" : [\n        \"ForgeConductorMain.swift\"\n      ],\n      \"target_dependencies\" : [\n        \"ForgeConductorCore\"\n      ],\n      \"type\" : \"executable\"\n    },\n    {\n      \"c99name\" : \"ForgeConductorApp\",\n      \"module_type\" : \"SwiftTarget\",\n      \"name\" : \"ForgeConductorApp\",\n      \"path\" : \"Sources/ForgeConductorApp\",\n      \"product_memberships\" : [\n        \"forge-conductor-app\"\n      ],\n      \"sources\" : [\n        \"AppDeployController.swift\",\n        \"AppModel.swift\",\n        \"AppTelemetryBinding.swift\",\n        \"ForgeConductorApp.swift\",\n        \"Metal/LoadTraceRenderer.swift\",\n        \"Metal/MetalGaugeKit.swift\",\n        \"Metal/MetalLoadChart.swift\",\n        \"Metal/MetalMeterView.swift\",\n        \"Metal/MultiSeriesLoadRenderer.swift\",\n        \"Views/AgentsView.swift\",\n        \"Views/AppSidebarView.swift\",\n        \"Views/ContentView.swift\",\n        \"Views/DiagnosticsView.swift\",\n        \"Views/LiveFeedView.swift\",\n        \"Views/MCPServersView.swift\",\n        \"Views/ManagerSettingsView.swift\",\n        \"Views/Rig/RigDashboardView.swift\",\n        \"Views/TelemetryDashboardView.swift\",\n        \"Views/ToolsView.swift\"\n      ],\n      \"target_dependencies\" : [\n        \"ForgeConductorCore\"\n      ],\n      \"type\" : \"executable\"\n    }\n  ],\n  \"tools_version\" : \"6.2\"\n}\n"
+    },
+    {
+      "command": "xcodebuild -list -json -workspace ForgeConductor.xcworkspace",
+      "exit_code": 0,
+      "output": "{\n  \"workspace\" : {\n    \"name\" : \"ForgeConductor\",\n    \"schemes\" : [\n      \"forge-conductor\",\n      \"ForgeConductor\"\n    ]\n  }\n}\n"
+    },
+    {
+      "command": "xcodebuild -list -json -project ForgeConductor.xcodeproj",
+      "exit_code": 0,
+      "output": "{\n  \"project\" : {\n    \"configurations\" : [\n      \"Debug\",\n      \"Release\"\n    ],\n    \"name\" : \"ForgeConductor\",\n    \"schemes\" : [\n      \"forge-conductor\",\n      \"ForgeConductor\"\n    ],\n    \"targets\" : [\n      \"ForgeConductorCore\",\n      \"forge-conductor\",\n      \"ForgeConductor\",\n      \"ForgeConductorTests\",\n      \"ForgeConductorUITests\"\n    ]\n  }\n}\n"
+    }
+  ],
+  "features": [
+    {
+      "baseline_status": "discovered_static",
+      "category": "command",
+      "detail": ".commands {",
+      "id": "CMD-9F0D5D5B98",
+      "key": ".commands {",
+      "parity_status": "unknown",
+      "source": {
+        "line": 36,
+        "path": "Sources/ForgeConductorApp/ForgeConductorApp.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "command",
+      "detail": "CommandMenu(\"Navigation\") {",
+      "id": "CMD-B9197A2822",
+      "key": "Navigation",
+      "parity_status": "unknown",
+      "source": {
+        "line": 38,
+        "path": "Sources/ForgeConductorApp/ForgeConductorApp.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "command",
+      "detail": "CommandMenu(\"Telemetry\") {",
+      "id": "CMD-FF4A30A48F",
+      "key": "Telemetry",
+      "parity_status": "unknown",
+      "source": {
+        "line": 44,
+        "path": "Sources/ForgeConductorApp/ForgeConductorApp.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "keyboard_shortcut",
+      "detail": ".keyboardShortcut(\"r\", modifiers: [.command])",
+      "id": "CMD-BB0F238D6A",
+      "key": "\"r\", modifiers: [.command]",
+      "parity_status": "unknown",
+      "source": {
+        "line": 46,
+        "path": "Sources/ForgeConductorApp/ForgeConductorApp.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "keyboard_shortcut",
+      "detail": ".keyboardShortcut(\"s\", modifiers: [.command, .control])",
+      "id": "CMD-B24E64ABC6",
+      "key": "\"s\", modifiers: [.command, .control]",
+      "parity_status": "unknown",
+      "source": {
+        "line": 42,
+        "path": "Sources/ForgeConductorApp/ForgeConductorApp.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp",
+      "detail": "// Verifies durable SQLite-backed memory MCP tools against an isolated temp home.",
+      "id": "MCP-51FC97C8EC",
+      "key": "MCP",
+      "parity_status": "unknown",
+      "source": {
+        "line": 2,
+        "path": "Tests/ForgeConductorTests/MemoryToolTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp",
+      "detail": "public var mcp: MCPConfig",
+      "id": "MCP-602ABCC874",
+      "key": "MCPConfig",
+      "parity_status": "unknown",
+      "source": {
+        "line": 17,
+        "path": "Sources/ForgeConductorCore/Domain/AppConfig.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp",
+      "detail": "throw MCPConfigurationError.invalidRoot(mcpConfigURL.path)",
+      "id": "MCP-AE1A4C36F0",
+      "key": "MCPConfigurationError",
+      "parity_status": "unknown",
+      "source": {
+        "line": 371,
+        "path": "Sources/ForgeConductorCore/Telemetry/LMStudioEnvironment.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp",
+      "detail": "mcpLoad: MCPLoadWindows(",
+      "id": "MCP-694E9D8C93",
+      "key": "MCPLoadWindows",
+      "parity_status": "unknown",
+      "source": {
+        "line": 208,
+        "path": "Sources/ForgeConductorCore/Telemetry/ForgeCollector.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp",
+      "detail": ") -> ProcessDiscovery.MCPProcess {",
+      "id": "MCP-6D78F1A462",
+      "key": "MCPProcess",
+      "parity_status": "unknown",
+      "source": {
+        "line": 611,
+        "path": "Tests/ForgeConductorTests/LiveCollectorEvidenceTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp",
+      "detail": "private struct MCPProcessFixture {",
+      "id": "MCP-3D723955FA",
+      "key": "MCPProcessFixture",
+      "parity_status": "unknown",
+      "source": {
+        "line": 1799,
+        "path": "Tests/ForgeConductorTests/ContinuityTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp",
+      "detail": "private enum MCPProcessFixtureError: Error {",
+      "id": "MCP-E00A5B1500",
+      "key": "MCPProcessFixtureError",
+      "parity_status": "unknown",
+      "source": {
+        "line": 1806,
+        "path": "Tests/ForgeConductorTests/ContinuityTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp",
+      "detail": "final class MCPProcessTelemetryRegressionTests: XCTestCase {",
+      "id": "MCP-ADE744EB1E",
+      "key": "MCPProcessTelemetryRegressionTests",
+      "parity_status": "unknown",
+      "source": {
+        "line": 243,
+        "path": "Tests/ForgeConductorTests/LiveCollectorEvidenceTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp",
+      "detail": "// MCPProtocolAndDiagnosticsTests.swift",
+      "id": "MCP-191F38FDEF",
+      "key": "MCPProtocolAndDiagnosticsTests",
+      "parity_status": "unknown",
+      "source": {
+        "line": 1,
+        "path": "Tests/ForgeConductorTests/MCPProtocolAndDiagnosticsTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp",
+      "detail": "XCTAssertTrue(MCPServeVerifier.requiredProductTools.isSubset(of: Set(byName.keys)))",
+      "id": "MCP-C4A796E6A6",
+      "key": "MCPServeVerifier",
+      "parity_status": "unknown",
+      "source": {
+        "line": 40,
+        "path": "Tests/ForgeConductorTests/MemoryToolTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp",
+      "detail": "private final class RecordingVerifier: MCPServeVerifying, @unchecked Sendable {",
+      "id": "MCP-9ABBA11F85",
+      "key": "MCPServeVerifying",
+      "parity_status": "unknown",
+      "source": {
+        "line": 279,
+        "path": "Tests/ForgeConductorTests/LMStudioConnectorReliabilityTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp",
+      "detail": "let server = MCPServer(app: app, clientID: ClientID(\"memory-continuity-schema\"))",
+      "id": "MCP-0DDF758AF2",
+      "key": "MCPServer",
+      "parity_status": "unknown",
+      "source": {
+        "line": 29,
+        "path": "Tests/ForgeConductorTests/MemoryToolTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp",
+      "detail": "public var mcpServerCards: [MCPServerCard] { forge?.mcpServers ?? [] }",
+      "id": "MCP-6D04766CD7",
+      "key": "MCPServerCard",
+      "parity_status": "unknown",
+      "source": {
+        "line": 356,
+        "path": "Sources/ForgeConductorApp/AppModel.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp",
+      "detail": "MCPServerCardAssembler.normalizedAuditClientID(",
+      "id": "MCP-1694B034B4",
+      "key": "MCPServerCardAssembler",
+      "parity_status": "unknown",
+      "source": {
+        "line": 507,
+        "path": "Tests/ForgeConductorTests/LiveCollectorEvidenceTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp",
+      "detail": "// MCPServersView.swift",
+      "id": "MCP-85F09ACD1B",
+      "key": "MCPServersView",
+      "parity_status": "unknown",
+      "source": {
+        "line": 1,
+        "path": "Sources/ForgeConductorApp/Views/MCPServersView.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp",
+      "detail": "let packet = try MCPStdioTransport.encode([",
+      "id": "MCP-D2D64F9F7F",
+      "key": "MCPStdioTransport",
+      "parity_status": "unknown",
+      "source": {
+        "line": 10,
+        "path": "Tests/ForgeConductorTests/MCPProtocolAndDiagnosticsTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp",
+      "detail": "guard case MCPStreamError.messageTooLarge(64) = error else {",
+      "id": "MCP-A7D5F8D237",
+      "key": "MCPStreamError",
+      "parity_status": "unknown",
+      "source": {
+        "line": 31,
+        "path": "Tests/ForgeConductorTests/MCPProtocolAndDiagnosticsTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp",
+      "detail": "let reader = MCPStreamReader(handle: pipe.fileHandleForReading, maximumMessageBytes: 64)",
+      "id": "MCP-4CAF1519E1",
+      "key": "MCPStreamReader",
+      "parity_status": "unknown",
+      "source": {
+        "line": 26,
+        "path": "Tests/ForgeConductorTests/MCPProtocolAndDiagnosticsTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "let r = try app.tools.call(name: \"agent_list\", arguments: [:], clientID: ClientID(\"t4\"))",
+      "id": "MCP-01E4F6D53F",
+      "key": "agent_list",
+      "parity_status": "unknown",
+      "source": {
+        "line": 434,
+        "path": "Tests/ForgeConductorTests/CoreTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "case \"agent_recommend\":",
+      "id": "MCP-097F790F93",
+      "key": "agent_recommend",
+      "parity_status": "unknown",
+      "source": {
+        "line": 254,
+        "path": "Sources/ForgeConductorCore/MCP/MCPServer.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "case \"agent_run_complete\":",
+      "id": "MCP-1BFBB11011",
+      "key": "agent_run_complete",
+      "parity_status": "unknown",
+      "source": {
+        "line": 59,
+        "path": "Sources/ForgeConductorCore/Application/Tools/AgentToolPack.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "name: \"agent_run_start\",",
+      "id": "MCP-42051C5647",
+      "key": "agent_run_start",
+      "parity_status": "unknown",
+      "source": {
+        "line": 68,
+        "path": "Tests/ForgeConductorTests/ContinuityTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "name: \"agent_run_status\",",
+      "id": "MCP-4D13E0047A",
+      "key": "agent_run_status",
+      "parity_status": "unknown",
+      "source": {
+        "line": 663,
+        "path": "Tests/ForgeConductorTests/ContinuityTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "let get = try app.tools.call(name: \"context_get\", arguments: [:], clientID: client)",
+      "id": "MCP-2DD2F3EF76",
+      "key": "context_get",
+      "parity_status": "unknown",
+      "source": {
+        "line": 51,
+        "path": "Tests/ForgeConductorTests/ContinuityTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "let list = try app.tools.call(name: \"context_list\", arguments: [\"limit\": 5], clientID: client)",
+      "id": "MCP-9242AE501C",
+      "key": "context_list",
+      "parity_status": "unknown",
+      "source": {
+        "line": 170,
+        "path": "Tests/ForgeConductorTests/ContinuityTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "let status = try app.tools.call(name: \"forge_status\", arguments: [:], clientID: client)",
+      "id": "MCP-B51DBFE706",
+      "key": "forge_status",
+      "parity_status": "unknown",
+      "source": {
+        "line": 186,
+        "path": "Tests/ForgeConductorTests/MemoryToolTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "case \"fs_delete\":",
+      "id": "MCP-669C9348BC",
+      "key": "fs_delete",
+      "parity_status": "unknown",
+      "source": {
+        "line": 138,
+        "path": "Sources/ForgeConductorCore/Application/ToolAuthorizationService.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "case \"fs_edit\": return try fsEdit(arguments)",
+      "id": "MCP-AED65F001B",
+      "key": "fs_edit",
+      "parity_status": "unknown",
+      "source": {
+        "line": 22,
+        "path": "Sources/ForgeConductorCore/Application/Tools/FilesystemToolPack.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "case \"fs_glob\": return try fsGlob(arguments, runner: ProcessRunner())",
+      "id": "MCP-0258DDF216",
+      "key": "fs_glob",
+      "parity_status": "unknown",
+      "source": {
+        "line": 24,
+        "path": "Sources/ForgeConductorCore/Application/Tools/FilesystemToolPack.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "name: \"fs_list\",",
+      "id": "MCP-882CF56740",
+      "key": "fs_list",
+      "parity_status": "unknown",
+      "source": {
+        "line": 1722,
+        "path": "Tests/ForgeConductorTests/ContinuityTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "case \"fs_mkdir\": return try fsMkdir(arguments)",
+      "id": "MCP-9DD6EC7913",
+      "key": "fs_mkdir",
+      "parity_status": "unknown",
+      "source": {
+        "line": 25,
+        "path": "Sources/ForgeConductorCore/Application/Tools/FilesystemToolPack.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "case \"fs_move\":",
+      "id": "MCP-55FA335C9D",
+      "key": "fs_move",
+      "parity_status": "unknown",
+      "source": {
+        "line": 140,
+        "path": "Sources/ForgeConductorCore/Application/ToolAuthorizationService.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "let r = try app.tools.call(name: \"fs_read\", arguments: [\"path\": path], clientID: ClientID(\"t2\"))",
+      "id": "MCP-3A722BFF26",
+      "key": "fs_read",
+      "parity_status": "unknown",
+      "source": {
+        "line": 195,
+        "path": "Tests/ForgeConductorTests/CoreTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "name: \"fs_write\",",
+      "id": "MCP-9C133026E4",
+      "key": "fs_write",
+      "parity_status": "unknown",
+      "source": {
+        "line": 736,
+        "path": "Tests/ForgeConductorTests/LiveCollectorEvidenceTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "let f = lib.makeFunction(name: \"g_frag\") else { return nil }",
+      "id": "MCP-A5A3AD85C6",
+      "key": "g_frag",
+      "parity_status": "unknown",
+      "source": {
+        "line": 72,
+        "path": "Sources/ForgeConductorApp/Metal/MetalGaugeKit.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "let v = lib.makeFunction(name: \"g_vert\"),",
+      "id": "MCP-D13412AEA8",
+      "key": "g_vert",
+      "parity_status": "unknown",
+      "source": {
+        "line": 71,
+        "path": "Sources/ForgeConductorApp/Metal/MetalGaugeKit.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "case \"git_add\":",
+      "id": "MCP-054C5F322D",
+      "key": "git_add",
+      "parity_status": "unknown",
+      "source": {
+        "line": 32,
+        "path": "Sources/ForgeConductorCore/Application/Tools/GitToolPack.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "case \"git_commit\":",
+      "id": "MCP-FC15CB5F44",
+      "key": "git_commit",
+      "parity_status": "unknown",
+      "source": {
+        "line": 35,
+        "path": "Sources/ForgeConductorCore/Application/Tools/GitToolPack.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "case \"git_diff\":",
+      "id": "MCP-501EC33A2A",
+      "key": "git_diff",
+      "parity_status": "unknown",
+      "source": {
+        "line": 26,
+        "path": "Sources/ForgeConductorCore/Application/Tools/GitToolPack.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "case \"git_log\":",
+      "id": "MCP-D4B42720D7",
+      "key": "git_log",
+      "parity_status": "unknown",
+      "source": {
+        "line": 29,
+        "path": "Sources/ForgeConductorCore/Application/Tools/GitToolPack.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "case \"git_status\":",
+      "id": "MCP-75F0524454",
+      "key": "git_status",
+      "parity_status": "unknown",
+      "source": {
+        "line": 24,
+        "path": "Sources/ForgeConductorCore/Application/Tools/GitToolPack.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "name: \"memory_delete\",",
+      "id": "MCP-ADA29A6E28",
+      "key": "memory_delete",
+      "parity_status": "unknown",
+      "source": {
+        "line": 99,
+        "path": "Tests/ForgeConductorTests/MemoryToolTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "name: \"memory_get\",",
+      "id": "MCP-EFFD08E4F7",
+      "key": "memory_get",
+      "parity_status": "unknown",
+      "source": {
+        "line": 72,
+        "path": "Tests/ForgeConductorTests/MemoryToolTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "name: \"memory_list\",",
+      "id": "MCP-51D6824AA8",
+      "key": "memory_list",
+      "parity_status": "unknown",
+      "source": {
+        "line": 83,
+        "path": "Tests/ForgeConductorTests/MemoryToolTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "name: \"memory_search\",",
+      "id": "MCP-C50439EC88",
+      "key": "memory_search",
+      "parity_status": "unknown",
+      "source": {
+        "line": 91,
+        "path": "Tests/ForgeConductorTests/MemoryToolTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "name: \"memory_set\",",
+      "id": "MCP-CC8B36BEA1",
+      "key": "memory_set",
+      "parity_status": "unknown",
+      "source": {
+        "line": 60,
+        "path": "Tests/ForgeConductorTests/MemoryToolTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "name: \"missing_test_tool\",",
+      "id": "MCP-10220416F0",
+      "key": "missing_test_tool",
+      "parity_status": "unknown",
+      "source": {
+        "line": 1458,
+        "path": "Tests/ForgeConductorTests/ContinuityTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "case \"pdf_from_file\":",
+      "id": "MCP-6C3ECC4797",
+      "key": "pdf_from_file",
+      "parity_status": "unknown",
+      "source": {
+        "line": 353,
+        "path": "Sources/ForgeConductorCore/MCP/MCPServer.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "name: \"pdf_write\",",
+      "id": "MCP-C1A60429DB",
+      "key": "pdf_write",
+      "parity_status": "unknown",
+      "source": {
+        "line": 309,
+        "path": "Tests/ForgeConductorTests/CoreTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "case \"search_text\":",
+      "id": "MCP-DB5D66AF48",
+      "key": "search_text",
+      "parity_status": "unknown",
+      "source": {
+        "line": 363,
+        "path": "Sources/ForgeConductorCore/MCP/MCPServer.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "name: \"session_checkpoint\",",
+      "id": "MCP-E60F36EBE1",
+      "key": "session_checkpoint",
+      "parity_status": "unknown",
+      "source": {
+        "line": 34,
+        "path": "Tests/ForgeConductorTests/ContinuityTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "name: \"session_handoff\",",
+      "id": "MCP-8D916718E2",
+      "key": "session_handoff",
+      "parity_status": "unknown",
+      "source": {
+        "line": 158,
+        "path": "Tests/ForgeConductorTests/MemoryToolTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "name: \"shell_exec\",",
+      "id": "MCP-01883FAD6D",
+      "key": "shell_exec",
+      "parity_status": "unknown",
+      "source": {
+        "line": 408,
+        "path": "Tests/ForgeConductorTests/CoreTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "mcp_tool_candidate",
+      "detail": "name: \"throwing_test_tool\",",
+      "id": "MCP-D3D3CDE3DB",
+      "key": "throwing_test_tool",
+      "parity_status": "unknown",
+      "source": {
+        "line": 1479,
+        "path": "Tests/ForgeConductorTests/ContinuityTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "memory",
+      "detail": "XCTAssertTrue(seed.contains(\"context_get\") || seed.contains(\"Forge Continuity\"))",
+      "id": "MEM-2DA38BB17C",
+      "key": "Continuity",
+      "parity_status": "unknown",
+      "source": {
+        "line": 94,
+        "path": "Tests/ForgeConductorTests/ContinuityTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "memory",
+      "detail": "for index in 0..<ContinuityAutomation.checkpointEveryTools {",
+      "id": "MEM-257A559982",
+      "key": "ContinuityAutomation",
+      "parity_status": "unknown",
+      "source": {
+        "line": 1595,
+        "path": "Tests/ForgeConductorTests/ContinuityTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "memory",
+      "detail": "public struct ContinuityObservation: Sendable {",
+      "id": "MEM-A146AF97E6",
+      "key": "ContinuityObservation",
+      "parity_status": "unknown",
+      "source": {
+        "line": 15,
+        "path": "Sources/ForgeConductorCore/Application/ContinuityAutomation.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "memory",
+      "detail": "// ContinuityTests.swift",
+      "id": "MEM-D36A139313",
+      "key": "ContinuityTests",
+      "parity_status": "unknown",
+      "source": {
+        "line": 1,
+        "path": "Tests/ForgeConductorTests/ContinuityTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "memory",
+      "detail": "ContinuityToolPack(),",
+      "id": "MEM-73E2BE0FCE",
+      "key": "ContinuityToolPack",
+      "parity_status": "unknown",
+      "source": {
+        "line": 33,
+        "path": "Sources/ForgeConductorCore/Application/ToolRouter.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "memory",
+      "detail": "\"Handoff saved. Start a new LM Studio chat with Forge MCP enabled, then call context_get \" +",
+      "id": "MEM-F1D610375F",
+      "key": "Handoff",
+      "parity_status": "unknown",
+      "source": {
+        "line": 88,
+        "path": "Sources/ForgeConductorCore/Application/ContextContinuityService.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "memory",
+      "detail": "var legacyCustom = HandoffPacket(",
+      "id": "MEM-CA2F27CD88",
+      "key": "HandoffPacket",
+      "parity_status": "unknown",
+      "source": {
+        "line": 305,
+        "path": "Tests/ForgeConductorTests/ContinuityTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "memory",
+      "detail": "XCTAssertEqual(source, HandoffSource.auto.rawValue)",
+      "id": "MEM-6EA92F9FF4",
+      "key": "HandoffSource",
+      "parity_status": "unknown",
+      "source": {
+        "line": 1633,
+        "path": "Tests/ForgeConductorTests/ContinuityTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "memory",
+      "detail": "# Forge Conductor \u2014 Durable Memory",
+      "id": "MEM-ABE8AFA09F",
+      "key": "Memory",
+      "parity_status": "unknown",
+      "source": {
+        "line": 645,
+        "path": "Sources/ForgeConductorCore/Application/ContextContinuityService.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "memory",
+      "detail": "_ = setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))",
+      "id": "MEM-091BDBEC8D",
+      "key": "MemoryLayout",
+      "parity_status": "unknown",
+      "source": {
+        "line": 132,
+        "path": "Tests/ForgeConductorTests/RealtimeStreamTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "memory",
+      "detail": "\"system_key\": MemoryNote.isSystemKey(key),",
+      "id": "MEM-742DE3CEE9",
+      "key": "MemoryNote",
+      "parity_status": "unknown",
+      "source": {
+        "line": 130,
+        "path": "Sources/ForgeConductorCore/Application/Tools/MemoryToolPack.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "memory",
+      "detail": "MemoryToolPack(),",
+      "id": "MEM-1561AE424F",
+      "key": "MemoryToolPack",
+      "parity_status": "unknown",
+      "source": {
+        "line": 32,
+        "path": "Sources/ForgeConductorCore/Application/ToolRouter.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "memory",
+      "detail": "// MemoryToolTests.swift",
+      "id": "MEM-CAAB367620",
+      "key": "MemoryToolTests",
+      "parity_status": "unknown",
+      "source": {
+        "line": 1,
+        "path": "Tests/ForgeConductorTests/MemoryToolTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "process",
+      "detail": "let pipe = Pipe()",
+      "id": "PROC-504B25D95A",
+      "key": "Pipe(",
+      "parity_status": "unknown",
+      "source": {
+        "line": 25,
+        "path": "Tests/ForgeConductorTests/MCPProtocolAndDiagnosticsTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "process",
+      "detail": "let process = Process()",
+      "id": "PROC-59C757E0BA",
+      "key": "Process(",
+      "parity_status": "unknown",
+      "source": {
+        "line": 1821,
+        "path": "Tests/ForgeConductorTests/ContinuityTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "process",
+      "detail": "handle.readabilityHandler = nil",
+      "id": "PROC-8355C3465C",
+      "key": "readabilityHandler",
+      "parity_status": "unknown",
+      "source": {
+        "line": 146,
+        "path": "Sources/ForgeConductorCore/Infrastructure/ProcessRunner.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "product",
+      "detail": "{\"name\": \"ForgeConductorCore\", \"targets\": [\"ForgeConductorCore\"], \"type\": {\"library\": [\"automatic\"]}}",
+      "id": "BUILD-CD74D060A3",
+      "key": "ForgeConductorCore",
+      "parity_status": "unknown",
+      "source": {
+        "line": 1,
+        "path": "Package.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "product",
+      "detail": "{\"name\": \"forge-conductor\", \"targets\": [\"ForgeConductorCLI\"], \"type\": {\"executable\": null}}",
+      "id": "BUILD-6AA6E5982C",
+      "key": "forge-conductor",
+      "parity_status": "unknown",
+      "source": {
+        "line": 1,
+        "path": "Package.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "product",
+      "detail": "{\"name\": \"forge-conductor-app\", \"targets\": [\"ForgeConductorApp\"], \"type\": {\"executable\": null}}",
+      "id": "BUILD-F76A5BC463",
+      "key": "forge-conductor-app",
+      "parity_status": "unknown",
+      "source": {
+        "line": 1,
+        "path": "Package.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "scene",
+      "detail": "Settings {",
+      "id": "UI-DB349A6329",
+      "key": "Settings",
+      "parity_status": "unknown",
+      "source": {
+        "line": 30,
+        "path": "Sources/ForgeConductorApp/ForgeConductorApp.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "target",
+      "detail": "{\"c99name\": \"ForgeConductorApp\", \"module_type\": \"SwiftTarget\", \"name\": \"ForgeConductorApp\", \"path\": \"Sources/ForgeConductorApp\", \"product_memberships\": [\"forge-conductor-app\"], \"sources\": [\"AppDeployController.swift\", \"AppModel.swift\", \"AppTelemetryBinding.swift\", \"ForgeConductorApp.swift\", \"Metal/LoadTraceRenderer.swift\", \"Metal/MetalGaugeKit.swift\", \"Metal/MetalLoadChart.swift\", \"Metal/MetalMeterView.swift\", \"Metal/MultiSeriesLoadRenderer.swift\", \"Views/AgentsView.swift\", \"Views/AppSidebarView",
+      "id": "BUILD-74D314EFE3",
+      "key": "ForgeConductorApp",
+      "parity_status": "unknown",
+      "source": {
+        "line": 1,
+        "path": "Package.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "target",
+      "detail": "{\"c99name\": \"ForgeConductorCLI\", \"module_type\": \"SwiftTarget\", \"name\": \"ForgeConductorCLI\", \"path\": \"Sources/ForgeConductorCLI\", \"product_memberships\": [\"forge-conductor\"], \"sources\": [\"ForgeConductorMain.swift\"], \"target_dependencies\": [\"ForgeConductorCore\"], \"type\": \"executable\"}",
+      "id": "BUILD-42A5B89FCE",
+      "key": "ForgeConductorCLI",
+      "parity_status": "unknown",
+      "source": {
+        "line": 1,
+        "path": "Package.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "target",
+      "detail": "{\"c99name\": \"ForgeConductorCore\", \"module_type\": \"SwiftTarget\", \"name\": \"ForgeConductorCore\", \"path\": \"Sources/ForgeConductorCore\", \"product_memberships\": [\"ForgeConductorCore\", \"forge-conductor\", \"forge-conductor-app\"], \"resources\": [{\"path\": \"/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Resources/Agents/debug.md\", \"rule\": {\"process\": {}}}, {\"path\": \"/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Resources/Agents/docs.md\", \"rule\": {\"process\": ",
+      "id": "BUILD-28A7A4E462",
+      "key": "ForgeConductorCore",
+      "parity_status": "unknown",
+      "source": {
+        "line": 1,
+        "path": "Package.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "target",
+      "detail": "{\"c99name\": \"ForgeConductorTests\", \"module_type\": \"SwiftTarget\", \"name\": \"ForgeConductorTests\", \"path\": \"Tests/ForgeConductorTests\", \"resources\": [{\"path\": \"/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/Fixtures/telemetry_contract_keys.json\", \"rule\": {\"process\": {}}}], \"sources\": [\"AppConfigAndDoctorTests.swift\", \"ContinuityTests.swift\", \"CoreTests.swift\", \"DashboardSecurityTests.swift\", \"DashboardTests.swift\", \"ForgeProcessEntryTests.swift\", \"G1G10AcceptanceTests.swift\"",
+      "id": "BUILD-50A5474278",
+      "key": "ForgeConductorTests",
+      "parity_status": "unknown",
+      "source": {
+        "line": 1,
+        "path": "Package.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "telemetry",
+      "detail": "private struct GaugeVertex {",
+      "id": "TEL-4333B67EC0",
+      "key": "GaugeVertex",
+      "parity_status": "unknown",
+      "source": {
+        "line": 51,
+        "path": "Sources/ForgeConductorApp/Metal/MetalGaugeKit.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "telemetry",
+      "detail": "body.contains(\"href=\\\"/\\\"\") || body.contains(\"Telemetry dashboard\"),",
+      "id": "TEL-78F8F4DA48",
+      "key": "Telemetry",
+      "parity_status": "unknown",
+      "source": {
+        "line": 113,
+        "path": "Tests/ForgeConductorTests/DashboardTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "telemetry",
+      "detail": "let missing = TelemetryContract.validate(snapshot: snap)",
+      "id": "TEL-F4BAA0406A",
+      "key": "TelemetryContract",
+      "parity_status": "unknown",
+      "source": {
+        "line": 17,
+        "path": "Tests/ForgeConductorTests/TelemetryContractTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "telemetry",
+      "detail": "// TelemetryContractTests.swift",
+      "id": "TEL-ED0CC21A55",
+      "key": "TelemetryContractTests",
+      "parity_status": "unknown",
+      "source": {
+        "line": 1,
+        "path": "Tests/ForgeConductorTests/TelemetryContractTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "telemetry",
+      "detail": "// TelemetryDashboardView.swift",
+      "id": "TEL-3BA7671EE1",
+      "key": "TelemetryDashboardView",
+      "parity_status": "unknown",
+      "source": {
+        "line": 1,
+        "path": "Sources/ForgeConductorApp/Views/TelemetryDashboardView.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "telemetry",
+      "detail": "public enum TelemetryError: Error, LocalizedError {",
+      "id": "TEL-4E58190805",
+      "key": "TelemetryError",
+      "parity_status": "unknown",
+      "source": {
+        "line": 289,
+        "path": "Sources/ForgeConductorCore/Telemetry/TelemetryService.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "telemetry",
+      "detail": "XCTAssertEqual(TelemetryHealth.ok.tone, .healthy)",
+      "id": "TEL-BED348846A",
+      "key": "TelemetryHealth",
+      "parity_status": "unknown",
+      "source": {
+        "line": 11,
+        "path": "Tests/ForgeConductorTests/RigParityTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "telemetry",
+      "detail": "public func health() -> TelemetryHealthReport {",
+      "id": "TEL-093C8348F8",
+      "key": "TelemetryHealthReport",
+      "parity_status": "unknown",
+      "source": {
+        "line": 222,
+        "path": "Sources/ForgeConductorCore/Telemetry/TelemetryService.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "telemetry",
+      "detail": "// TelemetryModels.swift",
+      "id": "TEL-0B1911920D",
+      "key": "TelemetryModels",
+      "parity_status": "unknown",
+      "source": {
+        "line": 1,
+        "path": "Sources/ForgeConductorCore/Telemetry/Models/TelemetryModels.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "telemetry",
+      "detail": "public final class TelemetryService: TelemetryProviding, @unchecked Sendable {",
+      "id": "TEL-CCCFF4FC61",
+      "key": "TelemetryProviding",
+      "parity_status": "unknown",
+      "source": {
+        "line": 17,
+        "path": "Sources/ForgeConductorCore/Telemetry/TelemetryService.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "telemetry",
+      "detail": "XCTAssertEqual(TelemetryRoutes.parseStreamHz(query: \"hz=25\"), 25)",
+      "id": "TEL-9CCF7D69F7",
+      "key": "TelemetryRoutes",
+      "parity_status": "unknown",
+      "source": {
+        "line": 179,
+        "path": "Tests/ForgeConductorTests/RealtimeStreamTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "telemetry",
+      "detail": "XCTAssertEqual(snap.runtime, TelemetryService.runtimeIdentifier)",
+      "id": "TEL-81D9E38B60",
+      "key": "TelemetryService",
+      "parity_status": "unknown",
+      "source": {
+        "line": 30,
+        "path": "Tests/ForgeConductorTests/NativeAppSmokeTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "telemetry",
+      "detail": "@Published public private(set) var lastTyped: TelemetrySnapshot?",
+      "id": "TEL-2AE8C6D641",
+      "key": "TelemetrySnapshot",
+      "parity_status": "unknown",
+      "source": {
+        "line": 28,
+        "path": "Sources/ForgeConductorApp/AppModel.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "telemetry",
+      "detail": "/// Copy source TelemetryStatic into a test home so loadStatic serves the production UI.",
+      "id": "TEL-BD08491B8C",
+      "key": "TelemetryStatic",
+      "parity_status": "unknown",
+      "source": {
+        "line": 67,
+        "path": "Tests/ForgeConductorTests/DashboardTests.swift"
+      },
+      "tests": []
+    },
+    {
+      "baseline_status": "discovered_static",
+      "category": "telemetry",
+      "detail": "TelemetryStatusTone.mostSevere([.healthy, .failure, .informational]),",
+      "id": "TEL-B203FD5450",
+      "key": "TelemetryStatusTone",
+      "parity_status": "unknown",
+      "source": {
+        "line": 19,
+        "path": "Tests/ForgeConductorTests/RigParityTests.swift"
+      },
+      "tests": []
+    }
+  ],
+  "generated_at": "2026-08-23T18:48:51.171456+00:00",
+  "parity_summary": {
+    "additive": 0,
+    "migrated": 0,
+    "preserved": 0,
+    "removed": 0,
+    "unknown": 98,
+    "untested": 98
+  },
+  "project_markers": {
+    "package_swift": "Package.swift",
+    "projects": [
+      "ForgeConductor.xcodeproj"
+    ],
+    "workspaces": [
+      "ForgeConductor.xcworkspace",
+      "ForgeConductor.xcodeproj/project.xcworkspace"
+    ]
+  },
+  "repository_root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+  "required_runtime_surfaces": [
+    "app scenes and windows",
+    "menus commands and shortcuts",
+    "settings persistence",
+    "MCP initialize/list/tools/resources/prompts",
+    "project format round trips",
+    "model/provider integrations",
+    "telemetry-to-gauge mappings",
+    "import/export",
+    "accessibility"
+  ],
+  "runtime_completion_required": true,
+  "schema_version": 1,
+  "source_snapshot": {
+    "file_count": 222,
+    "files": [
+      {
+        "bytes": 5536,
+        "path": "CODE_OF_CONDUCT.md",
+        "sha256": "e7876dc747bd285e6f0e3ea5c54f6d207328c77d737657bf54238327987e2a9a"
+      },
+      {
+        "bytes": 6148,
+        "path": ".DS_Store",
+        "sha256": "468eb2aeeeafb64b6bed5f0a89f6e1dbed1ca6c3b769afeec39eacf55e7fece5"
+      },
+      {
+        "bytes": 11358,
+        "path": "LICENSE",
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+      },
+      {
+        "bytes": 6026,
+        "path": "CHANGELOG.md",
+        "sha256": "c3261d8f1e6dab8e402d87ccfc6b35f1871364885bb15106598089a6aae6bca2"
+      },
+      {
+        "bytes": 220,
+        "path": "NOTICE",
+        "sha256": "760c83d776e8e7e284d4f56ac9733ca87bcfe8d113a5415bef71747ee9ea2b8a"
+      },
+      {
+        "bytes": 7470,
+        "path": "README.md",
+        "sha256": "2cd74d3b75a569d836e8d27c44f110a8ca020145e74d2c4b63e311f2475f4e2d"
+      },
+      {
+        "bytes": 13667,
+        "path": "USER-GUIDE.md",
+        "sha256": "9e1cfd6fad4e1eac3b615d3cd6eca9836c5a24e58a769201e8a8107ea03efffc"
+      },
+      {
+        "bytes": 2549,
+        "path": "XCODE.md",
+        "sha256": "c9ec805e3adf892b72aabb3a52796b237881a05f91c950880ebc526c9d154480"
+      },
+      {
+        "bytes": 474,
+        "path": ".gitignore",
+        "sha256": "f5ad36c09b4c4518d9c8079eea6a9540311fd96e925a6df535fc9fb996784924"
+      },
+      {
+        "bytes": 1840,
+        "path": "CONTRIBUTING.md",
+        "sha256": "b0fa5bba0c6629ad97445db7d6beb6b9e16b9528e851ef965d359e3967661ad8"
+      },
+      {
+        "bytes": 1652,
+        "path": "Package.swift",
+        "sha256": "b9a127df55fa37c879c06c9c3cffcbf26ae159e3492063427e2b648cbab0e042"
+      },
+      {
+        "bytes": 9779,
+        "path": "AGENTS.md",
+        "sha256": "a6681a087c53e102f529424757525b2f4429eb8f0ef9897ba5a7aa78556db72c"
+      },
+      {
+        "bytes": 1361,
+        "path": "SECURITY.md",
+        "sha256": "32d4760c426a0a500b023859c3229f4b5e48be8369141c23ebd3f51da0b83934"
+      },
+      {
+        "bytes": 99247,
+        "path": "ForgeConductor.xcodeproj/project.pbxproj",
+        "sha256": "7d66b54b24ab2823fa45382247b48f1e33372b340f8eda4c72efdfa7943a164d"
+      },
+      {
+        "bytes": 135,
+        "path": "ForgeConductor.xcodeproj/project.xcworkspace/contents.xcworkspacedata",
+        "sha256": "7f3b00b5c3fdb45242d7b87e1e5c4e25d1fa8129a16c94295ecc4e8ea2235c5f"
+      },
+      {
+        "bytes": 16090,
+        "path": "ForgeConductor.xcodeproj/project.xcworkspace/xcuserdata/jimdaley.xcuserdatad/UserInterfaceState.xcuserstate",
+        "sha256": "4edfe09aeeaf59d4a545c3d42051acdda5658775d8478f91ac7223d347302207"
+      },
+      {
+        "bytes": 4215,
+        "path": "ForgeConductor.xcodeproj/xcshareddata/xcschemes/forge-conductor.xcscheme",
+        "sha256": "975225d645f85779c8e16e18cab5d3bd773b40300b9d3bced4c3c49d9f1b3d26"
+      },
+      {
+        "bytes": 3820,
+        "path": "ForgeConductor.xcodeproj/xcshareddata/xcschemes/ForgeConductor.xcscheme",
+        "sha256": "88f51015359ae04de669309f43af9530895c4320def345938280c331c29edaa2"
+      },
+      {
+        "bytes": 8728,
+        "path": "Tests/ForgeConductorTests/RealtimeStreamTests.swift",
+        "sha256": "b38b4644e70d7e3b780322f906d9f9b9798f8393a2cec060b3cc720a5f077d51"
+      },
+      {
+        "bytes": 4436,
+        "path": "Tests/ForgeConductorTests/MachHostMetricsTests.swift",
+        "sha256": "8a80df933714f844b3e68d446118ce577b7ca5b0f6ff175bdb543f9222f81c0e"
+      },
+      {
+        "bytes": 2885,
+        "path": "Tests/ForgeConductorTests/NativeAppSmokeTests.swift",
+        "sha256": "8e92f334a43155d6ec3006f3063a2e30588a279bdefd3a55adc9189ca9441433"
+      },
+      {
+        "bytes": 2957,
+        "path": "Tests/ForgeConductorTests/HTTPTestHelpers.swift",
+        "sha256": "4f5d6e61240b16b9fd360871331f3e42430d49f9b30f67a5ccba6ddbd0e149c9"
+      },
+      {
+        "bytes": 2435,
+        "path": "Tests/ForgeConductorTests/TelemetryContractTests.swift",
+        "sha256": "429ecc631bdac4fa7cf7e94ecc0bb572abdd6e7f0087161528de89a9951b8fa4"
+      },
+      {
+        "bytes": 12488,
+        "path": "Tests/ForgeConductorTests/MemoryToolTests.swift",
+        "sha256": "cc6fb5cce18ac243fae179f66535bfc6ffc173860e3935d240aa64fa815a821a"
+      },
+      {
+        "bytes": 31634,
+        "path": "Tests/ForgeConductorTests/LiveCollectorEvidenceTests.swift",
+        "sha256": "4b0c4874a7dc3be5f90f93b08bd056aa8ccb62457ce084cd9fd232ba9599c80e"
+      },
+      {
+        "bytes": 4305,
+        "path": "Tests/ForgeConductorTests/AppConfigAndDoctorTests.swift",
+        "sha256": "22ec70ab28624a2284a028a8843db66088319fc8bc7380af51d02390140f7aec"
+      },
+      {
+        "bytes": 4165,
+        "path": "Tests/ForgeConductorTests/DashboardSecurityTests.swift",
+        "sha256": "3e7b28dc9fb00e5bd407016ffb2005d9a9cc895a7fcd6d0527e4dfc110ed323b"
+      },
+      {
+        "bytes": 14295,
+        "path": "Tests/ForgeConductorTests/G1G10AcceptanceTests.swift",
+        "sha256": "48d686efb4e286586c0e149be7ed3081511a8c0fc2ab8108ba7bf8ee88d524ea"
+      },
+      {
+        "bytes": 10501,
+        "path": "Tests/ForgeConductorTests/ProductPathReliabilityTests.swift",
+        "sha256": "22c775250f79ec50c73705319964cffe96324635f42e3f5f4915818a1edd31ea"
+      },
+      {
+        "bytes": 12960,
+        "path": "Tests/ForgeConductorTests/LMStudioConnectorReliabilityTests.swift",
+        "sha256": "786fe26f30b24912537b0d497093a195596f57746cee77eda6f0454c6764179e"
+      },
+      {
+        "bytes": 10175,
+        "path": "Tests/ForgeConductorTests/RigParityTests.swift",
+        "sha256": "951b7de30abff5646bf046ec48f04b3758066f056679d30ac0349e91c580395b"
+      },
+      {
+        "bytes": 6407,
+        "path": "Tests/ForgeConductorTests/ProcessRunnerTests.swift",
+        "sha256": "ecaf73e8a12792d1515020e323e869ff09d83e7f51b73d8b27025fa65e4a9afd"
+      },
+      {
+        "bytes": 2706,
+        "path": "Tests/ForgeConductorTests/NativeTelemetryTests.swift",
+        "sha256": "4b8fe5bdf994ebfb1a3eab1db20efc75920164e12da94cec6c4698a3af760181"
+      },
+      {
+        "bytes": 23431,
+        "path": "Tests/ForgeConductorTests/CoreTests.swift",
+        "sha256": "a2b70385396fccf7cc35a2986646747fc128f51ce2ce2e410695345f41a6c720"
+      },
+      {
+        "bytes": 5687,
+        "path": "Tests/ForgeConductorTests/MCPProtocolAndDiagnosticsTests.swift",
+        "sha256": "d66b58579f727569e690b7626dfbee9eb3ad813daaa2e831b3bd86b491ea4c79"
+      },
+      {
+        "bytes": 5662,
+        "path": "Tests/ForgeConductorTests/DashboardTests.swift",
+        "sha256": "86d204f931cb5ff096f919a311404df7091704546bc7a3a8ab89795455d1f3df"
+      },
+      {
+        "bytes": 81835,
+        "path": "Tests/ForgeConductorTests/ContinuityTests.swift",
+        "sha256": "529c69f13a332bb8818aeeb2895d9be24fef2f2bea46457cbd4e169fb08281f9"
+      },
+      {
+        "bytes": 56977,
+        "path": "Tests/ForgeConductorTests/ManagerTests.swift",
+        "sha256": "c3e810d9dec3f306a3ddf4307ccbf82004a9de8a3e3f4dcc87f6a37b27800ffa"
+      },
+      {
+        "bytes": 2298,
+        "path": "Tests/ForgeConductorTests/ForgeProcessEntryTests.swift",
+        "sha256": "8acef891eb5d90328b0d6678a4c80c0454106ba63f6f570fb7d9e3a789bd615a"
+      },
+      {
+        "bytes": 481,
+        "path": "Tests/ForgeConductorTests/Fixtures/telemetry_contract_keys.json",
+        "sha256": "6856f9c0c0f4ba3fa30b9426ca16e3d9f0da793aa017f27c6e93698df2f76e7d"
+      },
+      {
+        "bytes": 4675,
+        "path": "Tests/ForgeConductorUITests/ForgeConductorUITests.swift",
+        "sha256": "35a66aa5c23df1732615fdfc31d093db5301c84c76a3e8acac4ffbd3f03f6da8"
+      },
+      {
+        "bytes": 1237,
+        "path": ".agents/skills/forge-continuity/SKILL.md",
+        "sha256": "9078d47a651196605fe662bf5dcbcf61bbf3008f633206ef6ab1690fe7d5b195"
+      },
+      {
+        "bytes": 1333,
+        "path": ".agents/skills/forge-runtime-evidence/SKILL.md",
+        "sha256": "60e67af2cf38265f37403925e60dc399134532b1d99349b407b360a013178daf"
+      },
+      {
+        "bytes": 1296,
+        "path": ".agents/skills/forge-conductor-repair/SKILL.md",
+        "sha256": "a45baa0754a41337e70a1ad3185e5bf15f1dec0107ace320af787bb324c3a362"
+      },
+      {
+        "bytes": 1244,
+        "path": ".agents/skills/forge-project-memory/SKILL.md",
+        "sha256": "9df20e3560d7652fea89feb00f9006373df6bc60ddd13550b615869de1a79739"
+      },
+      {
+        "bytes": 1282,
+        "path": ".agents/skills/forge-telemetry-gauges/SKILL.md",
+        "sha256": "e8895a1cad565f7a9c816b356e5abf6d3095fce117928805f66dc641108d88a3"
+      },
+      {
+        "bytes": 1464,
+        "path": "docs/G1-G7-STATUS.md",
+        "sha256": "ea0050bcd333c6bc1f14f2a2440b15924e1dcb1928774bb1b7796a5baa17fc7a"
+      },
+      {
+        "bytes": 5898,
+        "path": "docs/ARCHITECTURE.md",
+        "sha256": "b3931e06a4d216c94f207ad98ce1591fc0c6a521dd0524ce4eb55e97c54be03e"
+      },
+      {
+        "bytes": 2515,
+        "path": "docs/G1-G10-STATUS.md",
+        "sha256": "4969565f5715e027ce1ab18d1f4ae5e6e4c390c96a408f82e8d9b83503cf1a39"
+      },
+      {
+        "bytes": 4932,
+        "path": "docs/ENDPOINT-PROTECTION.md",
+        "sha256": "4deb6ce3a807470a2ed751be5996649b64a92bc7e299a1b039a987d87a116070"
+      },
+      {
+        "bytes": 3897,
+        "path": "docs/CONTEXT-AGENT-CONTINUITY.md",
+        "sha256": "5a178cee86cedcc33dbaa17576168f53477f407449ae1adc44e4c0f08d59c5d7"
+      },
+      {
+        "bytes": 1665,
+        "path": "docs/DURABLE-MEMORY.md",
+        "sha256": "5526ee8f07fdd120e042107b8987057efe81f3729659a3eef5adc9de499b9f21"
+      },
+      {
+        "bytes": 2441,
+        "path": "docs/RELEASE-0.5.0-TEST.md",
+        "sha256": "6bcf962d6e68477287bd9d252f876deeae88e3e6b75ef2bf4d979eb5a154dde5"
+      },
+      {
+        "bytes": 3876,
+        "path": "docs/AUDIT-2026-08-01.md",
+        "sha256": "18af717f3881f691387a9375b09ff031dfe206ba92b621e59216ce6e3c9453c2"
+      },
+      {
+        "bytes": 10808,
+        "path": "docs/LM-STUDIO-CONNECTION.md",
+        "sha256": "b4528de46e57527e10e1037ca39396960fc23e219b2509a4dd3741fca3426ead"
+      },
+      {
+        "bytes": 2133,
+        "path": "docs/RIG-PARITY.md",
+        "sha256": "53c5291cb819b94ce0ba48f745fb26d9fcfa10ca0d06c8de8a9d71d09c3485bf"
+      },
+      {
+        "bytes": 1788,
+        "path": "docs/TELEMETRY.md",
+        "sha256": "eb3c29e5ac631a4ac79a3707055b6fe390a1c08c9f50549c09bcda5bdc409440"
+      },
+      {
+        "bytes": 8978,
+        "path": "docs/AUDIT-2026-07-22.md",
+        "sha256": "47c877072dba364f40ebd4ffee7fb21f3e9da15aa6a207c21cdd02f69ab138ca"
+      },
+      {
+        "bytes": 4720,
+        "path": "docs/AUDIT-2026-07-23.md",
+        "sha256": "33603520200e865a66b79f1a518ab20ba8736be3b1ee35f78efc2722876b8a17"
+      },
+      {
+        "bytes": 1463,
+        "path": "docs/HOST-METRICS-APIS.md",
+        "sha256": "410a0f246dfd808a660d778d16477a867a938bc12283ec90b5dd7f0fc46558b6"
+      },
+      {
+        "bytes": 11977,
+        "path": "docs/AUDIT-2026-07-27.md",
+        "sha256": "5716468c37d818b8d7d9fac47ed1ae93d64cef292f965ec853c49c3998de8d5e"
+      },
+      {
+        "bytes": 3599,
+        "path": "script/build_and_run.sh",
+        "sha256": "1a79e6b9c67fa1be03d6f0c4a070eea7bc6d8ebb0b0c13f15fa1a20394485498"
+      },
+      {
+        "bytes": 181,
+        "path": ".codex/environments/environment.toml",
+        "sha256": "f71687608a7dd1fc83b071a3b6e57aaa2369c1241a3954bf21442c8c819e2daa"
+      },
+      {
+        "bytes": 63,
+        "path": ".github/FUNDING.yml",
+        "sha256": "40bef4cae743d7a4049964a4bf6a218ed820d138370ac67a4756d0cc6109ba03"
+      },
+      {
+        "bytes": 63,
+        "path": ".github/FUNDING.yaml",
+        "sha256": "40bef4cae743d7a4049964a4bf6a218ed820d138370ac67a4756d0cc6109ba03"
+      },
+      {
+        "bytes": 854,
+        "path": ".github/PULL_REQUEST_TEMPLATE.md",
+        "sha256": "86f23cff28909209a87f49d10baf4b334b00f922e078a4eabec5b119e3af473a"
+      },
+      {
+        "bytes": 2113,
+        "path": ".github/agents/attribution-guard.agent.md",
+        "sha256": "f492540064b7d705be317816b0bda89603e6bc7715d9e148cc02d74d6204e2fa"
+      },
+      {
+        "bytes": 603,
+        "path": ".github/ISSUE_TEMPLATE/feature_request.md",
+        "sha256": "e3574a6d4a51d78e54db6ef1b74c8fb79f451fbeba6b30ae9d99e48f725d067c"
+      },
+      {
+        "bytes": 661,
+        "path": ".github/ISSUE_TEMPLATE/bug_report.md",
+        "sha256": "b71be1421c385723cc4943f30eb73cf0f18e3e02a15e9a56d0cee6afdd640767"
+      },
+      {
+        "bytes": 45,
+        "path": ".github/ISSUE_TEMPLATE/config.yml",
+        "sha256": "e71bea835ed1158881306294d96968f125b0b0c5eff66cd94df559336bd0b210"
+      },
+      {
+        "bytes": 1046,
+        "path": "Sources/ForgeConductorApp/AppDeployController.swift",
+        "sha256": "872e4e08cdaf5f83f439456d691d7805ec8a2bf964a5dbef677b7ba0a422a160"
+      },
+      {
+        "bytes": 25005,
+        "path": "Sources/ForgeConductorApp/AppModel.swift",
+        "sha256": "1f7bc4b401475098bf66fe5d0e92c44b13a0ed3919a79c45cf62ee5c0fa4a853"
+      },
+      {
+        "bytes": 4504,
+        "path": "Sources/ForgeConductorApp/ForgeConductorApp.swift",
+        "sha256": "501cae380cd47aed928966225e9a7ed8fb7a4379f58cff01dc49372a7846d611"
+      },
+      {
+        "bytes": 4552,
+        "path": "Sources/ForgeConductorApp/AppTelemetryBinding.swift",
+        "sha256": "7ab7cf1644746a95ba86987968a48bb1844ea2a2fdc69fe38a3b97665349f6f9"
+      },
+      {
+        "bytes": 6288,
+        "path": "Sources/ForgeConductorApp/Metal/LoadTraceRenderer.swift",
+        "sha256": "23d5c817778f5e402004da7ce2ae1b059f52b0f79644672ed6dd37dc8b7b8dc4"
+      },
+      {
+        "bytes": 1244,
+        "path": "Sources/ForgeConductorApp/Metal/MetalLoadChart.swift",
+        "sha256": "949578910d2b7c1b669c8cf01372298aaab00eb18e4100aa5f7c3c7ea02ec514"
+      },
+      {
+        "bytes": 397,
+        "path": "Sources/ForgeConductorApp/Metal/MetalMeterView.swift",
+        "sha256": "ddcb1018f5c435132eb6f5f5f4c7b7333615cfff58d4463c096b624a65fbafed"
+      },
+      {
+        "bytes": 8254,
+        "path": "Sources/ForgeConductorApp/Metal/MultiSeriesLoadRenderer.swift",
+        "sha256": "1466e82f849cbf3ed6b4559ed74206624812ebcc0a05cd16ae72036b49579126"
+      },
+      {
+        "bytes": 18565,
+        "path": "Sources/ForgeConductorApp/Metal/MetalGaugeKit.swift",
+        "sha256": "ceaa6ee23024643cd47610a8626eef93fb246b168a10c5a9d16c1ffd19fc9fa4"
+      },
+      {
+        "bytes": 1805264,
+        "path": "Sources/ForgeConductorApp/Resources/Forge-Conductor.icns",
+        "sha256": "47b2c18dbe355fb94a5fcabfeebaf6f8433fc6fa4f3502574a27b55921fa3192"
+      },
+      {
+        "bytes": 181,
+        "path": "Sources/ForgeConductorApp/Resources/ForgeConductor.entitlements",
+        "sha256": "97704a8960b4facceef54397a08fb5d0a456247c3627359215aa2a27df22656c"
+      },
+      {
+        "bytes": 1162,
+        "path": "Sources/ForgeConductorApp/Resources/Info.plist",
+        "sha256": "0ca663f42ac9c88a88808109beeb8320896e17783858a1b7ed9373ba0d6fd10a"
+      },
+      {
+        "bytes": 60,
+        "path": "Sources/ForgeConductorApp/Resources/Assets.xcassets/Contents.json",
+        "sha256": "f5fb0e1f3a8142892ed092efb5955c1c2cc537003a89ad7bbdb9dade7fe8985f"
+      },
+      {
+        "bytes": 8500,
+        "path": "Sources/ForgeConductorApp/Resources/Assets.xcassets/AppIcon.appiconset/icon_32x32@2x.png",
+        "sha256": "0fbbd36df6f98187d3997fdaf6bf34baa1ff02c313c254bf5eddfa195b830a84"
+      },
+      {
+        "bytes": 29471,
+        "path": "Sources/ForgeConductorApp/Resources/Assets.xcassets/AppIcon.appiconset/icon_128x128.png",
+        "sha256": "73fc32b410ee1ccd4d9de19e98ee01026496ed4fc49afb70204c6b2bcf9cd53e"
+      },
+      {
+        "bytes": 351551,
+        "path": "Sources/ForgeConductorApp/Resources/Assets.xcassets/AppIcon.appiconset/icon_256x256@2x.png",
+        "sha256": "6e3b3779cd73a983d75ece1d2e053a691af04c669e07855c03fe58dfba518fc8"
+      },
+      {
+        "bytes": 2660,
+        "path": "Sources/ForgeConductorApp/Resources/Assets.xcassets/AppIcon.appiconset/icon_32x32.png",
+        "sha256": "aa33af964e1316b0cad43d5fc1d4899b0af0647a4146169142a68c3b92afdeb9"
+      },
+      {
+        "bytes": 351551,
+        "path": "Sources/ForgeConductorApp/Resources/Assets.xcassets/AppIcon.appiconset/icon_512x512.png",
+        "sha256": "6e3b3779cd73a983d75ece1d2e053a691af04c669e07855c03fe58dfba518fc8"
+      },
+      {
+        "bytes": 1257,
+        "path": "Sources/ForgeConductorApp/Resources/Assets.xcassets/AppIcon.appiconset/Contents.json",
+        "sha256": "13b1c7461192863c9f3ab3ceab313acd6f6531898360983495bf13d48dfc967f"
+      },
+      {
+        "bytes": 822,
+        "path": "Sources/ForgeConductorApp/Resources/Assets.xcassets/AppIcon.appiconset/icon_16x16.png",
+        "sha256": "582c2c29ddcfd8eba1eeecff222346a9b33972c0a6bccacb0fc9dbbf031771de"
+      },
+      {
+        "bytes": 2660,
+        "path": "Sources/ForgeConductorApp/Resources/Assets.xcassets/AppIcon.appiconset/icon_16x16@2x.png",
+        "sha256": "aa33af964e1316b0cad43d5fc1d4899b0af0647a4146169142a68c3b92afdeb9"
+      },
+      {
+        "bytes": 108418,
+        "path": "Sources/ForgeConductorApp/Resources/Assets.xcassets/AppIcon.appiconset/icon_128x128@2x.png",
+        "sha256": "cbbedd835a69a06812832f28f6e4504bf6d18aebc873bbc6c0d7114b02da5753"
+      },
+      {
+        "bytes": 867823,
+        "path": "Sources/ForgeConductorApp/Resources/Assets.xcassets/AppIcon.appiconset/icon_512x512@2x.png",
+        "sha256": "0e5eb2425d3dd7dad5f1f024a1351635e25d0bf7120a265493da28d33c4432aa"
+      },
+      {
+        "bytes": 108418,
+        "path": "Sources/ForgeConductorApp/Resources/Assets.xcassets/AppIcon.appiconset/icon_256x256.png",
+        "sha256": "cbbedd835a69a06812832f28f6e4504bf6d18aebc873bbc6c0d7114b02da5753"
+      },
+      {
+        "bytes": 9503,
+        "path": "Sources/ForgeConductorApp/Views/MCPServersView.swift",
+        "sha256": "634eda76fb5e443fb12426c6655859e83c09e906a8bb3576370ff6425b5e9a40"
+      },
+      {
+        "bytes": 3171,
+        "path": "Sources/ForgeConductorApp/Views/LiveFeedView.swift",
+        "sha256": "1ab2e6f14066211ce6c6b95df6fbdbdb6dcce8897a6ca988436c7eddba9a9b5b"
+      },
+      {
+        "bytes": 8685,
+        "path": "Sources/ForgeConductorApp/Views/TelemetryDashboardView.swift",
+        "sha256": "f1e3b29a8ff7b84025534ed2e0d65e6856fc5707cba08e770e4338af26390e99"
+      },
+      {
+        "bytes": 5934,
+        "path": "Sources/ForgeConductorApp/Views/ToolsView.swift",
+        "sha256": "976a954eab57134ac2b33883d986c801553726e1adb378d40d3a7144ae67c6cd"
+      },
+      {
+        "bytes": 3292,
+        "path": "Sources/ForgeConductorApp/Views/AppSidebarView.swift",
+        "sha256": "9d933ba30296554590d075208c2a13494c5381d9ef1d3b51dca03c0901470f76"
+      },
+      {
+        "bytes": 2787,
+        "path": "Sources/ForgeConductorApp/Views/AgentsView.swift",
+        "sha256": "792e81e7c25f088f3c232e06ea7bba139018f213c0ff3333527ef915c7558ab7"
+      },
+      {
+        "bytes": 4347,
+        "path": "Sources/ForgeConductorApp/Views/DiagnosticsView.swift",
+        "sha256": "19e37deda712427d6f5557af6ce7c3d4e243b951ebf6d9abf6e456755e52f090"
+      },
+      {
+        "bytes": 5918,
+        "path": "Sources/ForgeConductorApp/Views/ManagerSettingsView.swift",
+        "sha256": "1d5eed3796033dc09f00874ae3e48f49cc7979f51f67421ba0078a0c219bfbc5"
+      },
+      {
+        "bytes": 4533,
+        "path": "Sources/ForgeConductorApp/Views/ContentView.swift",
+        "sha256": "5b82f404e411dea5969ddc2576899a3c8423d4bc5e720b8c607ea4d7cf1de0d8"
+      },
+      {
+        "bytes": 31760,
+        "path": "Sources/ForgeConductorApp/Views/Rig/RigDashboardView.swift",
+        "sha256": "b4dfbcfac92af9f5979812172bf7cc1e99c6760319aea3f11bbb8ef0b76413e1"
+      },
+      {
+        "bytes": 23562,
+        "path": "Sources/ForgeConductorCLI/ForgeConductorMain.swift",
+        "sha256": "c8cac41fd648b848b162ac193f5f32a67768ad864b4f66017147268e7aa9f7cf"
+      },
+      {
+        "bytes": 7280,
+        "path": "Sources/ForgeConductorCore/Resources/TelemetryStatic/index.html",
+        "sha256": "5a53d1914bedaf55753b6d9764f1234c129b64cc25c81e7e6a074849fdd9d98e"
+      },
+      {
+        "bytes": 26920,
+        "path": "Sources/ForgeConductorCore/Resources/TelemetryStatic/style.css",
+        "sha256": "ac153c71e36b8655593c6bc539506145f49814375f6c00c8a40125889f4a1e58"
+      },
+      {
+        "bytes": 2849,
+        "path": "Sources/ForgeConductorCore/Resources/TelemetryStatic/tools-catalog.js",
+        "sha256": "22ff17d52ce37e4712a2e2bf06480cd774f46fc8a8285887189f5acc7ac38924"
+      },
+      {
+        "bytes": 33418,
+        "path": "Sources/ForgeConductorCore/Resources/TelemetryStatic/app.js",
+        "sha256": "2c8d2a00098d54ca65bea6466190e85a9c89553e8d2e7edd6d1eeb1484a83d59"
+      },
+      {
+        "bytes": 1789,
+        "path": "Sources/ForgeConductorCore/Resources/Agents/debug.md",
+        "sha256": "4013e3cfa6a4af1b51d69d4dc8445cc1e0590b0658fb5d250b4a431c70224bef"
+      },
+      {
+        "bytes": 2703,
+        "path": "Sources/ForgeConductorCore/Resources/Agents/explore.md",
+        "sha256": "0cfd24d91a74e24a64a8716e7fb6f57bb4a5a6388f5f0d2d843bbc4775e09b92"
+      },
+      {
+        "bytes": 2130,
+        "path": "Sources/ForgeConductorCore/Resources/Agents/implement.md",
+        "sha256": "1459a82d77ceebd099a6fce5ef2504bffac451f0bd9e41c96318c3ff85a70142"
+      },
+      {
+        "bytes": 1383,
+        "path": "Sources/ForgeConductorCore/Resources/Agents/precommit-audit.md",
+        "sha256": "9dc5693035148f124b1b990e8177aa799b5149fd818da7b9a1d447d537db8ea0"
+      },
+      {
+        "bytes": 1301,
+        "path": "Sources/ForgeConductorCore/Resources/Agents/research.md",
+        "sha256": "e5b0141797297ae5a5f647d9487445cfbffb43956ce1093e2edfad18ce4cb7e5"
+      },
+      {
+        "bytes": 1670,
+        "path": "Sources/ForgeConductorCore/Resources/Agents/plan.md",
+        "sha256": "89e9ad8543beaa7a681c48a153569b9b340bdf7fd4f34a9164354c5a6874aaff"
+      },
+      {
+        "bytes": 4047,
+        "path": "Sources/ForgeConductorCore/Resources/Agents/docs.md",
+        "sha256": "e1118265e19562bf5e470ad6de16cd0c4e009b01e55f263049b24f714649ee55"
+      },
+      {
+        "bytes": 1523,
+        "path": "Sources/ForgeConductorCore/Resources/Agents/review.md",
+        "sha256": "cfab52c5a3ecb384dba6bfa022db773729a0b48c2828e7716d970b873826a9cc"
+      },
+      {
+        "bytes": 1381,
+        "path": "Sources/ForgeConductorCore/Resources/Agents/test.md",
+        "sha256": "bc29c81555acd940eccfe692d4ded50717f43b87943a13644c62b11783d30cc0"
+      },
+      {
+        "bytes": 1453,
+        "path": "Sources/ForgeConductorCore/Resources/Agents/security.md",
+        "sha256": "b7a7bd4a6174499b75ce095f9208cbec26f6e158a0cd7cffd9d204d782340c99"
+      },
+      {
+        "bytes": 24879,
+        "path": "Sources/ForgeConductorCore/MCP/MCPServer.swift",
+        "sha256": "b94dfa9884ae45bd8e9263b7fb2d4cd43194f596987be66841ba28c56b7741fd"
+      },
+      {
+        "bytes": 11716,
+        "path": "Sources/ForgeConductorCore/MCP/MCPServeVerifier.swift",
+        "sha256": "fa44f45992dd3f0479da03144a349549c703656e0c337e4b8fffcbf96501cfbd"
+      },
+      {
+        "bytes": 7246,
+        "path": "Sources/ForgeConductorCore/Dashboard/DashboardHTTPRequest.swift",
+        "sha256": "c77b002f3c1e0ae390e7a32e3ff5101d37a60816260783c736b277493692d391"
+      },
+      {
+        "bytes": 19569,
+        "path": "Sources/ForgeConductorCore/Dashboard/DashboardHTML.swift",
+        "sha256": "633d99084d90b2ccbf3b46d336f81d1d53267ce815cc12e9f3e305994a632d05"
+      },
+      {
+        "bytes": 5220,
+        "path": "Sources/ForgeConductorCore/Dashboard/TelemetryRoutes.swift",
+        "sha256": "3f186a190594309c124ccc0ae8cfb134b1ea4f8f4e9abc25d2092af4b36cc43f"
+      },
+      {
+        "bytes": 12475,
+        "path": "Sources/ForgeConductorCore/Dashboard/DashboardServer.swift",
+        "sha256": "71c69533bb32573667575e3c3f83ec0adc6aaa2a1f81fcd6e20000a32aae7f32"
+      },
+      {
+        "bytes": 11865,
+        "path": "Sources/ForgeConductorCore/Dashboard/HTTPResponder.swift",
+        "sha256": "0bbfe8a88ec557f9d4324cc12bbf3763491d0edb88a33eba781c5ed2e968cfe1"
+      },
+      {
+        "bytes": 2454,
+        "path": "Sources/ForgeConductorCore/Dashboard/ManagerRoutes.swift",
+        "sha256": "4ed02b2a804bbd9255daa6e780655a732139ea2bfbe07d4285e125e6390e7ce4"
+      },
+      {
+        "bytes": 3964,
+        "path": "Sources/ForgeConductorCore/Dashboard/OperationalRoutes.swift",
+        "sha256": "3fe7b816c4b1f0ae327d7a208aae5fd8087b6908861cb0dfd8eb6149d0761f15"
+      },
+      {
+        "bytes": 14720,
+        "path": "Sources/ForgeConductorCore/Manager/ManagerNode.swift",
+        "sha256": "a734bc2b50ce50126d7fb2562ef0fc56586db28c65ff67514796d3c840a81f1f"
+      },
+      {
+        "bytes": 1710,
+        "path": "Sources/ForgeConductorCore/Manager/ManagerPIDFile.swift",
+        "sha256": "2b10e83c9c47a0cd963814d803e71a11832db4f5272d29d010c894cf670e1151"
+      },
+      {
+        "bytes": 4104,
+        "path": "Sources/ForgeConductorCore/Manager/ManagerDashboardClient.swift",
+        "sha256": "cb6e7a523383a33b2065c2829d4a317b8eaeb241e9acd76f30a9151f960f3399"
+      },
+      {
+        "bytes": 54033,
+        "path": "Sources/ForgeConductorCore/Manager/ManagerInstaller.swift",
+        "sha256": "298e5f15eb4d0ac79983e3a49145344b47d39e164ab063f6216cc1f7461cfe18"
+      },
+      {
+        "bytes": 2255,
+        "path": "Sources/ForgeConductorCore/Manager/ManagerRuntime.swift",
+        "sha256": "5d0cfbbf9be7a0ef61822ad5e61f12fbe6b3d1454b63ae045ac6f93e158720a5"
+      },
+      {
+        "bytes": 2865,
+        "path": "Sources/ForgeConductorCore/Manager/ManagerSettingsNormalizer.swift",
+        "sha256": "106b33c6e44f3f1de1a996efd1219dd4f3dd5165668bdd44c941c85112d36759"
+      },
+      {
+        "bytes": 26800,
+        "path": "Sources/ForgeConductorCore/Telemetry/LMStudioDeployService.swift",
+        "sha256": "5efceb87a91409f1f06eb7cac43652bddd860b41000c7b47ff3373fc3200a341"
+      },
+      {
+        "bytes": 17531,
+        "path": "Sources/ForgeConductorCore/Telemetry/LMStudioEnvironment.swift",
+        "sha256": "8bb930fa635d1ea1c47f331e14c028f1e1290b6615d7d39f5c778abb2196428c"
+      },
+      {
+        "bytes": 4421,
+        "path": "Sources/ForgeConductorCore/Telemetry/SystemCollector.swift",
+        "sha256": "4debde7c121533cfae1b0d8a0637e41fd3d213937c2887853747e0598842b88f"
+      },
+      {
+        "bytes": 12835,
+        "path": "Sources/ForgeConductorCore/Telemetry/TelemetryService.swift",
+        "sha256": "278dcf8518603d821f7abe9fe17208c20bb7841e2458ce62d60100b5397f6aaa"
+      },
+      {
+        "bytes": 5109,
+        "path": "Sources/ForgeConductorCore/Telemetry/RealtimeMetricsEngine.swift",
+        "sha256": "09483965850fa5bd556b600da5fe53fb72e3187b5b7628071bb7ff3103f050c0"
+      },
+      {
+        "bytes": 21120,
+        "path": "Sources/ForgeConductorCore/Telemetry/LMStudioMCPPluginInstaller.swift",
+        "sha256": "da120074ca73ff9310724ea314f4f8f976809558489c81a51a4ea0f35c0bc084"
+      },
+      {
+        "bytes": 16055,
+        "path": "Sources/ForgeConductorCore/Telemetry/ProcessDiscovery.swift",
+        "sha256": "72e284524428ccadff64f238eb3d39ba962f4a1f15ddd1ba3a283508da54d983"
+      },
+      {
+        "bytes": 34622,
+        "path": "Sources/ForgeConductorCore/Telemetry/ForgeCollector.swift",
+        "sha256": "713d67c8d213d6aa4cf7514a7cd42d0ae836ce8d97e71364f070cb15d40d61cc"
+      },
+      {
+        "bytes": 8467,
+        "path": "Sources/ForgeConductorCore/Telemetry/Collectors/CPUCollector.swift",
+        "sha256": "df7b189a9e49c59d1f8d7f2cf32c42c79e367e9dea92cadc6549562cfe97b8a4"
+      },
+      {
+        "bytes": 4519,
+        "path": "Sources/ForgeConductorCore/Telemetry/Collectors/PowerSourcesCollector.swift",
+        "sha256": "b35507ff32b50f62cd64a43bd7d1a4c084a512a701ed782a1ae70d9b5bed0572"
+      },
+      {
+        "bytes": 8978,
+        "path": "Sources/ForgeConductorCore/Telemetry/Collectors/ProcessMetricsCollector.swift",
+        "sha256": "320925650251f5fa4e75f861a0232bba74fc3d1fb405d60e9e7785099431f177"
+      },
+      {
+        "bytes": 3928,
+        "path": "Sources/ForgeConductorCore/Telemetry/Collectors/GPUCollector.swift",
+        "sha256": "76a0f5fff242984b16a36458648183c6676e9bbcb3af263dda3b90f51c0bcf1f"
+      },
+      {
+        "bytes": 2768,
+        "path": "Sources/ForgeConductorCore/Telemetry/Collectors/RAMCollector.swift",
+        "sha256": "f91c4c2f796bb9de86b7008bcc9112ee068589fa5bc26146ad5399c66c68053f"
+      },
+      {
+        "bytes": 3952,
+        "path": "Sources/ForgeConductorCore/Telemetry/Collectors/DiskIOCollector.swift",
+        "sha256": "dbf823cec35dc9d66daf86b0a4a902f8920dbe6fd58525efc950052115f4baba"
+      },
+      {
+        "bytes": 3463,
+        "path": "Sources/ForgeConductorCore/Telemetry/Collectors/IOKitPropertyWalk.swift",
+        "sha256": "041ccafc91d4eab011e91a7aad78c7ef5c234db3b870ff63d09bfc978217480a"
+      },
+      {
+        "bytes": 7140,
+        "path": "Sources/ForgeConductorCore/Telemetry/Collectors/CPUFrequencyEstimator.swift",
+        "sha256": "93a620385f935139e0f9c9874e8588e5225210aa2b3255b47178156ddcfe2fea"
+      },
+      {
+        "bytes": 1671,
+        "path": "Sources/ForgeConductorCore/Telemetry/Collectors/DiskVolumeCollector.swift",
+        "sha256": "67ff326c79e011fd308b0d98575dba07b449d813b5991279d73b487dcaebc6db"
+      },
+      {
+        "bytes": 10402,
+        "path": "Sources/ForgeConductorCore/Telemetry/Models/ForgeUIModels.swift",
+        "sha256": "9fcc28a4558b20cea5fa03037b68f0aba3901f87c012780d8d6b193d716bee99"
+      },
+      {
+        "bytes": 16814,
+        "path": "Sources/ForgeConductorCore/Telemetry/Models/TelemetryModels.swift",
+        "sha256": "34ae112218eef1e196d68a7164f8bbee33cd7a6b156d6ac861117d16ce9c4147"
+      },
+      {
+        "bytes": 21760,
+        "path": "Sources/ForgeConductorCore/Application/AgentCatalog.swift",
+        "sha256": "01014df75312309337a1f59880716351ededa50038d454a09a0a8670f05e77fa"
+      },
+      {
+        "bytes": 4185,
+        "path": "Sources/ForgeConductorCore/Application/ForgeProcessEntry.swift",
+        "sha256": "2734eb8162375127b9afefd6556e41d3774dd77de362b7519188ffa3589b5a31"
+      },
+      {
+        "bytes": 19396,
+        "path": "Sources/ForgeConductorCore/Application/AgentSessionService.swift",
+        "sha256": "7cfbe5fc00ee118278b048df445da0dc1c502c62564a91a7caa77d2425b4bf12"
+      },
+      {
+        "bytes": 10574,
+        "path": "Sources/ForgeConductorCore/Application/ForgeApp.swift",
+        "sha256": "d4bddaa325b768d5efef5e476a8801515da382406521673376667181166e2ce2"
+      },
+      {
+        "bytes": 28059,
+        "path": "Sources/ForgeConductorCore/Application/ContextContinuityService.swift",
+        "sha256": "51f2b235a6522f5725aa865622066a3a278098a83dd5cc5c8e05d7083e49a4e2"
+      },
+      {
+        "bytes": 17550,
+        "path": "Sources/ForgeConductorCore/Application/ToolRouter.swift",
+        "sha256": "66bb63d8ebc2146709de7e6e70e54770d6f54a9467adfaa03c94c1d2244458f0"
+      },
+      {
+        "bytes": 12280,
+        "path": "Sources/ForgeConductorCore/Application/ContinuityAutomation.swift",
+        "sha256": "d680bd842827eab5885c78907d3902d551c6fd10e3d16cf8464bfeb0a87ed66b"
+      },
+      {
+        "bytes": 11797,
+        "path": "Sources/ForgeConductorCore/Application/ToolAuthorizationService.swift",
+        "sha256": "89554c38843046a793f99e70b0f09afbcf8bc45434ff7d4e920bfe8660ddc3f0"
+      },
+      {
+        "bytes": 9859,
+        "path": "Sources/ForgeConductorCore/Application/Tools/FilesystemToolPack.swift",
+        "sha256": "5f547eb740b8090bd451dec9cddbdafd1feb6209cfd7bc9f6be492a36d7eac98"
+      },
+      {
+        "bytes": 1608,
+        "path": "Sources/ForgeConductorCore/Application/Tools/SearchToolPack.swift",
+        "sha256": "c13e5b592375c794fd229f980127202c2fff1a32345bfec3cab0252ef6d75233"
+      },
+      {
+        "bytes": 4603,
+        "path": "Sources/ForgeConductorCore/Application/Tools/AgentToolPack.swift",
+        "sha256": "df7e04af91142c8f9d1c9f6a27acc6b7f4ddb44d9c4d1009df98035805ed19bd"
+      },
+      {
+        "bytes": 2243,
+        "path": "Sources/ForgeConductorCore/Application/Tools/GitToolPack.swift",
+        "sha256": "5f73162eeae9bad8dd7a2b6feb7e1cbb9ff27ec96176d5eee41bb2ebbcd03e80"
+      },
+      {
+        "bytes": 2368,
+        "path": "Sources/ForgeConductorCore/Application/Tools/ContinuityToolPack.swift",
+        "sha256": "22a5aa47b76c023acfdbda5f7de405e9f31bbc8e67473f4b26f1274bd135fd94"
+      },
+      {
+        "bytes": 1629,
+        "path": "Sources/ForgeConductorCore/Application/Tools/ToolArgHelpers.swift",
+        "sha256": "d8d5dd898d39408f3807c8cce0d1fad6cdce0bd3caaa4b3c7924a817d0868bc6"
+      },
+      {
+        "bytes": 1990,
+        "path": "Sources/ForgeConductorCore/Application/Tools/ShellToolPack.swift",
+        "sha256": "f292922f75b45b22e0fd765ffb24bff25c8a2279b7e0318f4531df58060132fa"
+      },
+      {
+        "bytes": 2551,
+        "path": "Sources/ForgeConductorCore/Application/Tools/DocsToolPack.swift",
+        "sha256": "59cbcff5fc98ec0e595a62e9f8b81c0039d0e84ca28bbd8be9c7ca7a5188282e"
+      },
+      {
+        "bytes": 8116,
+        "path": "Sources/ForgeConductorCore/Application/Tools/MemoryToolPack.swift",
+        "sha256": "916df67b5ddd32538732cbe82e9c1382e1ddcf2817723055368e54298e325ee7"
+      },
+      {
+        "bytes": 5269,
+        "path": "Sources/ForgeConductorCore/Infrastructure/DashboardPortGuard.swift",
+        "sha256": "917eba36d1952fec851ad57d51b9baa26ea314cc7450a0ee52d5e88d8efc3276"
+      },
+      {
+        "bytes": 13867,
+        "path": "Sources/ForgeConductorCore/Infrastructure/ProcessRunner.swift",
+        "sha256": "0f9de0ea8a06bf1b78666080b8acf077afaa7841c3d548bbbf2114899d05b888"
+      },
+      {
+        "bytes": 13573,
+        "path": "Sources/ForgeConductorCore/Infrastructure/DiagnosticLog.swift",
+        "sha256": "c4c64d269eed5a96e0a52f46bafe3230f1f555250bd59f5d1ed583ec83990b31"
+      },
+      {
+        "bytes": 4352,
+        "path": "Sources/ForgeConductorCore/Infrastructure/AppPaths.swift",
+        "sha256": "dbae2ee6b38ccc019d46d9406952c7a8430cd88587c9640b5479d033de4b4af9"
+      },
+      {
+        "bytes": 8014,
+        "path": "Sources/ForgeConductorCore/Infrastructure/PDFWriter.swift",
+        "sha256": "99eb36ad5d0802f0bf7ddc76d7d5811a8f0d68ccf1114a1f88e900aea2409121"
+      },
+      {
+        "bytes": 713,
+        "path": "Sources/ForgeConductorCore/Infrastructure/ResourceBundle.swift",
+        "sha256": "b10d2446c18d240a5cd072130e6d47046f96addfc0c47bb3a501ead01dfc58a7"
+      },
+      {
+        "bytes": 4218,
+        "path": "Sources/ForgeConductorCore/Infrastructure/ConfigStore.swift",
+        "sha256": "7d71c02a9c0f1e39fcf7e864290bc62127c0264a84dc0e21481770943a94783d"
+      },
+      {
+        "bytes": 3157,
+        "path": "Sources/ForgeConductorCore/Infrastructure/AuditService.swift",
+        "sha256": "22b72bbdf747706c453aa21e9ac923ac4d1d7462c796543e52e479d8d90ea4da"
+      },
+      {
+        "bytes": 37675,
+        "path": "Sources/ForgeConductorCore/Infrastructure/SQLiteStore.swift",
+        "sha256": "630db7444e6bdf6cc2dfc474399f59f443cf6f84aa0e20a0479c4d6ea7cfbac7"
+      },
+      {
+        "bytes": 13775,
+        "path": "Sources/ForgeConductorCore/Domain/HandoffPacket.swift",
+        "sha256": "c89ce416ea25e8c71d47324a3670bd11306932686b182f0690768d19b96dc834"
+      },
+      {
+        "bytes": 17196,
+        "path": "Sources/ForgeConductorCore/Domain/ForgeSnapshot.swift",
+        "sha256": "0ab04c9a01356d5f22703cf6c5976c05afc65abfedd76965bd0c37182454f4a7"
+      },
+      {
+        "bytes": 3681,
+        "path": "Sources/ForgeConductorCore/Domain/DoctorModels.swift",
+        "sha256": "b0e530349b85dd0dfc952ca93609bcd7ae48a9da3e68ec3a8bc4cbe897c7d7f9"
+      },
+      {
+        "bytes": 12422,
+        "path": "Sources/ForgeConductorCore/Domain/Models.swift",
+        "sha256": "d71f812c181d22c35e449e1bd293f3e056f8290e5b8131f6a1727d8ca5a6fc30"
+      },
+      {
+        "bytes": 8832,
+        "path": "Sources/ForgeConductorCore/Domain/Protocols.swift",
+        "sha256": "c21eee7b82b215f59b57e127bd60882528e9c0b415c6355e4121ce7a9ef4cc07"
+      },
+      {
+        "bytes": 12762,
+        "path": "Sources/ForgeConductorCore/Domain/ManagerModels.swift",
+        "sha256": "047f31db9e7ef9d721aac8081dc16c52ae2454044866e87a85cc791fde70e4e0"
+      },
+      {
+        "bytes": 4507,
+        "path": "Sources/ForgeConductorCore/Domain/LMStudioConnector.swift",
+        "sha256": "951eb172b76cc9829346e4a23eaf04c653406ccb1993aa561f431dd4692e2fff"
+      },
+      {
+        "bytes": 2916,
+        "path": "Sources/ForgeConductorCore/Domain/JSONSupport.swift",
+        "sha256": "279e4d7cc4d1550e22bf58ae17a5b807b90fbea95c7133649b81333132cdc4d8"
+      },
+      {
+        "bytes": 8748,
+        "path": "Sources/ForgeConductorCore/Domain/AppConfig.swift",
+        "sha256": "18d6c36d4a7b155748c8e87a0b190902598747d2673dd157bcce5ceace94a81a"
+      },
+      {
+        "bytes": 160,
+        "path": "ForgeConductor.xcworkspace/contents.xcworkspacedata",
+        "sha256": "610ffaa72bed1d0962563a492100fbad801e42255b5d76f4e6d078eced0e421d"
+      },
+      {
+        "bytes": 1805264,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Forge-Conductor.icns",
+        "sha256": "47b2c18dbe355fb94a5fcabfeebaf6f8433fc6fa4f3502574a27b55921fa3192"
+      },
+      {
+        "bytes": 1215,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/README.md",
+        "sha256": "0c73eb3567caece10c633d1319afbcd066905ca0a4743731c034ad113f0b2236"
+      },
+      {
+        "bytes": 5697,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/manifest.json",
+        "sha256": "3ce520b6aed14ace4863bdec5fe4e414654a36306f75145ccaebac1565bc94fa"
+      },
+      {
+        "bytes": 8500,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Forge-Conductor.iconset/icon_32x32@2x.png",
+        "sha256": "0fbbd36df6f98187d3997fdaf6bf34baa1ff02c313c254bf5eddfa195b830a84"
+      },
+      {
+        "bytes": 29471,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Forge-Conductor.iconset/icon_128x128.png",
+        "sha256": "73fc32b410ee1ccd4d9de19e98ee01026496ed4fc49afb70204c6b2bcf9cd53e"
+      },
+      {
+        "bytes": 351551,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Forge-Conductor.iconset/icon_256x256@2x.png",
+        "sha256": "6e3b3779cd73a983d75ece1d2e053a691af04c669e07855c03fe58dfba518fc8"
+      },
+      {
+        "bytes": 2660,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Forge-Conductor.iconset/icon_32x32.png",
+        "sha256": "aa33af964e1316b0cad43d5fc1d4899b0af0647a4146169142a68c3b92afdeb9"
+      },
+      {
+        "bytes": 351551,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Forge-Conductor.iconset/icon_512x512.png",
+        "sha256": "6e3b3779cd73a983d75ece1d2e053a691af04c669e07855c03fe58dfba518fc8"
+      },
+      {
+        "bytes": 822,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Forge-Conductor.iconset/icon_16x16.png",
+        "sha256": "582c2c29ddcfd8eba1eeecff222346a9b33972c0a6bccacb0fc9dbbf031771de"
+      },
+      {
+        "bytes": 2660,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Forge-Conductor.iconset/icon_16x16@2x.png",
+        "sha256": "aa33af964e1316b0cad43d5fc1d4899b0af0647a4146169142a68c3b92afdeb9"
+      },
+      {
+        "bytes": 108418,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Forge-Conductor.iconset/icon_128x128@2x.png",
+        "sha256": "cbbedd835a69a06812832f28f6e4504bf6d18aebc873bbc6c0d7114b02da5753"
+      },
+      {
+        "bytes": 867823,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Forge-Conductor.iconset/icon_512x512@2x.png",
+        "sha256": "0e5eb2425d3dd7dad5f1f024a1351635e25d0bf7120a265493da28d33c4432aa"
+      },
+      {
+        "bytes": 108418,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Forge-Conductor.iconset/icon_256x256.png",
+        "sha256": "cbbedd835a69a06812832f28f6e4504bf6d18aebc873bbc6c0d7114b02da5753"
+      },
+      {
+        "bytes": 60,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Assets.xcassets/Contents.json",
+        "sha256": "f5fb0e1f3a8142892ed092efb5955c1c2cc537003a89ad7bbdb9dade7fe8985f"
+      },
+      {
+        "bytes": 8500,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Assets.xcassets/AppIcon.appiconset/icon_32x32@2x.png",
+        "sha256": "0fbbd36df6f98187d3997fdaf6bf34baa1ff02c313c254bf5eddfa195b830a84"
+      },
+      {
+        "bytes": 29471,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Assets.xcassets/AppIcon.appiconset/icon_128x128.png",
+        "sha256": "73fc32b410ee1ccd4d9de19e98ee01026496ed4fc49afb70204c6b2bcf9cd53e"
+      },
+      {
+        "bytes": 351551,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Assets.xcassets/AppIcon.appiconset/icon_256x256@2x.png",
+        "sha256": "6e3b3779cd73a983d75ece1d2e053a691af04c669e07855c03fe58dfba518fc8"
+      },
+      {
+        "bytes": 2660,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Assets.xcassets/AppIcon.appiconset/icon_32x32.png",
+        "sha256": "aa33af964e1316b0cad43d5fc1d4899b0af0647a4146169142a68c3b92afdeb9"
+      },
+      {
+        "bytes": 351551,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Assets.xcassets/AppIcon.appiconset/icon_512x512.png",
+        "sha256": "6e3b3779cd73a983d75ece1d2e053a691af04c669e07855c03fe58dfba518fc8"
+      },
+      {
+        "bytes": 1257,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Assets.xcassets/AppIcon.appiconset/Contents.json",
+        "sha256": "13b1c7461192863c9f3ab3ceab313acd6f6531898360983495bf13d48dfc967f"
+      },
+      {
+        "bytes": 822,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Assets.xcassets/AppIcon.appiconset/icon_16x16.png",
+        "sha256": "582c2c29ddcfd8eba1eeecff222346a9b33972c0a6bccacb0fc9dbbf031771de"
+      },
+      {
+        "bytes": 2660,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Assets.xcassets/AppIcon.appiconset/icon_16x16@2x.png",
+        "sha256": "aa33af964e1316b0cad43d5fc1d4899b0af0647a4146169142a68c3b92afdeb9"
+      },
+      {
+        "bytes": 108418,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Assets.xcassets/AppIcon.appiconset/icon_128x128@2x.png",
+        "sha256": "cbbedd835a69a06812832f28f6e4504bf6d18aebc873bbc6c0d7114b02da5753"
+      },
+      {
+        "bytes": 867823,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Assets.xcassets/AppIcon.appiconset/icon_512x512@2x.png",
+        "sha256": "0e5eb2425d3dd7dad5f1f024a1351635e25d0bf7120a265493da28d33c4432aa"
+      },
+      {
+        "bytes": 108418,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Assets.xcassets/AppIcon.appiconset/icon_256x256.png",
+        "sha256": "cbbedd835a69a06812832f28f6e4504bf6d18aebc873bbc6c0d7114b02da5753"
+      },
+      {
+        "bytes": 2660,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/png/forge-conductor-32.png",
+        "sha256": "aa33af964e1316b0cad43d5fc1d4899b0af0647a4146169142a68c3b92afdeb9"
+      },
+      {
+        "bytes": 351551,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/png/forge-conductor-512.png",
+        "sha256": "6e3b3779cd73a983d75ece1d2e053a691af04c669e07855c03fe58dfba518fc8"
+      },
+      {
+        "bytes": 29471,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/png/forge-conductor-128.png",
+        "sha256": "73fc32b410ee1ccd4d9de19e98ee01026496ed4fc49afb70204c6b2bcf9cd53e"
+      },
+      {
+        "bytes": 108418,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/png/forge-conductor-256.png",
+        "sha256": "cbbedd835a69a06812832f28f6e4504bf6d18aebc873bbc6c0d7114b02da5753"
+      },
+      {
+        "bytes": 867823,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/png/forge-conductor-1024.png",
+        "sha256": "0e5eb2425d3dd7dad5f1f024a1351635e25d0bf7120a265493da28d33c4432aa"
+      },
+      {
+        "bytes": 8500,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/png/forge-conductor-64.png",
+        "sha256": "0fbbd36df6f98187d3997fdaf6bf34baa1ff02c313c254bf5eddfa195b830a84"
+      },
+      {
+        "bytes": 822,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/png/forge-conductor-16.png",
+        "sha256": "582c2c29ddcfd8eba1eeecff222346a9b33972c0a6bccacb0fc9dbbf031771de"
+      },
+      {
+        "bytes": 1814298,
+        "path": "Assets/Forge-Conductor-Apple-Icon-Pack/preview/forge-conductor-icon-pack-preview.png",
+        "sha256": "52ae92363ef905d0a3be5760b4dd4f8e4566ed14b0ae56eefaa374a2e1bfdd05"
+      }
+    ],
+    "swift_file_count": 112,
+    "swift_line_count": 30335
+  }
+}

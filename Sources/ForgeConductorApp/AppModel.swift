@@ -34,7 +34,10 @@ public final class AppModel: ObservableObject {
     @Published public private(set) var diagnosticPreview: [DiagnosticEnvelope] = []
     @Published public private(set) var lastExportMessage: String?
     @Published public private(set) var measuredTelemetryHz: Double = 0
-    @Published public var autoRefresh = true
+    @Published public private(set) var runtimeDiagnosticSnapshot: RuntimeDiagnosticSnapshot?
+    @Published public var autoRefresh = true {
+        didSet { telemetryBinding.autoRefresh = autoRefresh }
+    }
     @Published public var selectedTab: AppTab = .rig
     @Published public var isNavigationVisible = true
 
@@ -119,48 +122,54 @@ public final class AppModel: ObservableObject {
         let host = forgeApp.config.model.dashboard.host
         let port = forgeApp.config.model.dashboard.port
         let currentPID = ProcessInfo.processInfo.processIdentifier
-        var externalPID = ManagerPIDFile.runningPID(paths: forgeApp.paths)
-        if externalPID == currentPID {
-            externalPID = nil
-        }
+        Task { [weak self] in
+            let externalPID = await Task.detached {
+                var pid = ManagerPIDFile.runningPID(paths: forgeApp.paths)
+                if pid == currentPID { pid = nil }
+                if pid == nil {
+                    switch DashboardPortGuard.inspect(host: host, port: port, selfPID: currentPID) {
+                    case .heldByOtherForge(let holder): pid = holder.pid
+                    default: break
+                    }
+                }
+                return pid
+            }.value
 
-        if externalPID == nil {
-            switch DashboardPortGuard.inspect(host: host, port: port, selfPID: currentPID) {
-            case .heldByOtherForge(let holder):
-                externalPID = holder.pid
-            default:
-                break
+            guard let self else { return }
+            if let externalPID {
+                manager = nil
+                remoteManager = ManagerDashboardClient(host: host, port: port)
+                managerMessage = "Attached to manager (pid \(externalPID))"
+                forgeApp.diagnostics.info("gui_attached_existing_manager", [
+                    "manager_pid": "\(externalPID)",
+                    "port": "\(port)",
+                ], category: .manager)
+                refreshRemoteManagerStatus()
+                return
             }
-        }
 
-        if let externalPID {
-            manager = nil
-            remoteManager = ManagerDashboardClient(host: host, port: port)
-            managerMessage = "Attached to manager (pid \(externalPID))"
-            forgeApp.diagnostics.info("gui_attached_existing_manager", [
-                "manager_pid": "\(externalPID)",
-                "port": "\(port)",
-            ], category: .manager)
-            refreshRemoteManagerStatus()
-            return
-        }
-
-        let node = ManagerNode(app: forgeApp)
-        manager = node
-        remoteManager = nil
-        do {
-            managerStatus = try node.startService()
-            forgeApp.diagnostics.info("gui_dashboard_bound", [
-                "port": "\(managerStatus?.dashboardPort ?? 0)",
-                "pid": "\(currentPID)",
-            ], category: .manager)
-        } catch {
-            managerStatus = node.statusModel()
-            lastError = "Dashboard bind failed: \(error.localizedDescription)"
-            managerMessage = lastError
-            forgeApp.diagnostics.error("gui_dashboard_bind_failed", [
-                "error": "\(error)",
-            ], category: .manager)
+            let node = ManagerNode(app: forgeApp)
+            do {
+                let status = try await Task.detached {
+                    try node.startService()
+                }.value
+                manager = node
+                remoteManager = nil
+                managerStatus = status
+                forgeApp.diagnostics.info("gui_dashboard_bound", [
+                    "port": "\(status.dashboardPort)",
+                    "pid": "\(currentPID)",
+                ], category: .manager)
+            } catch {
+                manager = node
+                remoteManager = nil
+                managerStatus = node.statusModel()
+                lastError = "Dashboard bind failed: \(error.localizedDescription)"
+                managerMessage = lastError
+                forgeApp.diagnostics.error("gui_dashboard_bind_failed", [
+                    "error": "\(error)",
+                ], category: .manager)
+            }
         }
     }
 
@@ -183,6 +192,7 @@ public final class AppModel: ObservableObject {
         updated = b.updated
         lastTyped = b.lastTyped
         measuredTelemetryHz = b.measuredHz
+        runtimeDiagnosticSnapshot = app?.runtimeDiagnosticSnapshot()
         isLoading = b.isLoading
         if let e = b.lastError { lastError = e }
     }
@@ -283,6 +293,7 @@ public final class AppModel: ObservableObject {
 
     public func refreshDiagnosticsPreview() {
         diagnosticPreview = app?.diagnostics.recent(limit: 200) ?? []
+        runtimeDiagnosticSnapshot = app?.runtimeDiagnosticSnapshot()
     }
 
     public func exportDiagnostics() {

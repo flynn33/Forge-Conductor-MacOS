@@ -1,0 +1,103 @@
+Test Suite 'Selected tests' started at 2026-08-23 14:38:32.528.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-23 14:38:32.528.
+Test Suite 'LatestValueMailboxTests' started at 2026-08-23 14:38:32.528.
+Test Case '-[ForgeConductorTests.LatestValueMailboxTests testProducerPressureUsesAtMostTwoLogicalSlotsAndConvergesToLatest]' started.
+Test Case '-[ForgeConductorTests.LatestValueMailboxTests testProducerPressureUsesAtMostTwoLogicalSlotsAndConvergesToLatest]' passed (0.010 seconds).
+Test Case '-[ForgeConductorTests.LatestValueMailboxTests testStaleGenerationAndPostStopValuesNeverReachNewSubscriber]' started.
+Test Case '-[ForgeConductorTests.LatestValueMailboxTests testStaleGenerationAndPostStopValuesNeverReachNewSubscriber]' passed (0.033 seconds).
+Test Case '-[ForgeConductorTests.LatestValueMailboxTests testStopClearsBufferedLatestDuringInFlightDelivery]' started.
+Test Case '-[ForgeConductorTests.LatestValueMailboxTests testStopClearsBufferedLatestDuringInFlightDelivery]' passed (0.033 seconds).
+Test Suite 'LatestValueMailboxTests' passed at 2026-08-23 14:38:32.605.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.076 (0.076) seconds
+Test Suite 'LifecycleOwnershipTests' started at 2026-08-23 14:38:32.605.
+Test Case '-[ForgeConductorTests.LifecycleOwnershipTests testManagerOwnerReleasesListenerAcrossTenCycles]' started.
+Test Case '-[ForgeConductorTests.LifecycleOwnershipTests testManagerOwnerReleasesListenerAcrossTenCycles]' passed (2.073 seconds).
+Test Case '-[ForgeConductorTests.LifecycleOwnershipTests testManagerRuntimeCancelsOwnedDispatchSources]' started.
+Test Case '-[ForgeConductorTests.LifecycleOwnershipTests testManagerRuntimeCancelsOwnedDispatchSources]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.LifecycleOwnershipTests testPortInspectionProcessAndPipeCompleteTenCycles]' started.
+Test Case '-[ForgeConductorTests.LifecycleOwnershipTests testPortInspectionProcessAndPipeCompleteTenCycles]' passed (0.708 seconds).
+Test Suite 'LifecycleOwnershipTests' passed at 2026-08-23 14:38:35.386.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 2.782 (2.782) seconds
+Test Suite 'ManagerTests' started at 2026-08-23 14:38:35.386.
+Test Case '-[ForgeConductorTests.ManagerTests testDashboardClientAttachesToExistingManager]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testDashboardClientAttachesToExistingManager]' passed (0.280 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testDashboardHTMLHasManagerControls]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testDashboardHTMLHasManagerControls]' passed (0.002 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testInstallerBinaryPathAndAllowlist]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testInstallerBinaryPathAndAllowlist]' passed (0.137 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testLaunchAgentLogRotationBoundsAndPrunesArchivesWithoutCurrentContent]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testLaunchAgentLogRotationBoundsAndPrunesArchivesWithoutCurrentContent]' passed (0.005 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testLaunchAgentLogRotationRetainsOnlyBoundedTailsInForgeHome]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testLaunchAgentLogRotationRetainsOnlyBoundedTailsInForgeHome]' passed (0.004 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testManagerArtifactAppVerificationFailurePreservesExistingInstallation]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testManagerArtifactAppVerificationFailurePreservesExistingInstallation]' passed (0.010 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testManagerArtifactCommitFailureRollsBackEarlierReplacements]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testManagerArtifactCommitFailureRollsBackEarlierReplacements]' passed (0.012 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testManagerArtifactCopyFailurePreservesExistingInstallation]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testManagerArtifactCopyFailurePreservesExistingInstallation]' passed (0.008 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testManagerArtifactSigningFailurePreservesExistingInstallation]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testManagerArtifactSigningFailurePreservesExistingInstallation]' passed (0.006 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testManagerArtifactStagingReplacesStaleBinaryFrameworkAndAppBundle]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testManagerArtifactStagingReplacesStaleBinaryFrameworkAndAppBundle]' passed (0.012 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testManagerArtifactTransactionCommitsCommandLinkWithArtifacts]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testManagerArtifactTransactionCommitsCommandLinkWithArtifacts]' passed (0.012 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testManagerCommandLinkCommitFailureRollsBackEntireArtifactTransaction]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testManagerCommandLinkCommitFailureRollsBackEntireArtifactTransaction]' passed (0.012 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testManagerRestartAPI]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testManagerRestartAPI]' passed (0.785 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testManagerRuntimeThrottlesPresenceMaintenance]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testManagerRuntimeThrottlesPresenceMaintenance]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testManagerSettingsPersist]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testManagerSettingsPersist]' passed (0.134 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testManagerStartPrunesDeadStalePresence]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testManagerStartPrunesDeadStalePresence]' passed (0.133 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testManagerStartStopService]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testManagerStartStopService]' passed (0.508 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testNormalizeSettingsPatch]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testNormalizeSettingsPatch]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testPIDFileHelpers]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testPIDFileHelpers]' passed (0.002 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testProductionSignatureValidatorPreservesValidMachOAndAppMetadata]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testProductionSignatureValidatorPreservesValidMachOAndAppMetadata]' passed (0.117 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testProductionSignatureValidatorPreservesValidTeamSignedAppWhenAvailable]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/ManagerTests.swift:668: -[ForgeConductorTests.ManagerTests testProductionSignatureValidatorPreservesValidTeamSignedAppWhenAvailable] : Test skipped - No valid local team-signed Forge app fixture is available
+Test Case '-[ForgeConductorTests.ManagerTests testProductionSignatureValidatorPreservesValidTeamSignedAppWhenAvailable]' skipped (0.001 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testProductionSignatureValidatorRejectsInvalidCMSWithoutMutation]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testProductionSignatureValidatorRejectsInvalidCMSWithoutMutation]' passed (0.005 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testProductionSignatureValidatorRepairsInvalidAdHocAppWithoutChangingNestedIdentity]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testProductionSignatureValidatorRepairsInvalidAdHocAppWithoutChangingNestedIdentity]' passed (0.070 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testProductionSignatureValidatorRepairsUnsignedMachOWithStableRuntimeIdentity]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testProductionSignatureValidatorRepairsUnsignedMachOWithStableRuntimeIdentity]' passed (0.055 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testSignatureInspectionErrorsAndAmbiguousMetadataFailClosed]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testSignatureInspectionErrorsAndAmbiguousMetadataFailClosed]' passed (0.012 seconds).
+Test Suite 'ManagerTests' passed at 2026-08-23 14:38:37.707.
+	 Executed 25 tests, with 1 test skipped and 0 failures (0 unexpected) in 2.319 (2.321) seconds
+Test Suite 'ProcessRunnerTests' started at 2026-08-23 14:38:37.707.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testDirectChildExitDoesNotWaitForDescendantPipeEOF]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testDirectChildExitDoesNotWaitForDescendantPipeEOF]' passed (0.004 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testLaunchFailureDoesNotPoisonTheNextRun]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testLaunchFailureDoesNotPoisonTheNextRun]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testMalformedAndCapSplitUTF8PreserveReadableOutput]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testMalformedAndCapSplitUTF8PreserveReadableOutput]' passed (0.003 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testNormalAndNonzeroExitStatuses]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testNormalAndNonzeroExitStatuses]' passed (0.003 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testOutputIsCapturedConcurrentlyAndTruncatedPerStream]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testOutputIsCapturedConcurrentlyAndTruncatedPerStream]' passed (0.004 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testParallelRunsRemainBoundedAndIndependent]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testParallelRunsRemainBoundedAndIndependent]' passed (0.023 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testRapidExitNotificationsAreNotLostUnderLoad]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testRapidExitNotificationsAreNotLostUnderLoad]' passed (0.009 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testTermIgnoringChildRequiresSIGKILL]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testTermIgnoringChildRequiresSIGKILL]' passed (0.305 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testTimeoutTerminatesChildAndReturnsConfirmedStatus]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testTimeoutTerminatesChildAndReturnsConfirmedStatus]' passed (0.021 seconds).
+Test Suite 'ProcessRunnerTests' passed at 2026-08-23 14:38:38.082.
+	 Executed 9 tests, with 0 failures (0 unexpected) in 0.374 (0.375) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-08-23 14:38:38.082.
+	 Executed 40 tests, with 1 test skipped and 0 failures (0 unexpected) in 5.550 (5.553) seconds
+Test Suite 'Selected tests' passed at 2026-08-23 14:38:38.082.
+	 Executed 40 tests, with 1 test skipped and 0 failures (0 unexpected) in 5.550 (5.554) seconds
+◇ Test run started.
+↳ Testing Library Version: 1501
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

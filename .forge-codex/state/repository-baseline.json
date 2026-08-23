@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-08-23T18:37:51Z",
+  "run_id": "aba90ab1-be80-4cc5-aa0b-23dd54d4a24d",
+  "repository": {
+    "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "branch": "repair/forge-conductor-runtime",
+    "commit": "1fce9e0188698167564056ee8ace266342f97c7b",
+    "origin": "https://github.com/flynn33/Forge-Conductor-MacOS.git",
+    "tracked_file_count": 213,
+    "initial_dirty_paths": [],
+    "control_install_paths": [
+      ".agents/",
+      ".forge-codex/",
+      "AGENTS.md"
+    ],
+    "worktrees": [
+      {
+        "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+        "commit": "1fce9e0188698167564056ee8ace266342f97c7b",
+        "branch": "repair/forge-conductor-runtime"
+      }
+    ],
+    "submodules": []
+  },
+  "package": {
+    "original_root": "/Users/jimdaley/Documents/RavenForge/Forge-Conductor-MacOS/Forge-Conductor-Codex-Autonomous-Repair-Package",
+    "version": "1.0.0",
+    "source_archive_sha256": "07a0ea359ad93930c5b29d7e368cfe8fdee226f60248b5cd3c19c675372c270e",
+    "audit_bundle_sha256": "7be0130778d980567a961c51b5172d0948b4923b134c7dac608f805272f86e6c",
+    "checksum_manifest_sha256": "b9fd2bfca834651e55b39af07cdba56d6ec4dfd7701221cbdeb1fefacb4d7b34",
+    "installed_validation": {
+      "valid": true,
+      "checks": 178,
+      "errors": [],
+      "report_sha256": "0e63c75d0907b81a1d01c3da0d2bff010a880548f0d75412ef4d0f4ef214b951"
+    },
+    "control_repairs": [
+      "Added the three schemas required by the package validator.",
+      "Excluded immutable audit and generated evidence/state outputs from recursive attribution findings."
+    ]
+  },
+  "project_shape": {
+    "workspace": "ForgeConductor.xcworkspace",
+    "project": "ForgeConductor.xcodeproj",
+    "schemes": ["forge-conductor", "ForgeConductor"],
+    "swift_package": "Package.swift",
+    "swift_tools_version": "6.2",
+    "swift_language_mode": "5",
+    "deployment_target": "macOS 26.0",
+    "products": [
+      "ForgeConductorCore",
+      "forge-conductor",
+      "forge-conductor-app"
+    ],
+    "test_target": "ForgeConductorTests",
+    "reproducible_build_entrypoint": "script/build_and_run.sh",
+    "external_evidence_root": "/Users/jimdaley/Documents/RavenForge/Forge-Conductor-MacOS/Forge-Conductor-Repair-Evidence/aba90ab1-be80-4cc5-aa0b-23dd54d4a24d"
+  },
+  "environment_evidence": ".forge-codex/state/environment.json",
+  "run_state": ".forge-codex/state/run-state.json",
+  "gate_evidence": ".forge-codex/state/gate-results/G00.json"
+}

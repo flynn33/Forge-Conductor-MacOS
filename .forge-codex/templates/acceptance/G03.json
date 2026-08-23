@@ -1,0 +1,33 @@
+{
+  "commands": [],
+  "criteria_results": [
+    {
+      "criterion": "maximum pending presentation state <= 2 logical slots",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "no per-update unstructured main-actor task path",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "latest value converges under producer pressure",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "stale generation and post-stop delivery tests pass",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "telemetry mapping/unit tests pass",
+      "evidence": [],
+      "passed": false
+    }
+  ],
+  "gate_id": "G03",
+  "instructions": "Replace placeholders only with command-backed artifacts and SHA-256 values. The validator rejects absent evidence.",
+  "schema_version": 1
+}

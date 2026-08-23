@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://forge-conductor.local/schemas/run-state.schema.json",
+  "title": "Forge Conductor Repair Run State",
+  "type": "object",
+  "required": ["schema_version", "run_id", "status", "created_at", "updated_at", "repository", "phases", "gates", "issues", "attempts", "evidence", "decisions", "handoffs", "current_work", "last_event_sequence"],
+  "properties": {
+    "schema_version": { "type": "string", "minLength": 1, "maxLength": 32 },
+    "run_id": { "type": "string", "format": "uuid" },
+    "status": { "type": "string", "enum": ["active", "complete", "blocked_environment", "fatal_invariant"] },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "repository": {
+      "type": "object",
+      "required": ["root", "branch", "commit"],
+      "properties": {
+        "root": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "branch": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "commit": { "type": "string", "pattern": "^[0-9a-fA-F]{7,64}$" }
+      },
+      "additionalProperties": true
+    },
+    "phases": { "type": "object", "additionalProperties": { "$ref": "#/$defs/workStatus" } },
+    "gates": { "type": "object", "additionalProperties": { "$ref": "#/$defs/workStatus" } },
+    "issues": { "$ref": "#/$defs/objectArray" },
+    "attempts": { "$ref": "#/$defs/objectArray" },
+    "evidence": { "$ref": "#/$defs/objectArray" },
+    "decisions": { "$ref": "#/$defs/objectArray" },
+    "handoffs": { "$ref": "#/$defs/objectArray" },
+    "current_work": { "anyOf": [{ "type": "null" }, { "type": "object", "additionalProperties": true }] },
+    "last_event_sequence": { "type": "integer", "minimum": 0 }
+  },
+  "$defs": {
+    "workStatus": {
+      "type": "object",
+      "required": ["status"],
+      "properties": { "status": { "type": "string", "enum": ["not_started", "running", "passed", "failed", "blocked", "skipped"] } },
+      "additionalProperties": true
+    },
+    "objectArray": { "type": "array", "maxItems": 50000, "items": { "type": "object", "additionalProperties": true } }
+  },
+  "additionalProperties": true
+}

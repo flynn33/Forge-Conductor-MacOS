@@ -1,0 +1,81 @@
+Test Suite 'Selected tests' started at 2026-08-23 14:12:38.294.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-23 14:12:38.295.
+Test Suite 'LatestValueMailboxTests' started at 2026-08-23 14:12:38.295.
+Test Case '-[ForgeConductorTests.LatestValueMailboxTests testProducerPressureUsesAtMostTwoLogicalSlotsAndConvergesToLatest]' started.
+Test Case '-[ForgeConductorTests.LatestValueMailboxTests testProducerPressureUsesAtMostTwoLogicalSlotsAndConvergesToLatest]' passed (0.009 seconds).
+Test Case '-[ForgeConductorTests.LatestValueMailboxTests testStaleGenerationAndPostStopValuesNeverReachNewSubscriber]' started.
+Test Case '-[ForgeConductorTests.LatestValueMailboxTests testStaleGenerationAndPostStopValuesNeverReachNewSubscriber]' passed (0.034 seconds).
+Test Case '-[ForgeConductorTests.LatestValueMailboxTests testStopClearsBufferedLatestDuringInFlightDelivery]' started.
+Test Case '-[ForgeConductorTests.LatestValueMailboxTests testStopClearsBufferedLatestDuringInFlightDelivery]' passed (0.036 seconds).
+Test Suite 'LatestValueMailboxTests' passed at 2026-08-23 14:12:38.375.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.080 (0.080) seconds
+Test Suite 'RealtimeStreamTests' started at 2026-08-23 14:12:38.375.
+Test Case '-[ForgeConductorTests.RealtimeStreamTests testContinuousSSESendsMultipleEvents]' started.
+Test Case '-[ForgeConductorTests.RealtimeStreamTests testContinuousSSESendsMultipleEvents]' passed (0.574 seconds).
+Test Case '-[ForgeConductorTests.RealtimeStreamTests testHealthReportsContinuousMode]' started.
+Test Case '-[ForgeConductorTests.RealtimeStreamTests testHealthReportsContinuousMode]' passed (0.427 seconds).
+Test Case '-[ForgeConductorTests.RealtimeStreamTests testHostStreamAdvancesWithoutSnapshotAPI]' started.
+Test Case '-[ForgeConductorTests.RealtimeStreamTests testHostStreamAdvancesWithoutSnapshotAPI]' passed (0.348 seconds).
+Test Case '-[ForgeConductorTests.RealtimeStreamTests testStreamHzParserUpgradesLegacyInterval]' started.
+Test Case '-[ForgeConductorTests.RealtimeStreamTests testStreamHzParserUpgradesLegacyInterval]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.RealtimeStreamTests testTelemetryServicePublishesOnEverySample]' started.
+Test Case '-[ForgeConductorTests.RealtimeStreamTests testTelemetryServicePublishesOnEverySample]' passed (0.418 seconds).
+Test Suite 'RealtimeStreamTests' passed at 2026-08-23 14:12:40.142.
+	 Executed 5 tests, with 0 failures (0 unexpected) in 1.767 (1.767) seconds
+Test Suite 'RigParityTests' started at 2026-08-23 14:12:40.142.
+Test Case '-[ForgeConductorTests.RigParityTests testCPUCollectorPerCoreCount]' started.
+Test Case '-[ForgeConductorTests.RigParityTests testCPUCollectorPerCoreCount]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.RigParityTests testDiskIOCollectorReturnsFiniteRates]' started.
+Test Case '-[ForgeConductorTests.RigParityTests testDiskIOCollectorReturnsFiniteRates]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.RigParityTests testForgePanelsPresentForRigUI]' started.
+Test Case '-[ForgeConductorTests.RigParityTests testForgePanelsPresentForRigUI]' passed (0.171 seconds).
+Test Case '-[ForgeConductorTests.RigParityTests testGPUCollectorMetalFlag]' started.
+Test Case '-[ForgeConductorTests.RigParityTests testGPUCollectorMetalFlag]' passed (0.002 seconds).
+Test Case '-[ForgeConductorTests.RigParityTests testHistoryPointSerializesUnavailableGPUAsJSONNull]' started.
+Test Case '-[ForgeConductorTests.RigParityTests testHistoryPointSerializesUnavailableGPUAsJSONNull]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.RigParityTests testManagerNodeStartStopInProcess]' started.
+Test Case '-[ForgeConductorTests.RigParityTests testManagerNodeStartStopInProcess]' passed (0.148 seconds).
+Test Case '-[ForgeConductorTests.RigParityTests testManagerRequiresServiceOrHTTPEvidenceBeforeReportingReady]' started.
+Test Case '-[ForgeConductorTests.RigParityTests testManagerRequiresServiceOrHTTPEvidenceBeforeReportingReady]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.RigParityTests testOrchestrationPolicyStillWarnsWhenLMStudioIsNotConfigured]' started.
+Test Case '-[ForgeConductorTests.RigParityTests testOrchestrationPolicyStillWarnsWhenLMStudioIsNotConfigured]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.RigParityTests testOrchestrationPolicyTreatsConfiguredLMStudioIdleAsInformational]' started.
+Test Case '-[ForgeConductorTests.RigParityTests testOrchestrationPolicyTreatsConfiguredLMStudioIdleAsInformational]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.RigParityTests testRigPanelChecklistDocumented]' started.
+Test Case '-[ForgeConductorTests.RigParityTests testRigPanelChecklistDocumented]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.RigParityTests testSnapshotContractAndHistoryMultiSeries]' started.
+Test Case '-[ForgeConductorTests.RigParityTests testSnapshotContractAndHistoryMultiSeries]' passed (0.274 seconds).
+Test Case '-[ForgeConductorTests.RigParityTests testSysStripDistinguishesUnavailableGPUFromMeasuredZero]' started.
+Test Case '-[ForgeConductorTests.RigParityTests testSysStripDistinguishesUnavailableGPUFromMeasuredZero]' passed (0.056 seconds).
+Test Case '-[ForgeConductorTests.RigParityTests testSysStripModelFromSystem]' started.
+Test Case '-[ForgeConductorTests.RigParityTests testSysStripModelFromSystem]' passed (0.056 seconds).
+Test Case '-[ForgeConductorTests.RigParityTests testSystemMetricsHasAllStripFields]' started.
+Test Case '-[ForgeConductorTests.RigParityTests testSystemMetricsHasAllStripFields]' passed (0.165 seconds).
+Test Case '-[ForgeConductorTests.RigParityTests testTelemetryHealthToneKeepsConfigurationAndUnknownOutOfFailureState]' started.
+Test Case '-[ForgeConductorTests.RigParityTests testTelemetryHealthToneKeepsConfigurationAndUnknownOutOfFailureState]' passed (0.000 seconds).
+Test Suite 'RigParityTests' passed at 2026-08-23 14:12:41.017.
+	 Executed 15 tests, with 0 failures (0 unexpected) in 0.875 (0.875) seconds
+Test Suite 'RuntimeObservabilityTests' started at 2026-08-23 14:12:41.017.
+Test Case '-[ForgeConductorTests.RuntimeObservabilityTests testRuntimeMetricsUseFixedKeysAndClampNonnegativeGauges]' started.
+Test Case '-[ForgeConductorTests.RuntimeObservabilityTests testRuntimeMetricsUseFixedKeysAndClampNonnegativeGauges]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.RuntimeObservabilityTests testRuntimeSnapshotDictionaryContainsOnlyNumericMetricMaps]' started.
+Test Case '-[ForgeConductorTests.RuntimeObservabilityTests testRuntimeSnapshotDictionaryContainsOnlyNumericMetricMaps]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.RuntimeObservabilityTests testSignpostBoundariesAcceptStableNumericOperationIdentifiers]' started.
+Test Case '-[ForgeConductorTests.RuntimeObservabilityTests testSignpostBoundariesAcceptStableNumericOperationIdentifiers]' passed (0.000 seconds).
+Test Suite 'RuntimeObservabilityTests' passed at 2026-08-23 14:12:41.018.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'TelemetryContractTests' started at 2026-08-23 14:12:41.018.
+Test Case '-[ForgeConductorTests.TelemetryContractTests testFixtureContractKeysFile]' started.
+Test Case '-[ForgeConductorTests.TelemetryContractTests testFixtureContractKeysFile]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.TelemetryContractTests testNativeSnapshotProducesContractKeys]' started.
+Test Case '-[ForgeConductorTests.TelemetryContractTests testNativeSnapshotProducesContractKeys]' passed (0.176 seconds).
+Test Suite 'TelemetryContractTests' passed at 2026-08-23 14:12:41.194.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.176 (0.176) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-08-23 14:12:41.194.
+	 Executed 28 tests, with 0 failures (0 unexpected) in 2.897 (2.899) seconds
+Test Suite 'Selected tests' passed at 2026-08-23 14:12:41.194.
+	 Executed 28 tests, with 0 failures (0 unexpected) in 2.897 (2.900) seconds
+◇ Test run started.
+↳ Testing Library Version: 1501
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

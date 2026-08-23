@@ -6,6 +6,7 @@
 
 import Foundation
 import MetalKit
+import ForgeConductorCore
 import simd
 
 /// Metal renderer for CPU load history (glowing cyan line + fill).
@@ -14,62 +15,46 @@ final class LoadTraceRenderer: NSObject, MTKViewDelegate {
     private var device: MTLDevice?
     private var queue: MTLCommandQueue?
     private var pipeline: MTLRenderPipelineState?
-    private var vertexBuffer: MTLBuffer?
+    private let vertices = MetalVertexBuffer<GaugeVertex>()
+    private let surfaceLifetime = GaugeSurfaceLifetime()
+    private weak var view: MTKView?
+    private var dirty = false
     private var sampleCount = 0
-    private let lock = NSLock()
     private var samples: [Float] = []
 
     func attach(to view: MTKView) {
-        let mtl = view.device ?? MTLCreateSystemDefaultDevice()
-        guard let device = mtl else { return }
+        let resources = MetalGaugeResources.shared
+        guard let device = resources.device,
+              let pipeline = resources.configure(
+                  view,
+                  clearColor: MTLClearColor(red: 0.01, green: 0.02, blue: 0.05, alpha: 1)
+              )
+        else { return }
         self.device = device
-        view.device = device
+        self.queue = resources.commandQueue
+        self.pipeline = pipeline
+        self.view = view
         view.delegate = self
-        queue = device.makeCommandQueue()
-        buildPipeline(device: device, pixelFormat: view.colorPixelFormat)
+        surfaceLifetime.attach()
     }
 
     func update(samples: [Float]) {
-        lock.lock()
-        self.samples = samples
-        lock.unlock()
-        rebuildVertices()
-    }
-
-    private func buildPipeline(device: MTLDevice, pixelFormat: MTLPixelFormat) {
-        let library: MTLLibrary
-        do {
-            library = try device.makeLibrary(source: Self.shaderSource, options: nil)
-        } catch {
+        guard self.samples != samples else {
+            RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedStatic)
             return
         }
-        guard let vert = library.makeFunction(name: "load_vertex"),
-              let frag = library.makeFunction(name: "load_fragment") else { return }
-
-        let desc = MTLRenderPipelineDescriptor()
-        desc.vertexFunction = vert
-        desc.fragmentFunction = frag
-        desc.colorAttachments[0].pixelFormat = pixelFormat
-        desc.colorAttachments[0].isBlendingEnabled = true
-        desc.colorAttachments[0].rgbBlendOperation = .add
-        desc.colorAttachments[0].alphaBlendOperation = .add
-        desc.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
-        desc.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
-        desc.colorAttachments[0].sourceAlphaBlendFactor = .one
-        desc.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
-        pipeline = try? device.makeRenderPipelineState(descriptor: desc)
+        self.samples = samples
+        rebuildVertices()
+        requestDraw()
     }
 
     private func rebuildVertices() {
         guard let device else { return }
-        lock.lock()
         let src = samples
-        lock.unlock()
         let n = max(src.count, 2)
         // Triangle strip fill under the curve + line on top: store fill verts then line verts.
         // Layout: for each sample i, position xy in NDC-ish [-1,1], color as attribute.
-        struct V { var pos: SIMD2<Float>; var color: SIMD4<Float> }
-        var verts: [V] = []
+        var verts: [GaugeVertex] = []
         verts.reserveCapacity(n * 2 + n)
 
         let cyan = SIMD4<Float>(0.09, 0.94, 1.0, 0.55)
@@ -88,25 +73,22 @@ final class LoadTraceRenderer: NSObject, MTKViewDelegate {
         // Fill strip
         for i in 0..<n {
             let val = i < src.count ? src[i] : 0
-            verts.append(V(pos: SIMD2(x(i), -0.85), color: base))
-            verts.append(V(pos: SIMD2(x(i), y(val)), color: cyan))
+            verts.append(GaugeVertex(pos: SIMD2(x(i), -0.85), color: base))
+            verts.append(GaugeVertex(pos: SIMD2(x(i), y(val)), color: cyan))
         }
         let fillCount = verts.count
 
         // Line
         for i in 0..<n {
             let val = i < src.count ? src[i] : 0
-            verts.append(V(pos: SIMD2(x(i), y(val)), color: cyanLine))
+            verts.append(GaugeVertex(pos: SIMD2(x(i), y(val)), color: cyanLine))
         }
 
-        let bytes = verts.count * MemoryLayout<V>.stride
-        vertexBuffer = device.makeBuffer(bytes: verts, length: bytes, options: .storageModeShared)
+        vertices.upload(verts, device: device)
         sampleCount = fillCount // first draw fill; line uses rest
         // Store line offset in high bits via sampleCount encoding: fillCount | (lineCount << 16) — simpler: store both
-        lock.lock()
         self.fillVertexCount = fillCount
         self.lineVertexCount = n
-        lock.unlock()
     }
 
     private var fillVertexCount = 0
@@ -115,21 +97,25 @@ final class LoadTraceRenderer: NSObject, MTKViewDelegate {
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
 
     func draw(in view: MTKView) {
+        guard dirty else {
+            RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedStatic)
+            return
+        }
         guard let drawable = view.currentDrawable,
               let rpd = view.currentRenderPassDescriptor,
               let pipeline,
               let queue,
               let buffer = queue.makeCommandBuffer(),
               let encoder = buffer.makeRenderCommandEncoder(descriptor: rpd),
-              let vertexBuffer else { return }
+              let vertexBuffer = vertices.buffer else { return }
+        dirty = false
+        RuntimeDiagnostics.shared.increment(.gaugeDraws)
 
         encoder.setRenderPipelineState(pipeline)
         encoder.setVertexBuffer(vertexBuffer, offset: 0, index: 0)
 
-        lock.lock()
         let fill = fillVertexCount
         let line = lineVertexCount
-        lock.unlock()
 
         if fill >= 2 {
             encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: fill)
@@ -142,38 +128,20 @@ final class LoadTraceRenderer: NSObject, MTKViewDelegate {
         buffer.commit()
     }
 
-    private static let shaderSource = """
-    #include <metal_stdlib>
-    using namespace metal;
-
-    struct VertexIn {
-        float2 position [[attribute(0)]];
-        float4 color    [[attribute(1)]];
-    };
-
-    struct VertexOut {
-        float4 position [[position]];
-        float4 color;
-    };
-
-    // We pass tightly packed float2 + float4 without MTLVertexDescriptor by
-    // reinterpreting buffer as float array in shader.
-    struct Packed {
-        float2 position;
-        float4 color;
-    };
-
-    vertex VertexOut load_vertex(uint vid [[vertex_id]],
-                                 const device Packed *vertices [[buffer(0)]]) {
-        Packed v = vertices[vid];
-        VertexOut out;
-        out.position = float4(v.position, 0.0, 1.0);
-        out.color = v.color;
-        return out;
+    func detach(from view: MTKView) {
+        if view.delegate === self { view.delegate = nil }
+        self.view = nil
+        dirty = false
+        vertices.release()
+        surfaceLifetime.detach()
     }
 
-    fragment float4 load_fragment(VertexOut in [[stage_in]]) {
-        return in.color;
+    private func requestDraw() {
+        dirty = true
+        guard let view, !view.isHidden else {
+            RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedHidden)
+            return
+        }
+        view.setNeedsDisplay(view.bounds)
     }
-    """
 }

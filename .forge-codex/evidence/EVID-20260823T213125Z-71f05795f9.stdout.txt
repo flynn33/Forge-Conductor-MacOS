@@ -1,0 +1,6 @@
+Starting recording with the Allocations template. Attaching to: Forge Conductor (75962). Time limit: 15.0 s
+Ctrl-C to stop the recording
+Reached specified time limit, ending recording...
+Recording completed. Saving output file...
+Output file saved as: 20260823T213125Z-P11-GAUGE-STRESS-Allocations.trace
+/Users/jimdaley/Documents/RavenForge/Forge-Conductor-MacOS/Forge-Conductor-Repair-Evidence/aba90ab1-be80-4cc5-aa0b-23dd54d4a24d/p11/20260823T213125Z-P11-GAUGE-STRESS-Allocations.trace

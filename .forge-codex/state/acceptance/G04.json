@@ -1,0 +1,125 @@
+{
+  "commands": [
+    {
+      "command": "env FORGE_BUILD_CONFIGURATION=release ./script/build_and_run.sh --verify",
+      "exit_code": 0,
+      "evidence": ".forge-codex/evidence/EVID-20260823T192804Z-95eb990973.json"
+    },
+    {
+      "command": ".forge-codex/scripts/check_p04_metal.py",
+      "exit_code": 0,
+      "evidence": ".forge-codex/evidence/EVID-20260823T193100Z-a782c3890a.json"
+    },
+    {
+      "command": "curl --fail --silent --show-error http://127.0.0.1:7788/api/health",
+      "exit_code": 0,
+      "evidence": ".forge-codex/evidence/EVID-20260823T192842Z-4e41ce2a84.json"
+    },
+    {
+      "command": "xcrun xctrace record --template 'Metal System Trace' --time-limit 5s --no-prompt --output P04-Release-Metal-System.trace --attach 41175",
+      "exit_code": 0,
+      "evidence": ".forge-codex/evidence/EVID-20260823T192902Z-89fd0383eb.json"
+    },
+    {
+      "command": "xcrun xctrace export --input P04-Release-Metal-System.trace --toc",
+      "exit_code": 0,
+      "evidence": ".forge-codex/evidence/EVID-20260823T192954Z-a1ccac7d61.json"
+    },
+    {
+      "command": "swift test --configuration release --no-parallel",
+      "exit_code": 0,
+      "evidence": ".forge-codex/evidence/EVID-20260823T193106Z-667173c96c.json"
+    }
+  ],
+  "criteria_results": [
+    {
+      "criterion": "Metal resource construction is shared or justified",
+      "evidence": [
+        {
+          "path": "Sources/ForgeConductorApp/Metal/MetalGaugeResources.swift",
+          "sha256": "03070d0e78f79bce568e73c7834c68bdf9b92581a5ac1297039b3c20476a5c4d"
+        },
+        {
+          "path": ".forge-codex/evidence/EVID-20260823T193100Z-a782c3890a.stdout.txt",
+          "sha256": "d61d72bfc705b73ce988d0690f85cac6a7e5f8fde3d4ce84e3059d2361506868"
+        },
+        {
+          "path": ".forge-codex/evidence/EVID-20260823T192842Z-4e41ce2a84.stdout.txt",
+          "sha256": "ee8d3228faee0138d395fa2f423a547b4e19e587cfd87b0f7ca49661d0e7c131"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "criterion": "hidden/static draw count reaches zero after quiescence",
+      "evidence": [
+        {
+          "path": "Sources/ForgeConductorApp/Metal/MetalGaugeKit.swift",
+          "sha256": "dee9d7e533403cb935e0b14e5a901aee61b284ffd8b992e2141fa3edf2dadb57"
+        },
+        {
+          "path": ".forge-codex/evidence/EVID-20260823T192631Z-cfa3748c4d.stdout.txt",
+          "sha256": "fe9fa09e4fcd8ad7002fde9ff498313abcac549db361cf85b5fb086c1192e386"
+        },
+        {
+          "path": ".forge-codex/evidence/EVID-20260823T192639Z-46267799f4.stdout.txt",
+          "sha256": "ccd303c6b89989cf5eaa52ed832e5b863b7ecc71386692030b8761ceb9dd5519"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "criterion": "no high-frequency buffer allocation path",
+      "evidence": [
+        {
+          "path": "Sources/ForgeConductorApp/Metal/MetalGaugeResources.swift",
+          "sha256": "03070d0e78f79bce568e73c7834c68bdf9b92581a5ac1297039b3c20476a5c4d"
+        },
+        {
+          "path": ".forge-codex/evidence/P04-metal-performance-report.json",
+          "sha256": "4958c561b8ac484218edbbfb14dad86c2c4174e5d7da5cee7feecc67278c4de5"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "criterion": "open-close release test passes",
+      "evidence": [
+        {
+          "path": ".forge-codex/evidence/EVID-20260823T192728Z-e788871dce.stdout.txt",
+          "sha256": "42be1aba4c1c2cce365cc399d339afa299d3c0f46c0f5ad36b9b5f62a9ce0176"
+        },
+        {
+          "path": ".forge-codex/evidence/EVID-20260823T192746Z-399a98b738.stdout.txt",
+          "sha256": "9e717e9ee222468433d7ce1cc6782555fcc2231168b03157d71f800ec25aaac0"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "criterion": "Release Metal/performance evidence meets budget",
+      "evidence": [
+        {
+          "path": ".forge-codex/evidence/EVID-20260823T193106Z-667173c96c.stdout.txt",
+          "sha256": "33b97a5b76d0b7835f2e54e092c68a9415fc5272e387321a23984bc385eed12a"
+        },
+        {
+          "path": "/Users/jimdaley/Documents/RavenForge/Forge-Conductor-MacOS/Forge-Conductor-Repair-Evidence/aba90ab1-be80-4cc5-aa0b-23dd54d4a24d/p04/P04-Release-Metal-System.trace/instrument_data/140A4D45-2E35-4CAF-B321-7D97E6303BCE/run_data/1.run.zip",
+          "sha256": "5fa486f92d22262b60cf74b983c7780a01a8e2125b376585889d108b0734e2d0"
+        },
+        {
+          "path": ".forge-codex/evidence/EVID-20260823T192954Z-a1ccac7d61.stdout.txt",
+          "sha256": "cf69ca0193cfc44225c659152ea329764a6fc62c0472adeb2835735607ec4a19"
+        },
+        {
+          "path": ".forge-codex/evidence/P04-metal-performance-report.json",
+          "sha256": "4958c561b8ac484218edbbfb14dad86c2c4174e5d7da5cee7feecc67278c4de5"
+        }
+      ],
+      "passed": true
+    }
+  ],
+  "gate_id": "G04",
+  "instructions": "Command-backed Release, runtime, source-invariant, lifecycle, and Metal trace evidence recorded for P04.",
+  "schema_version": 1
+}

@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "phase": "P09",
+  "owners": [
+    {
+      "owner": "HostAdapterRegistry",
+      "resources": ["adapter manifests", "adapter factories"],
+      "bound": "one registration per stable identifier; replacement is deterministic",
+      "release": "process lifetime registry; factories create independently owned adapters"
+    },
+    {
+      "owner": "ForgeNativeSessionHostAdapter",
+      "resources": ["native session ledger", "cancelled operation set", "transport"],
+      "bound": "4096 ledger records, 256 cancellation identifiers, one injected transport",
+      "release": "actor lifetime; atomic ledger persists compact recovery state without transcripts"
+    },
+    {
+      "owner": "ForgeNativeSessionHostAdapter.bootstrap",
+      "resources": ["canonical handoff", "response chunks", "assembled acknowledgment"],
+      "bound": "131072-byte handoff; 256 chunks of at most 16384 bytes; 262144-byte aggregate response",
+      "release": "function-local buffers release when the awaited bootstrap returns"
+    },
+    {
+      "owner": "NativeSessionTransport",
+      "resources": ["provider session operation"],
+      "bound": "one create or bootstrap call per adapter operation with a deadline and at most three rate-limit attempts",
+      "release": "every call is awaited; cancellation is forwarded with operation and provider identifiers"
+    },
+    {
+      "owner": "LocalLogicalSessionTransport",
+      "resources": ["idempotency session map", "cancelled operation set"],
+      "bound": "4096 idempotency sessions and 256 cancelled operations with deterministic key eviction",
+      "release": "transport instance lifetime; production composition creates one per adapter"
+    }
+  ]
+}

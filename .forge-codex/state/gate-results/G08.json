@@ -1,0 +1,70 @@
+{
+  "artifacts": [
+    {
+      "kind": "stdout",
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G08.stdout.txt",
+      "sha256": "456c68fd77f436c47987b7dd6b71d21c2b8a43790b473444e99a331b877da09b"
+    },
+    {
+      "kind": "stderr",
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G08.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "criteria",
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G08.criteria.json",
+      "sha256": "9400af9cca98362000bcd1426c6557108e041511a348c24617d1ad85f3d6fce1"
+    }
+  ],
+  "commands": [
+    {
+      "command": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-handlers/G08.sh",
+      "exit_code": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "456c68fd77f436c47987b7dd6b71d21c2b8a43790b473444e99a331b877da09b",
+      "timed_out": false
+    }
+  ],
+  "ended_at": "2026-08-23T20:45:54.583740+00:00",
+  "environment": {
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "repository": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
+  },
+  "evaluator": {
+    "criteria_results": [
+      {
+        "criterion": "handoff schema and compactness pass",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P08-continuity-report.json#86b23e437872b191570bf864250f76bfc29523ea49520cb75e2ea3ec98644f4b; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T204207Z-fb406e171d.json#88076e6dbb4f16e617b0ba3c25655991494a8aecb4aaeb0bccc658a1ccfb791b",
+        "passed": true
+      },
+      {
+        "criterion": "all transition crash points recover",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P08-continuity-report.json#86b23e437872b191570bf864250f76bfc29523ea49520cb75e2ea3ec98644f4b; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T204207Z-fb406e171d.json#88076e6dbb4f16e617b0ba3c25655991494a8aecb4aaeb0bccc658a1ccfb791b",
+        "passed": true
+      },
+      {
+        "criterion": "idempotency and exact acknowledgment pass",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P08-mcp-process-conformance.json#e18ee8d25baf6b3d38169e72d64046b78fe04ec150bc10bc6aba042786b20015; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T203838Z-4f3fba0ee5.json#e9c3a5836f9e3117bd07d129d01b60e0c1a733373ee854a7a696a93918124b4f",
+        "passed": true
+      },
+      {
+        "criterion": "context budget fallback passes",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P08-continuity-report.json#86b23e437872b191570bf864250f76bfc29523ea49520cb75e2ea3ec98644f4b; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T204207Z-fb406e171d.json#88076e6dbb4f16e617b0ba3c25655991494a8aecb4aaeb0bccc658a1ccfb791b",
+        "passed": true
+      },
+      {
+        "criterion": "continuity MCP conformance passes",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P08-mcp-process-conformance.json#e18ee8d25baf6b3d38169e72d64046b78fe04ec150bc10bc6aba042786b20015; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T204247Z-4561e060f3.json#6b40dc22f5e9ba3787794353232a1ad664509ebb520dcb5cc007be0600c91844",
+        "passed": true
+      }
+    ],
+    "name": "forge-gate-handler",
+    "version": "1"
+  },
+  "gate_id": "G08",
+  "notes": "",
+  "schema_version": 1,
+  "started_at": "2026-08-23T20:45:54.286886+00:00",
+  "status": "passed"
+}

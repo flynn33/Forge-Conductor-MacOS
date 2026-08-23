@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "phase": "P10",
+  "status": "passed",
+  "fixtures": [
+    {
+      "name": "schema-v3 continuity store",
+      "result": "migrated to v5, reopened, legacy handoff retained, current writes retained"
+    },
+    {
+      "name": "concurrent schema-v3 migration",
+      "result": "two initializers completed idempotently without partial state"
+    },
+    {
+      "name": "project memory restart",
+      "result": "stable project identity and durable records reopened"
+    },
+    {
+      "name": "unsupported project-memory version",
+      "result": "typed failure returned and original database bytes preserved"
+    },
+    {
+      "name": "corrupt project-memory database",
+      "result": "typed failure returned and byte-identical recovery artifact preserved"
+    },
+    {
+      "name": "native session ledger restart",
+      "result": "compact identifiers reopened without transcript or private payload persistence"
+    }
+  ],
+  "rollback_policy": "transactions roll back on failure; databases are preserved rather than deleted",
+  "evidence_ids": [
+    "EVID-20260823T210632Z-016869a17f",
+    "EVID-20260823T210727Z-dd0087ce58"
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T194137Z-26aa5b1b82.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5385,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T194137Z-26aa5b1b82.stderr.txt",
+      "sha256": "ccb4ee91e649bf3956c27959ced85a018cb3a2a2af2cbe91c18795471a1fe5f7"
+    }
+  ],
+  "command": "env DYLD_SHARED_REGION=avoid swift test --sanitize=address --no-parallel --filter LifecycleOwnershipTests",
+  "ended_at": "2026-08-23T19:41:37.901649+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 1,
+  "id": "EVID-20260823T194137Z-26aa5b1b82",
+  "kind": "address-sanitizer-dyld-workaround",
+  "related_findings": [],
+  "related_gates": [
+    "G05"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T19:41:37.458028+00:00",
+  "timed_out": false
+}

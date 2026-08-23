@@ -1,0 +1,35 @@
+{
+  "artifacts": [
+    {
+      "bytes": 61575,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T193106Z-667173c96c.stdout.txt",
+      "sha256": "33b97a5b76d0b7835f2e54e092c68a9415fc5272e387321a23984bc385eed12a"
+    },
+    {
+      "bytes": 835,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T193106Z-667173c96c.stderr.txt",
+      "sha256": "a3cc86d3e05dd3a3cffe22bd6503d51d0b35410a12f92c95978639ff5e345851"
+    }
+  ],
+  "command": "swift test --configuration release --no-parallel",
+  "ended_at": "2026-08-23T19:31:57.839601+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T193106Z-667173c96c",
+  "kind": "p04-release-swift-test",
+  "related_findings": [
+    "FC-PERF-001",
+    "FC-PERF-002",
+    "FC-PERF-003"
+  ],
+  "related_gates": [
+    "G04"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T19:31:06.679398+00:00",
+  "timed_out": false
+}

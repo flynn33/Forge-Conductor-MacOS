@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "phase": "P04",
+  "findings": ["FC-PERF-001", "FC-PERF-002", "FC-PERF-003"],
+  "build": "release",
+  "before": {
+    "evidence": ".forge-codex/evidence/EVID-20260823T191259Z-1cde4355df.stdout.txt",
+    "command_queues_created": 229,
+    "pipelines_created": 229,
+    "buffers_created": 1598,
+    "note": "Short native run before the P04 resource repair."
+  },
+  "release_after": {
+    "evidence": ".forge-codex/evidence/EVID-20260823T192842Z-4e41ce2a84.stdout.txt",
+    "active_surfaces": 229,
+    "command_queues_created": 1,
+    "pipelines_created": 1,
+    "buffers_created": 234,
+    "maximum_buffer_capacity_bytes": 65536,
+    "telemetry_queue_maximum": 2
+  },
+  "steady_buffer_window": {
+    "start_evidence": ".forge-codex/evidence/EVID-20260823T192151Z-4704466f4f.stdout.txt",
+    "end_evidence": ".forge-codex/evidence/EVID-20260823T192214Z-82141cd307.stdout.txt",
+    "start_buffers_created": 234,
+    "end_buffers_created": 234,
+    "allocation_delta": 0
+  },
+  "paused_quiescence_window": {
+    "start_evidence": ".forge-codex/evidence/EVID-20260823T192631Z-cfa3748c4d.stdout.txt",
+    "end_evidence": ".forge-codex/evidence/EVID-20260823T192639Z-46267799f4.stdout.txt",
+    "duration_seconds": 8,
+    "telemetry_events_produced": 249,
+    "metal_draw_delta": 0,
+    "buffer_allocation_delta": 0,
+    "command_queue_allocation_delta": 0,
+    "pipeline_allocation_delta": 0
+  },
+  "open_close_release": {
+    "reopen_evidence": ".forge-codex/evidence/EVID-20260823T192728Z-e788871dce.stdout.txt",
+    "reopened_active_surfaces": 229,
+    "reclose_evidence": ".forge-codex/evidence/EVID-20260823T192746Z-399a98b738.stdout.txt",
+    "reclosed_active_surfaces": 0,
+    "shared_queue_count_after_reopen": 1,
+    "shared_pipeline_count_after_reopen": 1
+  },
+  "trace": {
+    "kind": "Metal System Trace",
+    "path": "/Users/jimdaley/Documents/RavenForge/Forge-Conductor-MacOS/Forge-Conductor-Repair-Evidence/aba90ab1-be80-4cc5-aa0b-23dd54d4a24d/p04/P04-Release-Metal-System.trace",
+    "record_command_evidence": ".forge-codex/evidence/EVID-20260823T192902Z-89fd0383eb.json",
+    "toc_evidence": ".forge-codex/evidence/EVID-20260823T192954Z-a1ccac7d61.json",
+    "target": "Forge Conductor",
+    "target_pid": 41175
+  },
+  "budgets": {
+    "shared_command_queues_maximum": 1,
+    "shared_pipelines_maximum": 1,
+    "steady_allocation_delta_maximum": 0,
+    "paused_draw_delta_maximum": 0,
+    "released_active_surfaces_maximum": 0,
+    "passed": true
+  }
+}

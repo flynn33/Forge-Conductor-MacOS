@@ -1,0 +1,75 @@
+{
+  "captured_at": "2026-08-23T18:37:04.015487+00:00",
+  "environment_keys_present": [
+    "CODEX_CI",
+    "CODEX_INTERNAL_ORIGINATOR_OVERRIDE",
+    "CODEX_PERMISSION_PROFILE",
+    "CODEX_SESSION_ID",
+    "CODEX_SHELL",
+    "CODEX_THREAD_ID"
+  ],
+  "machine": "arm64",
+  "macos_runtime_capable": true,
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "project_markers": {
+    "package_swift": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Package.swift",
+    "projects": [
+      "ForgeConductor.xcodeproj"
+    ],
+    "workspaces": [
+      "ForgeConductor.xcworkspace"
+    ]
+  },
+  "repository_root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+  "schema_version": 1,
+  "tools": {
+    "bash": {
+      "available": true,
+      "exit_code": 0,
+      "output": "GNU bash, version 3.2.57(1)-release (arm64-apple-darwin25)\nCopyright (C) 2007 Free Software Foundation, Inc.\n",
+      "path": "/bin/bash"
+    },
+    "git": {
+      "available": true,
+      "exit_code": 0,
+      "output": "git version 2.50.1 (Apple Git-155)\n",
+      "path": "/usr/bin/git"
+    },
+    "python3": {
+      "available": true,
+      "exit_code": 0,
+      "output": "Python 3.9.6\n",
+      "path": "/usr/bin/python3"
+    },
+    "sqlite3": {
+      "available": true,
+      "exit_code": 0,
+      "output": "3.51.0 2025-06-12 13:14:41 f0ca7bba1c5e232e5d279fad6338121ab55af0c8c68c84cdfb18ba5114dcaapl (64-bit)\n",
+      "path": "/usr/bin/sqlite3"
+    },
+    "swift": {
+      "available": true,
+      "exit_code": 0,
+      "output": "swift-driver version: 1.127.14.1 Apple Swift version 6.2.3 (swiftlang-6.2.3.3.21 clang-1700.6.3.2)\nTarget: arm64-apple-macosx26.0\n",
+      "path": "/usr/bin/swift"
+    },
+    "xcodebuild": {
+      "available": true,
+      "exit_code": 0,
+      "output": "Xcode 26.2\nBuild version 17C52\n",
+      "path": "/usr/bin/xcodebuild"
+    },
+    "xcrun": {
+      "available": true,
+      "exit_code": 0,
+      "output": "xcrun version 72.\n",
+      "path": "/usr/bin/xcrun"
+    },
+    "xctrace": {
+      "available": true,
+      "exit_code": 0,
+      "output": "xctrace version 26.0 (17C52)\n",
+      "path": "/usr/bin/xcrun"
+    }
+  }
+}

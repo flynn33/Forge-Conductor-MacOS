@@ -1,0 +1,33 @@
+{
+  "commands": [],
+  "criteria_results": [
+    {
+      "criterion": "handoff schema and compactness pass",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "all transition crash points recover",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "idempotency and exact acknowledgment pass",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "context budget fallback passes",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "continuity MCP conformance passes",
+      "evidence": [],
+      "passed": false
+    }
+  ],
+  "gate_id": "G08",
+  "instructions": "Replace placeholders only with command-backed artifacts and SHA-256 values. The validator rejects absent evidence.",
+  "schema_version": 1
+}

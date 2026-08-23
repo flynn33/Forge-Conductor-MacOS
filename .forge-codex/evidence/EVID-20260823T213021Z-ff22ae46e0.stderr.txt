@@ -1,0 +1,3 @@
+Run issues were detected (trace is still ready to be viewed):
+* [Warning] Data stream: Signpost intervals with backdated timestamps were emitted that are not visualized on the timeline until immediate mode recording is stopped.
+

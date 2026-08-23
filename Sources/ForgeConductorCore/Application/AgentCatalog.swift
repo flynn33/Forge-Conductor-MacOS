@@ -8,6 +8,7 @@ import Foundation
 
 /// Loads agent playbooks from bundled Resources/Agents and ~/.forge-conductor/agents.
 public final class AgentCatalog: AgentCatalogProviding, @unchecked Sendable {
+    public static let maximumEntries = 256
     private let paths: AppPaths
     private var cache: [String: AgentSpec] = [:]
     private let lock = NSLock()
@@ -69,7 +70,9 @@ public final class AgentCatalog: AgentCatalogProviding, @unchecked Sendable {
         for spec in AgentCatalog.builtinDefaults() {
             if map[spec.id] == nil { map[spec.id] = spec }
         }
-        cache = map
+        cache = Dictionary(uniqueKeysWithValues: map.sorted { $0.key < $1.key }
+            .prefix(Self.maximumEntries)
+            .map { ($0.key, $0.value) })
     }
 
     public func all() -> [AgentSpec] {

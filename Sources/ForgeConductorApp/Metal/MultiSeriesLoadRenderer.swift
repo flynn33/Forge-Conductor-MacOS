@@ -1,5 +1,6 @@
 import Foundation
 import MetalKit
+import ForgeConductorCore
 // MultiSeriesLoadRenderer.swift
 // What: Renders synchronized CPU, RAM, and GPU histories in one Metal chart.
 // How: It normalizes series into a common viewport, uploads per-series vertices,
@@ -24,70 +25,60 @@ public final class MultiSeriesLoadRenderer: NSObject, MTKViewDelegate {
     private var device: MTLDevice?
     private var queue: MTLCommandQueue?
     private var pipeline: MTLRenderPipelineState?
-    private var vertexBuffer: MTLBuffer?
-    private var vertexCount = 0
-    private let lock = NSLock()
+    private let vertices = MetalVertexBuffer<GaugeVertex>()
+    private let surfaceLifetime = GaugeSurfaceLifetime()
+    private weak var view: MTKView?
+    private var dirty = false
     private var series: [Series] = []
+    private var currentCPU: [Float] = []
+    private var currentRAM: [Float] = []
+    private var currentGPU: [Float?] = []
 
     public func attach(to view: MTKView) {
-        let mtl = view.device ?? MTLCreateSystemDefaultDevice()
-        guard let device = mtl else { return }
+        let resources = MetalGaugeResources.shared
+        guard let device = resources.device,
+              let pipeline = resources.configure(
+                  view,
+                  clearColor: MTLClearColor(red: 0.01, green: 0.015, blue: 0.04, alpha: 1)
+              )
+        else { return }
         self.device = device
-        view.device = device
+        self.queue = resources.commandQueue
+        self.pipeline = pipeline
+        self.view = view
         view.delegate = self
-        view.clearColor = MTLClearColor(red: 0.01, green: 0.015, blue: 0.04, alpha: 1)
-        view.colorPixelFormat = .bgra8Unorm
-        view.isPaused = false
-        view.enableSetNeedsDisplay = false
-        view.preferredFramesPerSecond = 30
-        queue = device.makeCommandQueue()
-        buildPipeline(device: device, pixelFormat: view.colorPixelFormat)
+        surfaceLifetime.attach()
     }
 
     public func update(cpu: [Float], ram: [Float], gpu: [Float?]) {
-        lock.lock()
+        guard currentCPU != cpu || currentRAM != ram || currentGPU != gpu else {
+            RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedStatic)
+            return
+        }
+        currentCPU = cpu
+        currentRAM = ram
+        currentGPU = gpu
         series = [
             Series(values: cpu.map(Optional.some), color: SIMD4(0.09, 0.94, 1.0, 1.0)),
             Series(values: ram.map(Optional.some), color: SIMD4(1.0, 0.42, 0.12, 0.95)),
             Series(values: gpu, color: SIMD4(0.18, 1.0, 0.55, 0.95)),
         ]
-        lock.unlock()
         rebuild()
-    }
-
-    private func buildPipeline(device: MTLDevice, pixelFormat: MTLPixelFormat) {
-        guard let library = try? device.makeLibrary(source: Self.shaderSource, options: nil),
-              let vert = library.makeFunction(name: "ms_vertex"),
-              let frag = library.makeFunction(name: "ms_fragment") else { return }
-        let desc = MTLRenderPipelineDescriptor()
-        desc.vertexFunction = vert
-        desc.fragmentFunction = frag
-        desc.colorAttachments[0].pixelFormat = pixelFormat
-        desc.colorAttachments[0].isBlendingEnabled = true
-        desc.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
-        desc.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
-        pipeline = try? device.makeRenderPipelineState(descriptor: desc)
-    }
-
-    private struct V {
-        var pos: SIMD2<Float>
-        var color: SIMD4<Float>
+        requestDraw()
     }
 
     private func rebuild() {
         guard let device else { return }
-        lock.lock()
         let seriesCopy = series
-        lock.unlock()
 
-        var verts: [V] = []
+        var verts: [GaugeVertex] = []
         // Grid lines (horizontal at 25/50/75).
         let gridColor = SIMD4<Float>(0.1, 0.35, 0.45, 0.35)
         var gridCount = 0
         for g in [Float(0.25), Float(0.5), Float(0.75)] {
             let y = Float(-0.85) + Float(1.7) * g
-            verts.append(V(pos: SIMD2(Float(-1), y), color: gridColor))
-            verts.append(V(pos: SIMD2(Float(1), y), color: gridColor))
+            verts.append(GaugeVertex(pos: SIMD2(Float(-1), y), color: gridColor))
+            verts.append(GaugeVertex(pos: SIMD2(Float(1), y), color: gridColor))
             gridCount += 2
         }
         let fillStart = verts.count
@@ -100,8 +91,8 @@ public final class MultiSeriesLoadRenderer: NSObject, MTKViewDelegate {
                 let sample = i < cpu.values.count ? cpu.values[i] : nil
                 let v = min(max((sample ?? 0) / 100, 0), 1)
                 let y = -0.85 + 1.7 * v
-                verts.append(V(pos: SIMD2(x, -0.85), color: SIMD4<Float>(0.05, 0.2, 0.3, 0)))
-                verts.append(V(pos: SIMD2(x, y), color: fill))
+                verts.append(GaugeVertex(pos: SIMD2(x, -0.85), color: SIMD4<Float>(0.05, 0.2, 0.3, 0)))
+                verts.append(GaugeVertex(pos: SIMD2(x, y), color: fill))
                 fillCount += 2
             }
         }
@@ -131,20 +122,17 @@ public final class MultiSeriesLoadRenderer: NSObject, MTKViewDelegate {
                 let x = -1 + 2 * Float(i) / Float(n - 1)
                 let v = min(max(sample / 100, 0), 1)
                 let y = -0.85 + 1.7 * v
-                verts.append(V(pos: SIMD2(x, y), color: s.color))
+                verts.append(GaugeVertex(pos: SIMD2(x, y), color: s.color))
                 segmentCount += 1
             }
             finishSegment()
         }
 
-        let bytes = verts.count * MemoryLayout<V>.stride
-        vertexBuffer = device.makeBuffer(bytes: verts, length: max(bytes, 16), options: .storageModeShared)
-        lock.lock()
+        vertices.upload(verts, device: device)
         self.drawGrid = gridCount
         self.drawFillStart = fillStart
         self.drawFillCount = fillCount
         self.drawLines = lineRanges
-        lock.unlock()
     }
 
     private var drawGrid = 0
@@ -155,23 +143,27 @@ public final class MultiSeriesLoadRenderer: NSObject, MTKViewDelegate {
     public func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
 
     public func draw(in view: MTKView) {
+        guard dirty else {
+            RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedStatic)
+            return
+        }
         guard let drawable = view.currentDrawable,
               let rpd = view.currentRenderPassDescriptor,
               let pipeline,
               let queue,
               let buffer = queue.makeCommandBuffer(),
               let encoder = buffer.makeRenderCommandEncoder(descriptor: rpd),
-              let vertexBuffer else { return }
+              let vertexBuffer = vertices.buffer else { return }
+        dirty = false
+        RuntimeDiagnostics.shared.increment(.gaugeDraws)
 
         encoder.setRenderPipelineState(pipeline)
         encoder.setVertexBuffer(vertexBuffer, offset: 0, index: 0)
 
-        lock.lock()
         let grid = drawGrid
         let fillStart = drawFillStart
         let fillCount = drawFillCount
         let lines = drawLines
-        lock.unlock()
 
         if grid >= 2 {
             encoder.drawPrimitives(type: .line, vertexStart: 0, vertexCount: grid)
@@ -188,16 +180,22 @@ public final class MultiSeriesLoadRenderer: NSObject, MTKViewDelegate {
         buffer.commit()
     }
 
-    private static let shaderSource = """
-    #include <metal_stdlib>
-    using namespace metal;
-    struct Packed { float2 position; float4 color; };
-    struct Out { float4 position [[position]]; float4 color; };
-    vertex Out ms_vertex(uint vid [[vertex_id]], const device Packed *v [[buffer(0)]]) {
-        Out o; o.position = float4(v[vid].position, 0, 1); o.color = v[vid].color; return o;
+    public func detach(from view: MTKView) {
+        if view.delegate === self { view.delegate = nil }
+        self.view = nil
+        dirty = false
+        vertices.release()
+        surfaceLifetime.detach()
     }
-    fragment float4 ms_fragment(Out in [[stage_in]]) { return in.color; }
-    """
+
+    private func requestDraw() {
+        dirty = true
+        guard let view, !view.isHidden else {
+            RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedHidden)
+            return
+        }
+        view.setNeedsDisplay(view.bounds)
+    }
 }
 
 /// SwiftUI wrapper for multi-series Metal chart.
@@ -217,5 +215,9 @@ struct MultiSeriesLoadChart: NSViewRepresentable {
 
     func updateNSView(_ nsView: MTKView, context: Context) {
         context.coordinator.update(cpu: cpu, ram: ram, gpu: gpu)
+    }
+
+    static func dismantleNSView(_ nsView: MTKView, coordinator: MultiSeriesLoadRenderer) {
+        coordinator.detach(from: nsView)
     }
 }

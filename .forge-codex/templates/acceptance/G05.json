@@ -1,0 +1,28 @@
+{
+  "commands": [],
+  "criteria_results": [
+    {
+      "criterion": "all audit E2 risks have ownership disposition",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "confirmed retaining edges fixed with same-flow proof",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "process/pipe/task/timer/observer shutdown tests pass",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "ASan and TSan runs separately pass or have zero unresolved product findings",
+      "evidence": [],
+      "passed": false
+    }
+  ],
+  "gate_id": "G05",
+  "instructions": "Replace placeholders only with command-backed artifacts and SHA-256 values. The validator rejects absent evidence.",
+  "schema_version": 1
+}

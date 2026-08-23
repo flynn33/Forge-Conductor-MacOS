@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 69211,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T205337Z-6ea80747a3.stdout.txt",
+      "sha256": "553c2dfde232b02910fd3802e2cebfca0ae024a8cd7283285ca8e3fa7ceacc8b"
+    },
+    {
+      "bytes": 8591,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T205337Z-6ea80747a3.stderr.txt",
+      "sha256": "e06eaa81dfb7159b4a8f9c314f6316522d50b0a82159faa478c8aa8b844b6207"
+    }
+  ],
+  "command": "swift test --jobs 4 -Xswiftc -strict-concurrency=complete -Xswiftc -warnings-as-errors",
+  "ended_at": "2026-08-23T20:54:16.990767+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T205337Z-6ea80747a3",
+  "kind": "p09-strict-full-suite",
+  "related_findings": [],
+  "related_gates": [
+    "G09"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T20:53:37.162951+00:00",
+  "timed_out": false
+}

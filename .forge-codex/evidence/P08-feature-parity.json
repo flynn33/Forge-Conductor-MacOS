@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "phase": "P08",
+  "preserved": [
+    "MCP-SERVER-STDIO",
+    "MCP-TOOL-SESSION-CHECKPOINT",
+    "MCP-TOOL-SESSION-HANDOFF",
+    "MCP-TOOL-CONTEXT-GET",
+    "MCP-TOOL-CONTEXT-LIST",
+    "DATA-CONTEXT-HANDOFFS",
+    "DATA-AGENT-SESSIONS"
+  ],
+  "additive": [
+    "CONTINUITY-DURABLE-STATE-MACHINE",
+    "CONTINUITY-CANONICAL-HANDOFF",
+    "CONTINUITY-CONTEXT-BUDGET",
+    "MCP-TOOL-CONTINUITY-LIFECYCLE"
+  ],
+  "removed": [],
+  "unknown": [],
+  "untested": []
+}

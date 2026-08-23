@@ -1,0 +1,35 @@
+{
+  "artifacts": [
+    {
+      "bytes": 1418,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T193100Z-a782c3890a.stdout.txt",
+      "sha256": "d61d72bfc705b73ce988d0690f85cac6a7e5f8fde3d4ce84e3059d2361506868"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T193100Z-a782c3890a.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "command": ".forge-codex/scripts/check_p04_metal.py",
+  "ended_at": "2026-08-23T19:31:01.139571+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T193100Z-a782c3890a",
+  "kind": "p04-source-invariants",
+  "related_findings": [
+    "FC-PERF-001",
+    "FC-PERF-002",
+    "FC-PERF-003"
+  ],
+  "related_gates": [
+    "G04"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T19:31:00.798223+00:00",
+  "timed_out": false
+}

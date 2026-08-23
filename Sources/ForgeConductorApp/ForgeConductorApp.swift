@@ -8,12 +8,16 @@ import SwiftUI
 import AppKit
 import Combine
 import ForgeConductorCore
+#if SWIFT_PACKAGE
+import ForgeNativeSessionHostPlugin
+#endif
 
 /// Process entry: the app binary already receives argv from LaunchAgent and must
 /// also accept `serve` from LM Studio. Route non-GUI modes before SwiftUI starts.
 @main
 enum ForgeConductorMain {
     static func main() {
+        ForgeNativeSessionHostPlugin.register()
         // LaunchAgent:  …/Forge Conductor manager run --home …
         // LM Studio:    …/Forge Conductor serve   (+ FORGE_MCP_ROLE)
         // Double-click: no subcommand → GUI

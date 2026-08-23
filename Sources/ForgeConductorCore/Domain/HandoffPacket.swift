@@ -89,7 +89,7 @@ public struct HandoffPacket: Sendable, Equatable {
     public var chatLabel: String?
     public var clientID: String?
 
-    // Task
+    // Work item
     public var goal: String
     public var status: String
     public var projectSlug: String?

@@ -1,0 +1,94 @@
+{
+  "commands": [
+    {
+      "command": "swift test --no-parallel",
+      "exit_code": 0,
+      "evidence": ".forge-codex/evidence/EVID-20260823T190435Z-72024a943c.json"
+    },
+    {
+      "command": "curl --fail --silent --show-error http://127.0.0.1:7788/api/health",
+      "exit_code": 0,
+      "evidence": ".forge-codex/evidence/EVID-20260823T190504Z-695abfb997.json"
+    },
+    {
+      "command": "xcrun xctrace record --template 'Time Profiler' --time-limit 5s --no-prompt --output P02-Time-Profiler-Attach.trace --attach 32238",
+      "exit_code": 0,
+      "evidence": ".forge-codex/evidence/EVID-20260823T190411Z-562194f9ac.json"
+    },
+    {
+      "command": "sample 32238 5 1 -file P02-Sample-Baseline.txt",
+      "exit_code": 0,
+      "evidence": ".forge-codex/evidence/EVID-20260823T190515Z-0fb7b97728.json"
+    },
+    {
+      "command": "vmmap -summary 32238",
+      "exit_code": 0,
+      "evidence": ".forge-codex/evidence/EVID-20260823T190527Z-3d3279fc30.json"
+    }
+  ],
+  "criteria_results": [
+    {
+      "criterion": "diagnostic counters and signposts build",
+      "evidence": [
+        {
+          "path": "Sources/ForgeConductorCore/Infrastructure/RuntimeObservability.swift",
+          "sha256": "b1477822a5ec4187c9a44128c2bd9225a485166130c981484c3ebbab80c1e917"
+        },
+        {
+          "path": ".forge-codex/evidence/EVID-20260823T190435Z-72024a943c.stdout.txt",
+          "sha256": "3e6ac537d1a568f2f0fcb6259b641a377430ed5fc7fa520c046f51f7c39b4e81"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "criterion": "logs redact private content",
+      "evidence": [
+        {
+          "path": "Sources/ForgeConductorCore/Infrastructure/DiagnosticLog.swift",
+          "sha256": "b87c063ffca4a1d472a089b1d8ae838f9681232ab445f80206ae07949053cf48"
+        },
+        {
+          "path": ".forge-codex/evidence/EVID-20260823T190435Z-72024a943c.stdout.txt",
+          "sha256": "3e6ac537d1a568f2f0fcb6259b641a377430ed5fc7fa520c046f51f7c39b4e81"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "criterion": "baseline reproducer artifacts recorded",
+      "evidence": [
+        {
+          "path": ".forge-codex/evidence/P02-telemetry-baseline.json",
+          "sha256": "497ba34b5c3eeeb4b821f664b1df505976a64fcf4104c99f655371051a3d426e"
+        },
+        {
+          "path": ".forge-codex/evidence/EVID-20260823T190504Z-695abfb997.stdout.txt",
+          "sha256": "27a0939f7a0047ae94fb4c7c9e03dbcb0cab639a23930aa29b500a72317a6309"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "criterion": "before traces captured on capable macOS host",
+      "evidence": [
+        {
+          "path": "/Users/jimdaley/Documents/RavenForge/Forge-Conductor-MacOS/Forge-Conductor-Repair-Evidence/aba90ab1-be80-4cc5-aa0b-23dd54d4a24d/p02/P02-Time-Profiler-Attach.trace/instrument_data/193EC53B-8B26-4F00-9165-EB2F319E1578/run_data/1.run.zip",
+          "sha256": "8742bb04c07f0e7543508e0c55ac6c19e22cf71980a741ec586f54ea30a0f7ab"
+        },
+        {
+          "path": "/Users/jimdaley/Documents/RavenForge/Forge-Conductor-MacOS/Forge-Conductor-Repair-Evidence/aba90ab1-be80-4cc5-aa0b-23dd54d4a24d/p02/P02-Sample-Baseline.txt",
+          "sha256": "1df75054bd14acd1ced3c1fed5279152dee9204768450ced11b8e34a490fe41b"
+        },
+        {
+          "path": ".forge-codex/evidence/EVID-20260823T190527Z-3d3279fc30.stdout.txt",
+          "sha256": "3dd24fc23a33fe3a7e0592e9b8becbe10fb446612fb3ea2e9a3bc87abadf2050"
+        }
+      ],
+      "passed": true
+    }
+  ],
+  "gate_id": "G02",
+  "instructions": "Command-backed artifacts and SHA-256 values recorded for the P02 baseline.",
+  "schema_version": 1
+}

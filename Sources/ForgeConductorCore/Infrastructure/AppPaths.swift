@@ -47,12 +47,16 @@ public final class AppPaths: @unchecked Sendable {
     public var memoryNextChat: URL { memoryDir.appendingPathComponent("NEXT-CHAT.md") }
     public var memoryIndex: URL { memoryDir.appendingPathComponent("INDEX.md") }
 
+    /// Isolated durable databases for project-scoped MCP memory.
+    public var projectsDir: URL { home.appendingPathComponent("Projects", isDirectory: true) }
+    public var projectRegistry: URL { projectsDir.appendingPathComponent("registry.json") }
+
     @discardableResult
     public func ensureLayout() throws -> URL {
         let fm = FileManager.default
         for dir in [
             home, agentsDir, cacheDir, logsDir, dashboardDir, exportsDir,
-            memoryDir, memoryHandoffsDir,
+            memoryDir, memoryHandoffsDir, projectsDir,
             cacheDir.appendingPathComponent("browser", isDirectory: true),
         ] {
             try fm.createDirectory(at: dir, withIntermediateDirectories: true)

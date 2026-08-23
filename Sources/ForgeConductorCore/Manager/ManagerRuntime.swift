@@ -18,7 +18,7 @@ public final class ManagerRuntime: @unchecked Sendable {
     public var watchdog: DispatchSourceTimer?
     public var lastPresencePruneAt: Date?
     public var shutdownRequested = false
-    public var signalSources: [Any] = []
+    public var signalSources: [any DispatchSourceSignal] = []
     public let runLock = DispatchSemaphore(value: 0)
     public let queue = DispatchQueue(label: "forge.manager", qos: .userInitiated)
 
@@ -58,6 +58,22 @@ public final class ManagerRuntime: @unchecked Sendable {
     public func requestShutdown() {
         shutdownRequested = true
         desiredRunning = false
+    }
+
+    /// Releases the timer owned by this runtime. The owner must hold its lock.
+    public func cancelWatchdog() {
+        watchdog?.setEventHandler {}
+        watchdog?.cancel()
+        watchdog = nil
+    }
+
+    /// Releases signal handlers owned by this runtime. The owner must hold its lock.
+    public func cancelSignalSources() {
+        for source in signalSources {
+            source.setEventHandler {}
+            source.cancel()
+        }
+        signalSources.removeAll(keepingCapacity: false)
     }
 
     /// Called while the owning ManagerNode lock is held.

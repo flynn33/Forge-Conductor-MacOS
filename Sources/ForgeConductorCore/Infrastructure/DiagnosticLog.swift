@@ -6,6 +6,37 @@
 
 import Foundation
 
+public enum DiagnosticRedaction {
+    private static let privateKeys: Set<String> = [
+        "body", "command", "content", "cwd", "error", "goal", "home", "json",
+        "markdown", "narrative", "password", "path", "prompt", "query", "secret",
+        "summary", "token",
+    ]
+
+    public static func fields(_ fields: [String: String]) -> [String: String] {
+        Dictionary(uniqueKeysWithValues: fields.map { key, value in
+            (key, redactedValue(value, forKey: key))
+        })
+    }
+
+    public static func redactedValue(_ value: String, forKey key: String) -> String {
+        let normalized = key.lowercased()
+        let isPrivateKey = privateKeys.contains(normalized)
+            || normalized.hasSuffix("_path")
+            || normalized.contains("credential")
+        let looksLikePath = value.hasPrefix("/")
+            || value.hasPrefix("file://")
+            || value.contains("/Users/")
+        if isPrivateKey || looksLikePath {
+            return "<redacted:\(value.utf8.count)b>"
+        }
+        let flattened = value
+            .replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\r", with: " ")
+        return String(flattened.prefix(512))
+    }
+}
+
 /// Persistent, structured diagnostic logging for Forge Conductor.
 ///
 /// - Append-only JSONL on disk under `~/.forge-conductor/logs/`
@@ -19,12 +50,33 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
 
     private let paths: AppPaths
     private let role: String
+    private let ringLimit: Int
+    private let maximumLogBytes: UInt64
+    private let retainedArchives: Int
     private let lock = NSLock()
     private var ring: [DiagnosticEnvelope] = []
 
     public init(paths: AppPaths, role: String = "primary") {
         self.paths = paths
         self.role = role
+        let limits = ResourcePolicy.current.nominalLimits
+        self.ringLimit = min(Self.ringCapacity, limits.diagnosticRingRecords)
+        self.maximumLogBytes = min(Self.maxMasterLogBytes, limits.logFileBytes)
+        self.retainedArchives = limits.retainedLogArchives
+    }
+
+    init(
+        paths: AppPaths,
+        role: String = "primary",
+        ringLimit: Int,
+        maximumLogBytes: UInt64,
+        retainedArchives: Int
+    ) {
+        self.paths = paths
+        self.role = role
+        self.ringLimit = max(1, ringLimit)
+        self.maximumLogBytes = max(1, maximumLogBytes)
+        self.retainedArchives = max(0, retainedArchives)
     }
 
     // MARK: - Write
@@ -41,11 +93,11 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
                 role: record.role.isEmpty ? role : record.role,
                 pid: ProcessInfo.processInfo.processIdentifier,
                 category: record.category,
-                fields: record.fields
+                fields: DiagnosticRedaction.fields(record.fields)
             )
             ring.append(envelope)
-            if ring.count > Self.ringCapacity {
-                ring.removeFirst(ring.count - Self.ringCapacity)
+            if ring.count > ringLimit {
+                ring.removeFirst(ring.count - ringLimit)
             }
 
             let data = try envelope.jsonLine()
@@ -88,7 +140,7 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
     public func recent(limit: Int = 200) -> [DiagnosticEnvelope] {
         lock.lock()
         defer { lock.unlock() }
-        return Array(ring.suffix(limit))
+        return Array(ring.suffix(max(0, min(limit, ringLimit))))
     }
 
     /// Load all on-disk master JSONL records (best-effort; large files may be capped).
@@ -101,7 +153,8 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
         for line in text.split(whereSeparator: \.isNewline).suffix(maxLines) {
             let s = String(line).trimmingCharacters(in: .whitespacesAndNewlines)
             guard !s.isEmpty, let data = s.data(using: .utf8) else { continue }
-            if let env = try? JSONDecoder().decode(DiagnosticEnvelope.self, from: data) {
+            if var env = try? JSONDecoder().decode(DiagnosticEnvelope.self, from: data) {
+                env.fields = DiagnosticRedaction.fields(env.fields)
                 out.append(env)
             }
         }
@@ -147,7 +200,7 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
             "product": ForgeApp.productName,
             "version": ForgeApp.version,
             "exported_at": stamp.string(from: Date()),
-            "home": paths.home.path,
+            "home": DiagnosticRedaction.redactedValue(paths.home.path, forKey: "home"),
             "record_count": merged.count,
             "records": merged.map { $0.asDictionary() },
         ]
@@ -157,7 +210,7 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
         let md = Self.renderMarkdown(
             product: ForgeApp.productName,
             version: ForgeApp.version,
-            home: paths.home.path,
+            home: DiagnosticRedaction.redactedValue(paths.home.path, forKey: "home"),
             records: merged
         )
         try md.write(to: mdURL, atomically: true, encoding: .utf8)
@@ -179,9 +232,7 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
     // MARK: - Private
 
     private func append(_ data: Data, to url: URL) throws {
-        if url.lastPathComponent == Self.masterLogName {
-            try rotateMasterIfNeeded()
-        }
+        try rotateIfNeeded(url)
         if !FileManager.default.fileExists(atPath: url.path) {
             FileManager.default.createFile(atPath: url.path, contents: nil)
         }
@@ -191,19 +242,25 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
         try h.write(contentsOf: data)
     }
 
-    private func rotateMasterIfNeeded() throws {
-        let url = paths.masterDiagnostics
+    private func rotateIfNeeded(_ url: URL) throws {
         let fm = FileManager.default
         guard fm.fileExists(atPath: url.path) else { return }
         let attrs = try fm.attributesOfItem(atPath: url.path)
         let size = (attrs[.size] as? NSNumber)?.uint64Value ?? 0
-        guard size >= Self.maxMasterLogBytes else { return }
-        let stamp = Self.fileStamp()
-        let archive = paths.logsDir.appendingPathComponent("forge-diagnostics-\(stamp).jsonl.bak")
-        if fm.fileExists(atPath: archive.path) {
-            try fm.removeItem(at: archive)
+        guard size >= maximumLogBytes else { return }
+        if retainedArchives > 0 {
+            for generation in stride(from: retainedArchives, through: 2, by: -1) {
+                let older = URL(fileURLWithPath: "\(url.path).\(generation - 1)")
+                let newer = URL(fileURLWithPath: "\(url.path).\(generation)")
+                if fm.fileExists(atPath: newer.path) { try fm.removeItem(at: newer) }
+                if fm.fileExists(atPath: older.path) { try fm.moveItem(at: older, to: newer) }
+            }
+            let first = URL(fileURLWithPath: "\(url.path).1")
+            if fm.fileExists(atPath: first.path) { try fm.removeItem(at: first) }
+            try fm.moveItem(at: url, to: first)
+        } else {
+            try fm.removeItem(at: url)
         }
-        try fm.moveItem(at: url, to: archive)
         fm.createFile(atPath: url.path, contents: nil)
     }
 

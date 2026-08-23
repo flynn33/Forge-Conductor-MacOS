@@ -1,0 +1,23 @@
+Test Suite 'Selected tests' started at 2026-08-23 15:42:17.110.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-23 15:42:17.111.
+Test Suite 'ContinuityCoordinatorTests' started at 2026-08-23 15:42:17.111.
+Test Case '-[ForgeConductorTests.ContinuityCoordinatorTests testBudgetSourcesAndHandoffSizeBound]' started.
+Test Case '-[ForgeConductorTests.ContinuityCoordinatorTests testBudgetSourcesAndHandoffSizeBound]' passed (0.040 seconds).
+Test Case '-[ForgeConductorTests.ContinuityCoordinatorTests testEveryTransitionCrashPointRecoversWithoutDuplicateSuccessor]' started.
+Test Case '-[ForgeConductorTests.ContinuityCoordinatorTests testEveryTransitionCrashPointRecoversWithoutDuplicateSuccessor]' passed (0.129 seconds).
+Test Case '-[ForgeConductorTests.ContinuityCoordinatorTests testExternalMCPControlLifecycleAndSchemas]' started.
+Test Case '-[ForgeConductorTests.ContinuityCoordinatorTests testExternalMCPControlLifecycleAndSchemas]' passed (0.077 seconds).
+Test Case '-[ForgeConductorTests.ContinuityCoordinatorTests testIdempotentReplayAndExactAcknowledgement]' started.
+Test Case '-[ForgeConductorTests.ContinuityCoordinatorTests testIdempotentReplayAndExactAcknowledgement]' passed (0.013 seconds).
+Test Case '-[ForgeConductorTests.ContinuityCoordinatorTests testLegacyAgentSnapshotAndMergeCollectionsStayBounded]' started.
+Test Case '-[ForgeConductorTests.ContinuityCoordinatorTests testLegacyAgentSnapshotAndMergeCollectionsStayBounded]' passed (0.092 seconds).
+Test Suite 'ContinuityCoordinatorTests' passed at 2026-08-23 15:42:17.462.
+	 Executed 5 tests, with 0 failures (0 unexpected) in 0.351 (0.351) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-08-23 15:42:17.462.
+	 Executed 5 tests, with 0 failures (0 unexpected) in 0.351 (0.351) seconds
+Test Suite 'Selected tests' passed at 2026-08-23 15:42:17.462.
+	 Executed 5 tests, with 0 failures (0 unexpected) in 0.351 (0.352) seconds
+◇ Test run started.
+↳ Testing Library Version: 1501
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

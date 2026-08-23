@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "phase": "P07",
+  "owners": [
+    {
+      "owner": "ProjectMemoryService",
+      "resources": ["ProjectMemoryRepository"],
+      "bound": "8 open project repositories with deterministic oldest eviction",
+      "release": "eviction, closeAll, and deinit close every repository"
+    },
+    {
+      "owner": "ProjectMemoryRepository",
+      "resources": ["SQLite connection", "prepared statements", "WAL"],
+      "bound": "one connection per open project; all result pages and batches are capped",
+      "release": "statements finalize with defer; close checkpoints WAL and closes the connection"
+    },
+    {
+      "owner": "SQLiteStore.handoffLatest",
+      "resources": ["predicates"],
+      "bound": "function-local array capped at two fixed predicates",
+      "release": "released on function return"
+    },
+    {
+      "owner": "SQLiteStore.handoffList",
+      "resources": ["decoded handoff output"],
+      "bound": "normal queries cap at 100 and recovery queries cap at 10000 rows",
+      "release": "released on function return"
+    },
+    {
+      "owner": "SQLiteStore.sessionCloseOpen",
+      "resources": ["closed session output"],
+      "bound": "session queries and accumulated closed sessions cap at 10000 rows",
+      "release": "released on function return"
+    },
+    {
+      "owner": "MCPServer.run",
+      "resources": ["MCPStreamReader", "presence heartbeat"],
+      "bound": "one reader and one timer per stdio serve loop",
+      "release": "defer cancels heartbeat, clears reader buffer, removes presence, and records serve end"
+    },
+    {
+      "owner": "MCPProcessFixture",
+      "resources": ["Process", "stdin Pipe", "stdout Pipe", "stderr Pipe"],
+      "bound": "one process and three pipes per fixture",
+      "release": "explicit close and deinit terminate the process and close owned handles"
+    }
+  ]
+}

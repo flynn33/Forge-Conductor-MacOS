@@ -17,10 +17,13 @@ public final class ForgeApp: @unchecked Sendable {
     public let store: SQLiteStore
     public let audit: AuditService
     public let diagnostics: DiagnosticLog
+    public let runtimeDiagnostics: RuntimeDiagnostics
     public let catalog: AgentCatalog
     public let sessions: AgentSessionService
     public let continuity: ContextContinuityService
     public let continuityAutomation: ContinuityAutomation
+    public let projectMemory: ProjectMemoryService
+    public let continuityControl: ContinuityControlService
     public let clock: any Clock
     public let lmStudioDeploy: LMStudioDeployService
 
@@ -38,7 +41,8 @@ public final class ForgeApp: @unchecked Sendable {
         paths: paths,
         store: store,
         catalog: catalog,
-        toolNames: { [weak self] in self?.tools.toolNames ?? [] }
+        toolNames: { [weak self] in self?.tools.toolNames ?? [] },
+        runtimeDiagnostics: runtimeDiagnostics
     )
 
     private init(
@@ -47,10 +51,13 @@ public final class ForgeApp: @unchecked Sendable {
         store: SQLiteStore,
         audit: AuditService,
         diagnostics: DiagnosticLog,
+        runtimeDiagnostics: RuntimeDiagnostics,
         catalog: AgentCatalog,
         sessions: AgentSessionService,
         continuity: ContextContinuityService,
         continuityAutomation: ContinuityAutomation,
+        projectMemory: ProjectMemoryService,
+        continuityControl: ContinuityControlService,
         clock: any Clock,
         lmStudioDeploy: LMStudioDeployService
     ) {
@@ -59,10 +66,13 @@ public final class ForgeApp: @unchecked Sendable {
         self.store = store
         self.audit = audit
         self.diagnostics = diagnostics
+        self.runtimeDiagnostics = runtimeDiagnostics
         self.catalog = catalog
         self.sessions = sessions
         self.continuity = continuity
         self.continuityAutomation = continuityAutomation
+        self.projectMemory = projectMemory
+        self.continuityControl = continuityControl
         self.clock = clock
         self.lmStudioDeploy = lmStudioDeploy
     }
@@ -84,6 +94,7 @@ public final class ForgeApp: @unchecked Sendable {
             paths: paths,
             role: mcpRole
         )
+        let runtimeDiagnostics = RuntimeDiagnostics.shared
         let catalog = AgentCatalog(paths: paths)
         let idleTTL = TimeInterval(config.int("sessions", "idle_ttl_sec", default: 14_400))
         let sessions = AgentSessionService(
@@ -108,6 +119,8 @@ public final class ForgeApp: @unchecked Sendable {
             diagnostics: diagnostics,
             clock: clock
         )
+        let projectMemory = ProjectMemoryService(paths: paths, clock: clock)
+        let continuityControl = ContinuityControlService(memory: projectMemory)
 
         let deploy = LMStudioDeployService(paths: paths, diagnostics: diagnostics, store: store)
         let app = ForgeApp(
@@ -116,10 +129,13 @@ public final class ForgeApp: @unchecked Sendable {
             store: store,
             audit: audit,
             diagnostics: diagnostics,
+            runtimeDiagnostics: runtimeDiagnostics,
             catalog: catalog,
             sessions: sessions,
             continuity: continuity,
             continuityAutomation: continuityAutomation,
+            projectMemory: projectMemory,
+            continuityControl: continuityControl,
             clock: clock,
             lmStudioDeploy: deploy
         )
@@ -149,7 +165,12 @@ public final class ForgeApp: @unchecked Sendable {
     /// Close durable resources (SQLite) before deleting a temp home in tests.
     public func shutdown() {
         telemetry.stopBackgroundRefresh()
+        projectMemory.closeAll()
         store.close()
+    }
+
+    public func runtimeDiagnosticSnapshot() -> RuntimeDiagnosticSnapshot {
+        runtimeDiagnostics.snapshot()
     }
 
     public func statusSnapshotModel() throws -> AppStatusSnapshot {
@@ -181,7 +202,9 @@ public final class ForgeApp: @unchecked Sendable {
 
     /// HTTP / CLI edge.
     public func statusSnapshot() throws -> [String: Any] {
-        try statusSnapshotModel().asDictionary()
+        var snapshot = try statusSnapshotModel().asDictionary()
+        snapshot["runtime_diagnostics"] = runtimeDiagnosticSnapshot().asDictionary()
+        return snapshot
     }
 
     public func doctorModel() throws -> DoctorReport {

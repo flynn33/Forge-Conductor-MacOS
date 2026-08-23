@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "phase": "P02-TELEMETRY-BASELINE",
+  "captured_at": "2026-08-23T19:05:04Z",
+  "app_pid": 32238,
+  "reproducer": {
+    "steps": [
+      "Build and stage the native app with ./script/build_and_run.sh --build-only.",
+      "Launch the staged Forge Conductor app and leave the Rig dashboard active.",
+      "Read http://127.0.0.1:7788/api/health after at least five minutes.",
+      "Inspect runtime_diagnostics counters and gauges."
+    ],
+    "command_evidence": ".forge-codex/evidence/EVID-20260823T190504Z-695abfb997.json"
+  },
+  "observed_baseline": {
+    "telemetry_presentation_enqueued": 15052,
+    "telemetry_queue_depth": 2,
+    "telemetry_queue_maximum": 25,
+    "gauge_command_queues_created": 229,
+    "gauge_pipelines_created": 229,
+    "gauge_buffers_created": 34316,
+    "gauge_draws": 52907,
+    "telemetry_history_size": 900,
+    "lifecycle_subscriptions_active": 1,
+    "lifecycle_tasks_active": 2
+  },
+  "mapped_findings": [
+    {
+      "id": "FC-MEM-001",
+      "source": "Sources/ForgeConductorApp/AppTelemetryBinding.swift",
+      "signal": "telemetry queue depth and maximum"
+    },
+    {
+      "id": "FC-PERF-001",
+      "source": "Sources/ForgeConductorApp/Metal/MetalGaugeKit.swift",
+      "signal": "gauge command queue, pipeline, and draw counters"
+    },
+    {
+      "id": "FC-PERF-002",
+      "source": "Sources/ForgeConductorApp/Metal/MultiSeriesLoadRenderer.swift",
+      "signal": "gauge buffer creation counter"
+    },
+    {
+      "id": "FC-PERF-003",
+      "source": "Sources/ForgeConductorApp/Views/Rig/RigDashboardView.swift",
+      "signal": "gauge draw counter and Time Profiler trace"
+    }
+  ],
+  "trace_evidence": [
+    {
+      "kind": "Time Profiler",
+      "path": "/Users/jimdaley/Documents/RavenForge/Forge-Conductor-MacOS/Forge-Conductor-Repair-Evidence/aba90ab1-be80-4cc5-aa0b-23dd54d4a24d/p02/P02-Time-Profiler-Attach.trace",
+      "command_evidence": ".forge-codex/evidence/EVID-20260823T190411Z-562194f9ac.json"
+    },
+    {
+      "kind": "sample",
+      "path": "/Users/jimdaley/Documents/RavenForge/Forge-Conductor-MacOS/Forge-Conductor-Repair-Evidence/aba90ab1-be80-4cc5-aa0b-23dd54d4a24d/p02/P02-Sample-Baseline.txt",
+      "command_evidence": ".forge-codex/evidence/EVID-20260823T190515Z-0fb7b97728.json"
+    },
+    {
+      "kind": "vmmap",
+      "path": ".forge-codex/evidence/EVID-20260823T190527Z-3d3279fc30.stdout.txt",
+      "command_evidence": ".forge-codex/evidence/EVID-20260823T190527Z-3d3279fc30.json"
+    }
+  ],
+  "host_limitations": [
+    "The Allocations template attaches but does not honor its time limit for this app on this host; bounded failed attempts are retained separately.",
+    "Time Profiler, sample, and vmmap completed successfully on the same host and process."
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "artifacts": [
+    {
+      "bytes": 252,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T191244Z-78ad0fb553.stdout.txt",
+      "sha256": "83c142db2aedc447b8fa62e64ce9416fa6ffbbc7f442d36f529fcb0e1d34b4dc"
+    },
+    {
+      "bytes": 100,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T191244Z-78ad0fb553.stderr.txt",
+      "sha256": "6ec7dab5a78a195b4a4c4cad92ad43d3ece6a303cebdcfdc3f9ca1bdd2fab8a6"
+    }
+  ],
+  "command": "./script/build_and_run.sh --verify",
+  "ended_at": "2026-08-23T19:12:45.597715+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T191244Z-78ad0fb553",
+  "kind": "p03-native-app-verify",
+  "related_findings": [
+    "FC-MEM-001"
+  ],
+  "related_gates": [
+    "G03"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T19:12:44.700496+00:00",
+  "timed_out": false
+}

@@ -1,0 +1,36 @@
+{
+  "artifacts": [
+    {
+      "bytes": 11713,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P09-external-mcp-compatibility.json",
+      "sha256": "2c3731350d23513991cfc0523d2c145ba00c60d9421ef84543c2f75112de5337"
+    },
+    {
+      "bytes": 11713,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T205325Z-8e4577190c.stdout.txt",
+      "sha256": "2c3731350d23513991cfc0523d2c145ba00c60d9421ef84543c2f75112de5337"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T205325Z-8e4577190c.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "command": "python3 .forge-codex/scripts/check_p08_continuity.py --binary .build/release/forge-conductor --output .forge-codex/evidence/P09-external-mcp-compatibility.json",
+  "ended_at": "2026-08-23T20:53:26.156890+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T205325Z-8e4577190c",
+  "kind": "p09-external-mcp-compatibility",
+  "related_findings": [],
+  "related_gates": [
+    "G09"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T20:53:25.610010+00:00",
+  "timed_out": false
+}
