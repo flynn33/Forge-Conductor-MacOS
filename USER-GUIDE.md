@@ -1,6 +1,6 @@
 # Forge Conductor user guide
 
-Version **0.8.0**. This guide is for operators who run Forge Conductor with [LM Studio](https://lmstudio.ai) on macOS.
+Version **0.9.0**. This guide is for operators who run Forge Conductor with [LM Studio](https://lmstudio.ai) on macOS.
 
 It describes behavior that is implemented and tested in this tree. Where something is *not* automated, that is stated plainly.
 
@@ -27,7 +27,7 @@ Forge does **not**:
 
 Forge **does**:
 
-- expose filesystem, shell, git, memory, agent, and continuity tools to the model
+- expose filesystem, git, memory, agent, continuity, and opt-in shell tools to the model
 - persist task state under `~/.forge-conductor`
 - checkpoint and hand off that state without waiting for the model to remember `session_*`
 - block further project tools on a chat that has already been handed off, until `context_get`
@@ -90,12 +90,17 @@ forge-conductor doctor
 
 `install-lmstudio-plugin` is the supported way to write `mcp.json` and both mcpBridge plugins. Do not hand-edit those files unless deploy failed and you are diagnosing.
 
-Confirm the registered command is a `serve`-capable 0.8.0 binary:
+Confirm the registered command is a `serve`-capable 0.9.0 binary:
 
 ```bash
-forge-conductor version    # should print 0.8.0
+forge-conductor version    # should print 0.9.0
 plutil -p ~/.lmstudio/mcp.json
 ```
+
+`shell_exec` is disabled by default. It can be enabled only through trusted local
+configuration in `~/.forge-conductor/config.json` by setting `shell.enabled` to
+`true`; model arguments and dashboard settings cannot enable it. Even when
+enabled, commands require an authorized workspace and have a 120-second maximum.
 
 ---
 
@@ -109,7 +114,7 @@ plutil -p ~/.lmstudio/mcp.json
    - `forge_status`
    - `context_get`
    - `memory_search` / `memory_list` as needed
-6. Work. Prefer `agent_run_start` with an explicit `cwd` for write/shell work. Read-only listing of folders under your home is allowed without a session (not `Library`, `.ssh`, and similar).
+6. Work. Prefer `agent_run_start` with an explicit `cwd` for write work and any locally enabled shell work. Read-only listing of folders under your home is allowed without a session (not `Library`, `.ssh`, and similar).
 7. When Forge hands off, **start a new chat** and call `context_get`. Read `~/.forge-conductor/memory/NEXT-CHAT.md` if the model is confused.
 
 LM Studio only starts the `serve` processes when a chat has those MCP servers selected. Idle “MCP not running” on the dashboard with no chat open is expected.
@@ -174,6 +179,23 @@ Key/value notes in SQLite. They survive chats, model unloads, and MCP restarts.
 
 Suggested keys: `project/<slug>/overview`, `project/<slug>/paths`, `project/<slug>/decisions`, `user/preferences`. Internal keys (`agent_run/*`, `continuity/*`) are hidden from list/search unless `include_system` is true.
 
+### 7.1 Project-scoped memory
+
+Version 0.9.0 adds independent project stores for larger, structured working sets.
+Call `project_memory.initialize` with an authorized project path, then use the
+returned project id with the remaining tools.
+
+| Tool group | Purpose |
+|------------|---------|
+| `project_memory.remember` / `remember_batch` | Store one record or a bounded transactional batch |
+| `project_memory.search` / `get` / `list_recent` | Retrieve bounded, paginated results |
+| `project_memory.update` / `forget` / `link` | Version, tombstone, and relate records |
+| `project_memory.export` / `import` | Move checksummed project artifacts with preview support |
+| `project_memory.status` | Report store health, capabilities, sizes, and limits |
+
+Project memory is additive. The original `memory_*` notes remain available for
+small global or continuity-oriented keys.
+
 ---
 
 ## 8. Agents
@@ -217,6 +239,7 @@ Host metrics run at ~30 Hz in the native UI. That is intentional and uses CPU ev
 |------|---------|------------|
 | `context_budget_exceeded` | This chat was handed off. Project tools are blocked on this client. | New chat + `context_get` |
 | `identical_call_loop` | Same tool + same args 9 times. | Change arguments, or new chat + `context_get` |
+| `shell_disabled` | General shell execution is off in trusted local configuration. | Leave it disabled, or enable `shell.enabled` locally if the deployment requires it |
 | `active_session_required` | `shell_exec` / some git tools need a workspace (agent `cwd` or adopted packet `cwd`). | `agent_run_start` with `cwd`, or `context_get` if a packet has one |
 | `path_outside_allowed_roots` | Path is outside Forge home, configured roots, agent/packet cwd, and (for writes) not a permitted home read. | Use a path inside the workspace; do not write outside it |
 | `tool_forbidden` / `tool_not_granted` | Current agent playbook does not allow that tool. | Different agent, or complete the session |
@@ -228,7 +251,7 @@ Host metrics run at ~30 Hz in the native UI. That is intentional and uses CPU ev
 
 ## 11. Two MCP servers
 
-You will see **forge-conductor** (primary) and **forge-conductor-fallback**. They expose the same 34 tools. Both should stay registered.
+You will see **forge-conductor** (primary) and **forge-conductor-fallback**. They expose the same versioned tool surface. Both should stay registered.
 
 LM Studio may send all `tools/call` traffic to one of them (often fallback). That is a host routing choice. As long as one role is serving, work proceeds. Do not delete fallback because primary looks idle.
 
