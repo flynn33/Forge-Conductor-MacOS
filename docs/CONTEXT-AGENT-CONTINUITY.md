@@ -1,4 +1,4 @@
-# Context & Agent Continuity (v0.8.0)
+# Context & Agent Continuity (v0.9.0)
 
 ## Summary
 
@@ -49,7 +49,7 @@ them from SQLite after an interrupted or older-version write.
 
 1. **Model** — calls checkpoint/handoff tools
 2. **Budget** — ToolRouter tracks canonical consecutive tool fingerprints. The fourth identical call writes a soft handoff signal; the ninth is blocked with `identical_call_loop`. Continuity calls do not count toward the loop.
-3. **Runtime (0.8.0)** — `ContinuityAutomation` counts progress tools (`fs_*`, `shell_exec`, git, memory_set, agent_run_*). Every 5 progress tools (or 3 minutes) Forge writes a checkpoint. Every 20 progress tools (or 12 minutes) it writes a resume-ready handoff, writes `memory/NEXT-CHAT.md`, and **blocks** further filesystem/shell/git tools on that MCP client until `context_get`. LM Studio has no API to open a GUI chat; the hard block is the enforcement. `lms chat` is a separate CLI session, not the GUI.
+3. **Runtime (0.9.0)** — `ContinuityAutomation` counts progress tools (`fs_*`, enabled `shell_exec`, git, memory_set, agent_run_*). Every 5 progress tools (or 3 minutes) Forge writes a checkpoint. Every 20 progress tools (or 12 minutes) it writes a resume-ready handoff, writes `memory/NEXT-CHAT.md`, and **blocks** further filesystem/shell/git tools on that MCP client until `context_get`. LM Studio has no API to open a GUI chat; the hard block is the enforcement. `lms chat` is a separate CLI session, not the GUI.
 
 ## Phase 2
 

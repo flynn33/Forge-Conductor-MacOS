@@ -6,6 +6,54 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 for marketing versions (`MAJOR.MINOR.PATCH`).
 
+## [0.9.0] — 2026-08-23
+
+### Added
+
+- **Project-scoped memory MCP tools** — initialize, remember, batch, search, get,
+  update, forget, recent-list, link, export, import, and status operations backed
+  by independently managed SQLite stores.
+- Checksummed project-memory import/export, deterministic bounded pagination,
+  optimistic record versions, tombstones, typed links, and repository identity.
+- A serialized continuity coordinator with durable checkpoints, handoffs, session
+  lifecycle transitions, and a native session-host adapter plug-in.
+- Resource-policy tiers, runtime diagnostics, signposts, release stress coverage,
+  bounded latest-value telemetry mailboxes, and shared Metal gauge resources.
+- Recovery, migration, architecture, security, and qualification evidence for the
+  complete runtime repair program.
+
+### Changed
+
+- Marketing version **0.8.0 → 0.9.0** across the Swift runtime, Xcode targets,
+  acceptance tests, README, user guide, and current architecture/status documents.
+- Workspace and session paths may narrow authorization but can no longer create
+  new trusted authorization roots.
+- `shell_exec` is disabled by default, requires trusted local configuration when
+  enabled, rejects invalid timeouts, and enforces a 120-second maximum.
+- Filesystem listing is capped at 1,000 sorted entries with truncation metadata;
+  text edits retain the existing 2 MiB file ceiling.
+- Telemetry, process readers, dashboard connections, persistence, UI observation,
+  and Metal resources now have explicit bounded ownership and shutdown behavior.
+
+### Fixed
+
+- Continuity rollover and restart races that could lose or duplicate transitions.
+- Telemetry and gauge update paths that could retain work or perform excess
+  observation/render activity.
+- Persistence migration and project-memory recovery behavior under interruption,
+  concurrency, corrupt input, and import/export round trips.
+- Primary/fallback MCP process lifecycle and native host-adapter parity.
+
+### Qualification
+
+- Swift package, strict-concurrency, and Xcode unit/integration matrices each
+  passed 269 tests with two intentional environment skips and no failures.
+- Five native UI tests passed, including 100 navigation cycles; unsigned and
+  local ad-hoc Xcode Release builds also passed.
+- Address and Thread Sanitizer hosts built, but the installed platform runtime
+  blocked entry into product tests, so no sanitizer pass is claimed.
+- Developer ID signing, notarization, and distribution remain operator-owned.
+
 ## [0.8.0] — 2026-08-14
 
 ### Added
@@ -118,6 +166,8 @@ for marketing versions (`MAJOR.MINOR.PATCH`).
 See [`docs/AUDIT-2026-07-27.md`](docs/AUDIT-2026-07-27.md) and related audits for
 0.5.x verification evidence.
 
-[0.7.0]: https://github.com/flynn33/Forge-Conductor-MacOS/compare/6fe03e0...main
+[0.9.0]: https://github.com/flynn33/Forge-Conductor-MacOS/compare/f47dae3...main
+[0.8.0]: https://github.com/flynn33/Forge-Conductor-MacOS/commit/f47dae3354101bde0a7f0365e2ba058b18cc2c78
+[0.7.0]: https://github.com/flynn33/Forge-Conductor-MacOS/compare/6fe03e0...f47dae3
 [0.6.0]: https://github.com/flynn33/Forge-Conductor-MacOS/commit/6fe03e0626273ced4211ed4e1bbef8c70cfb36b8
 [0.5.3]: https://github.com/flynn33/Forge-Conductor-MacOS/commit/90fc5757dbf7acf629e16184c5347760dbff4a47

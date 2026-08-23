@@ -6,7 +6,7 @@ This project is **not** Claude Code orchestration, CCDT, or `~/.claude/local-mcp
 
 | | |
 |---|---|
-| **Version** | **0.8.0** |
+| **Version** | **0.9.0** |
 | **User guide** | [USER-GUIDE.md](USER-GUIDE.md) |
 | **Changelog** | [CHANGELOG.md](CHANGELOG.md) |
 | **License** | [Apache License 2.0](LICENSE) |
@@ -93,24 +93,21 @@ Context and agent handoffs: SQLite `context_handoffs` with rebuildable JSON/Mark
 
 More detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and the [project wiki](https://github.com/flynn33/Forge-Conductor-MacOS/wiki).
 
-## What's new in 0.7.0
+## What's new in 0.9.0
 
-Minor release: **context and agent continuity** over the existing LM Studio stdio
-MCP connection. Forge can checkpoint work, prepare a new-chat handoff, restore the
-latest packet, and reattach durable agent sessions without a new sidecar or HTTP
-dependency.
+This minor release adds durable, project-scoped memory and completes the runtime
+reliability work around continuity, resource ownership, telemetry, and local tool
+authorization.
 
-| Tool | Purpose |
-|------|---------|
-| `session_checkpoint` | Soft-save task context while work continues |
-| `session_handoff` | Finalize a resume-ready packet for a new chat |
-| `context_get` | Load the latest or a selected handoff packet |
-| `context_list` | List recent handoff packets |
+| Area | What changed |
+|------|--------------|
+| **Project memory** | Twelve `project_memory.*` tools provide bounded search, optimistic updates, links, batch writes, health, and checksummed import/export. |
+| **Continuity** | A serialized coordinator and native session-host adapter preserve handoff state across process and chat boundaries. |
+| **Runtime** | Resource policy, lifecycle ownership, diagnostics, bounded latest-value telemetry, and shared Metal resources reduce unbounded work and retained state. |
+| **Security** | Workspace authority is derived from trusted roots; `shell_exec` is disabled by default and capped at 120 seconds when explicitly enabled. |
 
-The durable `memory_*` tools introduced in 0.6 remain available. Continuity adds
-authoritative SQLite packets, rebuildable file projections, agent reattachment,
-and a repeated-call budget that soft-handoffs on call 4 and blocks call 9.
-Full release notes: **[CHANGELOG.md](CHANGELOG.md)**.
+Legacy `memory_*` and `session_*`/`context_*` tools remain compatible. Full release
+notes and qualification boundaries are in **[CHANGELOG.md](CHANGELOG.md)**.
 
 ## Design principles
 
@@ -120,9 +117,9 @@ Full release notes: **[CHANGELOG.md](CHANGELOG.md)**.
 4. Durable sessions, memory notes, and context/agent handoffs in SQLite for local-model agent runs.
 5. SwiftPM acceptance tests and native GUI compilation gate release builds; Xcode remains the distribution/signing project.
 
-Current 0.7 build and test evidence is recorded in
-[`docs/AUDIT-2026-08-01.md`](docs/AUDIT-2026-08-01.md). Earlier audit records remain
-available under `docs/`.
+Current 0.9.0 qualification evidence is recorded in
+[`.forge-codex/evidence/P12-final-validation-report.md`](.forge-codex/evidence/P12-final-validation-report.md).
+Earlier audit records remain available under `docs/`.
 
 ## CLI
 
@@ -135,13 +132,15 @@ forge-conductor agents
 forge-conductor serve                 # MCP stdio (LM Studio client)
 forge-conductor manager run [--open]
 forge-conductor manager start|stop|restart|status
-forge-conductor version               # prints 0.7.0 (and related build info)
+forge-conductor version               # prints 0.9.0 (and related build info)
 ```
 
 ## Changelog
 
 See **[CHANGELOG.md](CHANGELOG.md)** for the full version history.
 
+- **0.9.0** — Project memory, coordinated continuity, runtime ownership, and security hardening
+- **0.8.0** — Automatic continuity budgets, workspace resume, and MCP presence
 - **0.7.0** — Context and agent continuity (`session_*`, `context_*`), resume-ready handoffs
 - **0.6.0** — Durable memory MCP tools (`memory_*`)
 - **0.5.x** — LM Studio deploy path, agents, tool packs, rig / manager

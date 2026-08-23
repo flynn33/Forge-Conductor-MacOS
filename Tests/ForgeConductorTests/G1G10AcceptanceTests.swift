@@ -266,9 +266,33 @@ final class G1G10AcceptanceTests: XCTestCase {
 
     // MARK: G3/G4/G9/G10 meta
 
-    func testG3_VersionIsDefined() {
-        XCTAssertFalse(ForgeApp.version.isEmpty)
-        XCTAssertEqual(ForgeApp.version, "0.8.0")
+    func testG3_VersionAndReleaseDocumentsAreAligned() throws {
+        let version = ForgeApp.version
+        XCTAssertEqual(version, "0.9.0")
+
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let expectedReferences = [
+            ("README.md", "**Version** | **\(version)**"),
+            ("CHANGELOG.md", "## [\(version)]"),
+            ("USER-GUIDE.md", "Version **\(version)**"),
+            ("docs/ARCHITECTURE.md", "Version: `\(version)`"),
+            ("docs/TELEMETRY.md", "`\(version)`"),
+            ("docs/CONTEXT-AGENT-CONTINUITY.md", "(v\(version))"),
+            ("docs/G1-G10-STATUS.md", "(\(version))"),
+        ]
+        for (path, marker) in expectedReferences {
+            let contents = try String(contentsOf: repository.appendingPathComponent(path), encoding: .utf8)
+            XCTAssertTrue(contents.contains(marker), "\(path) is not aligned with \(version)")
+        }
+
+        let project = try String(
+            contentsOf: repository.appendingPathComponent("ForgeConductor.xcodeproj/project.pbxproj"),
+            encoding: .utf8
+        )
+        XCTAssertEqual(project.components(separatedBy: "MARKETING_VERSION = \(version);").count - 1, 6)
     }
 
     func testG9_ResolvePrefersExplicitBinary() {

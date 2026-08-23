@@ -26,12 +26,12 @@ The Xcode project mirrors these boundaries. SwiftPM provides a second reproducib
 
 ```text
 Domain/          Typed models, connector roles/health, protocols, JSON support
-Application/     Composition root, agent/session services, authorization, tool packs
-Infrastructure/ Paths, configuration, SQLite, audit, diagnostics, process execution
+Application/     Composition root, agent/session/continuity/project-memory services, authorization, tool packs
+Infrastructure/ Paths, configuration, SQLite stores, resource policy, audit, diagnostics, process execution
 MCP/             Bounded JSON-RPC stdio server and independent serve verifier
 Manager/         Persistent local service lifecycle and normalized settings
 Dashboard/       Loopback HTTP telemetry/control surface and request policy
-Telemetry/       Native collectors, LM Studio discovery, transactional deployment
+Telemetry/       Native collectors, bounded latest-value delivery, LM Studio discovery, transactional deployment
 ```
 
 ## Composition root
@@ -42,7 +42,9 @@ ForgeApp.bootstrap(home:)
   -> SQLiteStore migration
   -> AuditService + DiagnosticLog
   -> AgentCatalog + AgentSessionService
-  -> ContextContinuityService
+  -> ContextContinuityService + ContinuityCoordinator
+  -> ProjectMemoryService + HostAdapterRegistry
+  -> ResourcePolicy + RuntimeDiagnostics
   -> LM Studio installer/verifier/deploy services
   -> ToolAuthorizationService -> ToolRouter -> modular tool packs
   -> TelemetryService
@@ -83,8 +85,13 @@ resolve executable
 - Filesystem paths are canonicalized to prevent traversal and symlink escapes.
 - HTTP bodies, MCP frames, file reads, subprocess capture, and returned shell output are bounded.
 - Audit records redact commands and file contents.
+- Session and handoff paths may narrow existing authority but cannot create new
+  trusted authorization roots.
 
-`shell_exec` is intentionally a powerful local-model capability. It requires an active agent workspace, but it is not an operating-system sandbox; deployments should grant it only to trusted local agents.
+`shell_exec` is intentionally a powerful local-model capability. It is disabled
+by default, can be enabled only by trusted local configuration, requires an
+authorized workspace, and has a 120-second maximum. It is not an operating-system
+sandbox; deployments should enable it only for trusted local agents.
 
 ## Persistence
 
@@ -106,4 +113,4 @@ resolve executable
 swift test                           # full Core/CLI acceptance suite
 ```
 
-Version: `0.7.0`
+Version: `0.9.0`
