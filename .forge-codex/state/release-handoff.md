@@ -17,7 +17,8 @@ The autonomous repair phases P00-P12 are implemented locally on `repair/forge-co
 
 - Address and Thread Sanitizer test hosts built but were blocked before product test entry by the installed Xcode 26.2/macOS sanitizer runtime behavior. No sanitizer test pass is claimed.
 - The 8 GiB resource policy was exercised on a 48 GiB host; this is constrained-policy evidence, not physical 8 GiB hardware evidence.
-- Developer ID signing, notarization, distribution, pushing, and pull-request creation were not performed.
+- Developer ID signing, notarization, and distribution were not performed.
+- The repair branch was pushed to GitHub and opened as pull request #6 against `main`.
 - No Simulator was started. Every launched app, UI runner, profiler, and test host was terminated and checked after use.
 
 ## Evidence and recovery
