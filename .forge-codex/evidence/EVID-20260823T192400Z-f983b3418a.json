@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 1579,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T192400Z-f983b3418a.stdout.txt",
+      "sha256": "5bb9d2613ef139b6106c4628b6855f4092c6f5b29c5a11648098b4f7f646736b"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T192400Z-f983b3418a.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "command": "curl --fail --silent --show-error http://127.0.0.1:7788/api/health",
+  "ended_at": "2026-08-23T19:24:00.874477+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T192400Z-f983b3418a",
+  "kind": "p04-quiescence-after",
+  "related_findings": [],
+  "related_gates": [
+    "G04"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T19:24:00.864136+00:00",
+  "timed_out": false
+}

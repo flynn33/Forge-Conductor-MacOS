@@ -1,0 +1,562 @@
+Test Suite 'All tests' started at 2026-08-23 14:13:42.911.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-23 14:13:42.912.
+Test Suite 'AppConfigAndDoctorTests' started at 2026-08-23 14:13:42.912.
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testAppConfigApplySettingsPatch]' started.
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testAppConfigApplySettingsPatch]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testAppConfigRoundTripDictionary]' started.
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testAppConfigRoundTripDictionary]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testConfigStoreTypedModel]' started.
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testConfigStoreTypedModel]' passed (0.004 seconds).
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testCPUFrequencyEstimatorClusterEffective]' started.
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testCPUFrequencyEstimatorClusterEffective]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testCPUFrequencyNonNilOnThisMac]' started.
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testCPUFrequencyNonNilOnThisMac]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testDoctorModelTyped]' started.
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testDoctorModelTyped]' passed (0.274 seconds).
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testManagerRuntimeIsolation]' started.
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testManagerRuntimeIsolation]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testStatusSnapshotModel]' started.
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testStatusSnapshotModel]' passed (0.065 seconds).
+Test Suite 'AppConfigAndDoctorTests' passed at 2026-08-23 14:13:43.257.
+	 Executed 8 tests, with 0 failures (0 unexpected) in 0.344 (0.345) seconds
+Test Suite 'AuditOutcomeTelemetryTests' started at 2026-08-23 14:13:43.257.
+Test Case '-[ForgeConductorTests.AuditOutcomeTelemetryTests testAuditOutcomeClassificationIsExactAndNonConflating]' started.
+Test Case '-[ForgeConductorTests.AuditOutcomeTelemetryTests testAuditOutcomeClassificationIsExactAndNonConflating]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.AuditOutcomeTelemetryTests testGlobalUsageSummaryCountsOnlyErrorAsOperationalFailure]' started.
+Test Case '-[ForgeConductorTests.AuditOutcomeTelemetryTests testGlobalUsageSummaryCountsOnlyErrorAsOperationalFailure]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.AuditOutcomeTelemetryTests testOperationalErrorRateUsesAllEventsAsDenominator]' started.
+Test Case '-[ForgeConductorTests.AuditOutcomeTelemetryTests testOperationalErrorRateUsesAllEventsAsDenominator]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.AuditOutcomeTelemetryTests testUsageAndToolCardSerializationExposeOutcomeCounts]' started.
+Test Case '-[ForgeConductorTests.AuditOutcomeTelemetryTests testUsageAndToolCardSerializationExposeOutcomeCounts]' passed (0.000 seconds).
+Test Suite 'AuditOutcomeTelemetryTests' passed at 2026-08-23 14:13:43.258.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+Test Suite 'ContinuityTests' started at 2026-08-23 14:13:43.258.
+Test Case '-[ForgeConductorTests.ContinuityTests testAuthorizationDeniedHardBudgetFailsClosedWhenPersistenceFails]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testAuthorizationDeniedHardBudgetFailsClosedWhenPersistenceFails]' passed (0.076 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testAuthorizationDeniedLoopSignalsExactlyAtSoftAndHardThresholds]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testAuthorizationDeniedLoopSignalsExactlyAtSoftAndHardThresholds]' passed (0.080 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testAutoCheckpointDoesNotStealModelPacketIdentity]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testAutoCheckpointDoesNotStealModelPacketIdentity]' passed (0.129 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testBudgetFingerprintDistinguishesFractionalArguments]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testBudgetFingerprintDistinguishesFractionalArguments]' passed (0.077 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testBudgetHandoffPreservesCallingClientsCheckpointState]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testBudgetHandoffPreservesCallingClientsCheckpointState]' passed (0.077 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testBudgetHandoffPreservesExplicitAndLegacyCustomResumeSeeds]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testBudgetHandoffPreservesExplicitAndLegacyCustomResumeSeeds]' passed (0.070 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testBudgetHandoffReusesRichResumeReadyPacket]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testBudgetHandoffReusesRichResumeReadyPacket]' passed (0.069 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testBudgetLoopEventuallyRequiresHandoff]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testBudgetLoopEventuallyRequiresHandoff]' passed (0.077 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testBudgetLoopSignalsExactlyAtSoftAndHardThresholds]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testBudgetLoopSignalsExactlyAtSoftAndHardThresholds]' passed (0.076 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testCheckpointAndContextGetRoundTrip]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testCheckpointAndContextGetRoundTrip]' passed (0.069 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testCheckpointUpdatePreservesExplicitResumeSeed]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testCheckpointUpdatePreservesExplicitResumeSeed]' passed (0.066 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testCheckpointUpdateRegeneratesDefaultResumeSeed]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testCheckpointUpdateRegeneratesDefaultResumeSeed]' passed (0.069 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testConcurrentAgentReattachUsesAtomicOwnershipCompareAndSwap]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testConcurrentAgentReattachUsesAtomicOwnershipCompareAndSwap]' passed (0.129 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testConcurrentPrimaryAndFallbackWritesKeepProjectionsConsistent]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testConcurrentPrimaryAndFallbackWritesKeepProjectionsConsistent]' passed (0.147 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testConcurrentUpdatesToSamePacketPreserveDisjointFields]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testConcurrentUpdatesToSamePacketPreserveDisjointFields]' passed (0.129 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testConcurrentVersionThreeMigrationIsIdempotent]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testConcurrentVersionThreeMigrationIsIdempotent]' passed (0.009 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testContextGetAdoptsWorkspaceForShellWithoutNewAgent]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testContextGetAdoptsWorkspaceForShellWithoutNewAgent]' passed (0.074 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testContextListAndGetById]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testContextListAndGetById]' passed (0.070 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testContinuityArgumentLimitsCannotOverflowAndSensitiveStateIsRedacted]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testContinuityArgumentLimitsCannotOverflowAndSensitiveStateIsRedacted]' passed (0.069 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testContinuitySurvivesAppRestartWithDurableProjections]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testContinuitySurvivesAppRestartWithDurableProjections]' passed (0.137 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testContinuityToolsListed]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testContinuityToolsListed]' passed (0.068 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testDispatchFailuresRetainTheirErrorsAtSoftThreshold]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testDispatchFailuresRetainTheirErrorsAtSoftThreshold]' passed (0.076 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testHandoffFinalizesCallingClientsOpenCheckpoint]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testHandoffFinalizesCallingClientsOpenCheckpoint]' passed (0.069 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testHandoffMarksResumeReadyAndSnapshotsAgents]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testHandoffMarksResumeReadyAndSnapshotsAgents]' passed (0.073 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testHandoffSnapshotsOnlyCallingClientsOpenAgents]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testHandoffSnapshotsOnlyCallingClientsOpenAgents]' passed (0.074 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testHardBudgetBlocksWhenContinuityPersistenceFails]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testHardBudgetBlocksWhenContinuityPersistenceFails]' passed (0.072 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testLatestHandoffUsesWriteOrderWhenTimestampsTie]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testLatestHandoffUsesWriteOrderWhenTimestampsTie]' passed (0.077 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testMemoryLayoutCreatedOnBootstrap]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testMemoryLayoutCreatedOnBootstrap]' passed (0.064 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testMissingExplicitContextIDIsDistinguishedFromEmptyStore]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testMissingExplicitContextIDIsDistinguishedFromEmptyStore]' passed (0.067 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testNarrativeOnlyCheckpointReplacesCurrentTaskProjection]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testNarrativeOnlyCheckpointReplacesCurrentTaskProjection]' passed (0.066 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testNewChatRecoversGoalAndAgentThenReattachesOverMCP]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testNewChatRecoversGoalAndAgentThenReattachesOverMCP]' passed (0.136 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testNewClientCheckpointPreservesAgentsUntilTheyReattach]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testNewClientCheckpointPreservesAgentsUntilTheyReattach]' passed (0.076 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testNewClientStatusReattachesOpenAgentSession]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testNewClientStatusReattachesOpenAgentSession]' passed (0.133 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testPacketDecoderEnforcesJSONScalarAndContainerTypes]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testPacketDecoderEnforcesJSONScalarAndContainerTypes]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testPacketDecoderRejectsUnsupportedOrCorruptIdentityMetadata]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testPacketDecoderRejectsUnsupportedOrCorruptIdentityMetadata]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testPointerWriteFailureRollsBackHandoffRow]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testPointerWriteFailureRollsBackHandoffRow]' passed (0.065 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testPrimaryAndFallbackMCPProcessesShareContinuitySafely]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testPrimaryAndFallbackMCPProcessesShareContinuitySafely]' passed (0.315 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testProjectionFailureKeepsAuthoritativeWriteAndRepairsOnRestart]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testProjectionFailureKeepsAuthoritativeWriteAndRepairsOnRestart]' passed (0.136 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testReadOnlyHomePathIsAllowedWithoutAgentSession]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/ContinuityTests.swift:1719: -[ForgeConductorTests.ContinuityTests testReadOnlyHomePathIsAllowedWithoutAgentSession] : Test skipped - LM Studio Projects folder not present on this Mac
+Test Case '-[ForgeConductorTests.ContinuityTests testReadOnlyHomePathIsAllowedWithoutAgentSession]' skipped (0.068 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testRuntimeAutoCheckpointPersistsWithoutModelCall]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testRuntimeAutoCheckpointPersistsWithoutModelCall]' passed (0.118 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testRuntimeHandoffBlocksProjectToolsUntilContextGet]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testRuntimeHandoffBlocksProjectToolsUntilContextGet]' passed (0.314 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testStartupRepairsEveryMissingPacketProjection]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testStartupRepairsEveryMissingPacketProjection]' passed (0.130 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testUnknownExplicitHandoffIDFailsWithoutMutation]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testUnknownExplicitHandoffIDFailsWithoutMutation]' passed (0.070 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testVersionThreeStoreMigratesWithoutLosingHandoff]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testVersionThreeStoreMigratesWithoutLosingHandoff]' passed (0.068 seconds).
+Test Suite 'ContinuityTests' passed at 2026-08-23 14:13:47.294.
+	 Executed 44 tests, with 1 test skipped and 0 failures (0 unexpected) in 4.033 (4.037) seconds
+Test Suite 'CoreTests' started at 2026-08-23 14:13:47.294.
+Test Case '-[ForgeConductorTests.CoreTests testActiveAgentForbiddenToolsAreEnforcedAtRouter]' started.
+Test Case '-[ForgeConductorTests.CoreTests testActiveAgentForbiddenToolsAreEnforcedAtRouter]' passed (0.067 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testAgentListTool]' started.
+Test Case '-[ForgeConductorTests.CoreTests testAgentListTool]' passed (0.064 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testAgentMarkdownParser]' started.
+Test Case '-[ForgeConductorTests.CoreTests testAgentMarkdownParser]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testAgentPlaybooksAreRobust]' started.
+Test Case '-[ForgeConductorTests.CoreTests testAgentPlaybooksAreRobust]' passed (0.064 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testAuditDualWrite]' started.
+Test Case '-[ForgeConductorTests.CoreTests testAuditDualWrite]' passed (0.066 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testBindingRehydrateFromMemory]' started.
+Test Case '-[ForgeConductorTests.CoreTests testBindingRehydrateFromMemory]' passed (0.124 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testBootstrapCreatesLayout]' started.
+Test Case '-[ForgeConductorTests.CoreTests testBootstrapCreatesLayout]' passed (0.065 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testCatalogHasBuiltins]' started.
+Test Case '-[ForgeConductorTests.CoreTests testCatalogHasBuiltins]' passed (0.064 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testConfiguredWorkspaceRootAllowsFilesystemTool]' started.
+Test Case '-[ForgeConductorTests.CoreTests testConfiguredWorkspaceRootAllowsFilesystemTool]' passed (0.067 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testCustomAgentOverridesBuiltin]' started.
+Test Case '-[ForgeConductorTests.CoreTests testCustomAgentOverridesBuiltin]' passed (0.064 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testDoctorPasses]' started.
+Test Case '-[ForgeConductorTests.CoreTests testDoctorPasses]' passed (0.169 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testFilesystemToolRejectsPathOutsideWorkspaceRoots]' started.
+Test Case '-[ForgeConductorTests.CoreTests testFilesystemToolRejectsPathOutsideWorkspaceRoots]' passed (0.069 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testFilesystemToolRejectsSymlinkEscape]' started.
+Test Case '-[ForgeConductorTests.CoreTests testFilesystemToolRejectsSymlinkEscape]' passed (0.069 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testForgeStatusTool]' started.
+Test Case '-[ForgeConductorTests.CoreTests testForgeStatusTool]' passed (0.067 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testFSReadHandlesEmptyFileAndMaximumLength]' started.
+Test Case '-[ForgeConductorTests.CoreTests testFSReadHandlesEmptyFileAndMaximumLength]' passed (0.070 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testFSReadHonorsLineOffsetAndLength]' started.
+Test Case '-[ForgeConductorTests.CoreTests testFSReadHonorsLineOffsetAndLength]' passed (0.066 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testFSWriteRead]' started.
+Test Case '-[ForgeConductorTests.CoreTests testFSWriteRead]' passed (0.067 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testIdenticalToolCallLoopSoftHandoffThenHardBlock]' started.
+Test Case '-[ForgeConductorTests.CoreTests testIdenticalToolCallLoopSoftHandoffThenHardBlock]' passed (0.078 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testISO8601RoundTrip]' started.
+Test Case '-[ForgeConductorTests.CoreTests testISO8601RoundTrip]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testMCPInitializeAndToolsList]' started.
+Test Case '-[ForgeConductorTests.CoreTests testMCPInitializeAndToolsList]' passed (0.067 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testMCPToolCall]' started.
+Test Case '-[ForgeConductorTests.CoreTests testMCPToolCall]' passed (0.066 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testPDFWrite]' started.
+Test Case '-[ForgeConductorTests.CoreTests testPDFWrite]' passed (0.066 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testPruneStaleClosesIdle]' started.
+Test Case '-[ForgeConductorTests.CoreTests testPruneStaleClosesIdle]' passed (0.067 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testRecommendDocs]' started.
+Test Case '-[ForgeConductorTests.CoreTests testRecommendDocs]' passed (0.063 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testSessionIncompleteSchemaWarns]' started.
+Test Case '-[ForgeConductorTests.CoreTests testSessionIncompleteSchemaWarns]' passed (0.067 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testSessionLifecycleComplete]' started.
+Test Case '-[ForgeConductorTests.CoreTests testSessionLifecycleComplete]' passed (0.068 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testShellRequiresExplicitAgentWorkspace]' started.
+Test Case '-[ForgeConductorTests.CoreTests testShellRequiresExplicitAgentWorkspace]' passed (0.065 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testSupersedeClosesPriorOpen]' started.
+Test Case '-[ForgeConductorTests.CoreTests testSupersedeClosesPriorOpen]' passed (0.069 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testToolAuditRedactsFileContents]' started.
+Test Case '-[ForgeConductorTests.CoreTests testToolAuditRedactsFileContents]' passed (0.067 seconds).
+Test Suite 'CoreTests' passed at 2026-08-23 14:13:49.264.
+	 Executed 29 tests, with 0 failures (0 unexpected) in 1.968 (1.970) seconds
+Test Suite 'DashboardSecurityTests' started at 2026-08-23 14:13:49.265.
+Test Case '-[ForgeConductorTests.DashboardSecurityTests testDashboardCannotInvokePrivilegedTools]' started.
+Test Case '-[ForgeConductorTests.DashboardSecurityTests testDashboardCannotInvokePrivilegedTools]' passed (0.258 seconds).
+Test Case '-[ForgeConductorTests.DashboardSecurityTests testDashboardRejectsCrossOriginStateChange]' started.
+Test Case '-[ForgeConductorTests.DashboardSecurityTests testDashboardRejectsCrossOriginStateChange]' passed (0.247 seconds).
+Test Case '-[ForgeConductorTests.DashboardSecurityTests testParserRejectsMalformedAndOversizedLengths]' started.
+Test Case '-[ForgeConductorTests.DashboardSecurityTests testParserRejectsMalformedAndOversizedLengths]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.DashboardSecurityTests testPolicyRejectsCrossOriginAndNonJSONMutations]' started.
+Test Case '-[ForgeConductorTests.DashboardSecurityTests testPolicyRejectsCrossOriginAndNonJSONMutations]' passed (0.000 seconds).
+Test Suite 'DashboardSecurityTests' passed at 2026-08-23 14:13:49.770.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.505 (0.506) seconds
+Test Suite 'DashboardTests' started at 2026-08-23 14:13:49.770.
+Test Case '-[ForgeConductorTests.DashboardTests testControlSurfaceHasManagerControls]' started.
+Test Case '-[ForgeConductorTests.DashboardTests testControlSurfaceHasManagerControls]' passed (0.300 seconds).
+Test Case '-[ForgeConductorTests.DashboardTests testDashboardIndexHTML]' started.
+Test Case '-[ForgeConductorTests.DashboardTests testDashboardIndexHTML]' passed (0.292 seconds).
+Test Case '-[ForgeConductorTests.DashboardTests testDashboardStartsAndServesStatus]' started.
+Test Case '-[ForgeConductorTests.DashboardTests testDashboardStartsAndServesStatus]' passed (0.298 seconds).
+Test Suite 'DashboardTests' passed at 2026-08-23 14:13:50.661.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.890 (0.891) seconds
+Test Suite 'ForgeProcessEntryTests' started at 2026-08-23 14:13:50.661.
+Test Case '-[ForgeConductorTests.ForgeProcessEntryTests testHomeOverride]' started.
+Test Case '-[ForgeConductorTests.ForgeProcessEntryTests testHomeOverride]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeProcessEntryTests testParseModeGUIWhenNoArgs]' started.
+Test Case '-[ForgeConductorTests.ForgeProcessEntryTests testParseModeGUIWhenNoArgs]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeProcessEntryTests testParseModeManagerRun]' started.
+Test Case '-[ForgeConductorTests.ForgeProcessEntryTests testParseModeManagerRun]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeProcessEntryTests testParseModeServe]' started.
+Test Case '-[ForgeConductorTests.ForgeProcessEntryTests testParseModeServe]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeProcessEntryTests testResolveBinaryPrefersExplicitPreferred]' started.
+Test Case '-[ForgeConductorTests.ForgeProcessEntryTests testResolveBinaryPrefersExplicitPreferred]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeProcessEntryTests testServeArgumentsConstant]' started.
+Test Case '-[ForgeConductorTests.ForgeProcessEntryTests testServeArgumentsConstant]' passed (0.000 seconds).
+Test Suite 'ForgeProcessEntryTests' passed at 2026-08-23 14:13:50.662.
+	 Executed 6 tests, with 0 failures (0 unexpected) in 0.001 (0.001) seconds
+Test Suite 'G1G10AcceptanceTests' started at 2026-08-23 14:13:50.662.
+Test Case '-[ForgeConductorTests.G1G10AcceptanceTests testG1G2G7_DeployPrimaryFailoverAndMCPSmoke]' started.
+Test Case '-[ForgeConductorTests.G1G10AcceptanceTests testG1G2G7_DeployPrimaryFailoverAndMCPSmoke]' passed (0.828 seconds).
+Test Case '-[ForgeConductorTests.G1G10AcceptanceTests testG3_VersionIsDefined]' started.
+Test Case '-[ForgeConductorTests.G1G10AcceptanceTests testG3_VersionIsDefined]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.G1G10AcceptanceTests testG4_ProtocolsAreConcrete]' started.
+Test Case '-[ForgeConductorTests.G1G10AcceptanceTests testG4_ProtocolsAreConcrete]' passed (0.053 seconds).
+Test Case '-[ForgeConductorTests.G1G10AcceptanceTests testG5_RealtimeEngineSustainedSampling]' started.
+Test Case '-[ForgeConductorTests.G1G10AcceptanceTests testG5_RealtimeEngineSustainedSampling]' passed (0.340 seconds).
+Test Case '-[ForgeConductorTests.G1G10AcceptanceTests testG6_DiagnosticsExportContainsRequiredCategories]' started.
+Test Case '-[ForgeConductorTests.G1G10AcceptanceTests testG6_DiagnosticsExportContainsRequiredCategories]' passed (0.007 seconds).
+Test Case '-[ForgeConductorTests.G1G10AcceptanceTests testG8_SecondDashboardBindFailsClosed]' started.
+Test Case '-[ForgeConductorTests.G1G10AcceptanceTests testG8_SecondDashboardBindFailsClosed]' passed (0.279 seconds).
+Test Case '-[ForgeConductorTests.G1G10AcceptanceTests testG9_ResolvePrefersExplicitBinary]' started.
+Test Case '-[ForgeConductorTests.G1G10AcceptanceTests testG9_ResolvePrefersExplicitBinary]' passed (0.000 seconds).
+Test Suite 'G1G10AcceptanceTests' passed at 2026-08-23 14:13:52.170.
+	 Executed 7 tests, with 0 failures (0 unexpected) in 1.507 (1.508) seconds
+Test Suite 'LMStudioConnectorReliabilityTests' started at 2026-08-23 14:13:52.170.
+Test Case '-[ForgeConductorTests.LMStudioConnectorReliabilityTests testConnectionStateModelsFailForwardPromotion]' started.
+Test Case '-[ForgeConductorTests.LMStudioConnectorReliabilityTests testConnectionStateModelsFailForwardPromotion]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.LMStudioConnectorReliabilityTests testDeploymentVerifiesPrimaryAndFallbackBeforeAndAfterInstall]' started.
+Test Case '-[ForgeConductorTests.LMStudioConnectorReliabilityTests testDeploymentVerifiesPrimaryAndFallbackBeforeAndAfterInstall]' passed (0.005 seconds).
+Test Case '-[ForgeConductorTests.LMStudioConnectorReliabilityTests testFallbackIsPromotedWhenPrimaryDegradesAfterCommit]' started.
+Test Case '-[ForgeConductorTests.LMStudioConnectorReliabilityTests testFallbackIsPromotedWhenPrimaryDegradesAfterCommit]' passed (0.004 seconds).
+Test Case '-[ForgeConductorTests.LMStudioConnectorReliabilityTests testHostActivationDistinguishesSynchronizedConfigFromLazyConnections]' started.
+Test Case '-[ForgeConductorTests.LMStudioConnectorReliabilityTests testHostActivationDistinguishesSynchronizedConfigFromLazyConnections]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.LMStudioConnectorReliabilityTests testMalformedMCPConfigurationIsPreservedWithoutReplacingLivePlugins]' started.
+Test Case '-[ForgeConductorTests.LMStudioConnectorReliabilityTests testMalformedMCPConfigurationIsPreservedWithoutReplacingLivePlugins]' passed (0.002 seconds).
+Test Case '-[ForgeConductorTests.LMStudioConnectorReliabilityTests testRepeatedDeploymentWritesNewRevisionToForceLMStudioReload]' started.
+Test Case '-[ForgeConductorTests.LMStudioConnectorReliabilityTests testRepeatedDeploymentWritesNewRevisionToForceLMStudioReload]' passed (0.010 seconds).
+Test Case '-[ForgeConductorTests.LMStudioConnectorReliabilityTests testRoleIdentityMismatchFailsBeforeInstallerMutation]' started.
+Test Case '-[ForgeConductorTests.LMStudioConnectorReliabilityTests testRoleIdentityMismatchFailsBeforeInstallerMutation]' passed (0.004 seconds).
+Test Case '-[ForgeConductorTests.LMStudioConnectorReliabilityTests testTransactionalInstallPreservesForeignServersAndWritesTypedRoles]' started.
+Test Case '-[ForgeConductorTests.LMStudioConnectorReliabilityTests testTransactionalInstallPreservesForeignServersAndWritesTypedRoles]' passed (0.006 seconds).
+Test Suite 'LMStudioConnectorReliabilityTests' passed at 2026-08-23 14:13:52.204.
+	 Executed 8 tests, with 0 failures (0 unexpected) in 0.033 (0.034) seconds
+Test Suite 'LatestValueMailboxTests' started at 2026-08-23 14:13:52.204.
+Test Case '-[ForgeConductorTests.LatestValueMailboxTests testProducerPressureUsesAtMostTwoLogicalSlotsAndConvergesToLatest]' started.
+Test Case '-[ForgeConductorTests.LatestValueMailboxTests testProducerPressureUsesAtMostTwoLogicalSlotsAndConvergesToLatest]' passed (0.014 seconds).
+Test Case '-[ForgeConductorTests.LatestValueMailboxTests testStaleGenerationAndPostStopValuesNeverReachNewSubscriber]' started.
+Test Case '-[ForgeConductorTests.LatestValueMailboxTests testStaleGenerationAndPostStopValuesNeverReachNewSubscriber]' passed (0.037 seconds).
+Test Case '-[ForgeConductorTests.LatestValueMailboxTests testStopClearsBufferedLatestDuringInFlightDelivery]' started.
+Test Case '-[ForgeConductorTests.LatestValueMailboxTests testStopClearsBufferedLatestDuringInFlightDelivery]' passed (0.036 seconds).
+Test Suite 'LatestValueMailboxTests' passed at 2026-08-23 14:13:52.292.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.088 (0.088) seconds
+Test Suite 'LiveCollectorEvidenceTests' started at 2026-08-23 14:13:52.292.
+Test Case '-[ForgeConductorTests.LiveCollectorEvidenceTests testDiskIOCollectorProducesDeltaAfterTwoSamples]' started.
+Test Case '-[ForgeConductorTests.LiveCollectorEvidenceTests testDiskIOCollectorProducesDeltaAfterTwoSamples]' passed (0.156 seconds).
+Test Case '-[ForgeConductorTests.LiveCollectorEvidenceTests testForgeSnapshotIncludesDiscoveredMCPServers]' started.
+Test Case '-[ForgeConductorTests.LiveCollectorEvidenceTests testForgeSnapshotIncludesDiscoveredMCPServers]' passed (0.265 seconds).
+Test Case '-[ForgeConductorTests.LiveCollectorEvidenceTests testFullSnapshotContractTwice]' started.
+Test Case '-[ForgeConductorTests.LiveCollectorEvidenceTests testFullSnapshotContractTwice]' passed (0.262 seconds).
+Test Case '-[ForgeConductorTests.LiveCollectorEvidenceTests testGPUCollectorSeesDeviceUtilizationWhenAvailable]' started.
+Test Case '-[ForgeConductorTests.LiveCollectorEvidenceTests testGPUCollectorSeesDeviceUtilizationWhenAvailable]' passed (0.002 seconds).
+Test Case '-[ForgeConductorTests.LiveCollectorEvidenceTests testLegacyForgeServeLaunchersAreRemovedFromBinDir]' started.
+Test Case '-[ForgeConductorTests.LiveCollectorEvidenceTests testLegacyForgeServeLaunchersAreRemovedFromBinDir]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.LiveCollectorEvidenceTests testLMStudioMCPBridgePluginLayoutIsWritten]' started.
+Test Case '-[ForgeConductorTests.LiveCollectorEvidenceTests testLMStudioMCPBridgePluginLayoutIsWritten]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.LiveCollectorEvidenceTests testLMStudioMCPConfigStripsForeignProjects]' started.
+Test Case '-[ForgeConductorTests.LiveCollectorEvidenceTests testLMStudioMCPConfigStripsForeignProjects]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.LiveCollectorEvidenceTests testProcessDiscoveryFindsLocalMCPBinariesWhenPresent]' started.
+Test Case '-[ForgeConductorTests.LiveCollectorEvidenceTests testProcessDiscoveryFindsLocalMCPBinariesWhenPresent]' passed (0.097 seconds).
+Test Case '-[ForgeConductorTests.LiveCollectorEvidenceTests testProcessDiscoveryNeverClassifiesCCDT]' started.
+Test Case '-[ForgeConductorTests.LiveCollectorEvidenceTests testProcessDiscoveryNeverClassifiesCCDT]' passed (0.096 seconds).
+Test Case '-[ForgeConductorTests.LiveCollectorEvidenceTests testSwiftServeRegistrationShape]' started.
+Test Case '-[ForgeConductorTests.LiveCollectorEvidenceTests testSwiftServeRegistrationShape]' passed (0.002 seconds).
+Test Case '-[ForgeConductorTests.LiveCollectorEvidenceTests testTypedCardsFromLiveSnapshot]' started.
+Test Case '-[ForgeConductorTests.LiveCollectorEvidenceTests testTypedCardsFromLiveSnapshot]' passed (0.159 seconds).
+Test Suite 'LiveCollectorEvidenceTests' passed at 2026-08-23 14:13:53.332.
+	 Executed 11 tests, with 0 failures (0 unexpected) in 1.040 (1.041) seconds
+Test Suite 'MCPProcessTelemetryRegressionTests' started at 2026-08-23 14:13:53.332.
+Test Case '-[ForgeConductorTests.MCPProcessTelemetryRegressionTests testAppBundleServeClassificationExcludesGUIAndManager]' started.
+Test Case '-[ForgeConductorTests.MCPProcessTelemetryRegressionTests testAppBundleServeClassificationExcludesGUIAndManager]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.MCPProcessTelemetryRegressionTests testAssemblerOmitsLMStudioHostAndModelBackendCards]' started.
+Test Case '-[ForgeConductorTests.MCPProcessTelemetryRegressionTests testAssemblerOmitsLMStudioHostAndModelBackendCards]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.MCPProcessTelemetryRegressionTests testConnectorProcessIdentityRequiresExplicitValidRoleEvidence]' started.
+Test Case '-[ForgeConductorTests.MCPProcessTelemetryRegressionTests testConnectorProcessIdentityRequiresExplicitValidRoleEvidence]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.MCPProcessTelemetryRegressionTests testLivePrimaryDoesNotSuppressFallbackConfigurationWithSharedCommand]' started.
+Test Case '-[ForgeConductorTests.MCPProcessTelemetryRegressionTests testLivePrimaryDoesNotSuppressFallbackConfigurationWithSharedCommand]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.MCPProcessTelemetryRegressionTests testMatchingFallbackPresenceCorrectsUnknownLiveProcessRole]' started.
+Test Case '-[ForgeConductorTests.MCPProcessTelemetryRegressionTests testMatchingFallbackPresenceCorrectsUnknownLiveProcessRole]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.MCPProcessTelemetryRegressionTests testMCPExternalCountIncludesBothStdioRolesAndExcludesModelBackends]' started.
+Test Case '-[ForgeConductorTests.MCPProcessTelemetryRegressionTests testMCPExternalCountIncludesBothStdioRolesAndExcludesModelBackends]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.MCPProcessTelemetryRegressionTests testNativeProcessMetadataDecodesServeArgumentsAndFallbackRole]' started.
+Test Case '-[ForgeConductorTests.MCPProcessTelemetryRegressionTests testNativeProcessMetadataDecodesServeArgumentsAndFallbackRole]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.MCPProcessTelemetryRegressionTests testPolicyAndMaintenanceOutcomesAreActivityButNotOperationalMCPErrors]' started.
+Test Case '-[ForgeConductorTests.MCPProcessTelemetryRegressionTests testPolicyAndMaintenanceOutcomesAreActivityButNotOperationalMCPErrors]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.MCPProcessTelemetryRegressionTests testPresenceClientIDNormalizationRetainsUnknownShapes]' started.
+Test Case '-[ForgeConductorTests.MCPProcessTelemetryRegressionTests testPresenceClientIDNormalizationRetainsUnknownShapes]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.MCPProcessTelemetryRegressionTests testPSFallbackPreservesAppBundleExecutableAndServeArgument]' started.
+Test Case '-[ForgeConductorTests.MCPProcessTelemetryRegressionTests testPSFallbackPreservesAppBundleExecutableAndServeArgument]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.MCPProcessTelemetryRegressionTests testReconciledPresenceCountExcludesStaleAndForeignRows]' started.
+Test Case '-[ForgeConductorTests.MCPProcessTelemetryRegressionTests testReconciledPresenceCountExcludesStaleAndForeignRows]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.MCPProcessTelemetryRegressionTests testRolePresencesCoalesceConfigurationsAndCorrelateBareAuditClientIDs]' started.
+Test Case '-[ForgeConductorTests.MCPProcessTelemetryRegressionTests testRolePresencesCoalesceConfigurationsAndCorrelateBareAuditClientIDs]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.MCPProcessTelemetryRegressionTests testUnknownLiveRoleDoesNotSuppressEitherConfiguredRole]' started.
+Test Case '-[ForgeConductorTests.MCPProcessTelemetryRegressionTests testUnknownLiveRoleDoesNotSuppressEitherConfiguredRole]' passed (0.000 seconds).
+Test Suite 'MCPProcessTelemetryRegressionTests' passed at 2026-08-23 14:13:53.334.
+	 Executed 13 tests, with 0 failures (0 unexpected) in 0.001 (0.002) seconds
+Test Suite 'MCPProtocolAndDiagnosticsTests' started at 2026-08-23 14:13:53.334.
+Test Case '-[ForgeConductorTests.MCPProtocolAndDiagnosticsTests testDeployServiceResolvesExecutable]' started.
+Test Case '-[ForgeConductorTests.MCPProtocolAndDiagnosticsTests testDeployServiceResolvesExecutable]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.MCPProtocolAndDiagnosticsTests testDiagnosticExportJSONAndMarkdown]' started.
+Test Case '-[ForgeConductorTests.MCPProtocolAndDiagnosticsTests testDiagnosticExportJSONAndMarkdown]' passed (0.005 seconds).
+Test Case '-[ForgeConductorTests.MCPProtocolAndDiagnosticsTests testDiagnosticLogRedactsPrivateFieldsBeforePersistenceAndExport]' started.
+Test Case '-[ForgeConductorTests.MCPProtocolAndDiagnosticsTests testDiagnosticLogRedactsPrivateFieldsBeforePersistenceAndExport]' passed (0.003 seconds).
+Test Case '-[ForgeConductorTests.MCPProtocolAndDiagnosticsTests testProtocolNegotiationEchoesLMStudioVersion]' started.
+Test Case '-[ForgeConductorTests.MCPProtocolAndDiagnosticsTests testProtocolNegotiationEchoesLMStudioVersion]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.MCPProtocolAndDiagnosticsTests testRealtimeEngineIsContinuousNotTwoSecondSnapshot]' started.
+Test Case '-[ForgeConductorTests.MCPProtocolAndDiagnosticsTests testRealtimeEngineIsContinuousNotTwoSecondSnapshot]' passed (0.346 seconds).
+Test Case '-[ForgeConductorTests.MCPProtocolAndDiagnosticsTests testStdioTransportWritesSpecCompliantNDJSON]' started.
+Test Case '-[ForgeConductorTests.MCPProtocolAndDiagnosticsTests testStdioTransportWritesSpecCompliantNDJSON]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.MCPProtocolAndDiagnosticsTests testStreamReaderRejectsOversizedContentLengthBeforeReadingBody]' started.
+Test Case '-[ForgeConductorTests.MCPProtocolAndDiagnosticsTests testStreamReaderRejectsOversizedContentLengthBeforeReadingBody]' passed (0.000 seconds).
+Test Suite 'MCPProtocolAndDiagnosticsTests' passed at 2026-08-23 14:13:53.690.
+	 Executed 7 tests, with 0 failures (0 unexpected) in 0.355 (0.356) seconds
+Test Suite 'MachHostMetricsTests' started at 2026-08-23 14:13:53.690.
+Test Case '-[ForgeConductorTests.MachHostMetricsTests testCPUCollectorHostProcessorInfoDeltas]' started.
+Test Case '-[ForgeConductorTests.MachHostMetricsTests testCPUCollectorHostProcessorInfoDeltas]' passed (0.142 seconds).
+Test Case '-[ForgeConductorTests.MachHostMetricsTests testDiskIONoSleepDelta]' started.
+Test Case '-[ForgeConductorTests.MachHostMetricsTests testDiskIONoSleepDelta]' passed (0.057 seconds).
+Test Case '-[ForgeConductorTests.MachHostMetricsTests testEngineAdvancesMachPath]' started.
+Test Case '-[ForgeConductorTests.MachHostMetricsTests testEngineAdvancesMachPath]' passed (0.152 seconds).
+Test Case '-[ForgeConductorTests.MachHostMetricsTests testGPUCollectorIORegistry]' started.
+Test Case '-[ForgeConductorTests.MachHostMetricsTests testGPUCollectorIORegistry]' passed (0.002 seconds).
+Test Case '-[ForgeConductorTests.MachHostMetricsTests testMachTaskThreadSamplerSelf]' started.
+Test Case '-[ForgeConductorTests.MachHostMetricsTests testMachTaskThreadSamplerSelf]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.MachHostMetricsTests testPowerSourcesCollectorIOKit]' started.
+Test Case '-[ForgeConductorTests.MachHostMetricsTests testPowerSourcesCollectorIOKit]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.MachHostMetricsTests testProcessCollectorLibprocNotPs]' started.
+Test Case '-[ForgeConductorTests.MachHostMetricsTests testProcessCollectorLibprocNotPs]' passed (0.154 seconds).
+Test Case '-[ForgeConductorTests.MachHostMetricsTests testRAMCollectorHostStatistics64]' started.
+Test Case '-[ForgeConductorTests.MachHostMetricsTests testRAMCollectorHostStatistics64]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.MachHostMetricsTests testSystemCollectorWiresAllSurfaces]' started.
+Test Case '-[ForgeConductorTests.MachHostMetricsTests testSystemCollectorWiresAllSurfaces]' passed (0.168 seconds).
+Test Suite 'MachHostMetricsTests' passed at 2026-08-23 14:13:54.366.
+	 Executed 9 tests, with 0 failures (0 unexpected) in 0.676 (0.676) seconds
+Test Suite 'ManagerTests' started at 2026-08-23 14:13:54.366.
+Test Case '-[ForgeConductorTests.ManagerTests testDashboardClientAttachesToExistingManager]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testDashboardClientAttachesToExistingManager]' passed (0.274 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testDashboardHTMLHasManagerControls]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testDashboardHTMLHasManagerControls]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testInstallerBinaryPathAndAllowlist]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testInstallerBinaryPathAndAllowlist]' passed (0.142 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testLaunchAgentLogRotationBoundsAndPrunesArchivesWithoutCurrentContent]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testLaunchAgentLogRotationBoundsAndPrunesArchivesWithoutCurrentContent]' passed (0.005 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testLaunchAgentLogRotationRetainsOnlyBoundedTailsInForgeHome]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testLaunchAgentLogRotationRetainsOnlyBoundedTailsInForgeHome]' passed (0.003 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testManagerArtifactAppVerificationFailurePreservesExistingInstallation]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testManagerArtifactAppVerificationFailurePreservesExistingInstallation]' passed (0.010 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testManagerArtifactCommitFailureRollsBackEarlierReplacements]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testManagerArtifactCommitFailureRollsBackEarlierReplacements]' passed (0.013 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testManagerArtifactCopyFailurePreservesExistingInstallation]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testManagerArtifactCopyFailurePreservesExistingInstallation]' passed (0.008 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testManagerArtifactSigningFailurePreservesExistingInstallation]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testManagerArtifactSigningFailurePreservesExistingInstallation]' passed (0.007 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testManagerArtifactStagingReplacesStaleBinaryFrameworkAndAppBundle]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testManagerArtifactStagingReplacesStaleBinaryFrameworkAndAppBundle]' passed (0.011 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testManagerArtifactTransactionCommitsCommandLinkWithArtifacts]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testManagerArtifactTransactionCommitsCommandLinkWithArtifacts]' passed (0.012 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testManagerCommandLinkCommitFailureRollsBackEntireArtifactTransaction]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testManagerCommandLinkCommitFailureRollsBackEntireArtifactTransaction]' passed (0.014 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testManagerRestartAPI]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testManagerRestartAPI]' passed (0.777 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testManagerRuntimeThrottlesPresenceMaintenance]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testManagerRuntimeThrottlesPresenceMaintenance]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testManagerSettingsPersist]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testManagerSettingsPersist]' passed (0.144 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testManagerStartPrunesDeadStalePresence]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testManagerStartPrunesDeadStalePresence]' passed (0.139 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testManagerStartStopService]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testManagerStartStopService]' passed (0.507 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testNormalizeSettingsPatch]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testNormalizeSettingsPatch]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testPIDFileHelpers]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testPIDFileHelpers]' passed (0.002 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testProductionSignatureValidatorPreservesValidMachOAndAppMetadata]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testProductionSignatureValidatorPreservesValidMachOAndAppMetadata]' passed (0.119 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testProductionSignatureValidatorPreservesValidTeamSignedAppWhenAvailable]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/ManagerTests.swift:668: -[ForgeConductorTests.ManagerTests testProductionSignatureValidatorPreservesValidTeamSignedAppWhenAvailable] : Test skipped - No valid local team-signed Forge app fixture is available
+Test Case '-[ForgeConductorTests.ManagerTests testProductionSignatureValidatorPreservesValidTeamSignedAppWhenAvailable]' skipped (0.000 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testProductionSignatureValidatorRejectsInvalidCMSWithoutMutation]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testProductionSignatureValidatorRejectsInvalidCMSWithoutMutation]' passed (0.004 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testProductionSignatureValidatorRepairsInvalidAdHocAppWithoutChangingNestedIdentity]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testProductionSignatureValidatorRepairsInvalidAdHocAppWithoutChangingNestedIdentity]' passed (0.072 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testProductionSignatureValidatorRepairsUnsignedMachOWithStableRuntimeIdentity]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testProductionSignatureValidatorRepairsUnsignedMachOWithStableRuntimeIdentity]' passed (0.057 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testSignatureInspectionErrorsAndAmbiguousMetadataFailClosed]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testSignatureInspectionErrorsAndAmbiguousMetadataFailClosed]' passed (0.012 seconds).
+Test Suite 'ManagerTests' passed at 2026-08-23 14:13:56.703.
+	 Executed 25 tests, with 1 test skipped and 0 failures (0 unexpected) in 2.335 (2.337) seconds
+Test Suite 'MemoryToolTests' started at 2026-08-23 14:13:56.703.
+Test Case '-[ForgeConductorTests.MemoryToolTests testAgentAndContinuitySystemKeysHiddenFromDefaultMemoryQueries]' started.
+Test Case '-[ForgeConductorTests.MemoryToolTests testAgentAndContinuitySystemKeysHiddenFromDefaultMemoryQueries]' passed (0.077 seconds).
+Test Case '-[ForgeConductorTests.MemoryToolTests testForgeStatusIncludesMemoryCount]' started.
+Test Case '-[ForgeConductorTests.MemoryToolTests testForgeStatusIncludesMemoryCount]' passed (0.069 seconds).
+Test Case '-[ForgeConductorTests.MemoryToolTests testInvalidKeyRejected]' started.
+Test Case '-[ForgeConductorTests.MemoryToolTests testInvalidKeyRejected]' passed (0.069 seconds).
+Test Case '-[ForgeConductorTests.MemoryToolTests testMemoryAvailableDuringAgentSessionEvenIfNotInToolsPrimary]' started.
+Test Case '-[ForgeConductorTests.MemoryToolTests testMemoryAvailableDuringAgentSessionEvenIfNotInToolsPrimary]' passed (0.070 seconds).
+Test Case '-[ForgeConductorTests.MemoryToolTests testMemoryAvailableWithoutAgentSession]' started.
+Test Case '-[ForgeConductorTests.MemoryToolTests testMemoryAvailableWithoutAgentSession]' passed (0.068 seconds).
+Test Case '-[ForgeConductorTests.MemoryToolTests testMemoryPersistsAcrossAppBootstrap]' started.
+Test Case '-[ForgeConductorTests.MemoryToolTests testMemoryPersistsAcrossAppBootstrap]' passed (0.133 seconds).
+Test Case '-[ForgeConductorTests.MemoryToolTests testMemorySetGetListSearchDeleteRoundTrip]' started.
+Test Case '-[ForgeConductorTests.MemoryToolTests testMemorySetGetListSearchDeleteRoundTrip]' passed (0.074 seconds).
+Test Case '-[ForgeConductorTests.MemoryToolTests testMemoryToolsAreRegistered]' started.
+Test Case '-[ForgeConductorTests.MemoryToolTests testMemoryToolsAreRegistered]' passed (0.066 seconds).
+Test Case '-[ForgeConductorTests.MemoryToolTests testTagFilterAndContentAlias]' started.
+Test Case '-[ForgeConductorTests.MemoryToolTests testTagFilterAndContentAlias]' passed (0.066 seconds).
+Test Case '-[ForgeConductorTests.MemoryToolTests testTelemetrySeparatesMemoryAndContinuityToolPacks]' started.
+Test Case '-[ForgeConductorTests.MemoryToolTests testTelemetrySeparatesMemoryAndContinuityToolPacks]' passed (0.169 seconds).
+Test Suite 'MemoryToolTests' passed at 2026-08-23 14:13:57.565.
+	 Executed 10 tests, with 0 failures (0 unexpected) in 0.861 (0.862) seconds
+Test Suite 'NativeAppSmokeTests' started at 2026-08-23 14:13:57.565.
+Test Case '-[ForgeConductorTests.NativeAppSmokeTests testAllAgentPlaybooksRequireCompletion]' started.
+Test Case '-[ForgeConductorTests.NativeAppSmokeTests testAllAgentPlaybooksRequireCompletion]' passed (0.066 seconds).
+Test Case '-[ForgeConductorTests.NativeAppSmokeTests testNativeCompositionRootReadyForGUI]' started.
+Test Case '-[ForgeConductorTests.NativeAppSmokeTests testNativeCompositionRootReadyForGUI]' passed (0.346 seconds).
+Test Suite 'NativeAppSmokeTests' passed at 2026-08-23 14:13:57.978.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.412 (0.413) seconds
+Test Suite 'NativeTelemetryTests' started at 2026-08-23 14:13:57.978.
+Test Case '-[ForgeConductorTests.NativeTelemetryTests testDoctorUsesNativeTelemetry]' started.
+Test Case '-[ForgeConductorTests.NativeTelemetryTests testDoctorUsesNativeTelemetry]' passed (0.168 seconds).
+Test Case '-[ForgeConductorTests.NativeTelemetryTests testNativeSnapshotContractWithoutNode]' started.
+Test Case '-[ForgeConductorTests.NativeTelemetryTests testNativeSnapshotContractWithoutNode]' passed (0.169 seconds).
+Test Case '-[ForgeConductorTests.NativeTelemetryTests testProcessDiscoveryDoesNotCrash]' started.
+Test Case '-[ForgeConductorTests.NativeTelemetryTests testProcessDiscoveryDoesNotCrash]' passed (0.097 seconds).
+Test Suite 'NativeTelemetryTests' passed at 2026-08-23 14:13:58.412.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.434 (0.434) seconds
+Test Suite 'ProcessRunnerTests' started at 2026-08-23 14:13:58.412.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testDirectChildExitDoesNotWaitForDescendantPipeEOF]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testDirectChildExitDoesNotWaitForDescendantPipeEOF]' passed (0.005 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testLaunchFailureDoesNotPoisonTheNextRun]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testLaunchFailureDoesNotPoisonTheNextRun]' passed (0.002 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testMalformedAndCapSplitUTF8PreserveReadableOutput]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testMalformedAndCapSplitUTF8PreserveReadableOutput]' passed (0.004 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testNormalAndNonzeroExitStatuses]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testNormalAndNonzeroExitStatuses]' passed (0.003 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testOutputIsCapturedConcurrentlyAndTruncatedPerStream]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testOutputIsCapturedConcurrentlyAndTruncatedPerStream]' passed (0.003 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testParallelRunsRemainBoundedAndIndependent]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testParallelRunsRemainBoundedAndIndependent]' passed (0.024 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testRapidExitNotificationsAreNotLostUnderLoad]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testRapidExitNotificationsAreNotLostUnderLoad]' passed (0.011 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testTermIgnoringChildRequiresSIGKILL]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testTermIgnoringChildRequiresSIGKILL]' passed (0.304 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testTimeoutTerminatesChildAndReturnsConfirmedStatus]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testTimeoutTerminatesChildAndReturnsConfirmedStatus]' passed (0.023 seconds).
+Test Suite 'ProcessRunnerTests' passed at 2026-08-23 14:13:58.792.
+	 Executed 9 tests, with 0 failures (0 unexpected) in 0.379 (0.380) seconds
+Test Suite 'ProductPathReliabilityTests' started at 2026-08-23 14:13:58.792.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testDiagnosticsCaptureDeploySmokeFailurePath]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testDiagnosticsCaptureDeploySmokeFailurePath]' passed (0.003 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testForgeStatusToolCall]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testForgeStatusToolCall]' passed (0.069 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testInProcessMCPHandshakeToolsList]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testInProcessMCPHandshakeToolsList]' passed (0.070 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testPortGuardReportsFreeOnUnusedPort]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testPortGuardReportsFreeOnUnusedPort]' passed (0.068 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testProcessVerifierRejectsMissingContinuityTool]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testProcessVerifierRejectsMissingContinuityTool]' passed (0.230 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testProcessVerifierRejectsMissingMemoryTool]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testProcessVerifierRejectsMissingMemoryTool]' passed (0.174 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testProcessVerifierRejectsNonNDJSONPrefix]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testProcessVerifierRejectsNonNDJSONPrefix]' passed (0.175 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testProcessVerifierTimeoutIsBoundedForSilentChild]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testProcessVerifierTimeoutIsBoundedForSilentChild]' passed (0.243 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testRealtimeEngineMeasuredProgress]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testRealtimeEngineMeasuredProgress]' passed (0.457 seconds).
+Test Suite 'ProductPathReliabilityTests' passed at 2026-08-23 14:14:00.281.
+	 Executed 9 tests, with 0 failures (0 unexpected) in 1.488 (1.488) seconds
+Test Suite 'RealtimeStreamTests' started at 2026-08-23 14:14:00.281.
+Test Case '-[ForgeConductorTests.RealtimeStreamTests testContinuousSSESendsMultipleEvents]' started.
+Test Case '-[ForgeConductorTests.RealtimeStreamTests testContinuousSSESendsMultipleEvents]' passed (0.529 seconds).
+Test Case '-[ForgeConductorTests.RealtimeStreamTests testHealthReportsContinuousMode]' started.
+Test Case '-[ForgeConductorTests.RealtimeStreamTests testHealthReportsContinuousMode]' passed (0.432 seconds).
+Test Case '-[ForgeConductorTests.RealtimeStreamTests testHostStreamAdvancesWithoutSnapshotAPI]' started.
+Test Case '-[ForgeConductorTests.RealtimeStreamTests testHostStreamAdvancesWithoutSnapshotAPI]' passed (0.351 seconds).
+Test Case '-[ForgeConductorTests.RealtimeStreamTests testStreamHzParserUpgradesLegacyInterval]' started.
+Test Case '-[ForgeConductorTests.RealtimeStreamTests testStreamHzParserUpgradesLegacyInterval]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.RealtimeStreamTests testTelemetryServicePublishesOnEverySample]' started.
+Test Case '-[ForgeConductorTests.RealtimeStreamTests testTelemetryServicePublishesOnEverySample]' passed (0.416 seconds).
+Test Suite 'RealtimeStreamTests' passed at 2026-08-23 14:14:02.009.
+	 Executed 5 tests, with 0 failures (0 unexpected) in 1.728 (1.729) seconds
+Test Suite 'RigParityTests' started at 2026-08-23 14:14:02.009.
+Test Case '-[ForgeConductorTests.RigParityTests testCPUCollectorPerCoreCount]' started.
+Test Case '-[ForgeConductorTests.RigParityTests testCPUCollectorPerCoreCount]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.RigParityTests testDiskIOCollectorReturnsFiniteRates]' started.
+Test Case '-[ForgeConductorTests.RigParityTests testDiskIOCollectorReturnsFiniteRates]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.RigParityTests testForgePanelsPresentForRigUI]' started.
+Test Case '-[ForgeConductorTests.RigParityTests testForgePanelsPresentForRigUI]' passed (0.169 seconds).
+Test Case '-[ForgeConductorTests.RigParityTests testGPUCollectorMetalFlag]' started.
+Test Case '-[ForgeConductorTests.RigParityTests testGPUCollectorMetalFlag]' passed (0.003 seconds).
+Test Case '-[ForgeConductorTests.RigParityTests testHistoryPointSerializesUnavailableGPUAsJSONNull]' started.
+Test Case '-[ForgeConductorTests.RigParityTests testHistoryPointSerializesUnavailableGPUAsJSONNull]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.RigParityTests testManagerNodeStartStopInProcess]' started.
+Test Case '-[ForgeConductorTests.RigParityTests testManagerNodeStartStopInProcess]' passed (0.141 seconds).
+Test Case '-[ForgeConductorTests.RigParityTests testManagerRequiresServiceOrHTTPEvidenceBeforeReportingReady]' started.
+Test Case '-[ForgeConductorTests.RigParityTests testManagerRequiresServiceOrHTTPEvidenceBeforeReportingReady]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.RigParityTests testOrchestrationPolicyStillWarnsWhenLMStudioIsNotConfigured]' started.
+Test Case '-[ForgeConductorTests.RigParityTests testOrchestrationPolicyStillWarnsWhenLMStudioIsNotConfigured]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.RigParityTests testOrchestrationPolicyTreatsConfiguredLMStudioIdleAsInformational]' started.
+Test Case '-[ForgeConductorTests.RigParityTests testOrchestrationPolicyTreatsConfiguredLMStudioIdleAsInformational]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.RigParityTests testRigPanelChecklistDocumented]' started.
+Test Case '-[ForgeConductorTests.RigParityTests testRigPanelChecklistDocumented]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.RigParityTests testSnapshotContractAndHistoryMultiSeries]' started.
+Test Case '-[ForgeConductorTests.RigParityTests testSnapshotContractAndHistoryMultiSeries]' passed (0.261 seconds).
+Test Case '-[ForgeConductorTests.RigParityTests testSysStripDistinguishesUnavailableGPUFromMeasuredZero]' started.
+Test Case '-[ForgeConductorTests.RigParityTests testSysStripDistinguishesUnavailableGPUFromMeasuredZero]' passed (0.055 seconds).
+Test Case '-[ForgeConductorTests.RigParityTests testSysStripModelFromSystem]' started.
+Test Case '-[ForgeConductorTests.RigParityTests testSysStripModelFromSystem]' passed (0.054 seconds).
+Test Case '-[ForgeConductorTests.RigParityTests testSystemMetricsHasAllStripFields]' started.
+Test Case '-[ForgeConductorTests.RigParityTests testSystemMetricsHasAllStripFields]' passed (0.160 seconds).
+Test Case '-[ForgeConductorTests.RigParityTests testTelemetryHealthToneKeepsConfigurationAndUnknownOutOfFailureState]' started.
+Test Case '-[ForgeConductorTests.RigParityTests testTelemetryHealthToneKeepsConfigurationAndUnknownOutOfFailureState]' passed (0.000 seconds).
+Test Suite 'RigParityTests' passed at 2026-08-23 14:14:02.855.
+	 Executed 15 tests, with 0 failures (0 unexpected) in 0.844 (0.845) seconds
+Test Suite 'RuntimeObservabilityTests' started at 2026-08-23 14:14:02.855.
+Test Case '-[ForgeConductorTests.RuntimeObservabilityTests testRuntimeMetricsUseFixedKeysAndClampNonnegativeGauges]' started.
+Test Case '-[ForgeConductorTests.RuntimeObservabilityTests testRuntimeMetricsUseFixedKeysAndClampNonnegativeGauges]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.RuntimeObservabilityTests testRuntimeSnapshotDictionaryContainsOnlyNumericMetricMaps]' started.
+Test Case '-[ForgeConductorTests.RuntimeObservabilityTests testRuntimeSnapshotDictionaryContainsOnlyNumericMetricMaps]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.RuntimeObservabilityTests testSignpostBoundariesAcceptStableNumericOperationIdentifiers]' started.
+Test Case '-[ForgeConductorTests.RuntimeObservabilityTests testSignpostBoundariesAcceptStableNumericOperationIdentifiers]' passed (0.000 seconds).
+Test Suite 'RuntimeObservabilityTests' passed at 2026-08-23 14:14:02.855.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.001 (0.001) seconds
+Test Suite 'TelemetryContractTests' started at 2026-08-23 14:14:02.855.
+Test Case '-[ForgeConductorTests.TelemetryContractTests testFixtureContractKeysFile]' started.
+Test Case '-[ForgeConductorTests.TelemetryContractTests testFixtureContractKeysFile]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.TelemetryContractTests testNativeSnapshotProducesContractKeys]' started.
+Test Case '-[ForgeConductorTests.TelemetryContractTests testNativeSnapshotProducesContractKeys]' passed (0.163 seconds).
+Test Suite 'TelemetryContractTests' passed at 2026-08-23 14:14:03.019.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.163 (0.163) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-08-23 14:14:03.019.
+	 Executed 239 tests, with 2 tests skipped and 0 failures (0 unexpected) in 20.088 (20.107) seconds
+Test Suite 'All tests' passed at 2026-08-23 14:14:03.019.
+	 Executed 239 tests, with 2 tests skipped and 0 failures (0 unexpected) in 20.088 (20.107) seconds
+◇ Test run started.
+↳ Testing Library Version: 1501
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

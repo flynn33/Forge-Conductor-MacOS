@@ -1,0 +1,36 @@
+{
+  "artifacts": [
+    {
+      "bytes": 41073,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P07-mcp-process-conformance.json",
+      "sha256": "135ceac8822d2dad4d997d12fbc5adf9a8a97dc243fc7296cd06d1b5d13e52c4"
+    },
+    {
+      "bytes": 41073,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T201627Z-984d2e61cb.stdout.txt",
+      "sha256": "135ceac8822d2dad4d997d12fbc5adf9a8a97dc243fc7296cd06d1b5d13e52c4"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T201627Z-984d2e61cb.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "command": "python3 .forge-codex/scripts/check_p07_project_memory.py --binary .build/debug/forge-conductor --output .forge-codex/evidence/P07-mcp-process-conformance.json",
+  "ended_at": "2026-08-23T20:16:28.054920+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T201627Z-984d2e61cb",
+  "kind": "conformance",
+  "related_findings": [],
+  "related_gates": [
+    "G07"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T20:16:27.504646+00:00",
+  "timed_out": false
+}

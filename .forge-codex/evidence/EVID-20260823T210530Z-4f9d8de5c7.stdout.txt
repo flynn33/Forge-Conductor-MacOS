@@ -1,0 +1,215 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -project ForgeConductor.xcodeproj -scheme ForgeConductor -configuration Debug -destination platform=macOS -derivedDataPath .build/DerivedData-P10 CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= test-without-building "-only-testing:ForgeConductorUITests"
+
+Build settings from command line:
+    CODE_SIGN_IDENTITY = -
+    CODE_SIGN_STYLE = Manual
+    DEVELOPMENT_TEAM = 
+
+2026-08-23 16:05:31.865136-0500 ForgeConductorUITests-Runner[67666:1123144] [Default] Running tests...
+Test Suite 'All tests' started at 2026-08-23 16:05:31.939.
+Test Suite 'ForgeConductorUITests.xctest' started at 2026-08-23 16:05:31.939.
+Test Suite 'ForgeConductorUITests' started at 2026-08-23 16:05:31.939.
+Test Case '-[ForgeConductorUITests.ForgeConductorUITests testAppLaunchesAndShowsTitle]' started.
+    t =     0.00s Start Test at 2026-08-23 16:05:31.940
+    t =     0.10s Set Up
+    t =     0.11s     Open com.forge-conductor.app
+    t =     0.11s         Launch com.forge-conductor.app
+    t =     0.46s             Wait for accessibility to load
+    t =     0.94s             Setting up automation session
+    t =     0.94s             Wait for com.forge-conductor.app to idle
+    t =     0.96s Waiting 8.0s for "app-title" StaticText to exist
+    t =     1.99s     Checking `Expect predicate `existsNoRetry == 1` for object "app-title" StaticText`
+    t =     1.99s         Checking existence of `"app-title" StaticText`
+    t =     2.10s         Capturing element debug description
+    t =     3.02s     Checking `Expect predicate `existsNoRetry == 1` for object "app-title" StaticText`
+    t =     3.02s         Checking existence of `"app-title" StaticText`
+    t =     3.11s         Capturing element debug description
+    t =     4.04s     Checking `Expect predicate `existsNoRetry == 1` for object "app-title" StaticText`
+    t =     4.04s         Checking existence of `"app-title" StaticText`
+    t =     4.11s         Capturing element debug description
+    t =     5.04s     Checking `Expect predicate `existsNoRetry == 1` for object "app-title" StaticText`
+    t =     5.04s         Checking existence of `"app-title" StaticText`
+    t =     5.13s         Capturing element debug description
+    t =     6.06s     Checking `Expect predicate `existsNoRetry == 1` for object "app-title" StaticText`
+    t =     6.06s         Checking existence of `"app-title" StaticText`
+    t =     6.15s         Capturing element debug description
+    t =     6.97s     Checking `Expect predicate `existsNoRetry == 1` for object "app-title" StaticText`
+    t =     6.97s         Checking existence of `"app-title" StaticText`
+    t =     7.04s         Capturing element debug description
+    t =     7.97s     Checking `Expect predicate `existsNoRetry == 1` for object "app-title" StaticText`
+    t =     7.97s         Checking existence of `"app-title" StaticText`
+    t =     8.06s         Capturing element debug description
+    t =     8.97s     Checking `Expect predicate `existsNoRetry == 1` for object "app-title" StaticText`
+    t =     8.97s         Checking existence of `"app-title" StaticText`
+    t =     9.05s         Capturing element debug description
+    t =     9.05s     Checking existence of `"app-title" StaticText`
+    t =     9.13s Collecting debug information to assist test failure triage
+    t =     9.13s     Requesting snapshot of accessibility hierarchy for app with pid 67687
+    t =     9.25s Waiting 8.0s for "Forge Conductor" StaticText to exist
+    t =    10.29s     Checking `Expect predicate `existsNoRetry == 1` for object "Forge Conductor" StaticText`
+    t =    10.29s         Checking existence of `"Forge Conductor" StaticText`
+    t =    10.40s Checking existence of `Window (First Match)`
+    t =    10.40s Get number of matches for: Descendants matching type Window
+    t =    10.46s Tear Down
+    t =    10.46s     Terminate com.forge-conductor.app:67687
+Test Case '-[ForgeConductorUITests.ForgeConductorUITests testAppLaunchesAndShowsTitle]' passed (11.562 seconds).
+Test Case '-[ForgeConductorUITests.ForgeConductorUITests testCollapsedNavigationCanBeRestored]' started.
+    t =     0.00s Start Test at 2026-08-23 16:05:43.503
+    t =     0.09s Set Up
+    t =     0.09s     Open com.forge-conductor.app
+    t =     0.09s         Launch com.forge-conductor.app
+    t =     0.40s             Wait for accessibility to load
+    t =     0.86s             Setting up automation session
+    t =     0.86s             Wait for com.forge-conductor.app to idle
+    t =     0.88s Waiting 8.0s for "toolbar-navigation" Button to exist
+    t =     1.90s     Checking `Expect predicate `existsNoRetry == 1` for object "toolbar-navigation" Button`
+    t =     1.90s         Checking existence of `"toolbar-navigation" Button`
+    t =     2.04s Click "toolbar-navigation" Button
+    t =     2.04s     Wait for com.forge-conductor.app to idle
+    t =     2.05s     Find the "toolbar-navigation" Button
+    t =     2.15s     Check for interrupting elements affecting "toolbar-navigation" Button
+    t =     2.21s     Synthesize event
+    t =     2.56s     Wait for com.forge-conductor.app to idle
+    t =     2.62s Checking existence of `"toolbar-navigation" Button`
+    t =     2.75s Click "toolbar-navigation" Button
+    t =     2.75s     Wait for com.forge-conductor.app to idle
+    t =     2.76s     Find the "toolbar-navigation" Button
+    t =     2.85s     Check for interrupting elements affecting "toolbar-navigation" Button
+    t =     2.91s     Synthesize event
+    t =     3.28s     Wait for com.forge-conductor.app to idle
+    t =     3.47s Waiting 3.0s for "tab-rig" Button to exist
+    t =     4.50s     Checking `Expect predicate `existsNoRetry == 1` for object "tab-rig" Button`
+    t =     4.50s         Checking existence of `"tab-rig" Button`
+    t =     4.58s Tear Down
+    t =     4.58s     Terminate com.forge-conductor.app:67741
+Test Case '-[ForgeConductorUITests.ForgeConductorUITests testCollapsedNavigationCanBeRestored]' passed (5.665 seconds).
+Test Case '-[ForgeConductorUITests.ForgeConductorUITests testRefreshToolbarExists]' started.
+    t =     0.00s Start Test at 2026-08-23 16:05:49.169
+    t =     0.08s Set Up
+    t =     0.08s     Open com.forge-conductor.app
+    t =     0.08s         Launch com.forge-conductor.app
+    t =     0.38s             Wait for accessibility to load
+    t =     0.84s             Setting up automation session
+    t =     0.85s             Wait for com.forge-conductor.app to idle
+    t =     0.87s Waiting 5.0s for "toolbar-refresh" Button to exist
+    t =     1.87s     Checking `Expect predicate `existsNoRetry == 1` for object "toolbar-refresh" Button`
+    t =     1.87s         Checking existence of `"toolbar-refresh" Button`
+    t =     2.02s Click "toolbar-refresh" Button
+    t =     2.02s     Wait for com.forge-conductor.app to idle
+    t =     2.03s     Find the "toolbar-refresh" Button
+    t =     2.12s     Check for interrupting elements affecting "toolbar-refresh" Button
+    t =     2.23s     Synthesize event
+    t =     2.60s     Wait for com.forge-conductor.app to idle
+    t =     2.61s Checking existence of `Window (First Match)`
+    t =     2.62s Tear Down
+    t =     2.62s     Terminate com.forge-conductor.app:67746
+Test Case '-[ForgeConductorUITests.ForgeConductorUITests testRefreshToolbarExists]' passed (3.716 seconds).
+Test Case '-[ForgeConductorUITests.ForgeConductorUITests testSidebarTabsNavigate]' started.
+    t =     0.00s Start Test at 2026-08-23 16:05:52.886
+    t =     0.07s Set Up
+    t =     0.08s     Open com.forge-conductor.app
+    t =     0.08s         Launch com.forge-conductor.app
+    t =     0.36s             Wait for accessibility to load
+    t =     0.79s             Setting up automation session
+    t =     0.79s             Wait for com.forge-conductor.app to idle
+    t =     0.82s Waiting 2.0s for "tab-rig" Button to exist
+    t =     1.85s     Checking `Expect predicate `existsNoRetry == 1` for object "tab-rig" Button`
+    t =     1.85s         Checking existence of `"tab-rig" Button`
+    t =     1.98s Click "tab-rig" Button
+    t =     1.99s     Wait for com.forge-conductor.app to idle
+    t =     2.00s     Find the "tab-rig" Button
+    t =     2.08s     Check for interrupting elements affecting "tab-rig" Button
+    t =     2.19s     Synthesize event
+    t =     2.55s     Wait for com.forge-conductor.app to idle
+    t =     2.56s Waiting 3.0s for "detail-rig" Any to exist
+    t =     3.59s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =     3.59s         Checking existence of `"detail-rig" Any`
+    t =     3.72s Waiting 2.0s for "tab-mcp" Button to exist
+    t =     4.75s     Checking `Expect predicate `existsNoRetry == 1` for object "tab-mcp" Button`
+    t =     4.75s         Checking existence of `"tab-mcp" Button`
+    t =     4.86s Click "tab-mcp" Button
+    t =     4.86s     Wait for com.forge-conductor.app to idle
+    t =     4.86s     Find the "tab-mcp" Button
+    t =     4.94s     Check for interrupting elements affecting "tab-mcp" Button
+    t =     5.05s     Synthesize event
+    t =     5.50s     Wait for com.forge-conductor.app to idle
+    t =     5.51s Waiting 3.0s for "detail-mcp" Any to exist
+    t =     6.54s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =     6.54s         Checking existence of `"detail-mcp" Any`
+    t =     6.59s Waiting 2.0s for "tab-agents" Button to exist
+    t =     7.63s     Checking `Expect predicate `existsNoRetry == 1` for object "tab-agents" Button`
+    t =     7.63s         Checking existence of `"tab-agents" Button`
+    t =     7.67s Click "tab-agents" Button
+    t =     7.67s     Wait for com.forge-conductor.app to idle
+    t =     7.68s     Find the "tab-agents" Button
+    t =     7.72s     Check for interrupting elements affecting "tab-agents" Button
+    t =     7.74s     Synthesize event
+    t =     8.14s     Wait for com.forge-conductor.app to idle
+    t =     8.14s Waiting 3.0s for "detail-agents" Any to exist
+    t =     9.17s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-agents" Any`
+    t =     9.17s         Checking existence of `"detail-agents" Any`
+    t =     9.23s Waiting 2.0s for "tab-tools" Button to exist
+    t =    10.25s     Checking `Expect predicate `existsNoRetry == 1` for object "tab-tools" Button`
+    t =    10.26s         Checking existence of `"tab-tools" Button`
+    t =    10.31s Click "tab-tools" Button
+    t =    10.31s     Wait for com.forge-conductor.app to idle
+    t =    10.31s     Find the "tab-tools" Button
+    t =    10.36s     Check for interrupting elements affecting "tab-tools" Button
+    t =    10.37s     Synthesize event
+    t =    10.77s     Wait for com.forge-conductor.app to idle
+    t =    10.78s Waiting 3.0s for "detail-tools" Any to exist
+    t =    11.80s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-tools" Any`
+    t =    11.80s         Checking existence of `"detail-tools" Any`
+    t =    11.96s Waiting 2.0s for "tab-feed" Button to exist
+    t =    12.98s     Checking `Expect predicate `existsNoRetry == 1` for object "tab-feed" Button`
+    t =    12.98s         Checking existence of `"tab-feed" Button`
+    t =    13.12s Click "tab-feed" Button
+    t =    13.12s     Wait for com.forge-conductor.app to idle
+    t =    13.12s     Find the "tab-feed" Button
+    t =    13.25s     Check for interrupting elements affecting "tab-feed" Button
+    t =    13.27s     Synthesize event
+    t =    13.64s     Wait for com.forge-conductor.app to idle
+    t =    13.64s Waiting 3.0s for "detail-feed" Any to exist
+    t =    14.66s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-feed" Any`
+    t =    14.66s         Checking existence of `"detail-feed" Any`
+    t =    14.70s Waiting 2.0s for "tab-diagnostics" Button to exist
+    t =    15.73s     Checking `Expect predicate `existsNoRetry == 1` for object "tab-diagnostics" Button`
+    t =    15.73s         Checking existence of `"tab-diagnostics" Button`
+    t =    15.77s Click "tab-diagnostics" Button
+    t =    15.77s     Wait for com.forge-conductor.app to idle
+    t =    15.77s     Find the "tab-diagnostics" Button
+    t =    15.80s     Check for interrupting elements affecting "tab-diagnostics" Button
+    t =    15.82s     Synthesize event
+    t =    16.20s     Wait for com.forge-conductor.app to idle
+    t =    16.21s Waiting 3.0s for "detail-diagnostics" Any to exist
+    t =    17.23s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-diagnostics" Any`
+    t =    17.23s         Checking existence of `"detail-diagnostics" Any`
+    t =    17.39s Waiting 2.0s for "tab-manager" Button to exist
+    t =    18.43s     Checking `Expect predicate `existsNoRetry == 1` for object "tab-manager" Button`
+    t =    18.43s         Checking existence of `"tab-manager" Button`
+    t =    18.49s Click "tab-manager" Button
+    t =    18.49s     Wait for com.forge-conductor.app to idle
+    t =    18.49s     Find the "tab-manager" Button
+    t =    18.55s     Check for interrupting elements affecting "tab-manager" Button
+    t =    18.59s     Synthesize event
+    t =    19.02s     Wait for com.forge-conductor.app to idle
+    t =    19.02s Waiting 3.0s for "detail-manager" Any to exist
+    t =    20.04s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-manager" Any`
+    t =    20.04s         Checking existence of `"detail-manager" Any`
+    t =    20.11s Tear Down
+    t =    20.11s     Terminate com.forge-conductor.app:67762
+Test Case '-[ForgeConductorUITests.ForgeConductorUITests testSidebarTabsNavigate]' passed (21.251 seconds).
+Test Suite 'ForgeConductorUITests' passed at 2026-08-23 16:06:14.137.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 42.194 (42.198) seconds
+Test Suite 'ForgeConductorUITests.xctest' passed at 2026-08-23 16:06:14.138.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 42.194 (42.199) seconds
+Test Suite 'All tests' passed at 2026-08-23 16:06:14.138.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 42.194 (42.199) seconds
+
+Test session results, code coverage, and logs:
+	/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.build/DerivedData-P10/Logs/Test/Test-ForgeConductor-2026.08.23_16-05-31--0500.xcresult
+
+** TEST EXECUTE SUCCEEDED **
+
+Testing started

@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 252,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T184025Z-90a51329f5.stdout.txt",
+      "sha256": "60e3661d483df68284078ce2da2963d3f6b2ef62dd79e458134eb25c60557e5d"
+    },
+    {
+      "bytes": 100,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T184025Z-90a51329f5.stderr.txt",
+      "sha256": "6ec7dab5a78a195b4a4c4cad92ad43d3ece6a303cebdcfdc3f9ca1bdd2fab8a6"
+    }
+  ],
+  "command": "./script/build_and_run.sh --verify",
+  "ended_at": "2026-08-23T18:40:28.041299+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T184025Z-90a51329f5",
+  "kind": "p01-native-app-launch",
+  "related_findings": [],
+  "related_gates": [
+    "G01"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T18:40:25.639889+00:00",
+  "timed_out": false
+}

@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 2911,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T184048Z-71ae30f85c.stdout.txt",
+      "sha256": "6d0ce2d5c768758ab21c1d867c27e1aa5ebb92303b65916446f4e4eb2e48b7d1"
+    },
+    {
+      "bytes": 717,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T184048Z-71ae30f85c.stderr.txt",
+      "sha256": "410d7cff86efacfd8bfa9a2ed04cf4d4882f9b7345d59aa5fa46f8011f34ec56"
+    }
+  ],
+  "command": "xcodebuild -workspace ForgeConductor.xcworkspace -scheme ForgeConductor -destination platform=macOS test",
+  "ended_at": "2026-08-23T18:40:51.118439+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 65,
+  "id": "EVID-20260823T184048Z-71ae30f85c",
+  "kind": "p01-xcode-ui-characterization",
+  "related_findings": [],
+  "related_gates": [
+    "G01"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T18:40:48.777361+00:00",
+  "timed_out": false
+}

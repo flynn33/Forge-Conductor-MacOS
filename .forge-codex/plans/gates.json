@@ -1,0 +1,365 @@
+{
+  "completion_requires": [
+    "G00",
+    "G01",
+    "G02",
+    "G03",
+    "G04",
+    "G05",
+    "G06",
+    "G07",
+    "G08",
+    "G09",
+    "G10",
+    "G11",
+    "G12"
+  ],
+  "gates": [
+    {
+      "criteria": [
+        "environment doctor exits with recorded capability status",
+        "repository shape and Git state recorded",
+        "package validation passes",
+        "reproducible build entrypoint exists or tracked implementation task is active"
+      ],
+      "id": "G00",
+      "manual_pass_allowed": false,
+      "name": "Environment and reproducibility",
+      "phases": [
+        "P00"
+      ],
+      "required_evidence_fields": [
+        "command",
+        "exit_code",
+        "started_at",
+        "ended_at",
+        "environment",
+        "artifacts",
+        "sha256",
+        "evaluator"
+      ],
+      "type": "hard"
+    },
+    {
+      "criteria": [
+        "feature-baseline.json validates",
+        "existing MCP surfaces captured",
+        "persistence/settings/commands/scenes inventoried",
+        "all behavior-changing targets have characterization coverage"
+      ],
+      "id": "G01",
+      "manual_pass_allowed": false,
+      "name": "Feature baseline",
+      "phases": [
+        "P01"
+      ],
+      "required_evidence_fields": [
+        "command",
+        "exit_code",
+        "started_at",
+        "ended_at",
+        "environment",
+        "artifacts",
+        "sha256",
+        "evaluator"
+      ],
+      "type": "hard"
+    },
+    {
+      "criteria": [
+        "diagnostic counters and signposts build",
+        "logs redact private content",
+        "baseline reproducer artifacts recorded",
+        "before traces captured on capable macOS host"
+      ],
+      "id": "G02",
+      "manual_pass_allowed": false,
+      "name": "Baseline observability",
+      "phases": [
+        "P02"
+      ],
+      "required_evidence_fields": [
+        "command",
+        "exit_code",
+        "started_at",
+        "ended_at",
+        "environment",
+        "artifacts",
+        "sha256",
+        "evaluator"
+      ],
+      "type": "hard_runtime"
+    },
+    {
+      "criteria": [
+        "maximum pending presentation state <= 2 logical slots",
+        "no per-update unstructured main-actor task path",
+        "latest value converges under producer pressure",
+        "stale generation and post-stop delivery tests pass",
+        "telemetry mapping/unit tests pass"
+      ],
+      "id": "G03",
+      "manual_pass_allowed": false,
+      "name": "Bounded telemetry",
+      "phases": [
+        "P03"
+      ],
+      "required_evidence_fields": [
+        "command",
+        "exit_code",
+        "started_at",
+        "ended_at",
+        "environment",
+        "artifacts",
+        "sha256",
+        "evaluator"
+      ],
+      "type": "hard"
+    },
+    {
+      "criteria": [
+        "Metal resource construction is shared or justified",
+        "hidden/static draw count reaches zero after quiescence",
+        "no high-frequency buffer allocation path",
+        "open-close release test passes",
+        "Release Metal/performance evidence meets budget"
+      ],
+      "id": "G04",
+      "manual_pass_allowed": false,
+      "name": "Efficient gauges",
+      "phases": [
+        "P04"
+      ],
+      "required_evidence_fields": [
+        "command",
+        "exit_code",
+        "started_at",
+        "ended_at",
+        "environment",
+        "artifacts",
+        "sha256",
+        "evaluator"
+      ],
+      "type": "hard_runtime"
+    },
+    {
+      "criteria": [
+        "all audit E2 risks have ownership disposition",
+        "confirmed retaining edges fixed with same-flow proof",
+        "process/pipe/task/timer/observer shutdown tests pass",
+        "ASan and TSan runs separately pass or have zero unresolved product findings"
+      ],
+      "id": "G05",
+      "manual_pass_allowed": false,
+      "name": "Lifecycle and concurrency",
+      "phases": [
+        "P05"
+      ],
+      "required_evidence_fields": [
+        "command",
+        "exit_code",
+        "started_at",
+        "ended_at",
+        "environment",
+        "artifacts",
+        "sha256",
+        "evaluator"
+      ],
+      "type": "hard_runtime"
+    },
+    {
+      "criteria": [
+        "all long-lived collections declare/enforce limits",
+        "memory-pressure behavior passes",
+        "subprocess output/logs are bounded",
+        "main-actor blocking scan and tests pass",
+        "project/session release reaches bounded steady state"
+      ],
+      "id": "G06",
+      "manual_pass_allowed": false,
+      "name": "Bounded application state",
+      "phases": [
+        "P06"
+      ],
+      "required_evidence_fields": [
+        "command",
+        "exit_code",
+        "started_at",
+        "ended_at",
+        "environment",
+        "artifacts",
+        "sha256",
+        "evaluator"
+      ],
+      "type": "hard"
+    },
+    {
+      "criteria": [
+        "existing MCP compatibility passes",
+        "memory MCP conformance passes",
+        "project isolation and restart durability pass",
+        "migration/integrity/recovery pass",
+        "search/page/payload/cache budgets pass",
+        "redaction/security tests pass"
+      ],
+      "id": "G07",
+      "manual_pass_allowed": false,
+      "name": "Project memory MCP",
+      "phases": [
+        "P07"
+      ],
+      "required_evidence_fields": [
+        "command",
+        "exit_code",
+        "started_at",
+        "ended_at",
+        "environment",
+        "artifacts",
+        "sha256",
+        "evaluator"
+      ],
+      "type": "hard"
+    },
+    {
+      "criteria": [
+        "handoff schema and compactness pass",
+        "all transition crash points recover",
+        "idempotency and exact acknowledgment pass",
+        "context budget fallback passes",
+        "continuity MCP conformance passes"
+      ],
+      "id": "G08",
+      "manual_pass_allowed": false,
+      "name": "Continuity engine",
+      "phases": [
+        "P08"
+      ],
+      "required_evidence_fields": [
+        "command",
+        "exit_code",
+        "started_at",
+        "ended_at",
+        "environment",
+        "artifacts",
+        "sha256",
+        "evaluator"
+      ],
+      "type": "hard"
+    },
+    {
+      "criteria": [
+        "host capability report exists",
+        "required plugin target builds and tests",
+        "full no-operator rollover passes in a supported mode",
+        "external MCP-only compatibility passes",
+        "private UI automation scan passes"
+      ],
+      "id": "G09",
+      "manual_pass_allowed": false,
+      "name": "Host adapter and autonomous rollover",
+      "phases": [
+        "P09"
+      ],
+      "required_evidence_fields": [
+        "command",
+        "exit_code",
+        "started_at",
+        "ended_at",
+        "environment",
+        "artifacts",
+        "sha256",
+        "evaluator"
+      ],
+      "type": "hard"
+    },
+    {
+      "criteria": [
+        "every baseline feature preserved/additive/migrated",
+        "all old fixtures migrate and reopen",
+        "MCP golden snapshots compatible",
+        "UI commands/settings/accessibility tests pass",
+        "no unknown or untested affected feature"
+      ],
+      "id": "G10",
+      "manual_pass_allowed": false,
+      "name": "Feature parity and migrations",
+      "phases": [
+        "P10"
+      ],
+      "required_evidence_fields": [
+        "command",
+        "exit_code",
+        "started_at",
+        "ended_at",
+        "environment",
+        "artifacts",
+        "sha256",
+        "evaluator"
+      ],
+      "type": "hard"
+    },
+    {
+      "criteria": [
+        "Release stress suite passes",
+        "resident-size trajectories are bounded",
+        "telemetry/gauge hard invariants pass under stress",
+        "latency/CPU/GPU/wakeup/database budgets pass",
+        "lowest available representative memory tier evidence exists"
+      ],
+      "id": "G11",
+      "manual_pass_allowed": false,
+      "name": "Release resource validation",
+      "phases": [
+        "P11"
+      ],
+      "required_evidence_fields": [
+        "command",
+        "exit_code",
+        "started_at",
+        "ended_at",
+        "environment",
+        "artifacts",
+        "sha256",
+        "evaluator"
+      ],
+      "type": "hard_runtime"
+    },
+    {
+      "criteria": [
+        "all prior hard gates pass",
+        "critical/high unresolved findings = 0",
+        "full build/test matrix passes",
+        "secret and prohibited-authorship scans pass",
+        "evidence hashes validate",
+        "completion validator exits zero"
+      ],
+      "id": "G12",
+      "manual_pass_allowed": false,
+      "name": "Final quality",
+      "phases": [
+        "P12"
+      ],
+      "required_evidence_fields": [
+        "command",
+        "exit_code",
+        "started_at",
+        "ended_at",
+        "environment",
+        "artifacts",
+        "sha256",
+        "evaluator"
+      ],
+      "type": "hard"
+    }
+  ],
+  "schema_version": 1,
+  "status_values": [
+    "not_started",
+    "running",
+    "passed",
+    "failed",
+    "blocked_dependency",
+    "blocked_environment",
+    "retry_scheduled"
+  ]
+}

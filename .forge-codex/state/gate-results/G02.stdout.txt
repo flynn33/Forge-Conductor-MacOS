@@ -1,0 +1,26 @@
+{
+  "criteria_results": [
+    {
+      "criterion": "diagnostic counters and signposts build",
+      "passed": true,
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/RuntimeObservability.swift#b1477822a5ec4187c9a44128c2bd9225a485166130c981484c3ebbab80c1e917; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T190435Z-72024a943c.stdout.txt#3e6ac537d1a568f2f0fcb6259b641a377430ed5fc7fa520c046f51f7c39b4e81"
+    },
+    {
+      "criterion": "logs redact private content",
+      "passed": true,
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/DiagnosticLog.swift#b87c063ffca4a1d472a089b1d8ae838f9681232ab445f80206ae07949053cf48; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T190435Z-72024a943c.stdout.txt#3e6ac537d1a568f2f0fcb6259b641a377430ed5fc7fa520c046f51f7c39b4e81"
+    },
+    {
+      "criterion": "baseline reproducer artifacts recorded",
+      "passed": true,
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P02-telemetry-baseline.json#497ba34b5c3eeeb4b821f664b1df505976a64fcf4104c99f655371051a3d426e; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T190504Z-695abfb997.stdout.txt#27a0939f7a0047ae94fb4c7c9e03dbcb0cab639a23930aa29b500a72317a6309"
+    },
+    {
+      "criterion": "before traces captured on capable macOS host",
+      "passed": true,
+      "evidence": "/Users/jimdaley/Documents/RavenForge/Forge-Conductor-MacOS/Forge-Conductor-Repair-Evidence/aba90ab1-be80-4cc5-aa0b-23dd54d4a24d/p02/P02-Time-Profiler-Attach.trace/instrument_data/193EC53B-8B26-4F00-9165-EB2F319E1578/run_data/1.run.zip#8742bb04c07f0e7543508e0c55ac6c19e22cf71980a741ec586f54ea30a0f7ab; /Users/jimdaley/Documents/RavenForge/Forge-Conductor-MacOS/Forge-Conductor-Repair-Evidence/aba90ab1-be80-4cc5-aa0b-23dd54d4a24d/p02/P02-Sample-Baseline.txt#1df75054bd14acd1ced3c1fed5279152dee9204768450ced11b8e34a490fe41b; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T190527Z-3d3279fc30.stdout.txt#3dd24fc23a33fe3a7e0592e9b8becbe10fb446612fb3ea2e9a3bc87abadf2050"
+    }
+  ],
+  "valid": true,
+  "errors": []
+}

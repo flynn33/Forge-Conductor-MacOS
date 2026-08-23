@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 109,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T190038Z-7b2e90ce5e.stdout.txt",
+      "sha256": "776c764d5d00d1a3ec090faba0e4780d6734e02886d9544a5190f448b83a795a"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T190038Z-7b2e90ce5e.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "command": "xcrun xctrace record --template Allocations --time-limit 10s --no-prompt --output /Users/jimdaley/Documents/RavenForge/Forge-Conductor-MacOS/Forge-Conductor-Repair-Evidence/aba90ab1-be80-4cc5-aa0b-23dd54d4a24d/p02/P02-Allocations-Launch.trace --launch -- '/Users/jimdaley/GitHub/Forge-Conductor-MacOS/dist/Forge Conductor.app'",
+  "ended_at": "2026-08-23T19:02:49.437661+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": -9,
+  "id": "EVID-20260823T190038Z-7b2e90ce5e",
+  "kind": "p02-allocations-launch-baseline",
+  "related_findings": [],
+  "related_gates": [
+    "G02"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T19:00:38.790476+00:00",
+  "timed_out": false
+}

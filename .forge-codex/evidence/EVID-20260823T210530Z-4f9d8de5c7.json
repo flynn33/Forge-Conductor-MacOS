@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 14454,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T210530Z-4f9d8de5c7.stdout.txt",
+      "sha256": "7b185c5b7fd40816ff6ccc35c64cc2458be87e4a2500dae7e6e1cb070e159b65"
+    },
+    {
+      "bytes": 593,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T210530Z-4f9d8de5c7.stderr.txt",
+      "sha256": "d0c61a38e4d664dcd7ad343fc811c0483920382dfb474a572aaf90385d6c5a2d"
+    }
+  ],
+  "command": "xcodebuild -project ForgeConductor.xcodeproj -scheme ForgeConductor -configuration Debug -destination platform=macOS -derivedDataPath .build/DerivedData-P10 CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= test-without-building -only-testing:ForgeConductorUITests",
+  "ended_at": "2026-08-23T21:06:14.445959+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T210530Z-4f9d8de5c7",
+  "kind": "p10-native-ui-tests",
+  "related_findings": [],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T21:05:30.593996+00:00",
+  "timed_out": false
+}

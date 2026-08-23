@@ -78,6 +78,13 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
             }
         }
 
+        if tool == "shell_exec", !config.model.shell.enabled {
+            return .denied(
+                code: "shell_disabled",
+                message: "Unrestricted shell execution is disabled by trusted local configuration"
+            )
+        }
+
         let roots = authorizedRoots(binding: binding, clientID: clientID)
         let base = binding.flatMap(\.cwd).map(ToolArgHelpers.resolvePath) ?? roots.first ?? paths.home
         var normalized = arguments
@@ -131,6 +138,8 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
         }
 
         switch tool {
+        case "agent_run_start":
+            return [access("cwd")].compactMap { $0 }
         case "fs_read", "fs_write", "fs_edit", "fs_mkdir":
             return [access("path")].compactMap { $0 }
         case "fs_list", "fs_glob", "search_text":
@@ -172,14 +181,19 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
     }
 
     private func authorizedRoots(binding: ActiveBinding?, clientID: ClientID) -> [URL] {
-        let configured = config.model.allowedRoots.map(ToolArgHelpers.resolvePath)
-        let bindingRoot = binding.flatMap(\.cwd).map(ToolArgHelpers.resolvePath)
-        let extra = workspace?.additionalRoots(for: clientID) ?? []
-        return ([paths.home] + configured + [bindingRoot].compactMap { $0 } + extra)
+        let trusted = ([paths.home] + config.model.allowedRoots.map(ToolArgHelpers.resolvePath))
             .map(canonicalURL)
             .reduce(into: [URL]()) { roots, root in
                 if !roots.contains(root) { roots.append(root) }
             }
+        let claimed = [binding.flatMap(\.cwd).map(ToolArgHelpers.resolvePath)].compactMap { $0 }
+            + (workspace?.additionalRoots(for: clientID) ?? [])
+        guard !claimed.isEmpty else { return trusted }
+        return claimed.map(canonicalURL).filter { candidate in
+            trusted.contains { contains(candidate, root: $0) }
+        }.reduce(into: [URL]()) { roots, root in
+            if !roots.contains(root) { roots.append(root) }
+        }
     }
 
     /// Read-only access under the interactive user's home, excluding secret/system trees.
@@ -237,7 +251,14 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
         "agent_run_start", "agent_run_status", "agent_run_complete",
         // Durable memory remains available without and during agent sessions.
         "memory_set", "memory_get", "memory_list", "memory_delete", "memory_search",
+        "project_memory.initialize", "project_memory.remember", "project_memory.remember_batch",
+        "project_memory.search", "project_memory.get", "project_memory.update",
+        "project_memory.forget", "project_memory.list_recent", "project_memory.link",
+        "project_memory.export", "project_memory.import", "project_memory.status",
         "session_checkpoint", "session_handoff", "context_get", "context_list",
+        "continuity.checkpoint", "continuity.prepare_handoff",
+        "continuity.get_pending_handoff", "continuity.acknowledge_handoff",
+        "continuity.resume", "continuity.status", "continuity.request_rollover",
     ]
 
     private static let requiresActiveSession: Set<String> = [

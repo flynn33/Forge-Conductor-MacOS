@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 8568,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T184311Z-0dccfacc9f.stdout.txt",
+      "sha256": "332c4bc6124e9792eaf8d9aad109c79948ddff52f0cd56c228ad1abe01f4781b"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T184311Z-0dccfacc9f.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "command": "env FORGE_CONDUCTOR_HOME=/Users/jimdaley/Documents/RavenForge/Forge-Conductor-MacOS/Forge-Conductor-Repair-Evidence/aba90ab1-be80-4cc5-aa0b-23dd54d4a24d/p01-mcp-home zsh -c 'exec .build/debug/forge-conductor serve < .forge-codex/state/baseline/mcp-baseline-requests.ndjson'",
+  "ended_at": "2026-08-23T18:43:12.106417+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T184311Z-0dccfacc9f",
+  "kind": "p01-mcp-protocol-baseline",
+  "related_findings": [],
+  "related_gates": [
+    "G01"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T18:43:11.821435+00:00",
+  "timed_out": false
+}

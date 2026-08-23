@@ -1,0 +1,41 @@
+{
+  "artifacts": [
+    {
+      "bytes": 3983,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P06-resource-policy-inventory.json",
+      "sha256": "e62cc92dbd5fb54145ed84db6a14ac476c69ef5ae3aa5d243a54a0bf0bd5e400"
+    },
+    {
+      "bytes": 1163,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P06-bounded-state-report.json",
+      "sha256": "b05db8ae7a98a3d3d556712b78cca923b279e61315317ebdad7016438c46255c"
+    },
+    {
+      "bytes": 226,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T195911Z-2c43d9837a.stdout.txt",
+      "sha256": "49a317b61a5aa822cb9f4ffcb3f06ea3aa1e6973b6848e9fb077d76c65260a12"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T195911Z-2c43d9837a.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "command": ".forge-codex/scripts/check_p06_resources.py",
+  "ended_at": "2026-08-23T19:59:11.796299+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T195911Z-2c43d9837a",
+  "kind": "bounded-state-acceptance-check",
+  "related_findings": [],
+  "related_gates": [
+    "G06"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T19:59:11.750393+00:00",
+  "timed_out": false
+}

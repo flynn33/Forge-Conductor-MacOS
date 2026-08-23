@@ -414,6 +414,56 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(result.payload["code"] as? String, "active_session_required")
     }
 
+    func testAgentRunStartCannotCreateAuthorizationRoot() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let outside = tempHome.deletingLastPathComponent()
+
+        let result = try app.tools.call(
+            name: "agent_run_start",
+            arguments: ["agent_id": "implement", "goal": "escape", "cwd": outside.path],
+            clientID: ClientID("untrusted-session-root")
+        )
+
+        XCTAssertFalse(result.ok)
+        XCTAssertEqual(result.payload["code"] as? String, "path_outside_allowed_roots")
+        XCTAssertNil(app.sessions.binding(for: ClientID("untrusted-session-root")))
+    }
+
+    func testShellIsDisabledUnlessTrustedConfigurationEnablesIt() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let client = ClientID("disabled-shell")
+        _ = try app.sessions.start(agentID: "implement", goal: "probe", clientID: client, cwd: tempHome.path)
+
+        let result = try app.tools.call(
+            name: "shell_exec",
+            arguments: ["command": "true", "cwd": tempHome.path],
+            clientID: client
+        )
+
+        XCTAssertFalse(result.ok)
+        XCTAssertEqual(result.payload["code"] as? String, "shell_disabled")
+    }
+
+    func testShellRejectsNonFiniteTimeoutWhenEnabled() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        _ = try app.config.update(["shell": ["enabled": true]], save: false)
+        let client = ClientID("bounded-shell-timeout")
+        _ = try app.sessions.start(agentID: "implement", goal: "probe", clientID: client, cwd: tempHome.path)
+
+        let result = try XCTUnwrap(ShellToolPack().handle(
+            name: "shell_exec",
+            arguments: ["command": "true", "cwd": tempHome.path, "timeout_sec": Double.infinity],
+            clientID: client,
+            app: app
+        ))
+
+        XCTAssertFalse(result.ok)
+        XCTAssertEqual(result.payload["code"] as? String, "invalid_timeout")
+    }
+
     func testToolAuditRedactsFileContents() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }

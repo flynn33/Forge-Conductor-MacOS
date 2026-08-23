@@ -1,0 +1,41 @@
+Test Suite 'Selected tests' started at 2026-08-23 16:07:20.025.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-23 16:07:20.026.
+Test Suite 'ContinuityCoordinatorTests' started at 2026-08-23 16:07:20.026.
+Test Case '-[ForgeConductorTests.ContinuityCoordinatorTests testExternalMCPControlLifecycleAndSchemas]' started.
+Test Case '-[ForgeConductorTests.ContinuityCoordinatorTests testExternalMCPControlLifecycleAndSchemas]' passed (0.251 seconds).
+Test Suite 'ContinuityCoordinatorTests' passed at 2026-08-23 16:07:20.277.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.251 (0.251) seconds
+Test Suite 'ContinuityTests' started at 2026-08-23 16:07:20.277.
+Test Case '-[ForgeConductorTests.ContinuityTests testContinuityToolsListed]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testContinuityToolsListed]' passed (0.266 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testPrimaryAndFallbackMCPProcessesShareContinuitySafely]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testPrimaryAndFallbackMCPProcessesShareContinuitySafely]' passed (0.434 seconds).
+Test Suite 'ContinuityTests' passed at 2026-08-23 16:07:20.977.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.700 (0.700) seconds
+Test Suite 'MCPProtocolAndDiagnosticsTests' started at 2026-08-23 16:07:20.977.
+Test Case '-[ForgeConductorTests.MCPProtocolAndDiagnosticsTests testProtocolNegotiationEchoesLMStudioVersion]' started.
+Test Case '-[ForgeConductorTests.MCPProtocolAndDiagnosticsTests testProtocolNegotiationEchoesLMStudioVersion]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.MCPProtocolAndDiagnosticsTests testStdioTransportWritesSpecCompliantNDJSON]' started.
+Test Case '-[ForgeConductorTests.MCPProtocolAndDiagnosticsTests testStdioTransportWritesSpecCompliantNDJSON]' passed (0.000 seconds).
+Test Suite 'MCPProtocolAndDiagnosticsTests' passed at 2026-08-23 16:07:20.978.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'ProductPathReliabilityTests' started at 2026-08-23 16:07:20.978.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testForgeStatusToolCall]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testForgeStatusToolCall]' passed (0.064 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testInProcessMCPHandshakeToolsList]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testInProcessMCPHandshakeToolsList]' passed (0.114 seconds).
+Test Suite 'ProductPathReliabilityTests' passed at 2026-08-23 16:07:21.156.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.178 (0.178) seconds
+Test Suite 'ProjectMemoryTests' started at 2026-08-23 16:07:21.156.
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testToolConformanceIsAdditiveAndInitializeAdvertisesCapabilities]' started.
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testToolConformanceIsAdditiveAndInitializeAdvertisesCapabilities]' passed (0.156 seconds).
+Test Suite 'ProjectMemoryTests' passed at 2026-08-23 16:07:21.312.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.156 (0.156) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-08-23 16:07:21.312.
+	 Executed 8 tests, with 0 failures (0 unexpected) in 1.285 (1.286) seconds
+Test Suite 'Selected tests' passed at 2026-08-23 16:07:21.312.
+	 Executed 8 tests, with 0 failures (0 unexpected) in 1.285 (1.287) seconds
+◇ Test run started.
+↳ Testing Library Version: 1501
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

@@ -1,0 +1,1022 @@
+{
+  "finding_count": 29,
+  "findings": [
+    {
+      "assigned_phase": "P03",
+      "audit_tier": "A \u2014 deterministic source behavior",
+      "completion_requirements": [
+        "source path and line remain traceable",
+        "root cause or risk disposition is explicit",
+        "tests cover the release boundary",
+        "gate evidence references the finding",
+        "critical/high items are resolved before completion"
+      ],
+      "evidence_class": "E1",
+      "id": "FC-MEM-001",
+      "required_actions": [
+        "Confirm the exact source symbol and effective owner.",
+        "Create or identify the smallest deterministic reproducer.",
+        "Promote to E0 only with runtime/test evidence.",
+        "Apply the smallest feature-preserving fix.",
+        "Re-run the same flow and attach before/after evidence.",
+        "Update feature parity and resource-owner records."
+      ],
+      "severity": "Critical",
+      "source": {
+        "basis": "The recurring telemetry delivery path creates a fresh unstructured MainActor task that captures the update payload. No pending-task/latest-value gate is visible in the surrounding source. When production outruns MainActor consumption, queued tasks and their captured snapshots accumulate until serviced.",
+        "id": "FC-MEM-001",
+        "line": "48",
+        "path": "Sources/ForgeConductorApp/AppTelemetryBinding.swift",
+        "severity": "Critical",
+        "status": "Source-proven queueing behavior; live growth magnitude requires macOS profiling",
+        "tier": "A \u2014 deterministic source behavior",
+        "title": "Telemetry delivery can accumulate unbounded pending MainActor tasks",
+        "validation": "Instrument produced, scheduled, applied, dropped/coalesced, and maximum pending depth; stall MainActor for three seconds while telemetry continues."
+      },
+      "status": "open",
+      "title": "Telemetry delivery can accumulate unbounded pending MainActor tasks"
+    },
+    {
+      "assigned_phase": "P04",
+      "audit_tier": "A \u2014 deterministic source behavior",
+      "completion_requirements": [
+        "source path and line remain traceable",
+        "root cause or risk disposition is explicit",
+        "tests cover the release boundary",
+        "gate evidence references the finding",
+        "critical/high items are resolved before completion"
+      ],
+      "evidence_class": "E1",
+      "id": "FC-PERF-001",
+      "required_actions": [
+        "Confirm the exact source symbol and effective owner.",
+        "Create or identify the smallest deterministic reproducer.",
+        "Promote to E0 only with runtime/test evidence.",
+        "Apply the smallest feature-preserving fix.",
+        "Re-run the same flow and attach before/after evidence.",
+        "Update feature parity and resource-owner records."
+      ],
+      "severity": "Critical",
+      "source": {
+        "basis": "The native gauge view/representable constructs Metal command-queue and pipeline resources in its per-view object graph and configures recurring drawing. Cost therefore scales with the number of simultaneously instantiated gauge views.",
+        "id": "FC-PERF-001",
+        "line": "80",
+        "path": "Sources/ForgeConductorApp/Metal/MetalGaugeKit.swift",
+        "severity": "Critical",
+        "status": "Source-proven resource topology; device-specific CPU/GPU cost requires Instruments",
+        "tier": "A \u2014 deterministic source behavior",
+        "title": "Each gauge MTKView owns an independent command queue/pipeline and recurring render cadence",
+        "validation": "Record live MTKView, MTLCommandQueue, pipeline-state, and GPU work for 1, 10, 100, and the full gauge count; repeat after hiding and dismissing the screen."
+      },
+      "status": "open",
+      "title": "Each gauge MTKView owns an independent command queue/pipeline and recurring render cadence"
+    },
+    {
+      "assigned_phase": "P04",
+      "audit_tier": "A \u2014 deterministic source behavior",
+      "completion_requirements": [
+        "source path and line remain traceable",
+        "root cause or risk disposition is explicit",
+        "tests cover the release boundary",
+        "gate evidence references the finding",
+        "critical/high items are resolved before completion"
+      ],
+      "evidence_class": "E1",
+      "id": "FC-PERF-001",
+      "required_actions": [
+        "Confirm the exact source symbol and effective owner.",
+        "Create or identify the smallest deterministic reproducer.",
+        "Promote to E0 only with runtime/test evidence.",
+        "Apply the smallest feature-preserving fix.",
+        "Re-run the same flow and attach before/after evidence.",
+        "Update feature parity and resource-owner records."
+      ],
+      "severity": "Critical",
+      "source": {
+        "basis": "The native gauge view/representable constructs Metal command-queue and pipeline resources in its per-view object graph and configures recurring drawing. Cost therefore scales with the number of simultaneously instantiated gauge views.",
+        "id": "FC-PERF-001",
+        "line": "40",
+        "path": "Sources/ForgeConductorApp/Metal/MultiSeriesLoadRenderer.swift",
+        "severity": "Critical",
+        "status": "Source-proven resource topology; device-specific CPU/GPU cost requires Instruments",
+        "tier": "A \u2014 deterministic source behavior",
+        "title": "Each gauge MTKView owns an independent command queue/pipeline and recurring render cadence",
+        "validation": "Record live MTKView, MTLCommandQueue, pipeline-state, and GPU work for 1, 10, 100, and the full gauge count; repeat after hiding and dismissing the screen."
+      },
+      "status": "open",
+      "title": "Each gauge MTKView owns an independent command queue/pipeline and recurring render cadence"
+    },
+    {
+      "assigned_phase": "P03",
+      "audit_tier": "A \u2014 deterministic source behavior",
+      "completion_requirements": [
+        "source path and line remain traceable",
+        "root cause or risk disposition is explicit",
+        "tests cover the release boundary",
+        "gate evidence references the finding",
+        "critical/high items are resolved before completion"
+      ],
+      "evidence_class": "E1",
+      "id": "FC-PERF-002",
+      "required_actions": [
+        "Confirm the exact source symbol and effective owner.",
+        "Create or identify the smallest deterministic reproducer.",
+        "Promote to E0 only with runtime/test evidence.",
+        "Apply the smallest feature-preserving fix.",
+        "Re-run the same flow and attach before/after evidence.",
+        "Update feature parity and resource-owner records."
+      ],
+      "severity": "High",
+      "source": {
+        "basis": "The SwiftUI/native update path reaches makeBuffer, so model updates allocate a new MTLBuffer rather than writing to stable storage. At telemetry/display cadence this is deterministic allocation churn.",
+        "id": "FC-PERF-002",
+        "line": "141",
+        "path": "Sources/ForgeConductorApp/Metal/MultiSeriesLoadRenderer.swift",
+        "severity": "High",
+        "status": "Source-proven allocation site",
+        "tier": "A \u2014 deterministic source behavior",
+        "title": "Gauge update path allocates replacement Metal buffers",
+        "validation": "Use Allocations filtered to MTLBuffer creation and compare with a persistent-buffer implementation updated through contents()."
+      },
+      "status": "open",
+      "title": "Gauge update path allocates replacement Metal buffers"
+    },
+    {
+      "assigned_phase": "P03",
+      "audit_tier": "A \u2014 deterministic source behavior",
+      "completion_requirements": [
+        "source path and line remain traceable",
+        "root cause or risk disposition is explicit",
+        "tests cover the release boundary",
+        "gate evidence references the finding",
+        "critical/high items are resolved before completion"
+      ],
+      "evidence_class": "E1",
+      "id": "FC-PERF-003",
+      "required_actions": [
+        "Confirm the exact source symbol and effective owner.",
+        "Create or identify the smallest deterministic reproducer.",
+        "Promote to E0 only with runtime/test evidence.",
+        "Apply the smallest feature-preserving fix.",
+        "Re-run the same flow and attach before/after evidence.",
+        "Update feature parity and resource-owner records."
+      ],
+      "severity": "High",
+      "source": {
+        "basis": "TimelineView(.animation) requests recurring SwiftUI updates. In this gauge hierarchy it compounds telemetry delivery and native-view drawing even when sampled values do not change.",
+        "id": "FC-PERF-003",
+        "line": "17",
+        "path": "Sources/ForgeConductorApp/Views/Rig/RigDashboardView.swift",
+        "severity": "High",
+        "status": "Source-proven recurring invalidation",
+        "tier": "A \u2014 deterministic source behavior",
+        "title": "Gauge hierarchy has an animation clock independent of telemetry and MTKView drawing",
+        "validation": "Use SwiftUI Instruments to compare body-update counts with the timeline removed or scoped to the smallest animated primitive."
+      },
+      "status": "open",
+      "title": "Gauge hierarchy has an animation clock independent of telemetry and MTKView drawing"
+    },
+    {
+      "assigned_phase": "P03",
+      "audit_tier": "B \u2014 deterministic duplicate mapping; product invariant required",
+      "completion_requirements": [
+        "source path and line remain traceable",
+        "root cause or risk disposition is explicit",
+        "tests cover the release boundary",
+        "gate evidence references the finding",
+        "critical/high items are resolved before completion"
+      ],
+      "evidence_class": "E1",
+      "id": "FC-TELEM-DUPLICATE",
+      "required_actions": [
+        "Confirm the exact source symbol and effective owner.",
+        "Create or identify the smallest deterministic reproducer.",
+        "Promote to E0 only with runtime/test evidence.",
+        "Apply the smallest feature-preserving fix.",
+        "Re-run the same flow and attach before/after evidence.",
+        "Update feature parity and resource-owner records."
+      ],
+      "severity": "Medium",
+      "source": {
+        "basis": "Cases .agents, .diagnostics, .feed, .manager, .mcp, .rig, .tools all return `\"\"`.",
+        "id": "FC-TELEM-DUPLICATE",
+        "line": "73",
+        "path": "Sources/ForgeConductorApp/AppModel.swift",
+        "severity": "Medium",
+        "status": "Source-proven duplicate expression; may be intentional",
+        "tier": "B \u2014 deterministic duplicate mapping; product invariant required",
+        "title": "Distinct telemetry cases return the same source expression",
+        "validation": "Add a mapping contract test proving whether the shared source is intentional; otherwise correct the wrong case."
+      },
+      "status": "open",
+      "title": "Distinct telemetry cases return the same source expression"
+    },
+    {
+      "assigned_phase": "P03",
+      "audit_tier": "C \u2014 owner-local cleanup signal absent; external cleanup may exist",
+      "completion_requirements": [
+        "source path and line remain traceable",
+        "root cause or risk disposition is explicit",
+        "tests cover the release boundary",
+        "gate evidence references the finding",
+        "critical/high items are resolved before completion"
+      ],
+      "evidence_class": "E3",
+      "id": "FC-LIFE-GAP",
+      "required_actions": [
+        "Confirm the exact source symbol and effective owner.",
+        "Create or identify the smallest deterministic reproducer.",
+        "Promote to E0 only with runtime/test evidence.",
+        "Apply the smallest feature-preserving fix.",
+        "Re-run the same flow and attach before/after evidence.",
+        "Update feature parity and resource-owner records."
+      ],
+      "severity": "High",
+      "source": {
+        "basis": "class AppTelemetryBinding contains Task ownership/usage but no matching cleanup signal in the same type block.",
+        "id": "FC-LIFE-GAP",
+        "line": "48",
+        "path": "Sources/ForgeConductorApp/AppTelemetryBinding.swift",
+        "severity": "High",
+        "status": "Source-proven absence of matching cleanup syntax in this owner; not yet a proven live leak",
+        "tier": "C \u2014 owner-local cleanup signal absent; external cleanup may exist",
+        "title": "AppTelemetryBinding owns/uses Task without an owner-local cleanup marker",
+        "validation": "Instrument owner/resource counts and exercise the intended release boundary ten times; trace any survivor in a memgraph."
+      },
+      "status": "open",
+      "title": "AppTelemetryBinding owns/uses Task without an owner-local cleanup marker"
+    },
+    {
+      "assigned_phase": "P05",
+      "audit_tier": "C \u2014 owner-local cleanup signal absent; external cleanup may exist",
+      "completion_requirements": [
+        "source path and line remain traceable",
+        "root cause or risk disposition is explicit",
+        "tests cover the release boundary",
+        "gate evidence references the finding",
+        "critical/high items are resolved before completion"
+      ],
+      "evidence_class": "E3",
+      "id": "FC-LIFE-GAP",
+      "required_actions": [
+        "Confirm the exact source symbol and effective owner.",
+        "Create or identify the smallest deterministic reproducer.",
+        "Promote to E0 only with runtime/test evidence.",
+        "Apply the smallest feature-preserving fix.",
+        "Re-run the same flow and attach before/after evidence.",
+        "Update feature parity and resource-owner records."
+      ],
+      "severity": "High",
+      "source": {
+        "basis": "enum ForgeConductorMain contains DispatchSource ownership/usage but no matching cleanup signal in the same type block.",
+        "id": "FC-LIFE-GAP",
+        "line": "224",
+        "path": "Sources/ForgeConductorCLI/ForgeConductorMain.swift",
+        "severity": "High",
+        "status": "Source-proven absence of matching cleanup syntax in this owner; not yet a proven live leak",
+        "tier": "C \u2014 owner-local cleanup signal absent; external cleanup may exist",
+        "title": "ForgeConductorMain owns/uses DispatchSource without an owner-local cleanup marker",
+        "validation": "Instrument owner/resource counts and exercise the intended release boundary ten times; trace any survivor in a memgraph."
+      },
+      "status": "open",
+      "title": "ForgeConductorMain owns/uses DispatchSource without an owner-local cleanup marker"
+    },
+    {
+      "assigned_phase": "P05",
+      "audit_tier": "C \u2014 owner-local cleanup signal absent; external cleanup may exist",
+      "completion_requirements": [
+        "source path and line remain traceable",
+        "root cause or risk disposition is explicit",
+        "tests cover the release boundary",
+        "gate evidence references the finding",
+        "critical/high items are resolved before completion"
+      ],
+      "evidence_class": "E3",
+      "id": "FC-LIFE-GAP",
+      "required_actions": [
+        "Confirm the exact source symbol and effective owner.",
+        "Create or identify the smallest deterministic reproducer.",
+        "Promote to E0 only with runtime/test evidence.",
+        "Apply the smallest feature-preserving fix.",
+        "Re-run the same flow and attach before/after evidence.",
+        "Update feature parity and resource-owner records."
+      ],
+      "severity": "High",
+      "source": {
+        "basis": "enum ForgeConductorMain contains Process ownership/usage but no matching cleanup signal in the same type block.",
+        "id": "FC-LIFE-GAP",
+        "line": "401",
+        "path": "Sources/ForgeConductorCLI/ForgeConductorMain.swift",
+        "severity": "High",
+        "status": "Source-proven absence of matching cleanup syntax in this owner; not yet a proven live leak",
+        "tier": "C \u2014 owner-local cleanup signal absent; external cleanup may exist",
+        "title": "ForgeConductorMain owns/uses Process without an owner-local cleanup marker",
+        "validation": "Instrument owner/resource counts and exercise the intended release boundary ten times; trace any survivor in a memgraph."
+      },
+      "status": "open",
+      "title": "ForgeConductorMain owns/uses Process without an owner-local cleanup marker"
+    },
+    {
+      "assigned_phase": "P05",
+      "audit_tier": "C \u2014 owner-local cleanup signal absent; external cleanup may exist",
+      "completion_requirements": [
+        "source path and line remain traceable",
+        "root cause or risk disposition is explicit",
+        "tests cover the release boundary",
+        "gate evidence references the finding",
+        "critical/high items are resolved before completion"
+      ],
+      "evidence_class": "E3",
+      "id": "FC-LIFE-GAP",
+      "required_actions": [
+        "Confirm the exact source symbol and effective owner.",
+        "Create or identify the smallest deterministic reproducer.",
+        "Promote to E0 only with runtime/test evidence.",
+        "Apply the smallest feature-preserving fix.",
+        "Re-run the same flow and attach before/after evidence.",
+        "Update feature parity and resource-owner records."
+      ],
+      "severity": "High",
+      "source": {
+        "basis": "enum ForgeConductorMain contains Pipe/FileHandle ownership/usage but no matching cleanup signal in the same type block.",
+        "id": "FC-LIFE-GAP",
+        "line": "416",
+        "path": "Sources/ForgeConductorCLI/ForgeConductorMain.swift",
+        "severity": "High",
+        "status": "Source-proven absence of matching cleanup syntax in this owner; not yet a proven live leak",
+        "tier": "C \u2014 owner-local cleanup signal absent; external cleanup may exist",
+        "title": "ForgeConductorMain owns/uses Pipe/FileHandle without an owner-local cleanup marker",
+        "validation": "Instrument owner/resource counts and exercise the intended release boundary ten times; trace any survivor in a memgraph."
+      },
+      "status": "open",
+      "title": "ForgeConductorMain owns/uses Pipe/FileHandle without an owner-local cleanup marker"
+    },
+    {
+      "assigned_phase": "P05",
+      "audit_tier": "C \u2014 owner-local bound absent; cross-owner reset may exist",
+      "completion_requirements": [
+        "source path and line remain traceable",
+        "root cause or risk disposition is explicit",
+        "tests cover the release boundary",
+        "gate evidence references the finding",
+        "critical/high items are resolved before completion"
+      ],
+      "evidence_class": "E3",
+      "id": "FC-MEM-COLLECTION",
+      "required_actions": [
+        "Confirm the exact source symbol and effective owner.",
+        "Create or identify the smallest deterministic reproducer.",
+        "Promote to E0 only with runtime/test evidence.",
+        "Apply the smallest feature-preserving fix.",
+        "Re-run the same flow and attach before/after evidence.",
+        "Update feature parity and resource-owner records."
+      ],
+      "severity": "High",
+      "source": {
+        "basis": "The long-lived owner mutates `missing` via append/insert, but its type block contains no count cap, truncation, removal, or clear operation.",
+        "id": "FC-MEM-COLLECTION",
+        "line": "198",
+        "path": "Sources/ForgeConductorCore/Application/AgentSessionService.swift",
+        "severity": "High",
+        "status": "Source-proven append and absence of owner-local cap/eviction; cross-file reset must be traced",
+        "tier": "C \u2014 owner-local bound absent; cross-owner reset may exist",
+        "title": "Long-lived collection `missing` appends without an owner-local bound",
+        "validation": "Log collection count and high-water mark for a 30\u201360 minute session and across project/session release boundaries."
+      },
+      "status": "open",
+      "title": "Long-lived collection `missing` appends without an owner-local bound"
+    },
+    {
+      "assigned_phase": "P08",
+      "audit_tier": "C \u2014 owner-local bound absent; cross-owner reset may exist",
+      "completion_requirements": [
+        "source path and line remain traceable",
+        "root cause or risk disposition is explicit",
+        "tests cover the release boundary",
+        "gate evidence references the finding",
+        "critical/high items are resolved before completion"
+      ],
+      "evidence_class": "E3",
+      "id": "FC-MEM-COLLECTION",
+      "required_actions": [
+        "Confirm the exact source symbol and effective owner.",
+        "Create or identify the smallest deterministic reproducer.",
+        "Promote to E0 only with runtime/test evidence.",
+        "Apply the smallest feature-preserving fix.",
+        "Re-run the same flow and attach before/after evidence.",
+        "Update feature parity and resource-owner records."
+      ],
+      "severity": "High",
+      "source": {
+        "basis": "The long-lived owner mutates `snaps` via append/insert, but its type block contains no count cap, truncation, removal, or clear operation.",
+        "id": "FC-MEM-COLLECTION",
+        "line": "436",
+        "path": "Sources/ForgeConductorCore/Application/ContextContinuityService.swift",
+        "severity": "High",
+        "status": "Source-proven append and absence of owner-local cap/eviction; cross-file reset must be traced",
+        "tier": "C \u2014 owner-local bound absent; cross-owner reset may exist",
+        "title": "Long-lived collection `snaps` appends without an owner-local bound",
+        "validation": "Log collection count and high-water mark for a 30\u201360 minute session and across project/session release boundaries."
+      },
+      "status": "open",
+      "title": "Long-lived collection `snaps` appends without an owner-local bound"
+    },
+    {
+      "assigned_phase": "P08",
+      "audit_tier": "C \u2014 owner-local bound absent; cross-owner reset may exist",
+      "completion_requirements": [
+        "source path and line remain traceable",
+        "root cause or risk disposition is explicit",
+        "tests cover the release boundary",
+        "gate evidence references the finding",
+        "critical/high items are resolved before completion"
+      ],
+      "evidence_class": "E3",
+      "id": "FC-MEM-COLLECTION",
+      "required_actions": [
+        "Confirm the exact source symbol and effective owner.",
+        "Create or identify the smallest deterministic reproducer.",
+        "Promote to E0 only with runtime/test evidence.",
+        "Apply the smallest feature-preserving fix.",
+        "Re-run the same flow and attach before/after evidence.",
+        "Update feature parity and resource-owner records."
+      ],
+      "severity": "High",
+      "source": {
+        "basis": "The long-lived owner mutates `merged` via append/insert, but its type block contains no count cap, truncation, removal, or clear operation.",
+        "id": "FC-MEM-COLLECTION",
+        "line": "469",
+        "path": "Sources/ForgeConductorCore/Application/ContextContinuityService.swift",
+        "severity": "High",
+        "status": "Source-proven append and absence of owner-local cap/eviction; cross-file reset must be traced",
+        "tier": "C \u2014 owner-local bound absent; cross-owner reset may exist",
+        "title": "Long-lived collection `merged` appends without an owner-local bound",
+        "validation": "Log collection count and high-water mark for a 30\u201360 minute session and across project/session release boundaries."
+      },
+      "status": "open",
+      "title": "Long-lived collection `merged` appends without an owner-local bound"
+    },
+    {
+      "assigned_phase": "P08",
+      "audit_tier": "C \u2014 owner-local cleanup signal absent; external cleanup may exist",
+      "completion_requirements": [
+        "source path and line remain traceable",
+        "root cause or risk disposition is explicit",
+        "tests cover the release boundary",
+        "gate evidence references the finding",
+        "critical/high items are resolved before completion"
+      ],
+      "evidence_class": "E3",
+      "id": "FC-LIFE-GAP",
+      "required_actions": [
+        "Confirm the exact source symbol and effective owner.",
+        "Create or identify the smallest deterministic reproducer.",
+        "Promote to E0 only with runtime/test evidence.",
+        "Apply the smallest feature-preserving fix.",
+        "Re-run the same flow and attach before/after evidence.",
+        "Update feature parity and resource-owner records."
+      ],
+      "severity": "High",
+      "source": {
+        "basis": "class ContextContinuityService contains Task ownership/usage but no matching cleanup signal in the same type block.",
+        "id": "FC-LIFE-GAP",
+        "line": "609",
+        "path": "Sources/ForgeConductorCore/Application/ContextContinuityService.swift",
+        "severity": "High",
+        "status": "Source-proven absence of matching cleanup syntax in this owner; not yet a proven live leak",
+        "tier": "C \u2014 owner-local cleanup signal absent; external cleanup may exist",
+        "title": "ContextContinuityService owns/uses Task without an owner-local cleanup marker",
+        "validation": "Instrument owner/resource counts and exercise the intended release boundary ten times; trace any survivor in a memgraph."
+      },
+      "status": "open",
+      "title": "ContextContinuityService owns/uses Task without an owner-local cleanup marker"
+    },
+    {
+      "assigned_phase": "P05",
+      "audit_tier": "C \u2014 owner-local bound absent; cross-owner reset may exist",
+      "completion_requirements": [
+        "source path and line remain traceable",
+        "root cause or risk disposition is explicit",
+        "tests cover the release boundary",
+        "gate evidence references the finding",
+        "critical/high items are resolved before completion"
+      ],
+      "evidence_class": "E3",
+      "id": "FC-MEM-COLLECTION",
+      "required_actions": [
+        "Confirm the exact source symbol and effective owner.",
+        "Create or identify the smallest deterministic reproducer.",
+        "Promote to E0 only with runtime/test evidence.",
+        "Apply the smallest feature-preserving fix.",
+        "Re-run the same flow and attach before/after evidence.",
+        "Update feature parity and resource-owner records."
+      ],
+      "severity": "High",
+      "source": {
+        "basis": "The long-lived owner mutates `suffix` via append/insert, but its type block contains no count cap, truncation, removal, or clear operation.",
+        "id": "FC-MEM-COLLECTION",
+        "line": "218",
+        "path": "Sources/ForgeConductorCore/Application/ToolAuthorizationService.swift",
+        "severity": "High",
+        "status": "Source-proven append and absence of owner-local cap/eviction; cross-file reset must be traced",
+        "tier": "C \u2014 owner-local bound absent; cross-owner reset may exist",
+        "title": "Long-lived collection `suffix` appends without an owner-local bound",
+        "validation": "Log collection count and high-water mark for a 30\u201360 minute session and across project/session release boundaries."
+      },
+      "status": "open",
+      "title": "Long-lived collection `suffix` appends without an owner-local bound"
+    },
+    {
+      "assigned_phase": "P05",
+      "audit_tier": "C \u2014 owner-local cleanup signal absent; external cleanup may exist",
+      "completion_requirements": [
+        "source path and line remain traceable",
+        "root cause or risk disposition is explicit",
+        "tests cover the release boundary",
+        "gate evidence references the finding",
+        "critical/high items are resolved before completion"
+      ],
+      "evidence_class": "E3",
+      "id": "FC-LIFE-GAP",
+      "required_actions": [
+        "Confirm the exact source symbol and effective owner.",
+        "Create or identify the smallest deterministic reproducer.",
+        "Promote to E0 only with runtime/test evidence.",
+        "Apply the smallest feature-preserving fix.",
+        "Re-run the same flow and attach before/after evidence.",
+        "Update feature parity and resource-owner records."
+      ],
+      "severity": "High",
+      "source": {
+        "basis": "class ToolRouter contains AsyncStream ownership/usage but no matching cleanup signal in the same type block.",
+        "id": "FC-LIFE-GAP",
+        "line": "94",
+        "path": "Sources/ForgeConductorCore/Application/ToolRouter.swift",
+        "severity": "High",
+        "status": "Source-proven absence of matching cleanup syntax in this owner; not yet a proven live leak",
+        "tier": "C \u2014 owner-local cleanup signal absent; external cleanup may exist",
+        "title": "ToolRouter owns/uses AsyncStream without an owner-local cleanup marker",
+        "validation": "Instrument owner/resource counts and exercise the intended release boundary ten times; trace any survivor in a memgraph."
+      },
+      "status": "open",
+      "title": "ToolRouter owns/uses AsyncStream without an owner-local cleanup marker"
+    },
+    {
+      "assigned_phase": "P08",
+      "audit_tier": "C \u2014 owner-local cleanup signal absent; external cleanup may exist",
+      "completion_requirements": [
+        "source path and line remain traceable",
+        "root cause or risk disposition is explicit",
+        "tests cover the release boundary",
+        "gate evidence references the finding",
+        "critical/high items are resolved before completion"
+      ],
+      "evidence_class": "E3",
+      "id": "FC-LIFE-GAP",
+      "required_actions": [
+        "Confirm the exact source symbol and effective owner.",
+        "Create or identify the smallest deterministic reproducer.",
+        "Promote to E0 only with runtime/test evidence.",
+        "Apply the smallest feature-preserving fix.",
+        "Re-run the same flow and attach before/after evidence.",
+        "Update feature parity and resource-owner records."
+      ],
+      "severity": "High",
+      "source": {
+        "basis": "struct HandoffPacket contains Task ownership/usage but no matching cleanup signal in the same type block.",
+        "id": "FC-LIFE-GAP",
+        "line": "92",
+        "path": "Sources/ForgeConductorCore/Domain/HandoffPacket.swift",
+        "severity": "High",
+        "status": "Source-proven absence of matching cleanup syntax in this owner; not yet a proven live leak",
+        "tier": "C \u2014 owner-local cleanup signal absent; external cleanup may exist",
+        "title": "HandoffPacket owns/uses Task without an owner-local cleanup marker",
+        "validation": "Instrument owner/resource counts and exercise the intended release boundary ten times; trace any survivor in a memgraph."
+      },
+      "status": "open",
+      "title": "HandoffPacket owns/uses Task without an owner-local cleanup marker"
+    },
+    {
+      "assigned_phase": "P05",
+      "audit_tier": "C \u2014 owner-local cleanup signal absent; external cleanup may exist",
+      "completion_requirements": [
+        "source path and line remain traceable",
+        "root cause or risk disposition is explicit",
+        "tests cover the release boundary",
+        "gate evidence references the finding",
+        "critical/high items are resolved before completion"
+      ],
+      "evidence_class": "E3",
+      "id": "FC-LIFE-GAP",
+      "required_actions": [
+        "Confirm the exact source symbol and effective owner.",
+        "Create or identify the smallest deterministic reproducer.",
+        "Promote to E0 only with runtime/test evidence.",
+        "Apply the smallest feature-preserving fix.",
+        "Re-run the same flow and attach before/after evidence.",
+        "Update feature parity and resource-owner records."
+      ],
+      "severity": "High",
+      "source": {
+        "basis": "enum DashboardPortGuard contains Process ownership/usage but no matching cleanup signal in the same type block.",
+        "id": "FC-LIFE-GAP",
+        "line": "103",
+        "path": "Sources/ForgeConductorCore/Infrastructure/DashboardPortGuard.swift",
+        "severity": "High",
+        "status": "Source-proven absence of matching cleanup syntax in this owner; not yet a proven live leak",
+        "tier": "C \u2014 owner-local cleanup signal absent; external cleanup may exist",
+        "title": "DashboardPortGuard owns/uses Process without an owner-local cleanup marker",
+        "validation": "Instrument owner/resource counts and exercise the intended release boundary ten times; trace any survivor in a memgraph."
+      },
+      "status": "open",
+      "title": "DashboardPortGuard owns/uses Process without an owner-local cleanup marker"
+    },
+    {
+      "assigned_phase": "P05",
+      "audit_tier": "C \u2014 owner-local cleanup signal absent; external cleanup may exist",
+      "completion_requirements": [
+        "source path and line remain traceable",
+        "root cause or risk disposition is explicit",
+        "tests cover the release boundary",
+        "gate evidence references the finding",
+        "critical/high items are resolved before completion"
+      ],
+      "evidence_class": "E3",
+      "id": "FC-LIFE-GAP",
+      "required_actions": [
+        "Confirm the exact source symbol and effective owner.",
+        "Create or identify the smallest deterministic reproducer.",
+        "Promote to E0 only with runtime/test evidence.",
+        "Apply the smallest feature-preserving fix.",
+        "Re-run the same flow and attach before/after evidence.",
+        "Update feature parity and resource-owner records."
+      ],
+      "severity": "High",
+      "source": {
+        "basis": "enum DashboardPortGuard contains Pipe/FileHandle ownership/usage but no matching cleanup signal in the same type block.",
+        "id": "FC-LIFE-GAP",
+        "line": "107",
+        "path": "Sources/ForgeConductorCore/Infrastructure/DashboardPortGuard.swift",
+        "severity": "High",
+        "status": "Source-proven absence of matching cleanup syntax in this owner; not yet a proven live leak",
+        "tier": "C \u2014 owner-local cleanup signal absent; external cleanup may exist",
+        "title": "DashboardPortGuard owns/uses Pipe/FileHandle without an owner-local cleanup marker",
+        "validation": "Instrument owner/resource counts and exercise the intended release boundary ten times; trace any survivor in a memgraph."
+      },
+      "status": "open",
+      "title": "DashboardPortGuard owns/uses Pipe/FileHandle without an owner-local cleanup marker"
+    },
+    {
+      "assigned_phase": "P07",
+      "audit_tier": "C \u2014 owner-local bound absent; cross-owner reset may exist",
+      "completion_requirements": [
+        "source path and line remain traceable",
+        "root cause or risk disposition is explicit",
+        "tests cover the release boundary",
+        "gate evidence references the finding",
+        "critical/high items are resolved before completion"
+      ],
+      "evidence_class": "E3",
+      "id": "FC-MEM-COLLECTION",
+      "required_actions": [
+        "Confirm the exact source symbol and effective owner.",
+        "Create or identify the smallest deterministic reproducer.",
+        "Promote to E0 only with runtime/test evidence.",
+        "Apply the smallest feature-preserving fix.",
+        "Re-run the same flow and attach before/after evidence.",
+        "Update feature parity and resource-owner records."
+      ],
+      "severity": "High",
+      "source": {
+        "basis": "The long-lived owner mutates `predicates` via append/insert, but its type block contains no count cap, truncation, removal, or clear operation.",
+        "id": "FC-MEM-COLLECTION",
+        "line": "279",
+        "path": "Sources/ForgeConductorCore/Infrastructure/SQLiteStore.swift",
+        "severity": "High",
+        "status": "Source-proven append and absence of owner-local cap/eviction; cross-file reset must be traced",
+        "tier": "C \u2014 owner-local bound absent; cross-owner reset may exist",
+        "title": "Long-lived collection `predicates` appends without an owner-local bound",
+        "validation": "Log collection count and high-water mark for a 30\u201360 minute session and across project/session release boundaries."
+      },
+      "status": "open",
+      "title": "Long-lived collection `predicates` appends without an owner-local bound"
+    },
+    {
+      "assigned_phase": "P07",
+      "audit_tier": "C \u2014 owner-local bound absent; cross-owner reset may exist",
+      "completion_requirements": [
+        "source path and line remain traceable",
+        "root cause or risk disposition is explicit",
+        "tests cover the release boundary",
+        "gate evidence references the finding",
+        "critical/high items are resolved before completion"
+      ],
+      "evidence_class": "E3",
+      "id": "FC-MEM-COLLECTION",
+      "required_actions": [
+        "Confirm the exact source symbol and effective owner.",
+        "Create or identify the smallest deterministic reproducer.",
+        "Promote to E0 only with runtime/test evidence.",
+        "Apply the smallest feature-preserving fix.",
+        "Re-run the same flow and attach before/after evidence.",
+        "Update feature parity and resource-owner records."
+      ],
+      "severity": "High",
+      "source": {
+        "basis": "The long-lived owner mutates `out` via append/insert, but its type block contains no count cap, truncation, removal, or clear operation.",
+        "id": "FC-MEM-COLLECTION",
+        "line": "317",
+        "path": "Sources/ForgeConductorCore/Infrastructure/SQLiteStore.swift",
+        "severity": "High",
+        "status": "Source-proven append and absence of owner-local cap/eviction; cross-file reset must be traced",
+        "tier": "C \u2014 owner-local bound absent; cross-owner reset may exist",
+        "title": "Long-lived collection `out` appends without an owner-local bound",
+        "validation": "Log collection count and high-water mark for a 30\u201360 minute session and across project/session release boundaries."
+      },
+      "status": "open",
+      "title": "Long-lived collection `out` appends without an owner-local bound"
+    },
+    {
+      "assigned_phase": "P07",
+      "audit_tier": "C \u2014 owner-local bound absent; cross-owner reset may exist",
+      "completion_requirements": [
+        "source path and line remain traceable",
+        "root cause or risk disposition is explicit",
+        "tests cover the release boundary",
+        "gate evidence references the finding",
+        "critical/high items are resolved before completion"
+      ],
+      "evidence_class": "E3",
+      "id": "FC-MEM-COLLECTION",
+      "required_actions": [
+        "Confirm the exact source symbol and effective owner.",
+        "Create or identify the smallest deterministic reproducer.",
+        "Promote to E0 only with runtime/test evidence.",
+        "Apply the smallest feature-preserving fix.",
+        "Re-run the same flow and attach before/after evidence.",
+        "Update feature parity and resource-owner records."
+      ],
+      "severity": "High",
+      "source": {
+        "basis": "The long-lived owner mutates `closed` via append/insert, but its type block contains no count cap, truncation, removal, or clear operation.",
+        "id": "FC-MEM-COLLECTION",
+        "line": "551",
+        "path": "Sources/ForgeConductorCore/Infrastructure/SQLiteStore.swift",
+        "severity": "High",
+        "status": "Source-proven append and absence of owner-local cap/eviction; cross-file reset must be traced",
+        "tier": "C \u2014 owner-local bound absent; cross-owner reset may exist",
+        "title": "Long-lived collection `closed` appends without an owner-local bound",
+        "validation": "Log collection count and high-water mark for a 30\u201360 minute session and across project/session release boundaries."
+      },
+      "status": "open",
+      "title": "Long-lived collection `closed` appends without an owner-local bound"
+    },
+    {
+      "assigned_phase": "P07",
+      "audit_tier": "C \u2014 owner-local cleanup signal absent; external cleanup may exist",
+      "completion_requirements": [
+        "source path and line remain traceable",
+        "root cause or risk disposition is explicit",
+        "tests cover the release boundary",
+        "gate evidence references the finding",
+        "critical/high items are resolved before completion"
+      ],
+      "evidence_class": "E3",
+      "id": "FC-LIFE-GAP",
+      "required_actions": [
+        "Confirm the exact source symbol and effective owner.",
+        "Create or identify the smallest deterministic reproducer.",
+        "Promote to E0 only with runtime/test evidence.",
+        "Apply the smallest feature-preserving fix.",
+        "Re-run the same flow and attach before/after evidence.",
+        "Update feature parity and resource-owner records."
+      ],
+      "severity": "High",
+      "source": {
+        "basis": "class MCPServer contains Pipe/FileHandle ownership/usage but no matching cleanup signal in the same type block.",
+        "id": "FC-LIFE-GAP",
+        "line": "33",
+        "path": "Sources/ForgeConductorCore/MCP/MCPServer.swift",
+        "severity": "High",
+        "status": "Source-proven absence of matching cleanup syntax in this owner; not yet a proven live leak",
+        "tier": "C \u2014 owner-local cleanup signal absent; external cleanup may exist",
+        "title": "MCPServer owns/uses Pipe/FileHandle without an owner-local cleanup marker",
+        "validation": "Instrument owner/resource counts and exercise the intended release boundary ten times; trace any survivor in a memgraph."
+      },
+      "status": "open",
+      "title": "MCPServer owns/uses Pipe/FileHandle without an owner-local cleanup marker"
+    },
+    {
+      "assigned_phase": "P07",
+      "audit_tier": "C \u2014 owner-local cleanup signal absent; external cleanup may exist",
+      "completion_requirements": [
+        "source path and line remain traceable",
+        "root cause or risk disposition is explicit",
+        "tests cover the release boundary",
+        "gate evidence references the finding",
+        "critical/high items are resolved before completion"
+      ],
+      "evidence_class": "E3",
+      "id": "FC-LIFE-GAP",
+      "required_actions": [
+        "Confirm the exact source symbol and effective owner.",
+        "Create or identify the smallest deterministic reproducer.",
+        "Promote to E0 only with runtime/test evidence.",
+        "Apply the smallest feature-preserving fix.",
+        "Re-run the same flow and attach before/after evidence.",
+        "Update feature parity and resource-owner records."
+      ],
+      "severity": "High",
+      "source": {
+        "basis": "class MCPStreamReader contains Pipe/FileHandle ownership/usage but no matching cleanup signal in the same type block.",
+        "id": "FC-LIFE-GAP",
+        "line": "482",
+        "path": "Sources/ForgeConductorCore/MCP/MCPServer.swift",
+        "severity": "High",
+        "status": "Source-proven absence of matching cleanup syntax in this owner; not yet a proven live leak",
+        "tier": "C \u2014 owner-local cleanup signal absent; external cleanup may exist",
+        "title": "MCPStreamReader owns/uses Pipe/FileHandle without an owner-local cleanup marker",
+        "validation": "Instrument owner/resource counts and exercise the intended release boundary ten times; trace any survivor in a memgraph."
+      },
+      "status": "open",
+      "title": "MCPStreamReader owns/uses Pipe/FileHandle without an owner-local cleanup marker"
+    },
+    {
+      "assigned_phase": "P05",
+      "audit_tier": "C \u2014 owner-local cleanup signal absent; external cleanup may exist",
+      "completion_requirements": [
+        "source path and line remain traceable",
+        "root cause or risk disposition is explicit",
+        "tests cover the release boundary",
+        "gate evidence references the finding",
+        "critical/high items are resolved before completion"
+      ],
+      "evidence_class": "E3",
+      "id": "FC-LIFE-GAP",
+      "required_actions": [
+        "Confirm the exact source symbol and effective owner.",
+        "Create or identify the smallest deterministic reproducer.",
+        "Promote to E0 only with runtime/test evidence.",
+        "Apply the smallest feature-preserving fix.",
+        "Re-run the same flow and attach before/after evidence.",
+        "Update feature parity and resource-owner records."
+      ],
+      "severity": "High",
+      "source": {
+        "basis": "class ManagerRuntime contains Timer ownership/usage but no matching cleanup signal in the same type block.",
+        "id": "FC-LIFE-GAP",
+        "line": "18",
+        "path": "Sources/ForgeConductorCore/Manager/ManagerRuntime.swift",
+        "severity": "High",
+        "status": "Source-proven absence of matching cleanup syntax in this owner; not yet a proven live leak",
+        "tier": "C \u2014 owner-local cleanup signal absent; external cleanup may exist",
+        "title": "ManagerRuntime owns/uses Timer without an owner-local cleanup marker",
+        "validation": "Instrument owner/resource counts and exercise the intended release boundary ten times; trace any survivor in a memgraph."
+      },
+      "status": "open",
+      "title": "ManagerRuntime owns/uses Timer without an owner-local cleanup marker"
+    },
+    {
+      "assigned_phase": "P05",
+      "audit_tier": "C \u2014 owner-local cleanup signal absent; external cleanup may exist",
+      "completion_requirements": [
+        "source path and line remain traceable",
+        "root cause or risk disposition is explicit",
+        "tests cover the release boundary",
+        "gate evidence references the finding",
+        "critical/high items are resolved before completion"
+      ],
+      "evidence_class": "E3",
+      "id": "FC-LIFE-GAP",
+      "required_actions": [
+        "Confirm the exact source symbol and effective owner.",
+        "Create or identify the smallest deterministic reproducer.",
+        "Promote to E0 only with runtime/test evidence.",
+        "Apply the smallest feature-preserving fix.",
+        "Re-run the same flow and attach before/after evidence.",
+        "Update feature parity and resource-owner records."
+      ],
+      "severity": "High",
+      "source": {
+        "basis": "class ManagerRuntime contains DispatchSource ownership/usage but no matching cleanup signal in the same type block.",
+        "id": "FC-LIFE-GAP",
+        "line": "18",
+        "path": "Sources/ForgeConductorCore/Manager/ManagerRuntime.swift",
+        "severity": "High",
+        "status": "Source-proven absence of matching cleanup syntax in this owner; not yet a proven live leak",
+        "tier": "C \u2014 owner-local cleanup signal absent; external cleanup may exist",
+        "title": "ManagerRuntime owns/uses DispatchSource without an owner-local cleanup marker",
+        "validation": "Instrument owner/resource counts and exercise the intended release boundary ten times; trace any survivor in a memgraph."
+      },
+      "status": "open",
+      "title": "ManagerRuntime owns/uses DispatchSource without an owner-local cleanup marker"
+    },
+    {
+      "assigned_phase": "P07",
+      "audit_tier": "C \u2014 owner-local cleanup signal absent; external cleanup may exist",
+      "completion_requirements": [
+        "source path and line remain traceable",
+        "root cause or risk disposition is explicit",
+        "tests cover the release boundary",
+        "gate evidence references the finding",
+        "critical/high items are resolved before completion"
+      ],
+      "evidence_class": "E3",
+      "id": "FC-LIFE-GAP",
+      "required_actions": [
+        "Confirm the exact source symbol and effective owner.",
+        "Create or identify the smallest deterministic reproducer.",
+        "Promote to E0 only with runtime/test evidence.",
+        "Apply the smallest feature-preserving fix.",
+        "Re-run the same flow and attach before/after evidence.",
+        "Update feature parity and resource-owner records."
+      ],
+      "severity": "High",
+      "source": {
+        "basis": "struct MCPProcessFixture contains Process ownership/usage but no matching cleanup signal in the same type block.",
+        "id": "FC-LIFE-GAP",
+        "line": "1800",
+        "path": "Tests/ForgeConductorTests/ContinuityTests.swift",
+        "severity": "High",
+        "status": "Source-proven absence of matching cleanup syntax in this owner; not yet a proven live leak",
+        "tier": "C \u2014 owner-local cleanup signal absent; external cleanup may exist",
+        "title": "MCPProcessFixture owns/uses Process without an owner-local cleanup marker",
+        "validation": "Instrument owner/resource counts and exercise the intended release boundary ten times; trace any survivor in a memgraph."
+      },
+      "status": "open",
+      "title": "MCPProcessFixture owns/uses Process without an owner-local cleanup marker"
+    },
+    {
+      "assigned_phase": "P07",
+      "audit_tier": "C \u2014 owner-local cleanup signal absent; external cleanup may exist",
+      "completion_requirements": [
+        "source path and line remain traceable",
+        "root cause or risk disposition is explicit",
+        "tests cover the release boundary",
+        "gate evidence references the finding",
+        "critical/high items are resolved before completion"
+      ],
+      "evidence_class": "E3",
+      "id": "FC-LIFE-GAP",
+      "required_actions": [
+        "Confirm the exact source symbol and effective owner.",
+        "Create or identify the smallest deterministic reproducer.",
+        "Promote to E0 only with runtime/test evidence.",
+        "Apply the smallest feature-preserving fix.",
+        "Re-run the same flow and attach before/after evidence.",
+        "Update feature parity and resource-owner records."
+      ],
+      "severity": "High",
+      "source": {
+        "basis": "struct MCPProcessFixture contains Pipe/FileHandle ownership/usage but no matching cleanup signal in the same type block.",
+        "id": "FC-LIFE-GAP",
+        "line": "1801",
+        "path": "Tests/ForgeConductorTests/ContinuityTests.swift",
+        "severity": "High",
+        "status": "Source-proven absence of matching cleanup syntax in this owner; not yet a proven live leak",
+        "tier": "C \u2014 owner-local cleanup signal absent; external cleanup may exist",
+        "title": "MCPProcessFixture owns/uses Pipe/FileHandle without an owner-local cleanup marker",
+        "validation": "Instrument owner/resource counts and exercise the intended release boundary ten times; trace any survivor in a memgraph."
+      },
+      "status": "open",
+      "title": "MCPProcessFixture owns/uses Pipe/FileHandle without an owner-local cleanup marker"
+    },
+    {
+      "assigned_phase": "P05",
+      "audit_tier": "C \u2014 owner-local cleanup signal absent; external cleanup may exist",
+      "completion_requirements": [
+        "source path and line remain traceable",
+        "root cause or risk disposition is explicit",
+        "tests cover the release boundary",
+        "gate evidence references the finding",
+        "critical/high items are resolved before completion"
+      ],
+      "evidence_class": "E3",
+      "id": "FC-LIFE-GAP",
+      "required_actions": [
+        "Confirm the exact source symbol and effective owner.",
+        "Create or identify the smallest deterministic reproducer.",
+        "Promote to E0 only with runtime/test evidence.",
+        "Apply the smallest feature-preserving fix.",
+        "Re-run the same flow and attach before/after evidence.",
+        "Update feature parity and resource-owner records."
+      ],
+      "severity": "High",
+      "source": {
+        "basis": "class ManagerTests contains Task ownership/usage but no matching cleanup signal in the same type block.",
+        "id": "FC-LIFE-GAP",
+        "line": "265",
+        "path": "Tests/ForgeConductorTests/ManagerTests.swift",
+        "severity": "High",
+        "status": "Source-proven absence of matching cleanup syntax in this owner; not yet a proven live leak",
+        "tier": "C \u2014 owner-local cleanup signal absent; external cleanup may exist",
+        "title": "ManagerTests owns/uses Task without an owner-local cleanup marker",
+        "validation": "Instrument owner/resource counts and exercise the intended release boundary ten times; trace any survivor in a memgraph."
+      },
+      "status": "open",
+      "title": "ManagerTests owns/uses Task without an owner-local cleanup marker"
+    }
+  ],
+  "schema_version": 1,
+  "source": "/mnt/data/Forge-Conductor-Codex-Autonomous-Repair-Package/audit/Forge-Conductor-Consolidated-Findings.tsv"
+}

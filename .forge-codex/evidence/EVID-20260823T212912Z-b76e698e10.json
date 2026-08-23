@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T212912Z-b76e698e10.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T212912Z-b76e698e10.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "command": ".forge-codex/scripts/profile_macos.sh --capture --flow P11-GAUGE-STRESS --app '.build/DerivedData-P11-Release/Build/Products/Release/Forge Conductor.app' --duration 15 --template 'Metal System Trace' --output-root /Users/jimdaley/Documents/RavenForge/Forge-Conductor-MacOS/Forge-Conductor-Repair-Evidence/aba90ab1-be80-4cc5-aa0b-23dd54d4a24d/p11",
+  "ended_at": "2026-08-23T21:29:15.255841+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 1,
+  "id": "EVID-20260823T212912Z-b76e698e10",
+  "kind": "profile",
+  "related_findings": [],
+  "related_gates": [
+    "G11"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T21:29:12.881660+00:00",
+  "timed_out": false
+}

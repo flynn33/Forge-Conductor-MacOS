@@ -1,0 +1,46 @@
+{
+  "artifacts": [
+    {
+      "bytes": 1664,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P07-project-memory-report.json",
+      "sha256": "88d76f9daf1d2dd536e0d7715c81ad0fcb2b1ce620179160ae3f9b14c7abc2f1"
+    },
+    {
+      "bytes": 1862,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P07-resource-owner-matrix.json",
+      "sha256": "4b7da4806d7c77f4653e5f6800fe1d218ffb6f2c088161c3d59cfffba0d9bdb5"
+    },
+    {
+      "bytes": 520,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P07-feature-parity.json",
+      "sha256": "28c18eee49c00fb71549ecbb16b51ce38ca70a74d46ecf1b0c09e9fe32598dac"
+    },
+    {
+      "bytes": 324,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T202214Z-45beba1a02.stdout.txt",
+      "sha256": "1f1195dda5b4e826f9ae201dd2e5cdb06f6fc62c2925668550845efeadaccff2"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T202214Z-45beba1a02.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "command": "python3 .forge-codex/scripts/check_p07_completion.py",
+  "ended_at": "2026-08-23T20:22:14.453349+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T202214Z-45beba1a02",
+  "kind": "gate-check",
+  "related_findings": [],
+  "related_gates": [
+    "G07"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T20:22:14.414365+00:00",
+  "timed_out": false
+}

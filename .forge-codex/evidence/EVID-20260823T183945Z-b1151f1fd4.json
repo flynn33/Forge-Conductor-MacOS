@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 59210,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T183945Z-b1151f1fd4.stdout.txt",
+      "sha256": "031b780c1855391e10f0136aa17cefed9be914840b6d8141bec914828af8e088"
+    },
+    {
+      "bytes": 6887,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T183945Z-b1151f1fd4.stderr.txt",
+      "sha256": "d3c97c9c351cd1e3d37001718bfd653a989ec5659e9a6e8d86adf6e45c137a6e"
+    }
+  ],
+  "command": "swift test --no-parallel",
+  "ended_at": "2026-08-23T18:40:21.721093+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T183945Z-b1151f1fd4",
+  "kind": "p01-swift-characterization-baseline",
+  "related_findings": [],
+  "related_gates": [
+    "G01"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T18:39:45.795550+00:00",
+  "timed_out": false
+}

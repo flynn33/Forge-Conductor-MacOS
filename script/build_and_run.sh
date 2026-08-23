@@ -4,6 +4,7 @@ set -euo pipefail
 MODE="${1:-run}"
 APP_NAME="Forge Conductor"
 BUILD_PRODUCT="forge-conductor-app"
+BINARY_CONFIGURATION="${FORGE_BUILD_CONFIGURATION:-debug}"
 BUNDLE_ID="com.forge-conductor.app"
 MIN_SYSTEM_VERSION="26.0"
 
@@ -27,10 +28,14 @@ if [[ ! "$APP_BUILD_VERSION" =~ ^[1-9][0-9]*$ ]]; then
   echo "FORGE_BUILD_NUMBER must be a positive integer" >&2
   exit 1
 fi
+if [[ "$BINARY_CONFIGURATION" != "debug" && "$BINARY_CONFIGURATION" != "release" ]]; then
+  echo "FORGE_BUILD_CONFIGURATION must be debug or release" >&2
+  exit 1
+fi
 
 cd "$ROOT_DIR"
-swift build --product "$BUILD_PRODUCT"
-BUILD_DIR="$(swift build --show-bin-path)"
+swift build --configuration "$BINARY_CONFIGURATION" --product "$BUILD_PRODUCT"
+BUILD_DIR="$(swift build --configuration "$BINARY_CONFIGURATION" --show-bin-path)"
 BUILD_BINARY="$BUILD_DIR/$BUILD_PRODUCT"
 
 if [[ ! -x "$BUILD_BINARY" ]]; then

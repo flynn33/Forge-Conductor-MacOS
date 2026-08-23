@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-23T18:43:40Z",
+  "repository_root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+  "source_snapshot": {
+    "static_inventory_artifact": ".forge-codex/state/gate-results/G01.static-inventory.json",
+    "static_inventory_sha256": "a5a72673a572bac41141eb7e56179786689fa858b0993ce2c466cfe5430af517",
+    "swift_file_count": 112,
+    "swift_line_count": 30335
+  },
+  "runtime_evidence": [
+    ".forge-codex/evidence/EVID-20260823T184025Z-90a51329f5.json",
+    "/Users/jimdaley/Documents/RavenForge/Forge-Conductor-MacOS/Forge-Conductor-Repair-Evidence/aba90ab1-be80-4cc5-aa0b-23dd54d4a24d/p01-native-app-launch.png",
+    ".forge-codex/evidence/EVID-20260823T184311Z-0dccfacc9f.json"
+  ],
+  "features": [
+    {"id":"BUILD-CORE-LIBRARY","category":"build","name":"ForgeConductorCore library","baseline_status":"present","parity_status":"preserved","evidence":["Package.swift"],"tests":["swift test --no-parallel"]},
+    {"id":"BUILD-CLI-EXECUTABLE","category":"build","name":"forge-conductor executable","baseline_status":"present","parity_status":"preserved","evidence":["Package.swift","Sources/ForgeConductorCLI/ForgeConductorMain.swift"],"tests":["ForgeProcessEntryTests"]},
+    {"id":"BUILD-GUI-EXECUTABLE","category":"build","name":"Forge Conductor native application","baseline_status":"present","parity_status":"preserved","evidence":["Package.swift","Sources/ForgeConductorApp/ForgeConductorApp.swift"],"tests":["NativeAppSmokeTests","p01-native-app-launch"]},
+    {"id":"BUILD-XCODE-WORKSPACE","category":"build","name":"ForgeConductor Xcode workspace and schemes","baseline_status":"present","parity_status":"preserved","evidence":["ForgeConductor.xcworkspace","ForgeConductor.xcodeproj"],"tests":["xcodebuild -list"]},
+    {"id":"BUILD-RUN-ENTRYPOINT","category":"build","name":"Project-local build and run entrypoint","baseline_status":"present","parity_status":"preserved","evidence":["script/build_and_run.sh"],"tests":["p01-native-app-launch"]},
+
+    {"id":"UI-MAIN-WINDOW","category":"ui","name":"Single restorable Forge Conductor main window","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorApp/ForgeConductorApp.swift","p01-native-app-launch.png"],"tests":["ForgeConductorUITests.testAppLaunchesAndShowsTitle"]},
+    {"id":"UI-SETTINGS-WINDOW","category":"ui","name":"Manager settings scene","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorApp/ForgeConductorApp.swift","Sources/ForgeConductorApp/Views/ManagerSettingsView.swift"],"tests":["ManagerTests","AppConfigAndDoctorTests"]},
+    {"id":"UI-NAVIGATION-SIDEBAR","category":"ui","name":"Persistent collapsible sidebar navigation","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorApp/Views/AppSidebarView.swift"],"tests":["ForgeConductorUITests.testSidebarTabsNavigate","ForgeConductorUITests.testCollapsedNavigationCanBeRestored"]},
+    {"id":"UI-TAB-RIG","category":"ui","name":"FORGE RIG dashboard tab","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorApp/Views/Rig/RigDashboardView.swift","p01-native-app-launch.png"],"tests":["RigParityTests"]},
+    {"id":"UI-TAB-MCP","category":"ui","name":"LM Studio MCP tab","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorApp/Views/MCPServersView.swift"],"tests":["MCPProtocolAndDiagnosticsTests","LMStudioConnectorReliabilityTests"]},
+    {"id":"UI-TAB-AGENTS","category":"ui","name":"Agents tab","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorApp/Views/AgentsView.swift"],"tests":["CoreTests","ContinuityTests"]},
+    {"id":"UI-TAB-TOOLS","category":"ui","name":"Tools tab","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorApp/Views/ToolsView.swift"],"tests":["CoreTests"]},
+    {"id":"UI-TAB-LIVE-FEED","category":"ui","name":"Live Feed tab","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorApp/Views/LiveFeedView.swift"],"tests":["RealtimeStreamTests"]},
+    {"id":"UI-TAB-DIAGNOSTICS","category":"ui","name":"Diagnostics tab","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorApp/Views/DiagnosticsView.swift"],"tests":["MCPProtocolAndDiagnosticsTests.testDiagnosticExportJSONAndMarkdown"]},
+    {"id":"UI-TAB-MANAGER","category":"ui","name":"Manager tab","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorApp/Views/ManagerSettingsView.swift"],"tests":["ManagerTests"]},
+    {"id":"CMD-TOGGLE-NAVIGATION","category":"command","name":"Show or hide navigation command and toolbar action","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorApp/ForgeConductorApp.swift","Sources/ForgeConductorApp/Views/ContentView.swift"],"tests":["ForgeConductorUITests.testCollapsedNavigationCanBeRestored"]},
+    {"id":"CMD-REFRESH-NOW","category":"command","name":"Manual telemetry refresh command and toolbar action","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorApp/ForgeConductorApp.swift","Sources/ForgeConductorApp/Views/ContentView.swift"],"tests":["ForgeConductorUITests.testRefreshToolbarExists"]},
+    {"id":"CMD-AUTO-REFRESH","category":"command","name":"Automatic telemetry refresh toggle","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorApp/ForgeConductorApp.swift","Sources/ForgeConductorApp/AppTelemetryBinding.swift"],"tests":["RealtimeStreamTests"]},
+
+    {"id":"CLI-INSTALL","category":"cli","name":"Install CLI and app layout","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorCLI/ForgeConductorMain.swift","Sources/ForgeConductorCore/Manager/ManagerInstaller.swift"],"tests":["ProductPathReliabilityTests","ManagerTests"]},
+    {"id":"CLI-INSTALL-LMSTUDIO","category":"cli","name":"Deploy primary and fallback LM Studio MCP plugins","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorCLI/ForgeConductorMain.swift","Sources/ForgeConductorCore/Telemetry/LMStudioMCPPluginInstaller.swift"],"tests":["LMStudioConnectorReliabilityTests"]},
+    {"id":"CLI-DOCTOR","category":"cli","name":"Installation and endpoint diagnostics","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorCLI/ForgeConductorMain.swift"],"tests":["AppConfigAndDoctorTests"]},
+    {"id":"CLI-STATUS","category":"cli","name":"Runtime status JSON","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorCLI/ForgeConductorMain.swift"],"tests":["AppConfigAndDoctorTests.testStatusSnapshotModel"]},
+    {"id":"CLI-SERVE","category":"cli","name":"MCP stdio server mode","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorCLI/ForgeConductorMain.swift","Sources/ForgeConductorCore/MCP/MCPServer.swift"],"tests":["p01-mcp-protocol-baseline","MCPProtocolAndDiagnosticsTests"]},
+    {"id":"CLI-DASHBOARD","category":"cli","name":"Standalone dashboard server","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorCLI/ForgeConductorMain.swift","Sources/ForgeConductorCore/Dashboard/DashboardServer.swift"],"tests":["DashboardTests","DashboardSecurityTests"]},
+    {"id":"CLI-MANAGER","category":"cli","name":"Supervised dashboard manager lifecycle","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorCLI/ForgeConductorMain.swift","Sources/ForgeConductorCore/Manager/ManagerNode.swift"],"tests":["ManagerTests"]},
+    {"id":"CLI-AGENTS","category":"cli","name":"Specialist agent listing","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorCLI/ForgeConductorMain.swift"],"tests":["CoreTests"]},
+    {"id":"CLI-VERSION-HELP","category":"cli","name":"Version and help surfaces","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorCLI/ForgeConductorMain.swift"],"tests":["NativeAppSmokeTests"]},
+
+    {"id":"MCP-SERVER-STDIO","category":"mcp","name":"NDJSON and Content-Length stdio transport","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorCore/MCP/MCPServer.swift","EVID-20260823T184311Z-0dccfacc9f"],"tests":["MCPProtocolAndDiagnosticsTests"]},
+    {"id":"MCP-TOOL-AGENT-CONTEXT","category":"mcp_tool","name":"agent_context","baseline_status":"present","parity_status":"preserved","evidence":["EVID-20260823T184311Z-0dccfacc9f"],"tests":["CoreTests"]},
+    {"id":"MCP-TOOL-AGENT-GET","category":"mcp_tool","name":"agent_get","baseline_status":"present","parity_status":"preserved","evidence":["EVID-20260823T184311Z-0dccfacc9f"],"tests":["CoreTests"]},
+    {"id":"MCP-TOOL-AGENT-LIST","category":"mcp_tool","name":"agent_list","baseline_status":"present","parity_status":"preserved","evidence":["EVID-20260823T184311Z-0dccfacc9f"],"tests":["CoreTests"]},
+    {"id":"MCP-TOOL-AGENT-RECOMMEND","category":"mcp_tool","name":"agent_recommend","baseline_status":"present","parity_status":"preserved","evidence":["EVID-20260823T184311Z-0dccfacc9f"],"tests":["CoreTests"]},
+    {"id":"MCP-TOOL-AGENT-RUN-COMPLETE","category":"mcp_tool","name":"agent_run_complete","baseline_status":"present","parity_status":"preserved","evidence":["EVID-20260823T184311Z-0dccfacc9f"],"tests":["CoreTests","ContinuityTests"]},
+    {"id":"MCP-TOOL-AGENT-RUN-START","category":"mcp_tool","name":"agent_run_start","baseline_status":"present","parity_status":"preserved","evidence":["EVID-20260823T184311Z-0dccfacc9f"],"tests":["CoreTests","ContinuityTests"]},
+    {"id":"MCP-TOOL-AGENT-RUN-STATUS","category":"mcp_tool","name":"agent_run_status","baseline_status":"present","parity_status":"preserved","evidence":["EVID-20260823T184311Z-0dccfacc9f"],"tests":["CoreTests","ContinuityTests"]},
+    {"id":"MCP-TOOL-CONTEXT-GET","category":"mcp_tool","name":"context_get","baseline_status":"present","parity_status":"preserved","evidence":["EVID-20260823T184311Z-0dccfacc9f"],"tests":["ContinuityTests"]},
+    {"id":"MCP-TOOL-CONTEXT-LIST","category":"mcp_tool","name":"context_list","baseline_status":"present","parity_status":"preserved","evidence":["EVID-20260823T184311Z-0dccfacc9f"],"tests":["ContinuityTests"]},
+    {"id":"MCP-TOOL-FORGE-STATUS","category":"mcp_tool","name":"forge_status","baseline_status":"present","parity_status":"preserved","evidence":["EVID-20260823T184311Z-0dccfacc9f"],"tests":["MemoryToolTests"]},
+    {"id":"MCP-TOOL-FILESYSTEM","category":"mcp_tool_pack","name":"fs_read, fs_write, fs_edit, fs_list, fs_glob, fs_mkdir, fs_delete, fs_move","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorCore/Application/Tools/FilesystemToolPack.swift","EVID-20260823T184311Z-0dccfacc9f"],"tests":["CoreTests","ContinuityTests"]},
+    {"id":"MCP-TOOL-GIT","category":"mcp_tool_pack","name":"git_status, git_diff, git_log, git_add, git_commit","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorCore/Application/Tools/GitToolPack.swift","EVID-20260823T184311Z-0dccfacc9f"],"tests":["CoreTests"]},
+    {"id":"MCP-TOOL-MEMORY","category":"mcp_tool_pack","name":"memory_set, memory_get, memory_list, memory_search, memory_delete","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorCore/Application/Tools/MemoryToolPack.swift","EVID-20260823T184311Z-0dccfacc9f"],"tests":["MemoryToolTests"]},
+    {"id":"MCP-TOOL-PDF","category":"mcp_tool_pack","name":"pdf_write, pdf_from_file","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorCore/Application/Tools/DocsToolPack.swift","EVID-20260823T184311Z-0dccfacc9f"],"tests":["CoreTests"]},
+    {"id":"MCP-TOOL-SEARCH","category":"mcp_tool","name":"search_text","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorCore/Application/Tools/SearchToolPack.swift","EVID-20260823T184311Z-0dccfacc9f"],"tests":["CoreTests"]},
+    {"id":"MCP-TOOL-SESSION-CHECKPOINT","category":"mcp_tool","name":"session_checkpoint","baseline_status":"present","parity_status":"preserved","evidence":["EVID-20260823T184311Z-0dccfacc9f"],"tests":["ContinuityTests"]},
+    {"id":"MCP-TOOL-SESSION-HANDOFF","category":"mcp_tool","name":"session_handoff","baseline_status":"present","parity_status":"preserved","evidence":["EVID-20260823T184311Z-0dccfacc9f"],"tests":["ContinuityTests","MemoryToolTests"]},
+    {"id":"MCP-TOOL-SHELL","category":"mcp_tool","name":"shell_exec","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorCore/Application/Tools/ShellToolPack.swift","EVID-20260823T184311Z-0dccfacc9f"],"tests":["CoreTests","ProcessRunnerTests"]},
+    {"id":"MCP-EMPTY-RESOURCES-PROMPTS","category":"mcp","name":"Empty resources and prompts lists","baseline_status":"present","parity_status":"preserved","evidence":["EVID-20260823T184311Z-0dccfacc9f"],"tests":["p01-mcp-protocol-baseline"]},
+
+    {"id":"DATA-CONFIG-JSON","category":"persistence","name":"Atomic typed config.json with legacy dictionary merge","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorCore/Infrastructure/ConfigStore.swift","Sources/ForgeConductorCore/Domain/AppConfig.swift"],"tests":["AppConfigAndDoctorTests","ManagerTests"]},
+    {"id":"DATA-SQLITE-V5","category":"persistence","name":"SQLite schema version 5","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorCore/Infrastructure/SQLiteStore.swift"],"tests":["ContinuityTests","MemoryToolTests"]},
+    {"id":"DATA-MEMORY-NOTES","category":"persistence","name":"Durable memory notes","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorCore/Infrastructure/SQLiteStore.swift"],"tests":["MemoryToolTests"]},
+    {"id":"DATA-AGENT-SESSIONS","category":"persistence","name":"Durable agent session records","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorCore/Infrastructure/SQLiteStore.swift"],"tests":["CoreTests","ContinuityTests"]},
+    {"id":"DATA-CONTEXT-HANDOFFS","category":"persistence","name":"SQLite and file-backed context handoffs","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorCore/Infrastructure/SQLiteStore.swift","Sources/ForgeConductorCore/Application/ContextContinuityService.swift"],"tests":["ContinuityTests"]},
+    {"id":"DATA-AUDIT-DIAGNOSTICS","category":"persistence","name":"Audit and diagnostic JSONL streams","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorCore/Infrastructure/AuditService.swift","Sources/ForgeConductorCore/Infrastructure/DiagnosticLog.swift"],"tests":["MCPProtocolAndDiagnosticsTests"]},
+    {"id":"DATA-MANAGER-RUNTIME","category":"persistence","name":"Manager PID, state, and launch-agent files","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorCore/Infrastructure/AppPaths.swift","Sources/ForgeConductorCore/Manager/ManagerInstaller.swift"],"tests":["ManagerTests"]},
+    {"id":"DATA-LMSTUDIO-CONFIG","category":"persistence","name":"LM Studio mcp.json and role-specific plugin state","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorCore/Telemetry/LMStudioEnvironment.swift","Sources/ForgeConductorCore/Telemetry/LMStudioMCPPluginInstaller.swift"],"tests":["LMStudioConnectorReliabilityTests"]},
+    {"id":"DATA-TELEMETRY-STATIC","category":"persistence","name":"Static telemetry cache under application home","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorCore/Telemetry/TelemetryService.swift"],"tests":["NativeTelemetryTests"]},
+    {"id":"DATA-NO-USERDEFAULTS-KEYCHAIN","category":"persistence","name":"No UserDefaults or Keychain persistence surface","baseline_status":"present","parity_status":"preserved","evidence":["static source scan"],"tests":["p01-static-inventory"]},
+
+    {"id":"TEL-REALTIME-ENGINE","category":"telemetry","name":"Continuous native realtime metrics engine","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorCore/Telemetry/RealtimeMetricsEngine.swift"],"tests":["RealtimeStreamTests","MCPProtocolAndDiagnosticsTests.testRealtimeEngineIsContinuousNotTwoSecondSnapshot"]},
+    {"id":"TEL-COMPOSED-SNAPSHOT","category":"telemetry","name":"Typed composed telemetry snapshot and history","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorCore/Telemetry/TelemetryService.swift","Sources/ForgeConductorApp/AppTelemetryBinding.swift"],"tests":["TelemetryContractTests","RigParityTests","NativeTelemetryTests"]},
+    {"id":"TEL-UI-BINDING","category":"telemetry","name":"Realtime telemetry-to-SwiftUI binding","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorApp/AppTelemetryBinding.swift","p01-native-app-launch.png"],"tests":["RealtimeStreamTests","p01-native-app-launch"]},
+    {"id":"TEL-METAL-GAUGES","category":"telemetry","name":"Metal bars, rings, core bars, status tiles, and multi-series load chart","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorApp/Metal/MetalGaugeKit.swift","Sources/ForgeConductorApp/Metal/MultiSeriesLoadRenderer.swift","p01-native-app-launch.png"],"tests":["RigParityTests","p01-native-app-launch"]},
+    {"id":"TEL-NATIVE-COLLECTORS","category":"telemetry","name":"CPU, RAM, GPU, disk, power, and process collectors","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorCore/Telemetry/Collectors"],"tests":["MachHostMetricsTests","NativeTelemetryTests","LiveCollectorEvidenceTests"]},
+    {"id":"TEL-SSE-DASHBOARD","category":"telemetry","name":"Dashboard HTTP and realtime telemetry routes","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorCore/Dashboard/TelemetryRoutes.swift","Sources/ForgeConductorCore/Dashboard/DashboardServer.swift"],"tests":["DashboardTests","RealtimeStreamTests"]},
+    {"id":"RUNTIME-PROCESS-RUNNER","category":"lifecycle","name":"Bounded subprocess execution and pipe draining","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorCore/Infrastructure/ProcessRunner.swift"],"tests":["ProcessRunnerTests"]},
+    {"id":"RUNTIME-MANAGER-SUPERVISION","category":"lifecycle","name":"Dashboard node supervision and restart","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorCore/Manager/ManagerRuntime.swift","Sources/ForgeConductorCore/Manager/ManagerNode.swift"],"tests":["ManagerTests"]},
+    {"id":"RUNTIME-LMSTUDIO-PRIMARY-FALLBACK","category":"integration","name":"Primary and fail-forward LM Studio connector roles","baseline_status":"present","parity_status":"preserved","evidence":["Sources/ForgeConductorCore/Domain/LMStudioConnector.swift","Sources/ForgeConductorCore/Telemetry/LMStudioDeployService.swift"],"tests":["LMStudioConnectorReliabilityTests"]}
+  ],
+  "runtime_completion_required": false,
+  "required_runtime_surfaces": [],
+  "parity_summary": {
+    "preserved": 66,
+    "additive": 0,
+    "migrated": 0,
+    "unknown": 0,
+    "removed": 0,
+    "untested": 0
+  },
+  "known_environment_limits": [
+    {
+      "surface": "Xcode UI automation",
+      "status": "blocked_environment",
+      "evidence": ".forge-codex/evidence/EVID-20260823T184112Z-aee135dafe.json",
+      "detail": "The ad-hoc signed runner built, but XCTest timed out while enabling macOS automation mode. Native launch, screenshot, accessibility identifiers, and UI test source remain captured."
+    }
+  ]
+}

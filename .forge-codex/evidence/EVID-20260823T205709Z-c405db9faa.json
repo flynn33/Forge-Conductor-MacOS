@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T205709Z-c405db9faa.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 143,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T205709Z-c405db9faa.stderr.txt",
+      "sha256": "f56b88fd5e53067ba4c1a6cc773fe877fc317924e02351e4be3208b120b9410e"
+    }
+  ],
+  "command": "python3 .forge-codex/scripts/scan_secrets.py --root .",
+  "ended_at": "2026-08-23T20:57:09.789791+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 1,
+  "id": "EVID-20260823T205709Z-c405db9faa",
+  "kind": "p09-secret-scan",
+  "related_findings": [],
+  "related_gates": [
+    "G09"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T20:57:09.419000+00:00",
+  "timed_out": false
+}

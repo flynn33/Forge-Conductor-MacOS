@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "phase": "P06",
+  "unbounded_long_lived_collections": 0,
+  "resources": [
+    {"owner": "TelemetryService", "resource": "history", "maximum": "ResourcePolicy.telemetryHistoryPoints (600/1200/2400 nominal, floor 300)", "eviction": "drop oldest on append and pressure", "enforced": true},
+    {"owner": "TelemetryService", "resource": "listeners and listenerOrder", "maximum": 128, "eviction": "oldest registration", "enforced": true},
+    {"owner": "RealtimeMetricsEngine", "resource": "listeners and listenerOrder", "maximum": 128, "eviction": "oldest registration", "enforced": true},
+    {"owner": "DiagnosticLog", "resource": "in-memory ring", "maximum": "ResourcePolicy diagnosticRingRecords (1000/2000/4000)", "eviction": "oldest record", "enforced": true},
+    {"owner": "DiagnosticLog", "resource": "master/tool/agent/failover durable logs", "maximum": "4-8 MiB each plus 2-3 archives", "eviction": "generation rotation", "enforced": true},
+    {"owner": "ProcessRunner", "resource": "stdout buffer", "maximum": "ResourcePolicy processOutputBytesPerStream (4/8/16 MiB)", "eviction": "truncate new bytes", "enforced": true},
+    {"owner": "ProcessRunner", "resource": "stderr buffer", "maximum": "ResourcePolicy processOutputBytesPerStream (4/8/16 MiB)", "eviction": "truncate new bytes", "enforced": true},
+    {"owner": "HTTPResponder", "resource": "live SSE sessions", "maximum": 32, "eviction": "reject new stream with HTTP 503", "enforced": true},
+    {"owner": "SSEStreamSession", "resource": "pending frames", "maximum": 1, "eviction": "replace pending frame with latest", "enforced": true},
+    {"owner": "SSEStreamSession", "resource": "stream lifetime", "maximum": "3600 seconds product default", "eviction": "timer closes stream", "enforced": true},
+    {"owner": "ToolRouter", "resource": "per-client loop fingerprints", "maximum": 256, "eviction": "deterministic client eviction", "enforced": true},
+    {"owner": "ContinuityAutomation", "resource": "per-client state", "maximum": 128, "eviction": "deterministic client eviction; durable handoffs remain authoritative", "enforced": true},
+    {"owner": "ContinuityAutomation.ClientState", "resource": "implicit roots", "maximum": 16, "eviction": "oldest root", "enforced": true},
+    {"owner": "ContinuityAutomation.ClientState", "resource": "last tools", "maximum": 12, "eviction": "oldest tool", "enforced": true},
+    {"owner": "ContinuityAutomation.ClientState", "resource": "last paths", "maximum": 16, "eviction": "oldest path", "enforced": true},
+    {"owner": "AgentSessionService", "resource": "in-memory active bindings", "maximum": 128, "eviction": "deterministic memory eviction with durable rehydration", "enforced": true},
+    {"owner": "AgentCatalog", "resource": "parsed specifications", "maximum": 256, "eviction": "deterministic sorted catalog selection on reload", "enforced": true},
+    {"owner": "RuntimeDiagnostics", "resource": "counters and gauges", "maximum": "fixed RuntimeCounter/RuntimeGauge enum cardinality", "eviction": "not applicable; fixed keys", "enforced": true},
+    {"owner": "MetalGaugeResources", "resource": "pipeline cache", "maximum": "one configured BGRA8 pipeline in the product renderer", "eviction": "process-wide immutable warm cache", "enforced": true},
+    {"owner": "Metal renderers", "resource": "history/core/vertex arrays", "maximum": "telemetry history suffix 300 or finite host core count; buffer high-water observed", "eviction": "replacement on input and dismantle release", "enforced": true},
+    {"owner": "ProcessMetricsCollector", "resource": "previous CPU samples", "maximum": "current Forge/model process interest set; replaced every collection", "eviction": "whole-map replacement every sample", "enforced": true},
+    {"owner": "SystemCollector", "resource": "last disk/GPU/process snapshots", "maximum": "one current collector result; processes prefix 16", "eviction": "whole-value replacement", "enforced": true}
+  ]
+}

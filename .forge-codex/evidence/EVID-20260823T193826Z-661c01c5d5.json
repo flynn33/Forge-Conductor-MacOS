@@ -1,0 +1,33 @@
+{
+  "artifacts": [
+    {
+      "bytes": 11340,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T193826Z-661c01c5d5.stdout.txt",
+      "sha256": "48ea5cf223eff9c4edcd0579afa59c9c36b83c5e768702d24ebf154a476e5b71"
+    },
+    {
+      "bytes": 7661,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T193826Z-661c01c5d5.stderr.txt",
+      "sha256": "d73ad6325107a489c0dd8697220dfcba413ab7eb56059b663a0cdfc7862c00a9"
+    }
+  ],
+  "command": "swift test --no-parallel --filter 'LifecycleOwnershipTests|ProcessRunnerTests|ManagerTests|LatestValueMailboxTests'",
+  "ended_at": "2026-08-23T19:38:38.147829+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T193826Z-661c01c5d5",
+  "kind": "lifecycle-tests",
+  "related_findings": [
+    "FC-LIFE-GAP"
+  ],
+  "related_gates": [
+    "G05"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T19:38:26.974799+00:00",
+  "timed_out": false
+}

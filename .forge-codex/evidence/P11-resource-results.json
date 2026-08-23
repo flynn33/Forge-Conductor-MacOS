@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "phase": "P11",
+  "status": "passed",
+  "build": "release",
+  "application_commit": "1fce9e0188698167564056ee8ace266342f97c7b",
+  "fixture": {
+    "seed": 11,
+    "source_sha256": "d75f62bebd19fefe7b110eb000d75e9ea014d2316765dad87a0c046958dea3c3",
+    "memory_records": 500,
+    "mcp_requests": 100,
+    "project_cycles": 100,
+    "gauge_scene_cycles": 100,
+    "process_cycles": 25,
+    "rollovers": 25,
+    "release_stress_duration_seconds": 2.517,
+    "native_ui_duration_seconds": 355.421
+  },
+  "evidence": {
+    "stress": "EVID-20260823T212034Z-4070dbd74c",
+    "xcode_build": "EVID-20260823T212122Z-63e094fe2e",
+    "native_ui_cycles": "EVID-20260823T212139Z-5e0f9ed571",
+    "profiling_build": "EVID-20260823T212941Z-7cfd677b6d",
+    "metal_profile": "EVID-20260823T213021Z-ff22ae46e0",
+    "allocation_profile": "EVID-20260823T213125Z-71f05795f9",
+    "cpu_profile": "EVID-20260823T213156Z-8cb418d293",
+    "gauge_invariants": ".forge-codex/evidence/P04-metal-performance-report.json",
+    "resource_inventory": ".forge-codex/evidence/P06-resource-policy-inventory.json"
+  },
+  "evaluations": {
+    "latency_p99_maximum_ms": {
+      "ceiling": 2000,
+      "maximum_observed": 53.817708,
+      "passed": true
+    },
+    "resident_growth_bytes": {
+      "ceiling": 268435456,
+      "observed": 26738688,
+      "passed": true
+    },
+    "post_release_resident_slope_bytes_per_sample": {
+      "ceiling": 0,
+      "observed": 0,
+      "passed": true
+    },
+    "active_gauge_average_single_core_percent": {
+      "ceiling": 100,
+      "observed": 97.351852,
+      "passed": true
+    },
+    "interrupt_wakeups_per_second": {
+      "ceiling": 25,
+      "observed": 12.31625,
+      "passed": true
+    },
+    "database_and_wal_bytes": {
+      "ceiling": 16777216,
+      "observed": 4414576,
+      "passed": true
+    },
+    "stress_disk_written_bytes": {
+      "ceiling": 134217728,
+      "observed": 72294400,
+      "passed": true
+    },
+    "metal_allocated_bytes": {
+      "ceiling": 16777216,
+      "observed": 4079616,
+      "passed": true
+    },
+    "metal_steady_delta_bytes": {
+      "ceiling": 1048576,
+      "observed": 32768,
+      "passed": true
+    },
+    "metal_command_buffer_errors": {
+      "ceiling": 0,
+      "observed": 0,
+      "passed": true
+    }
+  },
+  "hard_invariants": {
+    "telemetry_maximum_logical_slots": 2,
+    "telemetry_post_stop_slots": 0,
+    "project_contexts_after_close": 0,
+    "shared_command_queues": 1,
+    "shared_pipelines": 1,
+    "steady_gauge_allocation_delta": 0,
+    "paused_gauge_draw_delta": 0,
+    "released_active_surfaces": 0,
+    "main_actor_blocking_process_waits": 0,
+    "unbounded_collections": 0,
+    "unbounded_retries": 0
+  },
+  "representative_memory_tier": {
+    "host_tier": "expanded",
+    "host_physical_bytes": 51539607552,
+    "lowest_executed_policy_tier": "constrained",
+    "representative_physical_memory_bytes": 8589934592,
+    "qualification_scope": "deterministic constrained-policy execution on expanded-tier hardware",
+    "physical_8_gib_hardware_claimed": false,
+    "passed": true
+  }
+}

@@ -6,6 +6,9 @@
 
 import Foundation
 import ForgeConductorCore
+#if SWIFT_PACKAGE
+import ForgeNativeSessionHostPlugin
+#endif
 
 /// Native command-line entry point for administration, MCP serving, and diagnostics.
 ///
@@ -14,6 +17,7 @@ import ForgeConductorCore
 @main
 enum ForgeConductorMain {
     static func main() {
+        ForgeNativeSessionHostPlugin.register()
         let args = Array(CommandLine.arguments.dropFirst())
         let command = args.first ?? "help"
         let rest = Array(args.dropFirst())
@@ -227,8 +231,14 @@ enum ForgeConductorMain {
         sigTerm.setEventHandler { sem.signal() }
         sigInt.resume()
         sigTerm.resume()
+        defer {
+            sigInt.setEventHandler {}
+            sigTerm.setEventHandler {}
+            sigInt.cancel()
+            sigTerm.cancel()
+            server.stop()
+        }
         sem.wait()
-        server.stop()
     }
 
     // MARK: - Manager
@@ -414,6 +424,7 @@ enum ForgeConductorMain {
             FileManager.default.createFile(atPath: app.paths.managerLog.path, contents: nil)
         }
         let log = try FileHandle(forWritingTo: app.paths.managerLog)
+        defer { try? log.close() }
         try log.seekToEnd()
         let banner = Data("\n--- manager start \(ISO8601.string(from: Date())) ---\n".utf8)
         try log.write(contentsOf: banner)

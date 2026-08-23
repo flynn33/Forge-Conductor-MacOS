@@ -1,0 +1,9 @@
+{
+  "audit_e2_count": 0,
+  "lifecycle_test_failures": 0,
+  "live_leak_growth_bytes": -656,
+  "p05_dispositions": 11,
+  "sanitizer_product_findings": 0,
+  "strict_concurrency_failures": 0,
+  "valid": true
+}

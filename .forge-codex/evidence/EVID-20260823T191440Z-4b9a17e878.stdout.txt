@@ -1,0 +1,52 @@
+{
+  "checks": [
+    {
+      "name": "listener-publishes-directly",
+      "passed": true
+    },
+    {
+      "name": "listener-creates-no-task",
+      "passed": true
+    },
+    {
+      "name": "mailbox-newest-capacity-one",
+      "passed": true
+    },
+    {
+      "name": "mailbox-owns-consumer-task",
+      "passed": true
+    },
+    {
+      "name": "mailbox-has-explicit-stop",
+      "passed": true
+    },
+    {
+      "name": "mailbox-invalidates-generations",
+      "passed": true
+    },
+    {
+      "name": "mailbox-bounds-logical-slots",
+      "passed": true
+    },
+    {
+      "name": "tab-accessibility-mapping-is-complete",
+      "passed": false
+    },
+    {
+      "name": "tab-accessibility-identifiers-are-unique",
+      "passed": true
+    }
+  ],
+  "phase": "P03",
+  "schema_version": 1,
+  "tab_accessibility_mapping": {
+    "agents": "agents",
+    "diagnostics": "diagnostics",
+    "feed": "feed",
+    "manager": "manager",
+    "mcp": "mcp",
+    "rig": "rig",
+    "tools": "tools"
+  },
+  "valid": false
+}

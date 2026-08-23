@@ -49,6 +49,12 @@ struct DiagnosticsView: View {
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 16)
 
+            if let runtime = model.runtimeDiagnosticSnapshot {
+                runtimeSummary(runtime)
+                    .padding(.horizontal, 16)
+                    .accessibilityIdentifier("diagnostics-runtime-summary")
+            }
+
             if model.diagnosticPreview.isEmpty {
                 ContentUnavailableView(
                     "No diagnostic records yet",
@@ -89,6 +95,35 @@ struct DiagnosticsView: View {
         .onAppear {
             model.refreshDiagnosticsPreview()
         }
+    }
+
+    private func runtimeSummary(_ snapshot: RuntimeDiagnosticSnapshot) -> some View {
+        let queue = snapshot.gauges[RuntimeGauge.telemetryLogicalQueueDepth.rawValue] ?? 0
+        let queueMaximum = snapshot.gauges[RuntimeGauge.telemetryMaximumQueueDepth.rawValue] ?? 0
+        let history = snapshot.gauges[RuntimeGauge.telemetryHistorySize.rawValue] ?? 0
+        let draws = snapshot.counters[RuntimeCounter.gaugeDraws.rawValue] ?? 0
+        let pipelines = snapshot.counters[RuntimeCounter.gaugePipelinesCreated.rawValue] ?? 0
+        let buffers = snapshot.counters[RuntimeCounter.gaugeBuffersCreated.rawValue] ?? 0
+        return HStack(spacing: 12) {
+            metric("Queue", "\(queue) / max \(queueMaximum)")
+            metric("History", "\(history)")
+            metric("Gauge draws", "\(draws)")
+            metric("Pipelines", "\(pipelines)")
+            metric("Buffers", "\(buffers)")
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func metric(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.system(.caption, design: .monospaced).weight(.semibold))
+        }
+        .padding(8)
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
     }
 
     private func severityColor(_ s: DiagnosticSeverity) -> Color {

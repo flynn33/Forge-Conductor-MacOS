@@ -105,15 +105,17 @@ public enum DashboardPortGuard {
         // -nP -iTCP:PORT -sTCP:LISTEN
         proc.arguments = ["-nP", "-iTCP:\(port)", "-sTCP:LISTEN"]
         let out = Pipe()
+        let readHandle = out.fileHandleForReading
+        defer { try? readHandle.close() }
         proc.standardOutput = out
-        proc.standardError = Pipe()
+        proc.standardError = out
         do {
             try proc.run()
             proc.waitUntilExit()
         } catch {
             return nil
         }
-        let data = out.fileHandleForReading.readDataToEndOfFile()
+        let data = readHandle.readDataToEndOfFile()
         guard let text = String(data: data, encoding: .utf8), !text.isEmpty else {
             return []
         }

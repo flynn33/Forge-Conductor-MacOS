@@ -17,13 +17,6 @@ struct MetalLoadChart: NSViewRepresentable {
 
     func makeNSView(context: Context) -> MTKView {
         let view = MTKView()
-        view.device = MTLCreateSystemDefaultDevice()
-        view.clearColor = MTLClearColor(red: 0.01, green: 0.02, blue: 0.05, alpha: 1)
-        view.colorPixelFormat = .bgra8Unorm
-        view.framebufferOnly = true
-        view.isPaused = false
-        view.enableSetNeedsDisplay = false
-        view.preferredFramesPerSecond = 30
         context.coordinator.attach(to: view)
         context.coordinator.update(samples: samples)
         return view
@@ -31,5 +24,9 @@ struct MetalLoadChart: NSViewRepresentable {
 
     func updateNSView(_ nsView: MTKView, context: Context) {
         context.coordinator.update(samples: samples)
+    }
+
+    static func dismantleNSView(_ nsView: MTKView, coordinator: LoadTraceRenderer) {
+        coordinator.detach(from: nsView)
     }
 }

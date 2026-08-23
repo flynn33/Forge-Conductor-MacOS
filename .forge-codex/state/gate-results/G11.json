@@ -1,0 +1,70 @@
+{
+  "artifacts": [
+    {
+      "kind": "stdout",
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G11.stdout.txt",
+      "sha256": "5cb2d4f7609ff0bd794f80e137178eb2c10c9335b41d779b0756184a20d9e0c9"
+    },
+    {
+      "kind": "stderr",
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G11.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "criteria",
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G11.criteria.json",
+      "sha256": "24be3535df2a32ea3dcf5190b3113e96c11b71e00a98d1ae9ae5419489dffd01"
+    }
+  ],
+  "commands": [
+    {
+      "command": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-handlers/G11.sh",
+      "exit_code": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "5cb2d4f7609ff0bd794f80e137178eb2c10c9335b41d779b0756184a20d9e0c9",
+      "timed_out": false
+    }
+  ],
+  "ended_at": "2026-08-23T21:38:16.418001+00:00",
+  "environment": {
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "repository": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
+  },
+  "evaluator": {
+    "criteria_results": [
+      {
+        "criterion": "Release stress suite passes",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P11-release-stress-results.json#c1f39620b4a218f03323b6cc0f53f5525093afe0e59830108df4c97b741e6dcb; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T212034Z-4070dbd74c.json#e471b320b9598855baa77538a8aa40dcbaa5abec763c56870840e7a62bc50a1f",
+        "passed": true
+      },
+      {
+        "criterion": "resident-size trajectories are bounded",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P11-resource-results.json#405832a52390a220626f3fbbf19dc94aa04c34bccbb2c641fc1ef471ce529ef1; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T213648Z-7ed720d512.json#51cd8033cd618a774a3f71aac6b16067b2445656391de6a2b1af2bdcaa105274",
+        "passed": true
+      },
+      {
+        "criterion": "telemetry/gauge hard invariants pass under stress",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P04-metal-performance-report.json#4958c561b8ac484218edbbfb14dad86c2c4174e5d7da5cee7feecc67278c4de5; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T212139Z-5e0f9ed571.json#954954a13db38323e91b3961b15f40d0774a7f394c3bdbbb9e73e0e48815e1f7; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P11-resource-results.json#405832a52390a220626f3fbbf19dc94aa04c34bccbb2c641fc1ef471ce529ef1",
+        "passed": true
+      },
+      {
+        "criterion": "latency/CPU/GPU/wakeup/database budgets pass",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P11-profile-report.json#abe2fec04f5bdc9e15180d7dabe54fed69fbb0baf5fdbb90520398ba509d75ba; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P11-resource-results.json#405832a52390a220626f3fbbf19dc94aa04c34bccbb2c641fc1ef471ce529ef1; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T213648Z-7ed720d512.json#51cd8033cd618a774a3f71aac6b16067b2445656391de6a2b1af2bdcaa105274",
+        "passed": true
+      },
+      {
+        "criterion": "lowest available representative memory tier evidence exists",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P11-release-stress-results.json#c1f39620b4a218f03323b6cc0f53f5525093afe0e59830108df4c97b741e6dcb; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P11-resource-results.json#405832a52390a220626f3fbbf19dc94aa04c34bccbb2c641fc1ef471ce529ef1",
+        "passed": true
+      }
+    ],
+    "name": "forge-gate-handler",
+    "version": "1"
+  },
+  "gate_id": "G11",
+  "notes": "",
+  "schema_version": 1,
+  "started_at": "2026-08-23T21:38:16.103887+00:00",
+  "status": "passed"
+}

@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 138,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T213951Z-91c8ae0192.stdout.txt",
+      "sha256": "5ead2612764157e07b1b8f0a6802a4d5c55a4848758a4c9d1e03ce9560a840fa"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T213951Z-91c8ae0192.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "command": "git status --porcelain=v1",
+  "ended_at": "2026-08-23T21:39:51.135164+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T213951Z-91c8ae0192",
+  "kind": "clean-checkout",
+  "related_findings": [],
+  "related_gates": [
+    "G12"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T21:39:51.114698+00:00",
+  "timed_out": false
+}

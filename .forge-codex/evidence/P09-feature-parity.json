@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "phase": "P09",
+  "preserved": [
+    "MCP-SERVER-STDIO",
+    "DATA-CONTEXT-HANDOFFS",
+    "RUNTIME-LMSTUDIO-PRIMARY-FALLBACK"
+  ],
+  "additive": [
+    "HOST-ADAPTER-REGISTRY",
+    "HOST-NATIVE-SESSION-PLUGIN",
+    "HOST-NATIVE-AUTONOMOUS-ROLLOVER"
+  ],
+  "removed": [],
+  "unknown": [],
+  "untested": []
+}

@@ -1,0 +1,34 @@
+{
+  "artifacts": [
+    {
+      "bytes": 8170,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T191232Z-37ef639495.stdout.txt",
+      "sha256": "6fc2325dfab870b9de902f4eb36f1c221e8059ca41af3f6247c280d377fcf369"
+    },
+    {
+      "bytes": 7397,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T191232Z-37ef639495.stderr.txt",
+      "sha256": "ef50d75e9dcb18d5bae50e36ca8b845ceaa88671004768a149a19e6675e446e5"
+    }
+  ],
+  "command": "swift test --filter 'LatestValueMailboxTests|TelemetryContractTests|RealtimeStreamTests|RigParityTests|RuntimeObservabilityTests'",
+  "ended_at": "2026-08-23T19:12:41.279979+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T191232Z-37ef639495",
+  "kind": "p03-bounded-mailbox-tests",
+  "related_findings": [
+    "FC-MEM-001",
+    "FC-LIFE-GAP"
+  ],
+  "related_gates": [
+    "G03"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T19:12:32.176242+00:00",
+  "timed_out": false
+}

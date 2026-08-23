@@ -1,0 +1,7 @@
+[0/1] Planning build
+Building for production...
+[0/1] Write sources
+[2/3] Write swift-version--58304C5D6DBC2206.txt
+[4/4] Compiling ForgeConductorCore AgentCatalog.swift
+[5/5] Compiling ForgeNativeSessionHostPlugin ForgeNativeSessionHostPlugin.swift
+Build of target: 'ForgeNativeSessionHostPlugin' complete! (22.94s)

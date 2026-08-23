@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 1877,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T205232Z-310671ba57.stdout.txt",
+      "sha256": "905d84ed7257b45b489b38e80f1c0a519ebdab7546a53a3d9874c6fcc2ca350d"
+    },
+    {
+      "bytes": 8000,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T205232Z-310671ba57.stderr.txt",
+      "sha256": "b3c898131c0a829ba29bfaf32612d9b25ffa745bc2ecbb48c6e4f45cb2f34131"
+    }
+  ],
+  "command": "swift test --jobs 4 --filter NativeSessionHostPluginTests",
+  "ended_at": "2026-08-23T20:52:43.825976+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T205232Z-310671ba57",
+  "kind": "p09-plugin-tests",
+  "related_findings": [],
+  "related_gates": [
+    "G09"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T20:52:32.761194+00:00",
+  "timed_out": false
+}

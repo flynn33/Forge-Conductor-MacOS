@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 115150,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T212139Z-5e0f9ed571.stdout.txt",
+      "sha256": "29c6adb98e122505683e46293c9de6dad2c080339098f2a250e02d1de77a8d8d"
+    },
+    {
+      "bytes": 596,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T212139Z-5e0f9ed571.stderr.txt",
+      "sha256": "24469c699ce4b9dd5469fecce748c35753485378a39ea32422db835616e1429a"
+    }
+  ],
+  "command": "xcodebuild -project ForgeConductor.xcodeproj -scheme ForgeConductor -configuration Debug -destination platform=macOS -derivedDataPath .build/DerivedData-P11 CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= test-without-building -only-testing:ForgeConductorUITests/ForgeConductorUITests/testHundredGaugeNavigationCyclesQuiesce",
+  "ended_at": "2026-08-23T21:27:36.883588+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T212139Z-5e0f9ed571",
+  "kind": "ui_test",
+  "related_findings": [],
+  "related_gates": [
+    "G11"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T21:21:39.364116+00:00",
+  "timed_out": false
+}

@@ -1,6 +1,6 @@
 // RigDashboardView.swift
 // What: Builds the real-time host and orchestration instrument panel.
-// How: A display-cadence TimelineView projects AppModel telemetry into modular Metal
+// How: AppModel telemetry changes project directly into modular demand-driven Metal
 // gauges, charts, process panels, MCP cards, and event summaries.
 // Why: The rig provides one coherent operational view without slowing Core sampling.
 
@@ -13,10 +13,8 @@ struct RigDashboardView: View {
     @EnvironmentObject private var model: AppModel
 
     var body: some View {
-        // TimelineView drives UI at animation/display cadence against the continuous engine.
-        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !model.autoRefresh)) { _ in
-            rigContent
-        }
+        // Telemetry publication is the only display clock; static values stay quiescent.
+        rigContent
     }
 
     private var rigContent: some View {

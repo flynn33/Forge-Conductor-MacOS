@@ -14,6 +14,9 @@ public final class MCPServer: @unchecked Sendable {
     private let role: LMStudioConnectorRole
     private let deploymentID: String
     private let lock = NSLock()
+    private let cancellationLock = NSLock()
+    private var cancelledRequestIDs: Set<String> = []
+    private var cancellationOrder: [String] = []
 
     public init(
         app: ForgeApp,
@@ -57,6 +60,15 @@ public final class MCPServer: @unchecked Sendable {
 
         var lastPresence = Date()
         let reader = MCPStreamReader(handle: input)
+        defer {
+            reader.close()
+            try? app.store.presenceDelete(clientID: presenceID)
+            app.diagnostics.info("mcp_serve_end", [
+                "client_id": clientID.rawValue,
+                "role": role.rawValue,
+                "deployment_id": deploymentID,
+            ])
+        }
         while let message = try reader.readMessage() {
             // Refresh presence while the stdio session is active (dashboard TTL ~45s).
             let now = Date()
@@ -69,12 +81,6 @@ public final class MCPServer: @unchecked Sendable {
                 try write(response, to: output)
             }
         }
-        try? app.store.presenceDelete(clientID: presenceID)
-        app.diagnostics.info("mcp_serve_end", [
-            "client_id": clientID.rawValue,
-            "role": role.rawValue,
-            "deployment_id": deploymentID,
-        ])
     }
 
     // MARK: - Message handling
@@ -90,9 +96,31 @@ public final class MCPServer: @unchecked Sendable {
             return errorResponse(id: id, code: -32600, message: "Invalid Request: missing method")
         }
 
+        if method == "notifications/cancelled" {
+            let params = message["params"] as? [String: Any] ?? [:]
+            if let requestID = Self.requestKey(params["requestId"] ?? params["request_id"]) {
+                cancellationLock.lock()
+                if cancelledRequestIDs.insert(requestID).inserted { cancellationOrder.append(requestID) }
+                if cancellationOrder.count > 256 {
+                    cancelledRequestIDs.remove(cancellationOrder.removeFirst())
+                }
+                cancellationLock.unlock()
+            }
+            return nil
+        }
         // Notifications we acknowledge silently
         if method == "notifications/initialized" || method.hasPrefix("notifications/") {
             return nil
+        }
+
+        if let requestID = Self.requestKey(id) {
+            cancellationLock.lock()
+            let cancelled = cancelledRequestIDs.remove(requestID) != nil
+            cancellationOrder.removeAll { $0 == requestID }
+            cancellationLock.unlock()
+            if cancelled {
+                return errorResponse(id: id, code: -32800, message: "Cancelled")
+            }
         }
 
         do {
@@ -116,6 +144,11 @@ public final class MCPServer: @unchecked Sendable {
                     "protocolVersion": negotiated,
                     "capabilities": [
                         "tools": ["listChanged": false] as [String: Any],
+                        "projectMemory": [
+                            "capabilityVersion": ProjectMemoryService.capabilityVersion,
+                            "schemaVersion": ProjectMemoryRepository.schemaVersion,
+                            "limits": app.projectMemory.limits.asDictionary(),
+                        ] as [String: Any],
                     ] as [String: Any],
                     "serverInfo": [
                         "name": serverName,
@@ -180,8 +213,11 @@ public final class MCPServer: @unchecked Sendable {
         app.tools.toolNames.map { name in
             [
                 "name": name,
-                "description": Self.descriptions[name] ?? "Forge-Conductor tool: \(name)",
-                "inputSchema": Self.schema(for: name),
+                "description": ProjectMemoryToolPack.description(for: name)
+                    ?? ContinuityLifecycleToolPack.description(for: name)
+                    ?? Self.descriptions[name] ?? "Forge-Conductor tool: \(name)",
+                "inputSchema": ProjectMemoryToolPack.schema(for: name)
+                    ?? ContinuityLifecycleToolPack.schema(for: name) ?? Self.schema(for: name),
             ]
         }
     }
@@ -336,7 +372,11 @@ public final class MCPServer: @unchecked Sendable {
                 "properties": [
                     "command": ["type": "string"] as [String: Any],
                     "cwd": ["type": "string"] as [String: Any],
-                    "timeout_sec": ["type": "number"] as [String: Any],
+                    "timeout_sec": [
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                        "maximum": ShellToolPack.maximumTimeoutSec,
+                    ] as [String: Any],
                 ] as [String: Any],
                 "required": ["command"],
             ]
@@ -433,6 +473,13 @@ public final class MCPServer: @unchecked Sendable {
         return supportedProtocolVersions[0]
     }
 
+    private static func requestKey(_ value: Any?) -> String? {
+        if let value = value as? String { return value }
+        if let value = value as? NSNumber { return value.stringValue }
+        if let value = value as? Int { return String(value) }
+        return nil
+    }
+
     private func ok(id: Any?, result: [String: Any]) -> [String: Any] {
         var resp: [String: Any] = [
             "jsonrpc": "2.0",
@@ -487,6 +534,14 @@ public final class MCPStreamReader {
         self.handle = handle
         self.maximumMessageBytes = maximumMessageBytes
     }
+
+    /// Releases buffered payload bytes at the serve boundary. The caller owns
+    /// the supplied handle, so standard input and test pipes are never closed here.
+    public func close() {
+        buffer.removeAll(keepingCapacity: false)
+    }
+
+    deinit { close() }
 
     public func readMessage() throws -> [String: Any]? {
         while true {

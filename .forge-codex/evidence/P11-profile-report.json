@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "phase": "P11",
+  "status": "passed",
+  "build": "release",
+  "host": {
+    "machine": "Apple Silicon arm64",
+    "physical_memory_bytes": 51539607552,
+    "logical_cpu_count": 14,
+    "os": "macOS 26.6.2",
+    "os_build": "25G83"
+  },
+  "application_commit": "1fce9e0188698167564056ee8ace266342f97c7b",
+  "profiling_build_override": "ENABLE_HARDENED_RUNTIME=NO for local ad-hoc profiling only",
+  "traces": [
+    {
+      "template": "Metal System Trace",
+      "duration_seconds": 15.932131,
+      "path": "/Users/jimdaley/Documents/RavenForge/Forge-Conductor-MacOS/Forge-Conductor-Repair-Evidence/aba90ab1-be80-4cc5-aa0b-23dd54d4a24d/p11/20260823T213021Z-P11-GAUGE-STRESS-Metal_System_Trace.trace",
+      "tree_sha256": "ee6ade2e9eb13328ab46a01d334e0978fa81535e7823a34682afe3eba87f803f",
+      "bytes": 241627731,
+      "files": 615,
+      "record_evidence": "EVID-20260823T213021Z-ff22ae46e0"
+    },
+    {
+      "template": "Allocations",
+      "duration_seconds": 15.797528,
+      "path": "/Users/jimdaley/Documents/RavenForge/Forge-Conductor-MacOS/Forge-Conductor-Repair-Evidence/aba90ab1-be80-4cc5-aa0b-23dd54d4a24d/p11/20260823T213125Z-P11-GAUGE-STRESS-Allocations.trace",
+      "tree_sha256": "006de4350810db2094fd68411e00deb01dc1812dc8f119dca72d70e2b054543a",
+      "bytes": 1060405647,
+      "files": 157,
+      "record_evidence": "EVID-20260823T213125Z-71f05795f9"
+    },
+    {
+      "template": "Time Profiler",
+      "duration_seconds": 15.635039,
+      "path": "/Users/jimdaley/Documents/RavenForge/Forge-Conductor-MacOS/Forge-Conductor-Repair-Evidence/aba90ab1-be80-4cc5-aa0b-23dd54d4a24d/p11/20260823T213156Z-P11-GAUGE-STRESS-Time_Profiler.trace",
+      "tree_sha256": "8daf7ee89a736df318a77d7b3b4da2ec277e34302731a3542f2ae9f6f32217f5",
+      "bytes": 19214818,
+      "files": 257,
+      "record_evidence": "EVID-20260823T213156Z-8cb418d293"
+    }
+  ],
+  "measurements": {
+    "cpu_time_profile_samples": 15221,
+    "cpu_active_seconds": 15.221,
+    "average_single_core_utilization_percent": 97.351852,
+    "cpu_potential_hangs": 0,
+    "cpu_hang_risks": 0,
+    "metal_command_buffer_submissions": 3167,
+    "metal_command_buffer_completions": 13209,
+    "metal_command_buffer_errors": 0,
+    "metal_potential_hangs": 0,
+    "metal_allocation_intervals": 8,
+    "metal_allocated_min_bytes": 4046848,
+    "metal_allocated_max_bytes": 4079616,
+    "metal_allocated_delta_bytes": 32768
+  }
+}

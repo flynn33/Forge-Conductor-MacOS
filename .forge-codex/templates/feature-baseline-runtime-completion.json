@@ -1,0 +1,10 @@
+{
+  "instructions": [
+    "Merge this work into feature-baseline.json after exercising the app.",
+    "Every feature must have a stable ID, baseline evidence, parity status, and executable tests.",
+    "Set runtime_completion_required false only after all discoverable UI/protocol/data surfaces are covered."
+  ],
+  "runtime_completion_required": true,
+  "runtime_features": [],
+  "schema_version": 1
+}

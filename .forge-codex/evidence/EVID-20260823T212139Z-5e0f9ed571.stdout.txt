@@ -1,0 +1,1843 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -project ForgeConductor.xcodeproj -scheme ForgeConductor -configuration Debug -destination platform=macOS -derivedDataPath .build/DerivedData-P11 CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= test-without-building "-only-testing:ForgeConductorUITests/ForgeConductorUITests/testHundredGaugeNavigationCyclesQuiesce"
+
+Build settings from command line:
+    CODE_SIGN_IDENTITY = -
+    CODE_SIGN_STYLE = Manual
+    DEVELOPMENT_TEAM = 
+
+2026-08-23 16:21:40.970804-0500 ForgeConductorUITests-Runner[72657:1152682] [Default] Running tests...
+Test Suite 'Selected tests' started at 2026-08-23 16:21:41.045.
+Test Suite 'ForgeConductorUITests.xctest' started at 2026-08-23 16:21:41.046.
+Test Suite 'ForgeConductorUITests' started at 2026-08-23 16:21:41.046.
+Test Case '-[ForgeConductorUITests.ForgeConductorUITests testHundredGaugeNavigationCyclesQuiesce]' started.
+    t =     0.00s Start Test at 2026-08-23 16:21:41.046
+    t =     0.07s Set Up
+    t =     0.08s     Open com.forge-conductor.app
+    t =     0.08s         Launch com.forge-conductor.app
+    t =     0.81s             Wait for accessibility to load
+    t =     1.26s             Setting up automation session
+    t =     1.27s             Wait for com.forge-conductor.app to idle
+    t =     1.29s Waiting 8.0s for "tab-rig" Button to exist
+    t =     2.30s     Checking `Expect predicate `existsNoRetry == 1` for object "tab-rig" Button`
+    t =     2.30s         Checking existence of `"tab-rig" Button`
+    t =     2.45s Waiting 8.0s for "tab-mcp" Button to exist
+    t =     3.48s     Checking `Expect predicate `existsNoRetry == 1` for object "tab-mcp" Button`
+    t =     3.48s         Checking existence of `"tab-mcp" Button`
+    t =     3.58s Click "tab-mcp" Button
+    t =     3.58s     Wait for com.forge-conductor.app to idle
+    t =     3.59s     Find the "tab-mcp" Button
+    t =     3.67s     Check for interrupting elements affecting "tab-mcp" Button
+    t =     3.69s     Synthesize event
+    t =     4.08s     Wait for com.forge-conductor.app to idle
+    t =     4.10s Waiting 2.0s for "detail-mcp" Any to exist
+    t =     5.13s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =     5.13s         Checking existence of `"detail-mcp" Any`
+    t =     5.20s Click "tab-rig" Button
+    t =     5.20s     Wait for com.forge-conductor.app to idle
+    t =     5.20s     Find the "tab-rig" Button
+    t =     5.24s     Check for interrupting elements affecting "tab-rig" Button
+    t =     5.26s     Synthesize event
+    t =     5.74s     Wait for com.forge-conductor.app to idle
+    t =     5.77s Waiting 2.0s for "detail-rig" Any to exist
+    t =     6.80s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =     6.80s         Checking existence of `"detail-rig" Any`
+    t =     7.07s Click "tab-mcp" Button
+    t =     7.07s     Wait for com.forge-conductor.app to idle
+    t =     7.07s     Find the "tab-mcp" Button
+    t =     7.26s     Check for interrupting elements affecting "tab-mcp" Button
+    t =     7.30s     Synthesize event
+    t =     7.68s     Wait for com.forge-conductor.app to idle
+    t =     7.68s Waiting 2.0s for "detail-mcp" Any to exist
+    t =     8.71s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =     8.71s         Checking existence of `"detail-mcp" Any`
+    t =     8.88s Click "tab-rig" Button
+    t =     8.88s     Wait for com.forge-conductor.app to idle
+    t =     8.88s     Find the "tab-rig" Button
+    t =     8.92s     Check for interrupting elements affecting "tab-rig" Button
+    t =     8.93s     Synthesize event
+    t =     9.41s     Wait for com.forge-conductor.app to idle
+    t =     9.44s Waiting 2.0s for "detail-rig" Any to exist
+    t =    10.47s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =    10.47s         Checking existence of `"detail-rig" Any`
+    t =    10.59s Click "tab-mcp" Button
+    t =    10.59s     Wait for com.forge-conductor.app to idle
+    t =    10.60s     Find the "tab-mcp" Button
+    t =    10.70s     Check for interrupting elements affecting "tab-mcp" Button
+    t =    10.78s     Synthesize event
+    t =    11.20s     Wait for com.forge-conductor.app to idle
+    t =    11.21s Waiting 2.0s for "detail-mcp" Any to exist
+    t =    12.24s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =    12.24s         Checking existence of `"detail-mcp" Any`
+    t =    12.40s Click "tab-rig" Button
+    t =    12.40s     Wait for com.forge-conductor.app to idle
+    t =    12.40s     Find the "tab-rig" Button
+    t =    12.44s     Check for interrupting elements affecting "tab-rig" Button
+    t =    12.46s     Synthesize event
+    t =    12.92s     Wait for com.forge-conductor.app to idle
+    t =    12.94s Waiting 2.0s for "detail-rig" Any to exist
+    t =    13.97s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =    13.97s         Checking existence of `"detail-rig" Any`
+    t =    14.14s Click "tab-mcp" Button
+    t =    14.14s     Wait for com.forge-conductor.app to idle
+    t =    14.14s     Find the "tab-mcp" Button
+    t =    14.23s     Check for interrupting elements affecting "tab-mcp" Button
+    t =    14.29s     Synthesize event
+    t =    14.70s     Wait for com.forge-conductor.app to idle
+    t =    14.71s Waiting 2.0s for "detail-mcp" Any to exist
+    t =    15.74s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =    15.74s         Checking existence of `"detail-mcp" Any`
+    t =    15.79s Click "tab-rig" Button
+    t =    15.79s     Wait for com.forge-conductor.app to idle
+    t =    15.80s     Find the "tab-rig" Button
+    t =    15.83s     Check for interrupting elements affecting "tab-rig" Button
+    t =    15.86s     Synthesize event
+    t =    16.33s     Wait for com.forge-conductor.app to idle
+    t =    16.36s Waiting 2.0s for "detail-rig" Any to exist
+    t =    17.39s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =    17.39s         Checking existence of `"detail-rig" Any`
+    t =    17.62s Click "tab-mcp" Button
+    t =    17.62s     Wait for com.forge-conductor.app to idle
+    t =    17.64s     Find the "tab-mcp" Button
+    t =    17.74s     Check for interrupting elements affecting "tab-mcp" Button
+    t =    17.81s     Synthesize event
+    t =    18.20s     Wait for com.forge-conductor.app to idle
+    t =    18.21s Waiting 2.0s for "detail-mcp" Any to exist
+    t =    19.25s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =    19.25s         Checking existence of `"detail-mcp" Any`
+    t =    19.30s Click "tab-rig" Button
+    t =    19.30s     Wait for com.forge-conductor.app to idle
+    t =    19.30s     Find the "tab-rig" Button
+    t =    19.34s     Check for interrupting elements affecting "tab-rig" Button
+    t =    19.36s     Synthesize event
+    t =    19.83s     Wait for com.forge-conductor.app to idle
+    t =    19.85s Waiting 2.0s for "detail-rig" Any to exist
+    t =    20.88s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =    20.88s         Checking existence of `"detail-rig" Any`
+    t =    21.02s Click "tab-mcp" Button
+    t =    21.02s     Wait for com.forge-conductor.app to idle
+    t =    21.04s     Find the "tab-mcp" Button
+    t =    21.14s     Check for interrupting elements affecting "tab-mcp" Button
+    t =    21.16s     Synthesize event
+    t =    21.56s     Wait for com.forge-conductor.app to idle
+    t =    21.56s Waiting 2.0s for "detail-mcp" Any to exist
+    t =    22.60s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =    22.60s         Checking existence of `"detail-mcp" Any`
+    t =    22.76s Click "tab-rig" Button
+    t =    22.76s     Wait for com.forge-conductor.app to idle
+    t =    22.76s     Find the "tab-rig" Button
+    t =    22.79s     Check for interrupting elements affecting "tab-rig" Button
+    t =    22.81s     Synthesize event
+    t =    23.27s     Wait for com.forge-conductor.app to idle
+    t =    23.31s Waiting 2.0s for "detail-rig" Any to exist
+    t =    24.34s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =    24.34s         Checking existence of `"detail-rig" Any`
+    t =    24.58s Click "tab-mcp" Button
+    t =    24.58s     Wait for com.forge-conductor.app to idle
+    t =    24.60s     Find the "tab-mcp" Button
+    t =    24.69s     Check for interrupting elements affecting "tab-mcp" Button
+    t =    24.74s     Synthesize event
+    t =    25.16s     Wait for com.forge-conductor.app to idle
+    t =    25.16s Waiting 2.0s for "detail-mcp" Any to exist
+    t =    26.19s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =    26.19s         Checking existence of `"detail-mcp" Any`
+    t =    26.25s Click "tab-rig" Button
+    t =    26.25s     Wait for com.forge-conductor.app to idle
+    t =    26.26s     Find the "tab-rig" Button
+    t =    26.29s     Check for interrupting elements affecting "tab-rig" Button
+    t =    26.31s     Synthesize event
+    t =    26.79s     Wait for com.forge-conductor.app to idle
+    t =    26.80s Waiting 2.0s for "detail-rig" Any to exist
+    t =    27.84s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =    27.84s         Checking existence of `"detail-rig" Any`
+    t =    27.98s Click "tab-mcp" Button
+    t =    27.98s     Wait for com.forge-conductor.app to idle
+    t =    27.98s     Find the "tab-mcp" Button
+    t =    28.08s     Check for interrupting elements affecting "tab-mcp" Button
+    t =    28.10s     Synthesize event
+    t =    28.54s     Wait for com.forge-conductor.app to idle
+    t =    28.54s Waiting 2.0s for "detail-mcp" Any to exist
+    t =    29.57s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =    29.57s         Checking existence of `"detail-mcp" Any`
+    t =    29.62s Click "tab-rig" Button
+    t =    29.62s     Wait for com.forge-conductor.app to idle
+    t =    29.63s     Find the "tab-rig" Button
+    t =    29.66s     Check for interrupting elements affecting "tab-rig" Button
+    t =    29.68s     Synthesize event
+    t =    30.16s     Wait for com.forge-conductor.app to idle
+    t =    30.19s Waiting 2.0s for "detail-rig" Any to exist
+    t =    31.21s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =    31.21s         Checking existence of `"detail-rig" Any`
+    t =    31.37s Click "tab-mcp" Button
+    t =    31.37s     Wait for com.forge-conductor.app to idle
+    t =    31.38s     Find the "tab-mcp" Button
+    t =    31.46s     Check for interrupting elements affecting "tab-mcp" Button
+    t =    31.57s     Synthesize event
+    t =    31.95s     Wait for com.forge-conductor.app to idle
+    t =    31.96s Waiting 2.0s for "detail-mcp" Any to exist
+    t =    32.98s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =    32.98s         Checking existence of `"detail-mcp" Any`
+    t =    33.13s Click "tab-rig" Button
+    t =    33.13s     Wait for com.forge-conductor.app to idle
+    t =    33.13s     Find the "tab-rig" Button
+    t =    33.28s     Check for interrupting elements affecting "tab-rig" Button
+    t =    33.39s     Synthesize event
+    t =    33.87s     Wait for com.forge-conductor.app to idle
+    t =    33.89s Waiting 2.0s for "detail-rig" Any to exist
+    t =    34.91s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =    34.91s         Checking existence of `"detail-rig" Any`
+    t =    35.03s Click "tab-mcp" Button
+    t =    35.03s     Wait for com.forge-conductor.app to idle
+    t =    35.03s     Find the "tab-mcp" Button
+    t =    35.12s     Check for interrupting elements affecting "tab-mcp" Button
+    t =    35.20s     Synthesize event
+    t =    35.61s     Wait for com.forge-conductor.app to idle
+    t =    35.61s Waiting 2.0s for "detail-mcp" Any to exist
+    t =    36.64s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =    36.64s         Checking existence of `"detail-mcp" Any`
+    t =    36.79s Click "tab-rig" Button
+    t =    36.79s     Wait for com.forge-conductor.app to idle
+    t =    36.79s     Find the "tab-rig" Button
+    t =    36.83s     Check for interrupting elements affecting "tab-rig" Button
+    t =    36.85s     Synthesize event
+    t =    37.31s     Wait for com.forge-conductor.app to idle
+    t =    37.33s Waiting 2.0s for "detail-rig" Any to exist
+    t =    38.35s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =    38.35s         Checking existence of `"detail-rig" Any`
+    t =    38.48s Click "tab-mcp" Button
+    t =    38.48s     Wait for com.forge-conductor.app to idle
+    t =    38.50s     Find the "tab-mcp" Button
+    t =    38.59s     Check for interrupting elements affecting "tab-mcp" Button
+    t =    38.64s     Synthesize event
+    t =    39.09s     Wait for com.forge-conductor.app to idle
+    t =    39.09s Waiting 2.0s for "detail-mcp" Any to exist
+    t =    40.11s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =    40.11s         Checking existence of `"detail-mcp" Any`
+    t =    40.16s Click "tab-rig" Button
+    t =    40.16s     Wait for com.forge-conductor.app to idle
+    t =    40.16s     Find the "tab-rig" Button
+    t =    40.20s     Check for interrupting elements affecting "tab-rig" Button
+    t =    40.21s     Synthesize event
+    t =    40.70s     Wait for com.forge-conductor.app to idle
+    t =    40.72s Waiting 2.0s for "detail-rig" Any to exist
+    t =    41.73s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =    41.73s         Checking existence of `"detail-rig" Any`
+    t =    41.84s Click "tab-mcp" Button
+    t =    41.84s     Wait for com.forge-conductor.app to idle
+    t =    41.86s     Find the "tab-mcp" Button
+    t =    41.94s     Check for interrupting elements affecting "tab-mcp" Button
+    t =    41.96s     Synthesize event
+    t =    42.39s     Wait for com.forge-conductor.app to idle
+    t =    42.40s Waiting 2.0s for "detail-mcp" Any to exist
+    t =    43.41s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =    43.41s         Checking existence of `"detail-mcp" Any`
+    t =    43.57s Click "tab-rig" Button
+    t =    43.57s     Wait for com.forge-conductor.app to idle
+    t =    43.57s     Find the "tab-rig" Button
+    t =    43.61s     Check for interrupting elements affecting "tab-rig" Button
+    t =    43.63s     Synthesize event
+    t =    44.09s     Wait for com.forge-conductor.app to idle
+    t =    44.11s Waiting 2.0s for "detail-rig" Any to exist
+    t =    45.12s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =    45.12s         Checking existence of `"detail-rig" Any`
+    t =    45.24s Click "tab-mcp" Button
+    t =    45.24s     Wait for com.forge-conductor.app to idle
+    t =    45.26s     Find the "tab-mcp" Button
+    t =    45.35s     Check for interrupting elements affecting "tab-mcp" Button
+    t =    45.43s     Synthesize event
+    t =    45.84s     Wait for com.forge-conductor.app to idle
+    t =    45.85s Waiting 2.0s for "detail-mcp" Any to exist
+    t =    46.86s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =    46.86s         Checking existence of `"detail-mcp" Any`
+    t =    47.02s Click "tab-rig" Button
+    t =    47.02s     Wait for com.forge-conductor.app to idle
+    t =    47.02s     Find the "tab-rig" Button
+    t =    47.06s     Check for interrupting elements affecting "tab-rig" Button
+    t =    47.08s     Synthesize event
+    t =    47.56s     Wait for com.forge-conductor.app to idle
+    t =    47.58s Waiting 2.0s for "detail-rig" Any to exist
+    t =    48.59s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =    48.59s         Checking existence of `"detail-rig" Any`
+    t =    48.73s Click "tab-mcp" Button
+    t =    48.73s     Wait for com.forge-conductor.app to idle
+    t =    48.73s     Find the "tab-mcp" Button
+    t =    48.84s     Check for interrupting elements affecting "tab-mcp" Button
+    t =    49.05s     Synthesize event
+    t =    49.42s     Wait for com.forge-conductor.app to idle
+    t =    49.43s Waiting 2.0s for "detail-mcp" Any to exist
+    t =    50.45s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =    50.45s         Checking existence of `"detail-mcp" Any`
+    t =    50.60s Click "tab-rig" Button
+    t =    50.60s     Wait for com.forge-conductor.app to idle
+    t =    50.61s     Find the "tab-rig" Button
+    t =    50.64s     Check for interrupting elements affecting "tab-rig" Button
+    t =    50.66s     Synthesize event
+    t =    51.17s     Wait for com.forge-conductor.app to idle
+    t =    51.19s Waiting 2.0s for "detail-rig" Any to exist
+    t =    52.21s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =    52.21s         Checking existence of `"detail-rig" Any`
+    t =    52.33s Click "tab-mcp" Button
+    t =    52.34s     Wait for com.forge-conductor.app to idle
+    t =    52.35s     Find the "tab-mcp" Button
+    t =    52.53s     Check for interrupting elements affecting "tab-mcp" Button
+    t =    52.55s     Synthesize event
+    t =    52.99s     Wait for com.forge-conductor.app to idle
+    t =    53.00s Waiting 2.0s for "detail-mcp" Any to exist
+    t =    54.02s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =    54.02s         Checking existence of `"detail-mcp" Any`
+    t =    54.18s Click "tab-rig" Button
+    t =    54.18s     Wait for com.forge-conductor.app to idle
+    t =    54.18s     Find the "tab-rig" Button
+    t =    54.22s     Check for interrupting elements affecting "tab-rig" Button
+    t =    54.24s     Synthesize event
+    t =    54.76s     Wait for com.forge-conductor.app to idle
+    t =    54.78s Waiting 2.0s for "detail-rig" Any to exist
+    t =    55.80s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =    55.80s         Checking existence of `"detail-rig" Any`
+    t =    55.97s Click "tab-mcp" Button
+    t =    55.97s     Wait for com.forge-conductor.app to idle
+    t =    55.99s     Find the "tab-mcp" Button
+    t =    56.08s     Check for interrupting elements affecting "tab-mcp" Button
+    t =    56.12s     Synthesize event
+    t =    56.54s     Wait for com.forge-conductor.app to idle
+    t =    56.55s Waiting 2.0s for "detail-mcp" Any to exist
+    t =    57.57s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =    57.57s         Checking existence of `"detail-mcp" Any`
+    t =    57.62s Click "tab-rig" Button
+    t =    57.62s     Wait for com.forge-conductor.app to idle
+    t =    57.63s     Find the "tab-rig" Button
+    t =    57.66s     Check for interrupting elements affecting "tab-rig" Button
+    t =    57.68s     Synthesize event
+    t =    58.18s     Wait for com.forge-conductor.app to idle
+    t =    58.20s Waiting 2.0s for "detail-rig" Any to exist
+    t =    59.23s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =    59.23s         Checking existence of `"detail-rig" Any`
+    t =    59.47s Click "tab-mcp" Button
+    t =    59.47s     Wait for com.forge-conductor.app to idle
+    t =    59.48s     Find the "tab-mcp" Button
+    t =    59.58s     Check for interrupting elements affecting "tab-mcp" Button
+    t =    59.65s     Synthesize event
+    t =    60.04s     Wait for com.forge-conductor.app to idle
+    t =    60.04s Waiting 2.0s for "detail-mcp" Any to exist
+    t =    61.06s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =    61.06s         Checking existence of `"detail-mcp" Any`
+    t =    61.11s Click "tab-rig" Button
+    t =    61.11s     Wait for com.forge-conductor.app to idle
+    t =    61.12s     Find the "tab-rig" Button
+    t =    61.16s     Check for interrupting elements affecting "tab-rig" Button
+    t =    61.18s     Synthesize event
+    t =    61.64s     Wait for com.forge-conductor.app to idle
+    t =    61.74s Waiting 2.0s for "detail-rig" Any to exist
+    t =    62.75s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =    62.75s         Checking existence of `"detail-rig" Any`
+    t =    62.89s Click "tab-mcp" Button
+    t =    62.89s     Wait for com.forge-conductor.app to idle
+    t =    62.92s     Find the "tab-mcp" Button
+    t =    63.01s     Check for interrupting elements affecting "tab-mcp" Button
+    t =    63.06s     Synthesize event
+    t =    63.45s     Wait for com.forge-conductor.app to idle
+    t =    63.46s Waiting 2.0s for "detail-mcp" Any to exist
+    t =    64.47s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =    64.47s         Checking existence of `"detail-mcp" Any`
+    t =    64.64s Click "tab-rig" Button
+    t =    64.64s     Wait for com.forge-conductor.app to idle
+    t =    64.64s     Find the "tab-rig" Button
+    t =    64.68s     Check for interrupting elements affecting "tab-rig" Button
+    t =    64.70s     Synthesize event
+    t =    65.19s     Wait for com.forge-conductor.app to idle
+    t =    65.21s Waiting 2.0s for "detail-rig" Any to exist
+    t =    66.22s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =    66.22s         Checking existence of `"detail-rig" Any`
+    t =    66.37s Click "tab-mcp" Button
+    t =    66.37s     Wait for com.forge-conductor.app to idle
+    t =    66.38s     Find the "tab-mcp" Button
+    t =    66.47s     Check for interrupting elements affecting "tab-mcp" Button
+    t =    66.53s     Synthesize event
+    t =    66.93s     Wait for com.forge-conductor.app to idle
+    t =    66.93s Waiting 2.0s for "detail-mcp" Any to exist
+    t =    67.94s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =    67.94s         Checking existence of `"detail-mcp" Any`
+    t =    67.99s Click "tab-rig" Button
+    t =    68.00s     Wait for com.forge-conductor.app to idle
+    t =    68.00s     Find the "tab-rig" Button
+    t =    68.14s     Check for interrupting elements affecting "tab-rig" Button
+    t =    68.15s     Synthesize event
+    t =    68.63s     Wait for com.forge-conductor.app to idle
+    t =    68.67s Waiting 2.0s for "detail-rig" Any to exist
+    t =    69.68s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =    69.68s         Checking existence of `"detail-rig" Any`
+    t =    69.93s Click "tab-mcp" Button
+    t =    69.93s     Wait for com.forge-conductor.app to idle
+    t =    69.94s     Find the "tab-mcp" Button
+    t =    70.01s     Check for interrupting elements affecting "tab-mcp" Button
+    t =    70.03s     Synthesize event
+    t =    70.40s     Wait for com.forge-conductor.app to idle
+    t =    70.41s Waiting 2.0s for "detail-mcp" Any to exist
+    t =    71.43s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =    71.43s         Checking existence of `"detail-mcp" Any`
+    t =    71.48s Click "tab-rig" Button
+    t =    71.48s     Wait for com.forge-conductor.app to idle
+    t =    71.49s     Find the "tab-rig" Button
+    t =    71.53s     Check for interrupting elements affecting "tab-rig" Button
+    t =    71.54s     Synthesize event
+    t =    72.03s     Wait for com.forge-conductor.app to idle
+    t =    72.06s Waiting 2.0s for "detail-rig" Any to exist
+    t =    73.07s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =    73.07s         Checking existence of `"detail-rig" Any`
+    t =    73.19s Click "tab-mcp" Button
+    t =    73.19s     Wait for com.forge-conductor.app to idle
+    t =    73.22s     Find the "tab-mcp" Button
+    t =    73.30s     Check for interrupting elements affecting "tab-mcp" Button
+    t =    73.33s     Synthesize event
+    t =    73.72s     Wait for com.forge-conductor.app to idle
+    t =    73.73s Waiting 2.0s for "detail-mcp" Any to exist
+    t =    74.73s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =    74.73s         Checking existence of `"detail-mcp" Any`
+    t =    74.79s Click "tab-rig" Button
+    t =    74.79s     Wait for com.forge-conductor.app to idle
+    t =    74.79s     Find the "tab-rig" Button
+    t =    74.83s     Check for interrupting elements affecting "tab-rig" Button
+    t =    74.84s     Synthesize event
+    t =    75.34s     Wait for com.forge-conductor.app to idle
+    t =    75.36s Waiting 2.0s for "detail-rig" Any to exist
+    t =    76.37s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =    76.37s         Checking existence of `"detail-rig" Any`
+    t =    76.49s Click "tab-mcp" Button
+    t =    76.49s     Wait for com.forge-conductor.app to idle
+    t =    76.49s     Find the "tab-mcp" Button
+    t =    76.58s     Check for interrupting elements affecting "tab-mcp" Button
+    t =    76.60s     Synthesize event
+    t =    76.98s     Wait for com.forge-conductor.app to idle
+    t =    76.98s Waiting 2.0s for "detail-mcp" Any to exist
+    t =    77.99s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =    77.99s         Checking existence of `"detail-mcp" Any`
+    t =    78.15s Click "tab-rig" Button
+    t =    78.15s     Wait for com.forge-conductor.app to idle
+    t =    78.15s     Find the "tab-rig" Button
+    t =    78.18s     Check for interrupting elements affecting "tab-rig" Button
+    t =    78.19s     Synthesize event
+    t =    78.65s     Wait for com.forge-conductor.app to idle
+    t =    78.68s Waiting 2.0s for "detail-rig" Any to exist
+    t =    79.68s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =    79.68s         Checking existence of `"detail-rig" Any`
+    t =    79.79s Click "tab-mcp" Button
+    t =    79.79s     Wait for com.forge-conductor.app to idle
+    t =    79.79s     Find the "tab-mcp" Button
+    t =    79.89s     Check for interrupting elements affecting "tab-mcp" Button
+    t =    79.91s     Synthesize event
+    t =    80.32s     Wait for com.forge-conductor.app to idle
+    t =    80.33s Waiting 2.0s for "detail-mcp" Any to exist
+    t =    81.34s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =    81.34s         Checking existence of `"detail-mcp" Any`
+    t =    81.40s Click "tab-rig" Button
+    t =    81.40s     Wait for com.forge-conductor.app to idle
+    t =    81.40s     Find the "tab-rig" Button
+    t =    81.44s     Check for interrupting elements affecting "tab-rig" Button
+    t =    81.45s     Synthesize event
+    t =    81.94s     Wait for com.forge-conductor.app to idle
+    t =    81.97s Waiting 2.0s for "detail-rig" Any to exist
+    t =    82.99s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =    82.99s         Checking existence of `"detail-rig" Any`
+    t =    83.13s Click "tab-mcp" Button
+    t =    83.13s     Wait for com.forge-conductor.app to idle
+    t =    83.15s     Find the "tab-mcp" Button
+    t =    83.22s     Check for interrupting elements affecting "tab-mcp" Button
+    t =    83.42s     Synthesize event
+    t =    83.81s     Wait for com.forge-conductor.app to idle
+    t =    83.82s Waiting 2.0s for "detail-mcp" Any to exist
+    t =    84.83s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =    84.83s         Checking existence of `"detail-mcp" Any`
+    t =    84.88s Click "tab-rig" Button
+    t =    84.88s     Wait for com.forge-conductor.app to idle
+    t =    84.88s     Find the "tab-rig" Button
+    t =    84.92s     Check for interrupting elements affecting "tab-rig" Button
+    t =    84.93s     Synthesize event
+    t =    85.45s     Wait for com.forge-conductor.app to idle
+    t =    85.48s Waiting 2.0s for "detail-rig" Any to exist
+    t =    86.50s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =    86.50s         Checking existence of `"detail-rig" Any`
+    t =    86.62s Click "tab-mcp" Button
+    t =    86.62s     Wait for com.forge-conductor.app to idle
+    t =    86.62s     Find the "tab-mcp" Button
+    t =    86.71s     Check for interrupting elements affecting "tab-mcp" Button
+    t =    86.81s     Synthesize event
+    t =    87.20s     Wait for com.forge-conductor.app to idle
+    t =    87.21s Waiting 2.0s for "detail-mcp" Any to exist
+    t =    88.23s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =    88.23s         Checking existence of `"detail-mcp" Any`
+    t =    88.28s Click "tab-rig" Button
+    t =    88.28s     Wait for com.forge-conductor.app to idle
+    t =    88.29s     Find the "tab-rig" Button
+    t =    88.32s     Check for interrupting elements affecting "tab-rig" Button
+    t =    88.35s     Synthesize event
+    t =    88.81s     Wait for com.forge-conductor.app to idle
+    t =    88.83s Waiting 2.0s for "detail-rig" Any to exist
+    t =    89.85s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =    89.86s         Checking existence of `"detail-rig" Any`
+    t =    90.01s Click "tab-mcp" Button
+    t =    90.01s     Wait for com.forge-conductor.app to idle
+    t =    90.01s     Find the "tab-mcp" Button
+    t =    90.11s     Check for interrupting elements affecting "tab-mcp" Button
+    t =    90.13s     Synthesize event
+    t =    90.52s     Wait for com.forge-conductor.app to idle
+    t =    90.53s Waiting 2.0s for "detail-mcp" Any to exist
+    t =    91.55s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =    91.55s         Checking existence of `"detail-mcp" Any`
+    t =    91.71s Click "tab-rig" Button
+    t =    91.71s     Wait for com.forge-conductor.app to idle
+    t =    91.71s     Find the "tab-rig" Button
+    t =    91.75s     Check for interrupting elements affecting "tab-rig" Button
+    t =    91.76s     Synthesize event
+    t =    92.23s     Wait for com.forge-conductor.app to idle
+    t =    92.25s Waiting 2.0s for "detail-rig" Any to exist
+    t =    93.27s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =    93.27s         Checking existence of `"detail-rig" Any`
+    t =    93.42s Click "tab-mcp" Button
+    t =    93.42s     Wait for com.forge-conductor.app to idle
+    t =    93.43s     Find the "tab-mcp" Button
+    t =    93.53s     Check for interrupting elements affecting "tab-mcp" Button
+    t =    93.60s     Synthesize event
+    t =    93.99s     Wait for com.forge-conductor.app to idle
+    t =    93.99s Waiting 2.0s for "detail-mcp" Any to exist
+    t =    95.01s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =    95.01s         Checking existence of `"detail-mcp" Any`
+    t =    95.06s Click "tab-rig" Button
+    t =    95.06s     Wait for com.forge-conductor.app to idle
+    t =    95.06s     Find the "tab-rig" Button
+    t =    95.10s     Check for interrupting elements affecting "tab-rig" Button
+    t =    95.11s     Synthesize event
+    t =    95.59s     Wait for com.forge-conductor.app to idle
+    t =    95.62s Waiting 2.0s for "detail-rig" Any to exist
+    t =    96.64s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =    96.64s         Checking existence of `"detail-rig" Any`
+    t =    96.74s Click "tab-mcp" Button
+    t =    96.74s     Wait for com.forge-conductor.app to idle
+    t =    96.74s     Find the "tab-mcp" Button
+    t =    96.85s     Check for interrupting elements affecting "tab-mcp" Button
+    t =    96.91s     Synthesize event
+    t =    97.30s     Wait for com.forge-conductor.app to idle
+    t =    97.30s Waiting 2.0s for "detail-mcp" Any to exist
+    t =    98.32s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =    98.32s         Checking existence of `"detail-mcp" Any`
+    t =    98.37s Click "tab-rig" Button
+    t =    98.37s     Wait for com.forge-conductor.app to idle
+    t =    98.37s     Find the "tab-rig" Button
+    t =    98.41s     Check for interrupting elements affecting "tab-rig" Button
+    t =    98.42s     Synthesize event
+    t =    98.93s     Wait for com.forge-conductor.app to idle
+    t =    98.94s Waiting 2.0s for "detail-rig" Any to exist
+    t =    99.97s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =    99.97s         Checking existence of `"detail-rig" Any`
+    t =   100.18s Click "tab-mcp" Button
+    t =   100.18s     Wait for com.forge-conductor.app to idle
+    t =   100.19s     Find the "tab-mcp" Button
+    t =   100.28s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   100.34s     Synthesize event
+    t =   100.73s     Wait for com.forge-conductor.app to idle
+    t =   100.73s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   101.76s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   101.76s         Checking existence of `"detail-mcp" Any`
+    t =   102.02s Click "tab-rig" Button
+    t =   102.02s     Wait for com.forge-conductor.app to idle
+    t =   102.03s     Find the "tab-rig" Button
+    t =   102.06s     Check for interrupting elements affecting "tab-rig" Button
+    t =   102.08s     Synthesize event
+    t =   102.56s     Wait for com.forge-conductor.app to idle
+    t =   102.59s Waiting 2.0s for "detail-rig" Any to exist
+    t =   103.61s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   103.61s         Checking existence of `"detail-rig" Any`
+    t =   103.81s Click "tab-mcp" Button
+    t =   103.81s     Wait for com.forge-conductor.app to idle
+    t =   103.81s     Find the "tab-mcp" Button
+    t =   103.91s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   103.98s     Synthesize event
+    t =   104.39s     Wait for com.forge-conductor.app to idle
+    t =   104.39s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   105.41s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   105.41s         Checking existence of `"detail-mcp" Any`
+    t =   105.47s Click "tab-rig" Button
+    t =   105.47s     Wait for com.forge-conductor.app to idle
+    t =   105.47s     Find the "tab-rig" Button
+    t =   105.51s     Check for interrupting elements affecting "tab-rig" Button
+    t =   105.53s     Synthesize event
+    t =   105.99s     Wait for com.forge-conductor.app to idle
+    t =   106.02s Waiting 2.0s for "detail-rig" Any to exist
+    t =   107.04s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   107.04s         Checking existence of `"detail-rig" Any`
+    t =   107.18s Click "tab-mcp" Button
+    t =   107.18s     Wait for com.forge-conductor.app to idle
+    t =   107.20s     Find the "tab-mcp" Button
+    t =   107.28s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   107.30s     Synthesize event
+    t =   107.69s     Wait for com.forge-conductor.app to idle
+    t =   107.70s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   108.71s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   108.71s         Checking existence of `"detail-mcp" Any`
+    t =   108.77s Click "tab-rig" Button
+    t =   108.77s     Wait for com.forge-conductor.app to idle
+    t =   108.78s     Find the "tab-rig" Button
+    t =   108.81s     Check for interrupting elements affecting "tab-rig" Button
+    t =   108.83s     Synthesize event
+    t =   109.31s     Wait for com.forge-conductor.app to idle
+    t =   109.35s Waiting 2.0s for "detail-rig" Any to exist
+    t =   110.36s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   110.36s         Checking existence of `"detail-rig" Any`
+    t =   110.57s Click "tab-mcp" Button
+    t =   110.57s     Wait for com.forge-conductor.app to idle
+    t =   110.57s     Find the "tab-mcp" Button
+    t =   110.74s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   110.88s     Synthesize event
+    t =   111.34s     Wait for com.forge-conductor.app to idle
+    t =   111.35s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   112.36s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   112.36s         Checking existence of `"detail-mcp" Any`
+    t =   112.41s Click "tab-rig" Button
+    t =   112.41s     Wait for com.forge-conductor.app to idle
+    t =   112.42s     Find the "tab-rig" Button
+    t =   112.45s     Check for interrupting elements affecting "tab-rig" Button
+    t =   112.46s     Synthesize event
+    t =   112.97s     Wait for com.forge-conductor.app to idle
+    t =   112.98s Waiting 2.0s for "detail-rig" Any to exist
+    t =   113.99s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   113.99s         Checking existence of `"detail-rig" Any`
+    t =   114.39s Click "tab-mcp" Button
+    t =   114.39s     Wait for com.forge-conductor.app to idle
+    t =   114.40s     Find the "tab-mcp" Button
+    t =   114.83s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   116.94s     Synthesize event
+    t =   117.47s     Wait for com.forge-conductor.app to idle
+    t =   117.48s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   118.50s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   118.50s         Checking existence of `"detail-mcp" Any`
+    t =   118.64s Click "tab-rig" Button
+    t =   118.64s     Wait for com.forge-conductor.app to idle
+    t =   118.64s     Find the "tab-rig" Button
+    t =   118.83s     Check for interrupting elements affecting "tab-rig" Button
+    t =   118.93s     Synthesize event
+    t =   119.54s     Wait for com.forge-conductor.app to idle
+    t =   119.56s Waiting 2.0s for "detail-rig" Any to exist
+    t =   120.57s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   120.58s         Checking existence of `"detail-rig" Any`
+    t =   120.78s Click "tab-mcp" Button
+    t =   120.78s     Wait for com.forge-conductor.app to idle
+    t =   120.80s     Find the "tab-mcp" Button
+    t =   120.91s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   121.24s     Synthesize event
+    t =   121.69s     Wait for com.forge-conductor.app to idle
+    t =   121.70s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   122.71s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   122.71s         Checking existence of `"detail-mcp" Any`
+    t =   122.77s Click "tab-rig" Button
+    t =   122.77s     Wait for com.forge-conductor.app to idle
+    t =   122.77s     Find the "tab-rig" Button
+    t =   122.86s     Check for interrupting elements affecting "tab-rig" Button
+    t =   122.99s     Synthesize event
+    t =   123.59s     Wait for com.forge-conductor.app to idle
+    t =   123.61s Waiting 2.0s for "detail-rig" Any to exist
+    t =   124.62s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   124.62s         Checking existence of `"detail-rig" Any`
+    t =   124.79s Click "tab-mcp" Button
+    t =   124.79s     Wait for com.forge-conductor.app to idle
+    t =   124.79s     Find the "tab-mcp" Button
+    t =   124.88s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   125.03s     Synthesize event
+    t =   125.41s     Wait for com.forge-conductor.app to idle
+    t =   125.42s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   126.44s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   126.44s         Checking existence of `"detail-mcp" Any`
+    t =   126.50s Click "tab-rig" Button
+    t =   126.50s     Wait for com.forge-conductor.app to idle
+    t =   126.50s     Find the "tab-rig" Button
+    t =   126.53s     Check for interrupting elements affecting "tab-rig" Button
+    t =   126.65s     Synthesize event
+    t =   127.12s     Wait for com.forge-conductor.app to idle
+    t =   127.15s Waiting 2.0s for "detail-rig" Any to exist
+    t =   128.17s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   128.17s         Checking existence of `"detail-rig" Any`
+    t =   128.32s Click "tab-mcp" Button
+    t =   128.32s     Wait for com.forge-conductor.app to idle
+    t =   128.33s     Find the "tab-mcp" Button
+    t =   128.42s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   128.43s     Synthesize event
+    t =   128.85s     Wait for com.forge-conductor.app to idle
+    t =   128.86s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   129.87s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   129.87s         Checking existence of `"detail-mcp" Any`
+    t =   129.93s Click "tab-rig" Button
+    t =   129.94s     Wait for com.forge-conductor.app to idle
+    t =   129.94s     Find the "tab-rig" Button
+    t =   129.98s     Check for interrupting elements affecting "tab-rig" Button
+    t =   130.00s     Synthesize event
+    t =   130.47s     Wait for com.forge-conductor.app to idle
+    t =   130.49s Waiting 2.0s for "detail-rig" Any to exist
+    t =   131.51s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   131.51s         Checking existence of `"detail-rig" Any`
+    t =   131.75s Click "tab-mcp" Button
+    t =   131.75s     Wait for com.forge-conductor.app to idle
+    t =   131.77s     Find the "tab-mcp" Button
+    t =   131.88s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   131.96s     Synthesize event
+    t =   132.36s     Wait for com.forge-conductor.app to idle
+    t =   132.37s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   133.39s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   133.39s         Checking existence of `"detail-mcp" Any`
+    t =   133.44s Click "tab-rig" Button
+    t =   133.44s     Wait for com.forge-conductor.app to idle
+    t =   133.45s     Find the "tab-rig" Button
+    t =   133.49s     Check for interrupting elements affecting "tab-rig" Button
+    t =   133.50s     Synthesize event
+    t =   133.99s     Wait for com.forge-conductor.app to idle
+    t =   134.01s Waiting 2.0s for "detail-rig" Any to exist
+    t =   135.03s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   135.03s         Checking existence of `"detail-rig" Any`
+    t =   135.16s Click "tab-mcp" Button
+    t =   135.17s     Wait for com.forge-conductor.app to idle
+    t =   135.19s     Find the "tab-mcp" Button
+    t =   135.28s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   135.34s     Synthesize event
+    t =   135.71s     Wait for com.forge-conductor.app to idle
+    t =   135.71s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   136.74s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   136.74s         Checking existence of `"detail-mcp" Any`
+    t =   136.79s Click "tab-rig" Button
+    t =   136.79s     Wait for com.forge-conductor.app to idle
+    t =   136.79s     Find the "tab-rig" Button
+    t =   136.83s     Check for interrupting elements affecting "tab-rig" Button
+    t =   136.84s     Synthesize event
+    t =   137.33s     Wait for com.forge-conductor.app to idle
+    t =   137.35s Waiting 2.0s for "detail-rig" Any to exist
+    t =   138.36s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   138.36s         Checking existence of `"detail-rig" Any`
+    t =   138.52s Click "tab-mcp" Button
+    t =   138.53s     Wait for com.forge-conductor.app to idle
+    t =   138.53s     Find the "tab-mcp" Button
+    t =   138.63s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   138.65s     Synthesize event
+    t =   139.03s     Wait for com.forge-conductor.app to idle
+    t =   139.04s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   140.06s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   140.06s         Checking existence of `"detail-mcp" Any`
+    t =   140.11s Click "tab-rig" Button
+    t =   140.11s     Wait for com.forge-conductor.app to idle
+    t =   140.11s     Find the "tab-rig" Button
+    t =   140.14s     Check for interrupting elements affecting "tab-rig" Button
+    t =   140.16s     Synthesize event
+    t =   140.64s     Wait for com.forge-conductor.app to idle
+    t =   140.67s Waiting 2.0s for "detail-rig" Any to exist
+    t =   141.68s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   141.68s         Checking existence of `"detail-rig" Any`
+    t =   141.83s Click "tab-mcp" Button
+    t =   141.83s     Wait for com.forge-conductor.app to idle
+    t =   141.83s     Find the "tab-mcp" Button
+    t =   141.93s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   141.95s     Synthesize event
+    t =   142.35s     Wait for com.forge-conductor.app to idle
+    t =   142.35s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   143.37s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   143.37s         Checking existence of `"detail-mcp" Any`
+    t =   143.53s Click "tab-rig" Button
+    t =   143.53s     Wait for com.forge-conductor.app to idle
+    t =   143.53s     Find the "tab-rig" Button
+    t =   143.57s     Check for interrupting elements affecting "tab-rig" Button
+    t =   143.58s     Synthesize event
+    t =   144.06s     Wait for com.forge-conductor.app to idle
+    t =   144.08s Waiting 2.0s for "detail-rig" Any to exist
+    t =   145.10s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   145.10s         Checking existence of `"detail-rig" Any`
+    t =   145.23s Click "tab-mcp" Button
+    t =   145.23s     Wait for com.forge-conductor.app to idle
+    t =   145.23s     Find the "tab-mcp" Button
+    t =   145.32s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   145.40s     Synthesize event
+    t =   145.81s     Wait for com.forge-conductor.app to idle
+    t =   145.82s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   146.84s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   146.84s         Checking existence of `"detail-mcp" Any`
+    t =   146.89s Click "tab-rig" Button
+    t =   146.89s     Wait for com.forge-conductor.app to idle
+    t =   146.89s     Find the "tab-rig" Button
+    t =   146.93s     Check for interrupting elements affecting "tab-rig" Button
+    t =   146.95s     Synthesize event
+    t =   147.44s     Wait for com.forge-conductor.app to idle
+    t =   147.47s Waiting 2.0s for "detail-rig" Any to exist
+    t =   148.49s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   148.49s         Checking existence of `"detail-rig" Any`
+    t =   148.57s Click "tab-mcp" Button
+    t =   148.57s     Wait for com.forge-conductor.app to idle
+    t =   148.57s     Find the "tab-mcp" Button
+    t =   148.67s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   148.79s     Synthesize event
+    t =   149.23s     Wait for com.forge-conductor.app to idle
+    t =   149.23s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   150.25s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   150.25s         Checking existence of `"detail-mcp" Any`
+    t =   150.30s Click "tab-rig" Button
+    t =   150.30s     Wait for com.forge-conductor.app to idle
+    t =   150.31s     Find the "tab-rig" Button
+    t =   150.45s     Check for interrupting elements affecting "tab-rig" Button
+    t =   150.46s     Synthesize event
+    t =   150.97s     Wait for com.forge-conductor.app to idle
+    t =   150.99s Waiting 2.0s for "detail-rig" Any to exist
+    t =   152.01s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   152.01s         Checking existence of `"detail-rig" Any`
+    t =   152.16s Click "tab-mcp" Button
+    t =   152.16s     Wait for com.forge-conductor.app to idle
+    t =   152.16s     Find the "tab-mcp" Button
+    t =   152.26s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   152.36s     Synthesize event
+    t =   152.73s     Wait for com.forge-conductor.app to idle
+    t =   152.74s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   153.75s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   153.76s         Checking existence of `"detail-mcp" Any`
+    t =   154.01s Click "tab-rig" Button
+    t =   154.01s     Wait for com.forge-conductor.app to idle
+    t =   154.01s     Find the "tab-rig" Button
+    t =   154.05s     Check for interrupting elements affecting "tab-rig" Button
+    t =   154.06s     Synthesize event
+    t =   154.59s     Wait for com.forge-conductor.app to idle
+    t =   154.61s Waiting 2.0s for "detail-rig" Any to exist
+    t =   155.62s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   155.62s         Checking existence of `"detail-rig" Any`
+    t =   155.78s Click "tab-mcp" Button
+    t =   155.78s     Wait for com.forge-conductor.app to idle
+    t =   155.79s     Find the "tab-mcp" Button
+    t =   155.87s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   155.98s     Synthesize event
+    t =   156.41s     Wait for com.forge-conductor.app to idle
+    t =   156.42s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   157.43s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   157.43s         Checking existence of `"detail-mcp" Any`
+    t =   157.48s Click "tab-rig" Button
+    t =   157.48s     Wait for com.forge-conductor.app to idle
+    t =   157.48s     Find the "tab-rig" Button
+    t =   157.52s     Check for interrupting elements affecting "tab-rig" Button
+    t =   157.54s     Synthesize event
+    t =   158.03s     Wait for com.forge-conductor.app to idle
+    t =   158.07s Waiting 2.0s for "detail-rig" Any to exist
+    t =   159.08s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   159.08s         Checking existence of `"detail-rig" Any`
+    t =   159.24s Click "tab-mcp" Button
+    t =   159.24s     Wait for com.forge-conductor.app to idle
+    t =   159.25s     Find the "tab-mcp" Button
+    t =   159.34s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   159.43s     Synthesize event
+    t =   159.84s     Wait for com.forge-conductor.app to idle
+    t =   159.85s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   160.86s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   160.86s         Checking existence of `"detail-mcp" Any`
+    t =   161.02s Click "tab-rig" Button
+    t =   161.02s     Wait for com.forge-conductor.app to idle
+    t =   161.02s     Find the "tab-rig" Button
+    t =   161.06s     Check for interrupting elements affecting "tab-rig" Button
+    t =   161.08s     Synthesize event
+    t =   161.54s     Wait for com.forge-conductor.app to idle
+    t =   161.58s Waiting 2.0s for "detail-rig" Any to exist
+    t =   162.59s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   162.59s         Checking existence of `"detail-rig" Any`
+    t =   162.69s Click "tab-mcp" Button
+    t =   162.69s     Wait for com.forge-conductor.app to idle
+    t =   162.71s     Find the "tab-mcp" Button
+    t =   162.80s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   162.95s     Synthesize event
+    t =   163.34s     Wait for com.forge-conductor.app to idle
+    t =   163.35s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   164.36s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   164.36s         Checking existence of `"detail-mcp" Any`
+    t =   164.62s Click "tab-rig" Button
+    t =   164.62s     Wait for com.forge-conductor.app to idle
+    t =   164.63s     Find the "tab-rig" Button
+    t =   164.77s     Check for interrupting elements affecting "tab-rig" Button
+    t =   164.78s     Synthesize event
+    t =   165.29s     Wait for com.forge-conductor.app to idle
+    t =   165.31s Waiting 2.0s for "detail-rig" Any to exist
+    t =   166.32s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   166.32s         Checking existence of `"detail-rig" Any`
+    t =   166.47s Click "tab-mcp" Button
+    t =   166.47s     Wait for com.forge-conductor.app to idle
+    t =   166.47s     Find the "tab-mcp" Button
+    t =   166.55s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   166.61s     Synthesize event
+    t =   167.01s     Wait for com.forge-conductor.app to idle
+    t =   167.02s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   168.03s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   168.04s         Checking existence of `"detail-mcp" Any`
+    t =   168.09s Click "tab-rig" Button
+    t =   168.09s     Wait for com.forge-conductor.app to idle
+    t =   168.09s     Find the "tab-rig" Button
+    t =   168.13s     Check for interrupting elements affecting "tab-rig" Button
+    t =   168.14s     Synthesize event
+    t =   168.62s     Wait for com.forge-conductor.app to idle
+    t =   168.66s Waiting 2.0s for "detail-rig" Any to exist
+    t =   169.67s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   169.67s         Checking existence of `"detail-rig" Any`
+    t =   169.79s Click "tab-mcp" Button
+    t =   169.79s     Wait for com.forge-conductor.app to idle
+    t =   169.81s     Find the "tab-mcp" Button
+    t =   169.91s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   169.97s     Synthesize event
+    t =   170.36s     Wait for com.forge-conductor.app to idle
+    t =   170.37s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   171.39s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   171.39s         Checking existence of `"detail-mcp" Any`
+    t =   171.54s Click "tab-rig" Button
+    t =   171.54s     Wait for com.forge-conductor.app to idle
+    t =   171.54s     Find the "tab-rig" Button
+    t =   171.58s     Check for interrupting elements affecting "tab-rig" Button
+    t =   171.59s     Synthesize event
+    t =   172.09s     Wait for com.forge-conductor.app to idle
+    t =   172.12s Waiting 2.0s for "detail-rig" Any to exist
+    t =   173.14s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   173.14s         Checking existence of `"detail-rig" Any`
+    t =   173.29s Click "tab-mcp" Button
+    t =   173.29s     Wait for com.forge-conductor.app to idle
+    t =   173.30s     Find the "tab-mcp" Button
+    t =   173.40s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   173.45s     Synthesize event
+    t =   173.91s     Wait for com.forge-conductor.app to idle
+    t =   173.91s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   174.93s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   174.93s         Checking existence of `"detail-mcp" Any`
+    t =   175.19s Click "tab-rig" Button
+    t =   175.19s     Wait for com.forge-conductor.app to idle
+    t =   175.19s     Find the "tab-rig" Button
+    t =   175.23s     Check for interrupting elements affecting "tab-rig" Button
+    t =   175.25s     Synthesize event
+    t =   175.75s     Wait for com.forge-conductor.app to idle
+    t =   175.76s Waiting 2.0s for "detail-rig" Any to exist
+    t =   176.78s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   176.78s         Checking existence of `"detail-rig" Any`
+    t =   176.91s Click "tab-mcp" Button
+    t =   176.91s     Wait for com.forge-conductor.app to idle
+    t =   176.91s     Find the "tab-mcp" Button
+    t =   177.01s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   177.07s     Synthesize event
+    t =   177.44s     Wait for com.forge-conductor.app to idle
+    t =   177.45s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   178.47s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   178.47s         Checking existence of `"detail-mcp" Any`
+    t =   178.52s Click "tab-rig" Button
+    t =   178.52s     Wait for com.forge-conductor.app to idle
+    t =   178.52s     Find the "tab-rig" Button
+    t =   178.56s     Check for interrupting elements affecting "tab-rig" Button
+    t =   178.58s     Synthesize event
+    t =   179.06s     Wait for com.forge-conductor.app to idle
+    t =   179.09s Waiting 2.0s for "detail-rig" Any to exist
+    t =   180.11s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   180.11s         Checking existence of `"detail-rig" Any`
+    t =   180.23s Click "tab-mcp" Button
+    t =   180.23s     Wait for com.forge-conductor.app to idle
+    t =   180.23s     Find the "tab-mcp" Button
+    t =   180.33s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   180.38s     Synthesize event
+    t =   180.77s     Wait for com.forge-conductor.app to idle
+    t =   180.78s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   181.79s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   181.79s         Checking existence of `"detail-mcp" Any`
+    t =   181.85s Click "tab-rig" Button
+    t =   181.85s     Wait for com.forge-conductor.app to idle
+    t =   181.85s     Find the "tab-rig" Button
+    t =   181.89s     Check for interrupting elements affecting "tab-rig" Button
+    t =   181.90s     Synthesize event
+    t =   182.37s     Wait for com.forge-conductor.app to idle
+    t =   182.39s Waiting 2.0s for "detail-rig" Any to exist
+    t =   183.40s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   183.40s         Checking existence of `"detail-rig" Any`
+    t =   183.53s Click "tab-mcp" Button
+    t =   183.53s     Wait for com.forge-conductor.app to idle
+    t =   183.53s     Find the "tab-mcp" Button
+    t =   183.62s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   183.70s     Synthesize event
+    t =   184.09s     Wait for com.forge-conductor.app to idle
+    t =   184.10s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   185.11s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   185.11s         Checking existence of `"detail-mcp" Any`
+    t =   185.17s Click "tab-rig" Button
+    t =   185.17s     Wait for com.forge-conductor.app to idle
+    t =   185.17s     Find the "tab-rig" Button
+    t =   185.31s     Check for interrupting elements affecting "tab-rig" Button
+    t =   185.43s     Synthesize event
+    t =   185.91s     Wait for com.forge-conductor.app to idle
+    t =   185.93s Waiting 2.0s for "detail-rig" Any to exist
+    t =   186.93s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   186.93s         Checking existence of `"detail-rig" Any`
+    t =   187.04s Click "tab-mcp" Button
+    t =   187.04s     Wait for com.forge-conductor.app to idle
+    t =   187.06s     Find the "tab-mcp" Button
+    t =   187.15s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   187.16s     Synthesize event
+    t =   187.55s     Wait for com.forge-conductor.app to idle
+    t =   187.56s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   188.58s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   188.58s         Checking existence of `"detail-mcp" Any`
+    t =   188.63s Click "tab-rig" Button
+    t =   188.63s     Wait for com.forge-conductor.app to idle
+    t =   188.63s     Find the "tab-rig" Button
+    t =   188.67s     Check for interrupting elements affecting "tab-rig" Button
+    t =   188.68s     Synthesize event
+    t =   189.20s     Wait for com.forge-conductor.app to idle
+    t =   189.22s Waiting 2.0s for "detail-rig" Any to exist
+    t =   190.23s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   190.23s         Checking existence of `"detail-rig" Any`
+    t =   190.34s Click "tab-mcp" Button
+    t =   190.34s     Wait for com.forge-conductor.app to idle
+    t =   190.34s     Find the "tab-mcp" Button
+    t =   190.43s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   190.45s     Synthesize event
+    t =   190.88s     Wait for com.forge-conductor.app to idle
+    t =   190.88s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   191.89s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   191.89s         Checking existence of `"detail-mcp" Any`
+    t =   191.94s Click "tab-rig" Button
+    t =   191.94s     Wait for com.forge-conductor.app to idle
+    t =   191.95s     Find the "tab-rig" Button
+    t =   192.09s     Check for interrupting elements affecting "tab-rig" Button
+    t =   192.10s     Synthesize event
+    t =   192.59s     Wait for com.forge-conductor.app to idle
+    t =   192.61s Waiting 2.0s for "detail-rig" Any to exist
+    t =   193.63s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   193.63s         Checking existence of `"detail-rig" Any`
+    t =   193.76s Click "tab-mcp" Button
+    t =   193.76s     Wait for com.forge-conductor.app to idle
+    t =   193.77s     Find the "tab-mcp" Button
+    t =   193.85s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   193.93s     Synthesize event
+    t =   194.32s     Wait for com.forge-conductor.app to idle
+    t =   194.33s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   195.34s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   195.34s         Checking existence of `"detail-mcp" Any`
+    t =   195.49s Click "tab-rig" Button
+    t =   195.49s     Wait for com.forge-conductor.app to idle
+    t =   195.50s     Find the "tab-rig" Button
+    t =   195.53s     Check for interrupting elements affecting "tab-rig" Button
+    t =   195.55s     Synthesize event
+    t =   196.04s     Wait for com.forge-conductor.app to idle
+    t =   196.07s Waiting 2.0s for "detail-rig" Any to exist
+    t =   197.09s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   197.09s         Checking existence of `"detail-rig" Any`
+    t =   197.21s Click "tab-mcp" Button
+    t =   197.21s     Wait for com.forge-conductor.app to idle
+    t =   197.23s     Find the "tab-mcp" Button
+    t =   197.33s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   197.38s     Synthesize event
+    t =   197.81s     Wait for com.forge-conductor.app to idle
+    t =   197.81s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   198.84s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   198.84s         Checking existence of `"detail-mcp" Any`
+    t =   199.11s Click "tab-rig" Button
+    t =   199.11s     Wait for com.forge-conductor.app to idle
+    t =   199.11s     Find the "tab-rig" Button
+    t =   199.15s     Check for interrupting elements affecting "tab-rig" Button
+    t =   199.18s     Synthesize event
+    t =   199.70s     Wait for com.forge-conductor.app to idle
+    t =   199.73s Waiting 2.0s for "detail-rig" Any to exist
+    t =   200.74s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   200.74s         Checking existence of `"detail-rig" Any`
+    t =   200.97s Click "tab-mcp" Button
+    t =   200.97s     Wait for com.forge-conductor.app to idle
+    t =   201.00s     Find the "tab-mcp" Button
+    t =   201.08s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   201.13s     Synthesize event
+    t =   201.54s     Wait for com.forge-conductor.app to idle
+    t =   201.55s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   202.56s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   202.56s         Checking existence of `"detail-mcp" Any`
+    t =   202.61s Click "tab-rig" Button
+    t =   202.61s     Wait for com.forge-conductor.app to idle
+    t =   202.61s     Find the "tab-rig" Button
+    t =   202.66s     Check for interrupting elements affecting "tab-rig" Button
+    t =   202.66s     Synthesize event
+    t =   203.13s     Wait for com.forge-conductor.app to idle
+    t =   203.16s Waiting 2.0s for "detail-rig" Any to exist
+    t =   204.17s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   204.17s         Checking existence of `"detail-rig" Any`
+    t =   204.42s Click "tab-mcp" Button
+    t =   204.42s     Wait for com.forge-conductor.app to idle
+    t =   204.44s     Find the "tab-mcp" Button
+    t =   204.53s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   204.56s     Synthesize event
+    t =   204.96s     Wait for com.forge-conductor.app to idle
+    t =   204.97s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   205.99s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   205.99s         Checking existence of `"detail-mcp" Any`
+    t =   206.04s Click "tab-rig" Button
+    t =   206.04s     Wait for com.forge-conductor.app to idle
+    t =   206.04s     Find the "tab-rig" Button
+    t =   206.18s     Check for interrupting elements affecting "tab-rig" Button
+    t =   206.20s     Synthesize event
+    t =   206.69s     Wait for com.forge-conductor.app to idle
+    t =   206.71s Waiting 2.0s for "detail-rig" Any to exist
+    t =   207.73s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   207.73s         Checking existence of `"detail-rig" Any`
+    t =   207.86s Click "tab-mcp" Button
+    t =   207.86s     Wait for com.forge-conductor.app to idle
+    t =   207.88s     Find the "tab-mcp" Button
+    t =   207.96s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   207.98s     Synthesize event
+    t =   208.41s     Wait for com.forge-conductor.app to idle
+    t =   208.41s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   209.43s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   209.43s         Checking existence of `"detail-mcp" Any`
+    t =   209.58s Click "tab-rig" Button
+    t =   209.58s     Wait for com.forge-conductor.app to idle
+    t =   209.58s     Find the "tab-rig" Button
+    t =   209.62s     Check for interrupting elements affecting "tab-rig" Button
+    t =   209.63s     Synthesize event
+    t =   210.10s     Wait for com.forge-conductor.app to idle
+    t =   210.13s Waiting 2.0s for "detail-rig" Any to exist
+    t =   211.15s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   211.15s         Checking existence of `"detail-rig" Any`
+    t =   211.38s Click "tab-mcp" Button
+    t =   211.39s     Wait for com.forge-conductor.app to idle
+    t =   211.39s     Find the "tab-mcp" Button
+    t =   211.48s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   211.53s     Synthesize event
+    t =   211.98s     Wait for com.forge-conductor.app to idle
+    t =   211.98s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   213.00s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   213.00s         Checking existence of `"detail-mcp" Any`
+    t =   213.05s Click "tab-rig" Button
+    t =   213.05s     Wait for com.forge-conductor.app to idle
+    t =   213.06s     Find the "tab-rig" Button
+    t =   213.09s     Check for interrupting elements affecting "tab-rig" Button
+    t =   213.11s     Synthesize event
+    t =   213.58s     Wait for com.forge-conductor.app to idle
+    t =   213.60s Waiting 2.0s for "detail-rig" Any to exist
+    t =   214.61s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   214.61s         Checking existence of `"detail-rig" Any`
+    t =   214.75s Click "tab-mcp" Button
+    t =   214.75s     Wait for com.forge-conductor.app to idle
+    t =   214.78s     Find the "tab-mcp" Button
+    t =   214.87s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   214.88s     Synthesize event
+    t =   215.27s     Wait for com.forge-conductor.app to idle
+    t =   215.28s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   216.28s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   216.28s         Checking existence of `"detail-mcp" Any`
+    t =   216.33s Click "tab-rig" Button
+    t =   216.33s     Wait for com.forge-conductor.app to idle
+    t =   216.33s     Find the "tab-rig" Button
+    t =   216.37s     Check for interrupting elements affecting "tab-rig" Button
+    t =   216.38s     Synthesize event
+    t =   216.89s     Wait for com.forge-conductor.app to idle
+    t =   216.91s Waiting 2.0s for "detail-rig" Any to exist
+    t =   217.92s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   217.92s         Checking existence of `"detail-rig" Any`
+    t =   218.09s Click "tab-mcp" Button
+    t =   218.09s     Wait for com.forge-conductor.app to idle
+    t =   218.09s     Find the "tab-mcp" Button
+    t =   218.17s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   218.18s     Synthesize event
+    t =   218.60s     Wait for com.forge-conductor.app to idle
+    t =   218.60s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   219.61s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   219.61s         Checking existence of `"detail-mcp" Any`
+    t =   219.67s Click "tab-rig" Button
+    t =   219.67s     Wait for com.forge-conductor.app to idle
+    t =   219.67s     Find the "tab-rig" Button
+    t =   219.71s     Check for interrupting elements affecting "tab-rig" Button
+    t =   219.73s     Synthesize event
+    t =   220.22s     Wait for com.forge-conductor.app to idle
+    t =   220.26s Waiting 2.0s for "detail-rig" Any to exist
+    t =   221.26s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   221.26s         Checking existence of `"detail-rig" Any`
+    t =   221.39s Click "tab-mcp" Button
+    t =   221.39s     Wait for com.forge-conductor.app to idle
+    t =   221.39s     Find the "tab-mcp" Button
+    t =   221.48s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   221.50s     Synthesize event
+    t =   221.88s     Wait for com.forge-conductor.app to idle
+    t =   221.88s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   222.90s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   222.90s         Checking existence of `"detail-mcp" Any`
+    t =   222.95s Click "tab-rig" Button
+    t =   222.95s     Wait for com.forge-conductor.app to idle
+    t =   222.96s     Find the "tab-rig" Button
+    t =   222.99s     Check for interrupting elements affecting "tab-rig" Button
+    t =   223.01s     Synthesize event
+    t =   223.48s     Wait for com.forge-conductor.app to idle
+    t =   223.50s Waiting 2.0s for "detail-rig" Any to exist
+    t =   224.51s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   224.51s         Checking existence of `"detail-rig" Any`
+    t =   224.76s Click "tab-mcp" Button
+    t =   224.76s     Wait for com.forge-conductor.app to idle
+    t =   224.76s     Find the "tab-mcp" Button
+    t =   224.86s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   224.93s     Synthesize event
+    t =   225.33s     Wait for com.forge-conductor.app to idle
+    t =   225.33s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   226.35s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   226.35s         Checking existence of `"detail-mcp" Any`
+    t =   226.40s Click "tab-rig" Button
+    t =   226.40s     Wait for com.forge-conductor.app to idle
+    t =   226.40s     Find the "tab-rig" Button
+    t =   226.54s     Check for interrupting elements affecting "tab-rig" Button
+    t =   226.56s     Synthesize event
+    t =   227.09s     Wait for com.forge-conductor.app to idle
+    t =   227.11s Waiting 2.0s for "detail-rig" Any to exist
+    t =   228.12s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   228.12s         Checking existence of `"detail-rig" Any`
+    t =   228.30s Click "tab-mcp" Button
+    t =   228.30s     Wait for com.forge-conductor.app to idle
+    t =   228.30s     Find the "tab-mcp" Button
+    t =   228.40s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   228.41s     Synthesize event
+    t =   228.82s     Wait for com.forge-conductor.app to idle
+    t =   228.83s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   229.84s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   229.84s         Checking existence of `"detail-mcp" Any`
+    t =   230.00s Click "tab-rig" Button
+    t =   230.00s     Wait for com.forge-conductor.app to idle
+    t =   230.00s     Find the "tab-rig" Button
+    t =   230.04s     Check for interrupting elements affecting "tab-rig" Button
+    t =   230.06s     Synthesize event
+    t =   230.57s     Wait for com.forge-conductor.app to idle
+    t =   230.59s Waiting 2.0s for "detail-rig" Any to exist
+    t =   231.61s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   231.61s         Checking existence of `"detail-rig" Any`
+    t =   231.82s Click "tab-mcp" Button
+    t =   231.82s     Wait for com.forge-conductor.app to idle
+    t =   231.82s     Find the "tab-mcp" Button
+    t =   231.92s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   231.98s     Synthesize event
+    t =   232.39s     Wait for com.forge-conductor.app to idle
+    t =   232.39s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   233.41s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   233.41s         Checking existence of `"detail-mcp" Any`
+    t =   233.46s Click "tab-rig" Button
+    t =   233.46s     Wait for com.forge-conductor.app to idle
+    t =   233.47s     Find the "tab-rig" Button
+    t =   233.50s     Check for interrupting elements affecting "tab-rig" Button
+    t =   233.52s     Synthesize event
+    t =   234.05s     Wait for com.forge-conductor.app to idle
+    t =   234.06s Waiting 2.0s for "detail-rig" Any to exist
+    t =   235.08s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   235.08s         Checking existence of `"detail-rig" Any`
+    t =   235.22s Click "tab-mcp" Button
+    t =   235.22s     Wait for com.forge-conductor.app to idle
+    t =   235.22s     Find the "tab-mcp" Button
+    t =   235.30s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   235.35s     Synthesize event
+    t =   235.78s     Wait for com.forge-conductor.app to idle
+    t =   235.78s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   236.80s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   236.80s         Checking existence of `"detail-mcp" Any`
+    t =   236.85s Click "tab-rig" Button
+    t =   236.85s     Wait for com.forge-conductor.app to idle
+    t =   236.86s     Find the "tab-rig" Button
+    t =   236.89s     Check for interrupting elements affecting "tab-rig" Button
+    t =   236.91s     Synthesize event
+    t =   237.39s     Wait for com.forge-conductor.app to idle
+    t =   237.42s Waiting 2.0s for "detail-rig" Any to exist
+    t =   238.44s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   238.44s         Checking existence of `"detail-rig" Any`
+    t =   238.56s Click "tab-mcp" Button
+    t =   238.56s     Wait for com.forge-conductor.app to idle
+    t =   238.58s     Find the "tab-mcp" Button
+    t =   238.65s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   238.66s     Synthesize event
+    t =   239.06s     Wait for com.forge-conductor.app to idle
+    t =   239.07s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   240.08s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   240.08s         Checking existence of `"detail-mcp" Any`
+    t =   240.13s Click "tab-rig" Button
+    t =   240.14s     Wait for com.forge-conductor.app to idle
+    t =   240.14s     Find the "tab-rig" Button
+    t =   240.18s     Check for interrupting elements affecting "tab-rig" Button
+    t =   240.20s     Synthesize event
+    t =   240.68s     Wait for com.forge-conductor.app to idle
+    t =   240.71s Waiting 2.0s for "detail-rig" Any to exist
+    t =   241.73s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   241.73s         Checking existence of `"detail-rig" Any`
+    t =   241.86s Click "tab-mcp" Button
+    t =   241.86s     Wait for com.forge-conductor.app to idle
+    t =   241.88s     Find the "tab-mcp" Button
+    t =   241.95s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   241.97s     Synthesize event
+    t =   242.44s     Wait for com.forge-conductor.app to idle
+    t =   242.44s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   243.47s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   243.47s         Checking existence of `"detail-mcp" Any`
+    t =   243.52s Click "tab-rig" Button
+    t =   243.52s     Wait for com.forge-conductor.app to idle
+    t =   243.52s     Find the "tab-rig" Button
+    t =   243.56s     Check for interrupting elements affecting "tab-rig" Button
+    t =   243.58s     Synthesize event
+    t =   244.05s     Wait for com.forge-conductor.app to idle
+    t =   244.07s Waiting 2.0s for "detail-rig" Any to exist
+    t =   245.10s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   245.10s         Checking existence of `"detail-rig" Any`
+    t =   245.35s Click "tab-mcp" Button
+    t =   245.35s     Wait for com.forge-conductor.app to idle
+    t =   245.36s     Find the "tab-mcp" Button
+    t =   245.45s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   245.48s     Synthesize event
+    t =   245.89s     Wait for com.forge-conductor.app to idle
+    t =   245.90s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   246.91s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   246.91s         Checking existence of `"detail-mcp" Any`
+    t =   246.96s Click "tab-rig" Button
+    t =   246.96s     Wait for com.forge-conductor.app to idle
+    t =   246.97s     Find the "tab-rig" Button
+    t =   247.00s     Check for interrupting elements affecting "tab-rig" Button
+    t =   247.03s     Synthesize event
+    t =   247.49s     Wait for com.forge-conductor.app to idle
+    t =   247.52s Waiting 2.0s for "detail-rig" Any to exist
+    t =   248.54s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   248.54s         Checking existence of `"detail-rig" Any`
+    t =   248.69s Click "tab-mcp" Button
+    t =   248.69s     Wait for com.forge-conductor.app to idle
+    t =   248.71s     Find the "tab-mcp" Button
+    t =   248.80s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   248.86s     Synthesize event
+    t =   249.25s     Wait for com.forge-conductor.app to idle
+    t =   249.26s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   250.28s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   250.28s         Checking existence of `"detail-mcp" Any`
+    t =   250.33s Click "tab-rig" Button
+    t =   250.33s     Wait for com.forge-conductor.app to idle
+    t =   250.33s     Find the "tab-rig" Button
+    t =   250.37s     Check for interrupting elements affecting "tab-rig" Button
+    t =   250.39s     Synthesize event
+    t =   250.88s     Wait for com.forge-conductor.app to idle
+    t =   250.91s Waiting 2.0s for "detail-rig" Any to exist
+    t =   251.93s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   251.93s         Checking existence of `"detail-rig" Any`
+    t =   252.08s Click "tab-mcp" Button
+    t =   252.08s     Wait for com.forge-conductor.app to idle
+    t =   252.09s     Find the "tab-mcp" Button
+    t =   252.16s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   252.18s     Synthesize event
+    t =   252.63s     Wait for com.forge-conductor.app to idle
+    t =   252.63s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   253.65s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   253.65s         Checking existence of `"detail-mcp" Any`
+    t =   253.71s Click "tab-rig" Button
+    t =   253.71s     Wait for com.forge-conductor.app to idle
+    t =   253.71s     Find the "tab-rig" Button
+    t =   253.75s     Check for interrupting elements affecting "tab-rig" Button
+    t =   253.76s     Synthesize event
+    t =   254.23s     Wait for com.forge-conductor.app to idle
+    t =   254.25s Waiting 2.0s for "detail-rig" Any to exist
+    t =   255.26s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   255.26s         Checking existence of `"detail-rig" Any`
+    t =   255.53s Click "tab-mcp" Button
+    t =   255.53s     Wait for com.forge-conductor.app to idle
+    t =   255.60s     Find the "tab-mcp" Button
+    t =   255.69s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   255.75s     Synthesize event
+    t =   256.15s     Wait for com.forge-conductor.app to idle
+    t =   256.15s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   257.17s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   257.17s         Checking existence of `"detail-mcp" Any`
+    t =   257.42s Click "tab-rig" Button
+    t =   257.42s     Wait for com.forge-conductor.app to idle
+    t =   257.43s     Find the "tab-rig" Button
+    t =   257.46s     Check for interrupting elements affecting "tab-rig" Button
+    t =   257.48s     Synthesize event
+    t =   257.98s     Wait for com.forge-conductor.app to idle
+    t =   257.99s Waiting 2.0s for "detail-rig" Any to exist
+    t =   259.01s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   259.01s         Checking existence of `"detail-rig" Any`
+    t =   259.11s Click "tab-mcp" Button
+    t =   259.11s     Wait for com.forge-conductor.app to idle
+    t =   259.11s     Find the "tab-mcp" Button
+    t =   259.19s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   259.37s     Synthesize event
+    t =   259.78s     Wait for com.forge-conductor.app to idle
+    t =   259.78s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   260.80s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   260.80s         Checking existence of `"detail-mcp" Any`
+    t =   260.85s Click "tab-rig" Button
+    t =   260.85s     Wait for com.forge-conductor.app to idle
+    t =   260.85s     Find the "tab-rig" Button
+    t =   260.89s     Check for interrupting elements affecting "tab-rig" Button
+    t =   260.91s     Synthesize event
+    t =   261.42s     Wait for com.forge-conductor.app to idle
+    t =   261.44s Waiting 2.0s for "detail-rig" Any to exist
+    t =   262.46s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   262.46s         Checking existence of `"detail-rig" Any`
+    t =   262.71s Click "tab-mcp" Button
+    t =   262.71s     Wait for com.forge-conductor.app to idle
+    t =   262.71s     Find the "tab-mcp" Button
+    t =   262.80s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   262.87s     Synthesize event
+    t =   263.29s     Wait for com.forge-conductor.app to idle
+    t =   263.30s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   264.31s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   264.31s         Checking existence of `"detail-mcp" Any`
+    t =   264.46s Click "tab-rig" Button
+    t =   264.46s     Wait for com.forge-conductor.app to idle
+    t =   264.47s     Find the "tab-rig" Button
+    t =   264.50s     Check for interrupting elements affecting "tab-rig" Button
+    t =   264.51s     Synthesize event
+    t =   264.99s     Wait for com.forge-conductor.app to idle
+    t =   265.01s Waiting 2.0s for "detail-rig" Any to exist
+    t =   266.03s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   266.03s         Checking existence of `"detail-rig" Any`
+    t =   266.14s Click "tab-mcp" Button
+    t =   266.14s     Wait for com.forge-conductor.app to idle
+    t =   266.17s     Find the "tab-mcp" Button
+    t =   266.27s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   266.35s     Synthesize event
+    t =   266.74s     Wait for com.forge-conductor.app to idle
+    t =   266.74s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   267.76s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   267.76s         Checking existence of `"detail-mcp" Any`
+    t =   267.91s Click "tab-rig" Button
+    t =   267.91s     Wait for com.forge-conductor.app to idle
+    t =   267.91s     Find the "tab-rig" Button
+    t =   267.95s     Check for interrupting elements affecting "tab-rig" Button
+    t =   267.97s     Synthesize event
+    t =   268.44s     Wait for com.forge-conductor.app to idle
+    t =   268.47s Waiting 2.0s for "detail-rig" Any to exist
+    t =   269.48s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   269.48s         Checking existence of `"detail-rig" Any`
+    t =   269.73s Click "tab-mcp" Button
+    t =   269.73s     Wait for com.forge-conductor.app to idle
+    t =   269.73s     Find the "tab-mcp" Button
+    t =   269.83s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   269.93s     Synthesize event
+    t =   270.34s     Wait for com.forge-conductor.app to idle
+    t =   270.35s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   271.37s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   271.37s         Checking existence of `"detail-mcp" Any`
+    t =   271.43s Click "tab-rig" Button
+    t =   271.43s     Wait for com.forge-conductor.app to idle
+    t =   271.43s     Find the "tab-rig" Button
+    t =   271.47s     Check for interrupting elements affecting "tab-rig" Button
+    t =   271.48s     Synthesize event
+    t =   271.97s     Wait for com.forge-conductor.app to idle
+    t =   272.00s Waiting 2.0s for "detail-rig" Any to exist
+    t =   273.02s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   273.02s         Checking existence of `"detail-rig" Any`
+    t =   273.17s Click "tab-mcp" Button
+    t =   273.17s     Wait for com.forge-conductor.app to idle
+    t =   273.20s     Find the "tab-mcp" Button
+    t =   273.28s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   273.44s     Synthesize event
+    t =   273.87s     Wait for com.forge-conductor.app to idle
+    t =   273.88s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   274.89s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   274.89s         Checking existence of `"detail-mcp" Any`
+    t =   275.14s Click "tab-rig" Button
+    t =   275.14s     Wait for com.forge-conductor.app to idle
+    t =   275.15s     Find the "tab-rig" Button
+    t =   275.19s     Check for interrupting elements affecting "tab-rig" Button
+    t =   275.21s     Synthesize event
+    t =   275.67s     Wait for com.forge-conductor.app to idle
+    t =   275.70s Waiting 2.0s for "detail-rig" Any to exist
+    t =   276.72s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   276.72s         Checking existence of `"detail-rig" Any`
+    t =   276.86s Click "tab-mcp" Button
+    t =   276.86s     Wait for com.forge-conductor.app to idle
+    t =   276.87s     Find the "tab-mcp" Button
+    t =   276.94s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   277.06s     Synthesize event
+    t =   277.51s     Wait for com.forge-conductor.app to idle
+    t =   277.52s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   278.53s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   278.53s         Checking existence of `"detail-mcp" Any`
+    t =   278.69s Click "tab-rig" Button
+    t =   278.69s     Wait for com.forge-conductor.app to idle
+    t =   278.69s     Find the "tab-rig" Button
+    t =   278.73s     Check for interrupting elements affecting "tab-rig" Button
+    t =   278.74s     Synthesize event
+    t =   279.24s     Wait for com.forge-conductor.app to idle
+    t =   279.26s Waiting 2.0s for "detail-rig" Any to exist
+    t =   280.27s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   280.27s         Checking existence of `"detail-rig" Any`
+    t =   280.46s Click "tab-mcp" Button
+    t =   280.46s     Wait for com.forge-conductor.app to idle
+    t =   280.46s     Find the "tab-mcp" Button
+    t =   280.54s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   280.55s     Synthesize event
+    t =   280.98s     Wait for com.forge-conductor.app to idle
+    t =   280.98s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   282.00s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   282.00s         Checking existence of `"detail-mcp" Any`
+    t =   282.15s Click "tab-rig" Button
+    t =   282.15s     Wait for com.forge-conductor.app to idle
+    t =   282.16s     Find the "tab-rig" Button
+    t =   282.19s     Check for interrupting elements affecting "tab-rig" Button
+    t =   282.21s     Synthesize event
+    t =   282.68s     Wait for com.forge-conductor.app to idle
+    t =   282.72s Waiting 2.0s for "detail-rig" Any to exist
+    t =   283.73s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   283.73s         Checking existence of `"detail-rig" Any`
+    t =   283.86s Click "tab-mcp" Button
+    t =   283.86s     Wait for com.forge-conductor.app to idle
+    t =   283.87s     Find the "tab-mcp" Button
+    t =   283.95s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   284.03s     Synthesize event
+    t =   284.44s     Wait for com.forge-conductor.app to idle
+    t =   284.44s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   285.46s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   285.46s         Checking existence of `"detail-mcp" Any`
+    t =   285.51s Click "tab-rig" Button
+    t =   285.51s     Wait for com.forge-conductor.app to idle
+    t =   285.51s     Find the "tab-rig" Button
+    t =   285.55s     Check for interrupting elements affecting "tab-rig" Button
+    t =   285.56s     Synthesize event
+    t =   286.06s     Wait for com.forge-conductor.app to idle
+    t =   286.08s Waiting 2.0s for "detail-rig" Any to exist
+    t =   287.10s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   287.10s         Checking existence of `"detail-rig" Any`
+    t =   287.28s Click "tab-mcp" Button
+    t =   287.28s     Wait for com.forge-conductor.app to idle
+    t =   287.29s     Find the "tab-mcp" Button
+    t =   287.38s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   287.46s     Synthesize event
+    t =   287.85s     Wait for com.forge-conductor.app to idle
+    t =   287.86s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   288.88s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   288.88s         Checking existence of `"detail-mcp" Any`
+    t =   288.93s Click "tab-rig" Button
+    t =   288.93s     Wait for com.forge-conductor.app to idle
+    t =   288.94s     Find the "tab-rig" Button
+    t =   288.97s     Check for interrupting elements affecting "tab-rig" Button
+    t =   288.98s     Synthesize event
+    t =   289.48s     Wait for com.forge-conductor.app to idle
+    t =   289.51s Waiting 2.0s for "detail-rig" Any to exist
+    t =   290.51s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   290.51s         Checking existence of `"detail-rig" Any`
+    t =   290.66s Click "tab-mcp" Button
+    t =   290.66s     Wait for com.forge-conductor.app to idle
+    t =   290.66s     Find the "tab-mcp" Button
+    t =   290.75s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   290.79s     Synthesize event
+    t =   291.19s     Wait for com.forge-conductor.app to idle
+    t =   291.20s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   292.21s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   292.21s         Checking existence of `"detail-mcp" Any`
+    t =   292.37s Click "tab-rig" Button
+    t =   292.37s     Wait for com.forge-conductor.app to idle
+    t =   292.38s     Find the "tab-rig" Button
+    t =   292.41s     Check for interrupting elements affecting "tab-rig" Button
+    t =   292.43s     Synthesize event
+    t =   292.90s     Wait for com.forge-conductor.app to idle
+    t =   292.94s Waiting 2.0s for "detail-rig" Any to exist
+    t =   293.95s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   293.95s         Checking existence of `"detail-rig" Any`
+    t =   294.06s Click "tab-mcp" Button
+    t =   294.06s     Wait for com.forge-conductor.app to idle
+    t =   294.07s     Find the "tab-mcp" Button
+    t =   294.17s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   294.23s     Synthesize event
+    t =   294.65s     Wait for com.forge-conductor.app to idle
+    t =   294.66s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   295.67s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   295.67s         Checking existence of `"detail-mcp" Any`
+    t =   295.83s Click "tab-rig" Button
+    t =   295.83s     Wait for com.forge-conductor.app to idle
+    t =   295.83s     Find the "tab-rig" Button
+    t =   295.87s     Check for interrupting elements affecting "tab-rig" Button
+    t =   295.88s     Synthesize event
+    t =   296.35s     Wait for com.forge-conductor.app to idle
+    t =   296.40s Waiting 2.0s for "detail-rig" Any to exist
+    t =   297.41s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   297.41s         Checking existence of `"detail-rig" Any`
+    t =   297.56s Click "tab-mcp" Button
+    t =   297.56s     Wait for com.forge-conductor.app to idle
+    t =   297.56s     Find the "tab-mcp" Button
+    t =   297.67s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   297.70s     Synthesize event
+    t =   298.10s     Wait for com.forge-conductor.app to idle
+    t =   298.10s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   299.11s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   299.11s         Checking existence of `"detail-mcp" Any`
+    t =   299.27s Click "tab-rig" Button
+    t =   299.27s     Wait for com.forge-conductor.app to idle
+    t =   299.27s     Find the "tab-rig" Button
+    t =   299.31s     Check for interrupting elements affecting "tab-rig" Button
+    t =   299.33s     Synthesize event
+    t =   299.84s     Wait for com.forge-conductor.app to idle
+    t =   299.86s Waiting 2.0s for "detail-rig" Any to exist
+    t =   300.86s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   300.87s         Checking existence of `"detail-rig" Any`
+    t =   300.99s Click "tab-mcp" Button
+    t =   300.99s     Wait for com.forge-conductor.app to idle
+    t =   300.99s     Find the "tab-mcp" Button
+    t =   301.07s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   301.15s     Synthesize event
+    t =   301.57s     Wait for com.forge-conductor.app to idle
+    t =   301.58s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   302.60s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   302.60s         Checking existence of `"detail-mcp" Any`
+    t =   302.65s Click "tab-rig" Button
+    t =   302.65s     Wait for com.forge-conductor.app to idle
+    t =   302.65s     Find the "tab-rig" Button
+    t =   302.69s     Check for interrupting elements affecting "tab-rig" Button
+    t =   302.71s     Synthesize event
+    t =   303.20s     Wait for com.forge-conductor.app to idle
+    t =   303.21s Waiting 2.0s for "detail-rig" Any to exist
+    t =   304.22s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   304.22s         Checking existence of `"detail-rig" Any`
+    t =   304.32s Click "tab-mcp" Button
+    t =   304.32s     Wait for com.forge-conductor.app to idle
+    t =   304.32s     Find the "tab-mcp" Button
+    t =   304.42s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   304.48s     Synthesize event
+    t =   304.93s     Wait for com.forge-conductor.app to idle
+    t =   304.93s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   305.94s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   305.94s         Checking existence of `"detail-mcp" Any`
+    t =   305.99s Click "tab-rig" Button
+    t =   305.99s     Wait for com.forge-conductor.app to idle
+    t =   306.01s     Find the "tab-rig" Button
+    t =   306.05s     Check for interrupting elements affecting "tab-rig" Button
+    t =   306.06s     Synthesize event
+    t =   306.54s     Wait for com.forge-conductor.app to idle
+    t =   306.56s Waiting 2.0s for "detail-rig" Any to exist
+    t =   307.58s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   307.58s         Checking existence of `"detail-rig" Any`
+    t =   307.73s Click "tab-mcp" Button
+    t =   307.73s     Wait for com.forge-conductor.app to idle
+    t =   307.75s     Find the "tab-mcp" Button
+    t =   307.83s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   307.88s     Synthesize event
+    t =   308.30s     Wait for com.forge-conductor.app to idle
+    t =   308.30s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   309.32s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   309.32s         Checking existence of `"detail-mcp" Any`
+    t =   309.47s Click "tab-rig" Button
+    t =   309.47s     Wait for com.forge-conductor.app to idle
+    t =   309.48s     Find the "tab-rig" Button
+    t =   309.63s     Check for interrupting elements affecting "tab-rig" Button
+    t =   309.65s     Synthesize event
+    t =   310.14s     Wait for com.forge-conductor.app to idle
+    t =   310.14s Waiting 2.0s for "detail-rig" Any to exist
+    t =   311.16s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   311.16s         Checking existence of `"detail-rig" Any`
+    t =   311.38s Click "tab-mcp" Button
+    t =   311.38s     Wait for com.forge-conductor.app to idle
+    t =   311.39s     Find the "tab-mcp" Button
+    t =   311.48s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   311.55s     Synthesize event
+    t =   311.92s     Wait for com.forge-conductor.app to idle
+    t =   311.92s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   312.94s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   312.94s         Checking existence of `"detail-mcp" Any`
+    t =   313.10s Click "tab-rig" Button
+    t =   313.10s     Wait for com.forge-conductor.app to idle
+    t =   313.10s     Find the "tab-rig" Button
+    t =   313.15s     Check for interrupting elements affecting "tab-rig" Button
+    t =   313.16s     Synthesize event
+    t =   313.65s     Wait for com.forge-conductor.app to idle
+    t =   313.69s Waiting 2.0s for "detail-rig" Any to exist
+    t =   314.70s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   314.70s         Checking existence of `"detail-rig" Any`
+    t =   314.85s Click "tab-mcp" Button
+    t =   314.85s     Wait for com.forge-conductor.app to idle
+    t =   314.85s     Find the "tab-mcp" Button
+    t =   314.96s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   315.02s     Synthesize event
+    t =   315.43s     Wait for com.forge-conductor.app to idle
+    t =   315.43s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   316.44s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   316.44s         Checking existence of `"detail-mcp" Any`
+    t =   316.50s Click "tab-rig" Button
+    t =   316.50s     Wait for com.forge-conductor.app to idle
+    t =   316.50s     Find the "tab-rig" Button
+    t =   316.53s     Check for interrupting elements affecting "tab-rig" Button
+    t =   316.55s     Synthesize event
+    t =   317.03s     Wait for com.forge-conductor.app to idle
+    t =   317.06s Waiting 2.0s for "detail-rig" Any to exist
+    t =   318.13s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   318.13s         Checking existence of `"detail-rig" Any`
+    t =   318.31s Click "tab-mcp" Button
+    t =   318.31s     Wait for com.forge-conductor.app to idle
+    t =   318.32s     Find the "tab-mcp" Button
+    t =   318.42s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   318.48s     Synthesize event
+    t =   318.88s     Wait for com.forge-conductor.app to idle
+    t =   318.88s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   319.89s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   319.89s         Checking existence of `"detail-mcp" Any`
+    t =   320.05s Click "tab-rig" Button
+    t =   320.05s     Wait for com.forge-conductor.app to idle
+    t =   320.06s     Find the "tab-rig" Button
+    t =   320.09s     Check for interrupting elements affecting "tab-rig" Button
+    t =   320.11s     Synthesize event
+    t =   320.62s     Wait for com.forge-conductor.app to idle
+    t =   320.63s Waiting 2.0s for "detail-rig" Any to exist
+    t =   321.64s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   321.64s         Checking existence of `"detail-rig" Any`
+    t =   321.74s Click "tab-mcp" Button
+    t =   321.74s     Wait for com.forge-conductor.app to idle
+    t =   321.75s     Find the "tab-mcp" Button
+    t =   321.85s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   321.93s     Synthesize event
+    t =   322.34s     Wait for com.forge-conductor.app to idle
+    t =   322.35s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   323.36s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   323.36s         Checking existence of `"detail-mcp" Any`
+    t =   323.51s Click "tab-rig" Button
+    t =   323.51s     Wait for com.forge-conductor.app to idle
+    t =   323.51s     Find the "tab-rig" Button
+    t =   323.65s     Check for interrupting elements affecting "tab-rig" Button
+    t =   323.66s     Synthesize event
+    t =   324.13s     Wait for com.forge-conductor.app to idle
+    t =   324.15s Waiting 2.0s for "detail-rig" Any to exist
+    t =   325.16s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   325.16s         Checking existence of `"detail-rig" Any`
+    t =   325.31s Click "tab-mcp" Button
+    t =   325.31s     Wait for com.forge-conductor.app to idle
+    t =   325.31s     Find the "tab-mcp" Button
+    t =   325.39s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   325.43s     Synthesize event
+    t =   325.83s     Wait for com.forge-conductor.app to idle
+    t =   325.83s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   326.84s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   326.84s         Checking existence of `"detail-mcp" Any`
+    t =   327.00s Click "tab-rig" Button
+    t =   327.00s     Wait for com.forge-conductor.app to idle
+    t =   327.01s     Find the "tab-rig" Button
+    t =   327.04s     Check for interrupting elements affecting "tab-rig" Button
+    t =   327.06s     Synthesize event
+    t =   327.54s     Wait for com.forge-conductor.app to idle
+    t =   327.57s Waiting 2.0s for "detail-rig" Any to exist
+    t =   328.58s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   328.58s         Checking existence of `"detail-rig" Any`
+    t =   328.81s Click "tab-mcp" Button
+    t =   328.81s     Wait for com.forge-conductor.app to idle
+    t =   328.87s     Find the "tab-mcp" Button
+    t =   328.96s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   329.01s     Synthesize event
+    t =   329.41s     Wait for com.forge-conductor.app to idle
+    t =   329.42s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   330.43s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   330.43s         Checking existence of `"detail-mcp" Any`
+    t =   330.48s Click "tab-rig" Button
+    t =   330.48s     Wait for com.forge-conductor.app to idle
+    t =   330.49s     Find the "tab-rig" Button
+    t =   330.53s     Check for interrupting elements affecting "tab-rig" Button
+    t =   330.54s     Synthesize event
+    t =   331.02s     Wait for com.forge-conductor.app to idle
+    t =   331.06s Waiting 2.0s for "detail-rig" Any to exist
+    t =   332.06s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   332.06s         Checking existence of `"detail-rig" Any`
+    t =   332.24s Click "tab-mcp" Button
+    t =   332.24s     Wait for com.forge-conductor.app to idle
+    t =   332.24s     Find the "tab-mcp" Button
+    t =   332.33s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   332.37s     Synthesize event
+    t =   332.75s     Wait for com.forge-conductor.app to idle
+    t =   332.75s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   333.76s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   333.76s         Checking existence of `"detail-mcp" Any`
+    t =   333.92s Click "tab-rig" Button
+    t =   333.92s     Wait for com.forge-conductor.app to idle
+    t =   333.92s     Find the "tab-rig" Button
+    t =   333.96s     Check for interrupting elements affecting "tab-rig" Button
+    t =   333.98s     Synthesize event
+    t =   334.51s     Wait for com.forge-conductor.app to idle
+    t =   334.53s Waiting 2.0s for "detail-rig" Any to exist
+    t =   335.54s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   335.54s         Checking existence of `"detail-rig" Any`
+    t =   335.76s Click "tab-mcp" Button
+    t =   335.76s     Wait for com.forge-conductor.app to idle
+    t =   335.84s     Find the "tab-mcp" Button
+    t =   335.92s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   335.98s     Synthesize event
+    t =   336.36s     Wait for com.forge-conductor.app to idle
+    t =   336.37s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   337.38s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   337.38s         Checking existence of `"detail-mcp" Any`
+    t =   337.54s Click "tab-rig" Button
+    t =   337.54s     Wait for com.forge-conductor.app to idle
+    t =   337.54s     Find the "tab-rig" Button
+    t =   337.58s     Check for interrupting elements affecting "tab-rig" Button
+    t =   337.60s     Synthesize event
+    t =   338.11s     Wait for com.forge-conductor.app to idle
+    t =   338.13s Waiting 2.0s for "detail-rig" Any to exist
+    t =   339.14s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   339.14s         Checking existence of `"detail-rig" Any`
+    t =   339.29s Click "tab-mcp" Button
+    t =   339.29s     Wait for com.forge-conductor.app to idle
+    t =   339.29s     Find the "tab-mcp" Button
+    t =   339.39s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   339.46s     Synthesize event
+    t =   339.86s     Wait for com.forge-conductor.app to idle
+    t =   339.87s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   340.88s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   340.88s         Checking existence of `"detail-mcp" Any`
+    t =   340.93s Click "tab-rig" Button
+    t =   340.93s     Wait for com.forge-conductor.app to idle
+    t =   340.93s     Find the "tab-rig" Button
+    t =   340.97s     Check for interrupting elements affecting "tab-rig" Button
+    t =   341.00s     Synthesize event
+    t =   341.52s     Wait for com.forge-conductor.app to idle
+    t =   341.53s Waiting 2.0s for "detail-rig" Any to exist
+    t =   342.54s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   342.54s         Checking existence of `"detail-rig" Any`
+    t =   342.68s Click "tab-mcp" Button
+    t =   342.68s     Wait for com.forge-conductor.app to idle
+    t =   342.70s     Find the "tab-mcp" Button
+    t =   342.79s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   342.89s     Synthesize event
+    t =   343.29s     Wait for com.forge-conductor.app to idle
+    t =   343.30s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   344.30s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   344.30s         Checking existence of `"detail-mcp" Any`
+    t =   344.47s Click "tab-rig" Button
+    t =   344.47s     Wait for com.forge-conductor.app to idle
+    t =   344.47s     Find the "tab-rig" Button
+    t =   344.51s     Check for interrupting elements affecting "tab-rig" Button
+    t =   344.53s     Synthesize event
+    t =   345.01s     Wait for com.forge-conductor.app to idle
+    t =   345.04s Waiting 2.0s for "detail-rig" Any to exist
+    t =   346.05s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   346.05s         Checking existence of `"detail-rig" Any`
+    t =   346.20s Click "tab-mcp" Button
+    t =   346.20s     Wait for com.forge-conductor.app to idle
+    t =   346.20s     Find the "tab-mcp" Button
+    t =   346.30s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   346.36s     Synthesize event
+    t =   346.76s     Wait for com.forge-conductor.app to idle
+    t =   346.77s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   347.78s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   347.78s         Checking existence of `"detail-mcp" Any`
+    t =   347.84s Click "tab-rig" Button
+    t =   347.84s     Wait for com.forge-conductor.app to idle
+    t =   347.84s     Find the "tab-rig" Button
+    t =   347.88s     Check for interrupting elements affecting "tab-rig" Button
+    t =   347.89s     Synthesize event
+    t =   348.39s     Wait for com.forge-conductor.app to idle
+    t =   348.42s Waiting 2.0s for "detail-rig" Any to exist
+    t =   349.43s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   349.43s         Checking existence of `"detail-rig" Any`
+    t =   349.64s Click "tab-mcp" Button
+    t =   349.64s     Wait for com.forge-conductor.app to idle
+    t =   349.66s     Find the "tab-mcp" Button
+    t =   349.75s     Check for interrupting elements affecting "tab-mcp" Button
+    t =   349.83s     Synthesize event
+    t =   350.24s     Wait for com.forge-conductor.app to idle
+    t =   350.25s Waiting 2.0s for "detail-mcp" Any to exist
+    t =   351.26s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-mcp" Any`
+    t =   351.26s         Checking existence of `"detail-mcp" Any`
+    t =   351.32s Click "tab-rig" Button
+    t =   351.32s     Wait for com.forge-conductor.app to idle
+    t =   351.32s     Find the "tab-rig" Button
+    t =   351.36s     Check for interrupting elements affecting "tab-rig" Button
+    t =   351.38s     Synthesize event
+    t =   351.86s     Wait for com.forge-conductor.app to idle
+    t =   351.89s Waiting 2.0s for "detail-rig" Any to exist
+    t =   352.90s     Checking `Expect predicate `existsNoRetry == 1` for object "detail-rig" Any`
+    t =   352.90s         Checking existence of `"detail-rig" Any`
+    t =   353.07s Checking existence of `Window (First Match)`
+    t =   353.08s Tear Down
+    t =   353.08s     Terminate com.forge-conductor.app:72662
+Test Case '-[ForgeConductorUITests.ForgeConductorUITests testHundredGaugeNavigationCyclesQuiesce]' passed (355.421 seconds).
+Test Suite 'ForgeConductorUITests' passed at 2026-08-23 16:27:36.468.
+	 Executed 1 test, with 0 failures (0 unexpected) in 355.421 (355.422) seconds
+Test Suite 'ForgeConductorUITests.xctest' passed at 2026-08-23 16:27:36.469.
+	 Executed 1 test, with 0 failures (0 unexpected) in 355.421 (355.424) seconds
+Test Suite 'Selected tests' passed at 2026-08-23 16:27:36.471.
+	 Executed 1 test, with 0 failures (0 unexpected) in 355.421 (355.425) seconds
+
+Test session results, code coverage, and logs:
+	/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.build/DerivedData-P11/Logs/Test/Test-ForgeConductor-2026.08.23_16-21-39--0500.xcresult
+
+** TEST EXECUTE SUCCEEDED **
+
+Testing started

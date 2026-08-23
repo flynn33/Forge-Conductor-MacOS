@@ -1,0 +1,36 @@
+{
+  "criteria_results": [
+    {
+      "criterion": "existing MCP compatibility passes",
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/MCP/MCPServer.swift#562f7e573a8a0cf4dcde1b4e1f31c443f3a3ad5561c4add92872d3fbc3fb03a6; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P07-mcp-process-conformance.json#135ceac8822d2dad4d997d12fbc5adf9a8a97dc243fc7296cd06d1b5d13e52c4; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T201632Z-6920be9c15.stdout.txt#2110b17824fe46b80909e785fb482e6683c54ca76578220260c508d852d8440f",
+      "passed": true
+    },
+    {
+      "criterion": "memory MCP conformance passes",
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Application/Tools/ProjectMemoryToolPack.swift#70e21d38ce0f0afed9472e6e2a7b9e15fc5c7cb28ef3254d6387af1e76cf60c2; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P07-mcp-process-conformance.json#135ceac8822d2dad4d997d12fbc5adf9a8a97dc243fc7296cd06d1b5d13e52c4; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T202214Z-45beba1a02.stdout.txt#1f1195dda5b4e826f9ae201dd2e5cdb06f6fc62c2925668550845efeadaccff2",
+      "passed": true
+    },
+    {
+      "criterion": "project isolation and restart durability pass",
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/ProjectMemoryRepository.swift#62b2e0adcb39ccb96e889fbc728e805604d4e4d1e6df0d37e78b4fadaf3edb66; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P07-mcp-process-conformance.json#135ceac8822d2dad4d997d12fbc5adf9a8a97dc243fc7296cd06d1b5d13e52c4; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T201609Z-581a87dcb8.stdout.txt#efa16cd515cd149f4643773ec3d9f1f879703aff3d4a91bc3081bdcfe1d70bc3",
+      "passed": true
+    },
+    {
+      "criterion": "migration/integrity/recovery pass",
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/ProjectMemoryTests.swift#bd18ca203a6eb6a3e034052fc364f26d750b33800cbcfad0f7a280665129e924; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P07-project-memory-report.json#88d76f9daf1d2dd536e0d7715c81ad0fcb2b1ce620179160ae3f9b14c7abc2f1; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T201609Z-581a87dcb8.stdout.txt#efa16cd515cd149f4643773ec3d9f1f879703aff3d4a91bc3081bdcfe1d70bc3",
+      "passed": true
+    },
+    {
+      "criterion": "search/page/payload/cache budgets pass",
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Domain/ProjectMemoryModels.swift#a47b36b95e09fabd07eb72227d9b02cb397d0453d5431562d7cce678400428cc; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/ProjectMemoryRepository.swift#62b2e0adcb39ccb96e889fbc728e805604d4e4d1e6df0d37e78b4fadaf3edb66; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P07-resource-owner-matrix.json#4b7da4806d7c77f4653e5f6800fe1d218ffb6f2c088161c3d59cfffba0d9bdb5; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P07-mcp-process-conformance.json#135ceac8822d2dad4d997d12fbc5adf9a8a97dc243fc7296cd06d1b5d13e52c4",
+      "passed": true
+    },
+    {
+      "criterion": "redaction/security tests pass",
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Application/ProjectMemoryService.swift#19f776834b656bba89496c9a7205162c269554d61dc046100f9a09c9054594aa; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T202205Z-6824db4d27.stdout.txt#06b033ec8356398fbf1e87d467a4c5149625707eb2e7e090c7b31cc7a7583658; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T202209Z-a14a40e46a.stdout.txt#be915aedab4cd32fd9c9ff048b75e0edfb06a66d2ff65476d5879d6490822256; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T201609Z-581a87dcb8.stdout.txt#efa16cd515cd149f4643773ec3d9f1f879703aff3d4a91bc3081bdcfe1d70bc3",
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "valid": true
+}

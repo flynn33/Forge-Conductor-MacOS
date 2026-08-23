@@ -1,0 +1,70 @@
+{
+  "artifacts": [
+    {
+      "kind": "stdout",
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G04.stdout.txt",
+      "sha256": "fa52a67ada4051cdaf064cb6fc52cdd72cd7957006924443b4e414e2f5abda61"
+    },
+    {
+      "kind": "stderr",
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G04.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "criteria",
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G04.criteria.json",
+      "sha256": "04fb03812290bdb7b43b973bde31d4399d351e29587f17096a419afd0c824b77"
+    }
+  ],
+  "commands": [
+    {
+      "command": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-handlers/G04.sh",
+      "exit_code": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "fa52a67ada4051cdaf064cb6fc52cdd72cd7957006924443b4e414e2f5abda61",
+      "timed_out": false
+    }
+  ],
+  "ended_at": "2026-08-23T19:34:24.329267+00:00",
+  "environment": {
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "repository": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
+  },
+  "evaluator": {
+    "criteria_results": [
+      {
+        "criterion": "Metal resource construction is shared or justified",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorApp/Metal/MetalGaugeResources.swift#03070d0e78f79bce568e73c7834c68bdf9b92581a5ac1297039b3c20476a5c4d; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T193100Z-a782c3890a.stdout.txt#d61d72bfc705b73ce988d0690f85cac6a7e5f8fde3d4ce84e3059d2361506868; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T192842Z-4e41ce2a84.stdout.txt#ee8d3228faee0138d395fa2f423a547b4e19e587cfd87b0f7ca49661d0e7c131",
+        "passed": true
+      },
+      {
+        "criterion": "hidden/static draw count reaches zero after quiescence",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorApp/Metal/MetalGaugeKit.swift#dee9d7e533403cb935e0b14e5a901aee61b284ffd8b992e2141fa3edf2dadb57; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T192631Z-cfa3748c4d.stdout.txt#fe9fa09e4fcd8ad7002fde9ff498313abcac549db361cf85b5fb086c1192e386; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T192639Z-46267799f4.stdout.txt#ccd303c6b89989cf5eaa52ed832e5b863b7ecc71386692030b8761ceb9dd5519",
+        "passed": true
+      },
+      {
+        "criterion": "no high-frequency buffer allocation path",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorApp/Metal/MetalGaugeResources.swift#03070d0e78f79bce568e73c7834c68bdf9b92581a5ac1297039b3c20476a5c4d; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P04-metal-performance-report.json#4958c561b8ac484218edbbfb14dad86c2c4174e5d7da5cee7feecc67278c4de5",
+        "passed": true
+      },
+      {
+        "criterion": "open-close release test passes",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T192728Z-e788871dce.stdout.txt#42be1aba4c1c2cce365cc399d339afa299d3c0f46c0f5ad36b9b5f62a9ce0176; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T192746Z-399a98b738.stdout.txt#9e717e9ee222468433d7ce1cc6782555fcc2231168b03157d71f800ec25aaac0",
+        "passed": true
+      },
+      {
+        "criterion": "Release Metal/performance evidence meets budget",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T193106Z-667173c96c.stdout.txt#33b97a5b76d0b7835f2e54e092c68a9415fc5272e387321a23984bc385eed12a; /Users/jimdaley/Documents/RavenForge/Forge-Conductor-MacOS/Forge-Conductor-Repair-Evidence/aba90ab1-be80-4cc5-aa0b-23dd54d4a24d/p04/P04-Release-Metal-System.trace/instrument_data/140A4D45-2E35-4CAF-B321-7D97E6303BCE/run_data/1.run.zip#5fa486f92d22262b60cf74b983c7780a01a8e2125b376585889d108b0734e2d0; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T192954Z-a1ccac7d61.stdout.txt#cf69ca0193cfc44225c659152ea329764a6fc62c0472adeb2835735607ec4a19; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P04-metal-performance-report.json#4958c561b8ac484218edbbfb14dad86c2c4174e5d7da5cee7feecc67278c4de5",
+        "passed": true
+      }
+    ],
+    "name": "forge-gate-handler",
+    "version": "1"
+  },
+  "gate_id": "G04",
+  "notes": "",
+  "schema_version": 1,
+  "started_at": "2026-08-23T19:34:23.967442+00:00",
+  "status": "passed"
+}

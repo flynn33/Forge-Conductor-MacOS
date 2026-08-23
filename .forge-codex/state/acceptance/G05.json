@@ -1,0 +1,65 @@
+{
+  "commands": [
+    {
+      "command": "swift test --no-parallel --filter 'LifecycleOwnershipTests|ProcessRunnerTests|ManagerTests|LatestValueMailboxTests'",
+      "exit_code": 0,
+      "evidence": ".forge-codex/evidence/EVID-20260823T193826Z-661c01c5d5.json"
+    },
+    {
+      "command": "swift test --no-parallel -Xswiftc -strict-concurrency=complete -Xswiftc -warnings-as-errors",
+      "exit_code": 0,
+      "evidence": ".forge-codex/evidence/EVID-20260823T194308Z-9a5fdacf6f.json"
+    },
+    {
+      "command": ".forge-codex/scripts/check_p05_lifecycle.py",
+      "exit_code": 0,
+      "evidence": ".forge-codex/evidence/EVID-20260823T194716Z-556705f0c7.json"
+    }
+  ],
+  "criteria_results": [
+    {
+      "criterion": "all audit E2 risks have ownership disposition",
+      "evidence": [
+        {"path": ".forge-codex/evidence/P05-resource-owner-matrix.json", "sha256": "16a2f2d0b63d4c53ba46006afdf85254fa580de2b5426c7e4a662503e5d3eeda"},
+        {"path": ".forge-codex/state/findings-resolution.json", "sha256": "117b4f7df12206bd8ff7a6c50963f4a372c715cfdc3adc50a0226271cb83b8cc"}
+      ],
+      "passed": true
+    },
+    {
+      "criterion": "confirmed retaining edges fixed with same-flow proof",
+      "evidence": [
+        {"path": "Sources/ForgeConductorCLI/ForgeConductorMain.swift", "sha256": "088f88f8b73f17591e68daaf8b1d6cf8770bf7a12debf4e22116df6c47a9ed8c"},
+        {"path": "Sources/ForgeConductorCore/Dashboard/DashboardServer.swift", "sha256": "055caca8d7535cca499badca7cdb6378ade81964824dd841d83a2e82bc15df0e"},
+        {"path": "Sources/ForgeConductorCore/Infrastructure/DashboardPortGuard.swift", "sha256": "2b0237ff6b35518fa8c34dffa31ffeff7356d9bf6eafcd6d1d9436a2fd96c244"},
+        {"path": "Sources/ForgeConductorCore/Manager/ManagerRuntime.swift", "sha256": "39a342889ba4a067bf837ec47fe8191a722e3df780023608ab0958fba047f941"},
+        {"path": ".forge-codex/evidence/EVID-20260823T193826Z-661c01c5d5.stdout.txt", "sha256": "48ea5cf223eff9c4edcd0579afa59c9c36b83c5e768702d24ebf154a476e5b71"}
+      ],
+      "passed": true
+    },
+    {
+      "criterion": "process/pipe/task/timer/observer shutdown tests pass",
+      "evidence": [
+        {"path": "Tests/ForgeConductorTests/LifecycleOwnershipTests.swift", "sha256": "d0a824f6b53cfc5286d1eb590b4529bda446aba6074f2ff71b8ab4337c007809"},
+        {"path": ".forge-codex/evidence/EVID-20260823T193826Z-661c01c5d5.stdout.txt", "sha256": "48ea5cf223eff9c4edcd0579afa59c9c36b83c5e768702d24ebf154a476e5b71"},
+        {"path": ".forge-codex/evidence/P05-sanitizer-and-lifecycle-report.json", "sha256": "05eb6fb9771d6a10566af837ab27fec90b9c80485f0e5f4301bffd5e6752e63a"}
+      ],
+      "passed": true
+    },
+    {
+      "criterion": "ASan and TSan runs separately pass or have zero unresolved product findings",
+      "evidence": [
+        {"path": ".forge-codex/evidence/P05-sanitizer-and-lifecycle-report.json", "sha256": "05eb6fb9771d6a10566af837ab27fec90b9c80485f0e5f4301bffd5e6752e63a"},
+        {"path": ".forge-codex/evidence/EVID-20260823T194148Z-4bc9b988c0.stderr.txt", "sha256": "343d66f8575dfd0c773094fcf09a2aae983cc15a26e108e733fc9b2c5169246e"},
+        {"path": ".forge-codex/evidence/EVID-20260823T194202Z-a41d508f0c.stderr.txt", "sha256": "c878345c2c2b6f9c210696529ff943adb936b8128c1e9dd51bd39ab39b749ab6"},
+        {"path": ".forge-codex/evidence/EVID-20260823T194308Z-9a5fdacf6f.stdout.txt", "sha256": "ac62c047f765668f088abe1b559bf82a448925472160b9e6d0396f70c5d4a180"},
+        {"path": ".forge-codex/evidence/EVID-20260823T194225Z-32827b0ff8.stdout.txt", "sha256": "c6bf199c5a3128cb16811ae598c954e70c8af806f17d3c484f85d96511abc14c"},
+        {"path": ".forge-codex/evidence/EVID-20260823T194253Z-44ca4b7694.stdout.txt", "sha256": "a6a19720b3c8f8860aa6d7aa418a9ece5156c63494d887f47173352b226dbf5b"},
+        {"path": ".forge-codex/evidence/EVID-20260823T194716Z-556705f0c7.stdout.txt", "sha256": "b06cf027ca8e7ffe3ae4ee6c76d88b3f8f7d27f57c7a0d4b7b25a6995818775b"}
+      ],
+      "passed": true
+    }
+  ],
+  "gate_id": "G05",
+  "instructions": "Recorded ownership dispositions, same-flow lifecycle stress, strict concurrency, sanitizer environment diagnosis, and non-growing live leak evidence for P05.",
+  "schema_version": 1
+}

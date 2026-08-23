@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 3605,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T210719Z-a3e959a8b6.stdout.txt",
+      "sha256": "0a168ed1e70e2e29c39ac3853c15202b68e9880c4eb1147deedce7b3fe156565"
+    },
+    {
+      "bytes": 99,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T210719Z-a3e959a8b6.stderr.txt",
+      "sha256": "4d012a1b526db926f1514297546e35b8be764e92ac513bb68773751d4b5be9fc"
+    }
+  ],
+  "command": "swift test -c release --no-parallel --filter 'ProductPathReliabilityTests.testInProcessMCPHandshakeToolsList|ProductPathReliabilityTests.testForgeStatusToolCall|ContinuityTests.testPrimaryAndFallbackMCPProcessesShareContinuitySafely|ContinuityTests.testContinuityToolsListed|ProjectMemoryTests.testToolConformanceIsAdditiveAndInitializeAdvertisesCapabilities|ContinuityCoordinatorTests.testExternalMCPControlLifecycleAndSchemas|MCPProtocolAndDiagnosticsTests.testStdioTransportWritesSpecCompliantNDJSON|MCPProtocolAndDiagnosticsTests.testProtocolNegotiationEchoesLMStudioVersion'",
+  "ended_at": "2026-08-23T21:07:21.397494+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T210719Z-a3e959a8b6",
+  "kind": "p10-mcp-protocol-compatibility",
+  "related_findings": [],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T21:07:19.216028+00:00",
+  "timed_out": false
+}

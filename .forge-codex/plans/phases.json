@@ -1,0 +1,253 @@
+{
+  "package_version": "1.0.0",
+  "phases": [
+    {
+      "dependencies": [],
+      "hard_gates": [
+        "G00"
+      ],
+      "id": "P00",
+      "name": "Bootstrap and preserve state",
+      "outputs": [
+        "environment.json",
+        "repository-baseline.json",
+        "run-state.json"
+      ],
+      "parallel_safe": false,
+      "priority": 100
+    },
+    {
+      "dependencies": [
+        "P00"
+      ],
+      "hard_gates": [
+        "G01"
+      ],
+      "id": "P01",
+      "name": "Feature and protocol baseline",
+      "outputs": [
+        "feature-baseline.json",
+        "mcp-baseline",
+        "data-fixtures",
+        "characterization-tests"
+      ],
+      "parallel_safe": false,
+      "priority": 95
+    },
+    {
+      "dependencies": [
+        "P01"
+      ],
+      "hard_gates": [
+        "G02"
+      ],
+      "id": "P02",
+      "name": "Baseline observability and reproducers",
+      "outputs": [
+        "baseline-traces",
+        "reproducers",
+        "diagnostic-counters"
+      ],
+      "parallel_safe": false,
+      "priority": 90
+    },
+    {
+      "dependencies": [
+        "P02"
+      ],
+      "hard_gates": [
+        "G03"
+      ],
+      "id": "P03",
+      "name": "Bound telemetry delivery",
+      "outputs": [
+        "bounded-mailbox",
+        "telemetry-tests",
+        "mapping-tests",
+        "before-after-evidence"
+      ],
+      "parallel_safe": false,
+      "priority": 88
+    },
+    {
+      "dependencies": [
+        "P02"
+      ],
+      "hard_gates": [
+        "G04"
+      ],
+      "id": "P04",
+      "name": "Efficient gauge and Metal architecture",
+      "outputs": [
+        "shared-renderer",
+        "scheduler",
+        "gauge-tests",
+        "metal-evidence"
+      ],
+      "parallel_safe": false,
+      "priority": 86
+    },
+    {
+      "dependencies": [
+        "P02"
+      ],
+      "hard_gates": [
+        "G05"
+      ],
+      "id": "P05",
+      "name": "Lifecycle and concurrency closure",
+      "outputs": [
+        "resource-owner-matrix",
+        "lifecycle-fixes",
+        "sanitizer-results",
+        "memgraph-results"
+      ],
+      "parallel_safe": false,
+      "priority": 84
+    },
+    {
+      "dependencies": [
+        "P03",
+        "P04",
+        "P05"
+      ],
+      "hard_gates": [
+        "G06"
+      ],
+      "id": "P06",
+      "name": "Bound histories caches logs and application state",
+      "outputs": [
+        "resource-policy",
+        "bounded-collections",
+        "pressure-tests"
+      ],
+      "parallel_safe": false,
+      "priority": 80
+    },
+    {
+      "dependencies": [
+        "P01",
+        "P02"
+      ],
+      "hard_gates": [
+        "G07"
+      ],
+      "id": "P07",
+      "name": "Project memory MCP",
+      "outputs": [
+        "memory-repository",
+        "memory-service",
+        "mcp-tools",
+        "migrations",
+        "conformance-tests"
+      ],
+      "parallel_safe": false,
+      "priority": 78
+    },
+    {
+      "dependencies": [
+        "P07"
+      ],
+      "hard_gates": [
+        "G08"
+      ],
+      "id": "P08",
+      "name": "Continuity engine",
+      "outputs": [
+        "handoff-model",
+        "continuity-coordinator",
+        "recovery",
+        "continuity-mcp",
+        "crash-matrix"
+      ],
+      "parallel_safe": false,
+      "priority": 76
+    },
+    {
+      "dependencies": [
+        "P08"
+      ],
+      "hard_gates": [
+        "G09"
+      ],
+      "id": "P09",
+      "name": "Host adapter plugin and autonomous rollover",
+      "outputs": [
+        "host-capability-report",
+        "plugin-kit",
+        "native-host-plugin",
+        "rollover-integration-tests"
+      ],
+      "parallel_safe": false,
+      "priority": 74
+    },
+    {
+      "dependencies": [
+        "P03",
+        "P04",
+        "P05",
+        "P06",
+        "P07",
+        "P08",
+        "P09"
+      ],
+      "hard_gates": [
+        "G10"
+      ],
+      "id": "P10",
+      "name": "Migration compatibility and feature parity",
+      "outputs": [
+        "parity-report",
+        "migration-report",
+        "protocol-compatibility-report"
+      ],
+      "parallel_safe": false,
+      "priority": 60
+    },
+    {
+      "dependencies": [
+        "P10"
+      ],
+      "hard_gates": [
+        "G11"
+      ],
+      "id": "P11",
+      "name": "Release stress and performance validation",
+      "outputs": [
+        "release-traces",
+        "resource-results",
+        "stress-results"
+      ],
+      "parallel_safe": false,
+      "priority": 50
+    },
+    {
+      "dependencies": [
+        "P11"
+      ],
+      "hard_gates": [
+        "G12"
+      ],
+      "id": "P12",
+      "name": "Final verification and delivery",
+      "outputs": [
+        "completion-report",
+        "evidence-index",
+        "release-handoff"
+      ],
+      "parallel_safe": false,
+      "priority": 40
+    }
+  ],
+  "schema_version": 1,
+  "selection_policy": {
+    "maximum_no_progress_attempts": 3,
+    "operator_questions_allowed": false,
+    "order": [
+      "highest_priority_ready",
+      "oldest_blocked_retry_due",
+      "smallest_reproducer",
+      "diagnostic_alternate"
+    ]
+  }
+}

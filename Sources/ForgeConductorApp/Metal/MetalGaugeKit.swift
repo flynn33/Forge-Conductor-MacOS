@@ -48,39 +48,6 @@ enum MetalGaugePalette {
     }
 }
 
-private struct GaugeVertex {
-    var pos: SIMD2<Float>
-    var color: SIMD4<Float>
-}
-
-/// Shared pipeline builder for 2D colored primitives.
-enum MetalGaugePipeline {
-    static let shader = """
-    #include <metal_stdlib>
-    using namespace metal;
-    struct P { float2 p; float4 c; };
-    struct O { float4 position [[position]]; float4 c; };
-    vertex O g_vert(uint i [[vertex_id]], const device P *v [[buffer(0)]]) {
-        O o; o.position = float4(v[i].p, 0, 1); o.c = v[i].c; return o;
-    }
-    fragment float4 g_frag(O in [[stage_in]]) { return in.c; }
-    """
-
-    static func make(device: MTLDevice, pixelFormat: MTLPixelFormat) -> MTLRenderPipelineState? {
-        guard let lib = try? device.makeLibrary(source: shader, options: nil),
-              let v = lib.makeFunction(name: "g_vert"),
-              let f = lib.makeFunction(name: "g_frag") else { return nil }
-        let d = MTLRenderPipelineDescriptor()
-        d.vertexFunction = v
-        d.fragmentFunction = f
-        d.colorAttachments[0].pixelFormat = pixelFormat
-        d.colorAttachments[0].isBlendingEnabled = true
-        d.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
-        d.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
-        return try? device.makeRenderPipelineState(descriptor: d)
-    }
-}
-
 // MARK: - Horizontal meter
 
 @MainActor
@@ -88,53 +55,87 @@ final class MetalBarRenderer: NSObject, MTKViewDelegate {
     private var device: MTLDevice?
     private var queue: MTLCommandQueue?
     private var pipeline: MTLRenderPipelineState?
-    private var buffer: MTLBuffer?
+    private let vertices = MetalVertexBuffer<GaugeVertex>()
+    private let surfaceLifetime = GaugeSurfaceLifetime()
+    private weak var view: MTKView?
+    private var dirty = false
     private var fraction: Float = 0
     private var color = MetalGaugePalette.cyan
-    private let lock = NSLock()
 
     func attach(_ view: MTKView) {
-        let mtl = view.device ?? MTLCreateSystemDefaultDevice()
-        guard let device = mtl else { return }
+        let resources = MetalGaugeResources.shared
+        guard let device = resources.device,
+              let pipeline = resources.configure(
+                  view,
+                  clearColor: MTLClearColor(red: 0.02, green: 0.04, blue: 0.08, alpha: 1)
+              )
+        else { return }
         self.device = device
-        view.device = device
+        self.queue = resources.commandQueue
+        self.pipeline = pipeline
+        self.view = view
         view.delegate = self
-        view.clearColor = MTLClearColor(red: 0.02, green: 0.04, blue: 0.08, alpha: 1)
-        view.isPaused = false
-        view.enableSetNeedsDisplay = false
-        view.preferredFramesPerSecond = 24
-        queue = device.makeCommandQueue()
-        pipeline = MetalGaugePipeline.make(device: device, pixelFormat: view.colorPixelFormat)
+        surfaceLifetime.attach()
         rebuild()
+        requestDraw()
     }
 
     func set(fraction: Float, color: SIMD4<Float>) {
-        lock.lock(); self.fraction = min(max(fraction, 0), 1); self.color = color; lock.unlock()
+        let nextFraction = min(max(fraction, 0), 1)
+        guard self.fraction != nextFraction || self.color != color else {
+            RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedStatic)
+            return
+        }
+        self.fraction = nextFraction
+        self.color = color
         rebuild()
+        requestDraw()
     }
 
     private func rebuild() {
         guard let device else { return }
-        lock.lock(); let f = fraction; let c = color; lock.unlock()
-        let x = -1 + 2 * f
-        var v: [GaugeVertex] = [
+        let x = -1 + 2 * fraction
+        let values: [GaugeVertex] = [
             .init(pos: SIMD2(-1, -0.55), color: MetalGaugePalette.track),
             .init(pos: SIMD2(1, -0.55), color: MetalGaugePalette.track),
             .init(pos: SIMD2(-1, 0.55), color: MetalGaugePalette.track),
             .init(pos: SIMD2(1, 0.55), color: MetalGaugePalette.track),
-            .init(pos: SIMD2(-1, -0.55), color: c),
-            .init(pos: SIMD2(x, -0.55), color: c),
-            .init(pos: SIMD2(-1, 0.55), color: c),
-            .init(pos: SIMD2(x, 0.55), color: c),
+            .init(pos: SIMD2(-1, -0.55), color: color),
+            .init(pos: SIMD2(x, -0.55), color: color),
+            .init(pos: SIMD2(-1, 0.55), color: color),
+            .init(pos: SIMD2(x, 0.55), color: color),
         ]
-        buffer = device.makeBuffer(bytes: &v, length: v.count * MemoryLayout<GaugeVertex>.stride, options: .storageModeShared)
+        vertices.upload(values, device: device)
+    }
+
+    func detach(from view: MTKView) {
+        if view.delegate === self { view.delegate = nil }
+        self.view = nil
+        dirty = false
+        vertices.release()
+        surfaceLifetime.detach()
+    }
+
+    private func requestDraw() {
+        dirty = true
+        guard let view, !view.isHidden else {
+            RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedHidden)
+            return
+        }
+        view.setNeedsDisplay(view.bounds)
     }
 
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
     func draw(in view: MTKView) {
+        guard dirty else {
+            RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedStatic)
+            return
+        }
         guard let d = view.currentDrawable, let rpd = view.currentRenderPassDescriptor,
-              let pipeline, let queue, let buffer,
+              let pipeline, let queue, let buffer = vertices.buffer,
               let cmd = queue.makeCommandBuffer(), let enc = cmd.makeRenderCommandEncoder(descriptor: rpd) else { return }
+        dirty = false
+        RuntimeDiagnostics.shared.increment(.gaugeDraws)
         enc.setRenderPipelineState(pipeline)
         enc.setVertexBuffer(buffer, offset: 0, index: 0)
         enc.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
@@ -156,8 +157,8 @@ struct MetalBarGauge: NSViewRepresentable {
         v.translatesAutoresizingMaskIntoConstraints = true
         v.autoResizeDrawable = true
         v.framebufferOnly = true
-        v.isPaused = false
-        v.enableSetNeedsDisplay = false
+        v.isPaused = true
+        v.enableSetNeedsDisplay = true
         v.setContentHuggingPriority(.defaultLow, for: .horizontal)
         v.setContentHuggingPriority(.required, for: .vertical)
         v.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
@@ -169,6 +170,10 @@ struct MetalBarGauge: NSViewRepresentable {
 
     func updateNSView(_ nsView: MTKView, context: Context) {
         context.coordinator.set(fraction: Float(fraction), color: MetalGaugePalette.from(swiftUI: tint))
+    }
+
+    static func dismantleNSView(_ nsView: MTKView, coordinator: MetalBarRenderer) {
+        coordinator.detach(from: nsView)
     }
 
     /// Honor the SwiftUI proposed size so Metal bars never invent their own scale.
@@ -186,35 +191,46 @@ final class MetalRingRenderer: NSObject, MTKViewDelegate {
     private var device: MTLDevice?
     private var queue: MTLCommandQueue?
     private var pipeline: MTLRenderPipelineState?
-    private var buffer: MTLBuffer?
+    private let vertices = MetalVertexBuffer<GaugeVertex>()
+    private let surfaceLifetime = GaugeSurfaceLifetime()
+    private weak var view: MTKView?
+    private var dirty = false
     private var count = 0
     private var fraction: Float = 0
     private var color = MetalGaugePalette.cyan
-    private let lock = NSLock()
 
     func attach(_ view: MTKView) {
-        let mtl = view.device ?? MTLCreateSystemDefaultDevice()
-        guard let device = mtl else { return }
+        let resources = MetalGaugeResources.shared
+        guard let device = resources.device,
+              let pipeline = resources.configure(
+                  view,
+                  clearColor: MTLClearColor(red: 0.015, green: 0.03, blue: 0.06, alpha: 1)
+              )
+        else { return }
         self.device = device
-        view.device = device
+        self.queue = resources.commandQueue
+        self.pipeline = pipeline
+        self.view = view
         view.delegate = self
-        view.clearColor = MTLClearColor(red: 0.015, green: 0.03, blue: 0.06, alpha: 1)
-        view.isPaused = false
-        view.enableSetNeedsDisplay = false
-        view.preferredFramesPerSecond = 24
-        queue = device.makeCommandQueue()
-        pipeline = MetalGaugePipeline.make(device: device, pixelFormat: view.colorPixelFormat)
+        surfaceLifetime.attach()
         rebuild()
+        requestDraw()
     }
 
     func set(fraction: Float, color: SIMD4<Float>) {
-        lock.lock(); self.fraction = min(max(fraction, 0), 1); self.color = color; lock.unlock()
+        let nextFraction = min(max(fraction, 0), 1)
+        guard self.fraction != nextFraction || self.color != color else {
+            RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedStatic)
+            return
+        }
+        self.fraction = nextFraction
+        self.color = color
         rebuild()
+        requestDraw()
     }
 
     private func rebuild() {
         guard let device else { return }
-        lock.lock(); let f = fraction; let c = color; lock.unlock()
         var verts: [GaugeVertex] = []
         let segments = 64
         let outer: Float = 0.88
@@ -222,11 +238,19 @@ final class MetalRingRenderer: NSObject, MTKViewDelegate {
         // Background ring full 360
         appendRing(into: &verts, from: 0, to: 1, outer: outer, inner: inner, color: MetalGaugePalette.track, segments: segments)
         // Progress arc (start at top, clockwise)
-        if f > 0.001 {
-            appendRing(into: &verts, from: 0, to: f, outer: outer, inner: inner, color: c, segments: max(4, Int(Float(segments) * f)))
+        if fraction > 0.001 {
+            appendRing(
+                into: &verts,
+                from: 0,
+                to: fraction,
+                outer: outer,
+                inner: inner,
+                color: color,
+                segments: max(4, Int(Float(segments) * fraction))
+            )
         }
         count = verts.count
-        buffer = device.makeBuffer(bytes: verts, length: max(verts.count, 1) * MemoryLayout<GaugeVertex>.stride, options: .storageModeShared)
+        vertices.upload(verts, device: device)
     }
 
     private func appendRing(
@@ -263,13 +287,36 @@ final class MetalRingRenderer: NSObject, MTKViewDelegate {
 
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
     func draw(in view: MTKView) {
+        guard dirty else {
+            RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedStatic)
+            return
+        }
         guard let d = view.currentDrawable, let rpd = view.currentRenderPassDescriptor,
-              let pipeline, let queue, let buffer, count >= 3,
+              let pipeline, let queue, let buffer = vertices.buffer, count >= 3,
               let cmd = queue.makeCommandBuffer(), let enc = cmd.makeRenderCommandEncoder(descriptor: rpd) else { return }
+        dirty = false
+        RuntimeDiagnostics.shared.increment(.gaugeDraws)
         enc.setRenderPipelineState(pipeline)
         enc.setVertexBuffer(buffer, offset: 0, index: 0)
         enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: count)
         enc.endEncoding(); cmd.present(d); cmd.commit()
+    }
+
+    func detach(from view: MTKView) {
+        if view.delegate === self { view.delegate = nil }
+        self.view = nil
+        dirty = false
+        vertices.release()
+        surfaceLifetime.detach()
+    }
+
+    private func requestDraw() {
+        dirty = true
+        guard let view, !view.isHidden else {
+            RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedHidden)
+            return
+        }
+        view.setNeedsDisplay(view.bounds)
     }
 }
 
@@ -287,6 +334,9 @@ struct MetalRingGauge: NSViewRepresentable {
     }
     func updateNSView(_ nsView: MTKView, context: Context) {
         context.coordinator.set(fraction: Float(fraction), color: MetalGaugePalette.from(swiftUI: tint))
+    }
+    static func dismantleNSView(_ nsView: MTKView, coordinator: MetalRingRenderer) {
+        coordinator.detach(from: nsView)
     }
 }
 
@@ -313,37 +363,46 @@ final class MetalCoreBarsRenderer: NSObject, MTKViewDelegate {
     private var device: MTLDevice?
     private var queue: MTLCommandQueue?
     private var pipeline: MTLRenderPipelineState?
-    private var buffer: MTLBuffer?
+    private let vertices = MetalVertexBuffer<GaugeVertex>()
+    private let surfaceLifetime = GaugeSurfaceLifetime()
+    private weak var view: MTKView?
+    private var dirty = false
     private var count = 0
     private var cores: [Float] = []
-    private let lock = NSLock()
 
     func attach(_ view: MTKView) {
-        let mtl = view.device ?? MTLCreateSystemDefaultDevice()
-        guard let device = mtl else { return }
+        let resources = MetalGaugeResources.shared
+        guard let device = resources.device,
+              let pipeline = resources.configure(
+                  view,
+                  clearColor: MTLClearColor(red: 0.01, green: 0.02, blue: 0.05, alpha: 1)
+              )
+        else { return }
         self.device = device
-        view.device = device
+        self.queue = resources.commandQueue
+        self.pipeline = pipeline
+        self.view = view
         view.delegate = self
-        view.clearColor = MTLClearColor(red: 0.01, green: 0.02, blue: 0.05, alpha: 1)
-        view.isPaused = false
-        view.enableSetNeedsDisplay = false
-        view.preferredFramesPerSecond = 20
-        queue = device.makeCommandQueue()
-        pipeline = MetalGaugePipeline.make(device: device, pixelFormat: view.colorPixelFormat)
+        surfaceLifetime.attach()
         rebuild()
+        requestDraw()
     }
 
     func set(cores: [Float]) {
-        lock.lock(); self.cores = cores; lock.unlock()
+        guard self.cores != cores else {
+            RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedStatic)
+            return
+        }
+        self.cores = cores
         rebuild()
+        requestDraw()
     }
 
     private func rebuild() {
         guard let device else { return }
-        lock.lock(); let cores = self.cores; lock.unlock()
         guard !cores.isEmpty else {
             count = 0
-            buffer = nil
+            vertices.clear()
             return
         }
         var verts: [GaugeVertex] = []
@@ -367,7 +426,7 @@ final class MetalCoreBarsRenderer: NSObject, MTKViewDelegate {
             verts.append(contentsOf: quad(x0, bottom, x1, y1, c))
         }
         count = verts.count
-        buffer = device.makeBuffer(bytes: verts, length: verts.count * MemoryLayout<GaugeVertex>.stride, options: .storageModeShared)
+        vertices.upload(verts, device: device)
     }
 
     private func quad(_ x0: Float, _ y0: Float, _ x1: Float, _ y1: Float, _ c: SIMD4<Float>) -> [GaugeVertex] {
@@ -383,13 +442,36 @@ final class MetalCoreBarsRenderer: NSObject, MTKViewDelegate {
 
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
     func draw(in view: MTKView) {
+        guard dirty else {
+            RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedStatic)
+            return
+        }
         guard let d = view.currentDrawable, let rpd = view.currentRenderPassDescriptor,
-              let pipeline, let queue, let buffer, count >= 3,
+              let pipeline, let queue, let buffer = vertices.buffer, count >= 3,
               let cmd = queue.makeCommandBuffer(), let enc = cmd.makeRenderCommandEncoder(descriptor: rpd) else { return }
+        dirty = false
+        RuntimeDiagnostics.shared.increment(.gaugeDraws)
         enc.setRenderPipelineState(pipeline)
         enc.setVertexBuffer(buffer, offset: 0, index: 0)
         enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: count)
         enc.endEncoding(); cmd.present(d); cmd.commit()
+    }
+
+    func detach(from view: MTKView) {
+        if view.delegate === self { view.delegate = nil }
+        self.view = nil
+        dirty = false
+        vertices.release()
+        surfaceLifetime.detach()
+    }
+
+    private func requestDraw() {
+        dirty = true
+        guard let view, !view.isHidden else {
+            RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedHidden)
+            return
+        }
+        view.setNeedsDisplay(view.bounds)
     }
 }
 
@@ -404,6 +486,9 @@ struct MetalCoreBarsView: NSViewRepresentable {
     }
     func updateNSView(_ nsView: MTKView, context: Context) {
         context.coordinator.set(cores: cores.map { Float($0) })
+    }
+    static func dismantleNSView(_ nsView: MTKView, coordinator: MetalCoreBarsRenderer) {
+        coordinator.detach(from: nsView)
     }
 }
 

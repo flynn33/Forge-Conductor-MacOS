@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T194148Z-4bc9b988c0.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5406,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T194148Z-4bc9b988c0.stderr.txt",
+      "sha256": "343d66f8575dfd0c773094fcf09a2aae983cc15a26e108e733fc9b2c5169246e"
+    }
+  ],
+  "command": "env -u MallocNanoZone swift test --sanitize=address --no-parallel --filter LifecycleOwnershipTests",
+  "ended_at": "2026-08-23T19:41:49.119165+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 1,
+  "id": "EVID-20260823T194148Z-4bc9b988c0",
+  "kind": "address-sanitizer-clean-environment",
+  "related_findings": [],
+  "related_gates": [
+    "G05"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T19:41:48.195844+00:00",
+  "timed_out": false
+}

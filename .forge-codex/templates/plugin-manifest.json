@@ -1,0 +1,21 @@
+{
+  "capabilities": {
+    "acknowledge_handoff": true,
+    "bootstrap_handoff": true,
+    "cancellation": true,
+    "context_budget": "exact_or_estimated",
+    "create_session": true,
+    "reconcile_idempotency": true,
+    "recovery": true
+  },
+  "configuration_keys": [],
+  "identifier": "com.forgeconductor.host.native",
+  "minimum_host_contract_version": 1,
+  "privacy": {
+    "credentials_via_secure_store": true,
+    "project_files_direct_access": false
+  },
+  "registration": "compile_time",
+  "schema_version": 1,
+  "version": "0.1.0"
+}

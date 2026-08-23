@@ -1,0 +1,21 @@
+Test Suite 'Selected tests' started at 2026-08-23 15:38:00.094.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-23 15:38:00.095.
+Test Suite 'ContinuityCoordinatorTests' started at 2026-08-23 15:38:00.095.
+Test Case '-[ForgeConductorTests.ContinuityCoordinatorTests testBudgetSourcesAndHandoffSizeBound]' started.
+Test Case '-[ForgeConductorTests.ContinuityCoordinatorTests testBudgetSourcesAndHandoffSizeBound]' passed (0.040 seconds).
+Test Case '-[ForgeConductorTests.ContinuityCoordinatorTests testEveryTransitionCrashPointRecoversWithoutDuplicateSuccessor]' started.
+Test Case '-[ForgeConductorTests.ContinuityCoordinatorTests testEveryTransitionCrashPointRecoversWithoutDuplicateSuccessor]' passed (0.116 seconds).
+Test Case '-[ForgeConductorTests.ContinuityCoordinatorTests testExternalMCPControlLifecycleAndSchemas]' started.
+Test Case '-[ForgeConductorTests.ContinuityCoordinatorTests testExternalMCPControlLifecycleAndSchemas]' passed (0.080 seconds).
+Test Case '-[ForgeConductorTests.ContinuityCoordinatorTests testIdempotentReplayAndExactAcknowledgement]' started.
+Test Case '-[ForgeConductorTests.ContinuityCoordinatorTests testIdempotentReplayAndExactAcknowledgement]' passed (0.011 seconds).
+Test Suite 'ContinuityCoordinatorTests' passed at 2026-08-23 15:38:00.341.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.246 (0.247) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-08-23 15:38:00.342.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.246 (0.247) seconds
+Test Suite 'Selected tests' passed at 2026-08-23 15:38:00.342.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.246 (0.248) seconds
+◇ Test run started.
+↳ Testing Library Version: 1501
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

@@ -1,0 +1,78 @@
+{
+  "note": "These are conservative initial ceilings, not measured claims about the current application. Codex must validate and may lower them. Raising a hard ceiling requires an ADR and minimum-machine evidence.",
+  "policy": {
+    "hard_invariants": {
+      "full_project_corpus_loaded_for_search_allowed": false,
+      "hidden_gauge_recurring_draws_after_quiescence": 0,
+      "main_actor_blocking_process_waits_allowed": 0,
+      "static_gauge_recurring_draws_after_convergence": 0,
+      "telemetry_in_flight_deliveries_per_subscriber_max": 1,
+      "telemetry_replaceable_latest_per_subscriber_max": 1,
+      "unbounded_collections_allowed": 0,
+      "unbounded_retries_allowed": 0
+    },
+    "performance_comparison": {
+      "no_positive_steady_state_resident_memory_slope_after_warmup": true,
+      "no_regression_without_approved_evidence": true,
+      "release_build_required": true,
+      "report_percentiles": [
+        "p50",
+        "p95",
+        "p99"
+      ],
+      "same_machine_fixture_duration_required": true,
+      "samples_minimum": 5
+    },
+    "pressure_response_order": [
+      "cancel_speculative_work",
+      "clear_result_caches",
+      "trim_histories_to_floor",
+      "release_hidden_render_resources",
+      "checkpoint_wal",
+      "compact_in_memory_session_context",
+      "reject_optional_new_work"
+    ],
+    "tiers": [
+      {
+        "active_model_stream_buffer_max_mib": 4,
+        "decoded_memory_cache_max_mib": 16,
+        "gauge_active_fps_cap": 30,
+        "id": "constrained",
+        "mcp_response_max_bytes": 1048576,
+        "memory_search_default_limit": 20,
+        "memory_search_hard_limit": 100,
+        "physical_memory_max_gib": 8,
+        "process_log_ring_max_mib": 4,
+        "search_cache_max_mib": 8,
+        "telemetry_history_points_per_metric": 600
+      },
+      {
+        "active_model_stream_buffer_max_mib": 8,
+        "decoded_memory_cache_max_mib": 32,
+        "gauge_active_fps_cap": 60,
+        "id": "standard",
+        "mcp_response_max_bytes": 2097152,
+        "memory_search_default_limit": 30,
+        "memory_search_hard_limit": 150,
+        "physical_memory_max_gib": 16,
+        "process_log_ring_max_mib": 8,
+        "search_cache_max_mib": 16,
+        "telemetry_history_points_per_metric": 1200
+      },
+      {
+        "active_model_stream_buffer_max_mib": 16,
+        "decoded_memory_cache_max_mib": 64,
+        "gauge_active_fps_cap": 60,
+        "id": "expanded",
+        "mcp_response_max_bytes": 4194304,
+        "memory_search_default_limit": 50,
+        "memory_search_hard_limit": 200,
+        "physical_memory_max_gib": null,
+        "process_log_ring_max_mib": 16,
+        "search_cache_max_mib": 32,
+        "telemetry_history_points_per_metric": 2400
+      }
+    ]
+  },
+  "schema_version": 1
+}

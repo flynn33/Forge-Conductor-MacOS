@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "phase": "P05",
+  "audit_e2_count": 0,
+  "audit_e3_count": 11,
+  "confirmed_ownership_gaps": 6,
+  "disposition_only_findings": 5,
+  "resources": [
+    {
+      "finding": "ForgeConductorMain owns/uses DispatchSource without an owner-local cleanup marker",
+      "creation": "cmdDashboard creates SIGINT and SIGTERM dispatch sources",
+      "owner": "one standalone dashboard invocation",
+      "intended_lifetime": "until the blocking dashboard command receives a shutdown signal",
+      "release": "defer clears handlers, cancels both sources, and stops the server",
+      "disposition": "confirmed gap fixed"
+    },
+    {
+      "finding": "ForgeConductorMain owns/uses Process without an owner-local cleanup marker",
+      "creation": "managerStartBackground launches the durable manager child",
+      "owner": "child process after Process.run duplicates launch descriptors",
+      "intended_lifetime": "independent manager lifetime tracked by its PID file",
+      "release": "the parent releases its Process after launch; manager stop owns child termination",
+      "disposition": "intentional ownership transfer"
+    },
+    {
+      "finding": "ForgeConductorMain owns/uses Pipe/FileHandle without an owner-local cleanup marker",
+      "creation": "managerStartBackground opens the manager log handle",
+      "owner": "parent launch scope before Process.run; duplicated descriptor in child afterward",
+      "intended_lifetime": "parent launch operation only",
+      "release": "defer closes the parent handle after launch verification",
+      "disposition": "confirmed gap fixed"
+    },
+    {
+      "finding": "Long-lived collection `missing` appends without an owner-local bound",
+      "creation": "agent completion creates a local array from one output schema",
+      "owner": "one completeRun stack frame",
+      "intended_lifetime": "one call",
+      "release": "automatic at function return; count cannot exceed schema.count",
+      "disposition": "scanner false positive; not a retained collection"
+    },
+    {
+      "finding": "Long-lived collection `suffix` appends without an owner-local bound",
+      "creation": "canonicalURL creates a local path-component array",
+      "owner": "one canonicalization stack frame",
+      "intended_lifetime": "one call",
+      "release": "automatic at function return; count cannot exceed finite URL path depth",
+      "disposition": "scanner false positive; not a retained collection"
+    },
+    {
+      "finding": "ToolRouter owns/uses AsyncStream without an owner-local cleanup marker",
+      "creation": "none",
+      "owner": "none",
+      "intended_lifetime": "not applicable",
+      "release": "not applicable",
+      "disposition": "stale scanner result; ToolRouter contains no AsyncStream"
+    },
+    {
+      "finding": "DashboardPortGuard owns/uses Process without an owner-local cleanup marker",
+      "creation": "lsofHolders launches one synchronous lsof child",
+      "owner": "one inspect call",
+      "intended_lifetime": "until lsof exits",
+      "release": "waitUntilExit reaps the bounded lsof child; ten-cycle test verifies completion",
+      "disposition": "scoped ownership verified"
+    },
+    {
+      "finding": "DashboardPortGuard owns/uses Pipe/FileHandle without an owner-local cleanup marker",
+      "creation": "lsofHolders creates one merged stdout/stderr pipe",
+      "owner": "one inspect call",
+      "intended_lifetime": "until output is drained after lsof exits",
+      "release": "defer closes the read handle; merged output prevents an undrained stderr deadlock",
+      "disposition": "confirmed gap fixed"
+    },
+    {
+      "finding": "ManagerRuntime owns/uses Timer without an owner-local cleanup marker",
+      "creation": "ManagerNode starts one watchdog DispatchSourceTimer",
+      "owner": "ManagerRuntime",
+      "intended_lifetime": "manager run lifetime",
+      "release": "cancelWatchdog clears the handler, cancels the source, and nils ownership",
+      "disposition": "confirmed gap fixed"
+    },
+    {
+      "finding": "ManagerRuntime owns/uses DispatchSource without an owner-local cleanup marker",
+      "creation": "ManagerNode installs SIGINT and SIGTERM dispatch sources",
+      "owner": "ManagerRuntime",
+      "intended_lifetime": "manager run lifetime",
+      "release": "cancelSignalSources clears handlers, cancels sources, and clears the typed collection",
+      "disposition": "confirmed gap fixed"
+    },
+    {
+      "finding": "ManagerTests owns/uses Task without an owner-local cleanup marker",
+      "creation": "one structured Task.sleep in an async XCTest method",
+      "owner": "the XCTest invocation",
+      "intended_lifetime": "until the awaited sleep returns or the test is canceled",
+      "release": "structured await completes before test return",
+      "disposition": "scanner false positive; no unstructured or retained task"
+    }
+  ]
+}

@@ -24,6 +24,9 @@ public final class AppTelemetryBinding: ObservableObject {
 
     private weak var app: ForgeApp?
     private var frameListenerID: UUID?
+    private var frameMailbox: LatestValueMailbox<TelemetrySnapshot>?
+    private var frameGeneration: UInt64?
+    private var refreshTask: Task<Void, Never>?
     private let updateSubject = PassthroughSubject<Void, Never>()
 
     /// Emits after a complete telemetry frame has been applied. Consumers that
@@ -43,13 +46,16 @@ public final class AppTelemetryBinding: ObservableObject {
             app.telemetry.startBackgroundRefresh(intervalSec: 0.5)
         }
 
-        // TelemetryService publishes one composed frame for every host sample.
-        frameListenerID = app.telemetry.addListener { [weak self] frame in
-            Task { @MainActor in
-                guard let self, self.autoRefresh else { return }
-                self.measuredHz = app.telemetry.realtimeEngine.measuredSampleHz
-                self.apply(frame)
-            }
+        // One consumer task plus one replaceable newest frame bounds retained UI state.
+        let mailbox = LatestValueMailbox<TelemetrySnapshot>(diagnostics: app.runtimeDiagnostics)
+        let generation = mailbox.start { [weak self, weak app, weak mailbox] frame, generation in
+            guard let self, let app, let mailbox else { return false }
+            return await self.deliver(frame, from: app, mailbox: mailbox, generation: generation)
+        }
+        frameMailbox = mailbox
+        frameGeneration = generation
+        frameListenerID = app.telemetry.addListener { [weak mailbox] frame in
+            mailbox?.publish(frame, generation: generation)
         }
 
         // One forge seed so MCP/agent cards appear immediately; host already streaming.
@@ -61,34 +67,41 @@ public final class AppTelemetryBinding: ObservableObject {
             app.telemetry.removeListener(id)
         }
         frameListenerID = nil
+        frameMailbox?.stop()
+        frameMailbox = nil
+        frameGeneration = nil
+        refreshTask?.cancel()
+        refreshTask = nil
+        app = nil
     }
 
     /// Manual recompose of forge cards only (does not replace the continuous host stream).
     public func refresh(force: Bool) {
         guard let app else { return }
         if isLoading && !force { return }
+        refreshTask?.cancel()
         objectWillChange.send()
         isLoading = true
         updateSubject.send()
-        Task { [weak self] in
+        let expectedGeneration = frameGeneration
+        refreshTask = Task { [weak self, weak app] in
+            guard let self, let app else { return }
             do {
                 let frame = try await Task.detached {
                     try app.telemetry.snapshotTyped(force: true)
                 }.value
-                await MainActor.run {
-                    self?.measuredHz = app.telemetry.realtimeEngine.measuredSampleHz
-                    self?.apply(frame)
-                }
+                guard !Task.isCancelled, self.frameGeneration == expectedGeneration else { return }
+                self.measuredHz = app.telemetry.realtimeEngine.measuredSampleHz
+                self.apply(frame)
             } catch {
-                await MainActor.run {
-                    self?.objectWillChange.send()
-                    self?.lastError = "\(error)"
-                    self?.isLoading = false
-                    self?.updateSubject.send()
-                    app.diagnostics.warn("telemetry_refresh_failed", [
-                        "error": "\(error)",
-                    ], category: .telemetry)
-                }
+                guard !Task.isCancelled, self.frameGeneration == expectedGeneration else { return }
+                self.objectWillChange.send()
+                self.lastError = "\(error)"
+                self.isLoading = false
+                self.updateSubject.send()
+                app.diagnostics.warn("telemetry_refresh_failed", [
+                    "error": "\(error)",
+                ], category: .telemetry)
             }
         }
     }
@@ -106,6 +119,18 @@ public final class AppTelemetryBinding: ObservableObject {
         let frame = app.telemetry.currentFrame()
         measuredHz = app.telemetry.realtimeEngine.measuredSampleHz
         apply(frame)
+    }
+
+    private func deliver(
+        _ frame: TelemetrySnapshot,
+        from app: ForgeApp,
+        mailbox: LatestValueMailbox<TelemetrySnapshot>,
+        generation: UInt64
+    ) -> Bool {
+        guard mailbox.isActive(generation: generation), autoRefresh else { return false }
+        measuredHz = app.telemetry.realtimeEngine.measuredSampleHz
+        apply(frame)
+        return true
     }
 
     private func apply(_ typed: TelemetrySnapshot) {

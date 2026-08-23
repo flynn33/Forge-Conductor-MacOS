@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-08-23T18:43:12Z",
+  "application_home": {
+    "environment_override": "FORGE_CONDUCTOR_HOME",
+    "default": "~/.forge-conductor",
+    "owner": "Sources/ForgeConductorCore/Infrastructure/AppPaths.swift"
+  },
+  "project_formats": [
+    {"name":"AppConfig","format":"JSON","version":"unversioned additive typed model","source":"Sources/ForgeConductorCore/Domain/AppConfig.swift"},
+    {"name":"HandoffPacket","format":"JSON plus Markdown projections","version":1,"source":"Sources/ForgeConductorCore/Domain/HandoffPacket.swift"},
+    {"name":"Agent playbook","format":"Markdown with metadata","source":"Sources/ForgeConductorCore/Resources/Agents"},
+    {"name":"LM Studio MCP registration","format":"mcp.json plus mcpBridge plugin JSON","source":"Sources/ForgeConductorCore/Telemetry/LMStudioMCPPluginInstaller.swift"}
+  ],
+  "databases": [
+    {
+      "path": "$FORGE_CONDUCTOR_HOME/store.sqlite",
+      "engine": "system SQLite3",
+      "journal_mode": "WAL",
+      "schema_version": 5,
+      "tables": ["schema_version","memory_notes","agent_sessions","presence","audit_events","context_handoffs"],
+      "indexes": ["idx_context_handoffs_updated","idx_context_handoffs_sequence","idx_context_handoffs_client_sequence"],
+      "source": "Sources/ForgeConductorCore/Infrastructure/SQLiteStore.swift"
+    }
+  ],
+  "config_keys": [
+    "log_level",
+    "allowed_roots",
+    "shell.default_timeout_sec",
+    "dashboard.host",
+    "dashboard.port",
+    "dashboard.refresh_interval_sec",
+    "manager.auto_restart",
+    "manager.watchdog_interval_sec",
+    "manager.open_browser_on_start",
+    "mcp.role",
+    "sessions.idle_ttl_sec",
+    "coordinator.enabled",
+    "coordinator.lease_ttl_sec",
+    "coordinator.presence_ttl_sec"
+  ],
+  "user_defaults_keys": [],
+  "keychain_entries": [],
+  "files_and_directories": [
+    "$FORGE_CONDUCTOR_HOME/config.json",
+    "$FORGE_CONDUCTOR_HOME/store.sqlite",
+    "$FORGE_CONDUCTOR_HOME/audit.jsonl",
+    "$FORGE_CONDUCTOR_HOME/agents/",
+    "$FORGE_CONDUCTOR_HOME/cache/browser/",
+    "$FORGE_CONDUCTOR_HOME/logs/",
+    "$FORGE_CONDUCTOR_HOME/exports/",
+    "$FORGE_CONDUCTOR_HOME/dashboard/",
+    "$FORGE_CONDUCTOR_HOME/manager.pid",
+    "$FORGE_CONDUCTOR_HOME/manager-state.json",
+    "$FORGE_CONDUCTOR_HOME/memory/handoffs/",
+    "$FORGE_CONDUCTOR_HOME/memory/handoffs/LATEST",
+    "$FORGE_CONDUCTOR_HOME/memory/current-task.md",
+    "$FORGE_CONDUCTOR_HOME/memory/NEXT-CHAT.md",
+    "$FORGE_CONDUCTOR_HOME/memory/INDEX.md",
+    "$FORGE_CONDUCTOR_HOME/telemetry/static/",
+    "~/.lmstudio/mcp.json",
+    "~/.lmstudio/extensions/plugins/mcp/forge-conductor/",
+    "~/.lmstudio/extensions/plugins/mcp/forge-conductor-fallback/",
+    "~/Library/LaunchAgents/com.forge-conductor.manager.plist",
+    "~/.local/bin/forge-conductor-swift"
+  ],
+  "migrations": [
+    {"from":"missing/empty","to":5,"behavior":"transactional schema creation"},
+    {"from":3,"to":5,"behavior":"add context_handoffs.client_id and write_sequence, backfill sequence, rebuild indexes"},
+    {"from":"legacy file handoffs","to":"SQLite plus repaired pointer notes","behavior":"idempotent bootstrap migration and pointer repair"},
+    {"from":"partial config JSON","to":"typed AppConfig","behavior":"deep merge over defaults while preserving known keys"}
+  ],
+  "fixtures": [
+    {
+      "root": "/Users/jimdaley/Documents/RavenForge/Forge-Conductor-MacOS/Forge-Conductor-Repair-Evidence/aba90ab1-be80-4cc5-aa0b-23dd54d4a24d/p01-mcp-home",
+      "database_schema_version": 5,
+      "created_by": "p01-mcp-protocol-baseline"
+    },
+    {"source":"Tests/ForgeConductorTests/ContinuityTests.swift","coverage":"legacy schema migration, conflict, interruption, restart, concurrent migration"},
+    {"source":"Tests/ForgeConductorTests/MemoryToolTests.swift","coverage":"durability, isolation, list/search/delete, system-key filtering"},
+    {"source":"Tests/ForgeConductorTests/AppConfigAndDoctorTests.swift","coverage":"typed config defaults and status projection"}
+  ]
+}

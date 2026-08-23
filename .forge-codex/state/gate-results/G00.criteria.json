@@ -1,0 +1,56 @@
+{
+  "criteria_results": [
+    {
+      "criterion": "environment doctor exits with recorded capability status",
+      "passed": true,
+      "evidence": [
+        {
+          "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.doctor.log",
+          "sha256": "17ab5d981c69d3eca540aa2fdd741cf1cb97f28fa359f716ee258afe33cad9cf"
+        },
+        {
+          "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/environment.json",
+          "sha256": "9d64ff74926765bfa29122f227badd953a4f67f34d174d0f72e28010f1d551e0"
+        }
+      ]
+    },
+    {
+      "criterion": "repository shape and Git state recorded",
+      "passed": true,
+      "evidence": [
+        {
+          "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/run-state.json",
+          "sha256": "73003a76bddd47b2d399ac46f1f3a91433de2cbeaa18c07ffde1ced87006c079"
+        }
+      ]
+    },
+    {
+      "criterion": "package validation passes",
+      "passed": true,
+      "evidence": [
+        {
+          "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.package.log",
+          "sha256": "2ec3a0ee8a09c6f1ad67edd95cf5daa0e6ec1b21f4abc026fb3cd157d013dbbb"
+        },
+        {
+          "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/PACKAGE_VALIDATION.json",
+          "sha256": "0e63c75d0907b81a1d01c3da0d2bff010a880548f0d75412ef4d0f4ef214b951"
+        }
+      ]
+    },
+    {
+      "criterion": "reproducible build entrypoint exists or tracked implementation task is active",
+      "passed": true,
+      "evidence": [
+        {
+          "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.build-script.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/script/build_and_run.sh",
+          "sha256": "1a79e6b9c67fa1be03d6f0c4a070eea7bc6d8ebb0b0c13f15fa1a20394485498"
+        }
+      ]
+    }
+  ]
+}

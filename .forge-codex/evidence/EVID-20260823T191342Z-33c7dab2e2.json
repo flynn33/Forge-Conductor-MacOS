@@ -1,0 +1,34 @@
+{
+  "artifacts": [
+    {
+      "bytes": 61575,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T191342Z-33c7dab2e2.stdout.txt",
+      "sha256": "f118032d5d658b90cf40406993ce16520fda0a330633a00d274d6eb7909f31dd"
+    },
+    {
+      "bytes": 119,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T191342Z-33c7dab2e2.stderr.txt",
+      "sha256": "63a06b4d4559c459532de0e6d651defb12d227615aa81056ba9eaa7fd9cf3545"
+    }
+  ],
+  "command": "swift test --no-parallel",
+  "ended_at": "2026-08-23T19:14:03.105729+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T191342Z-33c7dab2e2",
+  "kind": "p03-full-swift-test",
+  "related_findings": [
+    "FC-MEM-001",
+    "FC-LIFE-GAP"
+  ],
+  "related_gates": [
+    "G03"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T19:13:42.421983+00:00",
+  "timed_out": false
+}

@@ -1,0 +1,126 @@
+[0/1] Planning build
+Building for debugging...
+[0/9] Write swift-version--58304C5D6DBC2206.txt
+[2/76] Compiling ForgeConductorCore FilesystemToolPack.swift
+[3/76] Compiling ForgeConductorCore GitToolPack.swift
+[4/76] Compiling ForgeConductorCore MemoryToolPack.swift
+[5/76] Compiling ForgeConductorCore SearchToolPack.swift
+[6/76] Compiling ForgeConductorCore ShellToolPack.swift
+[7/81] Compiling ForgeConductorCore ToolAuthorizationService.swift
+[8/81] Compiling ForgeConductorCore ToolRouter.swift
+[9/81] Compiling ForgeConductorCore AgentToolPack.swift
+[10/81] Compiling ForgeConductorCore ContinuityToolPack.swift
+[11/81] Compiling ForgeConductorCore DocsToolPack.swift
+[12/81] Compiling ForgeConductorCore CPUCollector.swift
+[13/81] Compiling ForgeConductorCore CPUFrequencyEstimator.swift
+[14/81] Compiling ForgeConductorCore DiskIOCollector.swift
+[15/81] Compiling ForgeConductorCore DiskVolumeCollector.swift
+[16/81] Compiling ForgeConductorCore GPUCollector.swift
+[17/81] Emitting module ForgeConductorCore
+[18/81] Compiling ForgeConductorCore ToolArgHelpers.swift
+[19/81] Compiling ForgeConductorCore DashboardHTML.swift
+[20/81] Compiling ForgeConductorCore DashboardHTTPRequest.swift
+[21/81] Compiling ForgeConductorCore DashboardServer.swift
+[22/81] Compiling ForgeConductorCore HTTPResponder.swift
+[23/81] Compiling ForgeConductorCore ManagerInstaller.swift
+[24/81] Compiling ForgeConductorCore ManagerNode.swift
+[25/81] Compiling ForgeConductorCore ManagerPIDFile.swift
+[26/81] Compiling ForgeConductorCore ManagerRuntime.swift
+[27/81] Compiling ForgeConductorCore ManagerSettingsNormalizer.swift
+[28/81] Compiling ForgeConductorCore DashboardPortGuard.swift
+[29/81] Compiling ForgeConductorCore DiagnosticLog.swift
+[30/81] Compiling ForgeConductorCore PDFWriter.swift
+[31/81] Compiling ForgeConductorCore ProcessRunner.swift
+[32/81] Compiling ForgeConductorCore ResourceBundle.swift
+[33/81] Compiling ForgeConductorCore Models.swift
+[34/81] Compiling ForgeConductorCore Protocols.swift
+[35/81] Compiling ForgeConductorCore AppPaths.swift
+[36/81] Compiling ForgeConductorCore AuditService.swift
+[37/81] Compiling ForgeConductorCore ConfigStore.swift
+[38/81] Compiling ForgeConductorCore AgentCatalog.swift
+[39/81] Compiling ForgeConductorCore AgentSessionService.swift
+[40/81] Compiling ForgeConductorCore ContextContinuityService.swift
+[41/81] Compiling ForgeConductorCore ContinuityAutomation.swift
+[42/81] Compiling ForgeConductorCore ForgeApp.swift
+[43/81] Compiling ForgeConductorCore ForgeProcessEntry.swift
+[44/81] Compiling ForgeConductorCore IOKitPropertyWalk.swift
+[45/81] Compiling ForgeConductorCore PowerSourcesCollector.swift
+[46/81] Compiling ForgeConductorCore ProcessMetricsCollector.swift
+[47/81] Compiling ForgeConductorCore RAMCollector.swift
+[48/81] Compiling ForgeConductorCore ForgeCollector.swift
+[49/81] Compiling ForgeConductorCore ManagerRoutes.swift
+[50/81] Compiling ForgeConductorCore OperationalRoutes.swift
+[51/81] Compiling ForgeConductorCore TelemetryRoutes.swift
+[52/81] Compiling ForgeConductorCore AppConfig.swift
+[53/81] Compiling ForgeConductorCore DoctorModels.swift
+[54/81] Compiling ForgeConductorCore RuntimeObservability.swift
+[55/81] Compiling ForgeConductorCore SQLiteStore.swift
+[56/81] Compiling ForgeConductorCore MCPServeVerifier.swift
+[57/81] Compiling ForgeConductorCore MCPServer.swift
+[58/81] Compiling ForgeConductorCore ManagerDashboardClient.swift
+[59/81] Compiling ForgeConductorCore ForgeSnapshot.swift
+[60/81] Compiling ForgeConductorCore HandoffPacket.swift
+[61/81] Compiling ForgeConductorCore JSONSupport.swift
+[62/81] Compiling ForgeConductorCore LMStudioConnector.swift
+[63/81] Compiling ForgeConductorCore ManagerModels.swift
+[64/81] Compiling ForgeConductorCore LMStudioDeployService.swift
+[65/81] Compiling ForgeConductorCore LMStudioEnvironment.swift
+[66/81] Compiling ForgeConductorCore LMStudioMCPPluginInstaller.swift
+[67/81] Compiling ForgeConductorCore ForgeUIModels.swift
+[68/81] Compiling ForgeConductorCore TelemetryModels.swift
+[69/81] Compiling ForgeConductorCore ProcessDiscovery.swift
+[70/81] Compiling ForgeConductorCore RealtimeMetricsEngine.swift
+[71/81] Compiling ForgeConductorCore SystemCollector.swift
+[72/81] Compiling ForgeConductorCore TelemetryService.swift
+[73/81] Compiling ForgeConductorCore resource_bundle_accessor.swift
+[74/102] Compiling ForgeConductorApp ContentView.swift
+[75/103] Emitting module ForgeConductorCLI
+[76/103] Compiling ForgeConductorCLI ForgeConductorMain.swift
+[76/103] Write Objects.LinkFileList
+[78/103] Compiling ForgeConductorApp ToolsView.swift
+[79/103] Compiling ForgeConductorApp AppDeployController.swift
+[80/103] Compiling ForgeConductorApp AppModel.swift
+[81/103] Compiling ForgeConductorApp MetalLoadChart.swift
+[82/103] Compiling ForgeConductorApp MetalMeterView.swift
+[83/103] Emitting module ForgeConductorApp
+[84/103] Compiling ForgeConductorApp TelemetryDashboardView.swift
+[85/103] Compiling ForgeConductorApp ManagerSettingsView.swift
+[86/103] Compiling ForgeConductorApp DiagnosticsView.swift
+[86/103] Linking forge-conductor
+[87/103] Applying forge-conductor
+[89/126] Compiling ForgeConductorTests CoreTests.swift
+[90/126] Compiling ForgeConductorTests DashboardSecurityTests.swift
+[91/126] Compiling ForgeConductorTests RuntimeObservabilityTests.swift
+[92/126] Compiling ForgeConductorTests ProcessRunnerTests.swift
+[93/126] Compiling ForgeConductorTests ProductPathReliabilityTests.swift
+[94/126] Compiling ForgeConductorTests LMStudioConnectorReliabilityTests.swift
+[95/126] Compiling ForgeConductorTests LiveCollectorEvidenceTests.swift
+[96/126] Compiling ForgeConductorTests TelemetryContractTests.swift
+[97/126] Compiling ForgeConductorTests RealtimeStreamTests.swift
+[98/126] Compiling ForgeConductorTests NativeAppSmokeTests.swift
+[99/126] Compiling ForgeConductorTests NativeTelemetryTests.swift
+[100/126] Compiling ForgeConductorTests RigParityTests.swift
+[101/127] Compiling ForgeConductorTests resource_bundle_accessor.swift
+[102/127] Compiling ForgeConductorTests ManagerTests.swift
+[103/127] Compiling ForgeConductorTests MemoryToolTests.swift
+[104/127] Compiling ForgeConductorTests G1G10AcceptanceTests.swift
+[105/127] Compiling ForgeConductorTests HTTPTestHelpers.swift
+[106/127] Compiling ForgeConductorTests MCPProtocolAndDiagnosticsTests.swift
+[107/127] Compiling ForgeConductorTests MachHostMetricsTests.swift
+[110/127] Emitting module ForgeConductorTests
+[111/127] Compiling ForgeConductorTests DashboardTests.swift
+[112/127] Compiling ForgeConductorTests ForgeProcessEntryTests.swift
+[113/127] Compiling ForgeConductorTests AppConfigAndDoctorTests.swift
+[114/127] Compiling ForgeConductorTests ContinuityTests.swift
+[115/127] Compiling ForgeConductorApp LiveFeedView.swift
+[120/127] Compiling ForgeConductorApp RigDashboardView.swift
+[121/127] Compiling ForgeConductorApp AppSidebarView.swift
+[122/127] Compiling ForgeConductorApp MCPServersView.swift
+[122/127] Write Objects.LinkFileList
+[124/129] Compiling ForgeConductorPackageTests runner.swift
+[125/129] Emitting module ForgeConductorPackageTests
+[125/129] Write Objects.LinkFileList
+[126/129] Linking forge-conductor-app
+[127/129] Applying forge-conductor-app
+[128/129] Linking ForgeConductorPackageTests
+Build complete! (4.77s)

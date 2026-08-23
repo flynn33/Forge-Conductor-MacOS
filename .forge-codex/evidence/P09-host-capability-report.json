@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "phase": "P09",
+  "status": "passed",
+  "selected_mode": "B",
+  "selected_adapter": {
+    "identifier": "forge.native-session-host",
+    "version": "1.0.0",
+    "host_type": "forge-native-logical-session",
+    "capabilities": {
+      "create": true,
+      "bootstrap": true,
+      "usage_reporting": true,
+      "resume": true,
+      "idempotency": true,
+      "query_by_idempotency_key": true,
+      "acknowledgement": true,
+      "cancellation": true,
+      "deadlines": true
+    }
+  },
+  "modes": [
+    {
+      "mode": "A",
+      "name": "external MCP client",
+      "memory_and_handoffs": "supported",
+      "autonomous_external_chat_creation": "unavailable without a documented host API",
+      "fallback": "memory_only_handoff_ready"
+    },
+    {
+      "mode": "B",
+      "name": "Forge-native logical session host",
+      "memory_and_handoffs": "supported",
+      "autonomous_rollover": "supported and qualified",
+      "provider_boundary": "injected NativeSessionTransport"
+    },
+    {
+      "mode": "C",
+      "name": "supported external host adapter",
+      "status": "not configured",
+      "reason": "No documented external session-creation API is present in the repository baseline."
+    }
+  ],
+  "privacy": {
+    "complete_transcripts_persisted": false,
+    "ledger_contents": [
+      "logical and provider session identifiers",
+      "operation, project, predecessor, and idempotency identifiers",
+      "handoff identifier and checksum",
+      "bounded usage counts and state timestamps"
+    ],
+    "ledger_permissions": "0600",
+    "secrets": "owned by the configured transport; never accepted by the ledger"
+  },
+  "limits": {
+    "ledger_records": 4096,
+    "cancelled_operations": 256,
+    "response_chunks": 256,
+    "chunk_bytes": 16384,
+    "response_bytes": 262144,
+    "rate_limit_attempts": 3
+  },
+  "qualification": {
+    "plugin_tests": ".forge-codex/evidence/EVID-20260823T205539Z-7c10f18ca4.json",
+    "plugin_release_build": ".forge-codex/evidence/EVID-20260823T205600Z-67248c9a56.json",
+    "external_mcp": ".forge-codex/evidence/EVID-20260823T205325Z-8e4577190c.json",
+    "private_ui_scan": ".forge-codex/evidence/EVID-20260823T205330Z-dd887aaee2.json",
+    "strict_full_suite": ".forge-codex/evidence/EVID-20260823T205612Z-bbcdb66436.json",
+    "strict_full_suite_result": "265 tests, 2 environment skips, 0 failures"
+  }
+}

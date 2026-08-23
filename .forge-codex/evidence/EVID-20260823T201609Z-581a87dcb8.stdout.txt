@@ -1,0 +1,27 @@
+Test Suite 'Selected tests' started at 2026-08-23 15:16:19.062.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-23 15:16:19.063.
+Test Suite 'ProjectMemoryTests' started at 2026-08-23 15:16:19.063.
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testBatchPaginationUpdateConflictLinkAndTombstone]' started.
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testBatchPaginationUpdateConflictLinkAndTombstone]' passed (0.112 seconds).
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testDatabaseLockReturnsTypedBusyWithoutPartialWrite]' started.
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testDatabaseLockReturnsTypedBusyWithoutPartialWrite]' passed (3.088 seconds).
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testFallbackSearchAndCorruptDatabaseRecoveryArtifact]' started.
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testFallbackSearchAndCorruptDatabaseRecoveryArtifact]' passed (0.140 seconds).
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testIntegrityVersionFailurePreservesDatabaseAndExportChecksumIsVerified]' started.
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testIntegrityVersionFailurePreservesDatabaseAndExportChecksumIsVerified]' passed (0.134 seconds).
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testPrivateKeyRejectedPayloadBoundsAndCacheBound]' started.
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testPrivateKeyRejectedPayloadBoundsAndCacheBound]' passed (0.151 seconds).
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testProjectIsolationRedactionDeduplicationAndRestartDurability]' started.
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testProjectIsolationRedactionDeduplicationAndRestartDurability]' passed (0.143 seconds).
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testToolConformanceIsAdditiveAndInitializeAdvertisesCapabilities]' started.
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testToolConformanceIsAdditiveAndInitializeAdvertisesCapabilities]' passed (0.070 seconds).
+Test Suite 'ProjectMemoryTests' passed at 2026-08-23 15:16:22.902.
+	 Executed 7 tests, with 0 failures (0 unexpected) in 3.838 (3.839) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-08-23 15:16:22.902.
+	 Executed 7 tests, with 0 failures (0 unexpected) in 3.838 (3.839) seconds
+Test Suite 'Selected tests' passed at 2026-08-23 15:16:22.902.
+	 Executed 7 tests, with 0 failures (0 unexpected) in 3.838 (3.840) seconds
+◇ Test run started.
+↳ Testing Library Version: 1501
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

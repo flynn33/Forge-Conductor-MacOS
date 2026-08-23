@@ -1,0 +1,14 @@
+--- xcodebuild: WARNING: Using the first of multiple matching destinations:
+{ platform:macOS, arch:arm64, id:00006040-0016283C11F8801C, name:My Mac }
+{ platform:macOS, arch:x86_64, id:00006040-0016283C11F8801C, name:My Mac }
+Testing failed:
+	No signing certificate "Mac Development" found: No "Mac Development" signing certificate matching team ID "2Y25RTLZET" with a private key was found.
+	No signing certificate "Mac Development" found: No "Mac Development" signing certificate matching team ID "2Y25RTLZET" with a private key was found.
+	Testing cancelled because the build failed.
+
+** TEST FAILED **
+
+
+The following build commands failed:
+	Testing workspace ForgeConductor with scheme ForgeConductor
+(1 failure)

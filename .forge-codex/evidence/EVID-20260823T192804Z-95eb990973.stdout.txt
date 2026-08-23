@@ -1,0 +1,10 @@
+[0/1] Planning build
+Building for production...
+[0/5] Write sources
+[2/5] Write swift-version--58304C5D6DBC2206.txt
+[4/6] Compiling ForgeConductorCore AgentCatalog.swift
+[5/7] Compiling ForgeConductorApp AppDeployController.swift
+[5/7] Write Objects.LinkFileList
+[6/7] Linking forge-conductor-app
+Build of product 'forge-conductor-app' complete! (27.67s)
+Forge Conductor launched from /Users/jimdaley/GitHub/Forge-Conductor-MacOS/dist/Forge Conductor.app

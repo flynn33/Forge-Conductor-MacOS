@@ -1,0 +1,9 @@
+{
+  "bounded_resource_test_failures": 0,
+  "main_actor_blocking_tokens": 0,
+  "memory_pressure_monitor": true,
+  "resource_entries": 22,
+  "strict_suite_failures": 0,
+  "unbounded_long_lived_collections": 0,
+  "valid": true
+}

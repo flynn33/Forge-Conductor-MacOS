@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 84,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T204436Z-f892521a49.stdout.txt",
+      "sha256": "06b033ec8356398fbf1e87d467a4c5149625707eb2e7e090c7b31cc7a7583658"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T204436Z-f892521a49.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "command": "python3 .forge-codex/scripts/scan_attribution.py --root .",
+  "ended_at": "2026-08-23T20:44:36.583737+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T204436Z-f892521a49",
+  "kind": "p08-attribution-scan",
+  "related_findings": [],
+  "related_gates": [
+    "G08"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T20:44:36.226472+00:00",
+  "timed_out": false
+}

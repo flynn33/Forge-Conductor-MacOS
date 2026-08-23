@@ -17,6 +17,7 @@ public final class AgentSessionService: SessionManaging, @unchecked Sendable {
 
     private var memoryBindings: [String: ActiveBinding] = [:]
     private let lock = NSLock()
+    static let maxMemoryBindings = 128
 
     public init(
         store: SQLiteStore,
@@ -471,8 +472,18 @@ public final class AgentSessionService: SessionManaging, @unchecked Sendable {
 
     private func setMemoryBinding(clientID: ClientID, binding: ActiveBinding) {
         lock.lock()
+        if memoryBindings[clientID.rawValue] == nil,
+           memoryBindings.count >= Self.maxMemoryBindings,
+           let victim = memoryBindings.keys.filter({ $0 != clientID.rawValue }).sorted().first {
+            memoryBindings.removeValue(forKey: victim)
+        }
         memoryBindings[clientID.rawValue] = binding
         lock.unlock()
+    }
+
+    var memoryBindingCount: Int {
+        lock.lock(); defer { lock.unlock() }
+        return memoryBindings.count
     }
 
     private func sessionDict(_ s: AgentSession) -> [String: Any] {

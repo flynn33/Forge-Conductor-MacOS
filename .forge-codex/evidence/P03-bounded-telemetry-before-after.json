@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "phase": "P03",
+  "findings": ["FC-MEM-001", "FC-LIFE-GAP", "FC-TELEM-DUPLICATE"],
+  "invariant": "one in-flight delivery plus one replaceable latest snapshot",
+  "before": {
+    "evidence": ".forge-codex/evidence/EVID-20260823T190504Z-695abfb997.stdout.txt",
+    "presentation_enqueued": 15052,
+    "queue_maximum": 25,
+    "snapshots_replaced": 0,
+    "delivery_model": "one unstructured main-actor task per producer frame"
+  },
+  "after": {
+    "evidence": ".forge-codex/evidence/EVID-20260823T191259Z-1cde4355df.stdout.txt",
+    "presentation_enqueued": 427,
+    "queue_maximum": 2,
+    "snapshots_replaced": 337,
+    "snapshots_stale": 0,
+    "post_stop_deliveries": 0,
+    "delivery_model": "one long-lived consumer plus bufferingNewest(1)"
+  },
+  "pressure_test": {
+    "evidence": ".forge-codex/evidence/EVID-20260823T191232Z-37ef639495.json",
+    "produced_sequence": "1...1000",
+    "maximum_logical_slots": 2,
+    "converged_latest": 1000,
+    "stale_generation_test": "passed",
+    "post_stop_buffer_test": "passed"
+  },
+  "source": [
+    "Sources/ForgeConductorCore/Telemetry/LatestValueMailbox.swift",
+    "Sources/ForgeConductorApp/AppTelemetryBinding.swift",
+    "Sources/ForgeConductorApp/AppModel.swift"
+  ],
+  "mapping_disposition": {
+    "finding": "FC-TELEM-DUPLICATE",
+    "result": "disproved by current source contract",
+    "accessibility_identifiers": ["rig", "mcp", "agents", "tools", "feed", "diagnostics", "manager"],
+    "all_unique": true,
+    "validator": ".forge-codex/scripts/check_p03_telemetry.py"
+  }
+}

@@ -27,10 +27,13 @@ public enum StoreError: Error, LocalizedError, Equatable {
 
 /// SQLite3-backed store using the system library.
 public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unchecked Sendable {
+    private static let maximumHandoffQueryRows = 10_000
+    private static let maximumSessionQueryRows = 10_000
     private var db: OpaquePointer?
     private let lock = NSLock()
     private static let processInitializationLock = NSLock()
     private static let initializationLockTimeout: TimeInterval = 5
+    private var countedAsOpen = false
     public let path: URL
     private let clock: any Clock
 
@@ -66,6 +69,9 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
                 throw error
             }
         }
+        countedAsOpen = true
+        RuntimeDiagnostics.shared.adjust(.openDatabases, by: 1)
+        recordDatabaseFootprint()
     }
 
     deinit {
@@ -114,6 +120,10 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
         if let db {
             sqlite3_close(db)
             self.db = nil
+            if countedAsOpen {
+                countedAsOpen = false
+                RuntimeDiagnostics.shared.adjust(.openDatabases, by: -1)
+            }
         }
     }
 
@@ -276,8 +286,8 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
         clientID: String? = nil
     ) throws -> HandoffPacket? {
         var predicates: [String] = []
-        if resumeReadyOnly { predicates.append("resume_ready = 1") }
-        if clientID != nil { predicates.append("client_id = ?") }
+        if resumeReadyOnly, predicates.count < 2 { predicates.append("resume_ready = 1") }
+        if clientID != nil, predicates.count < 2 { predicates.append("client_id = ?") }
         let whereClause = predicates.isEmpty ? "" : " WHERE \(predicates.joined(separator: " AND "))"
         let sql = "SELECT id, packet_json FROM context_handoffs\(whereClause) ORDER BY write_sequence DESC LIMIT 1"
         return try withStatement(sql) { stmt in
@@ -300,13 +310,14 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
     }
 
     public func handoffListAll() throws -> [HandoffPacket] {
-        try handoffList(sql: "SELECT id, packet_json FROM context_handoffs ORDER BY write_sequence DESC")
+        try handoffList(sql: "SELECT id, packet_json FROM context_handoffs ORDER BY write_sequence DESC LIMIT \(Self.maximumHandoffQueryRows)")
     }
 
     private func handoffList(sql: String) throws -> [HandoffPacket] {
         try withStatement(sql) { stmt in
             var out: [HandoffPacket] = []
             while sqlite3_step(stmt) == SQLITE_ROW {
+                if out.count >= Self.maximumHandoffQueryRows { break }
                 guard let rowID = textCol(stmt, 0),
                       let cstr = sqlite3_column_text(stmt, 1) else { continue }
                 let text = String(cString: cstr)
@@ -523,7 +534,7 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
         var sql = "SELECT id, agent_id, client_id, status, summary, created_at, updated_at FROM agent_sessions WHERE 1=1"
         if agentID != nil { sql += " AND agent_id = ?" }
         if status != nil { sql += " AND status = ?" }
-        sql += " ORDER BY created_at DESC"
+        sql += " ORDER BY created_at DESC LIMIT \(Self.maximumSessionQueryRows)"
         return try withStatement(sql) { stmt in
             var i: Int32 = 1
             if let agentID { bind(stmt, i, agentID); i += 1 }
@@ -545,6 +556,7 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
         var seen = Set<String>()
         for st in [SessionStatus.open, .active, .running, .started] {
             for s in try sessionList(status: st) where s.clientID == clientID {
+                if closed.count >= Self.maximumSessionQueryRows { return closed }
                 if seen.contains(s.id.rawValue) { continue }
                 seen.insert(s.id.rawValue)
                 if let except, s.id == except { continue }
@@ -577,6 +589,10 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
         tags: [String],
         timestamp: String
     ) throws {
+        let operation = DispatchTime.now().uptimeNanoseconds
+        let signpost = RuntimeSignposts.memoryOperation(operation: operation)
+        defer { RuntimeSignposts.memoryOperationEnded(signpost, operation: operation) }
+        RuntimeDiagnostics.shared.increment(.memoryWrites)
         // store tags as JSON array string
         let tagsArr = try JSONSerialization.data(withJSONObject: tags)
         let tagsStr = String(data: tagsArr, encoding: .utf8) ?? "[]"
@@ -666,6 +682,10 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
         includeSystem: Bool = false,
         limit: Int = SQLiteStore.memoryQueryDefaultLimit
     ) throws -> [MemoryNote] {
+        let operation = DispatchTime.now().uptimeNanoseconds
+        let signpost = RuntimeSignposts.memoryOperation(operation: operation)
+        defer { RuntimeSignposts.memoryOperationEnded(signpost, operation: operation) }
+        RuntimeDiagnostics.shared.increment(.memorySearches)
         let capped = min(max(limit, 1), Self.memoryQueryMaxLimit)
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !needle.isEmpty else { return [] }
@@ -714,6 +734,15 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
         let updated = textCol(stmt, 4) ?? ""
         let tags = Self.decodeTags(tagsJSON)
         return MemoryNote(key: key, body: body, tags: tags, createdAt: created, updatedAt: updated)
+    }
+
+    private func recordDatabaseFootprint() {
+        let manager = FileManager.default
+        let databaseBytes = ((try? manager.attributesOfItem(atPath: path.path)[.size]) as? NSNumber)?.intValue ?? 0
+        let walPath = path.path + "-wal"
+        let walBytes = ((try? manager.attributesOfItem(atPath: walPath)[.size]) as? NSNumber)?.intValue ?? 0
+        RuntimeDiagnostics.shared.set(.memoryDatabaseBytes, to: databaseBytes)
+        RuntimeDiagnostics.shared.set(.memoryWALBytes, to: walBytes)
     }
 
     private static func decodeTags(_ json: String) -> [String] {

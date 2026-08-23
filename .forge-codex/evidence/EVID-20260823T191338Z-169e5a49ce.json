@@ -1,0 +1,33 @@
+{
+  "artifacts": [
+    {
+      "bytes": 631,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T191338Z-169e5a49ce.stdout.txt",
+      "sha256": "d0ce60f1f441b7cb0fea8aaee2dabe1fdee0513e22abc1eaaf17bc4b88ff6999"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T191338Z-169e5a49ce.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "command": ".forge-codex/scripts/check_p03_telemetry.py",
+  "ended_at": "2026-08-23T19:13:38.430400+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T191338Z-169e5a49ce",
+  "kind": "p03-source-invariant",
+  "related_findings": [
+    "FC-MEM-001"
+  ],
+  "related_gates": [
+    "G03"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T19:13:38.110130+00:00",
+  "timed_out": false
+}

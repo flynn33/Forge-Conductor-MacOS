@@ -1,0 +1,33 @@
+{
+  "commands": [],
+  "criteria_results": [
+    {
+      "criterion": "Release stress suite passes",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "resident-size trajectories are bounded",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "telemetry/gauge hard invariants pass under stress",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "latency/CPU/GPU/wakeup/database budgets pass",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "lowest available representative memory tier evidence exists",
+      "evidence": [],
+      "passed": false
+    }
+  ],
+  "gate_id": "G11",
+  "instructions": "Replace placeholders only with command-backed artifacts and SHA-256 values. The validator rejects absent evidence.",
+  "schema_version": 1
+}

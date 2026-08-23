@@ -1,0 +1,33 @@
+{
+  "commands": [],
+  "criteria_results": [
+    {
+      "criterion": "host capability report exists",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "required plugin target builds and tests",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "full no-operator rollover passes in a supported mode",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "external MCP-only compatibility passes",
+      "evidence": [],
+      "passed": false
+    },
+    {
+      "criterion": "private UI automation scan passes",
+      "evidence": [],
+      "passed": false
+    }
+  ],
+  "gate_id": "G09",
+  "instructions": "Replace placeholders only with command-backed artifacts and SHA-256 values. The validator rejects absent evidence.",
+  "schema_version": 1
+}

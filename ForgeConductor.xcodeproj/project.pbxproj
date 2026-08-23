@@ -142,6 +142,27 @@
 		P1R2O3D4U5C6T7E80002 /* Tests/ForgeConductorTests/ProductPathReliabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = P1R2O3D4U5C6T7E80001 /* Tests/ForgeConductorTests/ProductPathReliabilityTests.swift */; };
 		R1E2A3L4T5I6M7E8000002 /* Telemetry/RealtimeMetricsEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = R1E2A3L4T5I6M7E8000001 /* Telemetry/RealtimeMetricsEngine.swift */; };
 		R1E2A3L4T5S6T7R80002 /* Tests/ForgeConductorTests/RealtimeStreamTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = R1E2A3L4T5S6T7R80001 /* Tests/ForgeConductorTests/RealtimeStreamTests.swift */; };
+		P10B00000000000000000001 /* Application/ContinuityCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000001 /* Application/ContinuityCoordinator.swift */; };
+		P10B00000000000000000002 /* Application/Tools/ContinuityLifecycleToolPack.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000002 /* Application/Tools/ContinuityLifecycleToolPack.swift */; };
+		P10B00000000000000000003 /* Domain/ContinuityModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000003 /* Domain/ContinuityModels.swift */; };
+		P10B00000000000000000004 /* ForgeNativeSessionHostPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000004 /* ForgeNativeSessionHostPlugin.swift */; };
+		P10B00000000000000000005 /* Domain/HostAdapterRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000005 /* Domain/HostAdapterRegistry.swift */; };
+		P10B00000000000000000006 /* Telemetry/LatestValueMailbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000006 /* Telemetry/LatestValueMailbox.swift */; };
+		P10B00000000000000000007 /* Metal/MetalGaugeResources.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000007 /* Metal/MetalGaugeResources.swift */; };
+		P10B00000000000000000008 /* Domain/ProjectMemoryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000008 /* Domain/ProjectMemoryModels.swift */; };
+		P10B00000000000000000009 /* Infrastructure/ProjectMemoryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000009 /* Infrastructure/ProjectMemoryRepository.swift */; };
+		P10B00000000000000000010 /* Application/ProjectMemoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000010 /* Application/ProjectMemoryService.swift */; };
+		P10B00000000000000000011 /* Application/Tools/ProjectMemoryToolPack.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000011 /* Application/Tools/ProjectMemoryToolPack.swift */; };
+		P10B00000000000000000012 /* Infrastructure/ResourcePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000012 /* Infrastructure/ResourcePolicy.swift */; };
+		P10B00000000000000000013 /* Infrastructure/RuntimeObservability.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000013 /* Infrastructure/RuntimeObservability.swift */; };
+		P10B00000000000000000014 /* ContinuityCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000014 /* ContinuityCoordinatorTests.swift */; };
+		P10B00000000000000000015 /* LatestValueMailboxTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000015 /* LatestValueMailboxTests.swift */; };
+		P10B00000000000000000016 /* LifecycleOwnershipTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000016 /* LifecycleOwnershipTests.swift */; };
+		P10B00000000000000000017 /* NativeSessionHostPluginTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000017 /* NativeSessionHostPluginTests.swift */; };
+		P10B00000000000000000018 /* ProjectMemoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000018 /* ProjectMemoryTests.swift */; };
+		P10B00000000000000000019 /* ResourcePolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000019 /* ResourcePolicyTests.swift */; };
+		P10B00000000000000000020 /* RuntimeObservabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000020 /* RuntimeObservabilityTests.swift */; };
+		P11B00000000000000000001 /* ReleaseStressTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = P11F00000000000000000001 /* ReleaseStressTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -345,6 +366,27 @@
 		P1R2O3D4U5C6T7E80001 /* Tests/ForgeConductorTests/ProductPathReliabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/ForgeConductorTests/ProductPathReliabilityTests.swift; sourceTree = SOURCE_ROOT; };
 		R1E2A3L4T5I6M7E8000001 /* Telemetry/RealtimeMetricsEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Telemetry/RealtimeMetricsEngine.swift; sourceTree = "<group>"; };
 		R1E2A3L4T5S6T7R80001 /* Tests/ForgeConductorTests/RealtimeStreamTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/ForgeConductorTests/RealtimeStreamTests.swift; sourceTree = SOURCE_ROOT; };
+		P10F00000000000000000001 /* Application/ContinuityCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/ContinuityCoordinator.swift; sourceTree = "<group>"; };
+		P10F00000000000000000002 /* Application/Tools/ContinuityLifecycleToolPack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/Tools/ContinuityLifecycleToolPack.swift; sourceTree = "<group>"; };
+		P10F00000000000000000003 /* Domain/ContinuityModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/ContinuityModels.swift; sourceTree = "<group>"; };
+		P10F00000000000000000004 /* ForgeNativeSessionHostPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/ForgeNativeSessionHostPlugin/ForgeNativeSessionHostPlugin.swift; sourceTree = SOURCE_ROOT; };
+		P10F00000000000000000005 /* Domain/HostAdapterRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/HostAdapterRegistry.swift; sourceTree = "<group>"; };
+		P10F00000000000000000006 /* Telemetry/LatestValueMailbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Telemetry/LatestValueMailbox.swift; sourceTree = "<group>"; };
+		P10F00000000000000000007 /* Metal/MetalGaugeResources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Metal/MetalGaugeResources.swift; sourceTree = "<group>"; };
+		P10F00000000000000000008 /* Domain/ProjectMemoryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/ProjectMemoryModels.swift; sourceTree = "<group>"; };
+		P10F00000000000000000009 /* Infrastructure/ProjectMemoryRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Infrastructure/ProjectMemoryRepository.swift; sourceTree = "<group>"; };
+		P10F00000000000000000010 /* Application/ProjectMemoryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/ProjectMemoryService.swift; sourceTree = "<group>"; };
+		P10F00000000000000000011 /* Application/Tools/ProjectMemoryToolPack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/Tools/ProjectMemoryToolPack.swift; sourceTree = "<group>"; };
+		P10F00000000000000000012 /* Infrastructure/ResourcePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Infrastructure/ResourcePolicy.swift; sourceTree = "<group>"; };
+		P10F00000000000000000013 /* Infrastructure/RuntimeObservability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Infrastructure/RuntimeObservability.swift; sourceTree = "<group>"; };
+		P10F00000000000000000014 /* ContinuityCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContinuityCoordinatorTests.swift; sourceTree = "<group>"; };
+		P10F00000000000000000015 /* LatestValueMailboxTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LatestValueMailboxTests.swift; sourceTree = "<group>"; };
+		P10F00000000000000000016 /* LifecycleOwnershipTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LifecycleOwnershipTests.swift; sourceTree = "<group>"; };
+		P10F00000000000000000017 /* NativeSessionHostPluginTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeSessionHostPluginTests.swift; sourceTree = "<group>"; };
+		P10F00000000000000000018 /* ProjectMemoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectMemoryTests.swift; sourceTree = "<group>"; };
+		P10F00000000000000000019 /* ResourcePolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResourcePolicyTests.swift; sourceTree = "<group>"; };
+		P10F00000000000000000020 /* RuntimeObservabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeObservabilityTests.swift; sourceTree = "<group>"; };
+		P11F00000000000000000001 /* ReleaseStressTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseStressTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -404,6 +446,14 @@
 		64BB9664134D41DE87CE4C03 /* Tests/ForgeConductorTests */ = {
 			isa = PBXGroup;
 			children = (
+				P11F00000000000000000001 /* ReleaseStressTests.swift */,
+				P10F00000000000000000014 /* ContinuityCoordinatorTests.swift */,
+				P10F00000000000000000015 /* LatestValueMailboxTests.swift */,
+				P10F00000000000000000016 /* LifecycleOwnershipTests.swift */,
+				P10F00000000000000000017 /* NativeSessionHostPluginTests.swift */,
+				P10F00000000000000000018 /* ProjectMemoryTests.swift */,
+				P10F00000000000000000019 /* ResourcePolicyTests.swift */,
+				P10F00000000000000000020 /* RuntimeObservabilityTests.swift */,
 				C07A00000000000000000004 /* ContinuityTests.swift */,
 				A0FC00000000000000000007 /* LMStudioConnectorReliabilityTests.swift */,
 				A0FC00000000000000000009 /* DashboardSecurityTests.swift */,
@@ -481,6 +531,7 @@
 		DB59238523D446A9AC5B2534 /* ForgeConductorApp */ = {
 			isa = PBXGroup;
 			children = (
+				P10F00000000000000000007 /* Metal/MetalGaugeResources.swift */,
 				DC5D36D534784BBAA579243E /* AppModel.swift */,
 				A1T2E3L4E5M600000001 /* AppTelemetryBinding.swift */,
 				A1D2E3P4L5Y600000001 /* AppDeployController.swift */,
@@ -511,6 +562,18 @@
 		EF8AADDA82404E2F8ED4A976 /* ForgeConductorCore */ = {
 			isa = PBXGroup;
 			children = (
+				P10F00000000000000000001 /* Application/ContinuityCoordinator.swift */,
+				P10F00000000000000000002 /* Application/Tools/ContinuityLifecycleToolPack.swift */,
+				P10F00000000000000000003 /* Domain/ContinuityModels.swift */,
+				P10F00000000000000000004 /* ForgeNativeSessionHostPlugin.swift */,
+				P10F00000000000000000005 /* Domain/HostAdapterRegistry.swift */,
+				P10F00000000000000000006 /* Telemetry/LatestValueMailbox.swift */,
+				P10F00000000000000000008 /* Domain/ProjectMemoryModels.swift */,
+				P10F00000000000000000009 /* Infrastructure/ProjectMemoryRepository.swift */,
+				P10F00000000000000000010 /* Application/ProjectMemoryService.swift */,
+				P10F00000000000000000011 /* Application/Tools/ProjectMemoryToolPack.swift */,
+				P10F00000000000000000012 /* Infrastructure/ResourcePolicy.swift */,
+				P10F00000000000000000013 /* Infrastructure/RuntimeObservability.swift */,
 				C07A00000000000000000001 /* Domain/HandoffPacket.swift */,
 				C07A00000000000000000002 /* Application/ContextContinuityService.swift */,
 				C08A00000000000000000001 /* Application/ContinuityAutomation.swift */,
@@ -777,6 +840,14 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				P11B00000000000000000001 /* ReleaseStressTests.swift in Sources */,
+				P10B00000000000000000014 /* ContinuityCoordinatorTests.swift in Sources */,
+				P10B00000000000000000015 /* LatestValueMailboxTests.swift in Sources */,
+				P10B00000000000000000016 /* LifecycleOwnershipTests.swift in Sources */,
+				P10B00000000000000000017 /* NativeSessionHostPluginTests.swift in Sources */,
+				P10B00000000000000000018 /* ProjectMemoryTests.swift in Sources */,
+				P10B00000000000000000019 /* ResourcePolicyTests.swift in Sources */,
+				P10B00000000000000000020 /* RuntimeObservabilityTests.swift in Sources */,
 				C07A00000000000000000008 /* ContinuityTests.swift in Sources */,
 				A0FC00000000000000000008 /* LMStudioConnectorReliabilityTests.swift in Sources */,
 				A0FC0000000000000000000A /* DashboardSecurityTests.swift in Sources */,
@@ -805,6 +876,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				P10B00000000000000000007 /* Metal/MetalGaugeResources.swift in Sources */,
 				36E0A9288A004103A772C778 /* Metal/MetalGaugeKit.swift in Sources */,
 				0D50172020A24DFFA4B22EBC /* Views/Rig/RigDashboardView.swift in Sources */,
 				30C0CBE3171C4274BE818BDF /* Metal/MultiSeriesLoadRenderer.swift in Sources */,
@@ -847,6 +919,18 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				P10B00000000000000000001 /* Application/ContinuityCoordinator.swift in Sources */,
+				P10B00000000000000000002 /* Application/Tools/ContinuityLifecycleToolPack.swift in Sources */,
+				P10B00000000000000000003 /* Domain/ContinuityModels.swift in Sources */,
+				P10B00000000000000000004 /* ForgeNativeSessionHostPlugin.swift in Sources */,
+				P10B00000000000000000005 /* Domain/HostAdapterRegistry.swift in Sources */,
+				P10B00000000000000000006 /* Telemetry/LatestValueMailbox.swift in Sources */,
+				P10B00000000000000000008 /* Domain/ProjectMemoryModels.swift in Sources */,
+				P10B00000000000000000009 /* Infrastructure/ProjectMemoryRepository.swift in Sources */,
+				P10B00000000000000000010 /* Application/ProjectMemoryService.swift in Sources */,
+				P10B00000000000000000011 /* Application/Tools/ProjectMemoryToolPack.swift in Sources */,
+				P10B00000000000000000012 /* Infrastructure/ResourcePolicy.swift in Sources */,
+				P10B00000000000000000013 /* Infrastructure/RuntimeObservability.swift in Sources */,
 				C07A00000000000000000005 /* Domain/HandoffPacket.swift in Sources */,
 				C07A00000000000000000006 /* Application/ContextContinuityService.swift in Sources */,
 				C08A00000000000000000002 /* Application/ContinuityAutomation.swift in Sources */,

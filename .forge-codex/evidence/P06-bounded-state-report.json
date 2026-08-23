@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "phase": "P06",
+  "resource_inventory_entries": 22,
+  "unbounded_long_lived_collections": 0,
+  "memory_pressure": {
+    "monitor_installed": true,
+    "warning_and_critical_limits_tested": true,
+    "critical_history_floor": 300,
+    "optional_retention_only": true
+  },
+  "process_and_logs": {
+    "caller_can_raise_process_output_cap": false,
+    "stdout_and_stderr_independently_bounded": true,
+    "all_diagnostic_role_logs_rotated": true,
+    "retained_archive_generations_bounded": true
+  },
+  "main_actor": {
+    "blocking_tokens_in_app_sources": 0,
+    "dashboard_process_probe_detached": true,
+    "dashboard_bind_detached": true
+  },
+  "release": {
+    "application_composition_cycles": 10,
+    "surviving_application_owners": 0,
+    "manager_listener_cycles": 10,
+    "surviving_manager_owners": 0
+  },
+  "tests": {
+    "bounded_resource_evidence_id": "EVID-20260823T195742Z-533a0ffc8a",
+    "bounded_resource_tests": 24,
+    "bounded_resource_failures": 0,
+    "strict_suite_evidence_id": "EVID-20260823T195808Z-9893a6484a",
+    "strict_suite_tests": 249,
+    "strict_suite_skipped": 2,
+    "strict_suite_failures": 0
+  }
+}

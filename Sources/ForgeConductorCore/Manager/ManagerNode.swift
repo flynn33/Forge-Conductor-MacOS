@@ -33,6 +33,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
 
     deinit {
         stopWatchdog()
+        stopSignalHandlers()
         tearDownDashboard()
     }
 
@@ -268,6 +269,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
 
     private func halt() {
         stopWatchdog()
+        stopSignalHandlers()
         tearDownDashboard()
         ManagerPIDFile.remove(paths: app.paths)
         lock.lock()
@@ -360,8 +362,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
 
     private func stopWatchdog() {
         lock.lock()
-        runtime.watchdog?.cancel()
-        runtime.watchdog = nil
+        runtime.cancelWatchdog()
         lock.unlock()
     }
 
@@ -442,6 +443,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     }
 
     private func installSignalHandlers() {
+        stopSignalHandlers()
         signal(SIGINT, SIG_IGN)
         signal(SIGTERM, SIG_IGN)
         let sigInt = DispatchSource.makeSignalSource(signal: SIGINT, queue: runtime.queue)
@@ -452,6 +454,12 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         sigTerm.resume()
         lock.lock()
         runtime.signalSources = [sigInt, sigTerm]
+        lock.unlock()
+    }
+
+    private func stopSignalHandlers() {
+        lock.lock()
+        runtime.cancelSignalSources()
         lock.unlock()
     }
 

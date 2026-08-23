@@ -11,6 +11,7 @@ let package = Package(
     platforms: [.macOS(.v26)],
     products: [
         .library(name: "ForgeConductorCore", targets: ["ForgeConductorCore"]),
+        .library(name: "ForgeNativeSessionHostPlugin", targets: ["ForgeNativeSessionHostPlugin"]),
         .executable(name: "forge-conductor", targets: ["ForgeConductorCLI"]),
         .executable(name: "forge-conductor-app", targets: ["ForgeConductorApp"]),
     ],
@@ -24,18 +25,23 @@ let package = Package(
         ),
         .executableTarget(
             name: "ForgeConductorCLI",
-            dependencies: ["ForgeConductorCore"],
+            dependencies: ["ForgeConductorCore", "ForgeNativeSessionHostPlugin"],
             path: "Sources/ForgeConductorCLI"
+        ),
+        .target(
+            name: "ForgeNativeSessionHostPlugin",
+            dependencies: ["ForgeConductorCore"],
+            path: "Sources/ForgeNativeSessionHostPlugin"
         ),
         .executableTarget(
             name: "ForgeConductorApp",
-            dependencies: ["ForgeConductorCore"],
+            dependencies: ["ForgeConductorCore", "ForgeNativeSessionHostPlugin"],
             path: "Sources/ForgeConductorApp",
             exclude: ["Resources"]
         ),
         .testTarget(
             name: "ForgeConductorTests",
-            dependencies: ["ForgeConductorCore", "ForgeConductorCLI"],
+            dependencies: ["ForgeConductorCore", "ForgeConductorCLI", "ForgeNativeSessionHostPlugin"],
             path: "Tests/ForgeConductorTests",
             resources: [
                 .process("Fixtures"),

@@ -1,0 +1,1875 @@
+{
+  "checks": [
+    {
+      "detail": "VERSION",
+      "name": "required:VERSION",
+      "passed": true
+    },
+    {
+      "detail": "CODEX_EXECUTION_PROMPT.md",
+      "name": "required:CODEX_EXECUTION_PROMPT.md",
+      "passed": true
+    },
+    {
+      "detail": "docs/EXECUTION_CONTRACT.md",
+      "name": "required:docs/EXECUTION_CONTRACT.md",
+      "passed": true
+    },
+    {
+      "detail": "docs/EVIDENCE_RULES.md",
+      "name": "required:docs/EVIDENCE_RULES.md",
+      "passed": true
+    },
+    {
+      "detail": "docs/DECISION_POLICY.md",
+      "name": "required:docs/DECISION_POLICY.md",
+      "passed": true
+    },
+    {
+      "detail": "docs/FAIL_FORWARD_POLICY.md",
+      "name": "required:docs/FAIL_FORWARD_POLICY.md",
+      "passed": true
+    },
+    {
+      "detail": "docs/FEATURE_PRESERVATION.md",
+      "name": "required:docs/FEATURE_PRESERVATION.md",
+      "passed": true
+    },
+    {
+      "detail": "docs/PHASE_PLAYBOOK.md",
+      "name": "required:docs/PHASE_PLAYBOOK.md",
+      "passed": true
+    },
+    {
+      "detail": "architecture/TARGET_ARCHITECTURE.md",
+      "name": "required:architecture/TARGET_ARCHITECTURE.md",
+      "passed": true
+    },
+    {
+      "detail": "architecture/TELEMETRY_BACKPRESSURE.md",
+      "name": "required:architecture/TELEMETRY_BACKPRESSURE.md",
+      "passed": true
+    },
+    {
+      "detail": "architecture/GAUGE_RENDERING.md",
+      "name": "required:architecture/GAUGE_RENDERING.md",
+      "passed": true
+    },
+    {
+      "detail": "architecture/PROJECT_MEMORY_MCP.md",
+      "name": "required:architecture/PROJECT_MEMORY_MCP.md",
+      "passed": true
+    },
+    {
+      "detail": "architecture/CONTINUITY_AND_ROLLOVER.md",
+      "name": "required:architecture/CONTINUITY_AND_ROLLOVER.md",
+      "passed": true
+    },
+    {
+      "detail": "architecture/HOST_ADAPTER_PLUGIN.md",
+      "name": "required:architecture/HOST_ADAPTER_PLUGIN.md",
+      "passed": true
+    },
+    {
+      "detail": "specifications/MCP_TOOL_CONTRACTS.md",
+      "name": "required:specifications/MCP_TOOL_CONTRACTS.md",
+      "passed": true
+    },
+    {
+      "detail": "specifications/CONTINUITY_STATE_MACHINE.md",
+      "name": "required:specifications/CONTINUITY_STATE_MACHINE.md",
+      "passed": true
+    },
+    {
+      "detail": "specifications/COMPLETION_GATES.md",
+      "name": "required:specifications/COMPLETION_GATES.md",
+      "passed": true
+    },
+    {
+      "detail": "plans/phases.json",
+      "name": "required:plans/phases.json",
+      "passed": true
+    },
+    {
+      "detail": "plans/gates.json",
+      "name": "required:plans/gates.json",
+      "passed": true
+    },
+    {
+      "detail": "plans/resource-budgets.json",
+      "name": "required:plans/resource-budgets.json",
+      "passed": true
+    },
+    {
+      "detail": "schemas/run-state.schema.json",
+      "name": "required:schemas/run-state.schema.json",
+      "passed": true
+    },
+    {
+      "detail": "schemas/handoff.schema.json",
+      "name": "required:schemas/handoff.schema.json",
+      "passed": true
+    },
+    {
+      "detail": "schemas/memory-record.schema.json",
+      "name": "required:schemas/memory-record.schema.json",
+      "passed": true
+    },
+    {
+      "detail": "scripts/statectl.py",
+      "name": "required:scripts/statectl.py",
+      "passed": true
+    },
+    {
+      "detail": "scripts/feature_inventory.py",
+      "name": "required:scripts/feature_inventory.py",
+      "passed": true
+    },
+    {
+      "detail": "scripts/verify_completion.py",
+      "name": "required:scripts/verify_completion.py",
+      "passed": true
+    },
+    {
+      "detail": "scripts/scan_attribution.py",
+      "name": "required:scripts/scan_attribution.py",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:PACKAGE_VALIDATION.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:audit/Forge-Conductor-Audit-Evidence.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T183945Z-b1151f1fd4.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T184025Z-90a51329f5.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T184048Z-71ae30f85c.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T184112Z-aee135dafe.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T184311Z-0dccfacc9f.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T185718Z-7423c8eb79.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T190038Z-7b2e90ce5e.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T190308Z-bbb85d288b.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T190322Z-7010343b89.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T190411Z-562194f9ac.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T190435Z-72024a943c.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T190504Z-695abfb997.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T190515Z-0fb7b97728.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T190527Z-3d3279fc30.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T191232Z-37ef639495.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T191244Z-78ad0fb553.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T191259Z-1cde4355df.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T191338Z-169e5a49ce.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T191342Z-33c7dab2e2.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T191440Z-4b9a17e878.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T191456Z-1dd93b3c6a.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192135Z-0afe9d3de8.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192151Z-4704466f4f.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192214Z-82141cd307.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192316Z-d483557254.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192338Z-a24497b132.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192400Z-f983b3418a.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192528Z-b19c7be1fa.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192544Z-b1cba1659a.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192613Z-04727e0b2e.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192631Z-cfa3748c4d.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192639Z-46267799f4.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192702Z-59d9e97712.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192728Z-e788871dce.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192746Z-399a98b738.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192804Z-95eb990973.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192842Z-4e41ce2a84.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192849Z-c0a9658a23.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192902Z-89fd0383eb.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192954Z-a1ccac7d61.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T193100Z-a782c3890a.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T193106Z-667173c96c.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T193356Z-c8231b937d.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T193826Z-661c01c5d5.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T193845Z-e5d584a51f.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T194137Z-26aa5b1b82.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T194148Z-4bc9b988c0.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T194202Z-a41d508f0c.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T194225Z-32827b0ff8.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T194253Z-44ca4b7694.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T194308Z-9a5fdacf6f.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T194716Z-556705f0c7.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T195742Z-533a0ffc8a.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T195808Z-9893a6484a.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T195911Z-2c43d9837a.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T201609Z-581a87dcb8.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T201627Z-984d2e61cb.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T201632Z-6920be9c15.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T202205Z-6824db4d27.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T202209Z-a14a40e46a.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T202214Z-45beba1a02.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T203750Z-1bbe64a407.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T203803Z-50f314d32f.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T203838Z-4f3fba0ee5.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T203848Z-0e5e9877c6.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T204207Z-fb406e171d.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T204247Z-4561e060f3.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T204429Z-dafc744afc.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T204436Z-c106089676.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T204436Z-f892521a49.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T205232Z-310671ba57.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T205249Z-275cf7deec.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T205318Z-0b9d4725a3.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T205325Z-8e4577190c.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T205330Z-dd887aaee2.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T205337Z-6ea80747a3.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T205539Z-7c10f18ca4.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T205600Z-67248c9a56.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T205612Z-bbcdb66436.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T205703Z-d353891c4a.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T205709Z-3ba0d3d56b.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T205709Z-c405db9faa.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T205726Z-683bd3177f.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T210530Z-4f9d8de5c7.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T210623Z-182392fa73.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T210632Z-016869a17f.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T210719Z-a3e959a8b6.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T210727Z-dd0087ce58.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T210942Z-5955ae72b9.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T212034Z-4070dbd74c.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T212122Z-63e094fe2e.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T212139Z-5e0f9ed571.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T212825Z-b15b99d225.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T212912Z-b76e698e10.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T212941Z-7cfd677b6d.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T213021Z-ff22ae46e0.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T213125Z-71f05795f9.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T213156Z-8cb418d293.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T213648Z-7ed720d512.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T213951Z-91c8ae0192.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T214002Z-c28391e496.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T214015Z-ef17bf523b.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T214020Z-c24fd407d3.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T214059Z-39a8eab344.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T214100Z-4aba5b7a1b.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T214105Z-e462ac011e.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T214146Z-38e7461f37.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T214153Z-6e094e31a0.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T214211Z-c4735e8f70.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T214932Z-0462547840.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T215008Z-913025eedf.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T215054Z-ec120595aa.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T215148Z-d7bfd8b8ac.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T215500Z-12f8c5930c.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T221500Z-66c22093c5.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T221617Z-2cedb70293.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T221713Z-b90d9287c6.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T221805Z-1d35f43020.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T222004Z-20463cb0ce.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T222005Z-f35e8985e7.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T222006Z-5eb3e93965.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T222006Z-83087966ca.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T222007Z-32f22b0ab5.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T222036Z-1dee156e7c.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P02-telemetry-baseline.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P03-bounded-telemetry-before-after.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P04-metal-performance-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P05-resource-owner-matrix.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P05-sanitizer-and-lifecycle-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P06-bounded-state-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P06-resource-policy-inventory.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P07-feature-parity.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P07-mcp-process-conformance.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P07-project-memory-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P07-resource-owner-matrix.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P08-continuity-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P08-feature-parity.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P08-mcp-process-conformance.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P08-resource-owner-matrix.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P09-external-mcp-compatibility.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P09-feature-parity.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P09-host-capability-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P09-resource-owner-matrix.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P10-migration-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P10-parity-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P10-protocol-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P11-profile-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P11-release-stress-results.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P11-resource-results.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P12-final-validation-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P12-security-scan-summary.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/installed-runtime-self-test.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/portability-scan.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/source-archive-snapshot.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:plans/audit-remediation-matrix.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:plans/gates.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:plans/host-capability-resolution.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:plans/phases.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:plans/resource-budgets.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:plans/test-flows.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:schemas/handoff.schema.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:schemas/memory-record.schema.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:schemas/run-state.schema.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/acceptance/G02.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/acceptance/G03.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/acceptance/G04.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/acceptance/G05.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/acceptance/G06.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/acceptance/G07.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/acceptance/G08.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/acceptance/G09.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/acceptance/G10.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/acceptance/G11.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/baseline/characterization-tests.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/baseline/mcp-capabilities.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/baseline/persistence-inventory.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/completion-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/environment.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/evidence-index.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/feature-baseline.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/findings-resolution.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G00.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G00.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G01.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G01.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G01.static-inventory.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G02.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G02.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G03.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G03.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G04.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G04.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G05.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G05.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G06.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G06.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G07.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G07.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G08.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G08.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G09.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G09.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G10.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G10.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G11.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G11.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/host-capability-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/repository-baseline.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/run-state.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/source-risk-scan.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/acceptance/G02.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/acceptance/G03.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/acceptance/G04.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/acceptance/G05.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/acceptance/G06.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/acceptance/G07.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/acceptance/G08.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/acceptance/G09.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/acceptance/G10.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/acceptance/G11.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/baseline/characterization-tests.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/baseline/mcp-capabilities.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/baseline/persistence-inventory.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/evidence-index.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/feature-baseline-runtime-completion.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/findings-resolution.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/host-capability-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/plugin-manifest.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:templates/run-state.json",
+      "passed": true
+    },
+    {
+      "detail": "['P00', 'P01', 'P02', 'P03', 'P04', 'P05', 'P06', 'P07', 'P08', 'P09', 'P10', 'P11', 'P12']",
+      "name": "phase-ids-unique",
+      "passed": true
+    },
+    {
+      "detail": "['G00', 'G01', 'G02', 'G03', 'G04', 'G05', 'G06', 'G07', 'G08', 'G09', 'G10', 'G11', 'G12']",
+      "name": "gate-ids-unique",
+      "passed": true
+    },
+    {
+      "detail": "G00",
+      "name": "phase-gate:P00->G00",
+      "passed": true
+    },
+    {
+      "detail": "P00",
+      "name": "phase-dependency:P01->P00",
+      "passed": true
+    },
+    {
+      "detail": "G01",
+      "name": "phase-gate:P01->G01",
+      "passed": true
+    },
+    {
+      "detail": "P01",
+      "name": "phase-dependency:P02->P01",
+      "passed": true
+    },
+    {
+      "detail": "G02",
+      "name": "phase-gate:P02->G02",
+      "passed": true
+    },
+    {
+      "detail": "P02",
+      "name": "phase-dependency:P03->P02",
+      "passed": true
+    },
+    {
+      "detail": "G03",
+      "name": "phase-gate:P03->G03",
+      "passed": true
+    },
+    {
+      "detail": "P02",
+      "name": "phase-dependency:P04->P02",
+      "passed": true
+    },
+    {
+      "detail": "G04",
+      "name": "phase-gate:P04->G04",
+      "passed": true
+    },
+    {
+      "detail": "P02",
+      "name": "phase-dependency:P05->P02",
+      "passed": true
+    },
+    {
+      "detail": "G05",
+      "name": "phase-gate:P05->G05",
+      "passed": true
+    },
+    {
+      "detail": "P03",
+      "name": "phase-dependency:P06->P03",
+      "passed": true
+    },
+    {
+      "detail": "P04",
+      "name": "phase-dependency:P06->P04",
+      "passed": true
+    },
+    {
+      "detail": "P05",
+      "name": "phase-dependency:P06->P05",
+      "passed": true
+    },
+    {
+      "detail": "G06",
+      "name": "phase-gate:P06->G06",
+      "passed": true
+    },
+    {
+      "detail": "P01",
+      "name": "phase-dependency:P07->P01",
+      "passed": true
+    },
+    {
+      "detail": "P02",
+      "name": "phase-dependency:P07->P02",
+      "passed": true
+    },
+    {
+      "detail": "G07",
+      "name": "phase-gate:P07->G07",
+      "passed": true
+    },
+    {
+      "detail": "P07",
+      "name": "phase-dependency:P08->P07",
+      "passed": true
+    },
+    {
+      "detail": "G08",
+      "name": "phase-gate:P08->G08",
+      "passed": true
+    },
+    {
+      "detail": "P08",
+      "name": "phase-dependency:P09->P08",
+      "passed": true
+    },
+    {
+      "detail": "G09",
+      "name": "phase-gate:P09->G09",
+      "passed": true
+    },
+    {
+      "detail": "P03",
+      "name": "phase-dependency:P10->P03",
+      "passed": true
+    },
+    {
+      "detail": "P04",
+      "name": "phase-dependency:P10->P04",
+      "passed": true
+    },
+    {
+      "detail": "P05",
+      "name": "phase-dependency:P10->P05",
+      "passed": true
+    },
+    {
+      "detail": "P06",
+      "name": "phase-dependency:P10->P06",
+      "passed": true
+    },
+    {
+      "detail": "P07",
+      "name": "phase-dependency:P10->P07",
+      "passed": true
+    },
+    {
+      "detail": "P08",
+      "name": "phase-dependency:P10->P08",
+      "passed": true
+    },
+    {
+      "detail": "P09",
+      "name": "phase-dependency:P10->P09",
+      "passed": true
+    },
+    {
+      "detail": "G10",
+      "name": "phase-gate:P10->G10",
+      "passed": true
+    },
+    {
+      "detail": "P10",
+      "name": "phase-dependency:P11->P10",
+      "passed": true
+    },
+    {
+      "detail": "G11",
+      "name": "phase-gate:P11->G11",
+      "passed": true
+    },
+    {
+      "detail": "P11",
+      "name": "phase-dependency:P12->P11",
+      "passed": true
+    },
+    {
+      "detail": "G12",
+      "name": "phase-gate:P12->G12",
+      "passed": true
+    },
+    {
+      "detail": "G00",
+      "name": "completion-gate:G00",
+      "passed": true
+    },
+    {
+      "detail": "G01",
+      "name": "completion-gate:G01",
+      "passed": true
+    },
+    {
+      "detail": "G02",
+      "name": "completion-gate:G02",
+      "passed": true
+    },
+    {
+      "detail": "G03",
+      "name": "completion-gate:G03",
+      "passed": true
+    },
+    {
+      "detail": "G04",
+      "name": "completion-gate:G04",
+      "passed": true
+    },
+    {
+      "detail": "G05",
+      "name": "completion-gate:G05",
+      "passed": true
+    },
+    {
+      "detail": "G06",
+      "name": "completion-gate:G06",
+      "passed": true
+    },
+    {
+      "detail": "G07",
+      "name": "completion-gate:G07",
+      "passed": true
+    },
+    {
+      "detail": "G08",
+      "name": "completion-gate:G08",
+      "passed": true
+    },
+    {
+      "detail": "G09",
+      "name": "completion-gate:G09",
+      "passed": true
+    },
+    {
+      "detail": "G10",
+      "name": "completion-gate:G10",
+      "passed": true
+    },
+    {
+      "detail": "G11",
+      "name": "completion-gate:G11",
+      "passed": true
+    },
+    {
+      "detail": "G12",
+      "name": "completion-gate:G12",
+      "passed": true
+    },
+    {
+      "detail": "[]",
+      "name": "phase-dag-acyclic",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/build_evidence_index.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/check_p03_telemetry.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/check_p04_metal.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/check_p05_lifecycle.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/check_p06_resources.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/check_p07_completion.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/check_p07_project_memory.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/check_p08_completion.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/check_p08_continuity.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/check_p09_completion.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/check_p10_completion.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/check_p11_completion.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/check_private_ui_automation.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/feature_inventory.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/make_handoff.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/record_command.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/run_gate.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/scan_attribution.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/scan_secrets.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/select_next_work.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/source_risk_scan.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/statectl.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/validate_acceptance.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/validate_package.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/verify_completion.py",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:scripts/bootstrap.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:scripts/collect_memgraph.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:scripts/doctor.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:scripts/initialize_run.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:scripts/install_into_repo.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:scripts/profile_macos.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:scripts/run_codex_autonomously.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:scripts/run_gates.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:scripts/run_self_tests.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:scripts/test_all.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:state/flow-handlers/P02-TELEMETRY-BASELINE.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:state/flow-handlers/P11-GAUGE-STRESS.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:state/gate-handlers/G00.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:state/gate-handlers/G01.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:state/gate-handlers/G02.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:state/gate-handlers/G03.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:state/gate-handlers/G04.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:state/gate-handlers/G05.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:state/gate-handlers/G06.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:state/gate-handlers/G07.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:state/gate-handlers/G08.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:state/gate-handlers/G09.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:state/gate-handlers/G10.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:state/gate-handlers/G11.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:templates/build_and_run.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:templates/flow-handler.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:templates/gate-handlers/G00.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:templates/gate-handlers/G01.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:templates/gate-handlers/G02.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:templates/gate-handlers/G03.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:templates/gate-handlers/G04.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:templates/gate-handlers/G05.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:templates/gate-handlers/G06.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:templates/gate-handlers/G07.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:templates/gate-handlers/G08.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:templates/gate-handlers/G09.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:templates/gate-handlers/G10.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:templates/gate-handlers/G11.sh",
+      "passed": true
+    },
+    {
+      "detail": "Authorship-attribution scan passed for /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex",
+      "name": "authorship-attribution-scan",
+      "passed": true
+    },
+    {
+      "detail": "Secret scan passed for /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex",
+      "name": "secret-scan",
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex",
+  "schema_version": 1,
+  "valid": true,
+  "validated_at": "2026-08-23T22:20:43.041369+00:00",
+  "warnings": []
+}

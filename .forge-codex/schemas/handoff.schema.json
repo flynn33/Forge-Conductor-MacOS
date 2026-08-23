@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://forge-conductor.local/schemas/handoff.schema.json",
+  "title": "Forge Conductor Continuity Handoff",
+  "type": "object",
+  "required": ["schema_version", "handoff_id", "operation_id", "created_at", "project", "predecessor_session", "successor_session", "mission", "constraints", "current_work", "completed_work", "open_work", "decisions", "validation", "memory_references", "evidence_references", "next_actions", "host_state", "integrity"],
+  "properties": {
+    "schema_version": { "type": "string", "minLength": 1, "maxLength": 32 },
+    "handoff_id": { "type": "string", "format": "uuid" },
+    "operation_id": { "type": "string", "format": "uuid" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "project": {
+      "type": "object",
+      "required": ["project_id", "display_name", "repository_root", "branch", "commit", "dirty_summary"],
+      "properties": {
+        "project_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "display_name": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "repository_root": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "branch": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "commit": { "type": "string", "pattern": "^[0-9a-fA-F]{7,64}$" },
+        "dirty_summary": { "$ref": "#/$defs/stringArray" }
+      },
+      "additionalProperties": true
+    },
+    "predecessor_session": { "$ref": "#/$defs/session" },
+    "successor_session": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/session" }] },
+    "mission": { "type": "string", "minLength": 1, "maxLength": 32768 },
+    "constraints": { "$ref": "#/$defs/stringArray" },
+    "current_work": {
+      "type": "object",
+      "required": ["phase_id", "work_item_id", "summary", "active_files"],
+      "properties": {
+        "phase_id": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "work_item_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "summary": { "type": "string", "minLength": 1, "maxLength": 32768 },
+        "active_files": { "$ref": "#/$defs/stringArray" }
+      },
+      "additionalProperties": true
+    },
+    "completed_work": { "$ref": "#/$defs/objectArray" },
+    "open_work": { "$ref": "#/$defs/objectArray" },
+    "decisions": { "$ref": "#/$defs/objectArray" },
+    "validation": {
+      "type": "object",
+      "required": ["passed_gates", "open_gates", "commands"],
+      "properties": {
+        "passed_gates": { "$ref": "#/$defs/stringArray" },
+        "open_gates": { "$ref": "#/$defs/stringArray" },
+        "commands": { "$ref": "#/$defs/objectArray" }
+      },
+      "additionalProperties": true
+    },
+    "memory_references": { "$ref": "#/$defs/objectArray" },
+    "evidence_references": { "$ref": "#/$defs/objectArray" },
+    "next_actions": {
+      "type": "array",
+      "maxItems": 1000,
+      "items": {
+        "type": "object",
+        "required": ["order", "action", "command", "success_condition"],
+        "properties": {
+          "order": { "type": "integer", "minimum": 1 },
+          "action": { "type": "string", "minLength": 1, "maxLength": 8192 },
+          "command": { "type": "string", "maxLength": 8192 },
+          "success_condition": { "type": "string", "minLength": 1, "maxLength": 8192 }
+        },
+        "additionalProperties": true
+      }
+    },
+    "host_state": {
+      "type": "object",
+      "required": ["adapter_id", "continuity_state", "context_budget_source", "remaining_budget_estimate", "retry"],
+      "properties": {
+        "adapter_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "continuity_state": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "context_budget_source": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "remaining_budget_estimate": { "type": ["integer", "number", "null"] },
+        "retry": { "type": "object", "additionalProperties": true }
+      },
+      "additionalProperties": true
+    },
+    "integrity": {
+      "type": "object",
+      "required": ["content_sha256", "redaction_complete"],
+      "properties": {
+        "content_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "redaction_complete": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "$defs": {
+    "session": {
+      "type": "object",
+      "required": ["session_id", "provider_session_id", "model"],
+      "properties": {
+        "session_id": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "provider_session_id": { "type": ["string", "null"], "maxLength": 512 },
+        "model": { "type": ["string", "null"], "maxLength": 512 }
+      },
+      "additionalProperties": true
+    },
+    "stringArray": { "type": "array", "maxItems": 10000, "items": { "type": "string", "maxLength": 32768 } },
+    "objectArray": { "type": "array", "maxItems": 10000, "items": { "type": "object", "additionalProperties": true } }
+  },
+  "additionalProperties": true
+}

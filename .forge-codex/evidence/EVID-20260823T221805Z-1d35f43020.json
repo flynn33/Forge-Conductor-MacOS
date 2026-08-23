@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 573122,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T221805Z-1d35f43020.stdout.txt",
+      "sha256": "9956b6ba2be37ae21a65522a480e8beaae4b3f43a40393a02e46c64a28c71b3f"
+    },
+    {
+      "bytes": 590,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T221805Z-1d35f43020.stderr.txt",
+      "sha256": "9faa6533fbb5bb7ce0dcff0a1020e84114ad725cc8b6d277c76275ce8457a28c"
+    }
+  ],
+  "command": "xcodebuild -project ForgeConductor.xcodeproj -scheme ForgeConductor -configuration Debug -destination platform=macOS -derivedDataPath .build/DerivedData-P12-PostSecurity CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= test -only-testing:ForgeConductorTests",
+  "ended_at": "2026-08-23T22:19:04.884792+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T221805Z-1d35f43020",
+  "kind": "post-security-xcode-unit-test",
+  "related_findings": [],
+  "related_gates": [
+    "G12"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T22:18:05.709670+00:00",
+  "timed_out": false
+}

@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-08-23T22:01:00Z",
+  "selected_mode": "B",
+  "selected_adapter": "forge.native-session-host",
+  "adapters": [
+    {
+      "identifier": "forge.native-session-host",
+      "version": "1.0.0",
+      "host_type": "forge-native-logical-session",
+      "capabilities": {
+        "create": true,
+        "bootstrap": true,
+        "usage_reporting": true,
+        "resume": true,
+        "idempotency": true,
+        "query_by_idempotency_key": true,
+        "acknowledgement": true,
+        "cancellation": true,
+        "deadlines": true
+      }
+    }
+  ],
+  "autonomous_rollover_proven": true,
+  "required_plugin_built": true,
+  "uses_private_ui_automation": false,
+  "test_evidence": [
+    ".forge-codex/evidence/P09-host-capability-report.json",
+    ".forge-codex/evidence/EVID-20260823T205539Z-7c10f18ca4.json",
+    ".forge-codex/evidence/EVID-20260823T205600Z-67248c9a56.json",
+    ".forge-codex/evidence/EVID-20260823T205612Z-bbcdb66436.json"
+  ],
+  "qualification_note": "Autonomous rollover is proven only for the Forge-native logical session host through its injected NativeSessionTransport boundary. No undocumented external-chat API or private UI automation is claimed."
+}

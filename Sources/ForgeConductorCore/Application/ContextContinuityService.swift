@@ -9,6 +9,7 @@ import Darwin
 
 /// Context + agent continuity control plane (stdio MCP / same serve binary).
 public final class ContextContinuityService: @unchecked Sendable {
+    static let maximumAgentSnapshots = 128
     private let paths: AppPaths
     private let store: SQLiteStore
     private let sessions: AgentSessionService
@@ -417,6 +418,7 @@ public final class ContextContinuityService: @unchecked Sendable {
         var seen = Set<String>()
         var snaps: [AgentContinuitySnapshot] = []
         for s in open where s.clientID == clientID {
+            if snaps.count >= Self.maximumAgentSnapshots { break }
             if seen.contains(s.id.rawValue) { continue }
             seen.insert(s.id.rawValue)
 
@@ -462,6 +464,7 @@ public final class ContextContinuityService: @unchecked Sendable {
         var merged: [AgentContinuitySnapshot] = []
         var seen = Set<String>()
         for snapshot in prior where seen.insert(snapshot.sessionID).inserted {
+            if merged.count >= Self.maximumAgentSnapshots { break }
             guard let session = try store.sessionGet(id: SessionID(snapshot.sessionID)),
                   session.status.isOpen else {
                 continue
@@ -469,6 +472,7 @@ public final class ContextContinuityService: @unchecked Sendable {
             merged.append(currentBySession.removeValue(forKey: snapshot.sessionID) ?? snapshot)
         }
         for snapshot in current where seen.insert(snapshot.sessionID).inserted {
+            if merged.count >= Self.maximumAgentSnapshots { break }
             merged.append(snapshot)
         }
         return merged
@@ -606,7 +610,7 @@ public final class ContextContinuityService: @unchecked Sendable {
 
     private func projectCurrentTask(_ packet: HandoffPacket) throws {
         var md = """
-        # Current Task
+        # Current Work
 
         **Status:** \(packet.status)
         **Handoff id:** `\(packet.id)`

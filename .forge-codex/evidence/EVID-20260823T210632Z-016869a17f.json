@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 2796,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T210632Z-016869a17f.stdout.txt",
+      "sha256": "71f9de368121b92bf92a433df00715a665ff2658f37c07c6c016ef53e7d55447"
+    },
+    {
+      "bytes": 741,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T210632Z-016869a17f.stderr.txt",
+      "sha256": "b6e8a65188054028aeee0ef76691d965fabbeff0e70b167bf3ba834bbd85b7b8"
+    }
+  ],
+  "command": "swift test -c release --no-parallel --filter 'ContinuityTests.testVersionThreeStoreMigratesWithoutLosingHandoff|ContinuityTests.testConcurrentVersionThreeMigrationIsIdempotent|ProjectMemoryTests.testProjectIsolationRedactionDeduplicationAndRestartDurability|ProjectMemoryTests.testIntegrityVersionFailurePreservesDatabaseAndExportChecksumIsVerified|ProjectMemoryTests.testFallbackSearchAndCorruptDatabaseRecoveryArtifact|NativeSessionHostPluginTests.testFullAutonomousRolloverPersistsOnlyCompactIdentifiers'",
+  "ended_at": "2026-08-23T21:07:08.736650+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T210632Z-016869a17f",
+  "kind": "p10-migration-compatibility-tests",
+  "related_findings": [],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T21:06:32.891148+00:00",
+  "timed_out": false
+}

@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "phase": "P07",
+  "status": "passed",
+  "implementation": {
+    "legacy_compatibility": "All five memory_* tools and accepted schemas remain present and unchanged.",
+    "project_identity": "A restrictive atomic registry stores UUID identity, repository identity, and up to 32 canonical path aliases.",
+    "storage": "Each project owns Projects/<uuid>/memory.sqlite3 with WAL, foreign keys, busy timeout, typed bindings, transactions, schema version 1, and integrity checks.",
+    "search": "Deterministic lexical ranking, kind/tag/session filters, opaque cursors, row limits, and encoded-byte response limits are enforced.",
+    "redaction": "Credential patterns are redacted before persistence and private-key material is rejected.",
+    "recovery": "Unsupported future versions preserve the database unchanged; corruption preserves a recovery artifact; exports are checksummed; lock failures are typed and transactional.",
+    "transport": "The stdio executable passed initialize, tools/list, schemas, typed errors, cancellation, pagination, redaction, status, and restart durability."
+  },
+  "limits": {
+    "open_projects": 8,
+    "page_records": 100,
+    "batch_records": 50,
+    "batch_bytes": 1048576,
+    "response_bytes": 262144,
+    "body_bytes": 262144
+  },
+  "qualification": {
+    "focused_tests": ".forge-codex/evidence/EVID-20260823T201609Z-581a87dcb8.json",
+    "process_conformance": ".forge-codex/evidence/EVID-20260823T201627Z-984d2e61cb.json",
+    "strict_full_suite": ".forge-codex/evidence/EVID-20260823T201632Z-6920be9c15.json",
+    "strict_full_suite_result": "256 tests, 2 environment skips, 0 failures"
+  }
+}

@@ -1,0 +1,70 @@
+Test Suite 'Selected tests' started at 2026-08-23 14:57:50.290.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-23 14:57:50.298.
+Test Suite 'LifecycleOwnershipTests' started at 2026-08-23 14:57:50.298.
+Test Case '-[ForgeConductorTests.LifecycleOwnershipTests testManagerOwnerReleasesListenerAcrossTenCycles]' started.
+Test Case '-[ForgeConductorTests.LifecycleOwnershipTests testManagerOwnerReleasesListenerAcrossTenCycles]' passed (4.477 seconds).
+Test Case '-[ForgeConductorTests.LifecycleOwnershipTests testManagerRuntimeCancelsOwnedDispatchSources]' started.
+Test Case '-[ForgeConductorTests.LifecycleOwnershipTests testManagerRuntimeCancelsOwnedDispatchSources]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.LifecycleOwnershipTests testPortInspectionProcessAndPipeCompleteTenCycles]' started.
+Test Case '-[ForgeConductorTests.LifecycleOwnershipTests testPortInspectionProcessAndPipeCompleteTenCycles]' passed (0.715 seconds).
+Test Suite 'LifecycleOwnershipTests' passed at 2026-08-23 14:57:55.491.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 5.193 (5.193) seconds
+Test Suite 'ProcessRunnerTests' started at 2026-08-23 14:57:55.491.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testCallerCannotRaiseTheOwnerOutputCeiling]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testCallerCannotRaiseTheOwnerOutputCeiling]' passed (0.005 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testDirectChildExitDoesNotWaitForDescendantPipeEOF]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testDirectChildExitDoesNotWaitForDescendantPipeEOF]' passed (0.008 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testLaunchFailureDoesNotPoisonTheNextRun]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testLaunchFailureDoesNotPoisonTheNextRun]' passed (0.003 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testMalformedAndCapSplitUTF8PreserveReadableOutput]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testMalformedAndCapSplitUTF8PreserveReadableOutput]' passed (0.007 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testNormalAndNonzeroExitStatuses]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testNormalAndNonzeroExitStatuses]' passed (0.008 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testOutputIsCapturedConcurrentlyAndTruncatedPerStream]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testOutputIsCapturedConcurrentlyAndTruncatedPerStream]' passed (0.011 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testParallelRunsRemainBoundedAndIndependent]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testParallelRunsRemainBoundedAndIndependent]' passed (0.031 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testRapidExitNotificationsAreNotLostUnderLoad]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testRapidExitNotificationsAreNotLostUnderLoad]' passed (0.031 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testTermIgnoringChildRequiresSIGKILL]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testTermIgnoringChildRequiresSIGKILL]' passed (0.316 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testTimeoutTerminatesChildAndReturnsConfirmedStatus]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testTimeoutTerminatesChildAndReturnsConfirmedStatus]' passed (0.042 seconds).
+Test Suite 'ProcessRunnerTests' passed at 2026-08-23 14:57:55.955.
+	 Executed 10 tests, with 0 failures (0 unexpected) in 0.463 (0.464) seconds
+Test Suite 'RealtimeStreamTests' started at 2026-08-23 14:57:55.955.
+Test Case '-[ForgeConductorTests.RealtimeStreamTests testContinuousSSESendsMultipleEvents]' started.
+Test Case '-[ForgeConductorTests.RealtimeStreamTests testContinuousSSESendsMultipleEvents]' passed (0.771 seconds).
+Test Case '-[ForgeConductorTests.RealtimeStreamTests testHealthReportsContinuousMode]' started.
+Test Case '-[ForgeConductorTests.RealtimeStreamTests testHealthReportsContinuousMode]' passed (0.694 seconds).
+Test Case '-[ForgeConductorTests.RealtimeStreamTests testHostStreamAdvancesWithoutSnapshotAPI]' started.
+Test Case '-[ForgeConductorTests.RealtimeStreamTests testHostStreamAdvancesWithoutSnapshotAPI]' passed (0.361 seconds).
+Test Case '-[ForgeConductorTests.RealtimeStreamTests testStreamHzParserUpgradesLegacyInterval]' started.
+Test Case '-[ForgeConductorTests.RealtimeStreamTests testStreamHzParserUpgradesLegacyInterval]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.RealtimeStreamTests testTelemetryServicePublishesOnEverySample]' started.
+Test Case '-[ForgeConductorTests.RealtimeStreamTests testTelemetryServicePublishesOnEverySample]' passed (0.488 seconds).
+Test Suite 'RealtimeStreamTests' passed at 2026-08-23 14:57:58.269.
+	 Executed 5 tests, with 0 failures (0 unexpected) in 2.314 (2.314) seconds
+Test Suite 'ResourcePolicyTests' started at 2026-08-23 14:57:58.270.
+Test Case '-[ForgeConductorTests.ResourcePolicyTests testApplicationCompositionRootReleasesAcrossTenCycles]' started.
+Test Case '-[ForgeConductorTests.ResourcePolicyTests testApplicationCompositionRootReleasesAcrossTenCycles]' passed (1.447 seconds).
+Test Case '-[ForgeConductorTests.ResourcePolicyTests testDiagnosticRingAndEveryDurableRoleLogRotateWithinLimits]' started.
+Test Case '-[ForgeConductorTests.ResourcePolicyTests testDiagnosticRingAndEveryDurableRoleLogRotateWithinLimits]' passed (0.151 seconds).
+Test Case '-[ForgeConductorTests.ResourcePolicyTests testMemoryPressureOnlyReducesOptionalRetention]' started.
+Test Case '-[ForgeConductorTests.ResourcePolicyTests testMemoryPressureOnlyReducesOptionalRetention]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ResourcePolicyTests testPhysicalMemoryTiersMatchDeclaredAbsoluteCeilings]' started.
+Test Case '-[ForgeConductorTests.ResourcePolicyTests testPhysicalMemoryTiersMatchDeclaredAbsoluteCeilings]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ResourcePolicyTests testSubscriberAndPerClientStateCapsAreEnforced]' started.
+Test Case '-[ForgeConductorTests.ResourcePolicyTests testSubscriberAndPerClientStateCapsAreEnforced]' passed (0.582 seconds).
+Test Case '-[ForgeConductorTests.ResourcePolicyTests testTelemetryPressureUpdatesEnforcedCapacity]' started.
+Test Case '-[ForgeConductorTests.ResourcePolicyTests testTelemetryPressureUpdatesEnforcedCapacity]' passed (0.209 seconds).
+Test Suite 'ResourcePolicyTests' passed at 2026-08-23 14:58:00.659.
+	 Executed 6 tests, with 0 failures (0 unexpected) in 2.389 (2.389) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-08-23 14:58:00.659.
+	 Executed 24 tests, with 0 failures (0 unexpected) in 10.358 (10.360) seconds
+Test Suite 'Selected tests' passed at 2026-08-23 14:58:00.659.
+	 Executed 24 tests, with 0 failures (0 unexpected) in 10.358 (10.368) seconds
+◇ Test run started.
+↳ Testing Library Version: 1501
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

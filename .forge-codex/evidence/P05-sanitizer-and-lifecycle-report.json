@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "phase": "P05",
+  "lifecycle_tests": {
+    "evidence_id": "EVID-20260823T193826Z-661c01c5d5",
+    "tests": 40,
+    "skipped": 1,
+    "failures": 0,
+    "includes_ten_cycle_owner_release": true,
+    "includes_ten_cycle_process_pipe_completion": true
+  },
+  "strict_concurrency": {
+    "evidence_id": "EVID-20260823T194308Z-9a5fdacf6f",
+    "command": "swift test --no-parallel -Xswiftc -strict-concurrency=complete -Xswiftc -warnings-as-errors",
+    "tests": 242,
+    "skipped": 2,
+    "failures": 0
+  },
+  "address_sanitizer": {
+    "evidence_id": "EVID-20260823T193845Z-e5d584a51f",
+    "build_completed": true,
+    "product_tests_started": false,
+    "product_findings": 0,
+    "environment_disposition": "Xcode 26.2 sanitizer runtime blocked before product initialization; a platform xctest host also deadlocked inside __asan::InitializeShadowMemory before main"
+  },
+  "thread_sanitizer": {
+    "evidence_id": "EVID-20260823T194202Z-a41d508f0c",
+    "build_completed": true,
+    "product_tests_started": false,
+    "product_findings": 0,
+    "environment_disposition": "macOS rejected the Xcode 26.2 TSan dylib before product initialization with Sanitizer load violates platform policy"
+  },
+  "live_leak_growth": {
+    "first_evidence_id": "EVID-20260823T194225Z-32827b0ff8",
+    "second_evidence_id": "EVID-20260823T194253Z-44ca4b7694",
+    "first_reported_bytes": 608912,
+    "second_reported_bytes": 608256,
+    "growth_bytes": -656,
+    "product_growth_detected": false,
+    "classification": "non-growing framework retention rooted in NSMutableArray/AppIntents XPC metadata; no Forge symbol occurs in the retained graphs"
+  },
+  "unresolved_product_findings": 0
+}

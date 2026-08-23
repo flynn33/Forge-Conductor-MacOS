@@ -1,0 +1,34 @@
+{
+  "artifacts": [
+    {
+      "bytes": 1837,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T203750Z-1bbe64a407.stdout.txt",
+      "sha256": "46b9f351d77920d8e4a979a5f15f62c41c7d6734b983cc1a3ee12d10a60eebc4"
+    },
+    {
+      "bytes": 7702,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T203750Z-1bbe64a407.stderr.txt",
+      "sha256": "0f0ff5d1cb9ba0be7e71d23d4cb51b818f873ed06e728ff7c52bada029aa17b2"
+    }
+  ],
+  "command": "swift test --jobs 4 --filter ContinuityCoordinatorTests",
+  "ended_at": "2026-08-23T20:38:00.428128+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T203750Z-1bbe64a407",
+  "kind": "p08-focused-tests",
+  "related_findings": [
+    "FC-MEM-COLLECTION",
+    "FC-LIFE-GAP"
+  ],
+  "related_gates": [
+    "G08"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T20:37:50.301277+00:00",
+  "timed_out": false
+}

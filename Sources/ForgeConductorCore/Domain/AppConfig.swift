@@ -19,10 +19,17 @@ public struct AppConfig: Sendable, Equatable, Codable {
     public var coordinator: CoordinatorConfig
 
     public struct ShellConfig: Sendable, Equatable, Codable {
+        public var enabled: Bool
         public var defaultTimeoutSec: Int
-        public init(defaultTimeoutSec: Int = 30) { self.defaultTimeoutSec = defaultTimeoutSec }
+        public init(enabled: Bool = false, defaultTimeoutSec: Int = 30) {
+            self.enabled = enabled
+            self.defaultTimeoutSec = defaultTimeoutSec
+        }
 
-        enum CodingKeys: String, CodingKey { case defaultTimeoutSec = "default_timeout_sec" }
+        enum CodingKeys: String, CodingKey {
+            case enabled
+            case defaultTimeoutSec = "default_timeout_sec"
+        }
     }
 
     public struct DashboardConfig: Sendable, Equatable, Codable {
@@ -128,7 +135,10 @@ public struct AppConfig: Sendable, Equatable, Codable {
         [
             "log_level": logLevel,
             "allowed_roots": allowedRoots,
-            "shell": ["default_timeout_sec": shell.defaultTimeoutSec] as [String: Any],
+            "shell": [
+                "enabled": shell.enabled,
+                "default_timeout_sec": shell.defaultTimeoutSec,
+            ] as [String: Any],
             "dashboard": [
                 "host": dashboard.host,
                 "port": dashboard.port,
@@ -154,6 +164,7 @@ public struct AppConfig: Sendable, Equatable, Codable {
         if let v = dict["log_level"] as? String { base.logLevel = v }
         if let v = dict["allowed_roots"] as? [String] { base.allowedRoots = v }
         if let shell = dict["shell"] as? [String: Any] {
+            if let enabled = shell["enabled"] as? Bool { base.shell.enabled = enabled }
             if let t = shell["default_timeout_sec"] as? Int { base.shell.defaultTimeoutSec = t }
             else if let t = shell["default_timeout_sec"] as? Double { base.shell.defaultTimeoutSec = Int(t) }
         }

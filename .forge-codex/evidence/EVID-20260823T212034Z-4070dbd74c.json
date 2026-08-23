@@ -1,0 +1,36 @@
+{
+  "artifacts": [
+    {
+      "bytes": 3917,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P11-release-stress-results.json",
+      "sha256": "c1f39620b4a218f03323b6cc0f53f5525093afe0e59830108df4c97b741e6dcb"
+    },
+    {
+      "bytes": 1057,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T212034Z-4070dbd74c.stdout.txt",
+      "sha256": "bf25da3e6e2e02599849ef8ba6f47c0aec0f0e3e522dc893d51a02332d107976"
+    },
+    {
+      "bytes": 714,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T212034Z-4070dbd74c.stderr.txt",
+      "sha256": "e8080fc4041fbeafea359040b373ac6bb624398def3a4245128e686cd6b47359"
+    }
+  ],
+  "command": "env FORGE_P11_OUTPUT=.forge-codex/evidence/P11-release-stress-results.json swift test -c release --no-parallel --filter ReleaseStressTests.testDeterministicReleaseStressAndResourceBudgets",
+  "ended_at": "2026-08-23T21:21:13.589637+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T212034Z-4070dbd74c",
+  "kind": "test",
+  "related_findings": [],
+  "related_gates": [
+    "G11"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T21:20:34.031254+00:00",
+  "timed_out": false
+}

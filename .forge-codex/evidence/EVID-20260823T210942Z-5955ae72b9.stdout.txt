@@ -1,0 +1,10 @@
+{
+  "baseline_features": 66,
+  "migration_fixtures": 6,
+  "native_ui_tests": 4,
+  "ok": true,
+  "phase": "P10",
+  "protocol_checks": 8,
+  "strict_tests": 265,
+  "unknown_features": 0
+}

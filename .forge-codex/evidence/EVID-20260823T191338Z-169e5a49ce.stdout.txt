@@ -1,0 +1,35 @@
+{
+  "checks": [
+    {
+      "name": "listener-publishes-directly",
+      "passed": true
+    },
+    {
+      "name": "listener-creates-no-task",
+      "passed": true
+    },
+    {
+      "name": "mailbox-newest-capacity-one",
+      "passed": true
+    },
+    {
+      "name": "mailbox-owns-consumer-task",
+      "passed": true
+    },
+    {
+      "name": "mailbox-has-explicit-stop",
+      "passed": true
+    },
+    {
+      "name": "mailbox-invalidates-generations",
+      "passed": true
+    },
+    {
+      "name": "mailbox-bounds-logical-slots",
+      "passed": true
+    }
+  ],
+  "phase": "P03",
+  "schema_version": 1,
+  "valid": true
+}

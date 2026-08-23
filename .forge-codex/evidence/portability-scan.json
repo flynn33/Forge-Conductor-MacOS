@@ -1,0 +1,7 @@
+{
+  "hits": {
+    "templates/build_and_run.sh": [
+      "-maxdepth"
+    ]
+  }
+}

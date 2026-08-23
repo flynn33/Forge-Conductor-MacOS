@@ -22,6 +22,7 @@ import Darwin
 /// - every 10th tick: processes + disk volumes
 public final class RealtimeMetricsEngine: RealtimeMetricsStreaming, @unchecked Sendable {
     public static let defaultTargetHz: Double = 30
+    public static let maximumListeners = 128
 
     private let systemCollector: any SystemMetricsCollecting
     private let tieredCollector: SystemCollector?
@@ -33,6 +34,7 @@ public final class RealtimeMetricsEngine: RealtimeMetricsStreaming, @unchecked S
     private var _targetHz: Double = RealtimeMetricsEngine.defaultTargetHz
     private var _running = false
     private var listeners: [UUID: (SystemMetrics) -> Void] = [:]
+    private var listenerOrder: [UUID] = []
     private var tick: UInt64 = 0
 
     // Measured Hz over a 1s window
@@ -111,7 +113,12 @@ public final class RealtimeMetricsEngine: RealtimeMetricsStreaming, @unchecked S
     public func addListener(_ block: @escaping (SystemMetrics) -> Void) -> UUID {
         let id = UUID()
         lock.lock()
+        if listeners.count >= Self.maximumListeners, let oldest = listenerOrder.first {
+            listeners.removeValue(forKey: oldest)
+            listenerOrder.removeFirst()
+        }
         listeners[id] = block
+        listenerOrder.append(id)
         lock.unlock()
         return id
     }
@@ -119,7 +126,13 @@ public final class RealtimeMetricsEngine: RealtimeMetricsStreaming, @unchecked S
     public func removeListener(_ id: UUID) {
         lock.lock()
         listeners[id] = nil
+        listenerOrder.removeAll { $0 == id }
         lock.unlock()
+    }
+
+    var listenerCount: Int {
+        lock.lock(); defer { lock.unlock() }
+        return listeners.count
     }
 
     private func sampleOnce(forceFull: Bool) {

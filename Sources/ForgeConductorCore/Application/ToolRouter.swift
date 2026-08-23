@@ -16,6 +16,7 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
     /// Per-client consecutive identical call fingerprint (tool + canonical args).
     private let loopLock = NSLock()
     private var lastCallFingerprint: [String: (fingerprint: String, count: Int)] = [:]
+    static let maxTrackedClients = 256
     private static let maxIdenticalConsecutiveCalls = 3
     /// Soft budget: after this many identical calls, auto-checkpoint + handoff_required.
     private static let budgetIdenticalCalls = 8
@@ -30,7 +31,9 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         self.packs = packs ?? [
             AgentToolPack(),
             MemoryToolPack(),
+            ProjectMemoryToolPack(),
             ContinuityToolPack(),
+            ContinuityLifecycleToolPack(),
             FilesystemToolPack(),
             GitToolPack(),
             ShellToolPack(),
@@ -70,6 +73,7 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         // participates, including authorization denials, so policy failures cannot
         // evade the context-budget circuit breaker indefinitely.
         let isContinuity = ContinuityToolPack().toolNames.contains(name)
+            || ContinuityLifecycleToolPack().toolNames.contains(name)
         if !isContinuity,
            !ContinuityAutomation.resumeTools.contains(name),
            app.continuityAutomation.isBlocked(clientID) {
@@ -328,7 +332,12 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         "git_add", "git_commit", "pdf_write", "pdf_from_file",
         "agent_run_start", "agent_run_status", "agent_run_complete", "shell_exec",
         "memory_set", "memory_delete",
+        "project_memory.initialize", "project_memory.remember", "project_memory.remember_batch",
+        "project_memory.update", "project_memory.forget", "project_memory.link",
+        "project_memory.export", "project_memory.import",
         "session_checkpoint", "session_handoff",
+        "continuity.checkpoint", "continuity.prepare_handoff",
+        "continuity.acknowledge_handoff", "continuity.resume", "continuity.request_rollover",
     ]
 
     private func applyRuntimeContinuity(
@@ -426,8 +435,18 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
             lastCallFingerprint[key] = (fingerprint, next)
             return next
         }
+        if lastCallFingerprint[key] == nil,
+           lastCallFingerprint.count >= Self.maxTrackedClients,
+           let victim = lastCallFingerprint.keys.filter({ $0 != key }).sorted().first {
+            lastCallFingerprint.removeValue(forKey: victim)
+        }
         lastCallFingerprint[key] = (fingerprint, 1)
         return 1
+    }
+
+    var trackedClientCount: Int {
+        loopLock.lock(); defer { loopLock.unlock() }
+        return lastCallFingerprint.count
     }
 
     private func canonicalArgumentFingerprint(_ arguments: [String: Any]) -> String {

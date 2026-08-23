@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 7101,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T195742Z-533a0ffc8a.stdout.txt",
+      "sha256": "f2c7ea913587a567ef0c6d2cb11ec08bc1951725ed4117439b52c6186c8b9753"
+    },
+    {
+      "bytes": 7293,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T195742Z-533a0ffc8a.stderr.txt",
+      "sha256": "0fb23c6c76c4a2931a64be286b43e40c66125311c316b0b1b1b74da14e4a54fc"
+    }
+  ],
+  "command": "swift test --no-parallel --filter 'ResourcePolicyTests|ProcessRunnerTests|RealtimeStreamTests|LifecycleOwnershipTests'",
+  "ended_at": "2026-08-23T19:58:00.712021+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T195742Z-533a0ffc8a",
+  "kind": "bounded-resource-tests",
+  "related_findings": [],
+  "related_gates": [
+    "G06"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T19:57:42.065267+00:00",
+  "timed_out": false
+}
