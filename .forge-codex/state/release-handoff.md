@@ -2,7 +2,14 @@
 
 ## Outcome
 
-The autonomous repair phases P00-P12 are implemented locally on `repair/forge-conductor-runtime`. The pre-P12 repair checkpoint is `082404ec42bf2adb775385dea85ad3b20d0076f4`; final P12 evidence and security remediation are included in the release checkpoint created after completion validation.
+The autonomous repair phases P00-P12 were merged to `main` by pull request #6. The pre-P12 repair checkpoint is `082404ec42bf2adb775385dea85ad3b20d0076f4`; final P12 evidence and security remediation are included in that merged release checkpoint. Version and release-document alignment for 0.9.0 is prepared on `release/0.9.0-alignment` in pull request #7.
+
+## Release alignment
+
+- The runtime version and all six Xcode marketing-version settings are `0.9.0`.
+- README, changelog, user guide, architecture, telemetry, continuity, and current G1-G10 status documents agree on the release version and behavior.
+- A focused G3 acceptance test prevents drift between the runtime, Xcode project, and current release documents.
+- The focused test, CLI version check, Xcode project parse, plist validation, package validation, publication-hygiene scan, secret scan, and whitespace check passed.
 
 ## Qualification
 
@@ -18,7 +25,7 @@ The autonomous repair phases P00-P12 are implemented locally on `repair/forge-co
 - Address and Thread Sanitizer test hosts built but were blocked before product test entry by the installed Xcode 26.2/macOS sanitizer runtime behavior. No sanitizer test pass is claimed.
 - The 8 GiB resource policy was exercised on a 48 GiB host; this is constrained-policy evidence, not physical 8 GiB hardware evidence.
 - Developer ID signing, notarization, and distribution were not performed.
-- The repair branch was pushed to GitHub and opened as pull request #6 against `main`.
+- Pull request #6 was merged to `main`; pull request #7 is open for the 0.9.0 alignment.
 - No Simulator was started. Every launched app, UI runner, profiler, and test host was terminated and checked after use.
 
 ## Evidence and recovery
