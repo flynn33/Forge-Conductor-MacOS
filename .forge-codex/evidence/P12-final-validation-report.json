@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "phase": "P12",
+  "status": "passed_with_environment_limits",
+  "tested_revision": "082404ec42bf2adb775385dea85ad3b20d0076f4",
+  "full_matrix": {
+    "swift_release": {
+      "status": "passed",
+      "result": "266 tests, 2 intentional environment skips, 0 failures",
+      "evidence": ".forge-codex/evidence/EVID-20260823T214020Z-c24fd407d3.json"
+    },
+    "swift_debug": {
+      "status": "passed",
+      "result": "266 tests, 2 intentional environment skips, 0 failures",
+      "evidence": ".forge-codex/evidence/EVID-20260823T214105Z-e462ac011e.json"
+    },
+    "project_local_launch": {
+      "status": "passed",
+      "result": "Application launched, verified, and its exact project-local process was terminated",
+      "evidence": ".forge-codex/evidence/EVID-20260823T214146Z-38e7461f37.json"
+    },
+    "xcode_debug_build_for_testing": {
+      "status": "passed",
+      "evidence": ".forge-codex/evidence/EVID-20260823T214153Z-6e094e31a0.json"
+    },
+    "xcode_debug_full_test": {
+      "status": "passed",
+      "result": "266 unit and integration tests with 2 intentional skips and 0 failures; 5 native UI tests with 0 failures; 100-cycle navigation stress passed",
+      "evidence": ".forge-codex/evidence/EVID-20260823T214211Z-c4735e8f70.json"
+    },
+    "xcode_release_unsigned": {
+      "status": "passed",
+      "evidence": ".forge-codex/evidence/EVID-20260823T214932Z-0462547840.json"
+    },
+    "xcode_release_ad_hoc": {
+      "status": "passed",
+      "evidence": ".forge-codex/evidence/EVID-20260823T215008Z-913025eedf.json"
+    },
+    "strict_concurrency_warnings_as_errors": {
+      "status": "passed",
+      "result": "266 tests passed under complete strict concurrency and warnings-as-errors",
+      "evidence": ".forge-codex/evidence/EVID-20260823T215054Z-ec120595aa.json"
+    }
+  },
+  "post_security_remediation": {
+    "swift_debug": {
+      "status": "passed",
+      "result": "269 tests, 2 intentional environment skips, 0 failures",
+      "evidence": ".forge-codex/evidence/EVID-20260823T221617Z-2cedb70293.json"
+    },
+    "strict_concurrency_warnings_as_errors": {
+      "status": "passed",
+      "result": "269 tests, 2 intentional environment skips, 0 failures",
+      "evidence": ".forge-codex/evidence/EVID-20260823T221713Z-b90d9287c6.json"
+    },
+    "xcode_debug_unit_matrix": {
+      "status": "passed",
+      "result": "269 tests, 2 intentional environment skips, 0 failures",
+      "evidence": ".forge-codex/evidence/EVID-20260823T221805Z-1d35f43020.json"
+    },
+    "security": {
+      "status": "passed_for_critical_high",
+      "result": "0 unresolved Critical or High findings; 1 Medium and 1 Low local-dashboard hardening item remain open",
+      "evidence": ".forge-codex/evidence/P12-security-scan-summary.json"
+    }
+  },
+  "sanitizers": {
+    "address": {
+      "status": "blocked_environment_before_test_entry",
+      "build_status": "passed",
+      "test_status": "not_started",
+      "detail": "The instrumented package and test host built. XCTest and Swift Testing hosts then remained in pre-main sanitizer runtime initialization at sustained CPU and were terminated by exact PID; no product test began.",
+      "evidence": ".forge-codex/evidence/EVID-20260823T215148Z-d7bfd8b8ac.json"
+    },
+    "thread": {
+      "status": "blocked_environment_before_test_entry",
+      "build_status": "passed",
+      "test_status": "not_started",
+      "detail": "The instrumented package and test host built. macOS rejected the Xcode 26.2 Thread Sanitizer runtime dylib under platform policy before product initialization.",
+      "evidence": ".forge-codex/evidence/EVID-20260823T215500Z-12f8c5930c.json"
+    },
+    "supporting_lifecycle_proof": ".forge-codex/evidence/P05-sanitizer-and-lifecycle-report.json"
+  },
+  "shutdown": {
+    "simulator_started": false,
+    "application_and_test_processes_terminated_after_each_run": true,
+    "final_process_check_required": false
+  },
+  "distribution_boundaries": {
+    "developer_id_signing": "not performed",
+    "notarization": "not performed",
+    "publishing": "not authorized and not performed"
+  }
+}

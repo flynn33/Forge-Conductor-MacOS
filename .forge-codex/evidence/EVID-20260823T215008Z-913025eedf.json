@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 176588,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T215008Z-913025eedf.stdout.txt",
+      "sha256": "a759840e74499c22f2248d6b74abe89a10f8ace0f4ba8f4a2c020e4bc98d555d"
+    },
+    {
+      "bytes": 225,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T215008Z-913025eedf.stderr.txt",
+      "sha256": "bf0d2274e38490fac62d2a31c10a5198d4930d569352886f63faacabdd292e20"
+    }
+  ],
+  "command": "xcodebuild -project ForgeConductor.xcodeproj -scheme ForgeConductor -configuration Release -destination platform=macOS -derivedDataPath .build/DerivedData-P12-Release-AdHoc CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= build",
+  "ended_at": "2026-08-23T21:50:44.225608+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T215008Z-913025eedf",
+  "kind": "xcode-build-release-adhoc",
+  "related_findings": [],
+  "related_gates": [
+    "G12"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T21:50:08.932573+00:00",
+  "timed_out": false
+}

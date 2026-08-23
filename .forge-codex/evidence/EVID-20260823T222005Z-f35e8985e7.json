@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 125,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T222005Z-f35e8985e7.stdout.txt",
+      "sha256": "41e8814b06acbca9702ab74753764cd2d4221522f53f326980910b8cc45c17a9"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T222005Z-f35e8985e7.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "command": "python3 .forge-codex/scripts/source_risk_scan.py --repo . --output .forge-codex/state/source-risk-scan.json",
+  "ended_at": "2026-08-23T22:20:06.220314+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T222005Z-f35e8985e7",
+  "kind": "source-risk-scan",
+  "related_findings": [],
+  "related_gates": [
+    "G12"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T22:20:05.420224+00:00",
+  "timed_out": false
+}

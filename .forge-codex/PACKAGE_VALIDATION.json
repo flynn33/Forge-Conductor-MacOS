@@ -147,6 +147,761 @@
     },
     {
       "detail": "valid",
+      "name": "json:evidence/EVID-20260823T183945Z-b1151f1fd4.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T184025Z-90a51329f5.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T184048Z-71ae30f85c.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T184112Z-aee135dafe.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T184311Z-0dccfacc9f.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T185718Z-7423c8eb79.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T190038Z-7b2e90ce5e.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T190308Z-bbb85d288b.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T190322Z-7010343b89.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T190411Z-562194f9ac.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T190435Z-72024a943c.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T190504Z-695abfb997.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T190515Z-0fb7b97728.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T190527Z-3d3279fc30.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T191232Z-37ef639495.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T191244Z-78ad0fb553.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T191259Z-1cde4355df.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T191338Z-169e5a49ce.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T191342Z-33c7dab2e2.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T191440Z-4b9a17e878.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T191456Z-1dd93b3c6a.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192135Z-0afe9d3de8.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192151Z-4704466f4f.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192214Z-82141cd307.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192316Z-d483557254.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192338Z-a24497b132.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192400Z-f983b3418a.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192528Z-b19c7be1fa.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192544Z-b1cba1659a.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192613Z-04727e0b2e.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192631Z-cfa3748c4d.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192639Z-46267799f4.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192702Z-59d9e97712.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192728Z-e788871dce.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192746Z-399a98b738.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192804Z-95eb990973.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192842Z-4e41ce2a84.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192849Z-c0a9658a23.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192902Z-89fd0383eb.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T192954Z-a1ccac7d61.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T193100Z-a782c3890a.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T193106Z-667173c96c.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T193356Z-c8231b937d.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T193826Z-661c01c5d5.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T193845Z-e5d584a51f.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T194137Z-26aa5b1b82.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T194148Z-4bc9b988c0.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T194202Z-a41d508f0c.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T194225Z-32827b0ff8.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T194253Z-44ca4b7694.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T194308Z-9a5fdacf6f.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T194716Z-556705f0c7.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T195742Z-533a0ffc8a.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T195808Z-9893a6484a.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T195911Z-2c43d9837a.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T201609Z-581a87dcb8.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T201627Z-984d2e61cb.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T201632Z-6920be9c15.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T202205Z-6824db4d27.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T202209Z-a14a40e46a.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T202214Z-45beba1a02.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T203750Z-1bbe64a407.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T203803Z-50f314d32f.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T203838Z-4f3fba0ee5.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T203848Z-0e5e9877c6.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T204207Z-fb406e171d.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T204247Z-4561e060f3.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T204429Z-dafc744afc.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T204436Z-c106089676.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T204436Z-f892521a49.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T205232Z-310671ba57.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T205249Z-275cf7deec.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T205318Z-0b9d4725a3.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T205325Z-8e4577190c.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T205330Z-dd887aaee2.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T205337Z-6ea80747a3.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T205539Z-7c10f18ca4.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T205600Z-67248c9a56.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T205612Z-bbcdb66436.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T205703Z-d353891c4a.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T205709Z-3ba0d3d56b.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T205709Z-c405db9faa.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T205726Z-683bd3177f.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T210530Z-4f9d8de5c7.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T210623Z-182392fa73.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T210632Z-016869a17f.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T210719Z-a3e959a8b6.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T210727Z-dd0087ce58.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T210942Z-5955ae72b9.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T212034Z-4070dbd74c.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T212122Z-63e094fe2e.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T212139Z-5e0f9ed571.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T212825Z-b15b99d225.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T212912Z-b76e698e10.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T212941Z-7cfd677b6d.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T213021Z-ff22ae46e0.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T213125Z-71f05795f9.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T213156Z-8cb418d293.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T213648Z-7ed720d512.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T213951Z-91c8ae0192.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T214002Z-c28391e496.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T214015Z-ef17bf523b.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T214020Z-c24fd407d3.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T214059Z-39a8eab344.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T214100Z-4aba5b7a1b.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T214105Z-e462ac011e.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T214146Z-38e7461f37.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T214153Z-6e094e31a0.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T214211Z-c4735e8f70.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T214932Z-0462547840.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T215008Z-913025eedf.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T215054Z-ec120595aa.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T215148Z-d7bfd8b8ac.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T215500Z-12f8c5930c.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T221500Z-66c22093c5.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T221617Z-2cedb70293.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T221713Z-b90d9287c6.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T221805Z-1d35f43020.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T222004Z-20463cb0ce.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T222005Z-f35e8985e7.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T222006Z-5eb3e93965.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T222006Z-83087966ca.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T222007Z-32f22b0ab5.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260823T222036Z-1dee156e7c.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P02-telemetry-baseline.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P03-bounded-telemetry-before-after.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P04-metal-performance-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P05-resource-owner-matrix.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P05-sanitizer-and-lifecycle-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P06-bounded-state-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P06-resource-policy-inventory.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P07-feature-parity.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P07-mcp-process-conformance.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P07-project-memory-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P07-resource-owner-matrix.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P08-continuity-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P08-feature-parity.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P08-mcp-process-conformance.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P08-resource-owner-matrix.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P09-external-mcp-compatibility.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P09-feature-parity.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P09-host-capability-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P09-resource-owner-matrix.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P10-migration-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P10-parity-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P10-protocol-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P11-profile-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P11-release-stress-results.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P11-resource-results.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P12-final-validation-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P12-security-scan-summary.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
       "name": "json:evidence/installed-runtime-self-test.json",
       "passed": true
     },
@@ -272,7 +1027,17 @@
     },
     {
       "detail": "valid",
+      "name": "json:state/completion-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
       "name": "json:state/environment.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/evidence-index.json",
       "passed": true
     },
     {
@@ -287,7 +1052,137 @@
     },
     {
       "detail": "valid",
+      "name": "json:state/gate-results/G00.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G00.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G01.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G01.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G01.static-inventory.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G02.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G02.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G03.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G03.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G04.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G04.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G05.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G05.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G06.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G06.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G07.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G07.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G08.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G08.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G09.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G09.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G10.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G10.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G11.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G11.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
       "name": "json:state/host-capability-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/repository-baseline.json",
       "passed": true
     },
     {
@@ -647,6 +1542,71 @@
     },
     {
       "detail": "compiled",
+      "name": "python:scripts/build_evidence_index.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/check_p03_telemetry.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/check_p04_metal.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/check_p05_lifecycle.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/check_p06_resources.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/check_p07_completion.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/check_p07_project_memory.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/check_p08_completion.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/check_p08_continuity.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/check_p09_completion.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/check_p10_completion.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/check_p11_completion.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/check_private_ui_automation.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
       "name": "python:scripts/feature_inventory.py",
       "passed": true
     },
@@ -753,6 +1713,16 @@
     {
       "detail": "syntax valid",
       "name": "shell:scripts/test_all.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:state/flow-handlers/P02-TELEMETRY-BASELINE.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
+      "name": "shell:state/flow-handlers/P11-GAUGE-STRESS.sh",
       "passed": true
     },
     {
@@ -900,6 +1870,6 @@
   "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex",
   "schema_version": 1,
   "valid": true,
-  "validated_at": "2026-08-23T18:37:04.431563+00:00",
+  "validated_at": "2026-08-23T22:20:43.041369+00:00",
   "warnings": []
 }

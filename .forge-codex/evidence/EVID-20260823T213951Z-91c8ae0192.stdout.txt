@@ -1,0 +1,2 @@
+?? .forge-codex/evidence/EVID-20260823T213951Z-91c8ae0192.stderr.txt
+?? .forge-codex/evidence/EVID-20260823T213951Z-91c8ae0192.stdout.txt

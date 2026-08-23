@@ -9,6 +9,7 @@ import Foundation
 /// Filesystem tool pack: read/write/edit/list/glob/mkdir/delete/move.
 public struct FilesystemToolPack: ToolPackHandling {
     private static let maximumTextFileBytes = 2 * 1024 * 1024
+    public static let maximumListEntries = 1_000
     public init() {}
 
     public var toolNames: [String] {
@@ -145,6 +146,13 @@ public struct FilesystemToolPack: ToolPackHandling {
             return .failure(code: "missing_args", message: "path, old, new required")
         }
         let url = ToolArgHelpers.resolvePath(path)
+        let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+        guard size <= Self.maximumTextFileBytes else {
+            return .failure(
+                code: "file_too_large",
+                message: "Text edits are limited to \(Self.maximumTextFileBytes) bytes"
+            )
+        }
         guard var text = try? String(contentsOf: url, encoding: .utf8) else {
             return .failure(code: "not_found", message: url.path)
         }
@@ -160,8 +168,14 @@ public struct FilesystemToolPack: ToolPackHandling {
     private func fsList(_ args: [String: Any]) throws -> ToolResult {
         let path = ToolArgHelpers.string(args, "path") ?? FileManager.default.currentDirectoryPath
         let url = ToolArgHelpers.resolvePath(path)
-        let items = try FileManager.default.contentsOfDirectory(atPath: url.path)
-        return .success(["path": url.path, "entries": items.sorted()])
+        let allItems = try FileManager.default.contentsOfDirectory(atPath: url.path).sorted()
+        let items = Array(allItems.prefix(Self.maximumListEntries))
+        return .success([
+            "path": url.path,
+            "entries": items,
+            "truncated": allItems.count > items.count,
+            "maximum_entries": Self.maximumListEntries,
+        ])
     }
 
     private func fsGlob(_ args: [String: Any], runner: ProcessRunner) throws -> ToolResult {

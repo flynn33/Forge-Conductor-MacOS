@@ -19,6 +19,8 @@ Validate:
 
 Resolve symlinks and standardize paths. Operations must remain inside the authorized project root or Forge application-support directories. Reject traversal and alias confusion.
 
+Session bindings and continuity packets may narrow access to a configured root, but they never create a new authorization root. The unrestricted `shell_exec` capability is disabled by default and can only be enabled through trusted local configuration; dashboard settings do not expose that switch. A working directory is not treated as confinement for a general shell.
+
 ## Secrets
 
 - Use the existing secure store or Keychain for credentials.

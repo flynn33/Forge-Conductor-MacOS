@@ -1,0 +1,4 @@
+{
+  "output": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/source-risk-scan.json",
+  "candidates": 282
+}

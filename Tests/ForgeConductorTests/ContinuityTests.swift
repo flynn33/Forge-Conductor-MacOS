@@ -1638,6 +1638,7 @@ final class ContinuityTests: XCTestCase {
     func testContextGetAdoptsWorkspaceForShellWithoutNewAgent() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
+        _ = try app.config.update(["shell": ["enabled": true]], save: false)
         let original = ClientID("adopt-original")
         _ = try app.tools.call(
             name: "session_checkpoint",

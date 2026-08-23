@@ -65,7 +65,7 @@ public final class AppPaths: @unchecked Sendable {
             let cfg: [String: Any] = [
                 "log_level": "info",
                 "allowed_roots": [] as [String],
-                "shell": ["default_timeout_sec": 30],
+                "shell": ["enabled": false, "default_timeout_sec": 30],
                 "dashboard": [
                     "host": "127.0.0.1",
                     "port": 7788,

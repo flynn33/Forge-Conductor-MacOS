@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T215148Z-d7bfd8b8ac.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 8481,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T215148Z-d7bfd8b8ac.stderr.txt",
+      "sha256": "ce57f2f9459ce64ff700a3f1c6107ab67477bac4b378eb591186b46e339cef16"
+    }
+  ],
+  "command": "swift test --sanitize=address --no-parallel",
+  "ended_at": "2026-08-23T21:55:00.003011+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 1,
+  "id": "EVID-20260823T215148Z-d7bfd8b8ac",
+  "kind": "address-sanitizer",
+  "related_findings": [],
+  "related_gates": [
+    "G12"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T21:51:48.186685+00:00",
+  "timed_out": false
+}

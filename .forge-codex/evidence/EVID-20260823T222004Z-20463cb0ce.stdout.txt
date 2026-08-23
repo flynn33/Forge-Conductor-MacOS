@@ -1,0 +1,6 @@
+{
+  "valid": true,
+  "checks": 367,
+  "errors": [],
+  "report": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/PACKAGE_VALIDATION.json"
+}

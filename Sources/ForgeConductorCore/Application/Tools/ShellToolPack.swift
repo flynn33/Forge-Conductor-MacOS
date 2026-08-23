@@ -8,6 +8,7 @@ import Foundation
 
 /// Shell tool pack: shell_exec.
 public struct ShellToolPack: ToolPackHandling {
+    public static let maximumTimeoutSec: TimeInterval = 120
     private let runner = ProcessRunner()
 
     public init() {}
@@ -20,8 +21,16 @@ public struct ShellToolPack: ToolPackHandling {
             return .failure(code: "missing_command", message: "command required")
         }
         let cwd = ToolArgHelpers.string(arguments, "cwd")
-        let timeout = (arguments["timeout_sec"] as? Double)
+        let requestedTimeout = (arguments["timeout_sec"] as? NSNumber)?.doubleValue
             ?? Double(app.config.int("shell", "default_timeout_sec", default: 30))
+        guard requestedTimeout.isFinite, requestedTimeout > 0 else {
+            return .failure(
+                code: "invalid_timeout",
+                message: "timeout_sec must be finite and positive",
+                retryable: false
+            )
+        }
+        let timeout = min(requestedTimeout, Self.maximumTimeoutSec)
         let result = try runner.run(
             executable: "/bin/bash",
             arguments: ["-lc", command],

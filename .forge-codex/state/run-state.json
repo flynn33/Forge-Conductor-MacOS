@@ -26,7 +26,7 @@
     }
   ],
   "created_at": "2026-08-23T18:32:04.449808+00:00",
-  "current_work": "P12",
+  "current_work": null,
   "decisions": [],
   "evidence": [
     "04fb03812290bdb7b43b973bde31d4399d351e29587f17096a419afd0c824b77",
@@ -35,6 +35,7 @@
     "1aa97c749b734a48dd19dfca93d250d454f0ee25c9496b2227c0ab6f8f7d842b",
     "1f33267dc6f77f755f5c8a2b537d600ba9f0b4218d3854af1f24263003af0b49",
     "24be3535df2a32ea3dcf5190b3113e96c11b71e00a98d1ae9ae5419489dffd01",
+    "3e8e63a0bccf3a5efd4e831f46213597233ba317f0c2d993ec262bdf90c4ddbd",
     "456c68fd77f436c47987b7dd6b71d21c2b8a43790b473444e99a331b877da09b",
     "47d39d678a1d5b15134be9e4a45880a184adb5541942e6ffb2bcaecbfa8362be",
     "4d90174ff7f47db00f49a9a621cc9d958030f840662682fbf5c6de3e6fe6c20a",
@@ -145,6 +146,31 @@
     "EVID-20260823T213125Z-71f05795f9",
     "EVID-20260823T213156Z-8cb418d293",
     "EVID-20260823T213648Z-7ed720d512",
+    "EVID-20260823T213951Z-91c8ae0192",
+    "EVID-20260823T214002Z-c28391e496",
+    "EVID-20260823T214015Z-ef17bf523b",
+    "EVID-20260823T214020Z-c24fd407d3",
+    "EVID-20260823T214059Z-39a8eab344",
+    "EVID-20260823T214100Z-4aba5b7a1b",
+    "EVID-20260823T214105Z-e462ac011e",
+    "EVID-20260823T214146Z-38e7461f37",
+    "EVID-20260823T214153Z-6e094e31a0",
+    "EVID-20260823T214211Z-c4735e8f70",
+    "EVID-20260823T214932Z-0462547840",
+    "EVID-20260823T215008Z-913025eedf",
+    "EVID-20260823T215054Z-ec120595aa",
+    "EVID-20260823T215148Z-d7bfd8b8ac",
+    "EVID-20260823T215500Z-12f8c5930c",
+    "EVID-20260823T221500Z-66c22093c5",
+    "EVID-20260823T221617Z-2cedb70293",
+    "EVID-20260823T221713Z-b90d9287c6",
+    "EVID-20260823T221805Z-1d35f43020",
+    "EVID-20260823T222004Z-20463cb0ce",
+    "EVID-20260823T222005Z-f35e8985e7",
+    "EVID-20260823T222006Z-5eb3e93965",
+    "EVID-20260823T222006Z-83087966ca",
+    "EVID-20260823T222007Z-32f22b0ab5",
+    "EVID-20260823T222036Z-1dee156e7c",
     "b73cca38f82eb1e02a02cd37a504653a7561c5ed02bdcdfffe9f3891eacddc88",
     "cceda1d1209095847a386a86f9048b1de62691c7e7d8ef6a1954b151b7ad759d",
     "d35955092f94076cf65a68f7ac24f677303902ca70b1a7a7b65fa12524d948a6",
@@ -276,10 +302,12 @@
       "updated_at": "2026-08-23T21:38:16.466876+00:00"
     },
     "G12": {
-      "evaluator": null,
-      "evidence_ids": [],
-      "status": "not_started",
-      "updated_at": null
+      "evaluator": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G12.json",
+      "evidence_ids": [
+        "3e8e63a0bccf3a5efd4e831f46213597233ba317f0c2d993ec262bdf90c4ddbd"
+      ],
+      "status": "passed",
+      "updated_at": "2026-08-23T22:20:44.743642+00:00"
     }
   },
   "handoffs": [],
@@ -307,7 +335,7 @@
       "updated_at": "2026-08-23T18:49:02.103484+00:00"
     }
   ],
-  "last_event_sequence": 141,
+  "last_event_sequence": 169,
   "phases": {
     "P00": {
       "attempts": 1,
@@ -384,18 +412,18 @@
     "P12": {
       "attempts": 1,
       "last_error": null,
-      "status": "running",
-      "updated_at": "2026-08-23T21:38:21.953670+00:00"
+      "status": "passed",
+      "updated_at": "2026-08-23T22:20:42.573688+00:00"
     }
   },
   "repository": {
     "branch": "repair/forge-conductor-runtime",
-    "commit": "1fce9e0188698167564056ee8ace266342f97c7b",
+    "commit": "082404ec42bf2adb775385dea85ad3b20d0076f4",
     "dirty": true,
     "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
   },
   "run_id": "aba90ab1-be80-4cc5-aa0b-23dd54d4a24d",
   "schema_version": 1,
-  "status": "active",
-  "updated_at": "2026-08-23T21:39:10.806238+00:00"
+  "status": "complete",
+  "updated_at": "2026-08-23T22:20:44.828270+00:00"
 }

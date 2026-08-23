@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 70321,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T221713Z-b90d9287c6.stdout.txt",
+      "sha256": "9d12360c5f0f38808cb8f8eeb8e0c21a9cc8563085071d65ac8bde8dd6a8afcf"
+    },
+    {
+      "bytes": 8724,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T221713Z-b90d9287c6.stderr.txt",
+      "sha256": "f85e9f428d75011c7dbcfe5719cd6db77062dbe2c0b1587f5d926aa474eb712c"
+    }
+  ],
+  "command": "swift test --no-parallel -Xswiftc -strict-concurrency=complete -Xswiftc -warnings-as-errors",
+  "ended_at": "2026-08-23T22:17:54.380904+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260823T221713Z-b90d9287c6",
+  "kind": "post-security-strict-concurrency",
+  "related_findings": [],
+  "related_gates": [
+    "G12"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-23T22:17:13.455792+00:00",
+  "timed_out": false
+}
