@@ -1,0 +1,19 @@
+event: response.created
+data: {"type":"response.created","sequence_number":0,"response":{"id":"resp_lms_fixture_root","object":"response","created_at":1787760000,"status":"in_progress","model":"fixture/tool-model","output":[],"previous_response_id":null,"usage":null}}
+
+event: response.output_item.added
+data: {"type":"response.output_item.added","sequence_number":1,"output_index":0,"item":{"id":"fc_lms_fixture_ack","type":"function_call","status":"in_progress","arguments":"","call_id":"call_lms_fixture_ack","name":"forge_continuity_ack"}}
+
+event: response.function_call_arguments.delta
+data: {"type":"response.function_call_arguments.delta","sequence_number":2,"item_id":"fc_lms_fixture_ack","output_index":0,"delta":"{\"schema_version\":2,\"handoff_id\":\"00000000-0000-4000-8000-000000000101\","}
+
+event: response.function_call_arguments.delta
+data: {"type":"response.function_call_arguments.delta","sequence_number":3,"item_id":"fc_lms_fixture_ack","output_index":0,"delta":"\"bootstrap_nonce\":\"fixture-nonce-0001\"}"}
+
+event: response.function_call_arguments.done
+data: {"type":"response.function_call_arguments.done","sequence_number":4,"item_id":"fc_lms_fixture_ack","output_index":0,"name":"forge_continuity_ack","arguments":"{\"schema_version\":2,\"handoff_id\":\"00000000-0000-4000-8000-000000000101\",\"bootstrap_nonce\":\"fixture-nonce-0001\"}"}
+
+event: response.completed
+data: {"type":"response.completed","sequence_number":5,"response":{"id":"resp_lms_fixture_root","object":"response","created_at":1787760000,"completed_at":1787760001,"status":"completed","model":"fixture/tool-model","output":[{"id":"fc_lms_fixture_ack","type":"function_call","status":"completed","arguments":"{\"schema_version\":2,\"handoff_id\":\"00000000-0000-4000-8000-000000000101\",\"bootstrap_nonce\":\"fixture-nonce-0001\"}","call_id":"call_lms_fixture_ack","name":"forge_continuity_ack"}],"previous_response_id":null,"usage":{"input_tokens":512,"output_tokens":32,"total_tokens":544}}}
+
+data: [DONE]

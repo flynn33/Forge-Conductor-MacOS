@@ -1,0 +1,34 @@
+{
+  "artifacts": [
+    {
+      "bytes": 5812,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260826T182914Z-ecdd4775c1.stdout.txt",
+      "sha256": "d591252dde93d20caa509ae6d653eff728e365591845134ad12612afc25dae64"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260826T182914Z-ecdd4775c1.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "command": "python3 .forge-autonomy-state/evidence/FC-BASE-000/verify_live_source_evidence.py --repo .",
+  "ended_at": "2026-08-26T18:29:14.900935+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260826T182914Z-ecdd4775c1",
+  "kind": "autonomy-baseline-source-proof",
+  "related_findings": [
+    "FC-HOST-001",
+    "FC-SHELL-001"
+  ],
+  "related_gates": [
+    "G09"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-26T18:29:14.853374+00:00",
+  "timed_out": false
+}

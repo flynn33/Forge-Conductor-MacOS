@@ -1,0 +1,33 @@
+{
+  "artifacts": [
+    {
+      "bytes": 3630,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260826T183031Z-0913edd711.stdout.txt",
+      "sha256": "601b8a55760491e1d57c100e3d39848242569078c53737f247a768516bb3b723"
+    },
+    {
+      "bytes": 5518,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260826T183031Z-0913edd711.stderr.txt",
+      "sha256": "c34f0575d157ac115015ee72718a4e52d9d879f05823f1a0430c9ddd45adc530"
+    }
+  ],
+  "command": "swift test --no-parallel --filter LiveCollectorEvidenceTests/testForgeSnapshotIncludesDiscoveredMCPServers",
+  "ended_at": "2026-08-26T18:30:36.944874+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 1,
+  "id": "EVID-20260826T183031Z-0913edd711",
+  "kind": "autonomy-baseline-live-process-reproducer",
+  "related_findings": [
+    "FC-OBS-LIVE-MCP-001"
+  ],
+  "related_gates": [
+    "G02"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-26T18:30:31.000875+00:00",
+  "timed_out": false
+}

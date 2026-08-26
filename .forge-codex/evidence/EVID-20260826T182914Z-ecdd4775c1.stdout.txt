@@ -1,0 +1,131 @@
+{
+  "all_hashes_match": true,
+  "all_line_ranges_valid": true,
+  "finding_count": 15,
+  "index": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-continuity-design/evidence/source-evidence-index.json",
+  "repository": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+  "results": [
+    {
+      "actual_sha256": "76e3b21f258fccb5a0a80ec75efc9c50528d951ebf2ca87caf8f44247a6ea28f",
+      "expected_sha256": "76e3b21f258fccb5a0a80ec75efc9c50528d951ebf2ca87caf8f44247a6ea28f",
+      "hash_matches": true,
+      "id": "FC-CONT-001",
+      "line_range_valid": true,
+      "path": "Sources/ForgeConductorCore/Application/Tools/ContinuityLifecycleToolPack.swift"
+    },
+    {
+      "actual_sha256": "11e112df156c841280c4456a933b606a9050bc0e22b5e79184836978fdfeebee",
+      "expected_sha256": "11e112df156c841280c4456a933b606a9050bc0e22b5e79184836978fdfeebee",
+      "hash_matches": true,
+      "id": "FC-CONT-002",
+      "line_range_valid": true,
+      "path": "Sources/ForgeConductorCore/Application/ContinuityCoordinator.swift"
+    },
+    {
+      "actual_sha256": "11e112df156c841280c4456a933b606a9050bc0e22b5e79184836978fdfeebee",
+      "expected_sha256": "11e112df156c841280c4456a933b606a9050bc0e22b5e79184836978fdfeebee",
+      "hash_matches": true,
+      "id": "FC-CONT-003",
+      "line_range_valid": true,
+      "path": "Sources/ForgeConductorCore/Application/ContinuityCoordinator.swift"
+    },
+    {
+      "actual_sha256": "f1abf82ff3fd613fa675f1edf56bd2c75155b069ee42a741bbbf8c5fd2fdfca2",
+      "expected_sha256": "f1abf82ff3fd613fa675f1edf56bd2c75155b069ee42a741bbbf8c5fd2fdfca2",
+      "hash_matches": true,
+      "id": "FC-CONT-004",
+      "line_range_valid": true,
+      "path": "Sources/ForgeConductorCore/Application/ContextContinuityService.swift"
+    },
+    {
+      "actual_sha256": "f1abf82ff3fd613fa675f1edf56bd2c75155b069ee42a741bbbf8c5fd2fdfca2",
+      "expected_sha256": "f1abf82ff3fd613fa675f1edf56bd2c75155b069ee42a741bbbf8c5fd2fdfca2",
+      "hash_matches": true,
+      "id": "FC-CONT-005",
+      "line_range_valid": true,
+      "path": "Sources/ForgeConductorCore/Application/ContextContinuityService.swift"
+    },
+    {
+      "actual_sha256": "614e9ef0663b8e2a37eb02aa72b55717026aa7fcf84327e2641f3a24754cb190",
+      "expected_sha256": "614e9ef0663b8e2a37eb02aa72b55717026aa7fcf84327e2641f3a24754cb190",
+      "hash_matches": true,
+      "id": "FC-CONT-006",
+      "line_range_valid": true,
+      "path": "Sources/ForgeConductorCore/Application/ToolRouter.swift"
+    },
+    {
+      "actual_sha256": "614e9ef0663b8e2a37eb02aa72b55717026aa7fcf84327e2641f3a24754cb190",
+      "expected_sha256": "614e9ef0663b8e2a37eb02aa72b55717026aa7fcf84327e2641f3a24754cb190",
+      "hash_matches": true,
+      "id": "FC-CONT-007",
+      "line_range_valid": true,
+      "path": "Sources/ForgeConductorCore/Application/ToolRouter.swift"
+    },
+    {
+      "actual_sha256": "12ec1e4eaae0a911948baa87115b95e44bcab42248136c99f1db30dc857b22d2",
+      "expected_sha256": "12ec1e4eaae0a911948baa87115b95e44bcab42248136c99f1db30dc857b22d2",
+      "hash_matches": true,
+      "id": "FC-HOST-001",
+      "line_range_valid": true,
+      "path": "Sources/ForgeNativeSessionHostPlugin/ForgeNativeSessionHostPlugin.swift"
+    },
+    {
+      "actual_sha256": "12ec1e4eaae0a911948baa87115b95e44bcab42248136c99f1db30dc857b22d2",
+      "expected_sha256": "12ec1e4eaae0a911948baa87115b95e44bcab42248136c99f1db30dc857b22d2",
+      "hash_matches": true,
+      "id": "FC-HOST-002",
+      "line_range_valid": true,
+      "path": "Sources/ForgeNativeSessionHostPlugin/ForgeNativeSessionHostPlugin.swift"
+    },
+    {
+      "actual_sha256": "31d3ac4e4887650f3dfffaa127bb7f3809ce1c25f821128d329bc182523aa9a8",
+      "expected_sha256": "31d3ac4e4887650f3dfffaa127bb7f3809ce1c25f821128d329bc182523aa9a8",
+      "hash_matches": true,
+      "id": "FC-MGR-001",
+      "line_range_valid": true,
+      "path": "Sources/ForgeConductorCore/Manager/ManagerNode.swift"
+    },
+    {
+      "actual_sha256": "31d3ac4e4887650f3dfffaa127bb7f3809ce1c25f821128d329bc182523aa9a8",
+      "expected_sha256": "31d3ac4e4887650f3dfffaa127bb7f3809ce1c25f821128d329bc182523aa9a8",
+      "hash_matches": true,
+      "id": "FC-MGR-002",
+      "line_range_valid": true,
+      "path": "Sources/ForgeConductorCore/Manager/ManagerNode.swift"
+    },
+    {
+      "actual_sha256": "8d8b1bac46609e6541599312860106337d8c4f60ade2b176ddcca291e211bd24",
+      "expected_sha256": "8d8b1bac46609e6541599312860106337d8c4f60ade2b176ddcca291e211bd24",
+      "hash_matches": true,
+      "id": "FC-SHELL-001",
+      "line_range_valid": true,
+      "path": "Sources/ForgeConductorCore/Domain/AppConfig.swift"
+    },
+    {
+      "actual_sha256": "8375fd682538cb1ec52db0a8c15f2605f0aa31fffc2c974d3be40052c1e63ccf",
+      "expected_sha256": "8375fd682538cb1ec52db0a8c15f2605f0aa31fffc2c974d3be40052c1e63ccf",
+      "hash_matches": true,
+      "id": "FC-SHELL-002",
+      "line_range_valid": true,
+      "path": "Sources/ForgeConductorCore/Infrastructure/AppPaths.swift"
+    },
+    {
+      "actual_sha256": "447a2bdc8907718371bea44a3381df293e1e0872e8826939d00a3e1db781991b",
+      "expected_sha256": "447a2bdc8907718371bea44a3381df293e1e0872e8826939d00a3e1db781991b",
+      "hash_matches": true,
+      "id": "FC-SHELL-003",
+      "line_range_valid": true,
+      "path": "Sources/ForgeConductorCore/Application/ToolAuthorizationService.swift"
+    },
+    {
+      "actual_sha256": "1d5eed3796033dc09f00874ae3e48f49cc7979f51f67421ba0078a0c219bfbc5",
+      "expected_sha256": "1d5eed3796033dc09f00874ae3e48f49cc7979f51f67421ba0078a0c219bfbc5",
+      "hash_matches": true,
+      "id": "FC-SHELL-004",
+      "line_range_valid": true,
+      "path": "Sources/ForgeConductorApp/Views/ManagerSettingsView.swift"
+    }
+  ],
+  "schema_version": 1,
+  "unique_source_count": 10
+}

@@ -1,0 +1,40 @@
+{
+  "models": [
+    {
+      "type": "llm",
+      "publisher": "fixture",
+      "key": "fixture/tool-model",
+      "display_name": "Fixture Tool Model",
+      "architecture": "fixture",
+      "quantization": {
+        "name": "Q4_K_M",
+        "bits_per_weight": 4
+      },
+      "size_bytes": 1073741824,
+      "params_string": "1B",
+      "loaded_instances": [
+        {
+          "id": "fixture/tool-model@32768",
+          "config": {
+            "context_length": 32768,
+            "eval_batch_size": 512,
+            "parallel": 1,
+            "flash_attention": true,
+            "offload_kv_cache_to_gpu": true
+          }
+        }
+      ],
+      "max_context_length": 131072,
+      "format": "gguf",
+      "capabilities": {
+        "vision": false,
+        "trained_for_tool_use": true,
+        "reasoning": {
+          "allowed_options": ["off", "low"],
+          "default": "off"
+        }
+      },
+      "description": "Deterministic contract fixture"
+    }
+  ]
+}

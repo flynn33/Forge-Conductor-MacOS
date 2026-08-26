@@ -171,6 +171,8 @@
     "EVID-20260823T222006Z-83087966ca",
     "EVID-20260823T222007Z-32f22b0ab5",
     "EVID-20260823T222036Z-1dee156e7c",
+    "EVID-20260826T182914Z-ecdd4775c1",
+    "EVID-20260826T183031Z-0913edd711",
     "b73cca38f82eb1e02a02cd37a504653a7561c5ed02bdcdfffe9f3891eacddc88",
     "cceda1d1209095847a386a86f9048b1de62691c7e7d8ef6a1954b151b7ad759d",
     "d35955092f94076cf65a68f7ac24f677303902ca70b1a7a7b65fa12524d948a6",
@@ -272,42 +274,46 @@
       "updated_at": "2026-08-23T20:45:54.629465+00:00"
     },
     "G09": {
-      "evaluator": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G09.json",
+      "evaluator": "live-source-hash-and-contract-audit",
       "evidence_ids": [
         "718134c59c7491b914c1325288df58ea28b3f803465b43539a15bc9e5c4e8b06",
         "944c80f8d7b63d6d4298dd6fcd3c2b0122e6fc81e66aabfb483877a98bb9f47c",
+        "EVID-20260826T182914Z-ecdd4775c1",
         "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       ],
-      "status": "passed",
-      "updated_at": "2026-08-23T20:58:19.613218+00:00"
+      "status": "failed",
+      "updated_at": "2026-08-26T18:29:37.833557+00:00"
     },
     "G10": {
-      "evaluator": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G10.json",
+      "evaluator": "dependency-reopened",
       "evidence_ids": [
         "1574239ab804b951325b8b5fcaf7f4f7528c787a1e1914fff941fe4ae6d34e2a",
+        "EVID-20260826T182914Z-ecdd4775c1",
         "e05955416a6162b75c469385f49c3beaaa90bf7f4dcbae1b5abedeafbc25cfd0",
         "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       ],
-      "status": "passed",
-      "updated_at": "2026-08-23T21:11:05.296968+00:00"
+      "status": "blocked_dependency",
+      "updated_at": "2026-08-26T18:29:38.115337+00:00"
     },
     "G11": {
-      "evaluator": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G11.json",
+      "evaluator": "dependency-reopened",
       "evidence_ids": [
         "24be3535df2a32ea3dcf5190b3113e96c11b71e00a98d1ae9ae5419489dffd01",
         "5cb2d4f7609ff0bd794f80e137178eb2c10c9335b41d779b0756184a20d9e0c9",
+        "EVID-20260826T182914Z-ecdd4775c1",
         "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       ],
-      "status": "passed",
-      "updated_at": "2026-08-23T21:38:16.466876+00:00"
+      "status": "blocked_dependency",
+      "updated_at": "2026-08-26T18:29:38.401233+00:00"
     },
     "G12": {
-      "evaluator": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G12.json",
+      "evaluator": "dependency-reopened",
       "evidence_ids": [
-        "3e8e63a0bccf3a5efd4e831f46213597233ba317f0c2d993ec262bdf90c4ddbd"
+        "3e8e63a0bccf3a5efd4e831f46213597233ba317f0c2d993ec262bdf90c4ddbd",
+        "EVID-20260826T182914Z-ecdd4775c1"
       ],
-      "status": "passed",
-      "updated_at": "2026-08-23T22:20:44.743642+00:00"
+      "status": "blocked_dependency",
+      "updated_at": "2026-08-26T18:29:38.693001+00:00"
     }
   },
   "handoffs": [],
@@ -333,9 +339,42 @@
       "status": "resolved",
       "title": "G01 gate overwrites completed runtime feature baseline",
       "updated_at": "2026-08-23T18:49:02.103484+00:00"
+    },
+    {
+      "created_at": "2026-08-26T18:29:37.546573+00:00",
+      "evidence_class": "E1",
+      "id": "FC-AUTONOMY-001",
+      "notes": "EVID-20260826T182914Z-ecdd4775c1 verifies package-indexed live hashes; G09 prior proof used LocalLogicalSessionTransport and is invalid under the continuity supplement.",
+      "path": "Sources/ForgeNativeSessionHostPlugin/ForgeNativeSessionHostPlugin.swift",
+      "severity": "High",
+      "status": "open",
+      "title": "Release transport is synthetic and cannot prove autonomous rollover",
+      "updated_at": "2026-08-26T18:29:37.546441+00:00"
+    },
+    {
+      "created_at": "2026-08-26T18:29:37.687402+00:00",
+      "evidence_class": "E1",
+      "id": "FC-SHELL-DEFAULT-001",
+      "notes": "EVID-20260826T182914Z-ecdd4775c1 verifies the default-disabled source findings; host-local enabled configuration does not satisfy fresh or migrated installs.",
+      "path": "Sources/ForgeConductorCore/Domain/AppConfig.swift",
+      "severity": "High",
+      "status": "open",
+      "title": "Fresh configuration defaults shell off and has no migration or UI toggle",
+      "updated_at": "2026-08-26T18:29:37.687243+00:00"
+    },
+    {
+      "created_at": "2026-08-26T18:30:45.040874+00:00",
+      "evidence_class": "E0",
+      "id": "FC-OBS-LIVE-MCP-001",
+      "notes": "EVID-20260826T183031Z-0913edd711 reproduces missing-card assertions while deterministic FORGE_SKIP_PS=1 suite passes; investigate independently before release.",
+      "path": "Tests/ForgeConductorTests/LiveCollectorEvidenceTests.swift",
+      "severity": "Medium",
+      "status": "open",
+      "title": "Live MCP process snapshot assertion is unstable against active LM Studio helpers",
+      "updated_at": "2026-08-26T18:30:45.040680+00:00"
     }
   ],
-  "last_event_sequence": 169,
+  "last_event_sequence": 183,
   "phases": {
     "P00": {
       "attempts": 1,
@@ -393,37 +432,37 @@
     },
     "P09": {
       "attempts": 0,
-      "last_error": null,
-      "status": "passed",
-      "updated_at": "2026-08-23T21:39:10.806071+00:00"
+      "last_error": "Stricter package rejects synthetic transport as autonomous successor proof.",
+      "status": "ready",
+      "updated_at": "2026-08-26T18:29:37.977380+00:00"
     },
     "P10": {
       "attempts": 1,
-      "last_error": null,
-      "status": "passed",
-      "updated_at": "2026-08-23T21:11:11.332848+00:00"
+      "last_error": "Depends on reopened P09 and new feature-parity work.",
+      "status": "blocked_dependency",
+      "updated_at": "2026-08-26T18:29:38.260792+00:00"
     },
     "P11": {
       "attempts": 1,
-      "last_error": null,
-      "status": "passed",
-      "updated_at": "2026-08-23T21:38:21.875049+00:00"
+      "last_error": "Depends on renewed parity and autonomy validation.",
+      "status": "blocked_dependency",
+      "updated_at": "2026-08-26T18:29:38.547555+00:00"
     },
     "P12": {
       "attempts": 1,
-      "last_error": null,
-      "status": "passed",
-      "updated_at": "2026-08-23T22:20:42.573688+00:00"
+      "last_error": "Completion is invalid until renewed hard gates pass.",
+      "status": "blocked_dependency",
+      "updated_at": "2026-08-26T18:29:38.848566+00:00"
     }
   },
   "repository": {
-    "branch": "repair/forge-conductor-runtime",
-    "commit": "082404ec42bf2adb775385dea85ad3b20d0076f4",
+    "branch": "repair/autonomous-continuity",
+    "commit": "1f39ee6bdf1d4f907c6e1cb31f6213f2945d3985",
     "dirty": true,
-    "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
+    "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy"
   },
   "run_id": "aba90ab1-be80-4cc5-aa0b-23dd54d4a24d",
   "schema_version": 1,
-  "status": "complete",
-  "updated_at": "2026-08-23T22:20:44.828270+00:00"
+  "status": "active",
+  "updated_at": "2026-08-26T18:30:45.040876+00:00"
 }

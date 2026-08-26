@@ -1,0 +1,16 @@
+{
+  "checks": {
+    "attribution_scan_passed": true,
+    "baseline_captured_before_source_edit": true,
+    "deterministic_lm_studio_fixture_passed": true,
+    "diff_check_passed": true,
+    "legacy_mcp_names_preserved": true,
+    "machine_paths_absent": true,
+    "product_behavior_unchanged": true,
+    "required_evidence_present": true,
+    "secret_scan_passed": true
+  },
+  "errors": [],
+  "schema_version": 1,
+  "valid": true
+}

@@ -1,0 +1,13 @@
+{
+  "blocked_work_packages": [],
+  "completed_work_packages": [
+    "FC-BASE-000"
+  ],
+  "current_work_package": "FC-SHELL-001",
+  "last_event_sha256": "97b99e001f9c790782cdb917825ca5ef0b5ad736716a2a25c07620521b5dc6f2",
+  "run_id": "1e48ce8e-c41f-4d6d-a0e6-c3201200671b",
+  "schema_version": 1,
+  "started_at": "2026-08-26T18:25:31.107798+00:00",
+  "status": "active",
+  "updated_at": "2026-08-26T18:50:58.757265+00:00"
+}

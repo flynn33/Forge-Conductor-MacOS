@@ -1,0 +1,89 @@
+{
+  "captured_at": "2026-08-26T18:50:58.698839+00:00",
+  "results": [
+    {
+      "command": "swift test --no-parallel",
+      "evidence": "EVID-20260826T183031Z-0913edd711",
+      "executed": 269,
+      "exit_code": 1,
+      "failure_scope": "LiveCollectorEvidenceTests.testForgeSnapshotIncludesDiscoveredMCPServers",
+      "failures": 9,
+      "id": "FC-BASE-LIVE-SWIFTPM",
+      "issue": "FC-OBS-LIVE-MCP-001",
+      "skipped": 1,
+      "status": "failed_observed_environment_integration",
+      "stderr_sha256": "1ece50ca33032ae6ef01c2ac469fcf55f52080854a70f39915fcee34a122154e",
+      "stdout_sha256": "33b12a53bd992525b5f628b4709455b585be978e4b3dfbc03a80d28eea324648"
+    },
+    {
+      "command": "/usr/bin/env FORGE_SKIP_PS=1 swift test --no-parallel",
+      "executed": 272,
+      "exit_code": 0,
+      "failures": 0,
+      "id": "FC-BASE-DETERMINISTIC-SWIFTPM",
+      "skipped": 1,
+      "status": "passed",
+      "stderr_sha256": "63a06b4d4559c459532de0e6d651defb12d227615aa81056ba9eaa7fd9cf3545",
+      "stdout_sha256": "7da32015ea3c08b8ea4a5ce6a68d4832e68aff00128d1ec3d38e9414f417b1b6"
+    },
+    {
+      "command": "./script/build_and_run.sh --verify",
+      "exit_code": 0,
+      "id": "FC-BASE-BUILD-RUN-VERIFY",
+      "status": "passed",
+      "stderr_sha256": "d0aa7e016728bf7489e5e95f1a8569d7f05f2a8498d65001883c52ee6e46d3c6",
+      "stdout_sha256": "ae31027eb5b7a186c186f747fe19340ef1085995530c4591293af31fda3863b4"
+    },
+    {
+      "command": "xcodebuild -workspace ForgeConductor.xcworkspace -scheme ForgeConductor -configuration Debug -derivedDataPath .forge-autonomy-state/evidence/FC-BASE-000/xcode-derived CODE_SIGNING_ALLOWED=NO build",
+      "exit_code": 0,
+      "id": "FC-BASE-XCODE-DEBUG",
+      "status": "passed",
+      "stderr_sha256": "12346bd8b84cb14aa8db5786b51211c82256dcd16b874c357c65888a16a354f2",
+      "stdout_sha256": "56b4749cd938985e00fd127d8cb4b9f77046b282fc42c6289feabcdb8abfd488"
+    },
+    {
+      "command": "swift test --no-parallel --filter LMStudioContractFixtureTests",
+      "executed": 3,
+      "exit_code": 0,
+      "failures": 0,
+      "id": "FC-BASE-LMSTUDIO-FIXTURE",
+      "status": "passed",
+      "stderr_sha256": "c8c00b9f292c595e5bab8b76458315ee3af85b5b30eeb2dab5a54900da0e086e",
+      "stdout_sha256": "dc6b9e87d45e8db5df6eb37075875a4a50d8bedd58da7f3600ce6c82b4039f75"
+    },
+    {
+      "command": "forge-conductor serve with initialize, tools/list, resources/list, prompts/list, and ping",
+      "id": "FC-BASE-MCP-PROTOCOL",
+      "response_sha256": "94216e67c35bc818e92cf919cff67be9b4fdbc41bd5d1c4ebbf04719e0869a32",
+      "status": "passed",
+      "tool_count": 53,
+      "validation_sha256": "52d9c65f8a65b6647f325554198aca4df41c69c7dda072d81d739f9a8b4cc772"
+    },
+    {
+      "command": "python3 .forge-codex/scripts/scan_attribution.py --root .",
+      "exit_code": 0,
+      "id": "FC-BASE-ATTRIBUTION-SCAN",
+      "status": "passed",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "f73b06819c46dca77f5594bea8d9e3db318aa004eb2260f3900d14db3d0b2a8c"
+    },
+    {
+      "command": "python3 .forge-codex/scripts/scan_secrets.py --root .",
+      "exit_code": 0,
+      "id": "FC-BASE-SECRET-SCAN",
+      "status": "passed",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "1f10164f39f4e67de1cf6bdac8d1636fc76d44bef21de813f93a5efc5bed361a"
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0,
+      "id": "FC-BASE-DIFF-CHECK",
+      "status": "passed",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "schema_version": 1
+}
