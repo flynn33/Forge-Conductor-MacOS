@@ -7,6 +7,76 @@ import XCTest
 
 /// G1/G7: product reliability — MCP negotiate + tools surface without LM Studio UI.
 final class ProductPathReliabilityTests: XCTestCase {
+    func testXcodeRuntimeLauncherEmbedsDeclaredProductIdentity() throws {
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let project = try String(
+            contentsOf: repository.appendingPathComponent(
+                "ForgeConductor.xcodeproj/project.pbxproj"
+            ),
+            encoding: .utf8
+        )
+
+        for configurationID in [
+            "F0A700000000000000000010",
+            "F0A700000000000000000011",
+        ] {
+            let start = try XCTUnwrap(project.range(of: "\(configurationID) /*"))
+            let end = try XCTUnwrap(
+                project.range(of: "\n\t\t};", range: start.lowerBound..<project.endIndex)
+            )
+            let configuration = project[start.lowerBound..<end.upperBound]
+            XCTAssertTrue(
+                configuration.contains("CREATE_INFOPLIST_SECTION_IN_BINARY = YES;"),
+                "runtime helper must embed the declared bundle identifier"
+            )
+            XCTAssertTrue(
+                configuration.contains(
+                    #"PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.runtime-launcher";"#
+                ),
+                "runtime helper must retain its exact product identity"
+            )
+        }
+    }
+
+    func testProjectBuildEntrypointStagesRuntimeLauncherBeforeBundleSigning() throws {
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let entrypoint = try String(
+            contentsOf: repository.appendingPathComponent("script/build_and_run.sh"),
+            encoding: .utf8
+        )
+
+        let requiredFragments = [
+            #"RUNTIME_HELPER_PRODUCT="forge-runtime-launcher""#,
+            #"APP_HELPERS="$APP_CONTENTS/Helpers""#,
+            #"RUNTIME_HELPER="$APP_HELPERS/$RUNTIME_HELPER_PRODUCT""#,
+            #"swift build --configuration "$BINARY_CONFIGURATION" --product "$RUNTIME_HELPER_PRODUCT""#,
+            #"cp "$BUILD_RUNTIME_HELPER" "$RUNTIME_HELPER""#,
+            #"chmod 0755 "$APP_BINARY" "$RUNTIME_HELPER""#,
+            #"/usr/bin/codesign --verify --deep --strict "$APP_BUNDLE""#,
+        ]
+        for fragment in requiredFragments {
+            XCTAssertTrue(entrypoint.contains(fragment), "missing build-entrypoint contract: \(fragment)")
+        }
+
+        let helperSigning = try XCTUnwrap(
+            entrypoint.range(of: #"--identifier "$RUNTIME_HELPER_IDENTIFIER""#)
+        )
+        let bundleSigning = try XCTUnwrap(
+            entrypoint.range(of: #"--identifier "$BUNDLE_ID""#)
+        )
+        let strictVerification = try XCTUnwrap(
+            entrypoint.range(of: #"/usr/bin/codesign --verify --deep --strict"#)
+        )
+        XCTAssertLessThan(helperSigning.lowerBound, bundleSigning.lowerBound)
+        XCTAssertLessThan(bundleSigning.lowerBound, strictVerification.lowerBound)
+    }
+
     func testInProcessMCPHandshakeToolsList() throws {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("forge-product-\(UUID().uuidString)", isDirectory: true)

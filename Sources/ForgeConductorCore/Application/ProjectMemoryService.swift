@@ -239,6 +239,14 @@ public final class ProjectMemoryService: @unchecked Sendable {
         values.forEach { $0.close() }
     }
 
+    public func closeProject(_ projectID: String) {
+        lock.lock()
+        let repository = repositories.removeValue(forKey: projectID)
+        repositoryOrder.removeAll { $0 == projectID }
+        lock.unlock()
+        repository?.close()
+    }
+
     public func initialize(
         path: String,
         projectID: String? = nil,

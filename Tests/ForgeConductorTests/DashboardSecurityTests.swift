@@ -3,9 +3,132 @@
 // The cases preserve parser limits and host/origin protections before routing is reached.
 
 import XCTest
+import Darwin
 @testable import ForgeConductorCore
 
 final class DashboardSecurityTests: XCTestCase {
+    func testManagerControlCredentialIsStableOwnerOnlyAndComparedExactly() throws {
+        let home = FileManager.default.temporaryDirectory
+            .appendingPathComponent("forge-manager-credential-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: home) }
+        let paths = AppPaths(home: home)
+        try paths.ensureLayout()
+
+        let first = try ManagerControlCredentialStore(paths: paths).bearerToken()
+        let second = try ManagerControlCredentialStore(paths: paths).bearerToken()
+        XCTAssertEqual(first, second)
+        XCTAssertEqual(first.count, ManagerControlCredentialStore.tokenCharacterCount)
+        XCTAssertTrue(first.allSatisfy { $0.isHexDigit && !$0.isUppercase })
+
+        let attributes = try FileManager.default.attributesOfItem(
+            atPath: paths.managerControlCredential.path
+        )
+        XCTAssertEqual((attributes[.posixPermissions] as? NSNumber)?.intValue, 0o600)
+        XCTAssertEqual((attributes[.ownerAccountID] as? NSNumber)?.uint32Value, geteuid())
+
+        let authorizer = ManagerMutationAuthorizer(
+            credentials: ManagerControlCredentialStore(paths: paths)
+        )
+        XCTAssertFalse(authorizer.authorizes(nil))
+        XCTAssertFalse(authorizer.authorizes("Bearer wrong"))
+        XCTAssertFalse(authorizer.authorizes("bearer \(first)"))
+        XCTAssertTrue(authorizer.authorizes("Bearer \(first)"))
+
+        let config = try String(contentsOf: paths.configJSON, encoding: .utf8)
+        XCTAssertFalse(config.contains(first))
+    }
+
+    func testEveryManagerMutationExceptReadOnlyStatusRequiresAuthorization() {
+        for path in [
+            "/api/manager/start",
+            "/api/manager/stop",
+            "/api/manager/restart",
+            "/api/manager/shutdown",
+            "/api/manager/settings",
+            "/api/manager/projects/register",
+            "/api/manager/projects/bind",
+            "/api/manager/projects/reset-generation",
+            "/api/manager/runs/start",
+            "/api/manager/runs/control",
+            "/api/manager/future-mutation",
+        ] {
+            XCTAssertTrue(
+                ManagerMutationAuthorizer.requiresAuthorization(method: "POST", path: path),
+                path
+            )
+        }
+        XCTAssertTrue(
+            ManagerMutationAuthorizer.requiresAuthorization(
+                method: "PUT",
+                path: "/api/manager/settings"
+            )
+        )
+        XCTAssertFalse(
+            ManagerMutationAuthorizer.requiresAuthorization(
+                method: "GET",
+                path: "/api/manager/status"
+            )
+        )
+        for path in [
+            "/api/manager/settings",
+            "/api/manager/operator/snapshot",
+            "/api/manager/autonomy/status",
+        ] {
+            XCTAssertFalse(
+                ManagerMutationAuthorizer.requiresAuthorization(method: "GET", path: path),
+                path
+            )
+        }
+        XCTAssertFalse(
+            ManagerMutationAuthorizer.requiresAuthorization(
+                method: "POST",
+                path: "/api/manager/projects/status"
+            )
+        )
+        XCTAssertFalse(
+            ManagerMutationAuthorizer.requiresAuthorization(
+                method: "POST",
+                path: "/api/manager/runs/status"
+            )
+        )
+        XCTAssertTrue(
+            ManagerMutationAuthorizer.requiresAuthorization(
+                method: "GET",
+                path: "/api/manager/future-mutation"
+            )
+        )
+        XCTAssertTrue(
+            ManagerMutationAuthorizer.requiresAuthorization(
+                method: "POST",
+                path: "/api/manager/status"
+            )
+        )
+    }
+
+    func testManagerControlCredentialFailsClosedWhenStoragePermissionsAreBroadened() throws {
+        let home = FileManager.default.temporaryDirectory
+            .appendingPathComponent("forge-manager-credential-mode-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: home) }
+        let paths = AppPaths(home: home)
+        try paths.ensureLayout()
+
+        let store = ManagerControlCredentialStore(paths: paths)
+        let token = try store.bearerToken()
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o644],
+            ofItemAtPath: paths.managerControlCredential.path
+        )
+
+        XCTAssertThrowsError(try store.bearerToken()) { error in
+            guard case ManagerMutationCredentialError.invalidStorage = error else {
+                return XCTFail("Expected invalid protected storage, received \(error)")
+            }
+        }
+        XCTAssertFalse(
+            ManagerMutationAuthorizer(credentials: store).authorizes("Bearer \(token)")
+        )
+    }
+
     func testParserRejectsMalformedAndOversizedLengths() {
         let malformed = Data("POST / HTTP/1.1\r\nHost: 127.0.0.1:7788\r\nContent-Length:\r\n\r\n".utf8)
         XCTAssertEqual(

@@ -171,7 +171,110 @@ final class ReleaseStressTests: XCTestCase {
         }
         rssSamples.append(currentRSS())
 
-        // Repeated complete rollover with durable single-successor acknowledgement.
+        // One hundred manager restarts recover the same durable runs from four
+        // deliberately injected executable states. Each supervisor and coordinator
+        // owner must release before the next manager process composition is modeled.
+        let recoveryRoot = root.appendingPathComponent("manager-recovery", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: recoveryRoot,
+            withIntermediateDirectories: true
+        )
+        let recoveryProject = try await running!.projectContexts.repository.registerProject(
+            projectID: ProjectID(),
+            displayName: "Release Recovery Matrix",
+            canonicalRoot: recoveryRoot
+        )
+        let recoveryStates: [AutonomousRunState] = [.created, .validating, .ready, .running]
+        let recoveryRuns = try await makeRecoveryRuns(
+            repository: running!.projectContexts.repository,
+            project: recoveryProject,
+            root: recoveryRoot,
+            states: recoveryStates
+        )
+        XCTAssertEqual(recoveryRuns.count, recoveryStates.count)
+
+        let recoveryProbe = StressCoordinatorProbe()
+        for restart in 0..<100 {
+            let started = ContinuousClock.now
+            var supervisor: AutonomySupervisor? = try AutonomySupervisor(
+                repository: running!.projectContexts.repository,
+                maximumConcurrentRuns: 1
+            ) { runID in
+                StressRecoveryCoordinator(
+                    runID: runID,
+                    probe: recoveryProbe,
+                    waitsForCancellation: false
+                )
+            }
+            let owner = try XCTUnwrap(supervisor)
+            let report = try await owner.recoverOnManagerStart()
+            XCTAssertEqual(report.discoveredRuns, recoveryStates.count)
+            XCTAssertEqual(report.activatedRuns.count, 1)
+            XCTAssertEqual(report.deferredRuns.count, recoveryStates.count - 1)
+            try await eventually {
+                let snapshot = await owner.snapshot()
+                return snapshot.activeRunIDs.isEmpty
+                    && snapshot.deferredRunIDs.isEmpty
+                    && snapshot.recentResults.count == recoveryStates.count
+            }
+            await owner.shutdown()
+            let stopped = await owner.snapshot()
+            XCTAssertFalse(stopped.acceptingRuns)
+            XCTAssertTrue(stopped.activeRunIDs.isEmpty)
+            XCTAssertTrue(stopped.deferredRunIDs.isEmpty)
+            supervisor = nil
+            XCTAssertEqual(
+                recoveryProbe.snapshot().ownedCoordinators,
+                0,
+                "manager restart \(restart) retained coordinator owners"
+            )
+            measurements["manager_restart_ms", default: []].append(
+                milliseconds(since: started)
+            )
+        }
+        let recoveredOwners = recoveryProbe.snapshot()
+        XCTAssertEqual(recoveredOwners.activationsStarted, 400)
+        XCTAssertEqual(recoveredOwners.activationsFinished, 400)
+        XCTAssertEqual(recoveredOwners.peakActiveActivations, 1)
+        XCTAssertEqual(recoveredOwners.coordinatorsCreated, recoveredOwners.coordinatorsReleased)
+
+        // Cancellation must drain the active activation tasks and release their
+        // coordinator owners, while never activating the deferred recovery rows.
+        let cancellationProbe = StressCoordinatorProbe()
+        let cancellationStarted = ContinuousClock.now
+        var cancellationSupervisor: AutonomySupervisor? = try AutonomySupervisor(
+            repository: running!.projectContexts.repository,
+            maximumConcurrentRuns: 2
+        ) { runID in
+            StressRecoveryCoordinator(
+                runID: runID,
+                probe: cancellationProbe,
+                waitsForCancellation: true
+            )
+        }
+        let cancellationOwner = try XCTUnwrap(cancellationSupervisor)
+        let cancellationReport = try await cancellationOwner.recoverOnManagerStart()
+        XCTAssertEqual(cancellationReport.activatedRuns.count, 2)
+        XCTAssertEqual(cancellationReport.deferredRuns.count, 2)
+        try await eventually { cancellationProbe.snapshot().activeActivations == 2 }
+        await cancellationOwner.shutdown()
+        let cancelledSnapshot = await cancellationOwner.snapshot()
+        XCTAssertFalse(cancelledSnapshot.acceptingRuns)
+        XCTAssertTrue(cancelledSnapshot.activeRunIDs.isEmpty)
+        cancellationSupervisor = nil
+        try await eventually { cancellationProbe.snapshot().ownedCoordinators == 0 }
+        let cancelledOwners = cancellationProbe.snapshot()
+        XCTAssertEqual(cancelledOwners.coordinatorsCreated, 2)
+        XCTAssertEqual(cancelledOwners.coordinatorsReleased, 2)
+        XCTAssertEqual(cancelledOwners.activationsStarted, 2)
+        XCTAssertEqual(cancelledOwners.activationsFinished, 2)
+        XCTAssertEqual(cancelledOwners.activeActivations, 0)
+        measurements["manager_cancellation_ms", default: []].append(
+            milliseconds(since: cancellationStarted)
+        )
+        rssSamples.append(currentRSS())
+
+        // Fifty complete rollovers exercise durable single-successor acknowledgement.
         let pluginRoot = root.appendingPathComponent("native-host", isDirectory: true)
         let adapter = try ForgeNativeSessionHostAdapter(
             storageDirectory: pluginRoot, transport: LocalLogicalSessionTransport()
@@ -180,7 +283,7 @@ final class ReleaseStressTests: XCTestCase {
             let coordinator = ContinuityCoordinator(
                 engine: ContinuityStateEngine(memory: running!.projectMemory)
             )
-            for index in 0..<25 {
+            for index in 0..<50 {
                 let operationID = UUID().uuidString.lowercased()
                 let handoff = try stressHandoff(
                     projectID: projectID, operationID: operationID, index: index
@@ -196,7 +299,7 @@ final class ReleaseStressTests: XCTestCase {
         }
         rssSamples.append(currentRSS())
 
-        // Lowest policy tier and pressure response are executed on this expanded-tier host.
+        // Lowest policy tier and pressure response are executed on the current host.
         let constrained = ResourcePolicy(physicalMemoryBytes: 8 * ResourcePolicy.gibibyte)
         let constrainedNominal = constrained.limits(for: .nominal)
         let constrainedCritical = constrained.limits(for: .critical)
@@ -237,7 +340,8 @@ final class ReleaseStressTests: XCTestCase {
         let summarized: [String: [String: Any]] = measurements.mapValues(percentileDictionary)
         let fixture: [String: Any] = [
             "seed": 11, "memory_records": 500, "mcp_requests": 100,
-            "project_cycles": 100, "process_cycles": 25, "rollovers": 25,
+            "project_cycles": 100, "process_cycles": 25, "rollovers": 50,
+            "manager_restarts": 100, "manager_recovery_states": recoveryStates.count,
         ]
         let resource: [String: Any] = [
             "resident_baseline_bytes": rssBaseline,
@@ -257,6 +361,9 @@ final class ReleaseStressTests: XCTestCase {
             "telemetry_maximum_logical_slots": pressuredMailbox.maximumPendingLogicalSlots,
             "telemetry_post_stop_slots": mailbox.snapshot().pendingLogicalSlots,
             "project_contexts_after_close": projectContextsAfterClose,
+            "manager_recovery_peak_active_owners": recoveredOwners.peakActiveActivations,
+            "manager_recovery_post_shutdown_owners": recoveredOwners.ownedCoordinators,
+            "manager_cancellation_post_shutdown_owners": cancelledOwners.ownedCoordinators,
             "main_actor_blocking_process_waits": 0,
             "unbounded_collections": 0,
             "unbounded_retries": 0,
@@ -267,6 +374,12 @@ final class ReleaseStressTests: XCTestCase {
             "lowest_executed_tier": constrained.tier.rawValue,
             "constrained_limits": resourceLimitsDictionary(constrainedNominal),
             "constrained_critical_limits": resourceLimitsDictionary(constrainedCritical),
+            "constrained_execution_limits": executionLimitsDictionary(
+                constrained.executionLimits(for: .nominal)
+            ),
+            "constrained_critical_execution_limits": executionLimitsDictionary(
+                constrained.executionLimits(for: .critical)
+            ),
         ]
         let report: [String: Any] = [
             "schema_version": 1,
@@ -303,6 +416,73 @@ final class ReleaseStressTests: XCTestCase {
         ).validated()
     }
 
+    private func makeRecoveryRuns(
+        repository: ProjectControlPlaneRepository,
+        project: ProjectControlRecord,
+        root: URL,
+        states: [AutonomousRunState]
+    ) async throws -> [RunID] {
+        var runIDs: [RunID] = []
+        for (index, targetState) in states.enumerated() {
+            var run = try await repository.createAutonomousRun(AutonomousRunRequest(
+                projectID: project.projectID,
+                projectGeneration: project.generation,
+                mission: "Recover deterministic manager state \(index)",
+                providerID: "release-stress-provider",
+                adapterID: "release-stress-adapter",
+                modelKey: "release-stress-model",
+                specification: AutonomousRunSpecification(
+                    allowedTools: ["fs_read"],
+                    completionGates: ["release_stress"]
+                ),
+                authorizationScope: ToolAuthorizationScope(
+                    canonicalRoots: [root],
+                    allowedTools: ["fs_read"],
+                    networkAllowed: false,
+                    maximumInlineOutputBytes: 64 * 1_024
+                )
+            ))
+            let path: [AutonomousRunState]
+            switch targetState {
+            case .created:
+                path = []
+            case .validating:
+                path = [.validating]
+            case .ready:
+                path = [.validating, .ready]
+            case .running:
+                path = [.validating, .ready, .starting, .running]
+            default:
+                XCTFail("release recovery fixture does not support \(targetState.rawValue)")
+                path = []
+            }
+            if !path.isEmpty {
+                let lease = try await repository.acquireRunLease(
+                    runID: run.runID,
+                    ownerID: "release-state-injection-\(index)"
+                )
+                for nextState in path {
+                    run = try await repository.transitionAutonomousRun(
+                        runID: run.runID,
+                        lease: lease,
+                        transition: AutonomousRunTransition(
+                            expectedState: run.state,
+                            expectedRevision: run.revision,
+                            nextState: nextState,
+                            eventType: "release_stress_state_injected",
+                            eventSummary: "Injected deterministic restart state"
+                        )
+                    )
+                }
+                let released = try await repository.releaseRunLease(lease)
+                XCTAssertTrue(released)
+            }
+            XCTAssertEqual(run.state, targetState)
+            runIDs.append(run.runID)
+        }
+        return runIDs
+    }
+
     private func writeReport(_ report: [String: Any]) throws {
         guard let output = ProcessInfo.processInfo.environment["FORGE_P11_OUTPUT"] else { return }
         let url = URL(fileURLWithPath: output)
@@ -336,6 +516,24 @@ final class ReleaseStressTests: XCTestCase {
             "memory_search_hard_limit": limits.memorySearchHardLimit,
             "mcp_response_bytes": limits.mcpResponseBytes,
             "active_gauge_fps": limits.activeGaugeFPS,
+        ]
+    }
+
+    private func executionLimitsDictionary(_ limits: ResourceExecutionLimits) -> [String: Any] {
+        [
+            "maximum_active_managed_generations": limits.maximumActiveManagedGenerations,
+            "maximum_active_runtime_jobs": limits.maximumActiveRuntimeJobs,
+            "maximum_cpu_heavy_runtime_jobs": limits.maximumCPUHeavyRuntimeJobs,
+            "maximum_in_memory_events": limits.maximumInMemoryEvents,
+            "model_policy": [
+                "default_loaded_instances": limits.modelPolicy.defaultLoadedInstances,
+                "maximum_loaded_instances": limits.modelPolicy.maximumLoadedInstances,
+                "maximum_parallel_requests": limits.modelPolicy.maximumParallelRequests,
+                "idle_ttl_seconds": limits.modelPolicy.idleTTLSeconds,
+                "jit_loading_required": limits.modelPolicy.jitLoadingRequired,
+                "auto_evict_required": limits.modelPolicy.autoEvictRequired,
+                "serialize_successor_creation": limits.modelPolicy.serializeSuccessorCreation,
+            ] as [String: Any],
         ]
     }
 
@@ -398,6 +596,106 @@ final class ReleaseStressTests: XCTestCase {
         }
         XCTFail("stress condition timed out")
     }
+}
+
+private struct StressCoordinatorProbeSnapshot: Sendable, Equatable {
+    let coordinatorsCreated: Int
+    let coordinatorsReleased: Int
+    let ownedCoordinators: Int
+    let activationsStarted: Int
+    let activationsFinished: Int
+    let activeActivations: Int
+    let peakActiveActivations: Int
+}
+
+private final class StressCoordinatorProbe: @unchecked Sendable {
+    private let lock = NSLock()
+    private var coordinatorsCreated = 0
+    private var coordinatorsReleased = 0
+    private var activationsStarted = 0
+    private var activationsFinished = 0
+    private var activeActivations = 0
+    private var peakActiveActivations = 0
+
+    func coordinatorCreated() {
+        lock.lock()
+        coordinatorsCreated += 1
+        lock.unlock()
+    }
+
+    func coordinatorReleased() {
+        lock.lock()
+        coordinatorsReleased += 1
+        lock.unlock()
+    }
+
+    func activationStarted() {
+        lock.lock()
+        activationsStarted += 1
+        activeActivations += 1
+        peakActiveActivations = max(peakActiveActivations, activeActivations)
+        lock.unlock()
+    }
+
+    func activationFinished() {
+        lock.lock()
+        activationsFinished += 1
+        activeActivations = max(0, activeActivations - 1)
+        lock.unlock()
+    }
+
+    func snapshot() -> StressCoordinatorProbeSnapshot {
+        lock.lock()
+        defer { lock.unlock() }
+        return StressCoordinatorProbeSnapshot(
+            coordinatorsCreated: coordinatorsCreated,
+            coordinatorsReleased: coordinatorsReleased,
+            ownedCoordinators: max(0, coordinatorsCreated - coordinatorsReleased),
+            activationsStarted: activationsStarted,
+            activationsFinished: activationsFinished,
+            activeActivations: activeActivations,
+            peakActiveActivations: peakActiveActivations
+        )
+    }
+}
+
+private final class StressRecoveryCoordinator: ProjectRunCoordinating, @unchecked Sendable {
+    let runID: RunID
+    private let probe: StressCoordinatorProbe
+    private let waitsForCancellation: Bool
+
+    init(
+        runID: RunID,
+        probe: StressCoordinatorProbe,
+        waitsForCancellation: Bool
+    ) {
+        self.runID = runID
+        self.probe = probe
+        self.waitsForCancellation = waitsForCancellation
+        probe.coordinatorCreated()
+    }
+
+    deinit {
+        probe.coordinatorReleased()
+    }
+
+    func runActivation() async throws -> ProjectRunActivationResult {
+        probe.activationStarted()
+        defer { probe.activationFinished() }
+        if waitsForCancellation {
+            try await Task.sleep(for: .seconds(60))
+        } else {
+            await Task.yield()
+        }
+        return ProjectRunActivationResult(
+            runID: runID,
+            finalState: .running,
+            stepsExecuted: 0,
+            yielded: true
+        )
+    }
+
+    func stop() async {}
 }
 
 private actor StressDeliveryProbe {

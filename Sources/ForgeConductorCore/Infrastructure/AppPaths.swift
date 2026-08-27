@@ -22,8 +22,14 @@ public final class AppPaths: @unchecked Sendable {
     }
 
     public var storeSQLite: URL { home.appendingPathComponent("store.sqlite") }
+    public var controlPlaneSQLite: URL { home.appendingPathComponent("control-plane.sqlite3") }
     public var auditJSONL: URL { home.appendingPathComponent("audit.jsonl") }
     public var configJSON: URL { home.appendingPathComponent("config.json") }
+    public var configMigrationsDir: URL { home.appendingPathComponent("config-migrations", isDirectory: true) }
+    public var configMigrationLock: URL { configMigrationsDir.appendingPathComponent(".schema-v2.lock") }
+    public var shellPolicyMigrationReceipt: URL {
+        configMigrationsDir.appendingPathComponent("shell-policy-v2.json")
+    }
     public var agentsDir: URL { home.appendingPathComponent("agents", isDirectory: true) }
     public var cacheDir: URL { home.appendingPathComponent("cache", isDirectory: true) }
     public var logsDir: URL { home.appendingPathComponent("logs", isDirectory: true) }
@@ -38,6 +44,12 @@ public final class AppPaths: @unchecked Sendable {
     public var managerPid: URL { home.appendingPathComponent("manager.pid") }
     public var managerLog: URL { logsDir.appendingPathComponent("manager.log") }
     public var managerState: URL { home.appendingPathComponent("manager-state.json") }
+    /// Per-user bearer credential for loopback manager mutations. The credential
+    /// store creates this file atomically with owner-only permissions and never
+    /// includes its contents in configuration, status, diagnostics, or exports.
+    public var managerControlCredential: URL {
+        home.appendingPathComponent("manager-control.secret")
+    }
 
     /// Durable project memory (markdown) for cross-chat continuity.
     public var memoryDir: URL { home.appendingPathComponent("memory", isDirectory: true) }
@@ -50,22 +62,38 @@ public final class AppPaths: @unchecked Sendable {
     /// Isolated durable databases for project-scoped MCP memory.
     public var projectsDir: URL { home.appendingPathComponent("Projects", isDirectory: true) }
     public var projectRegistry: URL { projectsDir.appendingPathComponent("registry.json") }
+    public var runtimeArtifactsDir: URL {
+        home.appendingPathComponent("runtime-artifacts", isDirectory: true)
+    }
+    /// Durable configuration and idempotency ledgers for statically registered
+    /// manager-owned model providers. Each adapter receives its own child directory.
+    public var managedProvidersDir: URL {
+        home.appendingPathComponent("managed-providers", isDirectory: true)
+    }
 
     @discardableResult
     public func ensureLayout() throws -> URL {
         let fm = FileManager.default
         for dir in [
             home, agentsDir, cacheDir, logsDir, dashboardDir, exportsDir,
-            memoryDir, memoryHandoffsDir, projectsDir,
+            memoryDir, memoryHandoffsDir, projectsDir, runtimeArtifactsDir,
+            managedProvidersDir, configMigrationsDir,
             cacheDir.appendingPathComponent("browser", isDirectory: true),
         ] {
             try fm.createDirectory(at: dir, withIntermediateDirectories: true)
         }
         if !fm.fileExists(atPath: configJSON.path) {
             let cfg: [String: Any] = [
+                "config_schema_version": AppConfig.currentSchemaVersion,
                 "log_level": "info",
                 "allowed_roots": [] as [String],
-                "shell": ["enabled": false, "default_timeout_sec": 30],
+                "shell": [
+                    "enabled": true,
+                    "user_disabled": false,
+                    "policy_version": AppConfig.currentSchemaVersion,
+                    "policy_origin": "default_enabled",
+                    "default_timeout_sec": 30,
+                ] as [String: Any],
                 "dashboard": [
                     "host": "127.0.0.1",
                     "port": 7788,

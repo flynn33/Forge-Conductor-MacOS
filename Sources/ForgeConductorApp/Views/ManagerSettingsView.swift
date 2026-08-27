@@ -61,7 +61,6 @@ struct ManagerSettingsView: View {
                 TextField("UI refresh (sec)", value: $model.setRefresh, format: .number)
                 TextField("Watchdog (sec)", value: $model.setWatchdog, format: .number)
                 TextField("Session idle TTL (sec)", value: $model.setIdleTTL, format: .number)
-                TextField("Shell timeout (sec)", value: $model.setShellTimeout, format: .number)
                 Toggle("Auto-restart HTTP if it drops", isOn: $model.setAutoRestart)
                 HStack(spacing: 10) {
                     Button("Reload from disk") { model.loadSettingsFromConfig() }
@@ -69,6 +68,34 @@ struct ManagerSettingsView: View {
                         .buttonStyle(.borderedProminent)
                 }
                 .padding(.vertical, 2)
+            }
+
+            Section("Project shell") {
+                Toggle("Enable project shell tools", isOn: $model.setShellEnabled)
+                    .accessibilityIdentifier("settings-shell-enabled")
+                TextField("Default timeout (sec)", value: $model.setShellTimeout, format: .number)
+                Text(
+                    model.setShellEnabled
+                        ? "Authorized agent sessions may run project-root commands. Canonical path checks and the 120-second shell_exec ceiling still apply."
+                        : "Project shell tools are explicitly disabled. Filesystem and other independently authorized tools are unchanged."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("shell-effective-policy")
+
+                runtimeRow("zsh", id: "zsh", path: model.shellRuntimeCapabilities.zsh)
+                runtimeRow("Bash", id: "bash", path: model.shellRuntimeCapabilities.bash)
+                runtimeRow("Python", id: "python", path: model.shellRuntimeCapabilities.python)
+                runtimeRow("PowerShell", id: "powershell", path: model.shellRuntimeCapabilities.powershell)
+
+                LabeledContent("Policy origin", value: model.shellPolicyOrigin)
+                LabeledContent(
+                    "Migration",
+                    value: model.shellMigrationReceiptValid
+                        ? "\(model.shellMigrationState) · receipt verified"
+                        : model.shellMigrationState
+                )
+                .accessibilityIdentifier("shell-policy-migration-status")
             }
 
             Section("Maintenance") {
@@ -117,5 +144,12 @@ struct ManagerSettingsView: View {
         .formStyle(.grouped)
         .padding(16)
         .onAppear { model.loadSettingsFromConfig() }
+    }
+
+    @ViewBuilder
+    private func runtimeRow(_ label: String, id: String, path: String?) -> some View {
+        LabeledContent(label, value: path ?? "Not installed")
+            .foregroundStyle(path == nil ? .secondary : .primary)
+            .accessibilityIdentifier("runtime-capability-\(id)")
     }
 }

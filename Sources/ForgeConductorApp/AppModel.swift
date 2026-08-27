@@ -46,14 +46,22 @@ public final class AppModel: ObservableObject {
     @Published public var setRefresh: Int = 8
     @Published public var setWatchdog: Int = 3
     @Published public var setIdleTTL: Int = 14_400
+    @Published public var setShellEnabled: Bool = true
     @Published public var setShellTimeout: Int = 30
     @Published public var setAutoRestart: Bool = true
+    @Published public private(set) var shellPolicyOrigin: String = "default_enabled"
+    @Published public private(set) var shellMigrationState: String = "not_required"
+    @Published public private(set) var shellMigrationReceiptValid: Bool = false
+    @Published public private(set) var shellRuntimeCapabilities = ShellRuntimeCapabilities.detect()
 
     public private(set) var app: ForgeApp?
     public private(set) var manager: ManagerNode?
     public private(set) var remoteManager: ManagerDashboardClient?
     public private(set) var deployController: AppDeployController?
     public private(set) var telemetryBinding = AppTelemetryBinding()
+    let operatorManagerClient = OperatorManagerClientRouter(
+        client: UnavailableOperatorManagerClient(reason: "Manager connection has not been configured yet.")
+    )
 
     private var managerPoll: AnyCancellable?
     private var telemetryBag: AnyCancellable?
@@ -66,6 +74,12 @@ public final class AppModel: ObservableObject {
         case agents = "Agents"
         case tools = "Tools"
         case feed = "Live Feed"
+        case projects = "Projects"
+        case autonomy = "Autonomy"
+        case continuity = "Continuity"
+        case runtimes = "Runtimes"
+        case provider = "Provider"
+        case evidence = "Events & Evidence"
         case diagnostics = "Diagnostics"
         case manager = "Manager"
 
@@ -78,6 +92,12 @@ public final class AppModel: ObservableObject {
             case .agents: return "agents"
             case .tools: return "tools"
             case .feed: return "feed"
+            case .projects: return "projects"
+            case .autonomy: return "autonomy"
+            case .continuity: return "continuity"
+            case .runtimes: return "runtimes"
+            case .provider: return "provider"
+            case .evidence: return "evidence"
             case .diagnostics: return "diagnostics"
             case .manager: return "manager"
             }
@@ -99,8 +119,34 @@ public final class AppModel: ObservableObject {
             self.deployController = AppDeployController(app: forgeApp)
             telemetryBinding.attach(app: forgeApp)
             if CommandLine.arguments.contains("--uitesting") {
-                managerMessage = "Manager disabled during UI tests"
+                let fixturePort = ProcessInfo.processInfo.environment["FORGE_OPERATOR_UI_TEST_PORT"]
+                    .flatMap(Int.init)
+                    .flatMap { (1...65_535).contains($0) ? $0 : nil }
+                if let fixturePort {
+                    operatorManagerClient.replace(
+                        with: OperatorManagerHTTPClient(
+                            host: "127.0.0.1",
+                            port: fixturePort,
+                            credentials: ManagerControlCredentialStore(paths: forgeApp.paths)
+                        )
+                    )
+                    managerMessage = "Attached to operator UI test fixture"
+                } else {
+                    operatorManagerClient.replace(
+                        with: UnavailableOperatorManagerClient(
+                            reason: "Manager control is intentionally disabled during UI tests."
+                        )
+                    )
+                    managerMessage = "Manager disabled during UI tests"
+                }
             } else {
+                operatorManagerClient.replace(
+                    with: OperatorManagerHTTPClient(
+                        host: forgeApp.config.model.dashboard.host,
+                        port: forgeApp.config.model.dashboard.port,
+                        credentials: ManagerControlCredentialStore(paths: forgeApp.paths)
+                    )
+                )
                 attachToOrStartManager(app: forgeApp)
             }
             loadSettingsFromConfig()
@@ -138,7 +184,11 @@ public final class AppModel: ObservableObject {
             guard let self else { return }
             if let externalPID {
                 manager = nil
-                remoteManager = ManagerDashboardClient(host: host, port: port)
+                remoteManager = ManagerDashboardClient(
+                    host: host,
+                    port: port,
+                    credentials: ManagerControlCredentialStore(paths: forgeApp.paths)
+                )
                 managerMessage = "Attached to manager (pid \(externalPID))"
                 forgeApp.diagnostics.info("gui_attached_existing_manager", [
                     "manager_pid": "\(externalPID)",
@@ -151,7 +201,13 @@ public final class AppModel: ObservableObject {
             let node = ManagerNode(app: forgeApp)
             do {
                 let status = try await Task.detached {
-                    try node.startService()
+                    do {
+                        _ = try node.recoverManagedAutonomy()
+                        return try node.startService()
+                    } catch {
+                        node.shutdownManagedAutonomy()
+                        throw error
+                    }
                 }.value
                 manager = node
                 remoteManager = nil
@@ -506,8 +562,14 @@ public final class AppModel: ObservableObject {
         setRefresh = app.config.int("dashboard", "refresh_interval_sec", default: 8)
         setWatchdog = app.config.int("manager", "watchdog_interval_sec", default: 3)
         setIdleTTL = app.config.int("sessions", "idle_ttl_sec", default: 14_400)
+        setShellEnabled = app.config.bool("shell", "enabled", default: true)
         setShellTimeout = app.config.int("shell", "default_timeout_sec", default: 30)
         setAutoRestart = app.config.bool("manager", "auto_restart", default: true)
+        let shell = app.config.shellPolicyStatus
+        shellPolicyOrigin = shell.policyOrigin
+        shellMigrationState = shell.migration.state
+        shellMigrationReceiptValid = shell.migration.receiptValid
+        shellRuntimeCapabilities = shell.runtimes
         if let client = remoteManager {
             Task { [weak self] in
                 do {
@@ -521,6 +583,10 @@ public final class AppModel: ObservableObject {
     }
 
     public func saveSettings() {
+        guard let appPaths = app?.paths else {
+            managerMessage = "Manager credentials are unavailable"
+            return
+        }
         let patch = ManagerSettingsPatch(
             dashboardHost: setHost,
             dashboardPort: setPort,
@@ -528,6 +594,7 @@ public final class AppModel: ObservableObject {
             autoRestart: setAutoRestart,
             watchdogIntervalSec: setWatchdog,
             sessionIdleTTLSec: setIdleTTL,
+            shellEnabled: setShellEnabled,
             shellTimeoutSec: setShellTimeout
         )
         if let client = remoteManager {
@@ -539,7 +606,15 @@ public final class AppModel: ObservableObject {
                     self.apply(settings: settings)
                     self.remoteManager = ManagerDashboardClient(
                         host: settings.dashboardHost,
-                        port: settings.dashboardPort
+                        port: settings.dashboardPort,
+                        credentials: ManagerControlCredentialStore(paths: appPaths)
+                    )
+                    self.operatorManagerClient.replace(
+                        with: OperatorManagerHTTPClient(
+                            host: settings.dashboardHost,
+                            port: settings.dashboardPort,
+                            credentials: ManagerControlCredentialStore(paths: appPaths)
+                        )
                     )
                     self.managerMessage = "Settings saved"
                     self.refreshRemoteManagerStatus()
@@ -554,7 +629,15 @@ public final class AppModel: ObservableObject {
                 managerMessage = "Manager is unavailable"
                 return
             }
-            _ = try manager.updateSettings(patch, apply: true)
+            let settings = try manager.updateSettings(patch, apply: true)
+            apply(settings: settings)
+            operatorManagerClient.replace(
+                with: OperatorManagerHTTPClient(
+                    host: settings.dashboardHost,
+                    port: settings.dashboardPort,
+                    credentials: ManagerControlCredentialStore(paths: appPaths)
+                )
+            )
             managerStatus = manager.statusModel()
             managerMessage = "Settings saved"
         } catch {
@@ -568,8 +651,13 @@ public final class AppModel: ObservableObject {
         setRefresh = settings.dashboardRefreshSec
         setWatchdog = settings.watchdogIntervalSec
         setIdleTTL = settings.sessionIdleTTLSec
+        setShellEnabled = settings.shellEnabled
         setShellTimeout = settings.shellTimeoutSec
         setAutoRestart = settings.autoRestart
+        shellPolicyOrigin = settings.shellPolicyOrigin
+        shellMigrationState = settings.shellMigrationState
+        shellMigrationReceiptValid = settings.shellMigrationReceiptValid
+        shellRuntimeCapabilities = settings.shellRuntimeCapabilities
     }
 
     private func recordRemoteManagerFailure(action: String, error: Error) {

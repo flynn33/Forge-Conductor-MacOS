@@ -13,6 +13,7 @@ public final class MCPServer: @unchecked Sendable {
     private let clientID: ClientID
     private let role: LMStudioConnectorRole
     private let deploymentID: String
+    private let toolDefinitionCatalog: Result<ToolDefinitionCatalog, Error>
     private let lock = NSLock()
     private let cancellationLock = NSLock()
     private var cancelledRequestIDs: Set<String> = []
@@ -30,6 +31,9 @@ public final class MCPServer: @unchecked Sendable {
         self.role = role
         self.deploymentID = ProcessInfo.processInfo.environment["FORGE_DEPLOYMENT_ID"]?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        self.toolDefinitionCatalog = Result {
+            try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
+        }
     }
 
     /// Blocking serve loop: read newline-delimited or Content-Length framed messages from stdin.
@@ -149,6 +153,14 @@ public final class MCPServer: @unchecked Sendable {
                             "schemaVersion": ProjectMemoryRepository.schemaVersion,
                             "limits": app.projectMemory.limits.asDictionary(),
                         ] as [String: Any],
+                        "projectContext": [
+                            "schemaVersion": ProjectControlPlaneRepository.schemaVersion,
+                            "durableBindings": true,
+                            "generationFencing": true,
+                            "missingContextCode": ProjectContextError.projectContextRequired(
+                                ProjectBindingOwner(kind: .mcpClient, id: "capability-probe")
+                            ).code,
+                        ] as [String: Any],
                     ] as [String: Any],
                     "serverInfo": [
                         "name": serverName,
@@ -158,7 +170,7 @@ public final class MCPServer: @unchecked Sendable {
             case "ping":
                 return ok(id: id, result: [:] as [String: Any])
             case "tools/list":
-                let tools = toolDescriptors()
+                let tools = try toolDescriptors()
                 app.diagnostics.info("mcp_tools_list", [
                     "count": "\(tools.count)",
                     "client_id": clientID.rawValue,
@@ -209,253 +221,10 @@ public final class MCPServer: @unchecked Sendable {
         )
     }
 
-    private func toolDescriptors() -> [[String: Any]] {
-        app.tools.toolNames.map { name in
-            [
-                "name": name,
-                "description": ProjectMemoryToolPack.description(for: name)
-                    ?? ContinuityLifecycleToolPack.description(for: name)
-                    ?? Self.descriptions[name] ?? "Forge-Conductor tool: \(name)",
-                "inputSchema": ProjectMemoryToolPack.schema(for: name)
-                    ?? ContinuityLifecycleToolPack.schema(for: name) ?? Self.schema(for: name),
-            ]
-        }
+    private func toolDescriptors() throws -> [[String: Any]] {
+        try toolDefinitionCatalog.get().mcpDescriptors()
     }
 
-    private static let descriptions: [String: String] = [
-        "forge_status": "Runtime status: home, agents, open sessions, tools.",
-        "agent_list": "List specialist agent playbooks.",
-        "agent_get": "Get a specialist agent playbook by id.",
-        "agent_context": "Alias of agent_get — full playbook body.",
-        "agent_recommend": "Recommend a specialist agent for a task description.",
-        "agent_run_start": "Start a durable specialist session (supersedes prior open sessions).",
-        "agent_run_status": "Status of an agent session; reminds host to complete open runs.",
-        "agent_run_complete": "Close a session with a report matching output_schema.",
-        "session_checkpoint": "Soft-save context + open agent sessions for continuity (continue working).",
-        "session_handoff": "Finalize context/agent handoff for a new chat; returns resume_seed. Prefer before context is full.",
-        "context_get": "Load latest (or id) handoff packet — call first in every new chat bootstrap.",
-        "context_list": "List recent context handoff packets.",
-        "fs_read": "Read a UTF-8 text file. Optional 1-based line window: offset (start line) + length/limit (line count). Response includes total_lines, start_line, end_line, has_more, next_offset. Do not re-call with the same offset when content was returned.",
-        "fs_write": "Write a UTF-8 text file.",
-        "fs_edit": "Replace occurrences of old with new in a file.",
-        "fs_list": "List directory entries.",
-        "fs_glob": "Find files by name pattern under a path.",
-        "fs_mkdir": "Create a directory.",
-        "fs_delete": "Delete a file or directory.",
-        "fs_move": "Move/rename a path.",
-        "shell_exec": "Run a bash command with timeout.",
-        "git_status": "git status --porcelain.",
-        "git_diff": "git diff (optional staged).",
-        "git_log": "git log --oneline.",
-        "git_add": "git add path or -A.",
-        "git_commit": "git commit -m message.",
-        "pdf_write": "Write a PDF from markdown-ish text (stdlib, no pandoc).",
-        "pdf_from_file": "Convert a local markdown/text file to PDF.",
-        "search_text": "Recursive text search (grep).",
-        "memory_set": "Store a durable key/value note in Forge local memory (survives chat sessions).",
-        "memory_get": "Read a durable memory note by key.",
-        "memory_list": "List durable memory notes (optional prefix/tag; hides internal agent and continuity keys by default).",
-        "memory_delete": "Delete a durable memory note by key.",
-        "memory_search": "Search durable memory notes by substring in key/body/tags.",
-    ]
-
-    private static func schema(for name: String) -> [String: Any] {
-        let object: [String: Any] = ["type": "object"]
-        switch name {
-        case "agent_run_start":
-            return [
-                "type": "object",
-                "properties": [
-                    "agent_id": ["type": "string"] as [String: Any],
-                    "goal": ["type": "string"] as [String: Any],
-                    "cwd": ["type": "string"] as [String: Any],
-                ] as [String: Any],
-                "required": ["agent_id", "goal"],
-            ]
-        case "agent_run_status", "agent_run_complete":
-            return [
-                "type": "object",
-                "properties": [
-                    "session_id": ["type": "string"] as [String: Any],
-                    "report": ["type": "object"] as [String: Any],
-                ] as [String: Any],
-                "required": ["session_id"],
-            ]
-        case "agent_get", "agent_context":
-            return [
-                "type": "object",
-                "properties": ["agent_id": ["type": "string"] as [String: Any]] as [String: Any],
-                "required": ["agent_id"],
-            ]
-        case "agent_recommend":
-            return [
-                "type": "object",
-                "properties": ["task": ["type": "string"] as [String: Any]] as [String: Any],
-                "required": ["task"],
-            ]
-        case "session_checkpoint", "session_handoff":
-            return [
-                "type": "object",
-                "properties": [
-                    "goal": ["type": "string"] as [String: Any],
-                    "status": ["type": "string"] as [String: Any],
-                    "project_slug": ["type": "string"] as [String: Any],
-                    "cwd": ["type": "string"] as [String: Any],
-                    "narrative": ["type": "string"] as [String: Any],
-                    "summary": ["type": "string", "description": "Alias for narrative"] as [String: Any],
-                    "next_actions": ["type": "array", "items": ["type": "string"] as [String: Any]] as [String: Any],
-                    "blockers": ["type": "array", "items": ["type": "string"] as [String: Any]] as [String: Any],
-                    "key_files": ["type": "array", "items": ["type": "string"] as [String: Any]] as [String: Any],
-                    "decisions": ["type": "array", "items": ["type": "string"] as [String: Any]] as [String: Any],
-                    "chat_label": ["type": "string"] as [String: Any],
-                    "handoff_id": ["type": "string", "description": "Update an existing packet"] as [String: Any],
-                    "resume_seed": ["type": "string"] as [String: Any],
-                ] as [String: Any],
-                "required": [] as [String],
-            ]
-        case "context_get":
-            return [
-                "type": "object",
-                "properties": [
-                    "handoff_id": ["type": "string"] as [String: Any],
-                    "id": ["type": "string"] as [String: Any],
-                    "resume_ready": ["type": "boolean", "description": "Prefer latest resume-ready packet"] as [String: Any],
-                ] as [String: Any],
-                "required": [] as [String],
-            ]
-        case "context_list":
-            return [
-                "type": "object",
-                "properties": [
-                    "limit": ["type": "integer"] as [String: Any],
-                ] as [String: Any],
-                "required": [] as [String],
-            ]
-        case "fs_read":
-            return [
-                "type": "object",
-                "properties": [
-                    "path": ["type": "string"] as [String: Any],
-                    "offset": [
-                        "type": "integer",
-                        "description": "1-based start line for a partial read",
-                    ] as [String: Any],
-                    "length": [
-                        "type": "integer",
-                        "description": "Number of lines to return (alias: limit)",
-                    ] as [String: Any],
-                    "limit": [
-                        "type": "integer",
-                        "description": "Alias for length — number of lines to return",
-                    ] as [String: Any],
-                ] as [String: Any],
-                "required": ["path"],
-            ]
-        case "fs_list", "fs_delete", "fs_mkdir":
-            return [
-                "type": "object",
-                "properties": ["path": ["type": "string"] as [String: Any]] as [String: Any],
-                "required": name == "fs_list" ? [] as [String] : ["path"],
-            ]
-        case "fs_write":
-            return [
-                "type": "object",
-                "properties": [
-                    "path": ["type": "string"] as [String: Any],
-                    "content": ["type": "string"] as [String: Any],
-                ] as [String: Any],
-                "required": ["path", "content"],
-            ]
-        case "shell_exec":
-            return [
-                "type": "object",
-                "properties": [
-                    "command": ["type": "string"] as [String: Any],
-                    "cwd": ["type": "string"] as [String: Any],
-                    "timeout_sec": [
-                        "type": "number",
-                        "exclusiveMinimum": 0,
-                        "maximum": ShellToolPack.maximumTimeoutSec,
-                    ] as [String: Any],
-                ] as [String: Any],
-                "required": ["command"],
-            ]
-        case "pdf_write":
-            return [
-                "type": "object",
-                "properties": [
-                    "path": ["type": "string"] as [String: Any],
-                    "content": ["type": "string"] as [String: Any],
-                    "title": ["type": "string"] as [String: Any],
-                ] as [String: Any],
-                "required": ["path", "content"],
-            ]
-        case "pdf_from_file":
-            return [
-                "type": "object",
-                "properties": [
-                    "source_path": ["type": "string"] as [String: Any],
-                    "dest_path": ["type": "string"] as [String: Any],
-                    "title": ["type": "string"] as [String: Any],
-                ] as [String: Any],
-                "required": ["source_path"],
-            ]
-        case "search_text":
-            return [
-                "type": "object",
-                "properties": [
-                    "pattern": ["type": "string"] as [String: Any],
-                    "path": ["type": "string"] as [String: Any],
-                ] as [String: Any],
-                "required": ["pattern"],
-            ]
-        case "memory_set":
-            return [
-                "type": "object",
-                "properties": [
-                    "key": ["type": "string"] as [String: Any],
-                    "body": ["type": "string"] as [String: Any],
-                    "content": ["type": "string", "description": "Alias of body"] as [String: Any],
-                    "tags": [
-                        "type": "array",
-                        "items": ["type": "string"] as [String: Any],
-                    ] as [String: Any],
-                ] as [String: Any],
-                "required": ["key", "body"],
-            ]
-        case "memory_get", "memory_delete":
-            return [
-                "type": "object",
-                "properties": ["key": ["type": "string"] as [String: Any]] as [String: Any],
-                "required": ["key"],
-            ]
-        case "memory_list":
-            return [
-                "type": "object",
-                "properties": [
-                    "prefix": ["type": "string"] as [String: Any],
-                    "tag": ["type": "string"] as [String: Any],
-                    "include_system": ["type": "boolean"] as [String: Any],
-                    "include_body": ["type": "boolean"] as [String: Any],
-                    "limit": ["type": "integer"] as [String: Any],
-                ] as [String: Any],
-                "required": [] as [String],
-            ]
-        case "memory_search":
-            return [
-                "type": "object",
-                "properties": [
-                    "query": ["type": "string"] as [String: Any],
-                    "include_system": ["type": "boolean"] as [String: Any],
-                    "include_body": ["type": "boolean"] as [String: Any],
-                    "limit": ["type": "integer"] as [String: Any],
-                ] as [String: Any],
-                "required": ["query"],
-            ]
-        default:
-            return object.merging(["properties": [:] as [String: Any], "additionalProperties": true]) { _, n in n }
-        }
-    }
 
     /// Protocol versions we implement (tools list/call). Prefer the client's request when known.
     public static let supportedProtocolVersions: [String] = [

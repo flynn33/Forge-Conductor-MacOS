@@ -25,17 +25,33 @@ patterns=[
 hits=[]
 for p in root.rglob("*"):
     relative=p.relative_to(root)
-    control_parts=relative.parts[1:] if relative.parts and relative.parts[0] == ".forge-codex" else relative.parts
-    exempt_control=bool(
+    root_is_control=root.name == ".forge-codex"
+    root_is_autonomy=root.name == ".forge-autonomy-state"
+    within_control=root_is_control or bool(relative.parts and relative.parts[0] == ".forge-codex")
+    within_autonomy=root_is_autonomy or bool(relative.parts and relative.parts[0] == ".forge-autonomy-state")
+    control_parts=(
         relative.parts
-        and relative.parts[0] == ".forge-codex"
+        if root_is_control
+        else relative.parts[1:]
+        if relative.parts and relative.parts[0] == ".forge-codex"
+        else relative.parts
+    )
+    autonomy_parts=(
+        relative.parts
+        if root_is_autonomy
+        else relative.parts[1:]
+        if relative.parts and relative.parts[0] == ".forge-autonomy-state"
+        else relative.parts
+    )
+    exempt_control=bool(
+        within_control
         and control_parts
         and control_parts[0] in generated_or_immutable
     )
     exempt_autonomy=bool(
-        len(relative.parts) > 1
-        and relative.parts[0] == ".forge-autonomy-state"
-        and relative.parts[1] in autonomy_generated
+        within_autonomy
+        and autonomy_parts
+        and autonomy_parts[0] in autonomy_generated
     )
     exempt_policy=relative.as_posix() in policy_examples
     if not p.is_file() or p.name == "scan_attribution.py" or p.name == "PACKAGE_VALIDATION.json" or exempt_control or exempt_autonomy or exempt_policy or any(part in skip for part in relative.parts): continue

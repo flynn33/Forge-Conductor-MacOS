@@ -23,7 +23,9 @@ public final class ForgeApp: @unchecked Sendable {
     public let continuity: ContextContinuityService
     public let continuityAutomation: ContinuityAutomation
     public let projectMemory: ProjectMemoryService
+    public let projectContexts: ProjectContextService
     public let continuityControl: ContinuityControlService
+    public let runtimeJobs: RuntimeJobSubsystem
     public let clock: any Clock
     public let lmStudioDeploy: LMStudioDeployService
 
@@ -57,7 +59,9 @@ public final class ForgeApp: @unchecked Sendable {
         continuity: ContextContinuityService,
         continuityAutomation: ContinuityAutomation,
         projectMemory: ProjectMemoryService,
+        projectContexts: ProjectContextService,
         continuityControl: ContinuityControlService,
+        runtimeJobs: RuntimeJobSubsystem,
         clock: any Clock,
         lmStudioDeploy: LMStudioDeployService
     ) {
@@ -72,7 +76,9 @@ public final class ForgeApp: @unchecked Sendable {
         self.continuity = continuity
         self.continuityAutomation = continuityAutomation
         self.projectMemory = projectMemory
+        self.projectContexts = projectContexts
         self.continuityControl = continuityControl
+        self.runtimeJobs = runtimeJobs
         self.clock = clock
         self.lmStudioDeploy = lmStudioDeploy
     }
@@ -94,6 +100,28 @@ public final class ForgeApp: @unchecked Sendable {
             paths: paths,
             role: mcpRole
         )
+        let shellMigration = config.shellMigrationStatus
+        if shellMigration.diagnosticPending {
+            diagnostics.info(
+                "shell_policy_migration_completed",
+                [
+                    "migration_id": shellMigration.migrationID ?? "unknown",
+                    "source_schema_version": "\(shellMigration.sourceSchemaVersion)",
+                    "target_schema_version": "\(shellMigration.targetSchemaVersion)",
+                    "receipt_valid": shellMigration.receiptValid ? "true" : "false",
+                ],
+                category: .bootstrap
+            )
+            do {
+                try config.markShellMigrationDiagnosticEmitted()
+            } catch {
+                diagnostics.warn(
+                    "shell_policy_migration_diagnostic_receipt_update_failed",
+                    ["reason": error.localizedDescription],
+                    category: .bootstrap
+                )
+            }
+        }
         let runtimeDiagnostics = RuntimeDiagnostics.shared
         let catalog = AgentCatalog(paths: paths)
         let idleTTL = TimeInterval(config.int("sessions", "idle_ttl_sec", default: 14_400))
@@ -120,7 +148,19 @@ public final class ForgeApp: @unchecked Sendable {
             clock: clock
         )
         let projectMemory = ProjectMemoryService(paths: paths, clock: clock)
-        let continuityControl = ContinuityControlService(memory: projectMemory)
+        let projectContexts = try ProjectContextService(
+            databaseURL: paths.controlPlaneSQLite,
+            clock: clock
+        )
+        let continuityControl = ContinuityControlService(
+            memory: projectMemory,
+            controlPlane: projectContexts.repository
+        )
+        let runtimeJobs = try RuntimeJobSubsystem(
+            controlPlaneRepository: projectContexts.repository,
+            databaseURL: paths.controlPlaneSQLite,
+            artifactRoot: paths.runtimeArtifactsDir
+        )
 
         let deploy = LMStudioDeployService(paths: paths, diagnostics: diagnostics, store: store)
         let app = ForgeApp(
@@ -135,7 +175,9 @@ public final class ForgeApp: @unchecked Sendable {
             continuity: continuity,
             continuityAutomation: continuityAutomation,
             projectMemory: projectMemory,
+            projectContexts: projectContexts,
             continuityControl: continuityControl,
+            runtimeJobs: runtimeJobs,
             clock: clock,
             lmStudioDeploy: deploy
         )
@@ -162,11 +204,29 @@ public final class ForgeApp: @unchecked Sendable {
         return app
     }
 
-    /// Close durable resources (SQLite) before deleting a temp home in tests.
-    public func shutdown() {
+    /// Close durable resources (SQLite) only after every owned runtime process is reaped.
+    @discardableResult
+    public func shutdown() -> RuntimeJobShutdownReport {
         telemetry.stopBackgroundRefresh()
+        let runtimeStopped = DispatchSemaphore(value: 0)
+        let reportBox = RuntimeShutdownReportBox()
+        Task.detached { [runtimeJobs] in
+            reportBox.store(await runtimeJobs.shutdown())
+            runtimeStopped.signal()
+        }
+        guard runtimeStopped.wait(timeout: .now() + 35) == .success,
+              let report = reportBox.load(),
+              report.completed else {
+            return reportBox.load() ?? RuntimeJobShutdownReport(
+                completed: false,
+                unresolvedJobIDs: [],
+                persistencePendingJobIDs: []
+            )
+        }
         projectMemory.closeAll()
+        projectContexts.close()
         store.close()
+        return report
     }
 
     public func runtimeDiagnosticSnapshot() -> RuntimeDiagnosticSnapshot {
@@ -194,6 +254,7 @@ public final class ForgeApp: @unchecked Sendable {
             recentAudit: auditRows.map(AuditEventSummary.init(from:)),
             tools: tools.toolNames,
             telemetry: telemetry.health(),
+            shellPolicy: config.shellPolicyStatus,
             dashboardHost: cfg.dashboard.host,
             dashboardPort: cfg.dashboard.port,
             pid: ProcessInfo.processInfo.processIdentifier
@@ -218,6 +279,16 @@ public final class ForgeApp: @unchecked Sendable {
 
         check("home_layout", FileManager.default.fileExists(atPath: paths.home.path), paths.home.path)
         check("sqlite_store", FileManager.default.fileExists(atPath: paths.storeSQLite.path), paths.storeSQLite.path)
+        do {
+            let health = try projectContexts.health()
+            check(
+                "project_control_plane",
+                health.integrityResult == "ok" && health.schemaVersion == ProjectControlPlaneRepository.schemaVersion,
+                "schema=\(health.schemaVersion) journal=\(health.journalMode) integrity=\(health.integrityResult)"
+            )
+        } catch {
+            check("project_control_plane", false, error.localizedDescription)
+        }
         check("agent_catalog", catalog.all().count >= 5, "\(catalog.all().count) agents loaded")
         do {
             _ = try store.sessionList()
@@ -226,6 +297,26 @@ public final class ForgeApp: @unchecked Sendable {
             check("sqlite_query", false, "\(error)")
         }
         check("git_available", ProcessRunner.which("git") != nil, ProcessRunner.which("git") ?? "missing")
+
+        let shell = config.shellPolicyStatus
+        check(
+            "shell_policy_schema_v2",
+            config.model.configSchemaVersion == AppConfig.currentSchemaVersion
+                && shell.policyVersion == AppConfig.currentSchemaVersion,
+            "config=\(config.model.configSchemaVersion) policy=\(shell.policyVersion) origin=\(shell.policyOrigin)"
+        )
+        check(
+            "shell_policy_consistent",
+            shell.enabled != shell.userDisabled,
+            "enabled=\(shell.enabled) user_disabled=\(shell.userDisabled)"
+        )
+        let migrationValid = shell.migration.state != "failed"
+            && (!shell.migration.state.hasPrefix("migrated") || shell.migration.receiptValid)
+        check("shell_policy_migration", migrationValid, shell.migration.detail)
+        check("shell_runtime_zsh", shell.runtimes.zsh != nil, shell.runtimes.zsh ?? "missing")
+        check("shell_runtime_bash", shell.runtimes.bash != nil, shell.runtimes.bash ?? "missing")
+        check("shell_runtime_python", shell.runtimes.python != nil, shell.runtimes.python ?? "optional runtime missing", hard: false)
+        check("shell_runtime_powershell", shell.runtimes.powershell != nil, shell.runtimes.powershell ?? "optional runtime missing", hard: false)
 
         let tel = telemetry.health()
         check("telemetry_native", tel.ok, "swift SystemCollector+ForgeCollector")
@@ -277,6 +368,7 @@ public final class ForgeApp: @unchecked Sendable {
             home: paths.home.path,
             checks: checks,
             telemetry: tel,
+            shellPolicy: shell,
             binaryInstalled: binInstalled,
             binaryPath: binPath
         )
@@ -285,5 +377,22 @@ public final class ForgeApp: @unchecked Sendable {
     /// HTTP / CLI edge.
     public func doctor() throws -> [String: Any] {
         try doctorModel().asDictionary()
+    }
+}
+
+private final class RuntimeShutdownReportBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var report: RuntimeJobShutdownReport?
+
+    func store(_ report: RuntimeJobShutdownReport) {
+        lock.lock()
+        self.report = report
+        lock.unlock()
+    }
+
+    func load() -> RuntimeJobShutdownReport? {
+        lock.lock()
+        defer { lock.unlock() }
+        return report
     }
 }

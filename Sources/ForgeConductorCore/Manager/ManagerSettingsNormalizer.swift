@@ -44,6 +44,9 @@ public enum ManagerSettingsNormalizer {
         }
         if let shell = patch["shell"] as? [String: Any] {
             var s: [String: Any] = [:]
+            if let enabled = shell["enabled"] as? Bool {
+                s["enabled"] = enabled
+            }
             if let t = intValue(shell["default_timeout_sec"]) {
                 s["default_timeout_sec"] = min(max(t, 1), 600)
             }

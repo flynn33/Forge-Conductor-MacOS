@@ -45,6 +45,20 @@ struct ForgeConductorGUIApp: App {
                 }
                 .keyboardShortcut("s", modifiers: [.command, .control])
             }
+            CommandMenu("Operator") {
+                Button("Projects") { model.selectTab(.projects) }
+                    .keyboardShortcut("1", modifiers: [.command, .shift])
+                Button("Autonomy") { model.selectTab(.autonomy) }
+                    .keyboardShortcut("2", modifiers: [.command, .shift])
+                Button("Continuity") { model.selectTab(.continuity) }
+                    .keyboardShortcut("3", modifiers: [.command, .shift])
+                Button("Runtimes") { model.selectTab(.runtimes) }
+                    .keyboardShortcut("4", modifiers: [.command, .shift])
+                Button("Provider") { model.selectTab(.provider) }
+                    .keyboardShortcut("5", modifiers: [.command, .shift])
+                Button("Events & Evidence") { model.selectTab(.evidence) }
+                    .keyboardShortcut("6", modifiers: [.command, .shift])
+            }
             CommandMenu("Telemetry") {
                 Button("Refresh Now") { model.refresh(force: true) }
                     .keyboardShortcut("r", modifiers: [.command])

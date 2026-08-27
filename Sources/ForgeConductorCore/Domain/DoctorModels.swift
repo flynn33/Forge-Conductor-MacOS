@@ -32,6 +32,7 @@ public struct DoctorReport: Sendable, Equatable {
     public var home: String
     public var checks: [DoctorCheck]
     public var telemetry: TelemetryHealthReport
+    public var shellPolicy: ShellPolicyStatus
     public var binaryInstalled: Bool
     public var binaryPath: String
 
@@ -41,6 +42,7 @@ public struct DoctorReport: Sendable, Equatable {
         home: String,
         checks: [DoctorCheck],
         telemetry: TelemetryHealthReport,
+        shellPolicy: ShellPolicyStatus,
         binaryInstalled: Bool,
         binaryPath: String
     ) {
@@ -49,6 +51,7 @@ public struct DoctorReport: Sendable, Equatable {
         self.home = home
         self.checks = checks
         self.telemetry = telemetry
+        self.shellPolicy = shellPolicy
         self.binaryInstalled = binaryInstalled
         self.binaryPath = binaryPath
     }
@@ -60,6 +63,7 @@ public struct DoctorReport: Sendable, Equatable {
             "home": home,
             "checks": checks.map { $0.asDictionary() },
             "telemetry": telemetry.asDictionary(),
+            "shell": shellPolicy.asDictionary(),
             "binary": [
                 "installed": binaryInstalled,
                 "path": binaryPath,
@@ -85,6 +89,7 @@ public struct AppStatusSnapshot: Sendable, Equatable {
     public var recentAudit: [AuditEventSummary]
     public var tools: [String]
     public var telemetry: TelemetryHealthReport
+    public var shellPolicy: ShellPolicyStatus
     public var dashboardHost: String
     public var dashboardPort: Int
     public var pid: Int32
@@ -106,6 +111,7 @@ public struct AppStatusSnapshot: Sendable, Equatable {
             "recent_audit": recentAudit.map { $0.asDictionary() },
             "tools": tools,
             "telemetry": telemetry.asDictionary(),
+            "shell": shellPolicy.asDictionary(),
             "dashboard": [
                 "host": dashboardHost,
                 "port": dashboardPort,

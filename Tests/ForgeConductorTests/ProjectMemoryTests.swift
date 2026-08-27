@@ -62,7 +62,8 @@ final class ProjectMemoryTests: XCTestCase {
     func testProjectIsolationRedactionDeduplicationAndRestartDurability() throws {
         var app: ForgeApp? = try ForgeApp.bootstrap(home: home)
         let idA = try initialize(app!, project: projectA)
-        let idB = try initialize(app!, project: projectB)
+        let clientB = ClientID("project-memory-test-b")
+        let idB = try initialize(app!, project: projectB, clientID: clientB)
         XCTAssertNotEqual(idA, idB)
 
         let write: [String: Any] = [
@@ -83,7 +84,12 @@ final class ProjectMemoryTests: XCTestCase {
         XCTAssertTrue((recordA["body"] as? String)?.contains("<redacted>") == true)
         XCTAssertFalse((recordA["summary"] as? String)?.contains("super-secret-value") == true)
 
-        let inB = try call(app!, "project_memory.search", ["project_id": idB, "query": "Release"])
+        let inB = try call(
+            app!,
+            "project_memory.search",
+            ["project_id": idB, "query": "Release"],
+            clientID: clientB
+        )
         XCTAssertEqual(inB["count"] as? Int, 0)
 
         app?.shutdown()
@@ -167,7 +173,7 @@ final class ProjectMemoryTests: XCTestCase {
             arguments: [
                 "project_id": projectID, "kind": "fact", "title": "key", "summary": "contains key",
                 "body": "-----BEGIN PRIVATE KEY-----\nnot accepted", // Example private-key fixture.
-            ], clientID: ClientID("project-memory-security")
+            ], clientID: ClientID("project-memory-test")
         )
         XCTAssertFalse(rejected.ok)
         XCTAssertEqual(rejected.payload["code"] as? String, "redaction_rejected")
@@ -177,7 +183,7 @@ final class ProjectMemoryTests: XCTestCase {
             arguments: [
                 "project_id": projectID, "kind": "fact", "title": String(repeating: "x", count: 513),
                 "summary": "too large",
-            ], clientID: ClientID("project-memory-security")
+            ], clientID: ClientID("project-memory-test")
         )
         XCTAssertFalse(oversized.ok)
         XCTAssertEqual(oversized.payload["code"] as? String, "payload_too_large")
@@ -185,7 +191,11 @@ final class ProjectMemoryTests: XCTestCase {
         for index in 0..<12 {
             let directory = home.deletingLastPathComponent().appendingPathComponent("cache-project-\(index)", isDirectory: true)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            _ = try initialize(app, project: directory)
+            _ = try initialize(
+                app,
+                project: directory,
+                clientID: ClientID("project-memory-cache-\(index)")
+            )
         }
         XCTAssertLessThanOrEqual(app.projectMemory.openRepositoryCount, app.projectMemory.limits.maximumOpenProjects)
     }
@@ -207,7 +217,7 @@ final class ProjectMemoryTests: XCTestCase {
         let tampered = try app!.tools.call(
             name: "project_memory.import",
             arguments: ["project_id": projectID, "artifact": artifactPath, "preview": true],
-            clientID: ClientID("project-memory-import")
+            clientID: ClientID("project-memory-test")
         )
         XCTAssertFalse(tampered.ok)
         XCTAssertEqual(tampered.payload["code"] as? String, "integrity_failure")
@@ -286,7 +296,7 @@ final class ProjectMemoryTests: XCTestCase {
             name: "project_memory.remember",
             arguments: [
                 "project_id": projectID, "kind": "fact", "title": "Locked", "summary": "must roll back",
-            ], clientID: ClientID("project-memory-lock")
+            ], clientID: ClientID("project-memory-test")
         )
         XCTAssertFalse(result.ok)
         XCTAssertEqual(result.payload["code"] as? String, "database_busy")
@@ -295,13 +305,27 @@ final class ProjectMemoryTests: XCTestCase {
         XCTAssertEqual(status["record_count"] as? Int, 0)
     }
 
-    private func initialize(_ app: ForgeApp, project: URL) throws -> String {
-        let payload = try call(app, "project_memory.initialize", ["project_path": project.path])
+    private func initialize(
+        _ app: ForgeApp,
+        project: URL,
+        clientID: ClientID = ClientID("project-memory-test")
+    ) throws -> String {
+        let payload = try call(
+            app,
+            "project_memory.initialize",
+            ["project_path": project.path],
+            clientID: clientID
+        )
         return try XCTUnwrap(payload["project_id"] as? String)
     }
 
-    private func call(_ app: ForgeApp, _ name: String, _ arguments: [String: Any]) throws -> [String: Any] {
-        let result = try app.tools.call(name: name, arguments: arguments, clientID: ClientID("project-memory-test"))
+    private func call(
+        _ app: ForgeApp,
+        _ name: String,
+        _ arguments: [String: Any],
+        clientID: ClientID = ClientID("project-memory-test")
+    ) throws -> [String: Any] {
+        let result = try app.tools.call(name: name, arguments: arguments, clientID: clientID)
         XCTAssertTrue(result.ok, "\(name): \(result.payload)")
         return result.payload
     }

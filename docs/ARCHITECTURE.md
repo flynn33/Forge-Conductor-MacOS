@@ -18,6 +18,7 @@ Forge Conductor is a native macOS orchestration server for local models hosted b
 | `ForgeConductorCore` | Domain, application services, infrastructure, MCP, manager, dashboard, telemetry |
 | `forge-conductor` / `ForgeConductorCLI` | CLI, installer, manager commands, and MCP stdio executable |
 | `forge-conductor-app` / `ForgeConductorApp` | SwiftUI/AppKit/Metal operator application |
+| `forge-runtime-launcher` / `ForgeRuntimeLauncher` | Signed, resource-bounded native process launcher for managed jobs |
 | `ForgeConductorTests` | Unit, integration, security, connector, and process acceptance tests |
 
 The Xcode project mirrors these boundaries. SwiftPM provides a second reproducible Apple-native build path and stages the GUI through `script/build_and_run.sh`.
@@ -44,6 +45,8 @@ ForgeApp.bootstrap(home:)
   -> AgentCatalog + AgentSessionService
   -> ContextContinuityService + ContinuityCoordinator
   -> ProjectMemoryService + HostAdapterRegistry
+  -> ProjectControlPlaneRepository + RuntimeJobSubsystem
+  -> ManagedAutonomyRuntime + ManagedContinuityWorker
   -> ResourcePolicy + RuntimeDiagnostics
   -> LM Studio installer/verifier/deploy services
   -> ToolAuthorizationService -> ToolRouter -> modular tool packs
@@ -51,6 +54,12 @@ ForgeApp.bootstrap(home:)
 ```
 
 The root owns its services. Back-references are non-owning, avoiding service cycles. Presentation code receives the root through `AppModel`; it does not construct infrastructure directly.
+
+## Managed runtime ownership
+
+The runtime subsystem durably records job intent and exact process-group identity before releasing a signed native launcher to execute the requested tool. Read roots and writable roots are explicit and independently validated. Child-writable scratch is separate from manager-owned, hash-verified output artifacts. Each job has bounded output, duration, descendants, CPU time, descriptors, and file size.
+
+Normal completion, cancellation, timeout, restart recovery, and application shutdown converge on the same persisted TERM/KILL/probe state machine. A process group remains owned until exact-identity liveness checks confirm its death; service stores remain open while the bounded reaper still has ownership work. Startup also performs a bounded sweep of scratch and artifact directories that lack a matching durable job row.
 
 ## Manager ownership
 
@@ -88,16 +97,20 @@ resolve executable
 - Session and handoff paths may narrow existing authority but cannot create new
   trusted authorization roots.
 
-`shell_exec` is intentionally a powerful local-model capability. It is disabled
-by default, can be enabled only by trusted local configuration, requires an
-authorized workspace, and has a 120-second maximum. It is not an operating-system
-sandbox; deployments should enable it only for trusted local agents.
+`shell_exec` is intentionally a powerful local-model capability. Schema-v2
+configuration enables project shell tools by default and exposes an explicit
+native opt-out. Every call still requires an authorized workspace and has a
+120-second maximum. The legacy compatibility profile remains `/bin/bash -lc`.
+It is not an operating-system sandbox and should be granted only to trusted local
+agents. Pre-v2 configuration is backed up and migrated once with a verified receipt.
 
 ## Persistence
 
 `~/.forge-conductor` (or `FORGE_CONDUCTOR_HOME`) contains:
 
 - `store.sqlite` for sessions, bindings, handoff packets, durable memory, audit index, and presence
+- `runtime-jobs.sqlite` for managed-job intent, process identity, termination phase, receipts, and artifact metadata
+- `.runtime-support` for the private staged launcher and manager-owned runtime artifacts
 - `audit.jsonl` for append-only tool audit
 - `logs/*.jsonl` for categorized diagnostics
 - `agents/*.md` for replaceable playbook modules

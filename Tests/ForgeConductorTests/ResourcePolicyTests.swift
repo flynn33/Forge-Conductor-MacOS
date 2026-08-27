@@ -10,13 +10,40 @@ final class ResourcePolicyTests: XCTestCase {
         let constrained = ResourcePolicy(physicalMemoryBytes: 8 * ResourcePolicy.gibibyte)
         let standard = ResourcePolicy(physicalMemoryBytes: 16 * ResourcePolicy.gibibyte)
         let expanded = ResourcePolicy(physicalMemoryBytes: 32 * ResourcePolicy.gibibyte)
+        let highCapacity = ResourcePolicy(
+            physicalMemoryBytes: 32 * ResourcePolicy.gibibyte + 1
+        )
 
         XCTAssertEqual(constrained.tier, .constrained)
         XCTAssertEqual(standard.tier, .standard)
         XCTAssertEqual(expanded.tier, .expanded)
+        XCTAssertEqual(highCapacity.tier, .highCapacity)
         XCTAssertEqual(constrained.nominalLimits.telemetryHistoryPoints, 600)
         XCTAssertEqual(standard.nominalLimits.processOutputBytesPerStream, 8 * 1_048_576)
         XCTAssertEqual(expanded.nominalLimits.mcpResponseBytes, 4 * 1_048_576)
+        XCTAssertEqual(constrained.nominalExecutionLimits.maximumActiveManagedGenerations, 1)
+        XCTAssertEqual(constrained.nominalExecutionLimits.maximumActiveRuntimeJobs, 2)
+        XCTAssertEqual(constrained.nominalExecutionLimits.maximumCPUHeavyRuntimeJobs, 1)
+        XCTAssertEqual(constrained.nominalExecutionLimits.maximumInMemoryEvents, 1_000)
+        XCTAssertEqual(standard.nominalExecutionLimits.maximumActiveManagedGenerations, 1)
+        XCTAssertEqual(standard.nominalExecutionLimits.maximumActiveRuntimeJobs, 2)
+        XCTAssertEqual(standard.nominalExecutionLimits.maximumInMemoryEvents, 2_500)
+        XCTAssertEqual(expanded.nominalExecutionLimits.maximumActiveManagedGenerations, 2)
+        XCTAssertEqual(expanded.nominalExecutionLimits.maximumActiveRuntimeJobs, 4)
+        XCTAssertEqual(expanded.nominalExecutionLimits.maximumInMemoryEvents, 5_000)
+        XCTAssertEqual(highCapacity.nominalExecutionLimits.maximumActiveManagedGenerations, 2)
+        XCTAssertEqual(highCapacity.nominalExecutionLimits.maximumActiveRuntimeJobs, 6)
+        XCTAssertEqual(highCapacity.nominalExecutionLimits.maximumInMemoryEvents, 10_000)
+    }
+
+    func testEveryPhysicalMemoryBoundarySelectsTheConservativeTier() {
+        let gibibyte = ResourcePolicy.gibibyte
+        XCTAssertEqual(ResourcePolicy(physicalMemoryBytes: 8 * gibibyte).tier, .constrained)
+        XCTAssertEqual(ResourcePolicy(physicalMemoryBytes: 8 * gibibyte + 1).tier, .standard)
+        XCTAssertEqual(ResourcePolicy(physicalMemoryBytes: 16 * gibibyte).tier, .standard)
+        XCTAssertEqual(ResourcePolicy(physicalMemoryBytes: 16 * gibibyte + 1).tier, .expanded)
+        XCTAssertEqual(ResourcePolicy(physicalMemoryBytes: 32 * gibibyte).tier, .expanded)
+        XCTAssertEqual(ResourcePolicy(physicalMemoryBytes: 32 * gibibyte + 1).tier, .highCapacity)
     }
 
     func testMemoryPressureOnlyReducesOptionalRetention() {
@@ -36,6 +63,63 @@ final class ResourcePolicyTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(critical.mcpResponseBytes, 262_144)
             XCTAssertGreaterThanOrEqual(critical.activeGaugeFPS, 15)
         }
+    }
+
+    func testExecutionAndModelCeilingsAreBoundedAndTightenUnderPressure() {
+        for tierMemory in [
+            8 * ResourcePolicy.gibibyte,
+            16 * ResourcePolicy.gibibyte,
+            32 * ResourcePolicy.gibibyte,
+            64 * ResourcePolicy.gibibyte,
+        ] {
+            let policy = ResourcePolicy(physicalMemoryBytes: tierMemory)
+            let nominal = policy.executionLimits(for: .nominal)
+            let warning = policy.executionLimits(for: .warning)
+            let critical = policy.executionLimits(for: .critical)
+
+            XCTAssertEqual(nominal, policy.nominalExecutionLimits)
+            XCTAssertGreaterThanOrEqual(critical.maximumActiveManagedGenerations, 1)
+            XCTAssertGreaterThanOrEqual(critical.maximumActiveRuntimeJobs, 1)
+            XCTAssertGreaterThanOrEqual(critical.maximumCPUHeavyRuntimeJobs, 1)
+            XCTAssertLessThanOrEqual(
+                critical.maximumCPUHeavyRuntimeJobs,
+                critical.maximumActiveRuntimeJobs
+            )
+            XCTAssertLessThanOrEqual(
+                warning.maximumActiveManagedGenerations,
+                nominal.maximumActiveManagedGenerations
+            )
+            XCTAssertLessThanOrEqual(
+                critical.maximumActiveRuntimeJobs,
+                warning.maximumActiveRuntimeJobs
+            )
+            XCTAssertLessThanOrEqual(
+                critical.maximumInMemoryEvents,
+                warning.maximumInMemoryEvents
+            )
+            XCTAssertLessThanOrEqual(
+                critical.modelPolicy.maximumLoadedInstances,
+                warning.modelPolicy.maximumLoadedInstances
+            )
+            XCTAssertLessThanOrEqual(
+                warning.modelPolicy.maximumParallelRequests,
+                nominal.modelPolicy.maximumParallelRequests
+            )
+            XCTAssertLessThanOrEqual(
+                nominal.modelPolicy.defaultLoadedInstances,
+                nominal.modelPolicy.maximumLoadedInstances
+            )
+            XCTAssertTrue(nominal.modelPolicy.jitLoadingRequired)
+            XCTAssertTrue(nominal.modelPolicy.autoEvictRequired)
+            XCTAssertTrue(critical.modelPolicy.serializeSuccessorCreation)
+        }
+    }
+
+    func testRuntimeJobAdmissionMatchesTheResolvedHostTier() {
+        let policy = ResourcePolicy.current.nominalExecutionLimits
+        let runtime = RuntimeJobLimits.current
+        XCTAssertEqual(runtime.maximumConcurrentJobs, policy.maximumActiveRuntimeJobs)
+        XCTAssertEqual(runtime.maximumCPUHeavyJobs, policy.maximumCPUHeavyRuntimeJobs)
     }
 
     func testTelemetryPressureUpdatesEnforcedCapacity() throws {
@@ -101,7 +185,7 @@ final class ResourcePolicyTests: XCTestCase {
         }
     }
 
-    func testSubscriberAndPerClientStateCapsAreEnforced() throws {
+    func testSubscriberCapsAndBackgroundRefreshQuiesceAfterRemovalAndStop() throws {
         let home = temporaryHome("client-caps")
         defer { try? FileManager.default.removeItem(at: home) }
         let app = try ForgeApp.bootstrap(home: home)
@@ -118,6 +202,15 @@ final class ResourcePolicyTests: XCTestCase {
         XCTAssertEqual(concreteEngine.listenerCount, RealtimeMetricsEngine.maximumListeners)
         for id in telemetryIDs { app.telemetry.removeListener(id) }
         for id in engineIDs { app.telemetry.realtimeEngine.removeListener(id) }
+        XCTAssertEqual(app.telemetry.listenerCount, 0)
+        XCTAssertEqual(concreteEngine.listenerCount, 0)
+
+        app.telemetry.startBackgroundRefresh(intervalSec: 0.25)
+        XCTAssertTrue(app.telemetry.realtimeEngine.isRunning)
+        XCTAssertEqual(concreteEngine.listenerCount, 1)
+        app.telemetry.stopBackgroundRefresh()
+        XCTAssertFalse(app.telemetry.realtimeEngine.isRunning)
+        XCTAssertEqual(concreteEngine.listenerCount, 0)
 
         for index in 0..<300 {
             let client = ClientID("client-\(index)")

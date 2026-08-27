@@ -80,6 +80,7 @@ public final class HTTPResponder: @unchecked Sendable {
         case 200: reason = "OK"
         case 204: reason = "No Content"
         case 400: reason = "Bad Request"
+        case 401: reason = "Unauthorized"
         case 403: reason = "Forbidden"
         case 413: reason = "Content Too Large"
         case 415: reason = "Unsupported Media Type"

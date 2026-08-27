@@ -18,6 +18,22 @@ final class ContinuityTests: XCTestCase {
         try? FileManager.default.removeItem(at: tempHome)
     }
 
+    private func bindProjectContext(
+        _ app: ForgeApp,
+        clientID: ClientID,
+        root: URL? = nil
+    ) throws {
+        let canonicalRoot = try XCTUnwrap(root ?? tempHome)
+        let initialized = try app.projectMemory.initialize(path: canonicalRoot.path)
+        let projectID = try XCTUnwrap(initialized["project_id"] as? String)
+        let descriptor = try app.projectMemory.identities.descriptor(projectID: projectID)
+        _ = try app.projectContexts.registerAndBindMCPClient(
+            descriptor: descriptor,
+            canonicalRoot: canonicalRoot,
+            clientID: clientID
+        )
+    }
+
     func testMemoryLayoutCreatedOnBootstrap() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
@@ -1266,6 +1282,7 @@ final class ContinuityTests: XCTestCase {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
         let client = ClientID("loop")
+        try bindProjectContext(app, clientID: client)
         let path = tempHome.appendingPathComponent("loop.txt").path
         _ = try app.tools.call(
             name: "fs_write",
@@ -1301,6 +1318,7 @@ final class ContinuityTests: XCTestCase {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
         let client = ClientID("exact-loop-thresholds")
+        try bindProjectContext(app, clientID: client)
         let path = tempHome.appendingPathComponent("exact-loop.txt").path
         _ = try app.tools.call(
             name: "fs_write",
@@ -1343,6 +1361,7 @@ final class ContinuityTests: XCTestCase {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
         let client = ClientID("denied-exact-loop-thresholds")
+        try bindProjectContext(app, clientID: client)
         let outside = tempHome.deletingLastPathComponent()
             .appendingPathComponent("forge-denied-loop-\(UUID().uuidString).txt")
 
@@ -1401,6 +1420,7 @@ final class ContinuityTests: XCTestCase {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
         let client = ClientID("denied-failed-loop-persistence")
+        try bindProjectContext(app, clientID: client)
         let outside = tempHome.deletingLastPathComponent()
             .appendingPathComponent("forge-denied-failed-loop-\(UUID().uuidString).txt")
         try withSQLiteFixture(at: app.paths.storeSQLite) { database in
@@ -1505,6 +1525,7 @@ final class ContinuityTests: XCTestCase {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
         let client = ClientID("failed-loop-persistence")
+        try bindProjectContext(app, clientID: client)
         let path = tempHome.appendingPathComponent("failed-loop.txt").path
         _ = try app.tools.call(
             name: "fs_write",
@@ -1550,6 +1571,7 @@ final class ContinuityTests: XCTestCase {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
         let client = ClientID("fractional-loop")
+        try bindProjectContext(app, clientID: client)
         let path = tempHome.appendingPathComponent("fractional.txt").path
         _ = try app.tools.call(
             name: "fs_write",
@@ -1593,6 +1615,7 @@ final class ContinuityTests: XCTestCase {
         let handoffID = try XCTUnwrap(created.payload["handoff_id"] as? String)
 
         let smoke = ClientID("diagnostic-smoke")
+        try bindProjectContext(app, clientID: smoke)
         for index in 0..<ContinuityAutomation.checkpointEveryTools {
             let result = try app.tools.call(
                 name: "fs_write",
@@ -1618,6 +1641,7 @@ final class ContinuityTests: XCTestCase {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
         let client = ClientID("auto-checkpoint")
+        try bindProjectContext(app, clientID: client)
         for index in 0..<ContinuityAutomation.checkpointEveryTools {
             let path = tempHome.appendingPathComponent("auto-\(index).txt").path
             let result = try app.tools.call(
@@ -1635,11 +1659,12 @@ final class ContinuityTests: XCTestCase {
         XCTAssertEqual(latest["resume_ready"] as? Bool, false)
     }
 
-    func testContextGetAdoptsWorkspaceForShellWithoutNewAgent() throws {
+    func testContextGetRequiresExplicitProjectBindingBeforeShell() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
         _ = try app.config.update(["shell": ["enabled": true]], save: false)
         let original = ClientID("adopt-original")
+        try bindProjectContext(app, clientID: original)
         _ = try app.tools.call(
             name: "session_checkpoint",
             arguments: [
@@ -1655,6 +1680,15 @@ final class ContinuityTests: XCTestCase {
         XCTAssertTrue(got.ok)
         XCTAssertEqual(got.payload["found"] as? Bool, true)
 
+        let unboundShell = try app.tools.call(
+            name: "shell_exec",
+            arguments: ["command": "pwd", "cwd": tempHome.path],
+            clientID: resumed
+        )
+        XCTAssertFalse(unboundShell.ok)
+        XCTAssertEqual(unboundShell.payload["code"] as? String, "project_context_required")
+
+        try bindProjectContext(app, clientID: resumed)
         let shell = try app.tools.call(
             name: "shell_exec",
             arguments: ["command": "pwd", "cwd": tempHome.path],
@@ -1668,6 +1702,7 @@ final class ContinuityTests: XCTestCase {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
         let client = ClientID("auto-handoff-block")
+        try bindProjectContext(app, clientID: client)
         var last: ToolResult?
         for index in 0..<ContinuityAutomation.handoffEveryTools {
             last = try app.tools.call(

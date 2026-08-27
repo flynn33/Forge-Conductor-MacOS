@@ -23,6 +23,25 @@ public protocol ToolAuthorizing: Sendable {
         clientID: ClientID,
         binding: ActiveBinding?
     ) -> ToolAuthorizationDecision
+    func authorize(
+        tool: String,
+        arguments: [String: Any],
+        context: ToolInvocationContext?,
+        clientID: ClientID,
+        binding: ActiveBinding?
+    ) -> ToolAuthorizationDecision
+}
+
+public extension ToolAuthorizing {
+    func authorize(
+        tool: String,
+        arguments: [String: Any],
+        context: ToolInvocationContext?,
+        clientID: ClientID,
+        binding: ActiveBinding?
+    ) -> ToolAuthorizationDecision {
+        authorize(tool: tool, arguments: arguments, clientID: clientID, binding: binding)
+    }
 }
 
 /// Final authorization boundary for every tool adapter.
@@ -53,6 +72,37 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
         clientID: ClientID,
         binding: ActiveBinding?
     ) -> ToolAuthorizationDecision {
+        authorize(
+            tool: tool,
+            arguments: arguments,
+            context: nil,
+            clientID: clientID,
+            binding: binding
+        )
+    }
+
+    public func authorize(
+        tool: String,
+        arguments: [String: Any],
+        context: ToolInvocationContext?,
+        clientID: ClientID,
+        binding: ActiveBinding?
+    ) -> ToolAuthorizationDecision {
+        if let context {
+            guard context.clientID == clientID else {
+                return .denied(
+                    code: "project_scope_mismatch",
+                    message: "Invocation client does not match the durable project context"
+                )
+            }
+            let allowed = context.authorizationScope.allowedTools
+            guard allowed.contains("*") || allowed.contains(tool) else {
+                return .denied(
+                    code: "tool_not_granted",
+                    message: "Tool '\(tool)' is outside the durable project authorization scope"
+                )
+            }
+        }
         if let binding {
             if binding.toolsForbidden.contains(tool) {
                 return .denied(
@@ -69,7 +119,9 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
                 )
             }
         } else if Self.requiresActiveSession.contains(tool) {
-            let extras = workspace?.additionalRoots(for: clientID) ?? []
+            let extras = context?.authorizationScope.canonicalRoots
+                ?? workspace?.additionalRoots(for: clientID)
+                ?? []
             if extras.isEmpty {
                 return .denied(
                     code: "active_session_required",
@@ -78,14 +130,18 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
             }
         }
 
-        if tool == "shell_exec", !config.model.shell.enabled {
+        let shellPolicy = config.model.shell
+        if Self.runtimeExecutionTools.contains(tool), !shellPolicy.enabled {
+            let explicitlyDisabled = shellPolicy.userDisabled
             return .denied(
-                code: "shell_disabled",
-                message: "Unrestricted shell execution is disabled by trusted local configuration"
+                code: explicitlyDisabled ? "shell_disabled_by_user" : "shell_disabled",
+                message: explicitlyDisabled
+                    ? "Project shell tools were disabled explicitly in local settings"
+                    : "Project shell tools are unavailable because the configured policy is not enabled"
             )
         }
 
-        let roots = authorizedRoots(binding: binding, clientID: clientID)
+        let roots = authorizedRoots(binding: binding, context: context, clientID: clientID)
         let base = binding.flatMap(\.cwd).map(ToolArgHelpers.resolvePath) ?? roots.first ?? paths.home
         var normalized = arguments
 
@@ -171,7 +227,8 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
                 ))
             }
             return accesses
-        case "git_status", "git_diff", "git_log", "git_add", "git_commit", "shell_exec":
+        case "git_status", "git_diff", "git_log", "git_add", "git_commit", "shell_exec",
+             "process.run", "shell.run", "bash.run", "python.run", "powershell.run":
             return [
                 access("cwd") ?? PathAccess(key: "cwd", url: base, protectRoot: false),
             ]
@@ -180,7 +237,18 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
         }
     }
 
-    private func authorizedRoots(binding: ActiveBinding?, clientID: ClientID) -> [URL] {
+    private func authorizedRoots(
+        binding: ActiveBinding?,
+        context: ToolInvocationContext?,
+        clientID: ClientID
+    ) -> [URL] {
+        if let context {
+            return context.authorizationScope.canonicalRoots
+                .map(canonicalURL)
+                .reduce(into: [URL]()) { roots, root in
+                    if !roots.contains(root) { roots.append(root) }
+                }
+        }
         let trusted = ([paths.home] + config.model.allowedRoots.map(ToolArgHelpers.resolvePath))
             .map(canonicalURL)
             .reduce(into: [URL]()) { roots, root in
@@ -267,6 +335,11 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
 
     private static let cwdTools: Set<String> = [
         "git_status", "git_diff", "git_log", "git_add", "git_commit", "shell_exec",
+        "process.run", "shell.run", "bash.run", "python.run", "powershell.run",
+    ]
+
+    private static let runtimeExecutionTools: Set<String> = [
+        "shell_exec", "process.run", "shell.run", "bash.run", "python.run", "powershell.run",
     ]
 
     private static let readOnlyPathTools: Set<String> = [

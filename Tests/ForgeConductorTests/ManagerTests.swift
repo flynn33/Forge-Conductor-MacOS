@@ -170,6 +170,83 @@ final class ManagerTests: XCTestCase {
         _ = node
     }
 
+    func testOperatorSnapshotRouteIsBoundedRedactedAndPreservesExistingQueryPaths() async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        let port = Int.random(in: 19_000...28_000)
+        try app.config.update(["dashboard": ["port": port] as [String: Any]], save: true)
+        let projectRoot = home.appendingPathComponent("operator-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+        let node = ManagerNode(app: app)
+        let registered = try node.registerProject(path: projectRoot.path, displayName: "Operator Project")
+        let projectID = try XCTUnwrap((registered["project_id"] as? String).flatMap(UUID.init(uuidString:)))
+        let storedProject = try await app.projectContexts.repository.project(ProjectID(projectID))
+        let project = try XCTUnwrap(storedProject)
+        let scope = ToolAuthorizationScope(
+            canonicalRoots: [projectRoot],
+            allowedTools: ["project_memory.search"],
+            networkAllowed: false,
+            maximumInlineOutputBytes: 1_024
+        )
+        for mission in ["Earlier run", "Inspect api_key=supersecretvalue without exposing it"] {
+            _ = try await app.projectContexts.repository.createAutonomousRun(
+                AutonomousRunRequest(
+                    projectID: project.projectID,
+                    projectGeneration: project.generation,
+                    mission: mission,
+                    providerID: "lmstudio",
+                    adapterID: "forge.native-session-host",
+                    modelKey: "fixture-model",
+                    specification: AutonomousRunSpecification(
+                        allowedTools: ["project_memory.search"],
+                        completionGates: ["fixture-gate"]
+                    ),
+                    authorizationScope: scope
+                )
+            )
+        }
+
+        _ = try node.startService()
+        defer { _ = try? node.stopService() }
+        try await Task.sleep(for: .milliseconds(150))
+
+        let base = "http://127.0.0.1:\(port)"
+        let status = try HTTPTestHelpers.fetchJSON(
+            try XCTUnwrap(URL(string: base + "/api/manager/status?ignored=1"))
+        )
+        XCTAssertEqual(status["ok"] as? Bool, true)
+
+        let snapshot = try HTTPTestHelpers.fetchJSON(
+            try XCTUnwrap(URL(string: base + "/api/manager/operator/snapshot?limit=1"))
+        )
+        XCTAssertEqual(snapshot["limit"] as? Int, 1)
+        XCTAssertLessThanOrEqual((snapshot["projects"] as? [Any] ?? []).count, 1)
+        XCTAssertLessThanOrEqual((snapshot["runs"] as? [Any] ?? []).count, 1)
+        XCTAssertLessThanOrEqual((snapshot["continuity_operations"] as? [Any] ?? []).count, 1)
+        XCTAssertLessThanOrEqual((snapshot["runtime_jobs"] as? [Any] ?? []).count, 1)
+        XCTAssertLessThanOrEqual((snapshot["events"] as? [Any] ?? []).count, 1)
+        XCTAssertNotNil(snapshot["provider"] as? [String: Any])
+        XCTAssertNotNil(snapshot["runtime"] as? [String: Any])
+        let redactedSnapshot = try node.operatorSnapshot(limit: 100)
+        let mission = try XCTUnwrap(
+            redactedSnapshot.runs.first(where: { $0.mission.contains("<redacted>") })?.mission
+        )
+        XCTAssertTrue(mission.contains("<redacted>"))
+        XCTAssertFalse(mission.contains("supersecretvalue"))
+        XCTAssertNotNil(snapshot["next_cursor"] as? String)
+
+        for suffix in [
+            "?limit=0",
+            "?limit=abc",
+            "?limit=1&limit=2",
+            "?limit=1&cursor=0",
+        ] {
+            let code = try HTTPTestHelpers.fetchStatusCode(
+                try XCTUnwrap(URL(string: base + "/api/manager/operator/snapshot" + suffix))
+            )
+            XCTAssertEqual(code, 400, "Expected a rejected snapshot query for \(suffix)")
+        }
+    }
+
     func testManagerRuntimeThrottlesPresenceMaintenance() {
         let runtime = ManagerRuntime()
         let start = Date(timeIntervalSince1970: 1_000)
@@ -224,6 +301,10 @@ final class ManagerTests: XCTestCase {
                 "auto_restart": false,
                 "watchdog_interval_sec": 5,
             ] as [String: Any],
+            "shell": [
+                "enabled": false,
+                "default_timeout_sec": 37,
+            ] as [String: Any],
         ], apply: true)
 
         XCTAssertEqual(result["ok"] as? Bool, true)
@@ -232,10 +313,31 @@ final class ManagerTests: XCTestCase {
         XCTAssertEqual(mgr?["watchdog_interval_sec"] as? Int, 5)
         let dash = result["dashboard"] as? [String: Any]
         XCTAssertEqual(dash?["refresh_interval_sec"] as? Int, 12)
+        let shell = result["shell"] as? [String: Any]
+        XCTAssertEqual(shell?["enabled"] as? Bool, false)
+        XCTAssertEqual(shell?["user_disabled"] as? Bool, true)
+        XCTAssertEqual(shell?["policy_version"] as? Int, AppConfig.currentSchemaVersion)
+        XCTAssertEqual(shell?["policy_origin"] as? String, "user_disabled")
+        XCTAssertEqual(shell?["default_timeout_sec"] as? Int, 37)
+        XCTAssertNotNil(shell?["runtimes"] as? [String: Any])
 
         app.config.reload()
         XCTAssertEqual(app.config.bool("manager", "auto_restart", default: true), false)
         XCTAssertEqual(app.config.int("dashboard", "refresh_interval_sec", default: 8), 12)
+        XCTAssertFalse(app.config.model.shell.enabled)
+        XCTAssertTrue(app.config.model.shell.userDisabled)
+        XCTAssertEqual(app.config.model.shell.policyOrigin, "user_disabled")
+
+        let reenabled = try node.updateSettings(
+            ManagerSettingsPatch(shellEnabled: true),
+            apply: false
+        )
+        XCTAssertTrue(reenabled.shellEnabled)
+        XCTAssertFalse(reenabled.shellUserDisabled)
+        XCTAssertEqual(reenabled.shellPolicyOrigin, "user_enabled")
+        app.config.reload()
+        XCTAssertTrue(app.config.model.shell.enabled)
+        XCTAssertFalse(app.config.model.shell.userDisabled)
     }
 
     func testManagerRestartAPI() throws {
@@ -264,7 +366,11 @@ final class ManagerTests: XCTestCase {
         _ = try node.startService()
         try await Task.sleep(for: .milliseconds(150))
 
-        let client = ManagerDashboardClient(host: "127.0.0.1", port: port)
+        let client = ManagerDashboardClient(
+            host: "127.0.0.1",
+            port: port,
+            credentials: ManagerControlCredentialStore(paths: app.paths)
+        )
         let status = try await client.status()
         XCTAssertTrue(status.ok)
         XCTAssertTrue(status.serviceActive)
@@ -274,6 +380,12 @@ final class ManagerTests: XCTestCase {
         let settings = try await client.settings()
         XCTAssertEqual(settings.dashboardPort, port)
         XCTAssertEqual(settings.dashboardHost, "127.0.0.1")
+
+        let updated = try await client.updateSettings(
+            ManagerSettingsPatch(dashboardRefreshSec: 11),
+            apply: false
+        )
+        XCTAssertEqual(updated.dashboardRefreshSec, 11)
     }
 
     func testPIDFileHelpers() throws {

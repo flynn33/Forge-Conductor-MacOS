@@ -104,7 +104,7 @@ authorization.
 | **Project memory** | Twelve `project_memory.*` tools provide bounded search, optimistic updates, links, batch writes, health, and checksummed import/export. |
 | **Continuity** | A serialized coordinator and native session-host adapter preserve handoff state across process and chat boundaries. |
 | **Runtime** | Resource policy, lifecycle ownership, diagnostics, bounded latest-value telemetry, and shared Metal resources reduce unbounded work and retained state. |
-| **Security** | Workspace authority is derived from trusted roots; `shell_exec` is disabled by default and capped at 120 seconds when explicitly enabled. |
+| **Security** | Project shell tools are enabled by default, remain limited to authorized workspace roots, expose an explicit native opt-out, and keep `shell_exec` capped at 120 seconds. |
 
 Legacy `memory_*` and `session_*`/`context_*` tools remain compatible. Full release
 notes and qualification boundaries are in **[CHANGELOG.md](CHANGELOG.md)**.

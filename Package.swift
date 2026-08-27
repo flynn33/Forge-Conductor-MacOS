@@ -13,6 +13,7 @@ let package = Package(
         .library(name: "ForgeConductorCore", targets: ["ForgeConductorCore"]),
         .library(name: "ForgeNativeSessionHostPlugin", targets: ["ForgeNativeSessionHostPlugin"]),
         .executable(name: "forge-conductor", targets: ["ForgeConductorCLI"]),
+        .executable(name: "forge-runtime-launcher", targets: ["ForgeRuntimeLauncher"]),
         .executable(name: "forge-conductor-app", targets: ["ForgeConductorApp"]),
     ],
     targets: [
@@ -25,8 +26,16 @@ let package = Package(
         ),
         .executableTarget(
             name: "ForgeConductorCLI",
-            dependencies: ["ForgeConductorCore", "ForgeNativeSessionHostPlugin"],
+            dependencies: [
+                "ForgeConductorCore",
+                "ForgeNativeSessionHostPlugin",
+                "ForgeRuntimeLauncher",
+            ],
             path: "Sources/ForgeConductorCLI"
+        ),
+        .executableTarget(
+            name: "ForgeRuntimeLauncher",
+            path: "Sources/ForgeRuntimeLauncher"
         ),
         .target(
             name: "ForgeNativeSessionHostPlugin",
@@ -35,13 +44,17 @@ let package = Package(
         ),
         .executableTarget(
             name: "ForgeConductorApp",
-            dependencies: ["ForgeConductorCore", "ForgeNativeSessionHostPlugin"],
+            dependencies: [
+                "ForgeConductorCore",
+                "ForgeNativeSessionHostPlugin",
+                "ForgeRuntimeLauncher",
+            ],
             path: "Sources/ForgeConductorApp",
             exclude: ["Resources"]
         ),
         .testTarget(
             name: "ForgeConductorTests",
-            dependencies: ["ForgeConductorCore", "ForgeConductorCLI", "ForgeNativeSessionHostPlugin"],
+            dependencies: ["ForgeConductorCore", "ForgeConductorCLI", "ForgeNativeSessionHostPlugin", "ForgeRuntimeLauncher"],
             path: "Tests/ForgeConductorTests",
             resources: [
                 .process("Fixtures"),
