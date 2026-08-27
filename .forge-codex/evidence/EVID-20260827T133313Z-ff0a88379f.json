@@ -1,0 +1,51 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 5805,
+      "path": ".forge-codex/evidence/EVID-20260827T133313Z-ff0a88379f.stdout.txt",
+      "sha256": "877b426692e9b49609f6c0e73fdd497955580af09f8e6e8d4dceb94bd27d45e5",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 860,
+      "path": ".forge-codex/evidence/EVID-20260827T133313Z-ff0a88379f.stderr.txt",
+      "sha256": "49c40a1b87b40a52ca3c9f1422d489f444f8b29f9db5042287d22f72dc2b3122",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "command": "env FORGE_SKIP_PS=1 swift test -c release --no-parallel -Xswiftc -warnings-as-errors --filter 'ContinuityTests.testVersionTwoStoreMigratesPopulatedDataReopensAndRerunsIdempotently|ContinuityTests.testVersionThreeStoreMigratesWithoutLosingHandoff|ContinuityTests.testConcurrentVersionThreeMigrationIsIdempotent|ContinuityTests.testNonemptyUnversionedStoreFailsClosedWithoutMutatingDatabase|ContinuityTests.testNonMutatingSQLitePreflightRejectsInterruptedJournalWithoutChangingBytes|ContinuityTests.testNonMutatingSQLitePreflightReadsWALCloneWithoutChangingSourceFamily|ProjectMemoryTests.testVersionOneDatabaseMigratesPopulatedDataReopensAndRerunsIdempotently|ProjectMemoryTests.testConcurrentInitializersSerializeVersionOneMigration|ProjectMemoryTests.testNonemptyUnversionedDatabaseFailsClosedWithoutMutatingDatabase|RuntimeExecutionJobTests.testSchemaV2MigratesForwardWithProcessIdentityAndIdempotencyReceiptStorage|RuntimeExecutionJobTests.testConcurrentInitializersSerializeVersionTwoMigration|RuntimeExecutionJobTests.testNonemptyUnversionedRuntimeDatabaseFailsClosedWithoutMutation|ProjectControlPlaneRepositoryTests.testSchemaIntegrityPragmasAndMigrationReceiptAreIdempotent|ProjectControlPlaneRepositoryTests.testUnshippedAndUnversionedControlPlaneSchemasFailClosedWithoutMutation|ContinuityV2Tests.testProductionReconcilerCompletesContinuityFromExactDurableHandoff'",
+  "ended_at": "2026-08-27T13:34:26.671411+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260827T133313Z-ff0a88379f",
+  "kind": "test",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "related_findings": [],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 7834494,
+    "file_count": 234,
+    "schema_version": 1,
+    "sha256": "8e442f4c061909fd0ba9d5d1d59392087f62ae7ec32adfd83ed76924ae8ae7b8"
+  },
+  "source_manifest_after": {
+    "bytes": 7834494,
+    "file_count": 234,
+    "schema_version": 1,
+    "sha256": "8e442f4c061909fd0ba9d5d1d59392087f62ae7ec32adfd83ed76924ae8ae7b8"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-27T13:33:13.923688+00:00",
+  "timed_out": false
+}

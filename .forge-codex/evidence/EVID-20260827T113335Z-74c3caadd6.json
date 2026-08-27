@@ -1,0 +1,44 @@
+{
+  "artifacts": [
+    {
+      "bytes": 8183,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T113335Z-74c3caadd6.stdout.txt",
+      "sha256": "847b4097843377f7d32b1467c2057ce31dede5e67b72f238d61283ea76f0499c"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T113335Z-74c3caadd6.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "artifact_integrity_reconciliation": {
+    "preserved_artifacts": [
+      {
+        "basis": "recorded stdout has identical byte count and SHA-256",
+        "bytes": 8183,
+        "original_path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/P10-cli-compatibility-report.json",
+        "preserved_path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T113335Z-74c3caadd6.stdout.txt",
+        "sha256": "847b4097843377f7d32b1467c2057ce31dede5e67b72f238d61283ea76f0499c"
+      }
+    ],
+    "status": "fully_preserved",
+    "unavailable_artifacts": []
+  },
+  "command": "python3 .forge-codex/scripts/check_p10_cli_compatibility.py --binary .build/release/forge-conductor --baseline .forge-codex/state/baseline/cli-contract.json --report .forge-codex/evidence/P10-cli-compatibility-report.json",
+  "ended_at": "2026-08-27T11:33:36.513815+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260827T113335Z-74c3caadd6",
+  "kind": "p10-executable-cli-compatibility",
+  "related_findings": [],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-27T11:33:35.906542+00:00",
+  "timed_out": false
+}

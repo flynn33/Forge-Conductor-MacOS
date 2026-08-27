@@ -1,0 +1,20 @@
+Test Suite 'Selected tests' started at 2026-08-27 06:29:55.554.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-27 06:29:55.555.
+Test Suite 'NativeSessionHostPluginTests' started at 2026-08-27 06:29:55.555.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testV2BlockedCredentialFailureAndLegacySyntheticQuarantinePersist]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testV2BlockedCredentialFailureAndLegacySyntheticQuarantinePersist]' passed (0.021 seconds).
+Test Suite 'NativeSessionHostPluginTests' passed at 2026-08-27 06:29:55.576.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.021 (0.021) seconds
+Test Suite 'RuntimeExecutionJobTests' started at 2026-08-27 06:29:55.576.
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testSchemaV2MigratesForwardWithProcessIdentityAndIdempotencyReceiptStorage]' started.
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testSchemaV2MigratesForwardWithProcessIdentityAndIdempotencyReceiptStorage]' passed (0.012 seconds).
+Test Suite 'RuntimeExecutionJobTests' passed at 2026-08-27 06:29:55.588.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.012 (0.013) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-08-27 06:29:55.588.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.033 (0.034) seconds
+Test Suite 'Selected tests' passed at 2026-08-27 06:29:55.588.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.033 (0.034) seconds
+◇ Test run started.
+↳ Testing Library Version: 1501
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

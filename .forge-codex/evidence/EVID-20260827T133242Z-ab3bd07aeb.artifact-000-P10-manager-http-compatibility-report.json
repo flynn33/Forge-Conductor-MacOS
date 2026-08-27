@@ -1,0 +1,803 @@
+{
+  "baseline_revision": "1fce9e0188698167564056ee8ace266342f97c7b",
+  "g10_compatibility_eligible": false,
+  "generated_at": "2026-08-27T13:32:44.351999+00:00",
+  "hashes": {
+    "baseline_sha256": "0ca282a25abe7e839d15e56d93673161c80961a4fcc79110171d05016e0dcf5c",
+    "baseline_source_aggregate_sha256": "9741829234df2a61c6d84cd9eb8ed02c8afaf322ced46ebd79110c9389d8523d",
+    "binary_sha256": "2e65c8172fb604fd44f675fcc9b58f4dff97420d5f2ac76aca7f6194074b7e98",
+    "current_source_aggregate_sha256": "9e8496878b5672415d7f16a3e889c61040bef95289914f82f042974151e915d7",
+    "current_source_sha256": {
+      "Sources/ForgeConductorCore/Dashboard/DashboardHTTPRequest.swift": "c77b002f3c1e0ae390e7a32e3ff5101d37a60816260783c736b277493692d391",
+      "Sources/ForgeConductorCore/Dashboard/DashboardServer.swift": "8691aee3f7f70158c03269e3e38e5cdb88f95086daaa5e017c51748fa6e1a232",
+      "Sources/ForgeConductorCore/Dashboard/HTTPResponder.swift": "fbf30dd2c5aa48a840667b79088c645ca931feda4c49c989272eb59711509ad6",
+      "Sources/ForgeConductorCore/Dashboard/ManagerRoutes.swift": "d794c1b3b0781d2bc877a9ed6b1a9e57b4cfc00f7c1316b46ccd1746b50ca763",
+      "Sources/ForgeConductorCore/Domain/ManagerModels.swift": "07971e9bb88fb3489bfd257c9ec82ec883d245b2feece6bf74d8f01aa6ed98e7",
+      "Sources/ForgeConductorCore/Infrastructure/AppPaths.swift": "a802adfdbb3cd0775cc9c1334428788b621f3d08b00e1a0862b762efe33a6c49",
+      "Sources/ForgeConductorCore/Manager/ManagerNode.swift": "334ddfb16faf0d06dbacd8ac93a383aeec224db44cef8ee9720b22544caade35"
+    }
+  },
+  "ok": false,
+  "phase": "P10",
+  "runtime": {
+    "install_or_deploy_invoked": false,
+    "manager": {
+      "available": true,
+      "checks": [
+        {
+          "body_bytes": 515,
+          "body_sha256": "e2036433504b86f82b3c4be14600bc995829d9696c25bb247dce44b3ac4eef95",
+          "content_type": "application/json; charset=utf-8",
+          "id": "manager_ready",
+          "status": 200
+        },
+        {
+          "body_bytes": 106,
+          "body_sha256": "5e3a3e39954de958fb7a70596ea0e45947e5a6abd6e0a1a3818cdc3657807630",
+          "content_type": "application/json; charset=utf-8",
+          "id": "authorization_wrong_token",
+          "status": 401
+        },
+        {
+          "body_bytes": 515,
+          "body_sha256": "e2036433504b86f82b3c4be14600bc995829d9696c25bb247dce44b3ac4eef95",
+          "content_type": "application/json; charset=utf-8",
+          "id": "status_query",
+          "status": 200
+        },
+        {
+          "body_bytes": 615,
+          "body_sha256": "301b5d6bd09a715c8e08d7ded967d825f5dc552c7abad624d9cf5e7936a15791",
+          "content_type": "application/json; charset=utf-8",
+          "id": "settings",
+          "status": 200
+        },
+        {
+          "body_bytes": 784,
+          "body_sha256": "4058c869269ee16ea693706e1f5ae041610793b1d87934f2609d9009045811db",
+          "content_type": "application/json; charset=utf-8",
+          "id": "operator_snapshot",
+          "status": 200
+        },
+        {
+          "body_bytes": 88,
+          "body_sha256": "6a9af7e0bfe44e0141104f6943a32ac76de74f2538cc54d836d18f6ebb59e4e0",
+          "content_type": "application/json; charset=utf-8",
+          "id": "autonomy_status",
+          "status": 200
+        },
+        {
+          "body_bytes": 66,
+          "body_sha256": "60758acfbb9859939c4141a12251790da4a0f8ff72537736a19e267691c28c13",
+          "content_type": "application/json; charset=utf-8",
+          "id": "project_status_invalid",
+          "status": 500
+        },
+        {
+          "body_bytes": 62,
+          "body_sha256": "45e332f976167f1df36749cf37d22f0c4d6d42f85c6e7a5fc2bc60cd43d176e6",
+          "content_type": "application/json; charset=utf-8",
+          "id": "run_status_invalid",
+          "status": 500
+        },
+        {
+          "body_bytes": 106,
+          "body_sha256": "5e3a3e39954de958fb7a70596ea0e45947e5a6abd6e0a1a3818cdc3657807630",
+          "content_type": "application/json; charset=utf-8",
+          "id": "unauthorized_post_bind",
+          "status": 401
+        },
+        {
+          "body_bytes": 106,
+          "body_sha256": "5e3a3e39954de958fb7a70596ea0e45947e5a6abd6e0a1a3818cdc3657807630",
+          "content_type": "application/json; charset=utf-8",
+          "id": "unauthorized_post_register",
+          "status": 401
+        },
+        {
+          "body_bytes": 106,
+          "body_sha256": "5e3a3e39954de958fb7a70596ea0e45947e5a6abd6e0a1a3818cdc3657807630",
+          "content_type": "application/json; charset=utf-8",
+          "id": "unauthorized_post_reset_generation",
+          "status": 401
+        },
+        {
+          "body_bytes": 106,
+          "body_sha256": "5e3a3e39954de958fb7a70596ea0e45947e5a6abd6e0a1a3818cdc3657807630",
+          "content_type": "application/json; charset=utf-8",
+          "id": "unauthorized_post_restart",
+          "status": 401
+        },
+        {
+          "body_bytes": 106,
+          "body_sha256": "5e3a3e39954de958fb7a70596ea0e45947e5a6abd6e0a1a3818cdc3657807630",
+          "content_type": "application/json; charset=utf-8",
+          "id": "unauthorized_post_control",
+          "status": 401
+        },
+        {
+          "body_bytes": 106,
+          "body_sha256": "5e3a3e39954de958fb7a70596ea0e45947e5a6abd6e0a1a3818cdc3657807630",
+          "content_type": "application/json; charset=utf-8",
+          "id": "unauthorized_post_start",
+          "status": 401
+        },
+        {
+          "body_bytes": 106,
+          "body_sha256": "5e3a3e39954de958fb7a70596ea0e45947e5a6abd6e0a1a3818cdc3657807630",
+          "content_type": "application/json; charset=utf-8",
+          "id": "unauthorized_post_settings",
+          "status": 401
+        },
+        {
+          "body_bytes": 106,
+          "body_sha256": "5e3a3e39954de958fb7a70596ea0e45947e5a6abd6e0a1a3818cdc3657807630",
+          "content_type": "application/json; charset=utf-8",
+          "id": "unauthorized_post_shutdown",
+          "status": 401
+        },
+        {
+          "body_bytes": 106,
+          "body_sha256": "5e3a3e39954de958fb7a70596ea0e45947e5a6abd6e0a1a3818cdc3657807630",
+          "content_type": "application/json; charset=utf-8",
+          "id": "unauthorized_post_stop",
+          "status": 401
+        },
+        {
+          "body_bytes": 106,
+          "body_sha256": "5e3a3e39954de958fb7a70596ea0e45947e5a6abd6e0a1a3818cdc3657807630",
+          "content_type": "application/json; charset=utf-8",
+          "id": "unauthorized_put_settings",
+          "status": 401
+        },
+        {
+          "body_bytes": 106,
+          "body_sha256": "5e3a3e39954de958fb7a70596ea0e45947e5a6abd6e0a1a3818cdc3657807630",
+          "content_type": "application/json; charset=utf-8",
+          "id": "authorization_scheme_case",
+          "status": 401
+        },
+        {
+          "body_bytes": 106,
+          "body_sha256": "5e3a3e39954de958fb7a70596ea0e45947e5a6abd6e0a1a3818cdc3657807630",
+          "content_type": "application/json; charset=utf-8",
+          "id": "authorization_oversized",
+          "status": 401
+        },
+        {
+          "body_bytes": 106,
+          "body_sha256": "5e3a3e39954de958fb7a70596ea0e45947e5a6abd6e0a1a3818cdc3657807630",
+          "content_type": "application/json; charset=utf-8",
+          "id": "authorization_storage_fail_closed",
+          "status": 401
+        },
+        {
+          "body_bytes": 89,
+          "body_sha256": "29db2a71103e550f65d739ed803c721890b27017aa8aef626a608cd466a046f8",
+          "content_type": "application/json; charset=utf-8",
+          "id": "invalid_manager_target",
+          "status": 400
+        },
+        {
+          "body_bytes": 126,
+          "body_sha256": "a7dab6fadfcee4e75e59b2bd85a88e4bc2b74eadc450477db8d60b469aab2080",
+          "content_type": "application/json; charset=utf-8",
+          "id": "invalid_snapshot_query",
+          "status": 400
+        },
+        {
+          "body_bytes": 125,
+          "body_sha256": "e2512e2af5bcc056cd9275f203667b678afb86289d44ada383e69fecdb32077d",
+          "content_type": "application/json; charset=utf-8",
+          "id": "invalid_run_control",
+          "status": 400
+        },
+        {
+          "body_bytes": 106,
+          "body_sha256": "5e3a3e39954de958fb7a70596ea0e45947e5a6abd6e0a1a3818cdc3657807630",
+          "content_type": "application/json; charset=utf-8",
+          "id": "unknown_without_authorization",
+          "status": 401
+        },
+        {
+          "body_bytes": 9,
+          "body_sha256": "0019dfc4b32d63c1392aa264aed2253c1e0c2fb09216f8e2cc269bbfb8bb49b5",
+          "content_type": "text/plain",
+          "id": "authorized_not_found",
+          "status": 404
+        },
+        {
+          "body_bytes": 106,
+          "body_sha256": "5e3a3e39954de958fb7a70596ea0e45947e5a6abd6e0a1a3818cdc3657807630",
+          "content_type": "application/json; charset=utf-8",
+          "id": "wrong_method_without_authorization",
+          "status": 401
+        },
+        {
+          "body_bytes": 9,
+          "body_sha256": "0019dfc4b32d63c1392aa264aed2253c1e0c2fb09216f8e2cc269bbfb8bb49b5",
+          "content_type": "text/plain",
+          "id": "wrong_method_authorized",
+          "status": 404
+        },
+        {
+          "body_bytes": 47,
+          "body_sha256": "a8635e193464d7884ba653514016ccab744e29adf2b4d82f8bb48707e0751466",
+          "content_type": "text/plain",
+          "id": "bad_host",
+          "status": 403
+        },
+        {
+          "body_bytes": 58,
+          "body_sha256": "8f8de0c794861e9e200f974e4ba3e452f19f6d3d4c07c9b0854cf20d206e1599",
+          "content_type": "text/plain",
+          "id": "non_json_mutation",
+          "status": 415
+        },
+        {
+          "body_bytes": 47,
+          "body_sha256": "cb9870f23976bc3b746589c55f48c8eb869790f5d6280c3474e7a42d21235204",
+          "content_type": "text/plain",
+          "id": "cross_origin",
+          "status": 403
+        },
+        {
+          "body_bytes": 47,
+          "body_sha256": "cb9870f23976bc3b746589c55f48c8eb869790f5d6280c3474e7a42d21235204",
+          "content_type": "text/plain",
+          "id": "cross_site_fetch",
+          "status": 403
+        },
+        {
+          "body_bytes": 22,
+          "body_sha256": "6a656c848e5ebfe47d638555d486a62a90d30e136578d1a92d3dfab65c36de73",
+          "content_type": "text/plain",
+          "id": "parser_invalid_content_length",
+          "status": 400
+        },
+        {
+          "body_bytes": 34,
+          "body_sha256": "c9d4ad3345095b7c58d4a8ce8a8aa2135500b7a511dd37ae1e5731698145e864",
+          "content_type": "text/plain",
+          "id": "parser_transfer_encoding",
+          "status": 400
+        },
+        {
+          "body_bytes": 22,
+          "body_sha256": "c49c1143487ae0fc641001e7e6b8c849594b50077b2426726ec35c3ca036b3c5",
+          "content_type": "text/plain",
+          "id": "parser_body_too_large",
+          "status": 413
+        },
+        {
+          "body_bytes": 515,
+          "body_sha256": "e2036433504b86f82b3c4be14600bc995829d9696c25bb247dce44b3ac4eef95",
+          "content_type": "application/json; charset=utf-8",
+          "id": "authenticated_start",
+          "status": 200
+        },
+        {
+          "body_bytes": 1177,
+          "body_sha256": "b99a2ba4f5534142e23e944380c099b8813b96f32e3ad92d6789ea4db0e89d33",
+          "content_type": "application/json; charset=utf-8",
+          "id": "authenticated_settings_post",
+          "status": 200
+        },
+        {
+          "body_bytes": 1177,
+          "body_sha256": "b99a2ba4f5534142e23e944380c099b8813b96f32e3ad92d6789ea4db0e89d33",
+          "content_type": "application/json; charset=utf-8",
+          "id": "authenticated_settings_put",
+          "status": 200
+        },
+        {
+          "body_bytes": 415,
+          "body_sha256": "cb986f058ff604abe958c2b84a79ccc437d5297b7fc415f6371ab0b4bf2735ab",
+          "content_type": "application/json; charset=utf-8",
+          "id": "authenticated_project_register",
+          "status": 200
+        },
+        {
+          "body_bytes": 415,
+          "body_sha256": "cb986f058ff604abe958c2b84a79ccc437d5297b7fc415f6371ab0b4bf2735ab",
+          "content_type": "application/json; charset=utf-8",
+          "id": "authenticated_project_status",
+          "status": 200
+        },
+        {
+          "body_bytes": 540,
+          "body_sha256": "ee358adc86328072039efbab211a3725f057e8ed779207d6f657fdcaf0aee7f1",
+          "content_type": "application/json; charset=utf-8",
+          "id": "authenticated_project_bind",
+          "status": 200
+        },
+        {
+          "body_bytes": 171,
+          "body_sha256": "5b7c518cb7bef9c3fec95276ff1a26d90481d30485059269098375fe0c9416b8",
+          "content_type": "application/json; charset=utf-8",
+          "id": "authenticated_project_reset_generation",
+          "status": 200
+        },
+        {
+          "body_bytes": 517,
+          "body_sha256": "e0b9b30bbe368d493eb8ea56cfebc273dafc9635118dc34cf5f3bce5c42488ce",
+          "content_type": "application/json; charset=utf-8",
+          "id": "authenticated_stop",
+          "status": 200
+        },
+        {
+          "body_bytes": 515,
+          "body_sha256": "e2036433504b86f82b3c4be14600bc995829d9696c25bb247dce44b3ac4eef95",
+          "content_type": "application/json; charset=utf-8",
+          "id": "authenticated_start_after_stop",
+          "status": 200
+        },
+        {
+          "body_bytes": 515,
+          "body_sha256": "ebd706b67da7a03dfd2f7b1ffc27174e2945635793f3dda8bbc9c088806df207",
+          "content_type": "application/json; charset=utf-8",
+          "id": "authenticated_restart",
+          "status": 200
+        },
+        {
+          "body_bytes": 64,
+          "body_sha256": "fbfe7b7de54a4ac9cb7c87d12a8a8fb69cbb7390906954e7be89a39beebe0a11",
+          "content_type": "application/json; charset=utf-8",
+          "id": "authenticated_shutdown",
+          "status": 200
+        }
+      ],
+      "credential": {
+        "format": "64_lowercase_hex",
+        "noncredential_scan": {
+          "bytes": 7180,
+          "files": 6
+        },
+        "owner": "effective_user",
+        "permissions": "0600",
+        "response_disclosure": false
+      },
+      "mode": "temporary_home_loopback_process",
+      "process": {
+        "exit_code": 0,
+        "graceful_shutdown": true,
+        "pid_file_removed": true,
+        "port_closed": true,
+        "stderr_bytes": 192,
+        "stderr_sha256": "b00afff2c16f90e7fffdf3643fd12a85a7d6fc6ace3ad6c2d8e74b86ecc8c0f9",
+        "stdout_bytes": 0,
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "route_pairs_observed": [
+        [
+          "GET",
+          "/api/manager/autonomy/status"
+        ],
+        [
+          "GET",
+          "/api/manager/operator/snapshot"
+        ],
+        [
+          "GET",
+          "/api/manager/settings"
+        ],
+        [
+          "GET",
+          "/api/manager/status"
+        ],
+        [
+          "POST",
+          "/api/manager/projects/bind"
+        ],
+        [
+          "POST",
+          "/api/manager/projects/register"
+        ],
+        [
+          "POST",
+          "/api/manager/projects/reset-generation"
+        ],
+        [
+          "POST",
+          "/api/manager/projects/status"
+        ],
+        [
+          "POST",
+          "/api/manager/restart"
+        ],
+        [
+          "POST",
+          "/api/manager/runs/control"
+        ],
+        [
+          "POST",
+          "/api/manager/runs/start"
+        ],
+        [
+          "POST",
+          "/api/manager/runs/status"
+        ],
+        [
+          "POST",
+          "/api/manager/settings"
+        ],
+        [
+          "POST",
+          "/api/manager/shutdown"
+        ],
+        [
+          "POST",
+          "/api/manager/start"
+        ],
+        [
+          "POST",
+          "/api/manager/stop"
+        ],
+        [
+          "PUT",
+          "/api/manager/settings"
+        ]
+      ],
+      "success_semantics": {
+        "baseline_complete": true,
+        "baseline_exercised": [
+          [
+            "GET",
+            "/api/manager/settings"
+          ],
+          [
+            "GET",
+            "/api/manager/status"
+          ],
+          [
+            "POST",
+            "/api/manager/restart"
+          ],
+          [
+            "POST",
+            "/api/manager/settings"
+          ],
+          [
+            "POST",
+            "/api/manager/shutdown"
+          ],
+          [
+            "POST",
+            "/api/manager/start"
+          ],
+          [
+            "POST",
+            "/api/manager/stop"
+          ],
+          [
+            "PUT",
+            "/api/manager/settings"
+          ]
+        ],
+        "baseline_expected_count": 8,
+        "coverage_status": "partial",
+        "exercised": [
+          [
+            "GET",
+            "/api/manager/autonomy/status"
+          ],
+          [
+            "GET",
+            "/api/manager/operator/snapshot"
+          ],
+          [
+            "GET",
+            "/api/manager/settings"
+          ],
+          [
+            "GET",
+            "/api/manager/status"
+          ],
+          [
+            "POST",
+            "/api/manager/projects/bind"
+          ],
+          [
+            "POST",
+            "/api/manager/projects/register"
+          ],
+          [
+            "POST",
+            "/api/manager/projects/reset-generation"
+          ],
+          [
+            "POST",
+            "/api/manager/projects/status"
+          ],
+          [
+            "POST",
+            "/api/manager/restart"
+          ],
+          [
+            "POST",
+            "/api/manager/settings"
+          ],
+          [
+            "POST",
+            "/api/manager/shutdown"
+          ],
+          [
+            "POST",
+            "/api/manager/start"
+          ],
+          [
+            "POST",
+            "/api/manager/stop"
+          ],
+          [
+            "PUT",
+            "/api/manager/settings"
+          ]
+        ],
+        "exercised_count": 14,
+        "expected_count": 17,
+        "full_g10_compatibility_claimed": false,
+        "uncovered": [
+          {
+            "method": "POST",
+            "observed_non_success_statuses": [
+              400,
+              401
+            ],
+            "path": "/api/manager/runs/control",
+            "reason": "A 200 success requires a safely seeded controllable run fixture that this probe does not create.",
+            "success_status": 200
+          },
+          {
+            "method": "POST",
+            "observed_non_success_statuses": [
+              401
+            ],
+            "path": "/api/manager/runs/start",
+            "reason": "A 202 success may start a live provider-backed autonomous run and is outside this safe probe.",
+            "success_status": 202
+          },
+          {
+            "method": "POST",
+            "observed_non_success_statuses": [
+              500
+            ],
+            "path": "/api/manager/runs/status",
+            "reason": "A 200 success requires a safely seeded autonomous run fixture that this probe does not create.",
+            "success_status": 200
+          }
+        ]
+      }
+    },
+    "persistent_evidence_written": true,
+    "standalone_no_manager": {
+      "available": true,
+      "check": {
+        "body_bytes": 111,
+        "body_sha256": "36a6bbe6fdc8fba31a61f7409ea2c9e85a86f7fd2d863539fac1b4df3510d973",
+        "content_type": "application/json; charset=utf-8",
+        "id": "no_manager",
+        "status": 503
+      },
+      "process": {
+        "exit_code": 0,
+        "graceful_shutdown": true,
+        "port_closed": true,
+        "stderr_bytes": 118,
+        "stderr_sha256": "2ac6ea95e026c74db846d8027ff420e6e603e32614dd28bdc20c8467065b842c",
+        "stdout_bytes": 0,
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  },
+  "schema_version": 2,
+  "source": {
+    "baseline_route_count": 8,
+    "baseline_routes_preserved": true,
+    "current_route_count": 17,
+    "direct_statuses": {
+      "GET /api/manager/autonomy/status": [
+        200
+      ],
+      "GET /api/manager/operator/snapshot": [
+        200,
+        400
+      ],
+      "GET /api/manager/settings": [
+        200
+      ],
+      "GET /api/manager/status": [
+        200
+      ],
+      "POST /api/manager/projects/bind": [
+        200
+      ],
+      "POST /api/manager/projects/register": [
+        200
+      ],
+      "POST /api/manager/projects/reset-generation": [
+        200
+      ],
+      "POST /api/manager/projects/status": [
+        200
+      ],
+      "POST /api/manager/restart": [
+        200
+      ],
+      "POST /api/manager/runs/control": [
+        200,
+        400
+      ],
+      "POST /api/manager/runs/start": [
+        202
+      ],
+      "POST /api/manager/runs/status": [
+        200
+      ],
+      "POST /api/manager/settings": [
+        200
+      ],
+      "POST /api/manager/shutdown": [
+        200
+      ],
+      "POST /api/manager/start": [
+        200
+      ],
+      "POST /api/manager/stop": [
+        200
+      ],
+      "PUT /api/manager/settings": [
+        200
+      ]
+    },
+    "protected_route_pairs": [
+      [
+        "POST",
+        "/api/manager/projects/bind"
+      ],
+      [
+        "POST",
+        "/api/manager/projects/register"
+      ],
+      [
+        "POST",
+        "/api/manager/projects/reset-generation"
+      ],
+      [
+        "POST",
+        "/api/manager/restart"
+      ],
+      [
+        "POST",
+        "/api/manager/runs/control"
+      ],
+      [
+        "POST",
+        "/api/manager/runs/start"
+      ],
+      [
+        "POST",
+        "/api/manager/settings"
+      ],
+      [
+        "POST",
+        "/api/manager/shutdown"
+      ],
+      [
+        "POST",
+        "/api/manager/start"
+      ],
+      [
+        "POST",
+        "/api/manager/stop"
+      ],
+      [
+        "PUT",
+        "/api/manager/settings"
+      ]
+    ],
+    "public_route_pairs": [
+      [
+        "GET",
+        "/api/manager/autonomy/status"
+      ],
+      [
+        "GET",
+        "/api/manager/operator/snapshot"
+      ],
+      [
+        "GET",
+        "/api/manager/settings"
+      ],
+      [
+        "GET",
+        "/api/manager/status"
+      ],
+      [
+        "POST",
+        "/api/manager/projects/status"
+      ],
+      [
+        "POST",
+        "/api/manager/runs/status"
+      ]
+    ],
+    "route_pairs": [
+      [
+        "GET",
+        "/api/manager/status"
+      ],
+      [
+        "GET",
+        "/api/manager/settings"
+      ],
+      [
+        "GET",
+        "/api/manager/operator/snapshot"
+      ],
+      [
+        "POST",
+        "/api/manager/start"
+      ],
+      [
+        "POST",
+        "/api/manager/stop"
+      ],
+      [
+        "POST",
+        "/api/manager/restart"
+      ],
+      [
+        "POST",
+        "/api/manager/shutdown"
+      ],
+      [
+        "POST",
+        "/api/manager/settings"
+      ],
+      [
+        "PUT",
+        "/api/manager/settings"
+      ],
+      [
+        "POST",
+        "/api/manager/projects/register"
+      ],
+      [
+        "POST",
+        "/api/manager/projects/status"
+      ],
+      [
+        "POST",
+        "/api/manager/projects/bind"
+      ],
+      [
+        "POST",
+        "/api/manager/projects/reset-generation"
+      ],
+      [
+        "GET",
+        "/api/manager/autonomy/status"
+      ],
+      [
+        "POST",
+        "/api/manager/runs/start"
+      ],
+      [
+        "POST",
+        "/api/manager/runs/status"
+      ],
+      [
+        "POST",
+        "/api/manager/runs/control"
+      ]
+    ]
+  },
+  "source_manifest": {
+    "bytes": 7834494,
+    "file_count": 234,
+    "schema_version": 1,
+    "sha256": "8e442f4c061909fd0ba9d5d1d59392087f62ae7ec32adfd83ed76924ae8ae7b8"
+  },
+  "status": "partial"
+}

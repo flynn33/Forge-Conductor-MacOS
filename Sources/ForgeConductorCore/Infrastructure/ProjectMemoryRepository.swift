@@ -18,6 +18,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
     private let enableFTS5: Bool
     private let lock = NSLock()
     private var db: OpaquePointer?
+    private var openRegistration: SQLiteOpenRegistration?
 
     public init(
         projectID: String,
@@ -28,13 +29,20 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         guard UUID(uuidString: projectID) != nil else {
             throw ProjectMemoryError.invalidRequest("project_id must be a UUID")
         }
+        let standardizedDirectory = directory.standardizedFileURL
         self.projectID = projectID
-        self.directory = directory.standardizedFileURL
-        self.databaseURL = directory.appendingPathComponent("memory.sqlite3")
+        self.directory = standardizedDirectory
+        self.databaseURL = standardizedDirectory.appendingPathComponent("memory.sqlite3")
         self.clock = clock
         self.enableFTS5 = enableFTS5
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
+        try FileManager.default.createDirectory(
+            at: standardizedDirectory,
+            withIntermediateDirectories: true
+        )
+        try? FileManager.default.setAttributes(
+            [.posixPermissions: 0o700],
+            ofItemAtPath: standardizedDirectory.path
+        )
         try openAndMigrate()
     }
 
@@ -47,6 +55,8 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
             sqlite3_wal_checkpoint_v2(db, nil, SQLITE_CHECKPOINT_PASSIVE, nil, nil)
             sqlite3_close_v2(db)
             self.db = nil
+            VerifiedMigrationBackup.unregisterOpenDatabase(openRegistration)
+            openRegistration = nil
         }
     }
 
@@ -1265,17 +1275,25 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         skippedCount: Int,
         quarantinedCount: Int,
         startedAt: String,
+        migrationFingerprintSHA256: String,
         details: [String: Any]
     ) throws -> LegacyContinuityMigrationReceipt {
         guard importedCount >= 0, skippedCount >= 0, quarantinedCount >= 0,
-              ISO8601.date(from: startedAt) != nil else {
-            throw ProjectMemoryError.invalidRequest("legacy migration counts or timestamp are invalid")
+              ISO8601.date(from: startedAt) != nil,
+              migrationFingerprintSHA256.count == 64,
+              migrationFingerprintSHA256.allSatisfy({ $0.isHexDigit }),
+              migrationFingerprintSHA256 == migrationFingerprintSHA256.lowercased() else {
+            throw ProjectMemoryError.invalidRequest(
+                "legacy migration counts, timestamp, or fingerprint are invalid"
+            )
         }
         let detailsJSON = try JSONSupport.string(from: details)
         guard detailsJSON.utf8.count <= 16 * 1_024 else {
             throw ProjectMemoryError.payloadTooLarge("legacy migration details are oversized")
         }
-        let receiptID = UUID().uuidString.lowercased()
+        let receiptID = "legacy-global-" + JSONSupport.sha256Hex(
+            "\(projectID)|\(migrationFingerprintSHA256)"
+        )
         let completedAt = ISO8601.string(from: clock.now())
         lock.lock()
         defer { lock.unlock() }
@@ -1287,6 +1305,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
                   skipped_count,quarantined_count,integrity_result,details_json,
                   started_at,completed_at
                 ) VALUES(?,?,'legacy_global','2.0',?,?,?,'ok',?,?,?)
+                ON CONFLICT(receipt_id) DO NOTHING
                 """
             ) { statement in
                 bind(statement, 1, receiptID)
@@ -1300,15 +1319,56 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
                 try stepDone(statement)
             }
         }
-        return LegacyContinuityMigrationReceipt(
-            receiptID: receiptID,
-            projectID: projectID,
-            importedCount: importedCount,
-            skippedCount: skippedCount,
-            quarantinedCount: quarantinedCount,
-            startedAt: startedAt,
-            completedAt: completedAt
-        )
+        return try withStatementUnlocked(
+            """
+            SELECT project_id,source_version,target_version,imported_count,skipped_count,
+                   quarantined_count,integrity_result,details_json,started_at,completed_at
+            FROM continuity_migration_receipts WHERE receipt_id=? LIMIT 1
+            """
+        ) { statement in
+            bind(statement, 1, receiptID)
+            guard sqlite3_step(statement) == SQLITE_ROW,
+                  let storedProjectID = text(statement, 0),
+                  text(statement, 1) == "legacy_global",
+                  text(statement, 2) == ContinuityHandoffV2.schemaVersion,
+                  text(statement, 6) == "ok",
+                  let storedDetailsJSON = text(statement, 7),
+                  let storedStartedAt = text(statement, 8),
+                  let storedCompletedAt = text(statement, 9),
+                  storedProjectID == projectID,
+                  ISO8601.date(from: storedStartedAt) != nil,
+                  ISO8601.date(from: storedCompletedAt) != nil else {
+                throw ProjectMemoryError.integrityFailure(
+                    "legacy migration receipt could not be read back"
+                )
+            }
+            let storedDetails = try JSONSupport.object(from: Data(storedDetailsJSON.utf8))
+            guard storedDetails["migration_fingerprint_sha256"] as? String
+                    == migrationFingerprintSHA256 else {
+                throw ProjectMemoryError.integrityFailure(
+                    "legacy migration receipt fingerprint does not match"
+                )
+            }
+            let storedImportedCount = Int(sqlite3_column_int64(statement, 3))
+            let storedSkippedCount = Int(sqlite3_column_int64(statement, 4))
+            let storedQuarantinedCount = Int(sqlite3_column_int64(statement, 5))
+            guard storedImportedCount >= 0,
+                  storedSkippedCount >= 0,
+                  storedQuarantinedCount >= 0 else {
+                throw ProjectMemoryError.integrityFailure(
+                    "legacy migration receipt counts are invalid"
+                )
+            }
+            return LegacyContinuityMigrationReceipt(
+                receiptID: receiptID,
+                projectID: storedProjectID,
+                importedCount: storedImportedCount,
+                skippedCount: storedSkippedCount,
+                quarantinedCount: storedQuarantinedCount,
+                startedAt: storedStartedAt,
+                completedAt: storedCompletedAt
+            )
+        }
     }
 
     public func continuityLegacyQuarantineCount() throws -> Int {
@@ -1735,6 +1795,38 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
     // MARK: - Schema and writes
 
     private func openAndMigrate() throws {
+        try VerifiedMigrationBackup.withMigrationLock(
+            databaseURL: databaseURL,
+            timeoutSeconds: 60
+        ) {
+            do {
+                try VerifiedMigrationBackup.withNonMutatingSQLitePreflight(
+                    databaseURL: databaseURL
+                ) { candidate in
+                    guard let candidate else { return }
+                    let version = try candidate.integer("PRAGMA user_version;") ?? 0
+                    guard version <= Self.schemaVersion else {
+                        throw ProjectMemoryError.unsupportedVersion(version)
+                    }
+                    try candidate.requireEmptySchemaWhenUnversioned(
+                        reportedVersion: version
+                    )
+                }
+            } catch let error as ProjectMemoryError {
+                throw error
+            } catch let error as VerifiedMigrationBackupError {
+                if case .corruptSource = error {
+                    throw corruptDatabaseRecoveryError()
+                }
+                throw ProjectMemoryError.invalidRequest(error.localizedDescription)
+            } catch {
+                throw ProjectMemoryError.invalidRequest(error.localizedDescription)
+            }
+            try openAndMigrateLocked()
+        }
+    }
+
+    private func openAndMigrateLocked() throws {
         var handle: OpaquePointer?
         let flags = SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
         guard sqlite3_open_v2(databaseURL.path, &handle, flags, nil) == SQLITE_OK, let handle else {
@@ -1744,9 +1836,22 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         }
         db = handle
         do {
+            let initialVersion = try pragmaUserVersionUnlocked()
+            guard initialVersion <= Self.schemaVersion else {
+                throw ProjectMemoryError.unsupportedVersion(initialVersion)
+            }
+            do {
+                try VerifiedMigrationBackup.requireEmptySQLiteSchemaWhenUnversioned(
+                    database: handle,
+                    reportedVersion: initialVersion
+                )
+            } catch {
+                throw ProjectMemoryError.invalidRequest(error.localizedDescription)
+            }
             try execUnlocked("PRAGMA busy_timeout=3000; PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA synchronous=NORMAL;")
             try migrateUnlocked()
             try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: databaseURL.path)
+            openRegistration = try VerifiedMigrationBackup.registerOpenDatabase(at: databaseURL)
         } catch {
             let sqliteCode = sqlite3_errcode(handle)
             let preserve = sqliteCode == SQLITE_CORRUPT || sqliteCode == SQLITE_NOTADB
@@ -1757,22 +1862,51 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
             sqlite3_close_v2(handle)
             db = nil
             if preserve, FileManager.default.fileExists(atPath: databaseURL.path) {
-                let artifact = directory.appendingPathComponent("memory.corrupt-\(UUID().uuidString.lowercased()).sqlite3")
-                try? FileManager.default.copyItem(at: databaseURL, to: artifact)
-                throw ProjectMemoryError.integrityFailure("database preserved for recovery at \(artifact.lastPathComponent)")
+                throw corruptDatabaseRecoveryError()
             }
             throw error
+        }
+    }
+
+    private func corruptDatabaseRecoveryError() -> ProjectMemoryError {
+        let artifact = directory.appendingPathComponent(
+            "memory.corrupt-\(UUID().uuidString.lowercased()).sqlite3"
+        )
+        do {
+            _ = try VerifiedMigrationBackup.preserveStableFile(
+                from: databaseURL,
+                to: artifact
+            )
+            let writeAheadLog = URL(fileURLWithPath: databaseURL.path + "-wal")
+            if FileManager.default.fileExists(atPath: writeAheadLog.path) {
+                _ = try VerifiedMigrationBackup.preserveStableFile(
+                    from: writeAheadLog,
+                    to: URL(fileURLWithPath: artifact.path + "-wal")
+                )
+            }
+            return .integrityFailure(
+                "database family preserved for recovery at \(artifact.lastPathComponent)"
+            )
+        } catch {
+            return .integrityFailure(
+                "database corruption detected; recovery copy failed: \(error.localizedDescription)"
+            )
         }
     }
 
     private func migrateUnlocked() throws {
         let prior = try pragmaUserVersionUnlocked()
         guard prior <= Self.schemaVersion else { throw ProjectMemoryError.unsupportedVersion(prior) }
-        if prior > 0, FileManager.default.fileExists(atPath: databaseURL.path) {
+        if prior > 0, prior < Self.schemaVersion,
+           FileManager.default.fileExists(atPath: databaseURL.path) {
             let backup = directory.appendingPathComponent("memory.pre-migration-v\(prior).sqlite3")
-            if !FileManager.default.fileExists(atPath: backup.path) {
-                try? FileManager.default.copyItem(at: databaseURL, to: backup)
-            }
+            guard let db else { throw StoreError.openFailed("nil project memory database") }
+            _ = try VerifiedMigrationBackup.snapshotSQLite(
+                database: db,
+                to: backup,
+                expectedVersion: prior,
+                versionQuery: "PRAGMA user_version;"
+            )
         }
         try transactionUnlocked {
             try execUnlocked("""

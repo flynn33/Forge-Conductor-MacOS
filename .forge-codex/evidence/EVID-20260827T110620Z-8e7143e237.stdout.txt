@@ -1,0 +1,30 @@
+Test Suite 'Selected tests' started at 2026-08-27 06:06:23.636.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-27 06:06:23.637.
+Test Suite 'CoreTests' started at 2026-08-27 06:06:23.637.
+Test Case '-[ForgeConductorTests.CoreTests testShellExecPreservesLoginBashAndResponseContract]' started.
+Test Case '-[ForgeConductorTests.CoreTests testShellExecPreservesLoginBashAndResponseContract]' passed (0.156 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testShellRejectsNonFiniteTimeoutWhenEnabled]' started.
+Test Case '-[ForgeConductorTests.CoreTests testShellRejectsNonFiniteTimeoutWhenEnabled]' passed (0.133 seconds).
+Test Suite 'CoreTests' passed at 2026-08-27 06:06:23.925.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.288 (0.289) seconds
+Test Suite 'ToolDefinitionCatalogTests' started at 2026-08-27 06:06:23.926.
+Test Case '-[ForgeConductorTests.ToolDefinitionCatalogTests testCatalogRejectsMissingStaleAndDuplicateDefinitions]' started.
+Test Case '-[ForgeConductorTests.ToolDefinitionCatalogTests testCatalogRejectsMissingStaleAndDuplicateDefinitions]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ToolDefinitionCatalogTests testLegacyShellTimeoutSchemaRemainsCompatibleWithRuntimeClamping]' started.
+Test Case '-[ForgeConductorTests.ToolDefinitionCatalogTests testLegacyShellTimeoutSchemaRemainsCompatibleWithRuntimeClamping]' passed (0.147 seconds).
+Test Case '-[ForgeConductorTests.ToolDefinitionCatalogTests testMCPToolsListUsesTheCanonicalCatalogWithoutSchemaDrift]' started.
+Test Case '-[ForgeConductorTests.ToolDefinitionCatalogTests testMCPToolsListUsesTheCanonicalCatalogWithoutSchemaDrift]' passed (0.139 seconds).
+Test Case '-[ForgeConductorTests.ToolDefinitionCatalogTests testProductionCatalogExactlyCoversRouterAndIsCanonical]' started.
+Test Case '-[ForgeConductorTests.ToolDefinitionCatalogTests testProductionCatalogExactlyCoversRouterAndIsCanonical]' passed (0.129 seconds).
+Test Case '-[ForgeConductorTests.ToolDefinitionCatalogTests testProductionReplayCatalogExactlyCoversRouterAndRejectsDrift]' started.
+Test Case '-[ForgeConductorTests.ToolDefinitionCatalogTests testProductionReplayCatalogExactlyCoversRouterAndRejectsDrift]' passed (0.123 seconds).
+Test Suite 'ToolDefinitionCatalogTests' passed at 2026-08-27 06:06:24.463.
+	 Executed 5 tests, with 0 failures (0 unexpected) in 0.537 (0.538) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-08-27 06:06:24.463.
+	 Executed 7 tests, with 0 failures (0 unexpected) in 0.826 (0.827) seconds
+Test Suite 'Selected tests' passed at 2026-08-27 06:06:24.463.
+	 Executed 7 tests, with 0 failures (0 unexpected) in 0.826 (0.827) seconds
+◇ Test run started.
+↳ Testing Library Version: 1501
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

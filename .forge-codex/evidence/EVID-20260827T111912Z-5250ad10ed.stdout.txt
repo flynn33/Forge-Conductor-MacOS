@@ -1,0 +1,20 @@
+Test Suite 'Selected tests' started at 2026-08-27 06:19:23.406.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-27 06:19:23.407.
+Test Suite 'ContinuityTests' started at 2026-08-27 06:19:23.407.
+Test Case '-[ForgeConductorTests.ContinuityTests testVersionTwoStoreMigratesPopulatedDataReopensAndRerunsIdempotently]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testVersionTwoStoreMigratesPopulatedDataReopensAndRerunsIdempotently]' passed (0.024 seconds).
+Test Suite 'ContinuityTests' passed at 2026-08-27 06:19:23.431.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.024 (0.024) seconds
+Test Suite 'ProjectMemoryTests' started at 2026-08-27 06:19:23.431.
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testVersionOneDatabaseMigratesPopulatedDataReopensAndRerunsIdempotently]' started.
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testVersionOneDatabaseMigratesPopulatedDataReopensAndRerunsIdempotently]' passed (0.026 seconds).
+Test Suite 'ProjectMemoryTests' passed at 2026-08-27 06:19:23.458.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.026 (0.027) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-08-27 06:19:23.458.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.051 (0.051) seconds
+Test Suite 'Selected tests' passed at 2026-08-27 06:19:23.458.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.051 (0.052) seconds
+◇ Test run started.
+↳ Testing Library Version: 1501
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

@@ -127,6 +127,21 @@ final class ToolDefinitionCatalogTests: XCTestCase {
         }
     }
 
+    func testLegacyShellTimeoutSchemaRemainsCompatibleWithRuntimeClamping() throws {
+        try withProductionApp("legacy-shell-schema") { app in
+            let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
+            let definition = try XCTUnwrap(
+                catalog.definitions.first(where: { $0.name == "shell_exec" })
+            )
+            let schema = try definition.inputSchemaObject()
+            let properties = try XCTUnwrap(schema["properties"] as? [String: Any])
+            let timeout = try XCTUnwrap(properties["timeout_sec"] as? [String: Any])
+
+            XCTAssertEqual(timeout["type"] as? String, "number")
+            XCTAssertEqual(Set(timeout.keys), ["type"])
+        }
+    }
+
     func testProductionReplayCatalogExactlyCoversRouterAndRejectsDrift() throws {
         try withProductionApp("replay") { app in
             let names = app.tools.toolNames

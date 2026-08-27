@@ -201,6 +201,7 @@
 		P10B00000000000000000007 /* Metal/MetalGaugeResources.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000007 /* Metal/MetalGaugeResources.swift */; };
 		P10B00000000000000000008 /* Domain/ProjectMemoryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000008 /* Domain/ProjectMemoryModels.swift */; };
 		P10B00000000000000000009 /* Infrastructure/ProjectMemoryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000009 /* Infrastructure/ProjectMemoryRepository.swift */; };
+		C482E7FA103B4D6F95A18C20 /* Infrastructure/VerifiedMigrationBackup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71D3A9C84F6E42B1A5D809CE /* Infrastructure/VerifiedMigrationBackup.swift */; };
 		P10B00000000000000000010 /* Application/ProjectMemoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000010 /* Application/ProjectMemoryService.swift */; };
 		P10B00000000000000000011 /* Application/Tools/ProjectMemoryToolPack.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000011 /* Application/Tools/ProjectMemoryToolPack.swift */; };
 		P10B00000000000000000012 /* Infrastructure/ResourcePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000012 /* Infrastructure/ResourcePolicy.swift */; };
@@ -509,6 +510,7 @@
 		P10F00000000000000000007 /* Metal/MetalGaugeResources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Metal/MetalGaugeResources.swift; sourceTree = "<group>"; };
 		P10F00000000000000000008 /* Domain/ProjectMemoryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/ProjectMemoryModels.swift; sourceTree = "<group>"; };
 		P10F00000000000000000009 /* Infrastructure/ProjectMemoryRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Infrastructure/ProjectMemoryRepository.swift; sourceTree = "<group>"; };
+		71D3A9C84F6E42B1A5D809CE /* Infrastructure/VerifiedMigrationBackup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Infrastructure/VerifiedMigrationBackup.swift; sourceTree = "<group>"; };
 		P10F00000000000000000010 /* Application/ProjectMemoryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/ProjectMemoryService.swift; sourceTree = "<group>"; };
 		P10F00000000000000000011 /* Application/Tools/ProjectMemoryToolPack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/Tools/ProjectMemoryToolPack.swift; sourceTree = "<group>"; };
 		P10F00000000000000000012 /* Infrastructure/ResourcePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Infrastructure/ResourcePolicy.swift; sourceTree = "<group>"; };
@@ -773,6 +775,7 @@
 				P10F00000000000000000006 /* Telemetry/LatestValueMailbox.swift */,
 				P10F00000000000000000008 /* Domain/ProjectMemoryModels.swift */,
 				P10F00000000000000000009 /* Infrastructure/ProjectMemoryRepository.swift */,
+				71D3A9C84F6E42B1A5D809CE /* Infrastructure/VerifiedMigrationBackup.swift */,
 				P10F00000000000000000010 /* Application/ProjectMemoryService.swift */,
 				P10F00000000000000000011 /* Application/Tools/ProjectMemoryToolPack.swift */,
 				P10F00000000000000000012 /* Infrastructure/ResourcePolicy.swift */,
@@ -1201,6 +1204,7 @@
 				P10B00000000000000000006 /* Telemetry/LatestValueMailbox.swift in Sources */,
 				P10B00000000000000000008 /* Domain/ProjectMemoryModels.swift in Sources */,
 				P10B00000000000000000009 /* Infrastructure/ProjectMemoryRepository.swift in Sources */,
+				C482E7FA103B4D6F95A18C20 /* Infrastructure/VerifiedMigrationBackup.swift in Sources */,
 				P10B00000000000000000010 /* Application/ProjectMemoryService.swift in Sources */,
 				P10B00000000000000000011 /* Application/Tools/ProjectMemoryToolPack.swift in Sources */,
 				P10B00000000000000000012 /* Infrastructure/ResourcePolicy.swift in Sources */,

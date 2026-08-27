@@ -6,7 +6,6 @@
 
 import Foundation
 import SQLite3
-import Darwin
 
 /// Normalizes SQLite adapter failures into stable, user-readable error categories.
 public enum StoreError: Error, LocalizedError, Equatable {
@@ -31,8 +30,7 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
     private static let maximumSessionQueryRows = 10_000
     private var db: OpaquePointer?
     private let lock = NSLock()
-    private static let processInitializationLock = NSLock()
-    private static let initializationLockTimeout: TimeInterval = 5
+    private var openRegistration: SQLiteOpenRegistration?
     private var countedAsOpen = false
     public let path: URL
     private let clock: any Clock
@@ -47,7 +45,32 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
             at: path.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
-        try Self.withInitializationFileLock(databasePath: path) {
+        try VerifiedMigrationBackup.withMigrationLock(databaseURL: path, timeoutSeconds: 60) {
+            do {
+                try VerifiedMigrationBackup.withNonMutatingSQLitePreflight(
+                    databaseURL: path
+                ) { candidate in
+                    guard let candidate else { return }
+                    let hasVersionTable = try candidate.integer(
+                        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='schema_version'"
+                    ) == 1
+                    guard hasVersionTable else {
+                        try candidate.requireEmptySchemaWhenUnversioned(reportedVersion: 0)
+                        return
+                    }
+                    let rowCount = try candidate.integer("SELECT COUNT(*) FROM schema_version") ?? 0
+                    let version = try candidate.integer(
+                        "SELECT version FROM schema_version LIMIT 1"
+                    ) ?? 0
+                    guard rowCount == 1, (1...5).contains(version) else {
+                        throw VerifiedMigrationBackupError.invalidSource(
+                            "unsupported or malformed SQLite schema version \(version)"
+                        )
+                    }
+                }
+            } catch {
+                throw StoreError.openFailed(error.localizedDescription)
+            }
             var handle: OpaquePointer?
             let flags = SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
             guard sqlite3_open_v2(path.path, &handle, flags, nil) == SQLITE_OK, let handle else {
@@ -60,9 +83,11 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
                 // GUI manager + MCP serve share one home. Without a busy timeout, a locked
                 // store can stall serve startup long enough for LM Studio's ~60s plugin timeout.
                 try exec("PRAGMA busy_timeout=3000;")
+                try validateSchemaBeforeWrite()
                 try exec("PRAGMA journal_mode=WAL;")
                 try exec("PRAGMA foreign_keys=ON;")
                 try migrate()
+                openRegistration = try VerifiedMigrationBackup.registerOpenDatabase(at: path)
             } catch {
                 sqlite3_close(handle)
                 db = nil
@@ -74,43 +99,35 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
         recordDatabaseFootprint()
     }
 
-    deinit {
-        close()
+    private func validateSchemaBeforeWrite() throws {
+        lock.lock()
+        defer { lock.unlock() }
+        let hasVersionTable = try queryIntUnlocked(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='schema_version'"
+        ) == 1
+        guard let db else { throw StoreError.openFailed("nil db") }
+        do {
+            if hasVersionTable {
+                let rowCount = try queryIntUnlocked("SELECT COUNT(*) FROM schema_version") ?? 0
+                let prior = try queryIntUnlocked("SELECT version FROM schema_version LIMIT 1") ?? 0
+                guard rowCount == 1, (1...5).contains(prior) else {
+                    throw VerifiedMigrationBackupError.invalidSource(
+                        "unsupported or malformed SQLite schema version \(prior)"
+                    )
+                }
+                return
+            }
+            try VerifiedMigrationBackup.requireEmptySQLiteSchemaWhenUnversioned(
+                database: db,
+                reportedVersion: 0
+            )
+        } catch {
+            throw StoreError.openFailed(error.localizedDescription)
+        }
     }
 
-    private static func withInitializationFileLock<T>(
-        databasePath: URL,
-        _ body: () throws -> T
-    ) throws -> T {
-        let processDeadline = Date().addingTimeInterval(initializationLockTimeout)
-        guard processInitializationLock.lock(before: processDeadline) else {
-            throw StoreError.openFailed("timed out waiting for process initialization lock")
-        }
-        defer { processInitializationLock.unlock() }
-
-        let lockURL = databasePath.appendingPathExtension("initialization.lock")
-        let mode = mode_t(S_IRUSR | S_IWUSR)
-        let descriptor = lockURL.path.withCString {
-            Darwin.open($0, O_CREAT | O_RDWR, mode)
-        }
-        guard descriptor >= 0 else {
-            throw StoreError.openFailed("cannot open initialization lock: \(String(cString: strerror(errno)))")
-        }
-        defer { _ = Darwin.close(descriptor) }
-
-        let deadline = Date().addingTimeInterval(initializationLockTimeout)
-        while Darwin.lockf(descriptor, F_TLOCK, 0) != 0 {
-            let code = errno
-            guard code == EACCES || code == EAGAIN else {
-                throw StoreError.openFailed("cannot lock initialization: \(String(cString: strerror(code)))")
-            }
-            guard Date() < deadline else {
-                throw StoreError.openFailed("timed out waiting for database initialization lock")
-            }
-            Thread.sleep(forTimeInterval: 0.01)
-        }
-        defer { _ = Darwin.lockf(descriptor, F_ULOCK, 0) }
-        return try body()
+    deinit {
+        close()
     }
 
     /// Explicit close for tests that delete the home directory after bootstrap.
@@ -120,6 +137,8 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
         if let db {
             sqlite3_close(db)
             self.db = nil
+            VerifiedMigrationBackup.unregisterOpenDatabase(openRegistration)
+            openRegistration = nil
             if countedAsOpen {
                 countedAsOpen = false
                 RuntimeDiagnostics.shared.adjust(.openDatabases, by: -1)
@@ -130,6 +149,7 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
     // MARK: - Schema
 
     public func migrate() throws {
+        try createMigrationBackupIfNeeded()
         try exec("BEGIN IMMEDIATE;")
         do {
             try migrateLockedDatabase()
@@ -138,6 +158,29 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
             try? exec("ROLLBACK;")
             throw error
         }
+    }
+
+    private func createMigrationBackupIfNeeded() throws {
+        lock.lock()
+        defer { lock.unlock() }
+        let hasVersionTable = try queryIntUnlocked(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='schema_version'"
+        ) == 1
+        guard hasVersionTable else { return }
+        let prior = try queryIntUnlocked("SELECT version FROM schema_version LIMIT 1") ?? 0
+        guard prior > 0, prior < 5 else { return }
+        guard let db else { throw StoreError.openFailed("nil db") }
+        let stem = path.deletingPathExtension().lastPathComponent
+        let backupURL = path.deletingLastPathComponent().appendingPathComponent(
+            "\(stem).pre-migration-v\(prior).sqlite3",
+            isDirectory: false
+        )
+        _ = try VerifiedMigrationBackup.snapshotSQLite(
+            database: db,
+            to: backupURL,
+            expectedVersion: prior,
+            versionQuery: "SELECT version FROM schema_version LIMIT 1"
+        )
     }
 
     private func migrateLockedDatabase() throws {
@@ -925,6 +968,13 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
         try withStatement(sql) { stmt in
             guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
             return Int(sqlite3_column_int(stmt, 0))
+        }
+    }
+
+    private func queryIntUnlocked(_ sql: String) throws -> Int? {
+        try withStatementUnlocked(sql) { stmt in
+            guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
+            return Int(sqlite3_column_int64(stmt, 0))
         }
     }
 

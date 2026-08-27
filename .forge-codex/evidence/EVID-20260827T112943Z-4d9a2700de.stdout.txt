@@ -1,0 +1,17 @@
+Test Suite 'Selected tests' started at 2026-08-27 06:29:47.870.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-27 06:29:47.871.
+Test Suite 'ContinuityV2Tests' started at 2026-08-27 06:29:47.871.
+Test Case '-[ForgeConductorTests.ContinuityV2Tests testLegacyLocationV2MigrationPreservesBindingAcrossRestartAndIdempotentReplay]' started.
+Test Case '-[ForgeConductorTests.ContinuityV2Tests testLegacyLocationV2MigrationPreservesBindingAcrossRestartAndIdempotentReplay]' passed (0.060 seconds).
+Test Case '-[ForgeConductorTests.ContinuityV2Tests testLegacyMigrationImportsExactProjectReadOnlyAndQuarantinesAmbiguous]' started.
+Test Case '-[ForgeConductorTests.ContinuityV2Tests testLegacyMigrationImportsExactProjectReadOnlyAndQuarantinesAmbiguous]' passed (0.024 seconds).
+Test Suite 'ContinuityV2Tests' passed at 2026-08-27 06:29:47.954.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.083 (0.084) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-08-27 06:29:47.954.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.083 (0.084) seconds
+Test Suite 'Selected tests' passed at 2026-08-27 06:29:47.954.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.083 (0.084) seconds
+◇ Test run started.
+↳ Testing Library Version: 1501
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

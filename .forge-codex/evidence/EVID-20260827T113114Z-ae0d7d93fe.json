@@ -1,0 +1,34 @@
+{
+  "artifacts": [
+    {
+      "bytes": 4641,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T113114Z-ae0d7d93fe.stdout.txt",
+      "sha256": "e6a2fd01034ce486b81eeb0c550d9b01ae500b914a2b9900a75fd3106ca93261"
+    },
+    {
+      "bytes": 98,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T113114Z-ae0d7d93fe.stderr.txt",
+      "sha256": "e0606cbaa65d2b0312db79f47a538d11abb943541dce8b7c2d3c688f77be782c"
+    }
+  ],
+  "command": "swift test --no-parallel -Xswiftc -warnings-as-errors --filter 'AppConfigAndDoctorTests.testLegacyShellMigrationBackupReceiptAndExplicitDisableRemainValid|AppConfigAndDoctorTests.testConcurrentLegacyConfigLoadsPerformOneMigration|ContinuityTests.testVersionTwoStoreMigratesPopulatedDataReopensAndRerunsIdempotently|ContinuityTests.testVersionThreeStoreMigratesWithoutLosingHandoff|ContinuityTests.testConcurrentVersionThreeMigrationIsIdempotent|ProjectMemoryTests.testVersionOneDatabaseMigratesPopulatedDataReopensAndRerunsIdempotently|ContinuityV2Tests.testLegacyMigrationImportsExactProjectReadOnlyAndQuarantinesAmbiguous|ContinuityV2Tests.testLegacyLocationV2MigrationPreservesBindingAcrossRestartAndIdempotentReplay|NativeSessionHostPluginTests.testV2BlockedCredentialFailureAndLegacySyntheticQuarantinePersist|RuntimeExecutionJobTests.testSchemaV2MigratesForwardWithProcessIdentityAndIdempotencyReceiptStorage'",
+  "ended_at": "2026-08-27T11:31:15.641329+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260827T113114Z-ae0d7d93fe",
+  "kind": "p10-migration-matrix-debug",
+  "related_findings": [
+    "FC-MIGRATION-MATRIX-001",
+    "FC-MIGRATION-RECEIPT-001"
+  ],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-27T11:31:14.539280+00:00",
+  "timed_out": false
+}

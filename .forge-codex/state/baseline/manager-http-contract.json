@@ -1,0 +1,295 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-08-16T18:43:21Z",
+  "baseline_revision": "1fce9e0188698167564056ee8ace266342f97c7b",
+  "baseline_source_aggregate_sha256": "9741829234df2a61c6d84cd9eb8ed02c8afaf322ced46ebd79110c9389d8523d",
+  "baseline_source_sha256": {
+    "Sources/ForgeConductorCore/Dashboard/DashboardHTTPRequest.swift": "c77b002f3c1e0ae390e7a32e3ff5101d37a60816260783c736b277493692d391",
+    "Sources/ForgeConductorCore/Dashboard/DashboardServer.swift": "71c69533bb32573667575e3c3f83ec0adc6aaa2a1f81fcd6e20000a32aae7f32",
+    "Sources/ForgeConductorCore/Dashboard/HTTPResponder.swift": "0bbfe8a88ec557f9d4324cc12bbf3763491d0edb88a33eba781c5ed2e968cfe1",
+    "Sources/ForgeConductorCore/Dashboard/ManagerRoutes.swift": "4ed02b2a804bbd9255daa6e780655a732139ea2bfbe07d4285e125e6390e7ce4",
+    "Sources/ForgeConductorCore/Domain/ManagerModels.swift": "047f31db9e7ef9d721aac8081dc16c52ae2454044866e87a85cc791fde70e4e0",
+    "Sources/ForgeConductorCore/Infrastructure/AppPaths.swift": "dbae2ee6b38ccc019d46d9406952c7a8430cd88587c9640b5479d033de4b4af9",
+    "Sources/ForgeConductorCore/Manager/ManagerNode.swift": "a734bc2b50ce50126d7fb2562ef0fc56586db28c65ff67514796d3c840a81f1f"
+  },
+  "limits": {
+    "startup_timeout_seconds": 30,
+    "request_timeout_seconds": 5,
+    "shutdown_timeout_seconds": 20,
+    "maximum_process_stdout_bytes": 262144,
+    "maximum_process_stderr_bytes": 262144,
+    "maximum_response_bytes": 262144,
+    "maximum_redaction_scan_bytes": 4194304,
+    "maximum_redaction_scan_files": 512
+  },
+  "baseline_routes": [
+    ["GET", "/api/manager/status"],
+    ["GET", "/api/manager/settings"],
+    ["POST", "/api/manager/start"],
+    ["POST", "/api/manager/stop"],
+    ["POST", "/api/manager/restart"],
+    ["POST", "/api/manager/shutdown"],
+    ["POST", "/api/manager/settings"],
+    ["PUT", "/api/manager/settings"]
+  ],
+  "current_routes": [
+    {
+      "method": "GET",
+      "path": "/api/manager/status",
+      "success_status": 200,
+      "authorization": "public",
+      "safe_probe": "success"
+    },
+    {
+      "method": "GET",
+      "path": "/api/manager/settings",
+      "success_status": 200,
+      "authorization": "public",
+      "safe_probe": "success"
+    },
+    {
+      "method": "GET",
+      "path": "/api/manager/operator/snapshot",
+      "success_status": 200,
+      "authorization": "public",
+      "safe_probe": "success"
+    },
+    {
+      "method": "POST",
+      "path": "/api/manager/start",
+      "success_status": 200,
+      "authorization": "bearer",
+      "safe_probe": "authenticated_success_temporary_home"
+    },
+    {
+      "method": "POST",
+      "path": "/api/manager/stop",
+      "success_status": 200,
+      "authorization": "bearer",
+      "safe_probe": "authenticated_success_temporary_home"
+    },
+    {
+      "method": "POST",
+      "path": "/api/manager/restart",
+      "success_status": 200,
+      "authorization": "bearer",
+      "safe_probe": "authenticated_success_temporary_home"
+    },
+    {
+      "method": "POST",
+      "path": "/api/manager/shutdown",
+      "success_status": 200,
+      "authorization": "bearer",
+      "safe_probe": "authenticated_success_temporary_home_shutdown"
+    },
+    {
+      "method": "POST",
+      "path": "/api/manager/settings",
+      "success_status": 200,
+      "authorization": "bearer",
+      "safe_probe": "authenticated_success_temporary_home"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/manager/settings",
+      "success_status": 200,
+      "authorization": "bearer",
+      "safe_probe": "authenticated_success_temporary_home"
+    },
+    {
+      "method": "POST",
+      "path": "/api/manager/projects/register",
+      "success_status": 200,
+      "authorization": "bearer",
+      "safe_probe": "authenticated_success_temporary_project"
+    },
+    {
+      "method": "POST",
+      "path": "/api/manager/projects/status",
+      "success_status": 200,
+      "authorization": "public",
+      "safe_probe": "authenticated_success_temporary_project"
+    },
+    {
+      "method": "POST",
+      "path": "/api/manager/projects/bind",
+      "success_status": 200,
+      "authorization": "bearer",
+      "safe_probe": "authenticated_success_temporary_project"
+    },
+    {
+      "method": "POST",
+      "path": "/api/manager/projects/reset-generation",
+      "success_status": 200,
+      "authorization": "bearer",
+      "safe_probe": "authenticated_success_temporary_project"
+    },
+    {
+      "method": "GET",
+      "path": "/api/manager/autonomy/status",
+      "success_status": 200,
+      "authorization": "public",
+      "safe_probe": "success"
+    },
+    {
+      "method": "POST",
+      "path": "/api/manager/runs/start",
+      "success_status": 202,
+      "authorization": "bearer",
+      "safe_probe": "unauthorized_401_success_uncovered"
+    },
+    {
+      "method": "POST",
+      "path": "/api/manager/runs/status",
+      "success_status": 200,
+      "authorization": "public",
+      "safe_probe": "invalid_request_500_success_uncovered"
+    },
+    {
+      "method": "POST",
+      "path": "/api/manager/runs/control",
+      "success_status": 200,
+      "authorization": "bearer",
+      "safe_probe": "authenticated_invalid_400_success_uncovered"
+    }
+  ],
+  "envelopes": {
+    "status_required_keys": [
+      "ok",
+      "manager",
+      "state",
+      "desired_running",
+      "http_listening",
+      "service_active",
+      "pid",
+      "restart_count",
+      "auto_restart",
+      "watchdog_interval_sec",
+      "open_browser_on_start",
+      "dashboard",
+      "home",
+      "version"
+    ],
+    "status_dashboard_required_keys": [
+      "host",
+      "port",
+      "url",
+      "refresh_interval_sec"
+    ],
+    "settings_required_keys": [
+      "ok",
+      "dashboard",
+      "manager",
+      "sessions",
+      "shell",
+      "log_level"
+    ],
+    "settings_shell_baseline_required_keys": [
+      "default_timeout_sec"
+    ],
+    "unauthorized": {
+      "status": 401,
+      "body": {
+        "ok": false,
+        "code": "manager_mutation_unauthorized",
+        "message": "Manager mutation authorization is required"
+      }
+    },
+    "invalid_manager_target": {
+      "status": 400,
+      "required": {
+        "ok": false,
+        "code": "invalid_manager_target"
+      }
+    },
+    "invalid_snapshot_query": {
+      "status": 400,
+      "required": {
+        "ok": false,
+        "code": "invalid_snapshot_query"
+      }
+    },
+    "invalid_run_control": {
+      "status": 400,
+      "body": {
+        "ok": false,
+        "code": "invalid_run_control",
+        "message": "run_id and an exact pause, resume, cancel, or retry action are required"
+      }
+    },
+    "no_manager": {
+      "status": 503,
+      "body": {
+        "ok": false,
+        "code": "no_manager",
+        "message": "Not running under manager. Start with: forge-conductor manager run"
+      }
+    },
+    "internal_error": {
+      "status": 500,
+      "required_keys": [
+        "ok",
+        "message"
+      ],
+      "required_values": {
+        "ok": false
+      }
+    },
+    "not_found": {
+      "status": 404,
+      "content_type": "text/plain",
+      "body": "Not Found"
+    },
+    "shutdown": {
+      "status": 200,
+      "body": {
+        "ok": true,
+        "message": "Manager shutting down",
+        "state": "stopping"
+      }
+    }
+  },
+  "security": {
+    "loopback_hosts": [
+      "127.0.0.1",
+      "localhost",
+      "::1"
+    ],
+    "credential_filename": "manager-control.secret",
+    "credential_pattern": "^[0-9a-f]{64}$",
+    "credential_permissions": "0600",
+    "maximum_authorization_header_bytes": 512,
+    "maximum_request_header_bytes": 32768,
+    "maximum_request_body_bytes": 1048576,
+    "required_response_headers": {
+      "cache-control": "no-store",
+      "connection": "close",
+      "cross-origin-resource-policy": "same-origin",
+      "referrer-policy": "no-referrer",
+      "x-content-type-options": "nosniff"
+    },
+    "content_security_policy": "default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'",
+    "host_rejection": {
+      "status": 403,
+      "body": "Dashboard requests must target the local server"
+    },
+    "content_type_rejection": {
+      "status": 415,
+      "body": "State-changing dashboard requests require application/json"
+    },
+    "origin_rejection": {
+      "status": 403,
+      "body": "Cross-origin dashboard requests are not allowed"
+    },
+    "redaction_marker": "<redacted>",
+    "credential_never_exposed_in": [
+      "configuration",
+      "status",
+      "settings",
+      "operator_snapshot",
+      "diagnostics",
+      "exports",
+      "http_headers"
+    ]
+  }
+}

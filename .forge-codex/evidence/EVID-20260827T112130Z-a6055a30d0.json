@@ -1,0 +1,33 @@
+{
+  "artifacts": [
+    {
+      "bytes": 1281,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T112130Z-a6055a30d0.stdout.txt",
+      "sha256": "52d546516ecb69effa273f7c452cb3f7603a587c69a3d58a9ace19cfff95a6ea"
+    },
+    {
+      "bytes": 292,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T112130Z-a6055a30d0.stderr.txt",
+      "sha256": "b6eddcdbc2794e34c3f5e80709f111e5f099c0fdb06cbed3be84b7f43753c140"
+    }
+  ],
+  "command": "swift test -Xswiftc -warnings-as-errors --filter 'ContinuityTests.testVersionThreeStoreMigratesWithoutLosingHandoff|ContinuityTests.testConcurrentVersionThreeMigrationIsIdempotent'",
+  "ended_at": "2026-08-27T11:21:33.182017+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260827T112130Z-a6055a30d0",
+  "kind": "p10-global-v3-migration-lifecycle",
+  "related_findings": [
+    "FC-MIGRATION-MATRIX-001"
+  ],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-27T11:21:30.602790+00:00",
+  "timed_out": false
+}

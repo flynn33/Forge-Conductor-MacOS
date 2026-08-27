@@ -7,6 +7,29 @@ import XCTest
 @testable import ForgeConductorCore
 
 final class RuntimeExecutionJobTests: XCTestCase {
+    private actor InitializationGate {
+        private let participantCount: Int
+        private var arrivalCount = 0
+        private var waiters: [CheckedContinuation<Void, Never>] = []
+
+        init(participantCount: Int) {
+            self.participantCount = participantCount
+        }
+
+        func wait() async {
+            arrivalCount += 1
+            if arrivalCount == participantCount {
+                let pending = waiters
+                waiters.removeAll(keepingCapacity: false)
+                for waiter in pending { waiter.resume() }
+                return
+            }
+            await withCheckedContinuation { continuation in
+                waiters.append(continuation)
+            }
+        }
+    }
+
     func testConcurrentStdoutAndStderrDrainWithoutDeadlockAndSpillWithinBudget() async throws {
         let fixture = try await Fixture.make()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
@@ -751,13 +774,62 @@ final class RuntimeExecutionJobTests: XCTestCase {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
         let databaseURL = root.appendingPathComponent("runtime-v2.sqlite")
-        try Self.createRuntimeSchemaV2(at: databaseURL)
+        let legacyJobID = UUID()
+        let legacyProjectID = ProjectID()
+        try Self.createRuntimeSchemaV2(
+            at: databaseURL,
+            jobID: legacyJobID,
+            projectID: legacyProjectID
+        )
+
+        func assertLegacyJob(in repository: RuntimeJobRepository) async throws {
+            let storedJob = try await repository.job(legacyJobID)
+            let job = try XCTUnwrap(storedJob)
+            XCTAssertEqual(job.projectID, legacyProjectID)
+            XCTAssertEqual(job.projectGeneration, .initial)
+            XCTAssertEqual(job.runtimeKind, .bash)
+            XCTAssertEqual(job.executionProfile, .bashNoProfile)
+            XCTAssertEqual(job.replayClass, .readOnly)
+            XCTAssertEqual(job.state, .completed)
+            XCTAssertEqual(job.canonicalWorkingDirectory.path, "/legacy/runtime-project")
+            XCTAssertEqual(job.commandSummary, "legacy v2 completed job")
+            XCTAssertEqual(job.timeoutSeconds, 30)
+            XCTAssertEqual(job.exitCode, 0)
+            XCTAssertEqual(job.outputBytes, 14)
+            XCTAssertEqual(job.createdAt, "2026-08-26T00:00:00.000Z")
+            XCTAssertEqual(job.completedAt, "2026-08-26T00:00:01.000Z")
+        }
 
         let repository = try RuntimeJobRepository(databaseURL: databaseURL)
         let health = try await repository.health()
         XCTAssertEqual(health.schemaVersion, RuntimeJobRepository.schemaVersion)
         XCTAssertEqual(health.integrity.lowercased(), "ok")
+        try await assertLegacyJob(in: repository)
         await repository.close()
+
+        let backupURL = root.appendingPathComponent("runtime-v2.pre-migration-v2.sqlite3")
+        XCTAssertEqual(
+            try Self.sqliteCount(
+                databaseURL: backupURL,
+                sql: "SELECT version FROM runtime_job_schema_version WHERE singleton=1"
+            ),
+            2
+        )
+        XCTAssertEqual(try Self.sqliteText(databaseURL: backupURL, sql: "PRAGMA quick_check"), "ok")
+        XCTAssertEqual(
+            try Self.sqliteCount(
+                databaseURL: backupURL,
+                sql: "SELECT COUNT(*) FROM execution_jobs WHERE job_id=?",
+                textBinding: legacyJobID.uuidString.lowercased()
+            ),
+            1
+        )
+        XCTAssertEqual(
+            (try FileManager.default.attributesOfItem(atPath: backupURL.path)[.posixPermissions]
+                as? NSNumber)?.intValue,
+            0o600
+        )
+        let firstBackupData = try Data(contentsOf: backupURL)
 
         let columns = try Self.sqliteColumnNames(
             databaseURL: databaseURL,
@@ -772,6 +844,247 @@ final class RuntimeExecutionJobTests: XCTestCase {
             ),
             1
         )
+
+        let reopened = try RuntimeJobRepository(databaseURL: databaseURL)
+        try await assertLegacyJob(in: reopened)
+        let reopenedHealth = try await reopened.health()
+        XCTAssertEqual(reopenedHealth.schemaVersion, RuntimeJobRepository.schemaVersion)
+        await reopened.close()
+
+        let rerun = try RuntimeJobRepository(databaseURL: databaseURL)
+        try await assertLegacyJob(in: rerun)
+        let rerunHealth = try await rerun.health()
+        XCTAssertEqual(rerunHealth.integrity.lowercased(), "ok")
+        XCTAssertEqual(
+            try Self.sqliteCount(
+                databaseURL: databaseURL,
+                sql: "SELECT COUNT(*) FROM runtime_job_schema_version WHERE singleton=1 AND version=\(RuntimeJobRepository.schemaVersion)"
+            ),
+            1
+        )
+        await rerun.close()
+        XCTAssertEqual(try Data(contentsOf: backupURL), firstBackupData)
+    }
+
+    func testNonemptyUnversionedRuntimeDatabaseFailsClosedWithoutMutation() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("forge-runtime-unversioned-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let databaseURL = root.appendingPathComponent("runtime.sqlite")
+        try Self.createUnversionedRuntimeFixture(at: databaseURL)
+        let originalBytes = try Data(contentsOf: databaseURL)
+
+        XCTAssertThrowsError(try RuntimeJobRepository(databaseURL: databaseURL)) { error in
+            XCTAssertTrue(
+                error.localizedDescription.contains("unversioned SQLite database is not empty"),
+                "unexpected error: \(error)"
+            )
+        }
+        XCTAssertEqual(try Data(contentsOf: databaseURL), originalBytes)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: databaseURL.path + "-wal"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: databaseURL.path + "-shm"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: databaseURL.path + "-journal"))
+
+        let freshURL = root.appendingPathComponent("fresh-runtime.sqlite")
+        let fresh = try RuntimeJobRepository(databaseURL: freshURL)
+        let health = try await fresh.health()
+        XCTAssertEqual(health.schemaVersion, RuntimeJobRepository.schemaVersion)
+        await fresh.close()
+    }
+
+    func testMalformedCoResidentControlPlaneVersionFailsClosedWithoutMutatingWALFamily() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("forge-runtime-malformed-control-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let databaseURL = root.appendingPathComponent("control-plane.sqlite3")
+        let controlPlane = try ProjectControlPlaneRepository(databaseURL: databaseURL)
+        await controlPlane.close()
+
+        let database = try Self.openSQLiteFixture(at: databaseURL)
+        defer { sqlite3_close(database) }
+        try Self.executeSQLiteFixture(
+            """
+            PRAGMA journal_mode=WAL;
+            PRAGMA wal_autocheckpoint=0;
+            BEGIN IMMEDIATE;
+            ALTER TABLE control_schema_version RENAME TO valid_control_schema_version;
+            CREATE TABLE control_schema_version(
+                singleton INTEGER NOT NULL,
+                version INTEGER NOT NULL,
+                applied_at TEXT NOT NULL
+            );
+            INSERT INTO control_schema_version(singleton,version,applied_at)
+            VALUES(1,2,'2026-08-27T00:00:00.000Z'),(2,2,'2026-08-27T00:00:00.000Z');
+            DROP TABLE valid_control_schema_version;
+            COMMIT;
+            """,
+            database: database
+        )
+        let before = try Self.sqliteFamilySnapshot(at: databaseURL)
+        XCTAssertNotNil(before.writeAheadLog)
+        XCTAssertNotNil(before.sharedMemory)
+
+        XCTAssertThrowsError(try RuntimeJobRepository(databaseURL: databaseURL)) { error in
+            XCTAssertTrue(
+                error.localizedDescription.contains("unversioned SQLite database is not empty"),
+                "unexpected error: \(error)"
+            )
+        }
+        XCTAssertEqual(try Self.sqliteFamilySnapshot(at: databaseURL), before)
+    }
+
+    func testColumnTruncatedCoResidentControlPlaneFailsClosedWithoutMutatingWALFamily() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("forge-runtime-truncated-control-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let databaseURL = root.appendingPathComponent("control-plane.sqlite3")
+        let controlPlane = try ProjectControlPlaneRepository(databaseURL: databaseURL)
+        await controlPlane.close()
+
+        let database = try Self.openSQLiteFixture(at: databaseURL)
+        defer { sqlite3_close(database) }
+        try Self.executeSQLiteFixture(
+            """
+            PRAGMA journal_mode=WAL;
+            PRAGMA wal_autocheckpoint=0;
+            ALTER TABLE migration_receipts RENAME TO complete_migration_receipts;
+            CREATE TABLE migration_receipts(
+                receipt_id TEXT PRIMARY KEY,
+                migration_name TEXT NOT NULL,
+                source_version TEXT NOT NULL,
+                target_version TEXT NOT NULL,
+                source_sha256 TEXT,
+                backup_path TEXT,
+                backup_sha256 TEXT,
+                imported_count INTEGER NOT NULL DEFAULT 0,
+                skipped_count INTEGER NOT NULL DEFAULT 0,
+                quarantined_count INTEGER NOT NULL DEFAULT 0,
+                integrity_result TEXT NOT NULL,
+                details_json TEXT NOT NULL DEFAULT '{}',
+                started_at TEXT NOT NULL
+            );
+            DROP TABLE complete_migration_receipts;
+            """,
+            database: database
+        )
+        let before = try Self.sqliteFamilySnapshot(at: databaseURL)
+        XCTAssertNotNil(before.writeAheadLog)
+        XCTAssertNotNil(before.sharedMemory)
+
+        XCTAssertThrowsError(try RuntimeJobRepository(databaseURL: databaseURL)) { error in
+            XCTAssertTrue(
+                error.localizedDescription.contains("unversioned SQLite database is not empty"),
+                "unexpected error: \(error)"
+            )
+        }
+        XCTAssertEqual(try Self.sqliteFamilySnapshot(at: databaseURL), before)
+    }
+
+    func testPostOpenValidationRejectsRegisteredTruncatedControlPlaneWithoutMutation() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("forge-runtime-post-open-control-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let databaseURL = root.appendingPathComponent("control-plane.sqlite3")
+        let controlPlane = try ProjectControlPlaneRepository(databaseURL: databaseURL)
+        await controlPlane.close()
+
+        let database = try Self.openSQLiteFixture(at: databaseURL)
+        try Self.executeSQLiteFixture(
+            """
+            PRAGMA journal_mode=DELETE;
+            DROP TABLE provider_turns;
+            """,
+            database: database
+        )
+        XCTAssertEqual(sqlite3_close(database), SQLITE_OK)
+        let registration = try VerifiedMigrationBackup.registerOpenDatabase(at: databaseURL)
+        defer { VerifiedMigrationBackup.unregisterOpenDatabase(registration) }
+        let before = try Self.sqliteFamilySnapshot(at: databaseURL)
+
+        XCTAssertThrowsError(try RuntimeJobRepository(databaseURL: databaseURL)) { error in
+            XCTAssertTrue(
+                error.localizedDescription.contains("unversioned SQLite database is not empty"),
+                "unexpected error: \(error)"
+            )
+        }
+        XCTAssertEqual(try Self.sqliteFamilySnapshot(at: databaseURL), before)
+    }
+
+    func testConcurrentInitializersSerializeVersionTwoMigration() async throws {
+        let participantCount = 8
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(
+                "forge-runtime-v2-concurrent-migration-\(UUID().uuidString)",
+                isDirectory: true
+            )
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let databaseURL = root.appendingPathComponent("runtime-v2.sqlite")
+        let legacyJobID = UUID()
+        let legacyProjectID = ProjectID()
+        try Self.createRuntimeSchemaV2(
+            at: databaseURL,
+            jobID: legacyJobID,
+            projectID: legacyProjectID
+        )
+
+        let gate = InitializationGate(participantCount: participantCount)
+        let repositories = try await withThrowingTaskGroup(
+            of: RuntimeJobRepository.self,
+            returning: [RuntimeJobRepository].self
+        ) { group in
+            for _ in 0..<participantCount {
+                group.addTask {
+                    await gate.wait()
+                    return try RuntimeJobRepository(databaseURL: databaseURL)
+                }
+            }
+            var opened: [RuntimeJobRepository] = []
+            opened.reserveCapacity(participantCount)
+            for try await repository in group { opened.append(repository) }
+            return opened
+        }
+
+        XCTAssertEqual(repositories.count, participantCount)
+        for repository in repositories {
+            let health = try await repository.health()
+            XCTAssertEqual(health.schemaVersion, RuntimeJobRepository.schemaVersion)
+            XCTAssertEqual(health.integrity.lowercased(), "ok")
+            let storedJob = try await repository.job(legacyJobID)
+            let job = try XCTUnwrap(storedJob)
+            XCTAssertEqual(job.projectID, legacyProjectID)
+            XCTAssertEqual(job.commandSummary, "legacy v2 completed job")
+        }
+        for repository in repositories { await repository.close() }
+
+        XCTAssertEqual(
+            try Self.sqliteCount(
+                databaseURL: databaseURL,
+                sql: "SELECT version FROM runtime_job_schema_version WHERE singleton=1"
+            ),
+            RuntimeJobRepository.schemaVersion
+        )
+        let backupURL = root.appendingPathComponent("runtime-v2.pre-migration-v2.sqlite3")
+        XCTAssertEqual(
+            try Self.sqliteCount(
+                databaseURL: backupURL,
+                sql: "SELECT version FROM runtime_job_schema_version WHERE singleton=1"
+            ),
+            2
+        )
+        XCTAssertEqual(
+            try Self.sqliteCount(
+                databaseURL: backupURL,
+                sql: "SELECT COUNT(*) FROM execution_jobs WHERE job_id=?",
+                textBinding: legacyJobID.uuidString.lowercased()
+            ),
+            1
+        )
+        XCTAssertEqual(try Self.sqliteText(databaseURL: backupURL, sql: "PRAGMA quick_check"), "ok")
     }
 
     func testTerminalLedgerCompactionRetainsBoundedIdempotencyReceiptAndPreventsReplay() async throws {
@@ -2894,7 +3207,8 @@ final class RuntimeExecutionJobTests: XCTestCase {
         let shellSchema = try XCTUnwrap(shell["inputSchema"] as? [String: Any])
         let shellProperties = try XCTUnwrap(shellSchema["properties"] as? [String: Any])
         let timeout = try XCTUnwrap(shellProperties["timeout_sec"] as? [String: Any])
-        XCTAssertEqual((timeout["maximum"] as? NSNumber)?.doubleValue, 120)
+        XCTAssertEqual(timeout["type"] as? String, "number")
+        XCTAssertEqual(Set(timeout.keys), ["type"])
         XCTAssertEqual(shellSchema["required"] as? [String], ["command"])
     }
 
@@ -3023,7 +3337,11 @@ final class RuntimeExecutionJobTests: XCTestCase {
         )
     }
 
-    private static func createRuntimeSchemaV2(at databaseURL: URL) throws {
+    private static func createRuntimeSchemaV2(
+        at databaseURL: URL,
+        jobID: UUID,
+        projectID: ProjectID
+    ) throws {
         var database: OpaquePointer?
         let opened = sqlite3_open_v2(
             databaseURL.path,
@@ -3069,9 +3387,100 @@ final class RuntimeExecutionJobTests: XCTestCase {
             completed_at TEXT,
             updated_at TEXT NOT NULL
         );
+        INSERT INTO execution_jobs(
+            job_id,run_id,project_id,project_generation,runtime_kind,execution_profile,
+            replay_class,idempotency_key,state,canonical_cwd,command_summary,timeout_seconds,
+            exit_code,stdout_inline,stderr_inline,output_artifact_id,output_bytes,
+            process_identifier,process_group_identifier,created_at,started_at,completed_at,updated_at
+        ) VALUES(
+            '\(jobID.uuidString.lowercased())',NULL,'\(projectID.description)',1,'bash','bash_no_profile',
+            'read_only',NULL,'completed','/legacy/runtime-project','legacy v2 completed job',30,
+            0,'legacy output','',NULL,14,NULL,NULL,'2026-08-26T00:00:00.000Z',
+            '2026-08-26T00:00:00.100Z','2026-08-26T00:00:01.000Z','2026-08-26T00:00:01.000Z'
+        );
         """
         var message: UnsafeMutablePointer<CChar>?
         let executed = sqlite3_exec(database, sql, nil, nil, &message)
+        guard executed == SQLITE_OK else {
+            let detail = message.map { String(cString: $0) } ?? "SQLite error \(executed)"
+            sqlite3_free(message)
+            throw RuntimeJobError.storageFailure(detail)
+        }
+    }
+
+    private struct SQLiteFamilySnapshot: Equatable {
+        let database: Data?
+        let writeAheadLog: Data?
+        let sharedMemory: Data?
+        let rollbackJournal: Data?
+    }
+
+    private static func sqliteFamilySnapshot(at databaseURL: URL) throws -> SQLiteFamilySnapshot {
+        func dataIfPresent(_ url: URL) throws -> Data? {
+            guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+            return try Data(contentsOf: url)
+        }
+        return try SQLiteFamilySnapshot(
+            database: dataIfPresent(databaseURL),
+            writeAheadLog: dataIfPresent(URL(fileURLWithPath: databaseURL.path + "-wal")),
+            sharedMemory: dataIfPresent(URL(fileURLWithPath: databaseURL.path + "-shm")),
+            rollbackJournal: dataIfPresent(URL(fileURLWithPath: databaseURL.path + "-journal"))
+        )
+    }
+
+    private static func openSQLiteFixture(at databaseURL: URL) throws -> OpaquePointer {
+        var database: OpaquePointer?
+        let opened = sqlite3_open_v2(
+            databaseURL.path,
+            &database,
+            SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX,
+            nil
+        )
+        guard opened == SQLITE_OK, let database else {
+            if let database { sqlite3_close(database) }
+            throw RuntimeJobError.storageFailure("could not open control-plane fixture")
+        }
+        return database
+    }
+
+    private static func executeSQLiteFixture(
+        _ sql: String,
+        database: OpaquePointer
+    ) throws {
+        var message: UnsafeMutablePointer<CChar>?
+        let executed = sqlite3_exec(database, sql, nil, nil, &message)
+        guard executed == SQLITE_OK else {
+            let detail = message.map { String(cString: $0) } ?? "SQLite error \(executed)"
+            sqlite3_free(message)
+            throw RuntimeJobError.storageFailure(detail)
+        }
+    }
+
+    private static func createUnversionedRuntimeFixture(at databaseURL: URL) throws {
+        var database: OpaquePointer?
+        let opened = sqlite3_open_v2(
+            databaseURL.path,
+            &database,
+            SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX,
+            nil
+        )
+        guard opened == SQLITE_OK, let database else {
+            if let database { sqlite3_close(database) }
+            throw RuntimeJobError.storageFailure("could not create unversioned runtime fixture")
+        }
+        defer { sqlite3_close(database) }
+        var message: UnsafeMutablePointer<CChar>?
+        let executed = sqlite3_exec(
+            database,
+            """
+            PRAGMA journal_mode=DELETE;
+            CREATE TABLE foreign_records(id INTEGER PRIMARY KEY, payload TEXT NOT NULL);
+            INSERT INTO foreign_records(id,payload) VALUES(1,'must remain byte-for-byte intact');
+            """,
+            nil,
+            nil,
+            &message
+        )
         guard executed == SQLITE_OK else {
             let detail = message.map { String(cString: $0) } ?? "SQLite error \(executed)"
             sqlite3_free(message)
@@ -3139,6 +3548,31 @@ final class RuntimeExecutionJobTests: XCTestCase {
             throw RuntimeJobError.storageFailure("could not read SQLite count")
         }
         return Int(sqlite3_column_int64(statement, 0))
+    }
+
+    private static func sqliteText(databaseURL: URL, sql: String) throws -> String? {
+        var database: OpaquePointer?
+        let opened = sqlite3_open_v2(
+            databaseURL.path,
+            &database,
+            SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX,
+            nil
+        )
+        guard opened == SQLITE_OK, let database else {
+            if let database { sqlite3_close(database) }
+            throw RuntimeJobError.storageFailure("could not open SQLite fixture")
+        }
+        defer { sqlite3_close(database) }
+        var statement: OpaquePointer?
+        let prepared = sqlite3_prepare_v2(database, sql, -1, &statement, nil)
+        guard prepared == SQLITE_OK, let statement else {
+            throw RuntimeJobError.storageFailure("could not prepare SQLite text query")
+        }
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_step(statement) == SQLITE_ROW else {
+            throw RuntimeJobError.storageFailure("could not read SQLite text")
+        }
+        return sqlite3_column_text(statement, 0).map { String(cString: $0) }
     }
 
     private static let testLimits = RuntimeJobLimits(

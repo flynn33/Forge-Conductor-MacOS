@@ -1,0 +1,33 @@
+{
+  "artifacts": [
+    {
+      "bytes": 3356,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T115532Z-50cd86d07e.stdout.txt",
+      "sha256": "7c77d76080cbd4b5a9052bd3d8eb87d5354665115557a892178424f9caaa2afc"
+    },
+    {
+      "bytes": 11895,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T115532Z-50cd86d07e.stderr.txt",
+      "sha256": "cbfa6102fd6707145280b9f4837fee5956af1d3c5e79b0ecef9b7ae0d4118949"
+    }
+  ],
+  "command": "env FORGE_SKIP_PS=1 swift test --no-parallel -Xswiftc -warnings-as-errors --filter 'ContinuityTests.testVersionTwoStoreMigratesPopulatedDataReopensAndRerunsIdempotently|ContinuityTests.testVersionThreeStoreMigratesWithoutLosingHandoff|ContinuityTests.testConcurrentVersionThreeMigrationIsIdempotent|ContinuityTests.testVerifiedMigrationBackupCapturesWALAndRejectsTamperedReuse|ProjectMemoryTests.testVersionOneDatabaseMigratesPopulatedDataReopensAndRerunsIdempotently|NativeSessionHostPluginTests.testV2BlockedCredentialFailureAndLegacySyntheticQuarantinePersist|RuntimeExecutionJobTests.testSchemaV2MigratesForwardWithProcessIdentityAndIdempotencyReceiptStorage'",
+  "ended_at": "2026-08-27T11:55:45.459242+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260827T115532Z-50cd86d07e",
+  "kind": "p10-migration-backup-debug",
+  "related_findings": [
+    "FC-MIGRATION-BACKUP-001"
+  ],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-27T11:55:32.965602+00:00",
+  "timed_out": false
+}

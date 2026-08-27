@@ -6,6 +6,29 @@ import SQLite3
 @testable import ForgeConductorCore
 
 final class ProjectMemoryTests: XCTestCase {
+    private actor InitializationGate {
+        private let participantCount: Int
+        private var arrivalCount = 0
+        private var waiters: [CheckedContinuation<Void, Never>] = []
+
+        init(participantCount: Int) {
+            self.participantCount = participantCount
+        }
+
+        func wait() async {
+            arrivalCount += 1
+            if arrivalCount == participantCount {
+                let pending = waiters
+                waiters.removeAll(keepingCapacity: false)
+                for waiter in pending { waiter.resume() }
+                return
+            }
+            await withCheckedContinuation { continuation in
+                waiters.append(continuation)
+            }
+        }
+    }
+
     private var home: URL!
     private var projectA: URL!
     private var projectB: URL!
@@ -240,6 +263,337 @@ final class ProjectMemoryTests: XCTestCase {
         app?.shutdown()
     }
 
+    func testNonemptyUnversionedDatabaseFailsClosedWithoutMutatingDatabase() throws {
+        let projectID = UUID().uuidString.lowercased()
+        let directory = home.appendingPathComponent("project-memory-unversioned", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let databaseURL = directory.appendingPathComponent("memory.sqlite3")
+        try createUnversionedProjectMemoryFixture(at: databaseURL)
+        let originalBytes = try Data(contentsOf: databaseURL)
+
+        XCTAssertThrowsError(
+            try ProjectMemoryRepository(
+                projectID: projectID,
+                directory: directory,
+                enableFTS5: false
+            )
+        ) { error in
+            XCTAssertTrue(
+                error.localizedDescription.contains("unversioned SQLite database is not empty"),
+                "unexpected error: \(error)"
+            )
+        }
+        XCTAssertEqual(try Data(contentsOf: databaseURL), originalBytes)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: databaseURL.path + "-wal"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: databaseURL.path + "-shm"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: databaseURL.path + "-journal"))
+        XCTAssertFalse(
+            try FileManager.default.contentsOfDirectory(atPath: directory.path)
+                .contains { $0.hasPrefix("memory.corrupt-") }
+        )
+
+        let freshDirectory = home.appendingPathComponent("project-memory-fresh", isDirectory: true)
+        let fresh = try ProjectMemoryRepository(
+            projectID: UUID().uuidString.lowercased(),
+            directory: freshDirectory,
+            enableFTS5: false
+        )
+        XCTAssertEqual(
+            try fresh.status()["schema_version"] as? Int,
+            ProjectMemoryRepository.schemaVersion
+        )
+        fresh.close()
+    }
+
+    func testVersionOneDatabaseMigratesPopulatedDataReopensAndRerunsIdempotently() throws {
+        let projectID = UUID().uuidString.lowercased()
+        let recordID = UUID().uuidString.lowercased()
+        let handoffID = UUID().uuidString.lowercased()
+        let operationID = UUID().uuidString.lowercased()
+        let timestamp = "2026-01-03T04:05:06Z"
+        let directory = home.appendingPathComponent("project-memory-v1", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let databaseURL = directory.appendingPathComponent("memory.sqlite3")
+        let legacyHandoff = try ContinuityHandoff(
+            handoffID: handoffID,
+            operationID: operationID,
+            createdAt: timestamp,
+            project: [
+                "project_id": projectID,
+                "display_name": "Version One Fixture",
+                "repository_root": "/legacy/project",
+                "branch": "legacy-branch",
+                "commit": "legacy-commit",
+                "dirty_summary": [],
+            ],
+            predecessorSession: [
+                "session_id": "legacy-provider-session",
+                "provider_session_id": NSNull(),
+                "model": NSNull(),
+            ],
+            mission: "Preserve populated project memory",
+            currentWork: [
+                "phase_id": "P10",
+                "work_item_id": "project-memory-v1",
+                "summary": "Migrate legacy project memory",
+                "active_files": ["memory.sqlite3"],
+            ],
+            nextActions: [[
+                "order": 1,
+                "action": "Reopen migrated memory",
+                "command": "",
+                "success_condition": "Legacy semantics remain available",
+            ]],
+            hostState: [
+                "adapter_id": "legacy-adapter",
+                "continuity_state": ContinuityState.active.rawValue,
+                "context_budget_source": "legacy-fixture",
+                "retry": ["attempt": 0],
+            ]
+        ).validated()
+        try createVersionOneProjectMemoryFixture(
+            at: databaseURL,
+            projectID: projectID,
+            recordID: recordID,
+            handoff: legacyHandoff,
+            timestamp: timestamp
+        )
+
+        func assertMigratedSemantics(in repository: ProjectMemoryRepository) throws {
+            XCTAssertTrue(try repository.quickCheck())
+            let record = try XCTUnwrap(repository.get(id: recordID))
+            XCTAssertEqual(record.projectID, projectID)
+            XCTAssertEqual(record.kind, "decision")
+            XCTAssertEqual(record.title, "Legacy migration decision")
+            XCTAssertEqual(record.summary, "Preserve populated v1 semantics")
+            XCTAssertEqual(record.body, "legacy body")
+            XCTAssertEqual(record.tags, ["legacy", "migration"])
+            XCTAssertEqual(record.sourceKind, "operator")
+            XCTAssertEqual(record.sourceReference, "fixture://project-memory-v1")
+            XCTAssertEqual(record.sessionID, "legacy-session")
+            XCTAssertEqual(record.schemaVersion, 1)
+
+            let matches = try repository.search(
+                query: "populated v1",
+                kinds: ["decision"],
+                tags: ["migration"],
+                sessionID: "legacy-session",
+                limit: 10,
+                offset: 0
+            )
+            XCTAssertEqual(matches.map(\.0.id), [recordID])
+
+            let handoff = try XCTUnwrap(repository.continuityHandoff(id: handoffID))
+            XCTAssertEqual(handoff.operationID, operationID)
+            XCTAssertEqual(handoff.mission, "Preserve populated project memory")
+            let operation = try XCTUnwrap(repository.continuityOperation(id: operationID))
+            XCTAssertEqual(operation.predecessorSessionID, "legacy-provider-session")
+            XCTAssertEqual(operation.handoffID, handoffID)
+            XCTAssertEqual(operation.state, .active)
+            XCTAssertNil(try repository.continuityActiveOperation())
+            XCTAssertEqual(try repository.continuityActiveSessionID(), "legacy-provider-session")
+            XCTAssertEqual(try repository.continuityTransitionCount(operationID: operationID), 1)
+
+            let status = try repository.status()
+            XCTAssertEqual(status["schema_version"] as? Int, ProjectMemoryRepository.schemaVersion)
+            XCTAssertEqual(status["integrity"] as? String, "ok")
+        }
+
+        let first = try ProjectMemoryRepository(
+            projectID: projectID,
+            directory: directory,
+            enableFTS5: false
+        )
+        try assertMigratedSemantics(in: first)
+        XCTAssertEqual(try projectMemoryFixtureInt(at: databaseURL, sql: "PRAGMA user_version;"), 2)
+        XCTAssertEqual(
+            try projectMemoryFixtureInt(
+                at: databaseURL,
+                sql: "SELECT COUNT(*) FROM continuity_migration_receipts WHERE receipt_id='continuity-schema-v2' AND source_version='1' AND target_version='2' AND integrity_result='ok';"
+            ),
+            1
+        )
+        XCTAssertEqual(
+            try projectMemoryFixtureInt(
+                at: databaseURL,
+                sql: "SELECT COUNT(*) FROM continuity_handoffs WHERE handoff_id='\(handoffID)' AND quarantine_state='legacy_read_only' AND migration_source='project_memory_v1';"
+            ),
+            1
+        )
+        XCTAssertEqual(
+            try projectMemoryFixtureInt(
+                at: databaseURL,
+                sql: "SELECT COUNT(*) FROM rollover_operations WHERE operation_id='\(operationID)' AND quarantine_state='legacy_read_only' AND migration_source='project_memory_v1';"
+            ),
+            1
+        )
+        let currentRecord = try first.remember(ProjectMemoryWrite(
+            kind: "fact",
+            title: "Current schema write",
+            summary: "Write after version one migration",
+            tags: ["migration"],
+            idempotencyKey: "post-v1-migration"
+        )).0
+        XCTAssertEqual(currentRecord.schemaVersion, ProjectMemoryRepository.schemaVersion)
+        first.close()
+
+        let backupURL = directory.appendingPathComponent("memory.pre-migration-v1.sqlite3")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: backupURL.path))
+        XCTAssertEqual(try projectMemoryFixtureInt(at: backupURL, sql: "PRAGMA user_version;"), 1)
+        XCTAssertEqual(try projectMemoryFixtureText(at: backupURL, sql: "PRAGMA quick_check;"), "ok")
+        XCTAssertEqual(
+            (try FileManager.default.attributesOfItem(atPath: backupURL.path)[.posixPermissions]
+                as? NSNumber)?.intValue,
+            0o600
+        )
+        XCTAssertEqual(
+            try projectMemoryFixtureInt(
+                at: backupURL,
+                sql: "SELECT COUNT(*) FROM memory_records WHERE id='\(recordID)' AND project_id='\(projectID)';"
+            ),
+            1
+        )
+        let firstBackupData = try Data(contentsOf: backupURL)
+
+        let reopened = try ProjectMemoryRepository(
+            projectID: projectID,
+            directory: directory,
+            enableFTS5: false
+        )
+        try assertMigratedSemantics(in: reopened)
+        XCTAssertEqual(try reopened.get(id: currentRecord.id)?.schemaVersion, ProjectMemoryRepository.schemaVersion)
+        XCTAssertEqual(try reopened.status()["record_count"] as? Int, 2)
+        reopened.close()
+
+        let rerun = try ProjectMemoryRepository(
+            projectID: projectID,
+            directory: directory,
+            enableFTS5: false
+        )
+        defer { rerun.close() }
+        try assertMigratedSemantics(in: rerun)
+        XCTAssertEqual(try rerun.get(id: currentRecord.id)?.title, "Current schema write")
+        XCTAssertEqual(
+            try projectMemoryFixtureInt(
+                at: databaseURL,
+                sql: "SELECT COUNT(*) FROM continuity_migration_receipts WHERE receipt_id='continuity-schema-v2';"
+            ),
+            1
+        )
+        XCTAssertEqual(try Data(contentsOf: backupURL), firstBackupData)
+    }
+
+    func testConcurrentInitializersSerializeVersionOneMigration() async throws {
+        let participantCount = 8
+        let projectID = UUID().uuidString.lowercased()
+        let recordID = UUID().uuidString.lowercased()
+        let timestamp = "2026-01-03T04:05:06Z"
+        let directory = home.appendingPathComponent(
+            "project-memory-v1-concurrent",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let databaseURL = directory.appendingPathComponent("memory.sqlite3")
+        let handoff = try ContinuityHandoff(
+            handoffID: UUID().uuidString.lowercased(),
+            operationID: UUID().uuidString.lowercased(),
+            createdAt: timestamp,
+            project: [
+                "project_id": projectID,
+                "display_name": "Concurrent Version One Fixture",
+                "repository_root": "/legacy/concurrent-project",
+                "branch": "legacy-branch",
+                "commit": "legacy-commit",
+                "dirty_summary": [],
+            ],
+            predecessorSession: [
+                "session_id": "legacy-provider-session",
+                "provider_session_id": NSNull(),
+                "model": NSNull(),
+            ],
+            mission: "Serialize project memory migration",
+            currentWork: [
+                "phase_id": "P10",
+                "work_item_id": "project-memory-v1-concurrent",
+                "summary": "Open one legacy database concurrently",
+                "active_files": ["memory.sqlite3"],
+            ],
+            nextActions: [[
+                "order": 1,
+                "action": "Verify serialized migration",
+                "command": "",
+                "success_condition": "Every initializer opens schema version two",
+            ]],
+            hostState: [
+                "adapter_id": "legacy-adapter",
+                "continuity_state": ContinuityState.active.rawValue,
+                "context_budget_source": "legacy-fixture",
+                "retry": ["attempt": 0],
+            ]
+        ).validated()
+        try createVersionOneProjectMemoryFixture(
+            at: databaseURL,
+            projectID: projectID,
+            recordID: recordID,
+            handoff: handoff,
+            timestamp: timestamp
+        )
+
+        let gate = InitializationGate(participantCount: participantCount)
+        let repositories = try await withThrowingTaskGroup(
+            of: ProjectMemoryRepository.self,
+            returning: [ProjectMemoryRepository].self
+        ) { group in
+            for _ in 0..<participantCount {
+                group.addTask {
+                    await gate.wait()
+                    return try ProjectMemoryRepository(
+                        projectID: projectID,
+                        directory: directory,
+                        enableFTS5: false
+                    )
+                }
+            }
+            var opened: [ProjectMemoryRepository] = []
+            opened.reserveCapacity(participantCount)
+            for try await repository in group { opened.append(repository) }
+            return opened
+        }
+
+        XCTAssertEqual(repositories.count, participantCount)
+        for repository in repositories {
+            XCTAssertTrue(try repository.quickCheck())
+            XCTAssertEqual(
+                try repository.status()["schema_version"] as? Int,
+                ProjectMemoryRepository.schemaVersion
+            )
+            XCTAssertEqual(try repository.get(id: recordID)?.title, "Legacy migration decision")
+        }
+        for repository in repositories { repository.close() }
+
+        XCTAssertEqual(
+            try projectMemoryFixtureInt(at: databaseURL, sql: "PRAGMA user_version;"),
+            ProjectMemoryRepository.schemaVersion
+        )
+        XCTAssertEqual(
+            try projectMemoryFixtureInt(
+                at: databaseURL,
+                sql: "SELECT COUNT(*) FROM continuity_migration_receipts WHERE receipt_id='continuity-schema-v2';"
+            ),
+            1
+        )
+        let backupURL = directory.appendingPathComponent("memory.pre-migration-v1.sqlite3")
+        XCTAssertEqual(try projectMemoryFixtureInt(at: backupURL, sql: "PRAGMA user_version;"), 1)
+        XCTAssertEqual(
+            try projectMemoryFixtureInt(
+                at: backupURL,
+                sql: "SELECT COUNT(*) FROM memory_records WHERE id='\(recordID)';"
+            ),
+            1
+        )
+        XCTAssertEqual(try projectMemoryFixtureText(at: backupURL, sql: "PRAGMA quick_check;"), "ok")
+    }
+
     func testFallbackSearchAndCorruptDatabaseRecoveryArtifact() throws {
         let fallbackDirectory = home.appendingPathComponent("fallback", isDirectory: true)
         let fallbackID = UUID().uuidString.lowercased()
@@ -265,6 +619,10 @@ final class ProjectMemoryTests: XCTestCase {
         let database = projectDirectory.appendingPathComponent("memory.sqlite3")
         let corrupt = Data("not a sqlite database".utf8)
         try corrupt.write(to: database, options: .atomic)
+        let sourceWriteAheadLog = URL(fileURLWithPath: database.path + "-wal")
+        let writeAheadLogBytes = FileManager.default.fileExists(atPath: sourceWriteAheadLog.path)
+            ? try Data(contentsOf: sourceWriteAheadLog)
+            : nil
 
         app = try ForgeApp.bootstrap(home: home)
         let failed = try app!.tools.call(
@@ -274,10 +632,27 @@ final class ProjectMemoryTests: XCTestCase {
         XCTAssertFalse(failed.ok)
         XCTAssertEqual(failed.payload["code"] as? String, "integrity_failure")
         XCTAssertEqual(try Data(contentsOf: database), corrupt)
-        let preserved = try FileManager.default.contentsOfDirectory(at: projectDirectory, includingPropertiesForKeys: nil)
-            .filter { $0.lastPathComponent.hasPrefix("memory.corrupt-") }
-        XCTAssertEqual(preserved.count, 1)
-        XCTAssertEqual(try Data(contentsOf: preserved[0]), corrupt)
+        if let writeAheadLogBytes {
+            XCTAssertEqual(try Data(contentsOf: sourceWriteAheadLog), writeAheadLogBytes)
+        }
+        let recoveryFamily = try FileManager.default.contentsOfDirectory(
+            at: projectDirectory,
+            includingPropertiesForKeys: nil
+        ).filter { $0.lastPathComponent.hasPrefix("memory.corrupt-") }
+        let preservedDatabases = recoveryFamily.filter { $0.lastPathComponent.hasSuffix(".sqlite3") }
+        XCTAssertEqual(preservedDatabases.count, 1)
+        let preservedDatabase = try XCTUnwrap(preservedDatabases.first)
+        XCTAssertEqual(try Data(contentsOf: preservedDatabase), corrupt)
+        let permissions = try FileManager.default.attributesOfItem(atPath: preservedDatabase.path)[.posixPermissions]
+            as? NSNumber
+        XCTAssertEqual((permissions?.intValue ?? 0) & 0o777, 0o600)
+        let preservedWriteAheadLogs = recoveryFamily.filter {
+            $0.lastPathComponent.hasSuffix(".sqlite3-wal")
+        }
+        XCTAssertEqual(preservedWriteAheadLogs.count, writeAheadLogBytes == nil ? 0 : 1)
+        if let writeAheadLogBytes, let preservedWriteAheadLog = preservedWriteAheadLogs.first {
+            XCTAssertEqual(try Data(contentsOf: preservedWriteAheadLog), writeAheadLogBytes)
+        }
         app?.shutdown()
     }
 
@@ -339,5 +714,189 @@ final class ProjectMemoryTests: XCTestCase {
         guard sqlite3_exec(database, "PRAGMA user_version=\(version);", nil, nil, nil) == SQLITE_OK else {
             throw ProjectMemoryError.integrityFailure("cannot set fixture version")
         }
+    }
+
+    private func createUnversionedProjectMemoryFixture(at databaseURL: URL) throws {
+        var database: OpaquePointer?
+        guard sqlite3_open_v2(
+            databaseURL.path,
+            &database,
+            SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX,
+            nil
+        ) == SQLITE_OK, let database else {
+            if let database { sqlite3_close(database) }
+            throw ProjectMemoryError.integrityFailure("cannot create unversioned fixture")
+        }
+        defer { sqlite3_close(database) }
+        var errorMessage: UnsafeMutablePointer<CChar>?
+        let result = sqlite3_exec(
+            database,
+            """
+            PRAGMA journal_mode=DELETE;
+            CREATE TABLE foreign_records(id INTEGER PRIMARY KEY, payload TEXT NOT NULL);
+            INSERT INTO foreign_records(id,payload) VALUES(1,'must remain byte-for-byte intact');
+            """,
+            nil,
+            nil,
+            &errorMessage
+        )
+        guard result == SQLITE_OK else {
+            let message = errorMessage.map { String(cString: $0) }
+                ?? String(cString: sqlite3_errmsg(database))
+            sqlite3_free(errorMessage)
+            throw ProjectMemoryError.integrityFailure(message)
+        }
+    }
+
+    private func createVersionOneProjectMemoryFixture(
+        at databaseURL: URL,
+        projectID: String,
+        recordID: String,
+        handoff: ContinuityHandoff,
+        timestamp: String
+    ) throws {
+        var database: OpaquePointer?
+        guard sqlite3_open(databaseURL.path, &database) == SQLITE_OK, let database else {
+            throw ProjectMemoryError.integrityFailure("cannot open version one fixture")
+        }
+        defer { sqlite3_close(database) }
+        let payload = try JSONSupport.string(from: handoff.asDictionary())
+            .replacingOccurrences(of: "'", with: "''")
+        let contentHash = String(repeating: "a", count: 64)
+        let stateChecksum = String(repeating: "b", count: 64)
+        let sql = """
+        CREATE TABLE memory_records(
+            id TEXT PRIMARY KEY, project_id TEXT NOT NULL, version INTEGER NOT NULL,
+            kind TEXT NOT NULL, title TEXT NOT NULL, summary TEXT NOT NULL, body TEXT,
+            importance REAL NOT NULL, confidence REAL NOT NULL, source_kind TEXT NOT NULL,
+            source_reference TEXT, session_id TEXT, created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL, last_accessed_at TEXT NOT NULL, expires_at TEXT,
+            content_hash TEXT NOT NULL, is_tombstone INTEGER NOT NULL DEFAULT 0,
+            schema_version INTEGER NOT NULL, idempotency_key TEXT,
+            UNIQUE(project_id,kind,content_hash), UNIQUE(project_id,idempotency_key)
+        );
+        CREATE TABLE memory_tags(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT UNIQUE NOT NULL);
+        CREATE TABLE memory_record_tags(record_id TEXT NOT NULL REFERENCES memory_records(id) ON DELETE CASCADE,tag_id INTEGER NOT NULL REFERENCES memory_tags(id),PRIMARY KEY(record_id,tag_id));
+        CREATE TABLE memory_links(project_id TEXT NOT NULL,source_id TEXT NOT NULL REFERENCES memory_records(id),target_id TEXT NOT NULL REFERENCES memory_records(id),relation TEXT NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(source_id,target_id,relation));
+        CREATE TABLE sessions(id TEXT PRIMARY KEY,project_id TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,state TEXT NOT NULL);
+        CREATE TABLE handoffs(id TEXT PRIMARY KEY,project_id TEXT NOT NULL,record_id TEXT,created_at TEXT NOT NULL,acknowledged_at TEXT);
+        CREATE TABLE artifacts(id TEXT PRIMARY KEY,project_id TEXT NOT NULL,path TEXT NOT NULL,checksum TEXT NOT NULL,created_at TEXT NOT NULL);
+        CREATE TABLE project_aliases(project_id TEXT NOT NULL,alias TEXT NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(project_id,alias));
+        CREATE TABLE maintenance_state(project_id TEXT PRIMARY KEY,last_run_at TEXT,state_json TEXT NOT NULL);
+        CREATE TABLE event_journal(id INTEGER PRIMARY KEY AUTOINCREMENT,project_id TEXT NOT NULL,record_id TEXT,action TEXT NOT NULL,detail TEXT,created_at TEXT NOT NULL);
+        CREATE TABLE continuity_handoffs(
+          handoff_id TEXT PRIMARY KEY,project_id TEXT NOT NULL,operation_id TEXT NOT NULL UNIQUE,
+          payload_json TEXT NOT NULL,content_sha256 TEXT NOT NULL,created_at TEXT NOT NULL,
+          acknowledged_session_id TEXT,acknowledged_at TEXT
+        );
+        CREATE TABLE rollover_operations(
+          operation_id TEXT PRIMARY KEY,project_id TEXT NOT NULL,predecessor_session_id TEXT NOT NULL,
+          successor_session_id TEXT,handoff_id TEXT NOT NULL,state TEXT NOT NULL,attempt INTEGER NOT NULL,
+          adapter_id TEXT NOT NULL,idempotency_key TEXT NOT NULL,acknowledged_session_id TEXT,
+          acknowledged_handoff_id TEXT,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,
+          last_error TEXT,retry_at TEXT,state_checksum TEXT NOT NULL,
+          UNIQUE(project_id,idempotency_key)
+        );
+        CREATE TABLE rollover_transitions(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,operation_id TEXT NOT NULL,project_id TEXT NOT NULL,
+          from_state TEXT,to_state TEXT NOT NULL,attempt INTEGER NOT NULL,created_at TEXT NOT NULL,
+          adapter_id TEXT NOT NULL,evidence TEXT,state_checksum TEXT NOT NULL
+        );
+        CREATE TABLE project_active_sessions(
+          project_id TEXT PRIMARY KEY,session_id TEXT NOT NULL,updated_at TEXT NOT NULL
+        );
+        CREATE UNIQUE INDEX idx_rollover_active_project
+          ON rollover_operations(project_id) WHERE state <> 'predecessorSealed';
+        CREATE INDEX idx_rollover_project_updated ON rollover_operations(project_id,updated_at DESC);
+        CREATE INDEX idx_memory_project_recent ON memory_records(project_id,is_tombstone,updated_at DESC);
+        CREATE INDEX idx_memory_project_kind ON memory_records(project_id,kind,is_tombstone);
+        CREATE INDEX idx_memory_project_session ON memory_records(project_id,session_id,is_tombstone);
+        INSERT INTO memory_records(
+          id,project_id,version,kind,title,summary,body,importance,confidence,source_kind,
+          source_reference,session_id,created_at,updated_at,last_accessed_at,expires_at,
+          content_hash,is_tombstone,schema_version,idempotency_key
+        ) VALUES(
+          '\(recordID)','\(projectID)',1,'decision','Legacy migration decision',
+          'Preserve populated v1 semantics','legacy body',0.8,0.9,'operator',
+          'fixture://project-memory-v1','legacy-session','\(timestamp)','\(timestamp)','\(timestamp)',NULL,
+          '\(contentHash)',0,1,'legacy-record-key'
+        );
+        INSERT INTO memory_tags(id,name) VALUES(1,'legacy'),(2,'migration');
+        INSERT INTO memory_record_tags(record_id,tag_id) VALUES('\(recordID)',1),('\(recordID)',2);
+        INSERT INTO continuity_handoffs(
+          handoff_id,project_id,operation_id,payload_json,content_sha256,created_at,
+          acknowledged_session_id,acknowledged_at
+        ) VALUES(
+          '\(handoff.handoffID)','\(projectID)','\(handoff.operationID)','\(payload)',
+          '\(handoff.contentSHA256)','\(timestamp)',NULL,NULL
+        );
+        INSERT INTO rollover_operations(
+          operation_id,project_id,predecessor_session_id,successor_session_id,handoff_id,
+          state,attempt,adapter_id,idempotency_key,acknowledged_session_id,
+          acknowledged_handoff_id,created_at,updated_at,last_error,retry_at,state_checksum
+        ) VALUES(
+          '\(handoff.operationID)','\(projectID)','legacy-provider-session',NULL,'\(handoff.handoffID)',
+          'active',0,'legacy-adapter','legacy-operation-key',NULL,NULL,
+          '\(timestamp)','\(timestamp)',NULL,NULL,'\(stateChecksum)'
+        );
+        INSERT INTO rollover_transitions(
+          operation_id,project_id,from_state,to_state,attempt,created_at,adapter_id,evidence,state_checksum
+        ) VALUES(
+          '\(handoff.operationID)','\(projectID)',NULL,'active',0,'\(timestamp)',
+          'legacy-adapter','legacy operation created','\(stateChecksum)'
+        );
+        INSERT INTO project_active_sessions(project_id,session_id,updated_at)
+          VALUES('\(projectID)','legacy-provider-session','\(timestamp)');
+        PRAGMA user_version=1;
+        """
+        var errorMessage: UnsafeMutablePointer<CChar>?
+        guard sqlite3_exec(database, sql, nil, nil, &errorMessage) == SQLITE_OK else {
+            let message = errorMessage.map { String(cString: $0) }
+                ?? String(cString: sqlite3_errmsg(database))
+            sqlite3_free(errorMessage)
+            throw ProjectMemoryError.integrityFailure(message)
+        }
+    }
+
+    private func projectMemoryFixtureInt(at databaseURL: URL, sql: String) throws -> Int {
+        var database: OpaquePointer?
+        guard sqlite3_open(databaseURL.path, &database) == SQLITE_OK, let database else {
+            throw ProjectMemoryError.integrityFailure("cannot open project memory fixture")
+        }
+        defer { sqlite3_close(database) }
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK,
+              let statement else {
+            throw ProjectMemoryError.integrityFailure(String(cString: sqlite3_errmsg(database)))
+        }
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_step(statement) == SQLITE_ROW else {
+            throw ProjectMemoryError.integrityFailure(String(cString: sqlite3_errmsg(database)))
+        }
+        return Int(sqlite3_column_int64(statement, 0))
+    }
+
+    private func projectMemoryFixtureText(at databaseURL: URL, sql: String) throws -> String? {
+        var database: OpaquePointer?
+        guard sqlite3_open_v2(
+            databaseURL.path,
+            &database,
+            SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX,
+            nil
+        ) == SQLITE_OK, let database else {
+            if let database { sqlite3_close(database) }
+            throw ProjectMemoryError.integrityFailure("cannot open project memory fixture")
+        }
+        defer { sqlite3_close(database) }
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK,
+              let statement else {
+            throw ProjectMemoryError.integrityFailure(String(cString: sqlite3_errmsg(database)))
+        }
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_step(statement) == SQLITE_ROW else {
+            throw ProjectMemoryError.integrityFailure(String(cString: sqlite3_errmsg(database)))
+        }
+        return sqlite3_column_text(statement, 0).map { String(cString: $0) }
     }
 }

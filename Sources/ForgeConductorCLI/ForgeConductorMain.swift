@@ -63,19 +63,21 @@ enum ForgeConductorMain {
           forge-conductor <command> [options]
 
         Commands:
-          install              Layout + install Swift binary to ~/.forge-conductor/bin
+          install [--from PATH]  Layout + install Swift binary to ~/.forge-conductor/bin
           install-lmstudio-plugin [--binary PATH]  Deploy to LM Studio (primary+failover mcpBridge + mcp.json)
           doctor               Validate install, port conflicts, endpoint protection
           status               Print runtime status JSON
           serve                Run MCP server on stdio (for LM Studio)
-          dashboard            Start standalone control surface (no supervisor)
+          dashboard [--host HOST] [--port PORT] [--open]
+                               Start standalone control surface (no supervisor)
           manager              Supervised dashboard node (keeps UI up)
             run [--open]         Foreground manager
             start [--open]       Background manager
             stop                 Stop manager
             restart [--open]     Restart manager
             status               Manager status
-            install-login        App bundle + LaunchAgent (shows as Forge Conductor)
+            install-login [--keep-stale] [--open]
+                                 App bundle + LaunchAgent (shows as Forge Conductor)
             uninstall-login      Remove LaunchAgent
             cleanup-stale        Remove legacy com.forge.* agents (bash/python3 in Login Items)
             allowlist            Print EP / firewall allowlist guidance
@@ -275,7 +277,8 @@ enum ForgeConductorMain {
               restart [--open]              stop + start
               status [--home PATH]          JSON status
               cleanup-stale                 Remove legacy com.forge.* (bash/python3) login agents
-              install-login [--open]        Install Forge Conductor.app + LaunchAgent
+              install-login [--keep-stale] [--open]
+                                             Install Forge Conductor.app + LaunchAgent
               uninstall-login               Remove LaunchAgent
               allowlist                     Endpoint protection + firewall guidance
             """)

@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 5247,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T113923Z-2c6fd79219.stdout.txt",
+      "sha256": "2af39acebb0f4de9a18d34438dc8730070b226a2cd3c0d89b275498181eda88b"
+    },
+    {
+      "bytes": 119,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T113923Z-2c6fd79219.stderr.txt",
+      "sha256": "61634c3dff137d718016a5be2a7ec412013c599fbc9cb6879215627e6e2f9e09"
+    }
+  ],
+  "command": "env FORGE_SKIP_PS=1 swift test -Xswiftc -warnings-as-errors --filter AppConfigAndDoctorTests/testConfigStoreTypedModel --filter ManagerTests/testManagerSettingsPersist --filter ManagerTests/testDashboardClientAttachesToExistingManager --filter ManagerTests/testManagerRuntimeThrottlesPresenceMaintenance --filter ManagerTests/testOperatorSnapshotRouteIsBoundedRedactedAndPreservesExistingQueryPaths --filter DashboardSecurityTests/testManagerControlCredentialIsStableOwnerOnlyAndComparedExactly --filter DashboardSecurityTests/testEveryManagerMutationExceptReadOnlyStatusRequiresAuthorization --filter DashboardSecurityTests/testManagerControlCredentialFailsClosedWhenStoragePermissionsAreBroadened --filter ManagedAutonomyRuntimeTests/testDurableRunStartIdentityActivatesOnlyOnFirstExactAcceptance --filter ManagedAutonomyRuntimeTests/testHTTPRunControlRoutePersistsExactActionsAndRejectsUnknownActions --filter ResourcePolicyTests/testSubscriberCapsAndBackgroundRefreshQuiesceAfterRemovalAndStop --filter LatestValueMailboxTests/testStaleGenerationAndPostStopValuesNeverReachNewSubscriber --filter LatestValueMailboxTests/testStopClearsBufferedLatestDuringInFlightDelivery",
+  "ended_at": "2026-08-27T11:39:26.804461+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260827T113923Z-2c6fd79219",
+  "kind": "p10-host-safe-ui-contracts",
+  "related_findings": [],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-27T11:39:23.612740+00:00",
+  "timed_out": false
+}

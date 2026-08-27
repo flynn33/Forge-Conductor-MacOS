@@ -2443,6 +2443,15 @@ public actor LMStudioManagedSessionHostAdapterV2: SessionHostAdapterV2 {
         let loaded = try Self.loadLedger(from: ledgerURL)
         ledger = loaded.ledger
         if loaded.migrated {
+            let backupURL = storageDirectory.appendingPathComponent(
+                "native-session-ledger.pre-migration-v1.json",
+                isDirectory: false
+            )
+            _ = try VerifiedMigrationBackup.copyFile(
+                from: ledgerURL,
+                to: backupURL,
+                maximumBytes: Self.maximumLedgerBytes
+            )
             try Self.persist(ledger, to: ledgerURL)
         }
     }

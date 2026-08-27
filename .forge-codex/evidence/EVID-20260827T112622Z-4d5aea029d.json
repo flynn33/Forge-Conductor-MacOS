@@ -1,0 +1,33 @@
+{
+  "artifacts": [
+    {
+      "bytes": 2109,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T112622Z-4d5aea029d.stdout.txt",
+      "sha256": "15f89634a762e36dc6dc2847deb083a0908174fc821825c075c148ea201da4e6"
+    },
+    {
+      "bytes": 11833,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T112622Z-4d5aea029d.stderr.txt",
+      "sha256": "9ee46ac5e3959a4dfc416959cbfd599832235dfba097ff33fd58729b054249e8"
+    }
+  ],
+  "command": "swift test -Xswiftc -warnings-as-errors --filter 'ContinuityV2Tests.testLegacyMigrationImportsExactProjectReadOnlyAndQuarantinesAmbiguous|ContinuityV2Tests.testLegacyLocationV2MigrationPreservesBindingAcrossRestartAndIdempotentReplay'",
+  "ended_at": "2026-08-27T11:26:34.566463+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 1,
+  "id": "EVID-20260827T112622Z-4d5aea029d",
+  "kind": "p10-legacy-continuity-replay-reproducer",
+  "related_findings": [
+    "FC-MIGRATION-MATRIX-001"
+  ],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-27T11:26:22.617123+00:00",
+  "timed_out": false
+}

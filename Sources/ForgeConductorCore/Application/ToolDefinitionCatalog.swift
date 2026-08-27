@@ -373,11 +373,7 @@ private enum ProductionToolDefinitionSource {
                 "properties": [
                     "command": ["type": "string"] as [String: Any],
                     "cwd": ["type": "string"] as [String: Any],
-                    "timeout_sec": [
-                        "type": "number",
-                        "exclusiveMinimum": 0,
-                        "maximum": ShellToolPack.maximumTimeoutSec,
-                    ] as [String: Any],
+                    "timeout_sec": ["type": "number"] as [String: Any],
                 ] as [String: Any],
                 "required": ["command"],
             ]

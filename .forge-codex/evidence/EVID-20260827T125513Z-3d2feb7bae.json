@@ -1,0 +1,34 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 2063,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T125513Z-3d2feb7bae.stdout.txt",
+      "sha256": "437b009b84f294b4d4fcf2c44c721123f7fb62e8a4414855349144dbfe907a73"
+    },
+    {
+      "bytes": 582,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T125513Z-3d2feb7bae.stderr.txt",
+      "sha256": "7ee9adca44802d0187044ef05717cb51a9b65c8248b8ca7ce21f985435f18c09"
+    }
+  ],
+  "command": "env FORGE_SKIP_PS=1 swift test --no-parallel -Xswiftc -warnings-as-errors --filter 'ContinuityTests.testNonemptyUnversionedStoreFailsClosedWithoutMutatingDatabase|ProjectMemoryTests.testNonemptyUnversionedDatabaseFailsClosedWithoutMutatingDatabase|RuntimeExecutionJobTests.testNonemptyUnversionedRuntimeDatabaseFailsClosedWithoutMutation'",
+  "ended_at": "2026-08-27T12:55:17.457049+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260827T125513Z-3d2feb7bae",
+  "kind": "p10-unversioned-sqlite-focused-debug",
+  "related_findings": [
+    "FC-MIGRATION-MATRIX-001"
+  ],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-27T12:55:13.727207+00:00",
+  "timed_out": false
+}
