@@ -260,15 +260,32 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
     public private(set) var supportsFTS5 = false
     private let clock: any Clock
     private let enableFTS5: Bool
+    private let beforeMigrationCommitObserver: (@Sendable () throws -> Void)?
     private let lock = NSLock()
     private var db: OpaquePointer?
     private var openRegistration: SQLiteOpenRegistration?
 
-    public init(
+    public convenience init(
         projectID: String,
         directory: URL,
         clock: any Clock = SystemClock(),
         enableFTS5: Bool = true
+    ) throws {
+        try self.init(
+            projectID: projectID,
+            directory: directory,
+            clock: clock,
+            enableFTS5: enableFTS5,
+            beforeMigrationCommitObserver: nil
+        )
+    }
+
+    init(
+        projectID: String,
+        directory: URL,
+        clock: any Clock = SystemClock(),
+        enableFTS5: Bool = true,
+        beforeMigrationCommitObserver: (@Sendable () throws -> Void)?
     ) throws {
         guard UUID(uuidString: projectID) != nil else {
             throw ProjectMemoryError.invalidRequest("project_id must be a UUID")
@@ -279,6 +296,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         self.databaseURL = standardizedDirectory.appendingPathComponent("memory.sqlite3")
         self.clock = clock
         self.enableFTS5 = enableFTS5
+        self.beforeMigrationCommitObserver = beforeMigrationCommitObserver
         try FileManager.default.createDirectory(
             at: standardizedDirectory,
             withIntermediateDirectories: true
@@ -2820,7 +2838,19 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
                 try? execUnlocked("PRAGMA synchronous=NORMAL;")
             }
         }
-        try transactionUnlocked {
+        try transactionUnlocked(
+            beforeCommit: needsDurableCompletion ? { [self] in
+                try beforeMigrationCommitObserver?()
+                guard let db else {
+                    throw StoreError.openFailed("nil project memory database")
+                }
+                try VerifiedMigrationBackup.requireSQLiteMainFileUnmoved(
+                    database: db,
+                    sourceURL: databaseURL,
+                    purpose: "project memory migration commit"
+                )
+            } : nil
+        ) {
             guard let db else { throw StoreError.openFailed("nil project memory database") }
             if isSchemaMigration {
                 migrationManifest = try VerifiedMigrationBackup
@@ -3179,10 +3209,14 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         }
     }
 
-    private func transactionUnlocked<T>(_ body: () throws -> T) throws -> T {
+    private func transactionUnlocked<T>(
+        beforeCommit: (() throws -> Void)? = nil,
+        _ body: () throws -> T
+    ) throws -> T {
         try execUnlocked("BEGIN IMMEDIATE;")
         do {
             let value = try body()
+            try beforeCommit?()
             try execUnlocked("COMMIT;")
             return value
         } catch {

@@ -986,6 +986,145 @@ final class ContinuityTests: XCTestCase {
         XCTAssertEqual(try app.store.handoffList(limit: 10).count, 1)
     }
 
+    func testSQLiteStorePreCommitGuardRejectsAtomicPathReplacementAndRollsBackMigration() throws {
+        let databaseURL = tempHome.appendingPathComponent("store.sqlite")
+        let replacementURL = tempHome.appendingPathComponent("store-replacement.sqlite")
+        let backupURL = tempHome.appendingPathComponent("store.pre-migration-v2.sqlite3")
+        for (url, payload) in [
+            (databaseURL, "original migration payload"),
+            (replacementURL, "replacement payload"),
+        ] {
+            try withSQLiteFixture(at: url) { database in
+                try executeSQLiteFixture(
+                    database,
+                    sql: """
+                    PRAGMA journal_mode=DELETE;
+                    CREATE TABLE schema_version(version INTEGER NOT NULL);
+                    INSERT INTO schema_version(version) VALUES(2);
+                    CREATE TABLE legacy_payload(value TEXT NOT NULL);
+                    INSERT INTO legacy_payload(value) VALUES('\(payload)');
+                    """
+                )
+            }
+        }
+
+        var initializationError: Error?
+        do {
+            _ = try SQLiteStore(
+                path: databaseURL,
+                beforeMigrationCommitObserver: {
+                    try exchangeSQLiteFixturePaths(databaseURL, replacementURL)
+                },
+                postMigrationCommitObserver: nil
+            )
+            XCTFail("atomic pathname replacement must prevent migration commit")
+        } catch {
+            initializationError = error
+        }
+        XCTAssertTrue(
+            initializationError?.localizedDescription.contains(
+                "SQLite store migration commit"
+            ) == true,
+            initializationError?.localizedDescription ?? "missing initialization error"
+        )
+        XCTAssertTrue(
+            initializationError?.localizedDescription.contains("moved or was replaced") == true,
+            initializationError?.localizedDescription ?? "missing initialization error"
+        )
+
+        try exchangeSQLiteFixturePaths(databaseURL, replacementURL)
+        XCTAssertEqual(
+            try sqliteFixtureInt(
+                at: databaseURL,
+                sql: "SELECT version FROM schema_version LIMIT 1;"
+            ),
+            2
+        )
+        XCTAssertEqual(
+            try sqliteFixtureText(
+                at: databaseURL,
+                sql: "SELECT value FROM legacy_payload LIMIT 1;"
+            ),
+            "original migration payload"
+        )
+        XCTAssertEqual(
+            try sqliteFixtureInt(
+                at: replacementURL,
+                sql: "SELECT version FROM schema_version LIMIT 1;"
+            ),
+            2
+        )
+        XCTAssertEqual(
+            try sqliteFixtureText(
+                at: replacementURL,
+                sql: "SELECT value FROM legacy_payload LIMIT 1;"
+            ),
+            "replacement payload"
+        )
+        for url in [databaseURL, replacementURL] {
+            XCTAssertEqual(
+                try sqliteFixtureInt(
+                    at: url,
+                    sql: """
+                    SELECT COUNT(*) FROM sqlite_master
+                    WHERE type='table' AND name='context_handoffs';
+                    """
+                ),
+                0
+            )
+            XCTAssertEqual(
+                try sqliteFixtureInt(
+                    at: url,
+                    sql: """
+                    SELECT COUNT(*) FROM sqlite_master
+                    WHERE type='table' AND name='forge_migration_receipts';
+                    """
+                ),
+                0
+            )
+        }
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: backupURL.path))
+        XCTAssertEqual(
+            try sqliteFixtureInt(
+                at: backupURL,
+                sql: "SELECT version FROM schema_version LIMIT 1;"
+            ),
+            2
+        )
+        XCTAssertEqual(
+            try sqliteFixtureText(
+                at: backupURL,
+                sql: "SELECT value FROM legacy_payload LIMIT 1;"
+            ),
+            "original migration payload"
+        )
+        XCTAssertEqual(try sqliteFixtureText(at: backupURL, sql: "PRAGMA quick_check;"), "ok")
+
+        let activeManifestURL = VerifiedMigrationBackup.activeManifestURL(for: databaseURL)
+        let prepared = try JSONDecoder().decode(
+            VerifiedMigrationBackupManifest.self,
+            from: Data(contentsOf: activeManifestURL)
+        )
+        XCTAssertEqual(prepared.state, .prepared)
+        XCTAssertEqual(prepared.storageKind, .sqlite)
+        XCTAssertEqual(prepared.sourceVersion, 2)
+        XCTAssertEqual(prepared.targetVersion, 5)
+        XCTAssertEqual(prepared.backupFilename, backupURL.lastPathComponent)
+        XCTAssertEqual(
+            prepared.backupSHA256,
+            JSONSupport.sha256Hex(try Data(contentsOf: backupURL))
+        )
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: VerifiedMigrationBackup.archivedManifestURL(
+                    for: backupURL,
+                    targetVersion: 5
+                ).path
+            )
+        )
+    }
+
     func testVersionTwoStoreMigratesPopulatedDataReopensAndRerunsIdempotently() throws {
         let databaseURL = tempHome.appendingPathComponent("store.sqlite")
         let timestamp = "2026-01-02T03:04:05Z"
@@ -2170,6 +2309,242 @@ final class ContinuityTests: XCTestCase {
             "committed only after checkpoint boundary"
         )
         XCTAssertEqual(try sqliteFixtureInt(at: databaseURL, sql: "SELECT version FROM schema_version;"), 2)
+    }
+
+    func testSQLiteMainFileMovedGuardRejectsStablePathnameReplacement() throws {
+        let sourceURL = tempHome.appendingPathComponent("guard-source.sqlite3")
+        let replacementURL = tempHome.appendingPathComponent("guard-replacement.sqlite3")
+        let parkedURL = tempHome.appendingPathComponent("guard-original.sqlite3")
+        try withSQLiteFixture(at: sourceURL) { database in
+            try executeSQLiteFixture(
+                database,
+                sql: """
+                PRAGMA journal_mode=DELETE;
+                CREATE TABLE identity_marker(value TEXT NOT NULL);
+                INSERT INTO identity_marker(value) VALUES('original');
+                """
+            )
+            try withSQLiteFixture(at: replacementURL) { replacement in
+                try executeSQLiteFixture(
+                    replacement,
+                    sql: """
+                    PRAGMA journal_mode=DELETE;
+                    CREATE TABLE identity_marker(value TEXT NOT NULL);
+                    INSERT INTO identity_marker(value) VALUES('replacement');
+                    """
+                )
+            }
+
+            try FileManager.default.moveItem(at: sourceURL, to: parkedURL)
+            try FileManager.default.moveItem(at: replacementURL, to: sourceURL)
+
+            XCTAssertThrowsError(
+                try VerifiedMigrationBackup.requireSQLiteMainFileUnmoved(
+                    database: database,
+                    sourceURL: sourceURL,
+                    purpose: "stable replacement test"
+                )
+            ) { error in
+                XCTAssertTrue(
+                    error.localizedDescription.contains("SQLite main file moved or was replaced")
+                        && error.localizedDescription.contains("stable replacement test"),
+                    error.localizedDescription
+                )
+            }
+        }
+    }
+
+    func testSQLiteMainFileMovedGuardRecordsRestoredPathCycleWithoutTrustClaim() throws {
+        let sourceURL = tempHome.appendingPathComponent("restored-source.sqlite3")
+        let replacementURL = tempHome.appendingPathComponent("restored-replacement.sqlite3")
+        let parkedURL = tempHome.appendingPathComponent("restored-original.sqlite3")
+        let displacedURL = tempHome.appendingPathComponent("restored-displaced.sqlite3")
+        try withSQLiteFixture(at: sourceURL) { database in
+            try executeSQLiteFixture(
+                database,
+                sql: """
+                PRAGMA journal_mode=DELETE;
+                CREATE TABLE identity_marker(value TEXT NOT NULL);
+                INSERT INTO identity_marker(value) VALUES('original');
+                """
+            )
+            try withSQLiteFixture(at: replacementURL) { replacement in
+                try executeSQLiteFixture(
+                    replacement,
+                    sql: """
+                    PRAGMA journal_mode=DELETE;
+                    CREATE TABLE identity_marker(value TEXT NOT NULL);
+                    INSERT INTO identity_marker(value) VALUES('replacement');
+                    """
+                )
+            }
+
+            try FileManager.default.moveItem(at: sourceURL, to: parkedURL)
+            try FileManager.default.moveItem(at: replacementURL, to: sourceURL)
+            XCTAssertThrowsError(
+                try VerifiedMigrationBackup.requireSQLiteMainFileUnmoved(
+                    database: database,
+                    sourceURL: sourceURL,
+                    purpose: "replacement observation test"
+                )
+            )
+            try FileManager.default.moveItem(at: sourceURL, to: displacedURL)
+            try FileManager.default.moveItem(at: parkedURL, to: sourceURL)
+
+            // Record the VFS-specific result without treating either outcome as a
+            // portable security guarantee or broadening the same-user trust boundary.
+            do {
+                try VerifiedMigrationBackup.requireSQLiteMainFileUnmoved(
+                    database: database,
+                    sourceURL: sourceURL,
+                    purpose: "restored pathname observation test"
+                )
+                print("FORGE_SQLITE_RESTORED_PATH_OBSERVATION=accepted_after_restore")
+            } catch {
+                XCTAssertTrue(
+                    error.localizedDescription.contains("moved or was replaced")
+                        && error.localizedDescription.contains(
+                            "restored pathname observation test"
+                    ),
+                    error.localizedDescription
+                )
+                print("FORGE_SQLITE_RESTORED_PATH_OBSERVATION=failed_closed_after_restore")
+            }
+            XCTAssertEqual(
+                try sqliteFixtureText(
+                    at: sourceURL,
+                    sql: "SELECT value FROM identity_marker LIMIT 1;"
+                ),
+                "original"
+            )
+        }
+        XCTAssertEqual(
+            try sqliteFixtureText(
+                at: displacedURL,
+                sql: "SELECT value FROM identity_marker LIMIT 1;"
+            ),
+            "replacement"
+        )
+    }
+
+    func testPrepareSQLiteMigrationRejectsMovedMainFileBeforeArtifacts() throws {
+        let sourceURL = tempHome.appendingPathComponent("prepare-failure.sqlite3")
+        let replacementURL = tempHome.appendingPathComponent("prepare-replacement.sqlite3")
+        let parkedURL = tempHome.appendingPathComponent("prepare-original.sqlite3")
+        let backupURL = tempHome.appendingPathComponent(
+            "prepare-failure.pre-migration-v2.sqlite3"
+        )
+        try withSQLiteFixture(at: sourceURL) { database in
+            try executeSQLiteFixture(
+                database,
+                sql: """
+                PRAGMA journal_mode=DELETE;
+                CREATE TABLE schema_version(version INTEGER NOT NULL);
+                INSERT INTO schema_version(version) VALUES(2);
+                CREATE TABLE identity_marker(value TEXT NOT NULL);
+                INSERT INTO identity_marker(value) VALUES('original');
+                """
+            )
+            try withSQLiteFixture(at: replacementURL) { replacement in
+                try executeSQLiteFixture(
+                    replacement,
+                    sql: """
+                    PRAGMA journal_mode=DELETE;
+                    CREATE TABLE schema_version(version INTEGER NOT NULL);
+                    INSERT INTO schema_version(version) VALUES(2);
+                    CREATE TABLE identity_marker(value TEXT NOT NULL);
+                    INSERT INTO identity_marker(value) VALUES('replacement');
+                    """
+                )
+            }
+            try executeSQLiteFixture(database, sql: "BEGIN IMMEDIATE;")
+            defer { try? executeSQLiteFixture(database, sql: "ROLLBACK;") }
+
+            try FileManager.default.moveItem(at: sourceURL, to: parkedURL)
+            try FileManager.default.moveItem(at: replacementURL, to: sourceURL)
+
+            XCTAssertThrowsError(
+                try VerifiedMigrationBackup.prepareSQLiteMigrationAtWriteBoundary(
+                    database: database,
+                    sourceURL: sourceURL,
+                    backupURL: backupURL,
+                    sourceVersion: 2,
+                    targetVersion: 3,
+                    versionQuery: "SELECT version FROM schema_version LIMIT 1"
+                )
+            ) { error in
+                XCTAssertTrue(
+                    error.localizedDescription.contains("SQLite main file moved or was replaced")
+                        && error.localizedDescription.contains("migration backup writer entry"),
+                    error.localizedDescription
+                )
+            }
+
+            try FileManager.default.moveItem(at: sourceURL, to: replacementURL)
+            try FileManager.default.moveItem(at: parkedURL, to: sourceURL)
+            XCTAssertEqual(
+                try sqliteFixtureInt(
+                    at: sourceURL,
+                    sql: "SELECT version FROM schema_version LIMIT 1;"
+                ),
+                2
+            )
+            XCTAssertEqual(
+                try sqliteFixtureText(
+                    at: sourceURL,
+                    sql: "SELECT value FROM identity_marker LIMIT 1;"
+                ),
+                "original"
+            )
+            XCTAssertEqual(
+                try sqliteFixtureInt(
+                    at: replacementURL,
+                    sql: "SELECT version FROM schema_version LIMIT 1;"
+                ),
+                2
+            )
+            XCTAssertEqual(
+                try sqliteFixtureText(
+                    at: replacementURL,
+                    sql: "SELECT value FROM identity_marker LIMIT 1;"
+                ),
+                "replacement"
+            )
+            XCTAssertEqual(
+                try sqliteFixtureInt(
+                    at: sourceURL,
+                    sql: """
+                    SELECT COUNT(*) FROM sqlite_master
+                    WHERE type='table' AND name='forge_migration_receipts';
+                    """
+                ),
+                0
+            )
+
+            let migrationArtifacts = try FileManager.default.contentsOfDirectory(
+                at: tempHome,
+                includingPropertiesForKeys: nil
+            )
+            .map(\.lastPathComponent)
+            .filter {
+                $0.contains("pre-migration") || $0.contains("migration-manifest")
+            }
+            XCTAssertEqual(migrationArtifacts, [])
+            XCTAssertFalse(FileManager.default.fileExists(atPath: backupURL.path))
+            XCTAssertFalse(
+                FileManager.default.fileExists(
+                    atPath: VerifiedMigrationBackup.activeManifestURL(for: sourceURL).path
+                )
+            )
+            XCTAssertFalse(
+                FileManager.default.fileExists(
+                    atPath: VerifiedMigrationBackup.archivedManifestURL(
+                        for: backupURL,
+                        targetVersion: 3
+                    ).path
+                )
+            )
+        }
     }
 
     func testVerifiedMigrationManifestReconcilesPreparedSQLiteCompletion() throws {
@@ -3528,6 +3903,20 @@ private func sqliteFixtureText(at url: URL, sql: String) throws -> String? {
         result = sqlite3_column_text(statement, 0).map { String(cString: $0) }
     }
     return result
+}
+
+private func exchangeSQLiteFixturePaths(_ first: URL, _ second: URL) throws {
+    let result = first.path.withCString { firstPath in
+        second.path.withCString { secondPath in
+            Darwin.renamex_np(firstPath, secondPath, UInt32(RENAME_SWAP))
+        }
+    }
+    guard result == 0 else {
+        throw SQLiteFixtureError.failure(
+            "could not atomically exchange SQLite fixtures: "
+                + String(cString: strerror(errno))
+        )
+    }
 }
 
 private final class LockedFailureMessages: @unchecked Sendable {

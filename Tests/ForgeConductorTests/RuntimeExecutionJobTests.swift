@@ -917,6 +917,171 @@ final class RuntimeExecutionJobTests: XCTestCase {
         )
     }
 
+    func testRuntimeVersionTwoMigrationRejectsStablePathReplacementBeforeCommit() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "forge-runtime-v2-path-replacement-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let databaseURL = root.appendingPathComponent("runtime-v2.sqlite")
+        let replacementURL = root.appendingPathComponent("replacement.sqlite")
+        let displacedURL = root.appendingPathComponent("displaced.sqlite")
+        let backupURL = root.appendingPathComponent("runtime-v2.pre-migration-v2.sqlite3")
+        let originalJobID = UUID()
+        let replacementJobID = UUID()
+        let originalProjectID = ProjectID()
+        let replacementProjectID = ProjectID()
+        try Self.createRuntimeSchemaV2(
+            at: databaseURL,
+            jobID: originalJobID,
+            projectID: originalProjectID
+        )
+        try Self.createRuntimeSchemaV2(
+            at: replacementURL,
+            jobID: replacementJobID,
+            projectID: replacementProjectID
+        )
+
+        XCTAssertThrowsError(
+            try RuntimeJobRepository(
+                databaseURL: databaseURL,
+                beforeMigrationCommitObserver: {
+                    try FileManager.default.moveItem(at: databaseURL, to: displacedURL)
+                    try FileManager.default.moveItem(at: replacementURL, to: databaseURL)
+                }
+            )
+        ) { error in
+            XCTAssertTrue(
+                error.localizedDescription.contains("moved")
+                    || error.localizedDescription.contains("replaced")
+                    || error.localizedDescription.contains("movement check"),
+                "unexpected error: \(error)"
+            )
+        }
+
+        try FileManager.default.moveItem(at: databaseURL, to: replacementURL)
+        try FileManager.default.moveItem(at: displacedURL, to: databaseURL)
+
+        for fixture in [
+            (databaseURL, originalJobID, originalProjectID, replacementJobID),
+            (replacementURL, replacementJobID, replacementProjectID, originalJobID),
+        ] {
+            XCTAssertEqual(
+                try Self.sqliteCount(
+                    databaseURL: fixture.0,
+                    sql: "SELECT version FROM runtime_job_schema_version WHERE singleton=1"
+                ),
+                2
+            )
+            XCTAssertEqual(
+                try Self.sqliteCount(databaseURL: fixture.0, sql: "SELECT COUNT(*) FROM execution_jobs"),
+                1
+            )
+            XCTAssertEqual(
+                try Self.sqliteCount(
+                    databaseURL: fixture.0,
+                    sql: "SELECT COUNT(*) FROM execution_jobs WHERE job_id=? AND project_id=?",
+                    textBindings: [
+                        fixture.1.uuidString.lowercased(),
+                        fixture.2.description,
+                    ]
+                ),
+                1
+            )
+            XCTAssertEqual(
+                try Self.sqliteText(
+                    databaseURL: fixture.0,
+                    sql: "SELECT job_id FROM execution_jobs LIMIT 1"
+                ),
+                fixture.1.uuidString.lowercased()
+            )
+            XCTAssertEqual(
+                try Self.sqliteText(
+                    databaseURL: fixture.0,
+                    sql: "SELECT project_id FROM execution_jobs LIMIT 1"
+                ),
+                fixture.2.description
+            )
+            XCTAssertEqual(
+                try Self.sqliteText(
+                    databaseURL: fixture.0,
+                    sql: "SELECT command_summary FROM execution_jobs LIMIT 1"
+                ),
+                "legacy v2 completed job"
+            )
+            XCTAssertEqual(
+                try Self.sqliteText(
+                    databaseURL: fixture.0,
+                    sql: "SELECT stdout_inline FROM execution_jobs LIMIT 1"
+                ),
+                "legacy output"
+            )
+            XCTAssertEqual(
+                try Self.sqliteCount(
+                    databaseURL: fixture.0,
+                    sql: "SELECT COUNT(*) FROM execution_jobs WHERE job_id=?",
+                    textBinding: fixture.3.uuidString.lowercased()
+                ),
+                0
+            )
+            XCTAssertFalse(
+                try Self.sqliteColumnNames(
+                    databaseURL: fixture.0,
+                    table: "execution_jobs"
+                ).contains("process_start_seconds")
+            )
+            XCTAssertEqual(
+                try Self.sqliteCount(
+                    databaseURL: fixture.0,
+                    sql: "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='forge_migration_receipts'"
+                ),
+                0
+            )
+        }
+
+        XCTAssertEqual(
+            try Self.sqliteCount(
+                databaseURL: backupURL,
+                sql: "SELECT version FROM runtime_job_schema_version WHERE singleton=1"
+            ),
+            2
+        )
+        XCTAssertEqual(
+            try Self.sqliteCount(
+                databaseURL: backupURL,
+                sql: "SELECT COUNT(*) FROM execution_jobs WHERE job_id=? AND project_id=?",
+                textBindings: [
+                    originalJobID.uuidString.lowercased(),
+                    originalProjectID.description,
+                ]
+            ),
+            1
+        )
+        let activeManifest = try JSONDecoder().decode(
+            VerifiedMigrationBackupManifest.self,
+            from: Data(
+                contentsOf: VerifiedMigrationBackup.activeManifestURL(for: databaseURL)
+            )
+        )
+        XCTAssertEqual(activeManifest.state, .prepared)
+        XCTAssertEqual(activeManifest.sourceVersion, 2)
+        XCTAssertEqual(activeManifest.targetVersion, RuntimeJobRepository.schemaVersion)
+        XCTAssertEqual(activeManifest.backupFilename, backupURL.lastPathComponent)
+        XCTAssertEqual(
+            activeManifest.backupSHA256,
+            JSONSupport.sha256Hex(try Data(contentsOf: backupURL))
+        )
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: VerifiedMigrationBackup.archivedManifestURL(
+                    for: backupURL,
+                    targetVersion: RuntimeJobRepository.schemaVersion
+                ).path
+            )
+        )
+    }
+
     func testNonemptyUnversionedRuntimeDatabaseFailsClosedWithoutMutation() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("forge-runtime-unversioned-\(UUID().uuidString)", isDirectory: true)
@@ -3686,7 +3851,8 @@ final class RuntimeExecutionJobTests: XCTestCase {
     private static func sqliteCount(
         databaseURL: URL,
         sql: String,
-        textBinding: String? = nil
+        textBinding: String? = nil,
+        textBindings: [String] = []
     ) throws -> Int {
         var database: OpaquePointer?
         let opened = sqlite3_open_v2(
@@ -3706,10 +3872,19 @@ final class RuntimeExecutionJobTests: XCTestCase {
             throw RuntimeJobError.storageFailure("could not prepare SQLite count")
         }
         defer { sqlite3_finalize(statement) }
-        if let textBinding {
+        let bindings = textBindings.isEmpty ? textBinding.map { [$0] } ?? [] : textBindings
+        if !bindings.isEmpty {
             let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
-            guard sqlite3_bind_text(statement, 1, textBinding, -1, transient) == SQLITE_OK else {
-                throw RuntimeJobError.storageFailure("could not bind SQLite count")
+            for (offset, binding) in bindings.enumerated() {
+                guard sqlite3_bind_text(
+                    statement,
+                    Int32(offset + 1),
+                    binding,
+                    -1,
+                    transient
+                ) == SQLITE_OK else {
+                    throw RuntimeJobError.storageFailure("could not bind SQLite count")
+                }
             }
         }
         guard sqlite3_step(statement) == SQLITE_ROW else {

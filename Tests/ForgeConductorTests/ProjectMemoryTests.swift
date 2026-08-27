@@ -538,6 +538,197 @@ final class ProjectMemoryTests: XCTestCase {
         )
     }
 
+    func testVersionOneMigrationRejectsStablePathReplacementBeforeCommit() throws {
+        let projectID = UUID().uuidString.lowercased()
+        let originalRecordID = UUID().uuidString.lowercased()
+        let replacementRecordID = UUID().uuidString.lowercased()
+        let directory = home.appendingPathComponent(
+            "project-memory-v1-path-replacement",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true
+        )
+        let databaseURL = directory.appendingPathComponent("memory.sqlite3")
+        let backupURL = directory.appendingPathComponent("memory.pre-migration-v1.sqlite3")
+        let replacementURL = directory.appendingPathComponent("replacement.sqlite3")
+        let displacedURL = directory.appendingPathComponent("displaced.sqlite3")
+        let timestamp = "2026-01-03T04:05:06Z"
+        let handoff = try ContinuityHandoff(
+            handoffID: UUID().uuidString.lowercased(),
+            operationID: UUID().uuidString.lowercased(),
+            createdAt: timestamp,
+            project: [
+                "project_id": projectID,
+                "display_name": "Path Replacement Fixture",
+                "repository_root": "/legacy/path-replacement",
+                "branch": "legacy-branch",
+                "commit": "legacy-commit",
+                "dirty_summary": [],
+            ],
+            predecessorSession: [
+                "session_id": "legacy-provider-session",
+                "provider_session_id": NSNull(),
+                "model": NSNull(),
+            ],
+            mission: "Reject a replaced migration pathname",
+            currentWork: [
+                "phase_id": "P10",
+                "work_item_id": "project-memory-v1-path-replacement",
+                "summary": "Keep the migration connection on one main file",
+                "active_files": ["memory.sqlite3"],
+            ],
+            nextActions: [[
+                "order": 1,
+                "action": "Reject the replaced pathname",
+                "command": "",
+                "success_condition": "No migration transaction commits",
+            ]],
+            hostState: [
+                "adapter_id": "legacy-adapter",
+                "continuity_state": ContinuityState.active.rawValue,
+                "context_budget_source": "legacy-fixture",
+                "retry": ["attempt": 0],
+            ]
+        ).validated()
+        try createVersionOneProjectMemoryFixture(
+            at: databaseURL,
+            projectID: projectID,
+            recordID: originalRecordID,
+            handoff: handoff,
+            timestamp: timestamp
+        )
+        try createVersionOneProjectMemoryFixture(
+            at: replacementURL,
+            projectID: projectID,
+            recordID: replacementRecordID,
+            handoff: handoff,
+            timestamp: timestamp
+        )
+
+        XCTAssertThrowsError(
+            try ProjectMemoryRepository(
+                projectID: projectID,
+                directory: directory,
+                enableFTS5: false,
+                beforeMigrationCommitObserver: {
+                    try FileManager.default.moveItem(
+                        at: databaseURL,
+                        to: displacedURL
+                    )
+                    try FileManager.default.moveItem(
+                        at: replacementURL,
+                        to: databaseURL
+                    )
+                }
+            )
+        ) { error in
+            XCTAssertTrue(
+                error.localizedDescription.contains("moved")
+                    || error.localizedDescription.contains("replaced")
+                    || error.localizedDescription.contains("movement check"),
+                "\(error)"
+            )
+        }
+
+        try FileManager.default.moveItem(at: databaseURL, to: replacementURL)
+        try FileManager.default.moveItem(at: displacedURL, to: databaseURL)
+        XCTAssertEqual(
+            try projectMemoryFixtureInt(at: databaseURL, sql: "PRAGMA user_version;"),
+            1
+        )
+        XCTAssertEqual(
+            try projectMemoryFixtureInt(at: replacementURL, sql: "PRAGMA user_version;"),
+            1
+        )
+        XCTAssertEqual(
+            try projectMemoryFixtureInt(
+                at: databaseURL,
+                sql: "SELECT COUNT(*) FROM memory_records WHERE id='\(originalRecordID)';"
+            ),
+            1
+        )
+        XCTAssertEqual(
+            try projectMemoryFixtureInt(
+                at: databaseURL,
+                sql: "SELECT COUNT(*) FROM memory_records WHERE id='\(replacementRecordID)';"
+            ),
+            0
+        )
+        XCTAssertEqual(
+            try projectMemoryFixtureInt(
+                at: replacementURL,
+                sql: "SELECT COUNT(*) FROM memory_records WHERE id='\(replacementRecordID)';"
+            ),
+            1
+        )
+        XCTAssertEqual(
+            try projectMemoryFixtureInt(
+                at: replacementURL,
+                sql: "SELECT COUNT(*) FROM memory_records WHERE id='\(originalRecordID)';"
+            ),
+            0
+        )
+        XCTAssertEqual(
+            try projectMemoryFixtureInt(
+                at: databaseURL,
+                sql: "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='continuity_migration_receipts';"
+            ),
+            0
+        )
+        XCTAssertEqual(
+            try projectMemoryFixtureInt(
+                at: replacementURL,
+                sql: "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='continuity_migration_receipts';"
+            ),
+            0
+        )
+        XCTAssertTrue(FileManager.default.fileExists(atPath: backupURL.path))
+        XCTAssertEqual(
+            try projectMemoryFixtureInt(at: backupURL, sql: "PRAGMA user_version;"),
+            1
+        )
+        XCTAssertEqual(
+            try projectMemoryFixtureText(at: backupURL, sql: "PRAGMA quick_check;"),
+            "ok"
+        )
+        XCTAssertEqual(
+            try projectMemoryFixtureInt(
+                at: backupURL,
+                sql: "SELECT COUNT(*) FROM memory_records WHERE id='\(originalRecordID)';"
+            ),
+            1
+        )
+        XCTAssertEqual(
+            try projectMemoryFixtureInt(
+                at: backupURL,
+                sql: "SELECT COUNT(*) FROM memory_records WHERE id='\(replacementRecordID)';"
+            ),
+            0
+        )
+        let activeManifest = try JSONDecoder().decode(
+            VerifiedMigrationBackupManifest.self,
+            from: Data(
+                contentsOf: VerifiedMigrationBackup.activeManifestURL(for: databaseURL)
+            )
+        )
+        XCTAssertEqual(activeManifest.state, .prepared)
+        XCTAssertEqual(activeManifest.backupFilename, backupURL.lastPathComponent)
+        XCTAssertEqual(
+            activeManifest.backupSHA256,
+            JSONSupport.sha256Hex(try Data(contentsOf: backupURL))
+        )
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: VerifiedMigrationBackup.archivedManifestURL(
+                    for: backupURL,
+                    targetVersion: ProjectMemoryRepository.schemaVersion
+                ).path
+            )
+        )
+    }
+
     func testConcurrentInitializersSerializeVersionOneMigration() async throws {
         let participantCount = 8
         let projectID = UUID().uuidString.lowercased()
