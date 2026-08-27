@@ -45,17 +45,28 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
             at: path.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
+        var migrationManifest: VerifiedMigrationBackupManifest?
         try VerifiedMigrationBackup.withMigrationLock(databaseURL: path, timeoutSeconds: 60) {
             do {
                 try VerifiedMigrationBackup.withNonMutatingSQLitePreflight(
                     databaseURL: path
                 ) { candidate in
-                    guard let candidate else { return }
+                    guard let candidate else {
+                        _ = try VerifiedMigrationBackup.reconcileMigrationManifest(
+                            sourceURL: path,
+                            observedVersion: 0
+                        )
+                        return
+                    }
                     let hasVersionTable = try candidate.integer(
                         "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='schema_version'"
                     ) == 1
                     guard hasVersionTable else {
                         try candidate.requireEmptySchemaWhenUnversioned(reportedVersion: 0)
+                        _ = try VerifiedMigrationBackup.reconcileMigrationManifest(
+                            sourceURL: path,
+                            observedVersion: 0
+                        )
                         return
                     }
                     let rowCount = try candidate.integer("SELECT COUNT(*) FROM schema_version") ?? 0
@@ -67,6 +78,11 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
                             "unsupported or malformed SQLite schema version \(version)"
                         )
                     }
+                    migrationManifest = try VerifiedMigrationBackup
+                        .reconcileMigrationManifest(
+                            sourceURL: path,
+                            observedVersion: version
+                        )
                 }
             } catch {
                 throw StoreError.openFailed(error.localizedDescription)
@@ -84,9 +100,12 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
                 // store can stall serve startup long enough for LM Studio's ~60s plugin timeout.
                 try exec("PRAGMA busy_timeout=3000;")
                 try validateSchemaBeforeWrite()
+                if migrationManifest == nil {
+                    migrationManifest = try currentMigrationManifest()
+                }
                 try exec("PRAGMA journal_mode=WAL;")
                 try exec("PRAGMA foreign_keys=ON;")
-                try migrate()
+                try migrateLocked(migrationManifest: migrationManifest)
                 openRegistration = try VerifiedMigrationBackup.registerOpenDatabase(at: path)
             } catch {
                 sqlite3_close(handle)
@@ -149,42 +168,122 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
     // MARK: - Schema
 
     public func migrate() throws {
-        try createMigrationBackupIfNeeded()
-        try exec("BEGIN IMMEDIATE;")
-        do {
-            try migrateLockedDatabase()
-            try exec("COMMIT;")
-        } catch {
-            try? exec("ROLLBACK;")
-            throw error
+        try VerifiedMigrationBackup.withMigrationLock(databaseURL: path, timeoutSeconds: 60) {
+            let manifest = try currentMigrationManifest()
+            try migrateLocked(migrationManifest: manifest)
         }
     }
 
-    private func createMigrationBackupIfNeeded() throws {
+    private func migrateLocked(
+        migrationManifest initialManifest: VerifiedMigrationBackupManifest?
+    ) throws {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let db else { throw StoreError.openFailed("nil db") }
+        let hasVersionTable = try queryIntUnlocked(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='schema_version'"
+        ) == 1
+        let prior = hasVersionTable
+            ? try queryIntUnlocked("SELECT version FROM schema_version LIMIT 1") ?? 0
+            : 0
+        var migrationManifest = initialManifest
+        let isSchemaMigration = prior > 0 && prior < 5
+        let needsDurableCompletion = isSchemaMigration
+            || migrationManifest?.state == .prepared
+        if needsDurableCompletion {
+            try execUnlocked("PRAGMA synchronous=FULL;")
+        }
+        defer {
+            if needsDurableCompletion {
+                try? execUnlocked("PRAGMA synchronous=NORMAL;")
+            }
+        }
+
+        try execUnlocked("BEGIN IMMEDIATE;")
+        do {
+            if isSchemaMigration {
+                migrationManifest = try VerifiedMigrationBackup
+                    .prepareSQLiteMigrationAtWriteBoundary(
+                        database: db,
+                        sourceURL: path,
+                        backupURL: migrationBackupURL(sourceVersion: prior),
+                        sourceVersion: prior,
+                        targetVersion: 5,
+                        versionQuery: "SELECT version FROM schema_version LIMIT 1"
+                    )
+            } else if prior == 5, let currentManifest = migrationManifest {
+                migrationManifest = try VerifiedMigrationBackup.requireSQLiteMigrationReceipt(
+                    database: db,
+                    sourceURL: path,
+                    manifest: currentManifest
+                )
+            }
+            try migrateUnlockedDatabase()
+            if isSchemaMigration, let migrationManifest {
+                try VerifiedMigrationBackup.recordSQLiteMigrationReceipt(
+                    database: db,
+                    sourceURL: path,
+                    manifest: migrationManifest
+                )
+            }
+            try execUnlocked("COMMIT;")
+        } catch {
+            try? execUnlocked("ROLLBACK;")
+            throw error
+        }
+
+        if let migrationManifest, migrationManifest.state == .prepared {
+            try VerifiedMigrationBackup.checkpointSQLiteMigration(
+                database: db,
+                sourceURL: path
+            )
+            let observedVersion = try queryIntUnlocked(
+                "SELECT version FROM schema_version LIMIT 1"
+            ) ?? 0
+            let target = try VerifiedMigrationBackup.logicalSQLiteMetadata(
+                database: db,
+                sourceURL: path,
+                expectedVersion: 5,
+                versionQuery: "SELECT version FROM schema_version LIMIT 1"
+            )
+            _ = try VerifiedMigrationBackup.completeMigrationManifest(
+                sourceURL: path,
+                preparedManifest: migrationManifest,
+                observedVersion: observedVersion,
+                targetMetadata: target
+            )
+        }
+    }
+
+    private func currentMigrationManifest() throws -> VerifiedMigrationBackupManifest? {
         lock.lock()
         defer { lock.unlock() }
         let hasVersionTable = try queryIntUnlocked(
             "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='schema_version'"
         ) == 1
-        guard hasVersionTable else { return }
+        guard hasVersionTable else {
+            return try VerifiedMigrationBackup.reconcileMigrationManifest(
+                sourceURL: path,
+                observedVersion: 0
+            )
+        }
         let prior = try queryIntUnlocked("SELECT version FROM schema_version LIMIT 1") ?? 0
-        guard prior > 0, prior < 5 else { return }
-        guard let db else { throw StoreError.openFailed("nil db") }
-        let stem = path.deletingPathExtension().lastPathComponent
-        let backupURL = path.deletingLastPathComponent().appendingPathComponent(
-            "\(stem).pre-migration-v\(prior).sqlite3",
-            isDirectory: false
-        )
-        _ = try VerifiedMigrationBackup.snapshotSQLite(
-            database: db,
-            to: backupURL,
-            expectedVersion: prior,
-            versionQuery: "SELECT version FROM schema_version LIMIT 1"
+        return try VerifiedMigrationBackup.reconcileMigrationManifest(
+            sourceURL: path,
+            observedVersion: prior
         )
     }
 
-    private func migrateLockedDatabase() throws {
-        try exec("""
+    private func migrationBackupURL(sourceVersion: Int) -> URL {
+        let stem = path.deletingPathExtension().lastPathComponent
+        return path.deletingLastPathComponent().appendingPathComponent(
+            "\(stem).pre-migration-v\(sourceVersion).sqlite3",
+            isDirectory: false
+        )
+    }
+
+    private func migrateUnlockedDatabase() throws {
+        try execUnlocked("""
         CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS memory_notes (
             key TEXT PRIMARY KEY,
@@ -233,15 +332,15 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
         CREATE INDEX IF NOT EXISTS idx_context_handoffs_updated
             ON context_handoffs(updated_at DESC);
         """)
-        if try !tableHasColumn(table: "context_handoffs", column: "write_sequence") {
-            try exec(
+        if try !tableHasColumnUnlocked(table: "context_handoffs", column: "write_sequence") {
+            try execUnlocked(
                 "ALTER TABLE context_handoffs ADD COLUMN write_sequence INTEGER NOT NULL DEFAULT 0;"
             )
         }
-        if try !tableHasColumn(table: "context_handoffs", column: "client_id") {
-            try exec("ALTER TABLE context_handoffs ADD COLUMN client_id TEXT;")
+        if try !tableHasColumnUnlocked(table: "context_handoffs", column: "client_id") {
+            try execUnlocked("ALTER TABLE context_handoffs ADD COLUMN client_id TEXT;")
         }
-        try exec("""
+        try execUnlocked("""
         UPDATE context_handoffs
         SET write_sequence = rowid
         WHERE write_sequence = 0;
@@ -250,11 +349,11 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
         CREATE INDEX IF NOT EXISTS idx_context_handoffs_client_sequence
             ON context_handoffs(client_id, write_sequence DESC);
         """)
-        let version: Int = try queryInt("SELECT version FROM schema_version LIMIT 1") ?? 0
+        let version: Int = try queryIntUnlocked("SELECT version FROM schema_version LIMIT 1") ?? 0
         if version == 0 {
-            try exec("INSERT INTO schema_version(version) VALUES (5);")
+            try execUnlocked("INSERT INTO schema_version(version) VALUES (5);")
         } else if version < 5 {
-            try exec("UPDATE schema_version SET version = 5;")
+            try execUnlocked("UPDATE schema_version SET version = 5;")
         }
     }
 
@@ -978,8 +1077,8 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
         }
     }
 
-    private func tableHasColumn(table: String, column: String) throws -> Bool {
-        try withStatement("PRAGMA table_info(\(table))") { stmt in
+    private func tableHasColumnUnlocked(table: String, column: String) throws -> Bool {
+        try withStatementUnlocked("PRAGMA table_info(\(table))") { stmt in
             while sqlite3_step(stmt) == SQLITE_ROW {
                 if textCol(stmt, 1) == column { return true }
             }

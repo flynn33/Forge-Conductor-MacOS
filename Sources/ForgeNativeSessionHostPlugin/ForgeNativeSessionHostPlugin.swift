@@ -2420,6 +2420,7 @@ public actor LMStudioManagedSessionHostAdapterV2: SessionHostAdapterV2 {
     public static let maximumReconciliationRecords = 4096
     public static let maximumLiveTerminalRecords = 128
     public static let maximumProviderAttempts = 3
+    public static let maximumMigrationLineages = 4
     public static let acknowledgementToolName = "forge_continuity_ack"
 
     public nonisolated let identifier = ForgeNativeSessionHostPlugin.identifier
@@ -2436,24 +2437,101 @@ public actor LMStudioManagedSessionHostAdapterV2: SessionHostAdapterV2 {
         try FileManager.default.createDirectory(
             at: storageDirectory, withIntermediateDirectories: true
         )
-        ledgerURL = storageDirectory.appendingPathComponent(
+        let resolvedLedgerURL = storageDirectory.appendingPathComponent(
             "native-session-ledger.json", isDirectory: false
         )
+        ledgerURL = resolvedLedgerURL
         self.transport = transport
-        let loaded = try Self.loadLedger(from: ledgerURL)
-        ledger = loaded.ledger
-        if loaded.migrated {
-            let backupURL = storageDirectory.appendingPathComponent(
-                "native-session-ledger.pre-migration-v1.json",
-                isDirectory: false
-            )
-            _ = try VerifiedMigrationBackup.copyFile(
-                from: ledgerURL,
-                to: backupURL,
-                maximumBytes: Self.maximumLedgerBytes
-            )
-            try Self.persist(ledger, to: ledgerURL)
+        let resolvedLedger = try VerifiedMigrationBackup.withMigrationLock(
+            databaseURL: resolvedLedgerURL,
+            timeoutSeconds: 60
+        ) {
+            var loaded = try Self.loadLedger(from: resolvedLedgerURL)
+            let ledgerExists = FileManager.default.fileExists(atPath: resolvedLedgerURL.path)
+            let observedVersion = ledgerExists ? (loaded.migrated ? 1 : 2) : 0
+            if let manifest = try VerifiedMigrationBackup.reconcileMigrationManifest(
+                sourceURL: resolvedLedgerURL,
+                observedVersion: observedVersion,
+                allowCompletedFileLineageRestart: loaded.migrated
+            ), observedVersion == manifest.sourceVersion {
+                let installed = try VerifiedMigrationBackup.installFileMigrationTarget(
+                    sourceURL: resolvedLedgerURL,
+                    manifest: manifest
+                )
+                if manifest.state == .prepared {
+                    _ = try VerifiedMigrationBackup.completeMigrationManifest(
+                        sourceURL: resolvedLedgerURL,
+                        preparedManifest: manifest,
+                        observedVersion: manifest.targetVersion,
+                        targetMetadata: installed
+                    )
+                }
+                loaded = try Self.loadLedger(from: resolvedLedgerURL)
+            }
+
+            if loaded.migrated {
+                let backupURL = storageDirectory.appendingPathComponent(
+                    "native-session-ledger.pre-migration-v1.json",
+                    isDirectory: false
+                )
+                let targetURL = storageDirectory.appendingPathComponent(
+                    "native-session-ledger.schema-v2.target.json",
+                    isDirectory: false
+                )
+                let artifacts = try VerifiedMigrationBackup.prepareFileMigrationArtifacts(
+                    sourceURL: resolvedLedgerURL,
+                    preferredBackupURL: backupURL,
+                    preferredTargetArtifactURL: targetURL,
+                    maximumBytes: Self.maximumLedgerBytes,
+                    maximumLineages: Self.maximumMigrationLineages
+                ) { selectedBackup in
+                    let attributes = try FileManager.default.attributesOfItem(
+                        atPath: selectedBackup.url.path
+                    )
+                    guard let migratedAt = attributes[.modificationDate] as? Date else {
+                        throw SessionHostAdapterV2Error.ledgerIntegrity(
+                            "legacy ledger backup has no migration timestamp"
+                        )
+                    }
+                    let verifiedSource = try Self.loadLedger(
+                        from: selectedBackup.url,
+                        legacyMigratedAt: migratedAt
+                    )
+                    guard verifiedSource.migrated else {
+                        throw SessionHostAdapterV2Error.ledgerIntegrity(
+                            "legacy ledger backup did not decode as schema version one"
+                        )
+                    }
+                    return try Self.encodedLedger(verifiedSource.ledger)
+                }
+                let manifest = try VerifiedMigrationBackup.prepareMigrationManifest(
+                    sourceURL: resolvedLedgerURL,
+                    backup: artifacts.backup,
+                    sourceVersion: 1,
+                    targetVersion: 2,
+                    storageKind: .file,
+                    targetArtifact: artifacts.targetArtifact
+                )
+                let installed = try VerifiedMigrationBackup.installFileMigrationTarget(
+                    sourceURL: resolvedLedgerURL,
+                    manifest: manifest
+                )
+                _ = try VerifiedMigrationBackup.completeMigrationManifest(
+                    sourceURL: resolvedLedgerURL,
+                    preparedManifest: manifest,
+                    observedVersion: 2,
+                    targetMetadata: installed
+                )
+                loaded = try Self.loadLedger(from: resolvedLedgerURL)
+            }
+            guard !loaded.migrated else {
+                throw SessionHostAdapterV2Error.ledgerIntegrity(
+                    "ledger migration did not install schema version two"
+                )
+            }
+            return loaded.ledger
         }
+        ledger = resolvedLedger
     }
 
     public func capabilitiesV2() async throws -> HostCapabilitiesV2 {
@@ -3323,20 +3401,26 @@ public actor LMStudioManagedSessionHostAdapterV2: SessionHostAdapterV2 {
     }
 
     private static func persist(_ ledger: ManagedSessionLedgerV2, to url: URL) throws {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
-        let data = try encoder.encode(ledger)
-        guard data.count <= maximumLedgerBytes else {
-            throw SessionHostAdapterV2Error.storageLimit
-        }
+        let data = try encodedLedger(ledger)
         try data.write(
             to: url, options: [.atomic, .completeFileProtectionUnlessOpen]
         )
         try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
     }
 
+    private static func encodedLedger(_ ledger: ManagedSessionLedgerV2) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let data = try encoder.encode(ledger)
+        guard data.count <= maximumLedgerBytes else {
+            throw SessionHostAdapterV2Error.storageLimit
+        }
+        return data
+    }
+
     private static func loadLedger(
-        from url: URL
+        from url: URL,
+        legacyMigratedAt: Date? = nil
     ) throws -> (ledger: ManagedSessionLedgerV2, migrated: Bool) {
         guard FileManager.default.fileExists(atPath: url.path) else {
             return (ManagedSessionLedgerV2(), false)
@@ -3363,7 +3447,7 @@ public actor LMStudioManagedSessionHostAdapterV2: SessionHostAdapterV2 {
             guard records.count <= maximumRecords else {
                 throw SessionHostAdapterV2Error.ledgerIntegrity("legacy ledger has too many records")
             }
-            let migratedAt = ISO8601.string(from: Date())
+            let migratedAt = ISO8601.string(from: legacyMigratedAt ?? Date())
             let quarantined = try records.map { record -> ManagedLegacyQuarantineRecord in
                 let canonical = try JSONSerialization.data(
                     withJSONObject: record, options: [.sortedKeys, .withoutEscapingSlashes]

@@ -1352,7 +1352,8 @@ public actor RuntimeJobRepository {
         busyTimeoutMilliseconds: Int,
         timestamp: String
     ) throws -> OpaquePointer {
-        try VerifiedMigrationBackup.withMigrationLock(
+        var migrationManifest: VerifiedMigrationBackupManifest?
+        return try VerifiedMigrationBackup.withMigrationLock(
             databaseURL: databaseURL,
             timeoutSeconds: 60
         ) {
@@ -1360,7 +1361,13 @@ public actor RuntimeJobRepository {
                 try VerifiedMigrationBackup.withNonMutatingSQLitePreflight(
                     databaseURL: databaseURL
                 ) { candidate in
-                    guard let candidate else { return }
+                    guard let candidate else {
+                        _ = try VerifiedMigrationBackup.reconcileMigrationManifest(
+                            sourceURL: databaseURL,
+                            observedVersion: 0
+                        )
+                        return
+                    }
                     let hasRuntimeVersion = try candidate.integer(
                         "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='runtime_job_schema_version'"
                     ) == 1
@@ -1376,12 +1383,26 @@ public actor RuntimeJobRepository {
                                 "unsupported runtime job schema version \(version)"
                             )
                         }
+                        migrationManifest = try VerifiedMigrationBackup
+                            .reconcileMigrationManifest(
+                                sourceURL: databaseURL,
+                                observedVersion: version
+                            )
                         return
                     }
                     if try isExactCoResidentControlPlaneV2(candidate) {
+                        migrationManifest = try VerifiedMigrationBackup
+                            .reconcileMigrationManifest(
+                                sourceURL: databaseURL,
+                                observedVersion: 0
+                            )
                         return
                     }
                     try candidate.requireEmptySchemaWhenUnversioned(reportedVersion: 0)
+                    _ = try VerifiedMigrationBackup.reconcileMigrationManifest(
+                        sourceURL: databaseURL,
+                        observedVersion: 0
+                    )
                 }
             } catch let error as RuntimeJobError {
                 throw error
@@ -1391,7 +1412,8 @@ public actor RuntimeJobRepository {
             return try openAndMigrateLocked(
                 databaseURL: databaseURL,
                 busyTimeoutMilliseconds: busyTimeoutMilliseconds,
-                timestamp: timestamp
+                timestamp: timestamp,
+                migrationManifest: migrationManifest
             )
         }
     }
@@ -1399,7 +1421,8 @@ public actor RuntimeJobRepository {
     private static func openAndMigrateLocked(
         databaseURL: URL,
         busyTimeoutMilliseconds: Int,
-        timestamp: String
+        timestamp: String,
+        migrationManifest initialManifest: VerifiedMigrationBackupManifest?
     ) throws -> OpaquePointer {
         var connection: OpaquePointer?
         let flags = SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
@@ -1442,25 +1465,61 @@ public actor RuntimeJobRepository {
                     "unsupported runtime job schema version \(prior)"
                 )
             }
+            var migrationManifest = try initialManifest
+                ?? VerifiedMigrationBackup.reconcileMigrationManifest(
+                    sourceURL: databaseURL,
+                    observedVersion: prior
+                )
+            if prior == schemaVersion,
+               let currentManifest = migrationManifest {
+                migrationManifest = try VerifiedMigrationBackup.requireSQLiteMigrationReceipt(
+                    database: connection,
+                    sourceURL: databaseURL,
+                    manifest: currentManifest
+                )
+            }
             try rawExecute("PRAGMA foreign_keys=ON", database: connection)
             try rawExecute("PRAGMA journal_mode=WAL", database: connection)
             try rawExecute("PRAGMA synchronous=NORMAL", database: connection)
             try rawExecute("PRAGMA busy_timeout=\(busyTimeoutMilliseconds)", database: connection)
-            if prior > 0, prior < schemaVersion {
-                let stem = databaseURL.deletingPathExtension().lastPathComponent
-                let backupURL = databaseURL.deletingLastPathComponent().appendingPathComponent(
-                    "\(stem).pre-migration-v\(prior).sqlite3",
-                    isDirectory: false
-                )
-                _ = try VerifiedMigrationBackup.snapshotSQLite(
-                    database: connection,
-                    to: backupURL,
-                    expectedVersion: prior,
-                    versionQuery: "SELECT version FROM runtime_job_schema_version WHERE singleton=1"
-                )
+            let isSchemaMigration = (prior > 0 && prior < schemaVersion)
+                || (prior == 0 && isCurrentCoResidentControlPlane)
+            let needsDurableCompletion = isSchemaMigration
+                || migrationManifest?.state == .prepared
+            if needsDurableCompletion {
+                try rawExecute("PRAGMA synchronous=FULL", database: connection)
             }
+            defer {
+                if needsDurableCompletion {
+                    _ = try? rawExecute("PRAGMA synchronous=NORMAL", database: connection)
+                }
+            }
+            var completingManifest = migrationManifest
             try rawExecute("BEGIN IMMEDIATE", database: connection)
             do {
+                if isSchemaMigration {
+                    completingManifest = try VerifiedMigrationBackup
+                        .prepareSQLiteMigrationAtWriteBoundary(
+                            database: connection,
+                            sourceURL: databaseURL,
+                            backupURL: migrationBackupURL(
+                                databaseURL: databaseURL,
+                                sourceVersion: prior
+                            ),
+                            sourceVersion: prior,
+                            targetVersion: schemaVersion,
+                            versionQuery: prior == 0
+                                ? "SELECT 0;"
+                                : "SELECT version FROM runtime_job_schema_version WHERE singleton=1"
+                        )
+                } else if prior == schemaVersion,
+                          let currentManifest = completingManifest {
+                    completingManifest = try VerifiedMigrationBackup.requireSQLiteMigrationReceipt(
+                        database: connection,
+                        sourceURL: databaseURL,
+                        manifest: currentManifest
+                    )
+                }
                 try rawExecute(schema, database: connection)
                 if !rawTableHasColumn(
                     table: "runtime_job_output_streams",
@@ -1567,8 +1626,15 @@ public actor RuntimeJobRepository {
                     ON CONFLICT(singleton) DO UPDATE SET version=excluded.version,applied_at=excluded.applied_at
                     """,
                     database: connection,
-                    bindings: [.text(timestamp)]
+                    bindings: [.text(completingManifest?.preparedAt ?? timestamp)]
                 )
+                if isSchemaMigration, let completingManifest {
+                    try VerifiedMigrationBackup.recordSQLiteMigrationReceipt(
+                        database: connection,
+                        sourceURL: databaseURL,
+                        manifest: completingManifest
+                    )
+                }
                 let integrity = try rawScalarText("PRAGMA quick_check", database: connection) ?? "missing"
                 guard integrity.lowercased() == "ok" else {
                     throw RuntimeJobError.storageFailure("SQLite quick check failed: \(integrity)")
@@ -1578,11 +1644,44 @@ public actor RuntimeJobRepository {
                 _ = try? rawExecute("ROLLBACK", database: connection)
                 throw error
             }
+            if let completingManifest, completingManifest.state == .prepared {
+                let observedVersion = try rawScalarInt(
+                    "SELECT version FROM runtime_job_schema_version WHERE singleton=1",
+                    database: connection
+                ) ?? 0
+                try VerifiedMigrationBackup.checkpointSQLiteMigration(
+                    database: connection,
+                    sourceURL: databaseURL
+                )
+                let target = try VerifiedMigrationBackup.logicalSQLiteMetadata(
+                    database: connection,
+                    sourceURL: databaseURL,
+                    expectedVersion: schemaVersion,
+                    versionQuery: "SELECT version FROM runtime_job_schema_version WHERE singleton=1"
+                )
+                _ = try VerifiedMigrationBackup.completeMigrationManifest(
+                    sourceURL: databaseURL,
+                    preparedManifest: completingManifest,
+                    observedVersion: observedVersion,
+                    targetMetadata: target
+                )
+            }
             return connection
         } catch {
             sqlite3_close(connection)
             throw error
         }
+    }
+
+    private static func migrationBackupURL(
+        databaseURL: URL,
+        sourceVersion: Int
+    ) -> URL {
+        let stem = databaseURL.deletingPathExtension().lastPathComponent
+        return databaseURL.deletingLastPathComponent().appendingPathComponent(
+            "\(stem).pre-migration-v\(sourceVersion).sqlite3",
+            isDirectory: false
+        )
     }
 
     private static func isExactCoResidentControlPlaneV2(

@@ -307,6 +307,13 @@
     "EVID-20260827T143556Z-c6d39ea4ac",
     "EVID-20260827T143605Z-cfa4328943",
     "EVID-20260827T143614Z-159edd265d",
+    "EVID-20260827T161138Z-6e4e0134f8",
+    "EVID-20260827T161328Z-2a835789ec",
+    "EVID-20260827T161653Z-671fc6f5e4",
+    "EVID-20260827T161806Z-0acce7939b",
+    "EVID-20260827T161816Z-0a2cf31412",
+    "EVID-20260827T161831Z-64cf524597",
+    "EVID-20260827T162026Z-657b44b26e",
     "a5466d4e5b4d7a10f87df64ddfdb58b6b8ca5159a57c20527e98802a822245d7",
     "a5d4276cbf14db3a91baa7f6b79fb8cdb3fb042a2eaf663d3219ff36b5451667",
     "b3dc11a8dc286fa33b6567ff62089692e64787b23a66718cfe1766dc27195724",
@@ -591,23 +598,23 @@
       "created_at": "2026-08-27T11:18:41.579687+00:00",
       "evidence_class": "E1",
       "id": "FC-MIGRATION-MATRIX-001",
-      "notes": "Eight supported historical rows have populated migration, semantic validation, reopen, and rerun coverage in Debug and Release. Clone-before-open preflight proves rejected journal, WAL-backed, corrupt, unsupported, malformed co-resident, and nonempty-unversioned inputs do not mutate the source family. Canonical evidence EVID-20260827T142943Z-91834eb1f1 and EVID-20260827T143212Z-8ca31604b8 each passes 465 tests with four expected skips and zero failures. The matrix remains validating while legacy receipt crash recovery and backup manifest reconciliation stay open.",
+      "notes": "Eight supported historical rows now have populated migration, semantic validation, reopen, rerun, exact receipt, immutable recovery lineage, and fail-closed coverage in Debug and Release. Registered runtime v2 and co-resident control-plane runtime version-zero entry points produce recovery manifests. Canonical evidence EVID-20260827T161138Z-6e4e0134f8 and EVID-20260827T161328Z-2a835789ec each passes 477 tests with four expected skips and zero failures on source manifest 6fb4a5445c13a49e1c6c54240eecf4dec110022cfbbcbfd8479f087567a5f11b. The matrix remains validating while legacy receipt atomicity, the distinct post-COMMIT abrupt-process boundary, and exact-revision post-commit readback remain open.",
       "path": "Tests/ForgeConductorTests/ContinuityTests.swift",
       "severity": "High",
       "status": "validating",
       "title": "Old-format migration lifecycle matrix is incomplete",
-      "updated_at": "2026-08-27T14:37:38.581281+00:00"
+      "updated_at": "2026-08-27T16:21:21.119401+00:00"
     },
     {
       "created_at": "2026-08-27T11:18:41.661213+00:00",
       "evidence_class": "E1",
       "id": "FC-MIGRATION-BACKUP-001",
-      "notes": "Global, project-memory, runtime-job, control-plane, and native-ledger migration entry points use bounded locks and verified owner-only recovery artifacts. SQLite rejection inspects a stable private main-plus-WAL clone, validates exact co-resident control-plane table and column surfaces, and preserves corrupt source families without opening or recovering the original. Canonical Debug and Release evidence EVID-20260827T142943Z-91834eb1f1 and EVID-20260827T143212Z-8ca31604b8 pass 465 tests each. Prepared/completed manifests and deterministic interrupted-state reconciliation remain open.",
+      "notes": "SQLite and native file migrations now persist prepared and completed manifests binding source, backup, target, versions, hashes, bytes, and rollback instructions. Restored changed sources use four bounded immutable lineages; completed archives can repair an interrupted active manifest while preserving later writes. A real child-process SIGKILL proves durable-prepared recovery, kernel lock exclusion and release, exact backup retention, and receipt-backed completion. Canonical Debug and Release evidence EVID-20260827T161138Z-6e4e0134f8 and EVID-20260827T161328Z-2a835789ec pass 477 tests each. The distinct post-COMMIT pre-completion-manifest kill boundary and same-owner SQLite pathname replacement qualification remain open.",
       "path": "Sources/ForgeConductorCore/Infrastructure/ProjectMemoryRepository.swift",
       "severity": "High",
       "status": "patching",
       "title": "SQLite migrations do not uniformly verify recoverable source copies",
-      "updated_at": "2026-08-27T14:37:38.751472+00:00"
+      "updated_at": "2026-08-27T16:21:21.277509+00:00"
     },
     {
       "created_at": "2026-08-27T11:18:41.745343+00:00",
@@ -624,12 +631,12 @@
       "created_at": "2026-08-27T11:28:30.339203+00:00",
       "evidence_class": "E0",
       "id": "FC-MIGRATION-RECEIPT-001",
-      "notes": "Completed legacy v1/v2 migration replay derives a stable project, candidate, content, generation, and binding fingerprint; the stored receipt is reused and read back with its original counts. Canonical Debug and Release evidence EVID-20260827T142943Z-91834eb1f1 and EVID-20260827T143212Z-8ca31604b8 pass 465 tests each. A crash between imported or quarantined side effects and receipt persistence can still produce a replay receipt with different counts, so atomic journaling or deterministic reconciliation remains open.",
+      "notes": "Completed legacy v1 and v2 migration replay derives a stable project, candidate, content, generation, and binding fingerprint; the stored receipt is reused and read back with its original counts. Canonical Debug and Release evidence EVID-20260827T161138Z-6e4e0134f8 and EVID-20260827T161328Z-2a835789ec each passes 477 tests with four expected skips and zero failures. A crash between imported or quarantined side effects and receipt persistence can still produce a replay receipt with different counts, so atomic journaling or deterministic reconciliation remains open.",
       "path": "Sources/ForgeConductorCore/Infrastructure/ProjectMemoryRepository.swift",
       "severity": "High",
       "status": "patching",
       "title": "Legacy continuity replay appends duplicate migration receipts",
-      "updated_at": "2026-08-27T14:37:38.911118+00:00"
+      "updated_at": "2026-08-27T16:21:21.431389+00:00"
     },
     {
       "created_at": "2026-08-27T12:08:07.554118+00:00",
@@ -698,7 +705,7 @@
       "updated_at": "2026-08-27T14:37:38.417019+00:00"
     }
   ],
-  "last_event_sequence": 383,
+  "last_event_sequence": 393,
   "phases": {
     "P00": {
       "attempts": 1,
@@ -781,12 +788,12 @@
   },
   "repository": {
     "branch": "repair/autonomous-continuity",
-    "commit": "749bdf2c974f574897ae444639df2702026c5cba",
+    "commit": "283b38a7b671dfcc1337104ff14eac9288aa28a3",
     "dirty": true,
     "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy"
   },
   "run_id": "aba90ab1-be80-4cc5-aa0b-23dd54d4a24d",
   "schema_version": 1,
   "status": "active",
-  "updated_at": "2026-08-27T14:37:39.248252+00:00"
+  "updated_at": "2026-08-27T16:21:21.431507+00:00"
 }

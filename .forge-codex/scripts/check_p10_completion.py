@@ -31,10 +31,13 @@ MIGRATION_FIXTURE_TESTS = {
     ),
     "global-sqlite-v2-to-v5": (
         "testVersionTwoStoreMigratesPopulatedDataReopensAndRerunsIdempotently",
+        "testRestoredChangedSQLiteSourceCreatesBoundedSecondMigrationLineage",
+        "testSQLiteMigrationPromotesArchivedCompletionAfterPreparedManifestCrash",
     ),
     "global-sqlite-v3-to-v5": (
         "testVersionThreeStoreMigratesWithoutLosingHandoff",
         "testConcurrentVersionThreeMigrationIsIdempotent",
+        "testSQLitePreparedMigrationRecoversAfterSIGKILLAndReleasesInterprocessLock",
     ),
     "project-memory-v1-to-v2": (
         "testVersionOneDatabaseMigratesPopulatedDataReopensAndRerunsIdempotently",
@@ -48,12 +51,29 @@ MIGRATION_FIXTURE_TESTS = {
     ),
     "native-ledger-v1-to-v2": (
         "testV2BlockedCredentialFailureAndLegacySyntheticQuarantinePersist",
+        "testNativeLedgerChangedRestoreUsesBoundedImmutableLineages",
     ),
     "runtime-job-v2-to-v5": (
         "testSchemaV2MigratesForwardWithProcessIdentityAndIdempotencyReceiptStorage",
         "testConcurrentInitializersSerializeVersionTwoMigration",
+        "testRegisteredRuntimeVersionTwoMigrationStillCreatesRecoveryManifest",
     ),
 }
+MIGRATION_SAFEGUARD_TESTS = (
+    "testCoResidentControlPlaneRuntimeBootstrapCreatesVersionZeroRecoveryManifest",
+    "testNonMutatingSQLitePreflightRejectsInterruptedJournalWithoutChangingBytes",
+    "testNonMutatingSQLitePreflightReadsWALCloneWithoutChangingSourceFamily",
+    "testVerifiedMigrationBackupCapturesWALAndRejectsTamperedReuse",
+    "testVerifiedMigrationManifestReconcilesPreparedSQLiteCompletion",
+    "testSQLitePreparedMigrationRecoversAfterSIGKILLAndReleasesInterprocessLock",
+    "testSQLiteStoreDoesNotRecreateMissingSourceOwnedByManifest",
+    "testSQLiteStoreRejectsSourceChangedAfterPreparedBackup",
+    "testSQLiteStoreRejectsUnrelatedTargetWithoutMigrationReceipt",
+    "testMigrationArtifactsRejectFIFOsWithoutBlockingAndRecoverStaleTemporaryFile",
+    "testVerifiedMigrationManifestRejectsTamperedBackupAndLinkedManifest",
+    "testVerifiedMigrationBackupEnforcesBoundsAndRejectsLinkedArtifacts",
+    "testVerifiedMigrationLockIsBoundedAndOwnerOnly",
+)
 failures: list[str] = []
 
 
@@ -284,6 +304,12 @@ for fixture_id, test_names in MIGRATION_FIXTURE_TESTS.items():
                 f"{test_name}]' passed" in output,
                 f"{configuration} strict suite has no passing {fixture_id} proof: {test_name}",
             )
+for configuration, output in strict_outputs.items():
+    for test_name in MIGRATION_SAFEGUARD_TESTS:
+        check(
+            f"{test_name}]' passed" in output,
+            f"{configuration} strict suite has no passing migration safeguard: {test_name}",
+        )
 check(migration.get("backup_qualification", {}).get("status") == "passed", "migration backup qualification is not passed")
 check(migration.get("remaining_requirements") == [], "migration report has remaining requirements")
 if migration.get("status") == "passed":

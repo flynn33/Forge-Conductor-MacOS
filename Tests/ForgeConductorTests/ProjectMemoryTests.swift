@@ -446,6 +446,36 @@ final class ProjectMemoryTests: XCTestCase {
                 as? NSNumber)?.intValue,
             0o600
         )
+        let migrationManifest = try JSONDecoder().decode(
+            VerifiedMigrationBackupManifest.self,
+            from: Data(
+                contentsOf: VerifiedMigrationBackup.activeManifestURL(for: databaseURL)
+            )
+        )
+        XCTAssertEqual(migrationManifest.state, .completed)
+        XCTAssertEqual(migrationManifest.storageKind, .sqlite)
+        XCTAssertEqual(migrationManifest.sourceVersion, 1)
+        XCTAssertEqual(migrationManifest.targetVersion, ProjectMemoryRepository.schemaVersion)
+        XCTAssertEqual(
+            migrationManifest.backupSHA256,
+            JSONSupport.sha256Hex(try Data(contentsOf: backupURL))
+        )
+        XCTAssertNotNil(migrationManifest.targetSHA256)
+        XCTAssertEqual(
+            try projectMemoryFixtureInt(
+                at: databaseURL,
+                sql: "SELECT COUNT(*) FROM forge_migration_receipts WHERE migration_id='\(migrationManifest.migrationID)';"
+            ),
+            1
+        )
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: VerifiedMigrationBackup.archivedManifestURL(
+                    for: backupURL,
+                    targetVersion: ProjectMemoryRepository.schemaVersion
+                ).path
+            )
+        )
         XCTAssertEqual(
             try projectMemoryFixtureInt(
                 at: backupURL,
@@ -470,7 +500,6 @@ final class ProjectMemoryTests: XCTestCase {
             directory: directory,
             enableFTS5: false
         )
-        defer { rerun.close() }
         try assertMigratedSemantics(in: rerun)
         XCTAssertEqual(try rerun.get(id: currentRecord.id)?.title, "Current schema write")
         XCTAssertEqual(
@@ -481,6 +510,32 @@ final class ProjectMemoryTests: XCTestCase {
             1
         )
         XCTAssertEqual(try Data(contentsOf: backupURL), firstBackupData)
+        rerun.close()
+
+        try firstBackupData.write(to: databaseURL, options: .atomic)
+        for suffix in ["-wal", "-shm", "-journal"] {
+            let sidecar = URL(fileURLWithPath: databaseURL.path + suffix)
+            if FileManager.default.fileExists(atPath: sidecar.path) {
+                try FileManager.default.removeItem(at: sidecar)
+            }
+        }
+        let restored = try ProjectMemoryRepository(
+            projectID: projectID,
+            directory: directory,
+            enableFTS5: false
+        )
+        try assertMigratedSemantics(in: restored)
+        XCTAssertNil(try restored.get(id: currentRecord.id))
+        restored.close()
+        XCTAssertEqual(
+            try JSONDecoder().decode(
+                VerifiedMigrationBackupManifest.self,
+                from: Data(
+                    contentsOf: VerifiedMigrationBackup.activeManifestURL(for: databaseURL)
+                )
+            ),
+            migrationManifest
+        )
     }
 
     func testConcurrentInitializersSerializeVersionOneMigration() async throws {
@@ -653,6 +708,27 @@ final class ProjectMemoryTests: XCTestCase {
         if let writeAheadLogBytes, let preservedWriteAheadLog = preservedWriteAheadLogs.first {
             XCTAssertEqual(try Data(contentsOf: preservedWriteAheadLog), writeAheadLogBytes)
         }
+        app?.shutdown(); app = nil
+
+        app = try ForgeApp.bootstrap(home: home)
+        let repeated = try app!.tools.call(
+            name: "project_memory.initialize", arguments: ["project_path": projectA.path],
+            clientID: ClientID("project-memory-corruption-repeat")
+        )
+        XCTAssertFalse(repeated.ok)
+        XCTAssertEqual(repeated.payload["code"] as? String, "integrity_failure")
+        let repeatedRecoveryFamily = try FileManager.default.contentsOfDirectory(
+            at: projectDirectory,
+            includingPropertiesForKeys: nil
+        ).filter { $0.lastPathComponent.hasPrefix("memory.corrupt-") }
+        XCTAssertEqual(
+            repeatedRecoveryFamily.filter { $0.lastPathComponent.hasSuffix(".sqlite3") }.count,
+            1
+        )
+        XCTAssertEqual(
+            repeatedRecoveryFamily.filter { $0.lastPathComponent.hasSuffix(".sqlite3-wal") }.count,
+            writeAheadLogBytes == nil ? 0 : 1
+        )
         app?.shutdown()
     }
 
