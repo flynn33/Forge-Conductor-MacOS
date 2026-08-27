@@ -2,27 +2,27 @@
   "schema_version": 2,
   "phase": "P10",
   "status": "passed",
-  "generated_at": "2026-08-27T18:11:10Z",
+  "generated_at": "2026-08-27T19:24:35Z",
   "tested_tree": {
-    "head": "93e7ef2539451af1e6e7b951260b40a431d4b499",
+    "head": "167c4419d87b63b4f4427e07c620be7ea67cb5a3",
     "working_tree": false
   },
   "source_manifest": {
-    "bytes": 8151662,
+    "bytes": 8239721,
     "file_count": 234,
     "schema_version": 1,
-    "sha256": "3adc25065f9e4e9df14dca579c05c3c30934cfe04caca0a8b21b8417091cba1e"
+    "sha256": "74ce62d056b3c0a38789bc41dc39f7a6ae6954df904457525508344146b11fd6"
   },
   "strict_suites": {
     "debug": {
-      "evidence_id": "EVID-20260827T180654Z-3e03d91bdd",
-      "executed": 490,
+      "evidence_id": "EVID-20260827T191841Z-5f67a75f7f",
+      "executed": 498,
       "skipped": 4,
       "failures": 0
     },
     "release": {
-      "evidence_id": "EVID-20260827T180842Z-dc6310b299",
-      "executed": 490,
+      "evidence_id": "EVID-20260827T192048Z-c407e087b1",
+      "executed": 498,
       "skipped": 4,
       "failures": 0
     }
@@ -41,8 +41,8 @@
         "idempotent concurrent rerun"
       ],
       "evidence_ids": [
-        "EVID-20260827T180654Z-3e03d91bdd",
-        "EVID-20260827T180842Z-dc6310b299"
+        "EVID-20260827T191841Z-5f67a75f7f",
+        "EVID-20260827T192048Z-c407e087b1"
       ]
     },
     {
@@ -62,8 +62,8 @@
         "idempotent rerun"
       ],
       "evidence_ids": [
-        "EVID-20260827T180654Z-3e03d91bdd",
-        "EVID-20260827T180842Z-dc6310b299"
+        "EVID-20260827T191841Z-5f67a75f7f",
+        "EVID-20260827T192048Z-c407e087b1"
       ]
     },
     {
@@ -84,8 +84,8 @@
         "idempotent rerun"
       ],
       "evidence_ids": [
-        "EVID-20260827T180654Z-3e03d91bdd",
-        "EVID-20260827T180842Z-dc6310b299"
+        "EVID-20260827T191841Z-5f67a75f7f",
+        "EVID-20260827T192048Z-c407e087b1"
       ]
     },
     {
@@ -103,8 +103,8 @@
         "idempotent rerun"
       ],
       "evidence_ids": [
-        "EVID-20260827T180654Z-3e03d91bdd",
-        "EVID-20260827T180842Z-dc6310b299"
+        "EVID-20260827T191841Z-5f67a75f7f",
+        "EVID-20260827T192048Z-c407e087b1"
       ]
     },
     {
@@ -127,8 +127,8 @@
         "completed replay is idempotent"
       ],
       "evidence_ids": [
-        "EVID-20260827T180654Z-3e03d91bdd",
-        "EVID-20260827T180842Z-dc6310b299"
+        "EVID-20260827T191841Z-5f67a75f7f",
+        "EVID-20260827T192048Z-c407e087b1"
       ]
     },
     {
@@ -144,8 +144,8 @@
         "completed replay is idempotent"
       ],
       "evidence_ids": [
-        "EVID-20260827T180654Z-3e03d91bdd",
-        "EVID-20260827T180842Z-dc6310b299"
+        "EVID-20260827T191841Z-5f67a75f7f",
+        "EVID-20260827T192048Z-c407e087b1"
       ]
     },
     {
@@ -163,8 +163,8 @@
         "idempotent rerun"
       ],
       "evidence_ids": [
-        "EVID-20260827T180654Z-3e03d91bdd",
-        "EVID-20260827T180842Z-dc6310b299"
+        "EVID-20260827T191841Z-5f67a75f7f",
+        "EVID-20260827T192048Z-c407e087b1"
       ]
     },
     {
@@ -183,8 +183,8 @@
         "idempotent rerun"
       ],
       "evidence_ids": [
-        "EVID-20260827T180654Z-3e03d91bdd",
-        "EVID-20260827T180842Z-dc6310b299"
+        "EVID-20260827T191841Z-5f67a75f7f",
+        "EVID-20260827T192048Z-c407e087b1"
       ]
     }
   ],
@@ -194,7 +194,7 @@
       "disposition": "not_applicable",
       "reason": "the control-plane repository was introduced at schema v2 and has no shipped v1 fixture",
       "current_behavior": "fresh empty version 0 and exact current version 2 are accepted; fictional v1 and nonempty unversioned databases fail closed without mutation",
-      "evidence_id": "EVID-20260827T180654Z-3e03d91bdd"
+      "evidence_id": "EVID-20260827T191841Z-5f67a75f7f"
     }
   ],
   "pathname_trust_boundary": {

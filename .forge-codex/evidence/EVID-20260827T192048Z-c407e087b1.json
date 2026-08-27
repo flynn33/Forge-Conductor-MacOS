@@ -1,0 +1,53 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 138452,
+      "path": ".forge-codex/evidence/EVID-20260827T192048Z-c407e087b1.stdout.txt",
+      "sha256": "d1796f333634755c583e0c9428946314186f227c66a6a47391254b682ebda343",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 859,
+      "path": ".forge-codex/evidence/EVID-20260827T192048Z-c407e087b1.stderr.txt",
+      "sha256": "298c0db31337d4bb219da0f007c5ba4cd01f8aaa886a864990745021f971997c",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "command": "env FORGE_SKIP_PS=1 swift test -c release --no-parallel -Xswiftc -warnings-as-errors",
+  "ended_at": "2026-08-27T19:23:22.677796+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260827T192048Z-c407e087b1",
+  "kind": "p10-post-preflight-full-release",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 8239721,
+    "file_count": 234,
+    "schema_version": 1,
+    "sha256": "74ce62d056b3c0a38789bc41dc39f7a6ae6954df904457525508344146b11fd6"
+  },
+  "source_manifest_after": {
+    "bytes": 8239721,
+    "file_count": 234,
+    "schema_version": 1,
+    "sha256": "74ce62d056b3c0a38789bc41dc39f7a6ae6954df904457525508344146b11fd6"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-27T19:20:48.557321+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}
