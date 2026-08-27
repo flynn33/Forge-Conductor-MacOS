@@ -6,29 +6,58 @@
 
 import Foundation
 import Darwin
+import CoreFoundation
 
 /// JSON-RPC 2.0 MCP server over stdio for **LM Studio** (local models).
 public final class MCPServer: @unchecked Sendable {
+    public static let defaultMaximumConcurrentRequests = 8
+    public static let defaultShutdownWaitSeconds: TimeInterval = 15
+
+    private enum RequestKey: Hashable {
+        case string(String)
+        case number(String)
+    }
+
+    private enum RequestRegistration {
+        case accepted(ToolCallCancellation)
+        case preCancelled
+        case duplicate
+        case capacityExceeded
+    }
+
     private let app: ForgeApp
     private let clientID: ClientID
     private let role: LMStudioConnectorRole
     private let deploymentID: String
     private let toolDefinitionCatalog: Result<ToolDefinitionCatalog, Error>
+    private let maximumConcurrentRequests: Int
+    private let shutdownWaitSeconds: TimeInterval
+    private let requestQueue = DispatchQueue(
+        label: "forge.mcp.requests",
+        qos: .userInitiated,
+        attributes: .concurrent
+    )
     private let lock = NSLock()
     private let cancellationLock = NSLock()
-    private var cancelledRequestIDs: Set<String> = []
-    private var cancellationOrder: [String] = []
+    private var responseDeliveryOpen = false
+    private var activeRequests: [RequestKey: ToolCallCancellation] = [:]
+    private var cancelledRequestIDs: Set<RequestKey> = []
+    private var cancellationOrder: [RequestKey] = []
 
     public init(
         app: ForgeApp,
         clientID: ClientID = ClientID(),
         role: LMStudioConnectorRole = LMStudioConnectorRole(
             environmentValue: ProcessInfo.processInfo.environment["FORGE_MCP_ROLE"]
-        )
+        ),
+        maximumConcurrentRequests: Int = MCPServer.defaultMaximumConcurrentRequests,
+        shutdownWaitSeconds: TimeInterval = MCPServer.defaultShutdownWaitSeconds
     ) {
         self.app = app
         self.clientID = clientID
         self.role = role
+        self.maximumConcurrentRequests = max(1, min(maximumConcurrentRequests, 64))
+        self.shutdownWaitSeconds = max(0.1, min(shutdownWaitSeconds, 30))
         self.deploymentID = ProcessInfo.processInfo.environment["FORGE_DEPLOYMENT_ID"]?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         self.toolDefinitionCatalog = Result {
@@ -42,6 +71,7 @@ public final class MCPServer: @unchecked Sendable {
         // initialize responses until the buffer fills → host reports plugin timeout (~60s).
         setvbuf(stdout, nil, _IONBF, 0)
         setvbuf(stderr, nil, _IONBF, 0)
+        setResponseDelivery(open: true)
 
         app.diagnostics.info("mcp_serve_start", [
             "client_id": clientID.rawValue,
@@ -64,6 +94,8 @@ public final class MCPServer: @unchecked Sendable {
 
         var lastPresence = Date()
         let reader = MCPStreamReader(handle: input)
+        let workers = DispatchGroup()
+        let workerErrors = MCPWorkerErrorBox()
         defer {
             reader.close()
             try? app.store.presenceDelete(clientID: presenceID)
@@ -73,23 +105,56 @@ public final class MCPServer: @unchecked Sendable {
                 "deployment_id": deploymentID,
             ])
         }
-        while let message = try reader.readMessage() {
-            // Refresh presence while the stdio session is active (dashboard TTL ~45s).
-            let now = Date()
-            if now.timeIntervalSince(lastPresence) >= 15 {
-                refreshPresence()
-                lastPresence = now
+
+        var readerError: Error?
+        do {
+            while let message = try reader.readMessage() {
+                // Refresh presence while the stdio session is active (dashboard TTL ~45s).
+                let now = Date()
+                if now.timeIntervalSince(lastPresence) >= 15 {
+                    refreshPresence()
+                    lastPresence = now
+                }
+                if Self.isNotification(message) {
+                    if let response = handle(message) {
+                        try write(response, to: output)
+                    }
+                } else {
+                    try dispatchRequest(
+                        message,
+                        output: output,
+                        workers: workers,
+                        workerErrors: workerErrors
+                    )
+                }
             }
-            let response = handle(message)
-            if let response {
-                try write(response, to: output)
-            }
+        } catch {
+            readerError = error
         }
+
+        // EOF or a read failure means the peer has disconnected. Close the
+        // delivery boundary before cancellation so unwinding workers cannot
+        // emit a response after the transport has ended.
+        setResponseDelivery(open: false)
+        cancelActiveRequests()
+        let workerWait = workers.wait(timeout: .now() + shutdownWaitSeconds)
+        if let readerError { throw readerError }
+        guard workerWait == .success else {
+            throw MCPStreamError.requestShutdownTimedOut(shutdownWaitSeconds)
+        }
+        if let workerError = workerErrors.take() { throw workerError }
     }
 
     // MARK: - Message handling
 
     public func handle(_ message: [String: Any]) -> [String: Any]? {
+        handle(message, cancellation: nil)
+    }
+
+    func handle(
+        _ message: [String: Any],
+        cancellation: ToolCallCancellation?
+    ) -> [String: Any]? {
         let id = message["id"]
         let method = message["method"] as? String
         // Notification (no id): ignore result
@@ -103,12 +168,7 @@ public final class MCPServer: @unchecked Sendable {
         if method == "notifications/cancelled" {
             let params = message["params"] as? [String: Any] ?? [:]
             if let requestID = Self.requestKey(params["requestId"] ?? params["request_id"]) {
-                cancellationLock.lock()
-                if cancelledRequestIDs.insert(requestID).inserted { cancellationOrder.append(requestID) }
-                if cancellationOrder.count > 256 {
-                    cancelledRequestIDs.remove(cancellationOrder.removeFirst())
-                }
-                cancellationLock.unlock()
+                cancelRequest(requestID)
             }
             return nil
         }
@@ -117,14 +177,12 @@ public final class MCPServer: @unchecked Sendable {
             return nil
         }
 
-        if let requestID = Self.requestKey(id) {
-            cancellationLock.lock()
-            let cancelled = cancelledRequestIDs.remove(requestID) != nil
-            cancellationOrder.removeAll { $0 == requestID }
-            cancellationLock.unlock()
-            if cancelled {
+        if let cancellation {
+            if cancellation.isCancelled {
                 return errorResponse(id: id, code: -32800, message: "Cancelled")
             }
+        } else if let requestID = Self.requestKey(id), consumePreCancellation(requestID) {
+            return errorResponse(id: id, code: -32800, message: "Cancelled")
         }
 
         do {
@@ -185,7 +243,12 @@ public final class MCPServer: @unchecked Sendable {
                     "tool": name,
                     "client_id": clientID.rawValue,
                 ], category: .mcp)
-                let result = try app.tools.call(name: name, arguments: arguments, clientID: clientID)
+                let result = try app.tools.call(
+                    name: name,
+                    arguments: arguments,
+                    clientID: clientID,
+                    cancellation: cancellation
+                )
                 let text = (try? JSONSupport.string(from: result.payload)) ?? "{\"ok\":false}"
                 return ok(id: id, result: [
                     "content": [
@@ -202,6 +265,9 @@ public final class MCPServer: @unchecked Sendable {
                 if isNotification { return nil }
                 return errorResponse(id: id, code: -32601, message: "Method not found: \(method)")
             }
+        } catch is CancellationError {
+            if isNotification { return nil }
+            return errorResponse(id: id, code: -32800, message: "Cancelled")
         } catch {
             if isNotification { return nil }
             return errorResponse(id: id, code: -32000, message: "\(error)")
@@ -225,6 +291,123 @@ public final class MCPServer: @unchecked Sendable {
         try toolDefinitionCatalog.get().mcpDescriptors()
     }
 
+    private static func isNotification(_ message: [String: Any]) -> Bool {
+        let id = message["id"]
+        return id == nil || id is NSNull
+    }
+
+    private func dispatchRequest(
+        _ message: [String: Any],
+        output: FileHandle,
+        workers: DispatchGroup,
+        workerErrors: MCPWorkerErrorBox
+    ) throws {
+        let id = message["id"]
+        guard let requestID = Self.requestKey(id) else {
+            try write(
+                errorResponse(id: NSNull(), code: -32600, message: "Invalid Request: unsupported id"),
+                to: output
+            )
+            return
+        }
+
+        switch registerRequest(requestID) {
+        case .preCancelled:
+            try write(errorResponse(id: id, code: -32800, message: "Cancelled"), to: output)
+        case .duplicate:
+            try write(
+                errorResponse(id: id, code: -32600, message: "Invalid Request: duplicate active id"),
+                to: output
+            )
+        case .capacityExceeded:
+            try write(
+                errorResponse(
+                    id: id,
+                    code: -32000,
+                    message: "Server busy: maximum concurrent requests (\(maximumConcurrentRequests)) reached"
+                ),
+                to: output
+            )
+        case .accepted(let cancellation):
+            let envelope = MCPRequestEnvelope(message)
+            workers.enter()
+            requestQueue.async { [self] in
+                defer {
+                    finishRequest(requestID, cancellation: cancellation)
+                    workers.leave()
+                }
+                // The handler response is authoritative once execution returns.
+                // Replacing it with a late cancellation can conceal committed mutations.
+                guard let response = handle(envelope.message, cancellation: cancellation) else { return }
+                do {
+                    try write(response, to: output)
+                } catch {
+                    workerErrors.store(error)
+                }
+            }
+        }
+    }
+
+    private func registerRequest(_ requestID: RequestKey) -> RequestRegistration {
+        cancellationLock.lock()
+        defer { cancellationLock.unlock() }
+        if cancelledRequestIDs.remove(requestID) != nil {
+            cancellationOrder.removeAll { $0 == requestID }
+            return .preCancelled
+        }
+        if activeRequests[requestID] != nil { return .duplicate }
+        guard activeRequests.count < maximumConcurrentRequests else { return .capacityExceeded }
+        let cancellation = ToolCallCancellation()
+        activeRequests[requestID] = cancellation
+        return .accepted(cancellation)
+    }
+
+    private func finishRequest(
+        _ requestID: RequestKey,
+        cancellation: ToolCallCancellation
+    ) {
+        cancellationLock.lock()
+        if activeRequests[requestID] === cancellation {
+            activeRequests.removeValue(forKey: requestID)
+        }
+        cancellationLock.unlock()
+    }
+
+    private func cancelRequest(_ requestID: RequestKey) {
+        cancellationLock.lock()
+        if let active = activeRequests[requestID] {
+            cancellationLock.unlock()
+            active.cancel()
+            return
+        }
+        if cancelledRequestIDs.insert(requestID).inserted {
+            cancellationOrder.append(requestID)
+        }
+        if cancellationOrder.count > 256 {
+            cancelledRequestIDs.remove(cancellationOrder.removeFirst())
+        }
+        cancellationLock.unlock()
+    }
+
+    private func consumePreCancellation(_ requestID: RequestKey) -> Bool {
+        cancellationLock.lock()
+        defer { cancellationLock.unlock() }
+        let cancelled = cancelledRequestIDs.remove(requestID) != nil
+        if cancelled {
+            cancellationOrder.removeAll { $0 == requestID }
+        }
+        return cancelled
+    }
+
+    private func cancelActiveRequests() {
+        cancellationLock.lock()
+        let active = Array(activeRequests.values)
+        cancellationLock.unlock()
+        for cancellation in active {
+            cancellation.cancel()
+        }
+    }
+
 
     /// Protocol versions we implement (tools list/call). Prefer the client's request when known.
     public static let supportedProtocolVersions: [String] = [
@@ -242,10 +425,12 @@ public final class MCPServer: @unchecked Sendable {
         return supportedProtocolVersions[0]
     }
 
-    private static func requestKey(_ value: Any?) -> String? {
-        if let value = value as? String { return value }
-        if let value = value as? NSNumber { return value.stringValue }
-        if let value = value as? Int { return String(value) }
+    private static func requestKey(_ value: Any?) -> RequestKey? {
+        if let value = value as? String { return .string(value) }
+        if let value = value as? NSNumber {
+            guard CFGetTypeID(value) != CFBooleanGetTypeID() else { return nil }
+            return .number(value.stringValue)
+        }
         return nil
     }
 
@@ -274,11 +459,18 @@ public final class MCPServer: @unchecked Sendable {
         let packet = try MCPStdioTransport.encode(object)
         lock.lock()
         defer { lock.unlock() }
+        guard responseDeliveryOpen else { return }
         // One compact JSON-RPC message per line is the MCP stdio transport.
         try handle.write(contentsOf: packet)
         if handle.fileDescriptor >= 0 {
             fflush(stdout)
         }
+    }
+
+    private func setResponseDelivery(open: Bool) {
+        lock.lock()
+        responseDeliveryOpen = open
+        lock.unlock()
     }
 }
 
@@ -289,6 +481,33 @@ public enum MCPStdioTransport {
         var data = try JSONSupport.data(from: object)
         data.append(0x0A)
         return data
+    }
+}
+
+private final class MCPRequestEnvelope: @unchecked Sendable {
+    let message: [String: Any]
+
+    init(_ message: [String: Any]) {
+        self.message = message
+    }
+}
+
+private final class MCPWorkerErrorBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var error: Error?
+
+    func store(_ error: Error) {
+        lock.lock()
+        if self.error == nil {
+            self.error = error
+        }
+        lock.unlock()
+    }
+
+    func take() -> Error? {
+        lock.lock()
+        defer { lock.unlock() }
+        return error
     }
 }
 
@@ -378,11 +597,14 @@ public final class MCPStreamReader {
 
 public enum MCPStreamError: Error, LocalizedError, Sendable {
     case messageTooLarge(Int)
+    case requestShutdownTimedOut(TimeInterval)
 
     public var errorDescription: String? {
         switch self {
         case .messageTooLarge(let maximum):
             "MCP message exceeds the \(maximum)-byte limit"
+        case .requestShutdownTimedOut(let seconds):
+            "MCP requests did not stop within the \(seconds)-second shutdown deadline"
         }
     }
 }

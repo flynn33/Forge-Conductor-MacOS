@@ -35,6 +35,9 @@ public enum MCPServeVerifier {
         public var toolNames: [String]
         public var detail: String
         public var durationMs: Int
+        public var terminationInterventionRequired: Bool
+        public var terminationReason: String?
+        public var terminationStatus: Int32?
 
         public init(
             ok: Bool,
@@ -43,7 +46,10 @@ public enum MCPServeVerifier {
             toolCount: Int,
             toolNames: [String] = [],
             detail: String,
-            durationMs: Int
+            durationMs: Int,
+            terminationInterventionRequired: Bool = false,
+            terminationReason: String? = nil,
+            terminationStatus: Int32? = nil
         ) {
             self.ok = ok
             self.protocolVersion = protocolVersion
@@ -52,6 +58,9 @@ public enum MCPServeVerifier {
             self.toolNames = toolNames
             self.detail = detail
             self.durationMs = durationMs
+            self.terminationInterventionRequired = terminationInterventionRequired
+            self.terminationReason = terminationReason
+            self.terminationStatus = terminationStatus
         }
     }
 
@@ -108,7 +117,6 @@ public enum MCPServeVerifier {
         stdin.fileHandleForWriting.write(Data(initMsg.utf8))
         stdin.fileHandleForWriting.write(Data(inited.utf8))
         stdin.fileHandleForWriting.write(Data(tools.utf8))
-        try? stdin.fileHandleForWriting.close()
 
         let deadline = Date().addingTimeInterval(timeoutSec)
         var outData = Data()
@@ -119,21 +127,36 @@ public enum MCPServeVerifier {
             drain(stderr.fileHandleForReading, into: &errData, limit: 64 * 1_024)
             frames = decodeFrames(outData)
             if proc.isRunning == false { break }
-            // Do not terminate on the initialize capability's "tools" key;
-            // wait for the complete tools/list response (id 2).
-            if frames.contains(where: { numericID($0["id"]) == 2 }) {
+            // Concurrent MCP dispatch may complete tools/list before initialize.
+            // Keep draining until both handshake responses are present rather
+            // than terminating the child on whichever response arrives first.
+            let responseIDs = Set(frames.compactMap { numericID($0["id"]) })
+            if responseIDs.contains(1), responseIDs.contains(2) {
                 break
             }
             Thread.sleep(forTimeInterval: 0.05)
         }
-        if proc.isRunning {
-            proc.terminate()
-        }
+        let responseIDsBeforeEOF = Set(frames.compactMap { numericID($0["id"]) })
+        let handshakeCompletedBeforeEOF = responseIDsBeforeEOF.contains(1)
+            && responseIDsBeforeEOF.contains(2)
+        // EOF is a disconnect signal and correctly cancels active requests.
+        // Keep stdin open until both handshake responses have arrived, then
+        // close it and allow the server's checked shutdown boundary to finish.
+        let runningWhenEOFWasSent = proc.isRunning
+        try? stdin.fileHandleForWriting.close()
         let terminationDeadline = Date().addingTimeInterval(1)
         while proc.isRunning, Date() < terminationDeadline {
             drain(stdout.fileHandleForReading, into: &outData, limit: maximumOutputBytes)
             drain(stderr.fileHandleForReading, into: &errData, limit: 64 * 1_024)
             Thread.sleep(forTimeInterval: 0.01)
+        }
+        let terminationInterventionRequired = proc.isRunning
+        if terminationInterventionRequired {
+            proc.terminate()
+            let killDeadline = Date().addingTimeInterval(1)
+            while proc.isRunning, Date() < killDeadline {
+                Thread.sleep(forTimeInterval: 0.01)
+            }
         }
         if proc.isRunning {
             _ = Darwin.kill(proc.processIdentifier, SIGKILL)
@@ -146,6 +169,26 @@ public enum MCPServeVerifier {
         drain(stderr.fileHandleForReading, into: &errData, limit: 64 * 1_024)
         let errTail = String(data: errData, encoding: .utf8) ?? ""
         let ms = Int(Date().timeIntervalSince(start) * 1000)
+        let terminationReason: String?
+        let terminationStatus: Int32?
+        if proc.isRunning {
+            terminationReason = nil
+            terminationStatus = nil
+        } else {
+            switch proc.terminationReason {
+            case .exit:
+                terminationReason = "exit"
+            case .uncaughtSignal:
+                terminationReason = "uncaught_signal"
+            @unknown default:
+                terminationReason = "unknown"
+            }
+            terminationStatus = proc.terminationStatus
+        }
+        let naturalCleanExit = terminationInterventionRequired == false
+            && runningWhenEOFWasSent
+            && terminationReason == "exit"
+            && terminationStatus == 0
 
         // Accept only standards-compliant newline-delimited MCP output. This
         // deliberately prevents Forge's verifier from self-certifying LSP-style
@@ -196,11 +239,13 @@ public enum MCPServeVerifier {
             && descriptorsOK
             && identityOK
             && missingRequiredTools.isEmpty
+            && handshakeCompletedBeforeEOF
+            && naturalCleanExit
         var detail: String
         if ok {
-            detail = "initialize ok protocol=\(protocolVersion ?? "?") tools=\(toolCount) in \(ms)ms"
+            detail = "initialize ok protocol=\(protocolVersion ?? "?") tools=\(toolCount) handshake_before_eof=true running_at_eof=true process_exit=clean intervention=false in \(ms)ms"
         } else {
-            detail = "handshake incomplete role=\(connectorRole.rawValue) server=\(serverName ?? "nil") tools=\(toolCount) ndjson=\(ndjsonOnly) envelope=\(envelopeOK) descriptors=\(descriptorsOK) missing_required=\(missingRequiredTools.joined(separator: ",")) protocol=\(protocolVersion ?? "nil") stderr=\(errTail.prefix(200))"
+            detail = "handshake incomplete role=\(connectorRole.rawValue) server=\(serverName ?? "nil") tools=\(toolCount) ndjson=\(ndjsonOnly) envelope=\(envelopeOK) descriptors=\(descriptorsOK) missing_required=\(missingRequiredTools.joined(separator: ",")) protocol=\(protocolVersion ?? "nil") handshake_before_eof=\(handshakeCompletedBeforeEOF) running_at_eof=\(runningWhenEOFWasSent) process_exit=\(terminationReason ?? "running") process_status=\(terminationStatus.map(String.init) ?? "nil") intervention=\(terminationInterventionRequired) stderr=\(errTail.prefix(200))"
         }
 
         return Result(
@@ -210,7 +255,10 @@ public enum MCPServeVerifier {
             toolCount: toolCount,
             toolNames: toolNames,
             detail: detail,
-            durationMs: ms
+            durationMs: ms,
+            terminationInterventionRequired: terminationInterventionRequired,
+            terminationReason: terminationReason,
+            terminationStatus: terminationStatus
         )
     }
 

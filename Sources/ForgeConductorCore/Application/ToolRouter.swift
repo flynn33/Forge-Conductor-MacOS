@@ -47,6 +47,21 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
     }
 
     public func call(name: String, arguments: [String: Any], clientID: ClientID) throws -> ToolResult {
+        try call(
+            name: name,
+            arguments: arguments,
+            clientID: clientID,
+            cancellation: nil
+        )
+    }
+
+    public func call(
+        name: String,
+        arguments: [String: Any],
+        clientID: ClientID,
+        cancellation: ToolCallCancellation?
+    ) throws -> ToolResult {
+        try cancellation?.checkCancellation()
         let context: ToolInvocationContext?
         do {
             if Self.contextRequiredTools.contains(name) {
@@ -70,7 +85,8 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
             name: name,
             arguments: arguments,
             context: context,
-            clientID: clientID
+            clientID: clientID,
+            cancellation: cancellation
         )
     }
 
@@ -79,6 +95,21 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         arguments: [String: Any],
         context: ToolInvocationContext
     ) throws -> ToolResult {
+        try call(
+            name: name,
+            arguments: arguments,
+            context: context,
+            cancellation: nil
+        )
+    }
+
+    public func call(
+        name: String,
+        arguments: [String: Any],
+        context: ToolInvocationContext,
+        cancellation: ToolCallCancellation?
+    ) throws -> ToolResult {
+        try cancellation?.checkCancellation()
         do {
             try app.projectContexts.validate(context)
         } catch {
@@ -94,7 +125,8 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
             name: name,
             arguments: arguments,
             context: context,
-            clientID: context.clientID
+            clientID: context.clientID,
+            cancellation: cancellation
         )
     }
 
@@ -102,8 +134,10 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         name: String,
         arguments: [String: Any],
         context: ToolInvocationContext?,
-        clientID: ClientID
+        clientID: ClientID,
+        cancellation: ToolCallCancellation?
     ) throws -> ToolResult {
+        try cancellation?.checkCancellation()
         let start = Date()
         app.sessions.touchIfActive(clientID: clientID)
         let binding = try? app.sessions.rehydrate(clientID: clientID)
@@ -225,7 +259,8 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
                         name: name,
                         arguments: routedArguments,
                         context: context,
-                        clientID: clientID
+                        clientID: clientID,
+                        cancellation: cancellation
                     )
                 }
             } else {
@@ -233,7 +268,8 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
                     name: name,
                     arguments: routedArguments,
                     context: context,
-                    clientID: clientID
+                    clientID: clientID,
+                    cancellation: cancellation
                 )
             }
             result = try attachBootstrapProjectContextIfNeeded(
@@ -242,6 +278,23 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
                 arguments: routedArguments,
                 clientID: clientID
             )
+        } catch is CancellationError {
+            let cancelled = ToolResult.failure(
+                code: "request_cancelled",
+                message: "Tool call cancelled",
+                retryable: false
+            )
+            _ = recordAndReturn(
+                cancelled,
+                tool: name,
+                arguments: routedArguments,
+                clientID: clientID,
+                start: start,
+                status: "cancelled",
+                auditError: "request_cancelled",
+                mutating: Self.mutatingTools.contains(name)
+            )
+            throw CancellationError()
         } catch {
             var fail = ToolResult.failure(code: "tool_exception", message: "\(error)", retryable: true)
             if !isContinuity, loopCount == Self.maxIdenticalConsecutiveCalls + 1 {
@@ -655,7 +708,8 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         name: String,
         arguments: [String: Any],
         context: ToolInvocationContext?,
-        clientID: ClientID
+        clientID: ClientID,
+        cancellation: ToolCallCancellation?
     ) throws -> ToolResult {
         for pack in packs {
             if let result = try pack.handle(
@@ -663,7 +717,8 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
                 arguments: arguments,
                 context: context,
                 clientID: clientID,
-                app: app
+                app: app,
+                cancellation: cancellation
             ) {
                 return result
             }
