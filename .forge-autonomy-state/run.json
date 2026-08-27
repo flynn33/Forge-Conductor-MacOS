@@ -1,13 +1,26 @@
 {
-  "blocked_work_packages": [],
-  "completed_work_packages": [
-    "FC-BASE-000"
+  "blocked_work_packages": [
+    "FC-UI-001",
+    "FC-PERF-001",
+    "FC-E2E-001",
+    "FC-RELEASE-001"
   ],
-  "current_work_package": "FC-SHELL-001",
-  "last_event_sha256": "97b99e001f9c790782cdb917825ca5ef0b5ad736716a2a25c07620521b5dc6f2",
+  "completed_work_packages": [
+    "FC-BASE-000",
+    "FC-SHELL-001",
+    "FC-CTX-001",
+    "FC-CONT-001",
+    "FC-HOST-001",
+    "FC-AUTO-001",
+    "FC-BUDGET-001",
+    "FC-ROLL-001",
+    "FC-RUNTIME-001"
+  ],
+  "current_work_package": "FC-UI-001",
+  "last_event_sha256": "bcb5c9cfc9fa36803ea47841e60cbb6efe6e7b814dbc9963d8a7dc54d9a769ae",
   "run_id": "1e48ce8e-c41f-4d6d-a0e6-c3201200671b",
   "schema_version": 1,
   "started_at": "2026-08-26T18:25:31.107798+00:00",
   "status": "active",
-  "updated_at": "2026-08-26T18:50:58.757265+00:00"
+  "updated_at": "2026-08-27T03:05:25.247821+00:00"
 }

@@ -29,24 +29,46 @@
   "current_work": null,
   "decisions": [],
   "evidence": [
+    ".forge-codex/state/gate-results/G09.json",
+    ".forge-codex/state/gate-results/G10.json",
+    ".forge-codex/state/gate-results/G11.json",
+    ".forge-codex/state/gate-results/G12.json",
+    "04186e24f988da96cb8cc06f0e99ec878d2d920cc50ee16cffd73474c11141e6",
     "04fb03812290bdb7b43b973bde31d4399d351e29587f17096a419afd0c824b77",
     "0f5ff5eaffd84882273c49eebfd3e378246b67d2dafdf327735ec4e0a73806b2",
     "1574239ab804b951325b8b5fcaf7f4f7528c787a1e1914fff941fe4ae6d34e2a",
     "1aa97c749b734a48dd19dfca93d250d454f0ee25c9496b2227c0ab6f8f7d842b",
     "1f33267dc6f77f755f5c8a2b537d600ba9f0b4218d3854af1f24263003af0b49",
     "24be3535df2a32ea3dcf5190b3113e96c11b71e00a98d1ae9ae5419489dffd01",
+    "2785d7f96e01c41cd8b27a380640d0fe31dddaf62cc9075819ee72c736a688f9",
+    "34b987fe8c24d6f8ae00327251c853534350827868f48db6287c33eed2728b69",
+    "3a13aa54b872f78b815e84f1647b60062a064c87920d93e4d4a12eadc65b5bc9",
     "3e8e63a0bccf3a5efd4e831f46213597233ba317f0c2d993ec262bdf90c4ddbd",
     "456c68fd77f436c47987b7dd6b71d21c2b8a43790b473444e99a331b877da09b",
+    "4619a59fc44d424718384ef4ac926720e1c359213b7bdfdd71d71ebbfad9553c",
     "47d39d678a1d5b15134be9e4a45880a184adb5541942e6ffb2bcaecbfa8362be",
+    "4bad312521b60ddedbe4ac181bfa3af57afd87e454cd0b37c6f5bfb5fbfbdc03",
     "4d90174ff7f47db00f49a9a621cc9d958030f840662682fbf5c6de3e6fe6c20a",
+    "55fab8f7c2c55fef9ce6b0e47c8003fb2b645d05fd17c33f8cb43a399b442fdc",
+    "5bf76ffbb07513d1cc43cf0d3a983c47a6ad603f90587d0b521153c154ef382e",
     "5cb2d4f7609ff0bd794f80e137178eb2c10c9335b41d779b0756184a20d9e0c9",
+    "64bb866fdd08de7b2b12bf68b6fd0c1fb81601e6b6ab57581fcf6f727b556752",
+    "695e8159bc4b16e69ea780e710e2fa6f7b94955646766c533b0331071aedc19d",
     "718134c59c7491b914c1325288df58ea28b3f803465b43539a15bc9e5c4e8b06",
     "72c77100be1e99a6acecdfc985ebf529458708b5de41a8ccb49fbbbbe48b0b3e",
     "7560820c0530d52b1a97f265cecd284c99a0a416b670919d11204e48eb6b367c",
+    "7574917a10600271c1f4cfa7005c3573c8f449969ec130d96493cefde0f568ca",
+    "79d30397c0eda07a0ca4cd4f251d9c827198dead61f3e66d253171f25ed46e2b",
+    "7c0e43fefabe58792777d34b8f7836772185bce75d49ad9ec826c053078c3848",
+    "8567435662f008c740163ca3ad20bddd6d8c71f0fb892ed9c773157835c9afc5",
     "88711d133c06c28d1c6344846856bfac0c409fb3d2627616faa5a8da2d14af39",
+    "88b956106fcf5c94378cde7a21279b53dd7681037ebebb87a2f18dea560e97fc",
     "9400af9cca98362000bcd1426c6557108e041511a348c24617d1ad85f3d6fce1",
     "944c80f8d7b63d6d4298dd6fcd3c2b0122e6fc81e66aabfb483877a98bb9f47c",
     "9666acc77b1e5c243b69d8dfea2292d0fdae211e4d9149c7a8f4a676ccf7d6e4",
+    "975e9b790ffa880d313a8156e64d2fef50c8731107d4366368feffca72a88987",
+    "995add82b73a9a3f7bf26a1f9962427d0ec31861006c30aa257fb22b72cc5586",
+    "9ced0e868c51c76cfd4be68e399b8970c6b3303d7f4fcf64b303bc06090cca3c",
     "EVID-20260823T183945Z-b1151f1fd4",
     "EVID-20260823T184025Z-90a51329f5",
     "EVID-20260823T184048Z-71ae30f85c",
@@ -173,13 +195,45 @@
     "EVID-20260823T222036Z-1dee156e7c",
     "EVID-20260826T182914Z-ecdd4775c1",
     "EVID-20260826T183031Z-0913edd711",
+    "EVID-20260826T234519Z-288f365061",
+    "EVID-20260826T234612Z-ed39c77f19",
+    "EVID-20260826T234631Z-cae1c73a2f",
+    "EVID-20260826T234657Z-85411946cb",
+    "EVID-20260826T234711Z-f708331f5f",
+    "EVID-20260826T234718Z-32f5e2f934",
+    "EVID-20260826T235215Z-09978ce068",
+    "EVID-20260826T235235Z-1a8c68eef0",
+    "EVID-20260826T235244Z-b5ed8ebe5c",
+    "EVID-20260826T235254Z-ee03413577",
+    "EVID-20260826T235258Z-e4e21900d7",
+    "EVID-20260826T235400Z-6930a4351d",
+    "EVID-20260826T235407Z-a122486b46",
+    "EVID-20260826T235437Z-8d0816db0e",
+    "EVID-20260826T235442Z-1a48ed06c1",
+    "EVID-20260827T023533Z-c0f223a21a",
+    "EVID-20260827T023554Z-ece560aea2",
+    "EVID-20260827T025525Z-76eee5d27c",
+    "EVID-20260827T030358Z-22c36dd272",
+    "EVID-20260827T030641Z-831d98c838",
+    "EVID-20260827T031029Z-fdeb6a6226",
+    "EVID-20260827T031144Z-dcf64dc5b4",
+    "a5466d4e5b4d7a10f87df64ddfdb58b6b8ca5159a57c20527e98802a822245d7",
+    "a5d4276cbf14db3a91baa7f6b79fb8cdb3fb042a2eaf663d3219ff36b5451667",
+    "b3dc11a8dc286fa33b6567ff62089692e64787b23a66718cfe1766dc27195724",
+    "b4a2923d8277f49deb4efcc4b52802550f2d42e6e476ad7c42c8226f26da3385",
     "b73cca38f82eb1e02a02cd37a504653a7561c5ed02bdcdfffe9f3891eacddc88",
+    "bdefa9c91bc660ab3064070cb3dd5cbed2fd284df891ca3826e5dd7cb2774fae",
+    "c0b236e5da1c95cebab9dfe7b7eedb1c112a424e1fa6f27c94dba00cf26eb043",
+    "c403e7321a241f600e1b10832db8e7e5e3de7cac124d0eb911a32d9db4f058b4",
     "cceda1d1209095847a386a86f9048b1de62691c7e7d8ef6a1954b151b7ad759d",
+    "d089777dd60c47b9c9d69a28a45445e4f67e4994098a5a65ff4e5d1a7c4ec048",
     "d35955092f94076cf65a68f7ac24f677303902ca70b1a7a7b65fa12524d948a6",
+    "d7a8b12bdc99903df39cbd9bde72c118c9c7eae9f68154429768a336b2b265ba",
     "db06fee93b77af7b76208f85e3c0c53c49c5be48c2f61047199f2120f2325daf",
     "ded439d6b183d7f8074fa2a4bb9d28d6eca6b31d03160a650085360b877dca5a",
     "e05955416a6162b75c469385f49c3beaaa90bf7f4dcbae1b5abedeafbc25cfd0",
     "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "f1d06d7dd23bf3bd71f138fc1a9a5799dc4aa0e474e9a60552dfcecb68f41dc2",
     "fa52a67ada4051cdaf064cb6fc52cdd72cd7957006924443b4e414e2f5abda61"
   ],
   "gates": {
@@ -274,46 +328,80 @@
       "updated_at": "2026-08-23T20:45:54.629465+00:00"
     },
     "G09": {
-      "evaluator": "live-source-hash-and-contract-audit",
+      "evaluator": "forge-gate-handler",
       "evidence_ids": [
+        ".forge-codex/state/gate-results/G09.json",
+        "2785d7f96e01c41cd8b27a380640d0fe31dddaf62cc9075819ee72c736a688f9",
+        "3a13aa54b872f78b815e84f1647b60062a064c87920d93e4d4a12eadc65b5bc9",
+        "4619a59fc44d424718384ef4ac926720e1c359213b7bdfdd71d71ebbfad9553c",
         "718134c59c7491b914c1325288df58ea28b3f803465b43539a15bc9e5c4e8b06",
+        "7c0e43fefabe58792777d34b8f7836772185bce75d49ad9ec826c053078c3848",
+        "88b956106fcf5c94378cde7a21279b53dd7681037ebebb87a2f18dea560e97fc",
         "944c80f8d7b63d6d4298dd6fcd3c2b0122e6fc81e66aabfb483877a98bb9f47c",
+        "975e9b790ffa880d313a8156e64d2fef50c8731107d4366368feffca72a88987",
         "EVID-20260826T182914Z-ecdd4775c1",
+        "a5466d4e5b4d7a10f87df64ddfdb58b6b8ca5159a57c20527e98802a822245d7",
+        "a5d4276cbf14db3a91baa7f6b79fb8cdb3fb042a2eaf663d3219ff36b5451667",
+        "b4a2923d8277f49deb4efcc4b52802550f2d42e6e476ad7c42c8226f26da3385",
+        "c403e7321a241f600e1b10832db8e7e5e3de7cac124d0eb911a32d9db4f058b4",
         "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       ],
       "status": "failed",
-      "updated_at": "2026-08-26T18:29:37.833557+00:00"
+      "updated_at": "2026-08-27T03:10:09.380463+00:00"
     },
     "G10": {
-      "evaluator": "dependency-reopened",
+      "evaluator": "forge-gate-handler",
       "evidence_ids": [
+        ".forge-codex/state/gate-results/G10.json",
+        "04186e24f988da96cb8cc06f0e99ec878d2d920cc50ee16cffd73474c11141e6",
         "1574239ab804b951325b8b5fcaf7f4f7528c787a1e1914fff941fe4ae6d34e2a",
+        "5bf76ffbb07513d1cc43cf0d3a983c47a6ad603f90587d0b521153c154ef382e",
+        "695e8159bc4b16e69ea780e710e2fa6f7b94955646766c533b0331071aedc19d",
+        "79d30397c0eda07a0ca4cd4f251d9c827198dead61f3e66d253171f25ed46e2b",
+        "8567435662f008c740163ca3ad20bddd6d8c71f0fb892ed9c773157835c9afc5",
+        "995add82b73a9a3f7bf26a1f9962427d0ec31861006c30aa257fb22b72cc5586",
+        "9ced0e868c51c76cfd4be68e399b8970c6b3303d7f4fcf64b303bc06090cca3c",
         "EVID-20260826T182914Z-ecdd4775c1",
+        "c0b236e5da1c95cebab9dfe7b7eedb1c112a424e1fa6f27c94dba00cf26eb043",
         "e05955416a6162b75c469385f49c3beaaa90bf7f4dcbae1b5abedeafbc25cfd0",
         "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       ],
       "status": "blocked_dependency",
-      "updated_at": "2026-08-26T18:29:38.115337+00:00"
+      "updated_at": "2026-08-27T03:10:09.538990+00:00"
     },
     "G11": {
-      "evaluator": "dependency-reopened",
+      "evaluator": "forge-gate-handler",
       "evidence_ids": [
+        ".forge-codex/state/gate-results/G11.json",
         "24be3535df2a32ea3dcf5190b3113e96c11b71e00a98d1ae9ae5419489dffd01",
+        "34b987fe8c24d6f8ae00327251c853534350827868f48db6287c33eed2728b69",
+        "55fab8f7c2c55fef9ce6b0e47c8003fb2b645d05fd17c33f8cb43a399b442fdc",
         "5cb2d4f7609ff0bd794f80e137178eb2c10c9335b41d779b0756184a20d9e0c9",
+        "64bb866fdd08de7b2b12bf68b6fd0c1fb81601e6b6ab57581fcf6f727b556752",
+        "7574917a10600271c1f4cfa7005c3573c8f449969ec130d96493cefde0f568ca",
         "EVID-20260826T182914Z-ecdd4775c1",
-        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        "b3dc11a8dc286fa33b6567ff62089692e64787b23a66718cfe1766dc27195724",
+        "bdefa9c91bc660ab3064070cb3dd5cbed2fd284df891ca3826e5dd7cb2774fae",
+        "d089777dd60c47b9c9d69a28a45445e4f67e4994098a5a65ff4e5d1a7c4ec048",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "f1d06d7dd23bf3bd71f138fc1a9a5799dc4aa0e474e9a60552dfcecb68f41dc2"
       ],
       "status": "blocked_dependency",
-      "updated_at": "2026-08-26T18:29:38.401233+00:00"
+      "updated_at": "2026-08-27T03:10:09.685777+00:00"
     },
     "G12": {
-      "evaluator": "dependency-reopened",
+      "evaluator": "verify_completion.py",
       "evidence_ids": [
+        ".forge-codex/state/gate-results/G12.json",
         "3e8e63a0bccf3a5efd4e831f46213597233ba317f0c2d993ec262bdf90c4ddbd",
-        "EVID-20260826T182914Z-ecdd4775c1"
+        "4bad312521b60ddedbe4ac181bfa3af57afd87e454cd0b37c6f5bfb5fbfbdc03",
+        "EVID-20260826T182914Z-ecdd4775c1",
+        "EVID-20260827T030358Z-22c36dd272",
+        "EVID-20260827T030641Z-831d98c838",
+        "d7a8b12bdc99903df39cbd9bde72c118c9c7eae9f68154429768a336b2b265ba"
       ],
       "status": "blocked_dependency",
-      "updated_at": "2026-08-26T18:29:38.693001+00:00"
+      "updated_at": "2026-08-27T03:12:17.245745+00:00"
     }
   },
   "handoffs": [],
@@ -344,37 +432,37 @@
       "created_at": "2026-08-26T18:29:37.546573+00:00",
       "evidence_class": "E1",
       "id": "FC-AUTONOMY-001",
-      "notes": "EVID-20260826T182914Z-ecdd4775c1 verifies package-indexed live hashes; G09 prior proof used LocalLogicalSessionTransport and is invalid under the continuity supplement.",
+      "notes": "Resolved by production registration of the configuration-gated LM Studio managed v2 adapter. CMD-20260826T224938Z-9660289413 proves a real fresh root, exact acknowledgement, and automatic continuation; EVID-20260826T235215Z-09978ce068 validates production source, 15 plugin tests, and both current 395-test strict suites; G09 passed.",
       "path": "Sources/ForgeNativeSessionHostPlugin/ForgeNativeSessionHostPlugin.swift",
       "severity": "High",
-      "status": "open",
+      "status": "resolved",
       "title": "Release transport is synthetic and cannot prove autonomous rollover",
-      "updated_at": "2026-08-26T18:29:37.546441+00:00"
+      "updated_at": "2026-08-26T23:54:28.099481+00:00"
     },
     {
       "created_at": "2026-08-26T18:29:37.687402+00:00",
       "evidence_class": "E1",
       "id": "FC-SHELL-DEFAULT-001",
-      "notes": "EVID-20260826T182914Z-ecdd4775c1 verifies the default-disabled source findings; host-local enabled configuration does not satisfy fresh or migrated installs.",
+      "notes": "Resolved by schema-v2 default-enabled policy, verified legacy-disabled-default migration, and persisted settings toggles in both manager settings surfaces. EVID-20260826T235235Z-1a8c68eef0, EVID-20260826T235244Z-b5ed8ebe5c, and EVID-20260826T235254Z-ee03413577 pass; current Debug and Release 395-test strict suites also pass.",
       "path": "Sources/ForgeConductorCore/Domain/AppConfig.swift",
       "severity": "High",
-      "status": "open",
+      "status": "resolved",
       "title": "Fresh configuration defaults shell off and has no migration or UI toggle",
-      "updated_at": "2026-08-26T18:29:37.687243+00:00"
+      "updated_at": "2026-08-26T23:54:28.174542+00:00"
     },
     {
       "created_at": "2026-08-26T18:30:45.040874+00:00",
       "evidence_class": "E0",
       "id": "FC-OBS-LIVE-MCP-001",
-      "notes": "EVID-20260826T183031Z-0913edd711 reproduces missing-card assertions while deterministic FORGE_SKIP_PS=1 suite passes; investigate independently before release.",
+      "notes": "Resolved by testing the stable process intersection around the collector snapshot and excluding host/model-backend roles represented outside MCP cards. EVID-20260826T235258Z-e4e21900d7 passes against active live process discovery; current Debug and Release 395-test strict suites also pass.",
       "path": "Tests/ForgeConductorTests/LiveCollectorEvidenceTests.swift",
       "severity": "Medium",
-      "status": "open",
+      "status": "resolved",
       "title": "Live MCP process snapshot assertion is unstable against active LM Studio helpers",
-      "updated_at": "2026-08-26T18:30:45.040680+00:00"
+      "updated_at": "2026-08-26T23:54:28.248701+00:00"
     }
   ],
-  "last_event_sequence": 183,
+  "last_event_sequence": 248,
   "phases": {
     "P00": {
       "attempts": 1,
@@ -432,37 +520,37 @@
     },
     "P09": {
       "attempts": 0,
-      "last_error": "Stricter package rejects synthetic transport as autonomous successor proof.",
+      "last_error": "Current-source host-adapter qualification remains incomplete.",
       "status": "ready",
-      "updated_at": "2026-08-26T18:29:37.977380+00:00"
+      "updated_at": "2026-08-27T03:10:09.456994+00:00"
     },
     "P10": {
       "attempts": 1,
-      "last_error": "Depends on reopened P09 and new feature-parity work.",
+      "last_error": "Blocked by G09 and locked-session UI/protected-file prerequisites.",
       "status": "blocked_dependency",
-      "updated_at": "2026-08-26T18:29:38.260792+00:00"
+      "updated_at": "2026-08-27T03:10:09.618751+00:00"
     },
     "P11": {
       "attempts": 1,
-      "last_error": "Depends on renewed parity and autonomy validation.",
+      "last_error": "Blocked by G10 and unavailable sanitizer/profiling prerequisites.",
       "status": "blocked_dependency",
-      "updated_at": "2026-08-26T18:29:38.547555+00:00"
+      "updated_at": "2026-08-27T03:10:09.751811+00:00"
     },
     "P12": {
       "attempts": 1,
-      "last_error": "Completion is invalid until renewed hard gates pass.",
+      "last_error": "Blocked by current-source G09 and dependent G10/G11 gates.",
       "status": "blocked_dependency",
-      "updated_at": "2026-08-26T18:29:38.848566+00:00"
+      "updated_at": "2026-08-27T03:12:17.324843+00:00"
     }
   },
   "repository": {
     "branch": "repair/autonomous-continuity",
-    "commit": "1f39ee6bdf1d4f907c6e1cb31f6213f2945d3985",
+    "commit": "b72d6e8dc00681477224fb1b79859f553bc02558",
     "dirty": true,
     "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy"
   },
   "run_id": "aba90ab1-be80-4cc5-aa0b-23dd54d4a24d",
   "schema_version": 1,
   "status": "active",
-  "updated_at": "2026-08-26T18:30:45.040876+00:00"
+  "updated_at": "2026-08-27T03:12:17.324967+00:00"
 }

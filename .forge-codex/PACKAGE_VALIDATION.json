@@ -767,6 +767,126 @@
     },
     {
       "detail": "valid",
+      "name": "json:evidence/EVID-20260826T182914Z-ecdd4775c1.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260826T183031Z-0913edd711.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260826T234519Z-288f365061.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260826T234612Z-ed39c77f19.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260826T234631Z-cae1c73a2f.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260826T234657Z-85411946cb.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260826T234711Z-f708331f5f.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260826T234718Z-32f5e2f934.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260826T235215Z-09978ce068.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260826T235235Z-1a8c68eef0.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260826T235244Z-b5ed8ebe5c.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260826T235254Z-ee03413577.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260826T235258Z-e4e21900d7.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260826T235400Z-6930a4351d.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260826T235407Z-a122486b46.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260826T235437Z-8d0816db0e.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260826T235442Z-1a48ed06c1.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T023533Z-c0f223a21a.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T023554Z-ece560aea2.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T025525Z-76eee5d27c.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T030358Z-22c36dd272.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T030641Z-831d98c838.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T031029Z-fdeb6a6226.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T031144Z-dcf64dc5b4.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
       "name": "json:evidence/P02-telemetry-baseline.json",
       "passed": true
     },
@@ -1173,6 +1293,11 @@
     {
       "detail": "valid",
       "name": "json:state/gate-results/G11.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/gate-results/G12.json",
       "passed": true
     },
     {
@@ -1856,20 +1981,20 @@
       "passed": true
     },
     {
-      "detail": "Authorship-attribution scan passed for /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex",
+      "detail": "Authorship-attribution scan passed for /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex",
       "name": "authorship-attribution-scan",
       "passed": true
     },
     {
-      "detail": "Secret scan passed for /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex",
+      "detail": "Secret scan passed for /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex",
       "name": "secret-scan",
       "passed": true
     }
   ],
   "errors": [],
-  "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex",
+  "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex",
   "schema_version": 1,
   "valid": true,
-  "validated_at": "2026-08-23T22:20:43.041369+00:00",
+  "validated_at": "2026-08-27T03:15:05.116174+00:00",
   "warnings": []
 }

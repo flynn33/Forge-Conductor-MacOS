@@ -1,0 +1,12 @@
+{
+  "passed": false,
+  "errors": [
+    "gate-passed:G09: failed",
+    "gate-ledger-passed:G09: failed",
+    "gate-passed:G10: blocked",
+    "gate-ledger-passed:G10: blocked_dependency",
+    "gate-passed:G11: blocked",
+    "gate-ledger-passed:G11: blocked_dependency"
+  ],
+  "report": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/completion-report.json"
+}

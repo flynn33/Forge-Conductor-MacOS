@@ -1,36 +1,27 @@
 {
   "schema_version": 1,
   "phase": "P10",
-  "status": "passed",
-  "fixtures": [
-    {
-      "name": "schema-v3 continuity store",
-      "result": "migrated to v5, reopened, legacy handoff retained, current writes retained"
-    },
-    {
-      "name": "concurrent schema-v3 migration",
-      "result": "two initializers completed idempotently without partial state"
-    },
-    {
-      "name": "project memory restart",
-      "result": "stable project identity and durable records reopened"
-    },
-    {
-      "name": "unsupported project-memory version",
-      "result": "typed failure returned and original database bytes preserved"
-    },
-    {
-      "name": "corrupt project-memory database",
-      "result": "typed failure returned and byte-identical recovery artifact preserved"
-    },
-    {
-      "name": "native session ledger restart",
-      "result": "compact identifiers reopened without transcript or private payload persistence"
-    }
-  ],
-  "rollback_policy": "transactions roll back on failure; databases are preserved rather than deleted",
-  "evidence_ids": [
+  "status": "incomplete",
+  "reconciled_at": "2026-08-26T23:55:21Z",
+  "passing_current_scope": {
+    "suite": "strict Debug and Release SwiftPM suites",
+    "executed_each": 395,
+    "skipped_each": 2,
+    "failures_each": 0,
+    "covered_fixtures": [
+      "continuity schema migration and restart",
+      "legacy continuity handoff migration",
+      "project memory restart and recovery",
+      "unsupported and corrupt project-memory preservation",
+      "native session ledger restart",
+      "managed continuity v2 crash recovery"
+    ]
+  },
+  "preserved_prior_evidence": [
     "EVID-20260823T210632Z-016869a17f",
     "EVID-20260823T210727Z-dd0087ce58"
-  ]
+  ],
+  "rollback_policy": "transactions roll back on failure and source databases are preserved rather than deleted",
+  "remaining_requirement": "regenerate the complete legacy fixture inventory for the current data model and prove every fixture migrates and reopens before marking the all-fixtures criterion passed",
+  "current_evidence": ".forge-autonomy-state/evidence/FC-RELEASE-001/test-results.json"
 }

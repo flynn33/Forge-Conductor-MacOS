@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "work_package": "FC-HOST-001",
+  "status": "passed",
+  "hard_gate": true,
+  "evidence_complete": true,
+  "remaining_external_checks": [
+    "Keychain access from the signed application and LaunchAgent contexts is retained for FC-RELEASE-001",
+    "full create-bootstrap-acknowledge-seal rollover is retained for FC-ROLL-001 and FC-E2E-001"
+  ]
+}

@@ -1,34 +1,52 @@
 {
   "schema_version": 1,
   "phase": "P10",
-  "status": "passed",
-  "baseline_features": 66,
-  "preserved_features": 66,
-  "additive_features": [
+  "status": "incomplete",
+  "reconciled_at": "2026-08-26T23:55:21Z",
+  "tested_tree": "working tree after b72d6e8dc00681477224fb1b79859f553bc02558",
+  "superseded_snapshot": {
+    "baseline_features": 66,
+    "status": "passed",
+    "scope": "pre-autonomy implementation at the prior repository revision"
+  },
+  "current_automated_results": {
+    "swiftpm_debug_strict": "395 tests executed with 2 skips and 0 failures",
+    "swiftpm_release_strict": "395 tests executed with 2 skips and 0 failures",
+    "xcode_unit": "373 tests executed with 1 skip and 0 failures",
+    "project_local_build_and_run": "passed"
+  },
+  "preserved_by_current_suites": [
     "project-scoped durable memory",
-    "crash-recoverable session continuity",
-    "native logical-session host plugin",
-    "bounded runtime resource policies"
+    "managed continuity and crash recovery",
+    "native session host plugin",
+    "bounded runtime jobs and resource policies",
+    "existing unit-tested application, MCP, settings, and migration behavior"
+  ],
+  "additive_surfaces": [
+    "native operator console",
+    "managed autonomous continuation",
+    "runtime v3 execution and run-scoped cancellation",
+    "four-tier resource admission policy"
   ],
   "removed": [],
-  "unknown": [],
-  "untested": [],
-  "build_systems": {
-    "swiftpm": "265 release tests executed with 2 skips and 0 failures",
-    "xcode": "application, command-line tool, framework, unit tests, and UI tests built for testing"
-  },
+  "current_gaps": [
+    "the complete baseline feature inventory has not been regenerated and compared against the current working tree",
+    "MCP tool-name and schema, CLI, manager HTTP, settings, project format, import, and export comparisons are incomplete",
+    "native UI commands, accessibility actions, reconnect behavior, state presentation, and credential redaction are not behaviorally verified",
+    "performance-tier and hidden-view quiescence parity are incomplete"
+  ],
   "ui": {
-    "commands": [
-      "toggle navigation",
-      "refresh now",
-      "auto-refresh"
-    ],
-    "settings": "manager settings round-trip is covered by unit tests",
-    "accessibility": "4 native UI tests executed with 0 failures"
+    "implementation_present": true,
+    "behavioral_status": "blocked",
+    "developer_mode": "disabled",
+    "configured_team_signing_identity_present": false,
+    "xctest_attempts": 3,
+    "passing_xctest_attempts": 0,
+    "evidence": ".forge-autonomy-state/evidence/FC-UI-001/test-results.json"
   },
-  "evidence_ids": [
-    "EVID-20260823T210530Z-4f9d8de5c7",
-    "EVID-20260823T210623Z-182392fa73",
-    "EVID-20260823T210727Z-dd0087ce58"
+  "current_evidence": [
+    ".forge-autonomy-state/evidence/FC-RELEASE-001/test-results.json",
+    ".forge-autonomy-state/evidence/FC-UI-001/test-results.json",
+    ".forge-autonomy-state/evidence/FC-E2E-001/feature-parity-impact.json"
   ]
 }

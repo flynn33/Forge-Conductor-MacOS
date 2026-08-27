@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "work_package": "FC-AUTO-001",
+  "preserved": {
+    "existing_manager_service_lifecycle": true,
+    "existing_dashboard_and_status_routes": true,
+    "existing_provider_adapter_contracts": true,
+    "existing_mcp_tool_names_and_schemas": true,
+    "existing_agent_catalog_and_completion_tools": true,
+    "existing_project_and_continuity_formats": true
+  },
+  "additive": [
+    "manager-owned autonomy supervisor and per-run coordinator actors",
+    "durable autonomous runs, lease epochs, provider turns, tool intents, and events",
+    "production tool replay classifier and invocation broker",
+    "deterministic completion validation receipts",
+    "durable pause, resume, cancel, and retry controls",
+    "bounded shutdown and restart recovery"
+  ],
+  "intentional_behavior_changes": [
+    "autonomous work survives dashboard and GUI closure",
+    "only the current run lease epoch may advance durable state",
+    "non-replayable ambiguous work is not automatically repeated",
+    "model completion requests require deterministic gate validation"
+  ],
+  "removed": [],
+  "result": "passed"
+}

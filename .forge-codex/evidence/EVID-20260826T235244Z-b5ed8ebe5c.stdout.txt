@@ -1,0 +1,83 @@
+Test Suite 'Selected tests' started at 2026-08-26 18:52:44.734.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-26 18:52:44.735.
+Test Suite 'CoreTests' started at 2026-08-26 18:52:44.735.
+Test Case '-[ForgeConductorTests.CoreTests testActiveAgentForbiddenToolsAreEnforcedAtRouter]' started.
+Test Case '-[ForgeConductorTests.CoreTests testActiveAgentForbiddenToolsAreEnforcedAtRouter]' passed (0.103 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testAgentListTool]' started.
+Test Case '-[ForgeConductorTests.CoreTests testAgentListTool]' passed (0.072 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testAgentMarkdownParser]' started.
+Test Case '-[ForgeConductorTests.CoreTests testAgentMarkdownParser]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testAgentPlaybooksAreRobust]' started.
+Test Case '-[ForgeConductorTests.CoreTests testAgentPlaybooksAreRobust]' passed (0.069 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testAgentRunStartCannotCreateAuthorizationRoot]' started.
+Test Case '-[ForgeConductorTests.CoreTests testAgentRunStartCannotCreateAuthorizationRoot]' passed (0.075 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testAuditDualWrite]' started.
+Test Case '-[ForgeConductorTests.CoreTests testAuditDualWrite]' passed (0.072 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testBindingRehydrateFromMemory]' started.
+Test Case '-[ForgeConductorTests.CoreTests testBindingRehydrateFromMemory]' passed (0.134 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testBootstrapCreatesLayout]' started.
+Test Case '-[ForgeConductorTests.CoreTests testBootstrapCreatesLayout]' passed (0.071 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testCatalogHasBuiltins]' started.
+Test Case '-[ForgeConductorTests.CoreTests testCatalogHasBuiltins]' passed (0.072 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testConfiguredWorkspaceRootAllowsFilesystemTool]' started.
+Test Case '-[ForgeConductorTests.CoreTests testConfiguredWorkspaceRootAllowsFilesystemTool]' passed (0.096 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testCustomAgentOverridesBuiltin]' started.
+Test Case '-[ForgeConductorTests.CoreTests testCustomAgentOverridesBuiltin]' passed (0.072 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testDoctorPasses]' started.
+Test Case '-[ForgeConductorTests.CoreTests testDoctorPasses]' passed (0.182 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testExplicitShellDisableUsesDistinctAuthorizationReason]' started.
+Test Case '-[ForgeConductorTests.CoreTests testExplicitShellDisableUsesDistinctAuthorizationReason]' passed (0.093 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testFilesystemToolRejectsPathOutsideWorkspaceRoots]' started.
+Test Case '-[ForgeConductorTests.CoreTests testFilesystemToolRejectsPathOutsideWorkspaceRoots]' passed (0.081 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testFilesystemToolRejectsSymlinkEscape]' started.
+Test Case '-[ForgeConductorTests.CoreTests testFilesystemToolRejectsSymlinkEscape]' passed (0.082 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testForgeStatusTool]' started.
+Test Case '-[ForgeConductorTests.CoreTests testForgeStatusTool]' passed (0.075 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testFSReadHandlesEmptyFileAndMaximumLength]' started.
+Test Case '-[ForgeConductorTests.CoreTests testFSReadHandlesEmptyFileAndMaximumLength]' passed (0.100 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testFSReadHonorsLineOffsetAndLength]' started.
+Test Case '-[ForgeConductorTests.CoreTests testFSReadHonorsLineOffsetAndLength]' passed (0.094 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testFSWriteRead]' started.
+Test Case '-[ForgeConductorTests.CoreTests testFSWriteRead]' passed (0.083 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testIdenticalToolCallLoopSoftHandoffThenHardBlock]' started.
+Test Case '-[ForgeConductorTests.CoreTests testIdenticalToolCallLoopSoftHandoffThenHardBlock]' passed (0.098 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testISO8601RoundTrip]' started.
+Test Case '-[ForgeConductorTests.CoreTests testISO8601RoundTrip]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testMCPInitializeAndToolsList]' started.
+Test Case '-[ForgeConductorTests.CoreTests testMCPInitializeAndToolsList]' passed (0.077 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testMCPToolCall]' started.
+Test Case '-[ForgeConductorTests.CoreTests testMCPToolCall]' passed (0.075 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testMigratedLegacyConfigExecutesAuthorizedShellByDefault]' started.
+Test Case '-[ForgeConductorTests.CoreTests testMigratedLegacyConfigExecutesAuthorizedShellByDefault]' passed (0.127 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testPDFWrite]' started.
+Test Case '-[ForgeConductorTests.CoreTests testPDFWrite]' passed (0.089 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testPruneStaleClosesIdle]' started.
+Test Case '-[ForgeConductorTests.CoreTests testPruneStaleClosesIdle]' passed (0.073 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testRecommendDocs]' started.
+Test Case '-[ForgeConductorTests.CoreTests testRecommendDocs]' passed (0.073 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testSessionIncompleteSchemaWarns]' started.
+Test Case '-[ForgeConductorTests.CoreTests testSessionIncompleteSchemaWarns]' passed (0.074 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testSessionLifecycleComplete]' started.
+Test Case '-[ForgeConductorTests.CoreTests testSessionLifecycleComplete]' passed (0.076 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testShellExecPreservesLoginBashAndResponseContract]' started.
+Test Case '-[ForgeConductorTests.CoreTests testShellExecPreservesLoginBashAndResponseContract]' passed (0.077 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testShellExecutesByDefaultInsideAuthorizedProjectWorkspace]' started.
+Test Case '-[ForgeConductorTests.CoreTests testShellExecutesByDefaultInsideAuthorizedProjectWorkspace]' passed (0.155 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testShellRejectsNonFiniteTimeoutWhenEnabled]' started.
+Test Case '-[ForgeConductorTests.CoreTests testShellRejectsNonFiniteTimeoutWhenEnabled]' passed (0.074 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testShellRequiresExplicitProjectContext]' started.
+Test Case '-[ForgeConductorTests.CoreTests testShellRequiresExplicitProjectContext]' passed (0.073 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testSupersedeClosesPriorOpen]' started.
+Test Case '-[ForgeConductorTests.CoreTests testSupersedeClosesPriorOpen]' passed (0.075 seconds).
+Test Case '-[ForgeConductorTests.CoreTests testToolAuditRedactsFileContents]' started.
+Test Case '-[ForgeConductorTests.CoreTests testToolAuditRedactsFileContents]' passed (0.074 seconds).
+Test Suite 'CoreTests' passed at 2026-08-26 18:52:47.654.
+	 Executed 35 tests, with 0 failures (0 unexpected) in 2.916 (2.918) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-08-26 18:52:47.654.
+	 Executed 35 tests, with 0 failures (0 unexpected) in 2.916 (2.919) seconds
+Test Suite 'Selected tests' passed at 2026-08-26 18:52:47.654.
+	 Executed 35 tests, with 0 failures (0 unexpected) in 2.916 (2.919) seconds
+◇ Test run started.
+↳ Testing Library Version: 1501
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

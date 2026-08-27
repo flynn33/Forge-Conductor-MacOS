@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "work_package": "FC-PERF-001",
+  "preserved_by_implementation": {
+    "shell_remains_available_on_all_memory_tiers": true,
+    "managed_continuity_remains_available_on_all_memory_tiers": true,
+    "existing_telemetry_and_project_memory_contracts": true,
+    "existing_runtime_tool_contracts": true
+  },
+  "additive": [
+    "four explicit physical-memory policy tiers",
+    "bounded managed-generation and runtime-job admission",
+    "bounded event, stream, cache, artifact, history, and log limits",
+    "memory-pressure tightening",
+    "bounded model TTL and eviction policy",
+    "deterministic release stress report"
+  ],
+  "intentional_resource_changes": [
+    "lower-memory tiers serialize or reduce concurrent work without removing required features",
+    "memory pressure reduces optional retention and concurrency"
+  ],
+  "removed": [],
+  "profiling_evidence": {
+    "allocations_capture_attempted": true,
+    "allocations_capture_accepted": false,
+    "blocker": "xctrace remained in AuthorizationCopyRights and produced only an incomplete trace"
+  },
+  "parity_not_yet_verified": [
+    "performance and feature availability on representative lower-memory hardware",
+    "actual hidden-view rendering quiescence",
+    "long-running provider, database, process, and rollover behavior"
+  ],
+  "result": "incomplete"
+}

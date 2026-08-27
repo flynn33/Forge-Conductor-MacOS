@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-08-27T03:05:25.247821+00:00",
+  "run_id": "1e48ce8e-c41f-4d6d-a0e6-c3201200671b",
+  "branch": "repair/autonomous-continuity",
+  "baseline_commit": "b72d6e8dc00681477224fb1b79859f553bc02558",
+  "current_work_package": "FC-UI-001",
+  "completed_work_packages": [
+    "FC-BASE-000",
+    "FC-SHELL-001",
+    "FC-CTX-001",
+    "FC-CONT-001",
+    "FC-HOST-001",
+    "FC-AUTO-001",
+    "FC-BUDGET-001",
+    "FC-ROLL-001",
+    "FC-RUNTIME-001"
+  ],
+  "verified_results": [
+    "exact-tree strict SwiftPM runtime: 64 tests, 1 PowerShell host skip, 0 failures (CMD-20260827T030159Z-301b553f6b)",
+    "exact-tree ad-hoc-signed Xcode runtime: 64 tests, 1 PowerShell host skip, 0 failures (CMD-20260827T030030Z-e106bb4ef2)",
+    "Xcode build-for-testing succeeds with helper identifier com.forge-conductor.runtime-launcher (CMD-20260827T030013Z-bf6e30761e)",
+    "project-local app build, nested signing, deep verification, and launch pass (CMD-20260827T025942Z-8af334d72e)",
+    "package validation, prohibited-attribution scan, and secret scan pass"
+  ],
+  "current_environment_results": [
+    "exact-tree Debug: 444 tests, 3 skipped, 137 assertion failures including 42 unexpected (CMD-20260827T025715Z-b42c01b23b)",
+    "exact-tree Release: identical test counts and failed-test set (CMD-20260827T025822Z-dc523f8bbf)",
+    "the console is locked and macOS rejects reopening complete-file-protected registry.json with Cocoa 257 and underlying EPERM",
+    "file protection remains intact; the full suites are not passed"
+  ],
+  "historical_results_requiring_current_source_refresh": [
+    "real LM Studio fresh-root acknowledgement and automatic continuation",
+    "12-boundary managed continuity crash recovery",
+    "50-rollover and 100-restart deterministic stress fixture",
+    "full Xcode unit target"
+  ],
+  "gate_status": {
+    "G09": "failed_current_source_unqualified",
+    "G10": "blocked_dependency",
+    "G11": "blocked_dependency",
+    "G12": "blocked_dependency"
+  },
+  "open_blockers": [
+    ".forge-autonomy-state/blockers/FC-UI-001.json",
+    ".forge-autonomy-state/blockers/FC-PERF-001.json",
+    ".forge-autonomy-state/blockers/FC-E2E-001.json",
+    ".forge-autonomy-state/blockers/FC-RELEASE-001.json"
+  ],
+  "next_actions": [
+    "Unlock the console session and rerun exact-tree full strict Debug and Release suites without weakening file protection.",
+    "Rerun plugin, external MCP compatibility, private UI automation, and live LM Studio rollover qualification against the frozen source, then reevaluate G09.",
+    "Enable Developer Mode and install a valid Mac Development identity, then rerun XCUITest.",
+    "Resolve sanitizer runtime policy or toolchain compatibility and run Address Sanitizer and Thread Sanitizer separately.",
+    "Grant Instruments task-inspection authorization and capture the required traces and memgraph.",
+    "Complete the idle and active soaks, representative-hardware, signed app and LaunchAgent lifecycle, notarization, parity, migration, and remaining E2E matrices.",
+    "Rerun G10 through G12 and verify_completion.py only after their prerequisites pass."
+  ],
+  "evidence_root": ".forge-autonomy-state/evidence",
+  "command_log_root": ".forge-autonomy-state/command-logs"
+}

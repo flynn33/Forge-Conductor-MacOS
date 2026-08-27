@@ -1,0 +1,8 @@
+Sources/ForgeConductorApp/Views/ManagerSettingsView.swift:75:                    .accessibilityIdentifier("settings-shell-enabled")
+Sources/ForgeConductorApp/OperatorConsole/Views/RuntimesOperatorView.swift:86:                .accessibilityIdentifier("runtime-shell-enabled")
+Sources/ForgeConductorCore/Infrastructure/ConfigStore.swift:297:        shell["policy_origin"] = "legacy_disabled_default_migrated"
+Sources/ForgeConductorCore/Infrastructure/ConfigStore.swift:336:              persistedShell["policy_origin"] as? String == "legacy_disabled_default_migrated" else {
+Sources/ForgeConductorCore/Infrastructure/ConfigStore.swift:367:                || config.shell.policyOrigin == "legacy_disabled_default_migrated" {
+Sources/ForgeConductorCore/Infrastructure/ConfigStore.swift:460:            "policy_origin": "legacy_disabled_default_migrated",
+Sources/ForgeConductorCore/Domain/AppConfig.swift:33:            enabled: Bool = true,
+Sources/ForgeConductorCore/Domain/AppConfig.swift:103:        public init(enabled: Bool = true, leaseTTLSec: Int = 60, presenceTTLSec: Int = 30) {

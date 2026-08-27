@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "work_package": "FC-HOST-001",
+  "captured_at": "2026-08-26T21:20:50.928140+00:00",
+  "results": [
+    {
+      "id": "FC-HOST-TRANSIENT-COMPILE-STATE",
+      "command_ids": [
+        "CMD-20260826T211345Z-8803ed481f",
+        "CMD-20260826T211533Z-17ff848b19"
+      ],
+      "status": "remediated",
+      "classification": "dependency-independent context-budget repository code was captured between staged writes; the completed repository API restored the compiling checkpoint"
+    },
+    {
+      "id": "FC-HOST-DEBUG-BUILD",
+      "command_id": "CMD-20260826T211639Z-0aed6d3fd5",
+      "exit_code": 0,
+      "status": "passed"
+    },
+    {
+      "id": "FC-HOST-CONTRACT-TESTS",
+      "command_id": "CMD-20260826T211651Z-8bdd96471c",
+      "executed": 23,
+      "failures": 0,
+      "exit_code": 0,
+      "status": "passed",
+      "suites": {
+        "LMStudioContractFixtureTests": 10,
+        "NativeSessionHostPluginTests": 13
+      },
+      "coverage": [
+        "real model inventory and strict function-tool capability probe",
+        "non-synthetic response identifiers",
+        "SSE fragmentation and terminal-contract validation",
+        "connect, first-byte, idle, and total deadlines",
+        "context overflow and response truncation",
+        "malformed, oversized, disconnected, 403, 404, 409, 429, and 5xx responses",
+        "Keychain token lookup and credential redaction",
+        "bounded idempotency ledger reconciliation and compaction",
+        "reported usage distinguished from absent usage"
+      ]
+    },
+    {
+      "id": "FC-HOST-RELEASE-BUILD",
+      "command_id": "CMD-20260826T211700Z-ecd49e4ffa",
+      "exit_code": 0,
+      "status": "passed"
+    },
+    {
+      "id": "FC-HOST-LIVE-PROBE-FIRST-ATTEMPT",
+      "command_id": "CMD-20260826T211807Z-b96d461325",
+      "exit_code": -5,
+      "status": "remediated",
+      "classification": "typed idle deadline after the loaded model paused longer than the initial 60-second probe window"
+    },
+    {
+      "id": "FC-HOST-LIVE-STRICT-TOOL-PROBE",
+      "command_id": "CMD-20260826T211937Z-28aaee8067",
+      "exit_code": 0,
+      "status": "passed",
+      "observed": {
+        "model_key": "qwen/qwen3.8-27b",
+        "loaded_context_length": 119552,
+        "maximum_context_length": 262144,
+        "parallelism": 4,
+        "function_tool_contract_verified": true,
+        "streaming_verified": true,
+        "usage_reporting_verified": true,
+        "provider_response_id_prefix": "resp_",
+        "capability_fingerprint_sha256": "6708d05f2dc20097274f9c473a8813c8445bb262b2455e487ec557d835ed54de"
+      }
+    },
+    {
+      "id": "FC-HOST-STATIC-AND-ATTRIBUTION-SCANS",
+      "command_ids": [
+        "CMD-20260826T212045Z-873c18fc9f",
+        "CMD-20260826T212050Z-d660a7335a"
+      ],
+      "exit_code": 0,
+      "status": "passed"
+    }
+  ],
+  "acceptance": {
+    "non_synthetic_provider_response_id_required": "passed",
+    "local_logical_session_transport_is_injection_only": "passed",
+    "provider_unavailable_cannot_report_success": "passed",
+    "secret_redaction_passes": "passed",
+    "live_loaded_model_strict_tool_contract": "passed"
+  }
+}

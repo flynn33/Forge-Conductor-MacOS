@@ -1,0 +1,15 @@
+{
+  "adapter": "forge.native-session-host",
+  "adapter_version": "2.0.0",
+  "debug_strict_tests": 395,
+  "external_checks": 9,
+  "live_rollover_command_id": "CMD-20260826T224938Z-9660289413",
+  "model_key": "qwen/qwen3.8-27b",
+  "ok": true,
+  "phase": "P09",
+  "plugin_tests": 15,
+  "private_ui_violations": 0,
+  "provider": "lmstudio",
+  "release_strict_tests": 395,
+  "selected_mode": "B"
+}

@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "work_package": "FC-BUDGET-001",
+  "captured_at": "2026-08-26T23:10:44.765100+00:00",
+  "results": [
+    {
+      "id": "FC-BUDGET-FOCUSED-STRICT-SWIFTPM",
+      "command_id": "CMD-20260826T231044Z-ad06fc00ab",
+      "executed": 11,
+      "failures": 0,
+      "exit_code": 0,
+      "status": "passed",
+      "suites": {
+        "ContextBudgetSupervisorTests": 11
+      },
+      "coverage": [
+        "exact loaded-instance capacity discovery and invalid configuration rejection",
+        "provider-exact, tokenizer-exact, serialized-estimate, and overflow precedence",
+        "explicit reserves and adaptive thresholds for small and large contexts",
+        "automatic checkpoint and rollover without a model continuity call",
+        "emergency rollover after provider overflow",
+        "persisted observations, capacity, estimator version, and trigger state",
+        "restart restoration and configuration-change reevaluation",
+        "hysteresis and fresh-successor bootstrap arming"
+      ]
+    }
+  ],
+  "acceptance": {
+    "exact_estimated_and_overflow_paths": "passed",
+    "small_and_large_context_windows": "passed",
+    "automatic_rollover_without_model_tool_call": "passed",
+    "manager_restart_preserves_budget_state": "passed",
+    "checkpoint_escalates_to_one_rollover_operation": "passed"
+  }
+}

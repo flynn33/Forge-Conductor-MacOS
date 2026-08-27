@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "work_package": "FC-CONT-001",
+  "captured_at": "2026-08-26T21:12:18.238803+00:00",
+  "results": [
+    {
+      "id": "FC-CONT-CROSS-FEATURE-REGRESSION",
+      "command_id": "CMD-20260826T210845Z-08d7885072",
+      "executed": 72,
+      "skipped": 1,
+      "failing_test_cases": 9,
+      "assertion_failures": 373,
+      "exit_code": 1,
+      "status": "remediated",
+      "classification": "legacy continuity fixtures invoked project-scoped tools without the exact durable binding required by FC-CTX-001"
+    },
+    {
+      "id": "FC-CONT-FOCUSED-SWIFTPM",
+      "command_id": "CMD-20260826T211155Z-78c4ca76c5",
+      "executed": 72,
+      "skipped": 1,
+      "failures": 0,
+      "exit_code": 0,
+      "status": "passed",
+      "suites": {
+        "ContinuityCoordinatorTests": 5,
+        "ContinuityTests": 44,
+        "ContinuityV2Tests": 8,
+        "ProjectControlPlaneRepositoryTests": 8,
+        "ProjectMemoryTests": 7
+      },
+      "coverage": [
+        "project-local canonical handoffs and operations",
+        "exact V2 bootstrap acknowledgment and predecessor fencing",
+        "checkpoint, prepare-handoff, and request-rollover command separation",
+        "managed rollover queue persistence and recovery",
+        "legacy continuity migration and ambiguous-record quarantine",
+        "external-host handoff-only behavior",
+        "global continuity excluded from managed bootstrap authority",
+        "legacy continuity and project-memory regression coverage"
+      ]
+    }
+  ],
+  "acceptance": {
+    "continuity_request_rollover_enqueues_manager_operation": "passed",
+    "managed_bootstrap_never_uses_global_latest": "passed",
+    "external_mode_reports_handoff_only": "passed",
+    "legacy_ambiguous_records_are_quarantined": "passed",
+    "project_context_boundary_remains_fail_closed": "passed"
+  }
+}

@@ -1,21 +1,19 @@
 {
-  "schema_version": 1,
-  "captured_at": "2026-08-23T22:01:00Z",
+  "schema_version": 2,
+  "captured_at": "2026-08-26T23:47:18Z",
   "selected_mode": "B",
   "selected_adapter": "forge.native-session-host",
   "adapters": [
     {
       "identifier": "forge.native-session-host",
-      "version": "1.0.0",
-      "host_type": "forge-native-logical-session",
+      "version": "2.0.0",
+      "host_type": "lmstudio-rest-managed",
       "capabilities": {
-        "create": true,
-        "bootstrap": true,
+        "atomic_create_and_bootstrap": true,
+        "fresh_root": true,
         "usage_reporting": true,
-        "resume": true,
-        "idempotency": true,
-        "query_by_idempotency_key": true,
-        "acknowledgement": true,
+        "idempotency_lookup": true,
+        "project_generation_fencing": true,
         "cancellation": true,
         "deadlines": true
       }
@@ -26,9 +24,11 @@
   "uses_private_ui_automation": false,
   "test_evidence": [
     ".forge-codex/evidence/P09-host-capability-report.json",
-    ".forge-codex/evidence/EVID-20260823T205539Z-7c10f18ca4.json",
-    ".forge-codex/evidence/EVID-20260823T205600Z-67248c9a56.json",
-    ".forge-codex/evidence/EVID-20260823T205612Z-bbcdb66436.json"
+    ".forge-codex/evidence/EVID-20260826T234519Z-288f365061.json",
+    ".forge-codex/evidence/EVID-20260826T234631Z-cae1c73a2f.json",
+    ".forge-autonomy-state/evidence/FC-E2E-001/live-lmstudio-managed-continuity.json",
+    ".forge-autonomy-state/command-logs/FC-AUTO-001/commands.jsonl",
+    ".forge-autonomy-state/command-logs/FC-RELEASE-001/commands.jsonl"
   ],
-  "qualification_note": "Autonomous rollover is proven only for the Forge-native logical session host through its injected NativeSessionTransport boundary. No undocumented external-chat API or private UI automation is claimed."
+  "qualification_note": "Mode B is proven through the configured LM Studio REST managed adapter, a fresh provider root, exact handoff acknowledgement, and an automatic continuation rooted in the acknowledged response. External MCP mode remains memory-only and no undocumented external-chat API or private UI automation is claimed."
 }

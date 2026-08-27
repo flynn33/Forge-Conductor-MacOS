@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 383423,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T023533Z-c0f223a21a.stdout.txt",
+      "sha256": "8d41233ce50e06e0f37d8fec1471bc109f28d75959591958686d87d34b60728b"
+    },
+    {
+      "bytes": 258,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T023533Z-c0f223a21a.stderr.txt",
+      "sha256": "12346bd8b84cb14aa8db5786b51211c82256dcd16b874c357c65888a16a354f2"
+    }
+  ],
+  "command": "xcodebuild -project ForgeConductor.xcodeproj -scheme ForgeConductor -configuration Debug -derivedDataPath /tmp/forge-xcode-adhoc.8XAln2 CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- build-for-testing",
+  "ended_at": "2026-08-27T02:35:46.516556+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260827T023533Z-c0f223a21a",
+  "kind": "xcode-build-for-testing-adhoc",
+  "related_findings": [],
+  "related_gates": [
+    "G09"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-27T02:35:33.830569+00:00",
+  "timed_out": false
+}

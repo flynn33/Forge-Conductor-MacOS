@@ -42,16 +42,16 @@
 - Tests: `CoreTests`, `ContinuityTests`, `ProcessRunnerTests`, P12 security scan.
 - Rollback: revert authorization integration only with an equivalent confinement control and repeat security validation.
 
-## DEC-0004 — Use a supported native logical-session adapter for rollover
+## DEC-0004 — Use the supported LM Studio managed adapter for rollover
 
 - Date: 2026-08-23
 - Problem: external chat creation is not available through a documented repository-owned host API.
 - Evidence: `.forge-codex/evidence/P09-host-capability-report.json`
 - Constraints: do not use private UI automation or claim unsupported external-host behavior.
 - Feature IDs: `DATA-CONTEXT-HANDOFFS`
-- Selected option: mode B, `forge.native-session-host`, with an injected `NativeSessionTransport`; mode A remains memory-only handoff ready.
-- Ownership/lifetime impact: the bounded ledger owns identifiers, acknowledgements, usage, and rollover state but not transcripts or transport secrets.
+- Selected option: mode B, `forge.native-session-host` version 2, with configuration-gated `LMStudioManagedSessionTransport`; mode A remains memory-only handoff ready.
+- Ownership/lifetime impact: the bounded v2 ledger owns hashed identities, acknowledgement receipts, provider usage, and rollover state but not transcripts or transport secrets.
 - Compatibility impact: existing MCP handoffs remain supported; no undocumented external API is added.
 - Resource impact: ledger, response chunks, retries, and cancellation records have explicit bounds.
-- Tests: `NativeSessionHostPluginTests`, strict full suite, release plugin build.
+- Tests: `NativeSessionHostPluginTests`, real LM Studio fresh-root rollover and automatic continuation, current Debug and Release strict suites, release plugin build.
 - Rollback: disable the native adapter and retain memory-only handoffs.

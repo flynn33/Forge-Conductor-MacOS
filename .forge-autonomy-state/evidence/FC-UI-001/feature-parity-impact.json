@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "work_package": "FC-UI-001",
+  "preserved_by_implementation": {
+    "existing_application_navigation": true,
+    "existing_manager_owned_execution": true,
+    "existing_settings_and_runtime_surfaces": true,
+    "existing_project_and_continuity_data_contracts": true
+  },
+  "additive": [
+    "Projects operator surface",
+    "Autonomy run controls and status",
+    "Continuity state and handoff surface",
+    "Runtimes and Provider status",
+    "Events and Evidence surface",
+    "typed bounded manager clients and view models"
+  ],
+  "removed": [],
+  "behavioral_parity_not_yet_verified": [
+    "accessibility identifiers and actions",
+    "reconnect without duplicate scheduler creation",
+    "all error and recovery states",
+    "credential redaction in rendered UI",
+    "view-close subscription and rendering quiescence"
+  ],
+  "result": "blocked"
+}

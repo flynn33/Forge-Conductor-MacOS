@@ -1,20 +1,21 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "phase": "P09",
-  "status": "passed",
+  "captured_at": "2026-08-27T02:42:29Z",
+  "status": "unqualified_current_source",
+  "status_reason": "The supported host mode and historical live-provider proof remain present, but final runtime, security, and packaging changes postdate that proof. Current-source full Debug and Release suites are blocked by locked-session file protection.",
   "selected_mode": "B",
   "selected_adapter": {
     "identifier": "forge.native-session-host",
-    "version": "1.0.0",
-    "host_type": "forge-native-logical-session",
+    "version": "2.0.0",
+    "minimum_contract_version": 2,
+    "host_type": "lmstudio-rest-managed",
     "capabilities": {
-      "create": true,
-      "bootstrap": true,
+      "atomic_create_and_bootstrap": true,
+      "fresh_root": true,
       "usage_reporting": true,
-      "resume": true,
-      "idempotency": true,
-      "query_by_idempotency_key": true,
-      "acknowledgement": true,
+      "idempotency_lookup": true,
+      "project_generation_fencing": true,
       "cancellation": true,
       "deadlines": true
     }
@@ -29,10 +30,11 @@
     },
     {
       "mode": "B",
-      "name": "Forge-native logical session host",
+      "name": "Forge-native LM Studio managed host",
       "memory_and_handoffs": "supported",
-      "autonomous_rollover": "supported and qualified",
-      "provider_boundary": "injected NativeSessionTransport"
+      "autonomous_rollover": "supported; current-source qualification pending",
+      "provider_boundary": "LM Studio REST responses API",
+      "production_registration": "configuration-gated and fail-closed"
     },
     {
       "mode": "C",
@@ -41,31 +43,79 @@
       "reason": "No documented external session-creation API is present in the repository baseline."
     }
   ],
+  "live_provider_proof": {
+    "provider": "lmstudio",
+    "model_key": "qwen/qwen3.8-27b",
+    "context_length": 119552,
+    "fresh_root_validated": true,
+    "acknowledgement_validated": true,
+    "automatic_continuation_validated": true,
+    "provider_exact_usage": true,
+    "artifact": ".forge-autonomy-state/evidence/FC-E2E-001/live-lmstudio-managed-continuity.json",
+    "command_id": "CMD-20260826T224938Z-9660289413",
+    "source_scope": "historical pass before final source freeze"
+  },
   "privacy": {
     "complete_transcripts_persisted": false,
     "ledger_contents": [
-      "logical and provider session identifiers",
-      "operation, project, predecessor, and idempotency identifiers",
-      "handoff identifier and checksum",
-      "bounded usage counts and state timestamps"
+      "hashed idempotency and project identifiers",
+      "provider response identifiers and exact acknowledgement receipt",
+      "bounded provider usage and state timestamps"
     ],
     "ledger_permissions": "0600",
-    "secrets": "owned by the configured transport; never accepted by the ledger"
+    "secrets": "opaque Keychain references resolved behind LMStudioAuthorizationProviding"
   },
   "limits": {
-    "ledger_records": 4096,
-    "cancelled_operations": 256,
-    "response_chunks": 256,
-    "chunk_bytes": 16384,
-    "response_bytes": 262144,
-    "rate_limit_attempts": 3
+    "ledger_bytes": 4194304,
+    "active_records": 1024,
+    "reconciliation_records": 4096,
+    "live_terminal_records": 128,
+    "provider_attempts": 3
   },
   "qualification": {
-    "plugin_tests": ".forge-codex/evidence/EVID-20260823T205539Z-7c10f18ca4.json",
-    "plugin_release_build": ".forge-codex/evidence/EVID-20260823T205600Z-67248c9a56.json",
-    "external_mcp": ".forge-codex/evidence/EVID-20260823T205325Z-8e4577190c.json",
-    "private_ui_scan": ".forge-codex/evidence/EVID-20260823T205330Z-dd887aaee2.json",
-    "strict_full_suite": ".forge-codex/evidence/EVID-20260823T205612Z-bbcdb66436.json",
-    "strict_full_suite_result": "265 tests, 2 environment skips, 0 failures"
-  }
+    "plugin_contract_tests": {
+      "record": ".forge-codex/evidence/EVID-20260826T234631Z-cae1c73a2f.json"
+    },
+    "plugin_release_build": {
+      "record": ".forge-codex/evidence/EVID-20260826T234519Z-288f365061.json"
+    },
+    "external_mcp": {
+      "record": ".forge-codex/evidence/EVID-20260826T234711Z-f708331f5f.json",
+      "artifact": ".forge-codex/evidence/P09-external-mcp-compatibility.json"
+    },
+    "private_ui_scan": {
+      "record": ".forge-codex/evidence/EVID-20260826T234718Z-32f5e2f934.json"
+    },
+    "debug_strict_suite": {
+      "command_index": ".forge-autonomy-state/command-logs/FC-RELEASE-001/commands.jsonl",
+      "command_id": "CMD-20260827T025715Z-b42c01b23b",
+      "status": "blocked_by_locked_session_file_protection"
+    },
+    "release_strict_suite": {
+      "command_index": ".forge-autonomy-state/command-logs/FC-RELEASE-001/commands.jsonl",
+      "command_id": "CMD-20260827T025822Z-dc523f8bbf",
+      "status": "blocked_by_locked_session_file_protection"
+    },
+    "current_runtime_swiftpm": {
+      "command_index": ".forge-autonomy-state/command-logs/FC-RUNTIME-001/commands.jsonl",
+      "command_id": "CMD-20260827T030159Z-301b553f6b",
+      "status": "passed"
+    },
+    "current_runtime_xcode": {
+      "command_index": ".forge-autonomy-state/command-logs/FC-RUNTIME-001/commands.jsonl",
+      "command_id": "CMD-20260827T030030Z-e106bb4ef2",
+      "status": "passed"
+    },
+    "live_lmstudio": {
+      "command_index": ".forge-autonomy-state/evidence/FC-E2E-001/commands.jsonl",
+      "command_id": "CMD-20260826T224938Z-9660289413",
+      "artifact": ".forge-autonomy-state/evidence/FC-E2E-001/live-lmstudio-managed-continuity.json",
+      "status": "historical_pass_before_final_source_freeze"
+    }
+  },
+  "current_source_resume_conditions": [
+    "rerun full strict Debug and Release suites while the console session is unlocked",
+    "rerun the live LM Studio fresh-root acknowledgement and automatic continuation scenario",
+    "rerun plugin, external MCP compatibility, and private UI automation scans after the source is otherwise frozen"
+  ]
 }

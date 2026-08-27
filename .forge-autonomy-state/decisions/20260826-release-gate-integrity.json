@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-08-26T23:45:46Z",
+  "decision": "Retain partial and environment-blocked results as failures or blockers until their required commands produce usable evidence.",
+  "rationale": [
+    "A launched test or profiler process is not proof that a test or trace executed.",
+    "The short deterministic resource fixture does not replace the required 8-hour and 4-hour soaks or representative hardware.",
+    "Real provider continuity proof does not replace UI, performance, signing, sanitizer, or feature-parity gates."
+  ],
+  "affected_work_packages": [
+    "FC-UI-001",
+    "FC-PERF-001",
+    "FC-E2E-001",
+    "FC-RELEASE-001"
+  ]
+}

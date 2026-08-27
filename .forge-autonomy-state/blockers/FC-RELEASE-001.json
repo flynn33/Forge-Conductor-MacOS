@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "work_package": "FC-RELEASE-001",
+  "status": "blocked_hard_gates",
+  "recorded_at": "2026-08-27T02:42:29Z",
+  "summary": "Focused runtime and product-path proofs pass, but the locked-session full-suite rerun and sanitizer, UI, profiling, soak, signed lifecycle, notarization, and final parity gates remain open.",
+  "passed": [
+    "strict SwiftPM runtime: 64 tests, 1 host skip, 0 failures",
+    "ad-hoc-signed Xcode runtime: 64 tests, 1 host skip, 0 failures",
+    "Xcode helper exact product identifier",
+    "project-local app build, nested signing, deep verification, and launch"
+  ],
+  "locked_session_blocker": {
+    "command_references": [
+      "CMD-20260827T025715Z-b42c01b23b",
+      "CMD-20260827T025822Z-dc523f8bbf",
+      "CMD-20260827T024229Z-92a78059b3"
+    ],
+    "result": "Debug and Release compile and execute 444 tests but fail with identical protected registry.json reopen errors while CGSSessionScreenIsLocked=Yes.",
+    "resume_condition": "Unlock the console session and rerun both strict full suites without changing file protection."
+  },
+  "sanitizer_blockers": [
+    {
+      "kind": "address",
+      "command_references": [
+        "CMD-20260826T231558Z-5314efd9b5",
+        "CMD-20260826T232746Z-278074fd92"
+      ],
+      "result": "SwiftPM and Xcode workers spin before tests in Address Sanitizer allocator initialization.",
+      "samples": [
+        ".forge-autonomy-state/evidence/FC-RELEASE-001/asan-swiftpm-startup-spin.sample.txt",
+        ".forge-autonomy-state/evidence/FC-RELEASE-001/asan-xcode-startup-spin.sample.txt"
+      ]
+    },
+    {
+      "kind": "thread",
+      "command_references": [
+        "CMD-20260826T233210Z-a494b24c35",
+        "CMD-20260826T233250Z-e11abc6e37"
+      ],
+      "result": "SwiftPM runtime loading violates platform policy; the Xcode worker exits before establishing its test connection."
+    }
+  ],
+  "dependencies": [
+    "FC-UI-001",
+    "FC-PERF-001",
+    "FC-E2E-001 current-source refresh",
+    "signed app and LaunchAgent verification",
+    "notarization",
+    "final feature and protocol parity"
+  ],
+  "evidence": ".forge-autonomy-state/evidence/FC-RELEASE-001",
+  "resume_condition": "Resolve the locked-session, host security, signing, sanitizer, UI, profiling, soak, and downstream hard-gate conditions, then run the final completion validator."
+}

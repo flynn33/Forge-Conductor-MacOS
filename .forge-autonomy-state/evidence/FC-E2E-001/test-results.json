@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "work_package": "FC-E2E-001",
+  "captured_at": "2026-08-26T23:29:28.112021+00:00",
+  "overall_status": "partial",
+  "evidence_complete": false,
+  "dependencies": {
+    "FC-UI-001": "blocked",
+    "FC-PERF-001": "incomplete"
+  },
+  "results": [
+    {
+      "id": "FC-E2E-LIVE-LMSTUDIO-FIRST-ATTEMPT",
+      "command_id": "CMD-20260826T224759Z-929a788156",
+      "executed": 1,
+      "failures": 1,
+      "exit_code": 1,
+      "status": "environment_unavailable",
+      "classification": "LM Studio endpoint or loaded model was unavailable and the adapter failed closed with providerUnavailable"
+    },
+    {
+      "id": "FC-E2E-LIVE-LMSTUDIO-ROLLOVER",
+      "command_id": "CMD-20260826T224938Z-9660289413",
+      "executed": 1,
+      "failures": 0,
+      "exit_code": 0,
+      "duration_seconds": 376.679,
+      "status": "passed_within_scenario",
+      "artifact": {
+        "path": ".forge-autonomy-state/evidence/FC-E2E-001/live-lmstudio-managed-continuity.json",
+        "sha256": "cb90eec59b7129fd89dd4a88b597f59120d706c8de91133bb36f259f748f9c23"
+      },
+      "observed": {
+        "provider": "lmstudio",
+        "model_key": "qwen/qwen3.8-27b",
+        "context_length": 119552,
+        "real_response_identifiers": true,
+        "provider_exact_usage": true,
+        "fresh_root_validated": true,
+        "acknowledgement_validated": true,
+        "automatic_continuation_validated": true,
+        "automatic_continuation_input_tokens": 1454,
+        "automatic_continuation_output_tokens": 3478,
+        "automatic_continuation_total_tokens": 4932
+      }
+    }
+  ],
+  "related_recorded_deterministic_proof": [
+    {
+      "command_id": "CMD-20260826T231049Z-7b13acba2d",
+      "recorded_under": "FC-ROLL-001",
+      "executed": 12,
+      "failures": 0,
+      "coverage": [
+        "two-project threshold rollover and automatic continuation",
+        "provider configuration block quiescence across restart",
+        "transient outage reconciliation across manager restart",
+        "managed crash-boundary recovery",
+        "context-overflow rollover request",
+        "terminal and transient provider failure persistence"
+      ]
+    },
+    {
+      "command_id": "CMD-20260826T230926Z-a55ef7d379",
+      "recorded_under": "FC-AUTO-001",
+      "executed": 395,
+      "skipped": 2,
+      "failures": 0,
+      "configuration": "debug_strict"
+    },
+    {
+      "command_id": "CMD-20260826T231135Z-a82f5da923",
+      "recorded_under": "FC-RELEASE-001",
+      "executed": 395,
+      "skipped": 2,
+      "failures": 0,
+      "configuration": "release_strict"
+    }
+  ],
+  "acceptance": {
+    "all_hard_scenarios_pass": "incomplete",
+    "real_response_ids_and_usage_recorded": "passed",
+    "zero_operator_action_during_executed_rollover": "passed_for_live_scenario_with_provider_preconfigured",
+    "all_existing_features_preserved": "feature_parity_comparison_incomplete"
+  },
+  "remaining_scenarios": [
+    "GUI closure and manager independence through a complete managed run",
+    "reset fencing and recovery end to end",
+    "multi-project real-model and shell interleaving under tier limits",
+    "full auth-failure and outage recovery at the managed-run boundary",
+    "emergency overflow recovery through a fresh real successor",
+    "performance soaks, Instruments, and memgraph integration",
+    "final feature-parity comparison across tools, settings, formats, UI, and migrations"
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "artifacts": [
+    {
+      "bytes": 7455,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260826T235244Z-b5ed8ebe5c.stdout.txt",
+      "sha256": "4f2bcfe76638d2f2b05eb89ddb1ef328972b9744ea52acc8fc0cc5b28f4bed98"
+    },
+    {
+      "bytes": 98,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260826T235244Z-b5ed8ebe5c.stderr.txt",
+      "sha256": "e747f0c3660fab3fe3ff51568f4c65795998117c363342e1361f9012684ebd41"
+    }
+  ],
+  "command": "swift test --scratch-path /tmp/forge-g09-tests-20260826b -Xswiftc -warnings-as-errors --filter CoreTests",
+  "ended_at": "2026-08-26T23:52:47.697799+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260826T235244Z-b5ed8ebe5c",
+  "kind": "shell-tool-regression-tests",
+  "related_findings": [
+    "FC-SHELL-DEFAULT-001"
+  ],
+  "related_gates": [
+    "G09"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-26T23:52:44.313790+00:00",
+  "timed_out": false
+}

@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "work_package": "FC-SHELL-001",
+  "preserved": {
+    "mcp_tool": "shell_exec",
+    "input_fields": ["command", "cwd", "timeout_sec"],
+    "maximum_timeout_seconds": 120,
+    "compatibility_profile": "/bin/bash -lc",
+    "shell_tool_pack_source_changed": false,
+    "unrelated_tool_policy_changed": false
+  },
+  "additive": [
+    "config schema v2 migration receipt",
+    "explicit shell opt-out metadata",
+    "manager shell policy fields",
+    "native shell toggle and runtime capability rows",
+    "doctor and status shell policy evidence"
+  ],
+  "removed": [],
+  "result": "passed"
+}

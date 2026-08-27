@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "work_package": "FC-SHELL-001",
+  "captured_at": "2026-08-26T19:13:42.041391+00:00",
+  "results": [
+    {
+      "id": "FC-SHELL-FOCUSED-SWIFTPM",
+      "command_id": "CMD-20260826T191327Z-7697d8e37f",
+      "executed": 73,
+      "failures": 0,
+      "exit_code": 0,
+      "status": "passed",
+      "coverage": [
+        "fresh default shell execution",
+        "legacy migration and verified receipt",
+        "concurrent migration serialization",
+        "explicit disable persistence",
+        "manager settings persistence",
+        "native app composition",
+        "legacy Bash login payload and timeout contract"
+      ]
+    }
+  ],
+  "acceptance": {
+    "fresh_install_authorized_shell_default": "passed",
+    "migrated_install_authorized_shell_default": "passed",
+    "explicit_post_v2_disable_persists": "passed",
+    "shell_exec_contract_preserved": "passed"
+  }
+}

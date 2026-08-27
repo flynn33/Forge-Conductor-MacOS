@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "work_package": "FC-CONT-001",
+  "status": "passed",
+  "hard_gate": true,
+  "evidence_complete": true,
+  "remaining_external_checks": [
+    "real LM Studio successor creation and bootstrap are retained for FC-HOST-001 and FC-ROLL-001",
+    "crash-matrix and multi-project stress are retained for FC-E2E-001"
+  ]
+}

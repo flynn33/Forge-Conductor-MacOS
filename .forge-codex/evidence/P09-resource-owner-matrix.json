@@ -1,36 +1,36 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "phase": "P09",
   "owners": [
     {
       "owner": "HostAdapterRegistry",
-      "resources": ["adapter manifests", "adapter factories"],
-      "bound": "one registration per stable identifier; replacement is deterministic",
-      "release": "process lifetime registry; factories create independently owned adapters"
+      "resources": ["adapter manifests", "adapter factories", "managed provider factories"],
+      "bound": "one compile-time registration per stable identifier; replacement is deterministic",
+      "release": "process-lifetime registry; factories create independently owned adapters and providers"
     },
     {
-      "owner": "ForgeNativeSessionHostAdapter",
-      "resources": ["native session ledger", "cancelled operation set", "transport"],
-      "bound": "4096 ledger records, 256 cancellation identifiers, one injected transport",
-      "release": "actor lifetime; atomic ledger persists compact recovery state without transcripts"
+      "owner": "LMStudioManagedSessionHostAdapterV2",
+      "resources": ["durable intent ledger", "reconciliation records", "bounded terminal records"],
+      "bound": "4194304 ledger bytes, 1024 active records, 4096 reconciliation records, 128 live terminal records",
+      "release": "actor lifetime; terminal state compacts to reconciliation receipts without transcripts"
     },
     {
-      "owner": "ForgeNativeSessionHostAdapter.bootstrap",
-      "resources": ["canonical handoff", "response chunks", "assembled acknowledgment"],
-      "bound": "131072-byte handoff; 256 chunks of at most 16384 bytes; 262144-byte aggregate response",
-      "release": "function-local buffers release when the awaited bootstrap returns"
+      "owner": "LMStudioManagedSessionTransport",
+      "resources": ["URLSession requests", "bounded SSE decoder", "idempotency receipts", "operation permits"],
+      "bound": "validated response, text, tool-argument, event, timeout, and concurrency limits from provider configuration",
+      "release": "each request is awaited under a total deadline; cancellation invalidates the owned request"
     },
     {
-      "owner": "NativeSessionTransport",
-      "resources": ["provider session operation"],
-      "bound": "one create or bootstrap call per adapter operation with a deadline and at most three rate-limit attempts",
-      "release": "every call is awaited; cancellation is forwarded with operation and provider identifiers"
+      "owner": "LMStudioManagedModelProvider",
+      "resources": ["provider capability snapshot", "root and continuation requests"],
+      "bound": "one provider turn per managed execution step with provider-exact usage accounting",
+      "release": "turn-local request and response values release after durable commit"
     },
     {
-      "owner": "LocalLogicalSessionTransport",
-      "resources": ["idempotency session map", "cancelled operation set"],
-      "bound": "4096 idempotency sessions and 256 cancelled operations with deterministic key eviction",
-      "release": "transport instance lifetime; production composition creates one per adapter"
+      "owner": "LMStudioKeychainAuthorization",
+      "resources": ["opaque credential reference", "request authorization value"],
+      "bound": "one validated Keychain lookup per authorization request",
+      "release": "credential data remains outside the continuity ledger and is not written to diagnostics"
     }
   ]
 }

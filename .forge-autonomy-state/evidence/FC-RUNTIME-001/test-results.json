@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "work_package": "FC-RUNTIME-001",
+  "captured_at": "2026-08-27T03:02:29.438105+00:00",
+  "overall_status": "passed",
+  "evidence_complete": true,
+  "command_log_scope": {
+    "source": ".forge-autonomy-state/command-logs/FC-RUNTIME-001/commands.jsonl",
+    "entries": 13,
+    "first_command_id": "CMD-20260826T231056Z-4f1f91c2d0",
+    "last_command_id": "CMD-20260827T030159Z-301b553f6b",
+    "compact_log_matches_source": true
+  },
+  "results": [
+    {
+      "id": "FC-RUNTIME-FOCUSED-STRICT-SWIFTPM",
+      "command_id": "CMD-20260827T030159Z-301b553f6b",
+      "configuration": "debug_strict",
+      "current_source": true,
+      "executed": 64,
+      "skipped": 1,
+      "failures": 0,
+      "exit_code": 0,
+      "status": "passed"
+    },
+    {
+      "id": "FC-RUNTIME-FOCUSED-XCODE",
+      "command_id": "CMD-20260827T030030Z-e106bb4ef2",
+      "configuration": "xcode_debug_adhoc",
+      "current_source": true,
+      "executed": 64,
+      "skipped": 1,
+      "failures": 0,
+      "exit_code": 0,
+      "status": "passed",
+      "identity_contract": "helper identifier com.forge-conductor.runtime-launcher validated by the runtime launch gate"
+    },
+    {
+      "id": "FC-RUNTIME-RELEASE-BUILD",
+      "command_id": "CMD-20260827T015240Z-79f5b44ab6",
+      "configuration": "release_strict_build",
+      "exit_code": 0,
+      "status": "passed"
+    }
+  ],
+  "host_skip": {
+    "test": "testAdvertisedPowerShellProfileExecutesWithoutProcessGroupEscape",
+    "reason": "PowerShell is not installed on this host",
+    "runtime_capability_behavior": "the optional runtime is reported unavailable without disabling zsh, Bash, Python, or direct process execution"
+  },
+  "suite_boundary": {
+    "excluded_current_source_tests": [
+      "testBootstrapRouterLegacyShellExecUsesBoundProjectAndCompatibilityContract",
+      "testBootstrapRouterRunsDurableShellJobAndReadsBoundedOutput"
+    ],
+    "reason": "the locked macOS session prevents reopening registry.json after complete-file-protection writes; the same protected-file blocker is recorded under FC-RELEASE-001",
+    "runtime_subsystem_failures_outside_that_boundary": 0
+  },
+  "acceptance": {
+    "stdout_stderr_deadlock_proof": "passed",
+    "timeout_and_cancel_kill_descendants": "passed",
+    "exact_process_identity_and_bounded_reaper": "passed",
+    "output_and_artifacts_are_bounded_and_manager_owned": "passed",
+    "sandbox_and_authorized_roots": "passed",
+    "missing_optional_runtimes_do_not_disable_shell": "passed",
+    "stale_generation_results_are_quarantined": "passed",
+    "legacy_shell_exec_contract_is_preserved": "passed",
+    "swiftpm_and_xcode_runtime_surfaces": "passed"
+  }
+}

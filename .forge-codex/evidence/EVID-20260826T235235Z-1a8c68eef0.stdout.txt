@@ -1,0 +1,35 @@
+Test Suite 'Selected tests' started at 2026-08-26 18:52:36.482.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-26 18:52:36.483.
+Test Suite 'AppConfigAndDoctorTests' started at 2026-08-26 18:52:36.483.
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testAppConfigApplySettingsPatch]' started.
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testAppConfigApplySettingsPatch]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testAppConfigRoundTripDictionary]' started.
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testAppConfigRoundTripDictionary]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testConcurrentLegacyConfigLoadsPerformOneMigration]' started.
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testConcurrentLegacyConfigLoadsPerformOneMigration]' passed (0.008 seconds).
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testConfigStoreTypedModel]' started.
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testConfigStoreTypedModel]' passed (0.003 seconds).
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testCPUFrequencyEstimatorClusterEffective]' started.
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testCPUFrequencyEstimatorClusterEffective]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testCPUFrequencyNonNilOnThisMac]' started.
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testCPUFrequencyNonNilOnThisMac]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testDoctorModelTyped]' started.
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testDoctorModelTyped]' passed (0.311 seconds).
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testFreshConfigUsesSchemaV2DefaultEnabledShellPolicy]' started.
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testFreshConfigUsesSchemaV2DefaultEnabledShellPolicy]' passed (0.002 seconds).
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testLegacyShellMigrationBackupReceiptAndExplicitDisableRemainValid]' started.
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testLegacyShellMigrationBackupReceiptAndExplicitDisableRemainValid]' passed (0.080 seconds).
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testManagerRuntimeIsolation]' started.
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testManagerRuntimeIsolation]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testStatusSnapshotModel]' started.
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testStatusSnapshotModel]' passed (0.073 seconds).
+Test Suite 'AppConfigAndDoctorTests' passed at 2026-08-26 18:52:36.963.
+	 Executed 11 tests, with 0 failures (0 unexpected) in 0.479 (0.480) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-08-26 18:52:36.963.
+	 Executed 11 tests, with 0 failures (0 unexpected) in 0.479 (0.480) seconds
+Test Suite 'Selected tests' passed at 2026-08-26 18:52:36.963.
+	 Executed 11 tests, with 0 failures (0 unexpected) in 0.479 (0.480) seconds
+◇ Test run started.
+↳ Testing Library Version: 1501
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

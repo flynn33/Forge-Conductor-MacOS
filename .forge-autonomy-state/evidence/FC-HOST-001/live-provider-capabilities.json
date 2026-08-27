@@ -1,0 +1,15 @@
+{
+  "capability_fingerprint_sha256" : "6708d05f2dc20097274f9c473a8813c8445bb262b2455e487ec557d835ed54de",
+  "context_length" : 119552,
+  "contract_probe_response_id" : "resp_2eb20cf4d0f54c21f2bdd20da1e6d59199a5b1c5eed3e7be",
+  "flash_attention" : null,
+  "function_tool_contract_verified" : true,
+  "loaded_instance_id" : "qwen/qwen3.8-27b",
+  "maximum_context_length" : 262144,
+  "model_key" : "qwen/qwen3.8-27b",
+  "parallelism" : 4,
+  "provider_version" : "unreported",
+  "streaming_verified" : true,
+  "trained_for_tool_use" : true,
+  "usage_reporting_verified" : true
+}

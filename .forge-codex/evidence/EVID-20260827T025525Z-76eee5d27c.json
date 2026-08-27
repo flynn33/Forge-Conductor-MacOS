@@ -1,0 +1,41 @@
+{
+  "artifacts": [
+    {
+      "bytes": 21194,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/completion-report.json",
+      "sha256": "77d9599f6cf6d49aa3822871a84be8bd9661b7b44db3ed2d397f0cd8c80b2844"
+    },
+    {
+      "bytes": 13670,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/completion-report.md",
+      "sha256": "5f3fd04e321d96764b5cc319772790eb2baf0a7922be434ac52d995320235df2"
+    },
+    {
+      "bytes": 467,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T025525Z-76eee5d27c.stdout.txt",
+      "sha256": "5b21ce0c8b876aed77b5e0bd78a8a4a5c5220daa4701874f48f91013ab559ce1"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T025525Z-76eee5d27c.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "command": "./.forge-codex/scripts/verify_completion.py --repo . --no-finalize",
+  "ended_at": "2026-08-27T02:55:28.518981+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 1,
+  "id": "EVID-20260827T025525Z-76eee5d27c",
+  "kind": "completion-current-tree",
+  "related_findings": [],
+  "related_gates": [
+    "G12"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-27T02:55:25.917356+00:00",
+  "timed_out": false
+}

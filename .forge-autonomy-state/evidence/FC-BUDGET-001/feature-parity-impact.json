@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "work_package": "FC-BUDGET-001",
+  "preserved": {
+    "existing_context_budget_monitor_values": true,
+    "model_initiated_continuity_tools": true,
+    "existing_provider_usage_contracts": true,
+    "existing_continuity_handoff_contract": true,
+    "existing_manager_run_state_contract": true
+  },
+  "additive": [
+    "persisted provider capacity and context observations",
+    "provider-exact, tokenizer-exact, serialized-estimate, and overflow evidence hierarchy",
+    "explicit reserve calculation and adaptive small/large-window thresholds",
+    "automatic checkpoint and rollover action requests",
+    "hysteresis and fresh-successor bootstrap arming",
+    "restart and configuration-change reevaluation"
+  ],
+  "intentional_behavior_changes": [
+    "the manager triggers continuity before the model must request it",
+    "invalid active context configurations fail before execution",
+    "provider overflow immediately requests emergency rollover",
+    "a fresh successor cannot retrigger until its bootstrap usage is observed"
+  ],
+  "removed": [],
+  "result": "passed"
+}
