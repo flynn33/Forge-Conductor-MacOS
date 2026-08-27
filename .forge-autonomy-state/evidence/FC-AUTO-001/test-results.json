@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "work_package": "FC-AUTO-001",
+  "captured_at": "2026-08-26T23:10:23.456237+00:00",
+  "results": [
+    {
+      "id": "FC-AUTO-FULL-REGRESSION-FIRST-PASS",
+      "command_id": "CMD-20260826T230228Z-5004c4ddcf",
+      "executed": 395,
+      "skipped": 2,
+      "failures": 54,
+      "unexpected_failures": 2,
+      "exit_code": 1,
+      "status": "remediated",
+      "classification": "legacy CoreTests fixtures lacked the required durable project binding, and one live process-discovery assertion compared two non-atomic LM Studio snapshots"
+    },
+    {
+      "id": "FC-AUTO-FULL-STRICT-SWIFTPM",
+      "command_id": "CMD-20260826T230926Z-a55ef7d379",
+      "executed": 395,
+      "skipped": 2,
+      "failures": 0,
+      "exit_code": 0,
+      "status": "passed",
+      "suites": {
+        "AutonomySupervisorTests": 10,
+        "ManagedAutonomyRuntimeTests": 5,
+        "ManagedProjectRunStepExecutorTests": 6,
+        "ManagerTests": 26
+      },
+      "coverage": [
+        "manager startup recovers durable nonterminal runs without a GUI owner",
+        "runs continue when the dashboard service is stopped",
+        "lease epochs fence duplicate and stale owners",
+        "long external steps renew leases",
+        "provider and tool side-effect intent is durable before execution",
+        "non-replayable interrupted tools remain ambiguous and are not repeated",
+        "operator pause, resume, cancel, and retry are durable manager controls",
+        "run cancellation releases owned runtime jobs before terminal state",
+        "only deterministic completion validators can complete a run",
+        "shutdown waits for bounded coordinator cancellation cleanup"
+      ]
+    }
+  ],
+  "acceptance": {
+    "run_continues_with_gui_closed": "passed",
+    "duplicate_run_owners_are_fenced": "passed",
+    "manager_restart_recovers_nonterminal_run": "passed",
+    "model_cannot_directly_complete_run": "passed",
+    "manager_owned_work_remains_off_main_actor": "passed",
+    "full_strict_regression_suite": "passed"
+  }
+}

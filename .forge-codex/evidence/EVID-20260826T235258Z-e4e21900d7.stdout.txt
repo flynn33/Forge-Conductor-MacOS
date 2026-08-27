@@ -1,0 +1,15 @@
+Test Suite 'Selected tests' started at 2026-08-26 18:52:59.219.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-26 18:52:59.219.
+Test Suite 'LiveCollectorEvidenceTests' started at 2026-08-26 18:52:59.219.
+Test Case '-[ForgeConductorTests.LiveCollectorEvidenceTests testForgeSnapshotIncludesDiscoveredMCPServers]' started.
+Test Case '-[ForgeConductorTests.LiveCollectorEvidenceTests testForgeSnapshotIncludesDiscoveredMCPServers]' passed (0.405 seconds).
+Test Suite 'LiveCollectorEvidenceTests' passed at 2026-08-26 18:52:59.624.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.405 (0.405) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-08-26 18:52:59.624.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.405 (0.405) seconds
+Test Suite 'Selected tests' passed at 2026-08-26 18:52:59.624.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.405 (0.406) seconds
+◇ Test run started.
+↳ Testing Library Version: 1501
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

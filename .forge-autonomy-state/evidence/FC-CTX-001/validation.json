@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "work_package": "FC-CTX-001",
+  "status": "passed",
+  "hard_gate": true,
+  "evidence_complete": true,
+  "remaining_external_checks": [
+    "multi-project provider and runtime stress is retained for FC-E2E-001",
+    "full release and UI suites are retained for FC-UI-001 and FC-RELEASE-001"
+  ]
+}

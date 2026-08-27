@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "work_package": "FC-ROLL-001",
+  "preserved": {
+    "existing_continuity_tool_names": true,
+    "handoff_v2_schema_and_checksum_contract": true,
+    "existing_provider_adapter_v2_contract": true,
+    "existing_project_generation_boundary": true,
+    "external_handoff_only_mode": true
+  },
+  "additive": [
+    "managed continuity worker with twelve explicit recovery seams",
+    "fresh-root bootstrap and exact typed acknowledgment validation",
+    "transactional at-most-one successor acceptance and duplicate quarantine",
+    "predecessor authority fencing and idempotent sealing",
+    "durable exactly-once automatic continuation intent",
+    "automatic continuation consumption before ordinary provider work"
+  ],
+  "intentional_security_changes": [
+    "a successor cannot inherit the predecessor provider-response chain",
+    "mismatched project, generation, run, operation, checksum, or nonce is rejected",
+    "duplicate candidates never receive project authority",
+    "fenced predecessor sessions cannot invoke project tools"
+  ],
+  "removed": [],
+  "result": "passed"
+}

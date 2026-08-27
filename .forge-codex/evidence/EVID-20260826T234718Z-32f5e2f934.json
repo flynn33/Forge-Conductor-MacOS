@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 282,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260826T234718Z-32f5e2f934.stdout.txt",
+      "sha256": "4559de4743c5923418848c4a26ee6c374048893574cfc56cba69bd27e34348ca"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260826T234718Z-32f5e2f934.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "command": "python3 .forge-codex/scripts/check_private_ui_automation.py",
+  "ended_at": "2026-08-26T23:47:18.995846+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260826T234718Z-32f5e2f934",
+  "kind": "g09-private-ui-automation-scan",
+  "related_findings": [],
+  "related_gates": [
+    "G09"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-26T23:47:18.858018+00:00",
+  "timed_out": false
+}

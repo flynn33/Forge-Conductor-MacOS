@@ -1397,10 +1397,14 @@ public enum SelfExecutable {
     }
 
     public static func pathURL() throws -> URL {
-        var buf = [CChar](repeating: 0, count: Int(PATH_MAX))
-        var size = UInt32(buf.count)
-        if _NSGetExecutablePath(&buf, &size) == 0 {
-            let path = String(decoding: buf.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+        var size: UInt32 = 0
+        _ = _NSGetExecutablePath(nil, &size)
+        var buf = [CChar](repeating: 0, count: max(Int(size), Int(PATH_MAX)))
+        let result = buf.withUnsafeMutableBufferPointer { pointer in
+            _NSGetExecutablePath(pointer.baseAddress, &size)
+        }
+        if result == 0 {
+            let path = String(cString: buf)
             return URL(fileURLWithPath: path).resolvingSymlinksInPath()
         }
         let arg0 = CommandLine.arguments[0]
@@ -1412,6 +1416,3 @@ public enum SelfExecutable {
             .resolvingSymlinksInPath()
     }
 }
-
-@_silgen_name("_NSGetExecutablePath")
-func _NSGetExecutablePath(_ buf: UnsafeMutablePointer<CChar>, _ bufsize: UnsafeMutablePointer<UInt32>) -> Int32

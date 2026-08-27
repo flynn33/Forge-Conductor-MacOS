@@ -142,6 +142,56 @@
 		P1R2O3D4U5C6T7E80002 /* Tests/ForgeConductorTests/ProductPathReliabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = P1R2O3D4U5C6T7E80001 /* Tests/ForgeConductorTests/ProductPathReliabilityTests.swift */; };
 		R1E2A3L4T5I6M7E8000002 /* Telemetry/RealtimeMetricsEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = R1E2A3L4T5I6M7E8000001 /* Telemetry/RealtimeMetricsEngine.swift */; };
 		R1E2A3L4T5S6T7R80002 /* Tests/ForgeConductorTests/RealtimeStreamTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = R1E2A3L4T5S6T7R80001 /* Tests/ForgeConductorTests/RealtimeStreamTests.swift */; };
+		A26B00000000000000000001 /* Application/AutonomySupervisor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000001 /* Application/AutonomySupervisor.swift */; };
+		A26B00000000000000000002 /* Application/ContextBudgetSupervisor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000002 /* Application/ContextBudgetSupervisor.swift */; };
+		A26B00000000000000000003 /* Application/ExecutionJobService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000003 /* Application/ExecutionJobService.swift */; };
+		A26B00000000000000000004 /* Application/LegacyContinuityMigrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000004 /* Application/LegacyContinuityMigrator.swift */; };
+		A26B00000000000000000005 /* Application/ManagedAutonomyRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000005 /* Application/ManagedAutonomyRuntime.swift */; };
+		A26B00000000000000000006 /* Application/ManagedProjectRunStepExecutor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000006 /* Application/ManagedProjectRunStepExecutor.swift */; };
+		A26B00000000000000000007 /* Application/PersistedManagedRunBudgetEvaluator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000007 /* Application/PersistedManagedRunBudgetEvaluator.swift */; };
+		A26B00000000000000000008 /* Application/ProjectContextService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000008 /* Application/ProjectContextService.swift */; };
+		A26B00000000000000000009 /* Application/ProjectRunCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000009 /* Application/ProjectRunCoordinator.swift */; };
+		A26B00000000000000000010 /* Application/RuntimeJobSubsystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000010 /* Application/RuntimeJobSubsystem.swift */; };
+		A26B00000000000000000011 /* Application/ToolDefinitionCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000011 /* Application/ToolDefinitionCatalog.swift */; };
+		A26B00000000000000000012 /* Application/ToolInvocationBroker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000012 /* Application/ToolInvocationBroker.swift */; };
+		A26B00000000000000000013 /* Application/Tools/RuntimeJobToolPack.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000013 /* Application/Tools/RuntimeJobToolPack.swift */; };
+		A26B00000000000000000014 /* Domain/AutonomyModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000014 /* Domain/AutonomyModels.swift */; };
+		A26B00000000000000000015 /* Domain/ContextBudgetModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000015 /* Domain/ContextBudgetModels.swift */; };
+		A26B00000000000000000016 /* Domain/ContinuityV2Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000016 /* Domain/ContinuityV2Models.swift */; };
+		A26B00000000000000000017 /* Domain/ManagedModelProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000017 /* Domain/ManagedModelProvider.swift */; };
+		A26B00000000000000000018 /* Domain/ProjectContextModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000018 /* Domain/ProjectContextModels.swift */; };
+		A26B00000000000000000019 /* Domain/RuntimeJobModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000019 /* Domain/RuntimeJobModels.swift */; };
+		A26B00000000000000000020 /* Infrastructure/ProjectControlPlaneRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000020 /* Infrastructure/ProjectControlPlaneRepository.swift */; };
+		A26B00000000000000000021 /* Infrastructure/RuntimeJobRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000021 /* Infrastructure/RuntimeJobRepository.swift */; };
+		A26B00000000000000000022 /* Infrastructure/RuntimeProcessSupervisor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000022 /* Infrastructure/RuntimeProcessSupervisor.swift */; };
+		A26B00000000000000000023 /* AutonomySupervisorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000023 /* AutonomySupervisorTests.swift */; };
+		A26B00000000000000000024 /* ContextBudgetSupervisorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000024 /* ContextBudgetSupervisorTests.swift */; };
+		A26B00000000000000000025 /* ContinuityV2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000025 /* ContinuityV2Tests.swift */; };
+		A26B00000000000000000026 /* ManagedModelProviderBridgeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000026 /* ManagedModelProviderBridgeTests.swift */; };
+		A26B00000000000000000027 /* ManagedProjectRunStepExecutorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000027 /* ManagedProjectRunStepExecutorTests.swift */; };
+		A26B00000000000000000028 /* ProjectContextIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000028 /* ProjectContextIntegrationTests.swift */; };
+		A26B00000000000000000029 /* ProjectControlPlaneRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000029 /* ProjectControlPlaneRepositoryTests.swift */; };
+		A26B00000000000000000030 /* RuntimeExecutionJobTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000030 /* RuntimeExecutionJobTests.swift */; };
+		A26B00000000000000000031 /* ToolDefinitionCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000031 /* ToolDefinitionCatalogTests.swift */; };
+		A26B00000000000000000032 /* Application/ManagedContinuityWorker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000032 /* Application/ManagedContinuityWorker.swift */; };
+		A26B00000000000000000033 /* ManagedAutonomyRuntimeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000033 /* ManagedAutonomyRuntimeTests.swift */; };
+		A26B00000000000000000034 /* ManagedContinuityWorkerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000034 /* ManagedContinuityWorkerTests.swift */; };
+		A26B00000000000000000035 /* AutonomousContinuityAcceptanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000035 /* AutonomousContinuityAcceptanceTests.swift */; };
+		A26B00000000000000000036 /* OperatorConsole/Models/OperatorConsoleModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000036 /* OperatorConsole/Models/OperatorConsoleModels.swift */; };
+		A26B00000000000000000037 /* OperatorConsole/Services/OperatorManagerClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000037 /* OperatorConsole/Services/OperatorManagerClient.swift */; };
+		A26B00000000000000000038 /* OperatorConsole/ViewModels/AutonomyViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000038 /* OperatorConsole/ViewModels/AutonomyViewModel.swift */; };
+		A26B00000000000000000039 /* OperatorConsole/ViewModels/ContinuityViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000039 /* OperatorConsole/ViewModels/ContinuityViewModel.swift */; };
+		A26B00000000000000000040 /* OperatorConsole/ViewModels/EvidenceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000040 /* OperatorConsole/ViewModels/EvidenceViewModel.swift */; };
+		A26B00000000000000000041 /* OperatorConsole/ViewModels/ProjectsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000041 /* OperatorConsole/ViewModels/ProjectsViewModel.swift */; };
+		A26B00000000000000000042 /* OperatorConsole/ViewModels/ProviderViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000042 /* OperatorConsole/ViewModels/ProviderViewModel.swift */; };
+		A26B00000000000000000043 /* OperatorConsole/ViewModels/RuntimesViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000043 /* OperatorConsole/ViewModels/RuntimesViewModel.swift */; };
+		A26B00000000000000000044 /* OperatorConsole/Views/AutonomyOperatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000044 /* OperatorConsole/Views/AutonomyOperatorView.swift */; };
+		A26B00000000000000000045 /* OperatorConsole/Views/ContinuityOperatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000045 /* OperatorConsole/Views/ContinuityOperatorView.swift */; };
+		A26B00000000000000000046 /* OperatorConsole/Views/EvidenceOperatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000046 /* OperatorConsole/Views/EvidenceOperatorView.swift */; };
+		A26B00000000000000000047 /* OperatorConsole/Views/OperatorConsoleComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000047 /* OperatorConsole/Views/OperatorConsoleComponents.swift */; };
+		A26B00000000000000000048 /* OperatorConsole/Views/ProjectsOperatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000048 /* OperatorConsole/Views/ProjectsOperatorView.swift */; };
+		A26B00000000000000000049 /* OperatorConsole/Views/ProviderOperatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000049 /* OperatorConsole/Views/ProviderOperatorView.swift */; };
+		A26B00000000000000000050 /* OperatorConsole/Views/RuntimesOperatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000050 /* OperatorConsole/Views/RuntimesOperatorView.swift */; };
 		P10B00000000000000000001 /* Application/ContinuityCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000001 /* Application/ContinuityCoordinator.swift */; };
 		P10B00000000000000000002 /* Application/Tools/ContinuityLifecycleToolPack.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000002 /* Application/Tools/ContinuityLifecycleToolPack.swift */; };
 		P10B00000000000000000003 /* Domain/ContinuityModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000003 /* Domain/ContinuityModels.swift */; };
@@ -163,6 +213,8 @@
 		P10B00000000000000000019 /* ResourcePolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000019 /* ResourcePolicyTests.swift */; };
 		P10B00000000000000000020 /* RuntimeObservabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000020 /* RuntimeObservabilityTests.swift */; };
 		P11B00000000000000000001 /* ReleaseStressTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = P11F00000000000000000001 /* ReleaseStressTests.swift */; };
+		F0A700000000000000000001 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0A70000000000000000000A /* main.swift */; };
+		F0A700000000000000000002 /* forge-runtime-launcher in Embed Runtime Helper */ = {isa = PBXBuildFile; fileRef = F0A70000000000000000000B /* forge-runtime-launcher */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -201,6 +253,27 @@
 			remoteGlobalIDString = C596F91D22BA465F8D8290A1;
 			remoteInfo = ForgeConductorCore;
 		};
+		F0A700000000000000000003 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FF3F53A3F88F4DF8B3C98871 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F0A70000000000000000000E;
+			remoteInfo = ForgeRuntimeLauncher;
+		};
+		F0A700000000000000000004 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FF3F53A3F88F4DF8B3C98871 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F0A70000000000000000000E;
+			remoteInfo = ForgeRuntimeLauncher;
+		};
+		F0A700000000000000000005 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FF3F53A3F88F4DF8B3C98871 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F0A70000000000000000000E;
+			remoteInfo = ForgeRuntimeLauncher;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -224,6 +297,17 @@
 				136EB907F8144B23A1268E10 /* ForgeConductorCore.framework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F0A700000000000000000009 /* Embed Runtime Helper */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Helpers;
+			dstSubfolderSpec = 1;
+			files = (
+				F0A700000000000000000002 /* forge-runtime-launcher in Embed Runtime Helper */,
+			);
+			name = "Embed Runtime Helper";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -366,6 +450,56 @@
 		P1R2O3D4U5C6T7E80001 /* Tests/ForgeConductorTests/ProductPathReliabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/ForgeConductorTests/ProductPathReliabilityTests.swift; sourceTree = SOURCE_ROOT; };
 		R1E2A3L4T5I6M7E8000001 /* Telemetry/RealtimeMetricsEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Telemetry/RealtimeMetricsEngine.swift; sourceTree = "<group>"; };
 		R1E2A3L4T5S6T7R80001 /* Tests/ForgeConductorTests/RealtimeStreamTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/ForgeConductorTests/RealtimeStreamTests.swift; sourceTree = SOURCE_ROOT; };
+		A26F00000000000000000001 /* Application/AutonomySupervisor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/AutonomySupervisor.swift; sourceTree = "<group>"; };
+		A26F00000000000000000002 /* Application/ContextBudgetSupervisor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/ContextBudgetSupervisor.swift; sourceTree = "<group>"; };
+		A26F00000000000000000003 /* Application/ExecutionJobService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/ExecutionJobService.swift; sourceTree = "<group>"; };
+		A26F00000000000000000004 /* Application/LegacyContinuityMigrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/LegacyContinuityMigrator.swift; sourceTree = "<group>"; };
+		A26F00000000000000000005 /* Application/ManagedAutonomyRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/ManagedAutonomyRuntime.swift; sourceTree = "<group>"; };
+		A26F00000000000000000006 /* Application/ManagedProjectRunStepExecutor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/ManagedProjectRunStepExecutor.swift; sourceTree = "<group>"; };
+		A26F00000000000000000007 /* Application/PersistedManagedRunBudgetEvaluator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/PersistedManagedRunBudgetEvaluator.swift; sourceTree = "<group>"; };
+		A26F00000000000000000008 /* Application/ProjectContextService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/ProjectContextService.swift; sourceTree = "<group>"; };
+		A26F00000000000000000009 /* Application/ProjectRunCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/ProjectRunCoordinator.swift; sourceTree = "<group>"; };
+		A26F00000000000000000010 /* Application/RuntimeJobSubsystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/RuntimeJobSubsystem.swift; sourceTree = "<group>"; };
+		A26F00000000000000000011 /* Application/ToolDefinitionCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/ToolDefinitionCatalog.swift; sourceTree = "<group>"; };
+		A26F00000000000000000012 /* Application/ToolInvocationBroker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/ToolInvocationBroker.swift; sourceTree = "<group>"; };
+		A26F00000000000000000013 /* Application/Tools/RuntimeJobToolPack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/Tools/RuntimeJobToolPack.swift; sourceTree = "<group>"; };
+		A26F00000000000000000014 /* Domain/AutonomyModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/AutonomyModels.swift; sourceTree = "<group>"; };
+		A26F00000000000000000015 /* Domain/ContextBudgetModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/ContextBudgetModels.swift; sourceTree = "<group>"; };
+		A26F00000000000000000016 /* Domain/ContinuityV2Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/ContinuityV2Models.swift; sourceTree = "<group>"; };
+		A26F00000000000000000017 /* Domain/ManagedModelProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/ManagedModelProvider.swift; sourceTree = "<group>"; };
+		A26F00000000000000000018 /* Domain/ProjectContextModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/ProjectContextModels.swift; sourceTree = "<group>"; };
+		A26F00000000000000000019 /* Domain/RuntimeJobModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/RuntimeJobModels.swift; sourceTree = "<group>"; };
+		A26F00000000000000000020 /* Infrastructure/ProjectControlPlaneRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Infrastructure/ProjectControlPlaneRepository.swift; sourceTree = "<group>"; };
+		A26F00000000000000000021 /* Infrastructure/RuntimeJobRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Infrastructure/RuntimeJobRepository.swift; sourceTree = "<group>"; };
+		A26F00000000000000000022 /* Infrastructure/RuntimeProcessSupervisor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Infrastructure/RuntimeProcessSupervisor.swift; sourceTree = "<group>"; };
+		A26F00000000000000000023 /* AutonomySupervisorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutonomySupervisorTests.swift; sourceTree = "<group>"; };
+		A26F00000000000000000024 /* ContextBudgetSupervisorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContextBudgetSupervisorTests.swift; sourceTree = "<group>"; };
+		A26F00000000000000000025 /* ContinuityV2Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContinuityV2Tests.swift; sourceTree = "<group>"; };
+		A26F00000000000000000026 /* ManagedModelProviderBridgeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedModelProviderBridgeTests.swift; sourceTree = "<group>"; };
+		A26F00000000000000000027 /* ManagedProjectRunStepExecutorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedProjectRunStepExecutorTests.swift; sourceTree = "<group>"; };
+		A26F00000000000000000028 /* ProjectContextIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectContextIntegrationTests.swift; sourceTree = "<group>"; };
+		A26F00000000000000000029 /* ProjectControlPlaneRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectControlPlaneRepositoryTests.swift; sourceTree = "<group>"; };
+		A26F00000000000000000030 /* RuntimeExecutionJobTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeExecutionJobTests.swift; sourceTree = "<group>"; };
+		A26F00000000000000000031 /* ToolDefinitionCatalogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolDefinitionCatalogTests.swift; sourceTree = "<group>"; };
+		A26F00000000000000000032 /* Application/ManagedContinuityWorker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/ManagedContinuityWorker.swift; sourceTree = "<group>"; };
+		A26F00000000000000000033 /* ManagedAutonomyRuntimeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedAutonomyRuntimeTests.swift; sourceTree = "<group>"; };
+		A26F00000000000000000034 /* ManagedContinuityWorkerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedContinuityWorkerTests.swift; sourceTree = "<group>"; };
+		A26F00000000000000000035 /* AutonomousContinuityAcceptanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutonomousContinuityAcceptanceTests.swift; sourceTree = "<group>"; };
+		A26F00000000000000000036 /* OperatorConsole/Models/OperatorConsoleModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperatorConsole/Models/OperatorConsoleModels.swift; sourceTree = "<group>"; };
+		A26F00000000000000000037 /* OperatorConsole/Services/OperatorManagerClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperatorConsole/Services/OperatorManagerClient.swift; sourceTree = "<group>"; };
+		A26F00000000000000000038 /* OperatorConsole/ViewModels/AutonomyViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperatorConsole/ViewModels/AutonomyViewModel.swift; sourceTree = "<group>"; };
+		A26F00000000000000000039 /* OperatorConsole/ViewModels/ContinuityViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperatorConsole/ViewModels/ContinuityViewModel.swift; sourceTree = "<group>"; };
+		A26F00000000000000000040 /* OperatorConsole/ViewModels/EvidenceViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperatorConsole/ViewModels/EvidenceViewModel.swift; sourceTree = "<group>"; };
+		A26F00000000000000000041 /* OperatorConsole/ViewModels/ProjectsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperatorConsole/ViewModels/ProjectsViewModel.swift; sourceTree = "<group>"; };
+		A26F00000000000000000042 /* OperatorConsole/ViewModels/ProviderViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperatorConsole/ViewModels/ProviderViewModel.swift; sourceTree = "<group>"; };
+		A26F00000000000000000043 /* OperatorConsole/ViewModels/RuntimesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperatorConsole/ViewModels/RuntimesViewModel.swift; sourceTree = "<group>"; };
+		A26F00000000000000000044 /* OperatorConsole/Views/AutonomyOperatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperatorConsole/Views/AutonomyOperatorView.swift; sourceTree = "<group>"; };
+		A26F00000000000000000045 /* OperatorConsole/Views/ContinuityOperatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperatorConsole/Views/ContinuityOperatorView.swift; sourceTree = "<group>"; };
+		A26F00000000000000000046 /* OperatorConsole/Views/EvidenceOperatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperatorConsole/Views/EvidenceOperatorView.swift; sourceTree = "<group>"; };
+		A26F00000000000000000047 /* OperatorConsole/Views/OperatorConsoleComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperatorConsole/Views/OperatorConsoleComponents.swift; sourceTree = "<group>"; };
+		A26F00000000000000000048 /* OperatorConsole/Views/ProjectsOperatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperatorConsole/Views/ProjectsOperatorView.swift; sourceTree = "<group>"; };
+		A26F00000000000000000049 /* OperatorConsole/Views/ProviderOperatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperatorConsole/Views/ProviderOperatorView.swift; sourceTree = "<group>"; };
+		A26F00000000000000000050 /* OperatorConsole/Views/RuntimesOperatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperatorConsole/Views/RuntimesOperatorView.swift; sourceTree = "<group>"; };
 		P10F00000000000000000001 /* Application/ContinuityCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/ContinuityCoordinator.swift; sourceTree = "<group>"; };
 		P10F00000000000000000002 /* Application/Tools/ContinuityLifecycleToolPack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/Tools/ContinuityLifecycleToolPack.swift; sourceTree = "<group>"; };
 		P10F00000000000000000003 /* Domain/ContinuityModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/ContinuityModels.swift; sourceTree = "<group>"; };
@@ -387,6 +521,8 @@
 		P10F00000000000000000019 /* ResourcePolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResourcePolicyTests.swift; sourceTree = "<group>"; };
 		P10F00000000000000000020 /* RuntimeObservabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeObservabilityTests.swift; sourceTree = "<group>"; };
 		P11F00000000000000000001 /* ReleaseStressTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseStressTests.swift; sourceTree = "<group>"; };
+		F0A70000000000000000000A /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		F0A70000000000000000000B /* forge-runtime-launcher */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "forge-runtime-launcher"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -430,6 +566,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F0A70000000000000000000C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -438,6 +581,7 @@
 			children = (
 				EF8AADDA82404E2F8ED4A976 /* ForgeConductorCore */,
 				C446733565AC47CF93D47FF3 /* ForgeConductorCLI */,
+				F0A70000000000000000000D /* ForgeRuntimeLauncher */,
 				DB59238523D446A9AC5B2534 /* ForgeConductorApp */,
 			);
 			path = Sources;
@@ -446,6 +590,18 @@
 		64BB9664134D41DE87CE4C03 /* Tests/ForgeConductorTests */ = {
 			isa = PBXGroup;
 			children = (
+				A26F00000000000000000035 /* AutonomousContinuityAcceptanceTests.swift */,
+				A26F00000000000000000023 /* AutonomySupervisorTests.swift */,
+				A26F00000000000000000024 /* ContextBudgetSupervisorTests.swift */,
+				A26F00000000000000000025 /* ContinuityV2Tests.swift */,
+				A26F00000000000000000033 /* ManagedAutonomyRuntimeTests.swift */,
+				A26F00000000000000000034 /* ManagedContinuityWorkerTests.swift */,
+				A26F00000000000000000026 /* ManagedModelProviderBridgeTests.swift */,
+				A26F00000000000000000027 /* ManagedProjectRunStepExecutorTests.swift */,
+				A26F00000000000000000028 /* ProjectContextIntegrationTests.swift */,
+				A26F00000000000000000029 /* ProjectControlPlaneRepositoryTests.swift */,
+				A26F00000000000000000030 /* RuntimeExecutionJobTests.swift */,
+				A26F00000000000000000031 /* ToolDefinitionCatalogTests.swift */,
 				P11F00000000000000000001 /* ReleaseStressTests.swift */,
 				P10F00000000000000000014 /* ContinuityCoordinatorTests.swift */,
 				P10F00000000000000000015 /* LatestValueMailboxTests.swift */,
@@ -494,6 +650,7 @@
 			children = (
 				E1FEBD9C424A4245A89601F6 /* ForgeConductorCore.framework */,
 				FAD7DC3FA3A1480E9B4955B1 /* forge-conductor */,
+				F0A70000000000000000000B /* forge-runtime-launcher */,
 				29BC85D97DC146E3AA9DF401 /* Forge Conductor.app */,
 				1EBA34625EF54B7B870DFDC9 /* ForgeConductorTests.xctest */,
 				222C8F97CB2D45D39C28D4B7 /* ForgeConductorUITests.xctest */,
@@ -517,6 +674,14 @@
 			path = ForgeConductorCLI;
 			sourceTree = "<group>";
 		};
+		F0A70000000000000000000D /* ForgeRuntimeLauncher */ = {
+			isa = PBXGroup;
+			children = (
+				F0A70000000000000000000A /* main.swift */,
+			);
+			path = ForgeRuntimeLauncher;
+			sourceTree = "<group>";
+		};
 		CA4B3C65563941F98ACE0362 = {
 			isa = PBXGroup;
 			children = (
@@ -531,6 +696,21 @@
 		DB59238523D446A9AC5B2534 /* ForgeConductorApp */ = {
 			isa = PBXGroup;
 			children = (
+				A26F00000000000000000036 /* OperatorConsole/Models/OperatorConsoleModels.swift */,
+				A26F00000000000000000037 /* OperatorConsole/Services/OperatorManagerClient.swift */,
+				A26F00000000000000000038 /* OperatorConsole/ViewModels/AutonomyViewModel.swift */,
+				A26F00000000000000000039 /* OperatorConsole/ViewModels/ContinuityViewModel.swift */,
+				A26F00000000000000000040 /* OperatorConsole/ViewModels/EvidenceViewModel.swift */,
+				A26F00000000000000000041 /* OperatorConsole/ViewModels/ProjectsViewModel.swift */,
+				A26F00000000000000000042 /* OperatorConsole/ViewModels/ProviderViewModel.swift */,
+				A26F00000000000000000043 /* OperatorConsole/ViewModels/RuntimesViewModel.swift */,
+				A26F00000000000000000044 /* OperatorConsole/Views/AutonomyOperatorView.swift */,
+				A26F00000000000000000045 /* OperatorConsole/Views/ContinuityOperatorView.swift */,
+				A26F00000000000000000046 /* OperatorConsole/Views/EvidenceOperatorView.swift */,
+				A26F00000000000000000047 /* OperatorConsole/Views/OperatorConsoleComponents.swift */,
+				A26F00000000000000000048 /* OperatorConsole/Views/ProjectsOperatorView.swift */,
+				A26F00000000000000000049 /* OperatorConsole/Views/ProviderOperatorView.swift */,
+				A26F00000000000000000050 /* OperatorConsole/Views/RuntimesOperatorView.swift */,
 				P10F00000000000000000007 /* Metal/MetalGaugeResources.swift */,
 				DC5D36D534784BBAA579243E /* AppModel.swift */,
 				A1T2E3L4E5M600000001 /* AppTelemetryBinding.swift */,
@@ -562,6 +742,29 @@
 		EF8AADDA82404E2F8ED4A976 /* ForgeConductorCore */ = {
 			isa = PBXGroup;
 			children = (
+				A26F00000000000000000001 /* Application/AutonomySupervisor.swift */,
+				A26F00000000000000000002 /* Application/ContextBudgetSupervisor.swift */,
+				A26F00000000000000000003 /* Application/ExecutionJobService.swift */,
+				A26F00000000000000000004 /* Application/LegacyContinuityMigrator.swift */,
+				A26F00000000000000000005 /* Application/ManagedAutonomyRuntime.swift */,
+				A26F00000000000000000032 /* Application/ManagedContinuityWorker.swift */,
+				A26F00000000000000000006 /* Application/ManagedProjectRunStepExecutor.swift */,
+				A26F00000000000000000007 /* Application/PersistedManagedRunBudgetEvaluator.swift */,
+				A26F00000000000000000008 /* Application/ProjectContextService.swift */,
+				A26F00000000000000000009 /* Application/ProjectRunCoordinator.swift */,
+				A26F00000000000000000010 /* Application/RuntimeJobSubsystem.swift */,
+				A26F00000000000000000011 /* Application/ToolDefinitionCatalog.swift */,
+				A26F00000000000000000012 /* Application/ToolInvocationBroker.swift */,
+				A26F00000000000000000013 /* Application/Tools/RuntimeJobToolPack.swift */,
+				A26F00000000000000000014 /* Domain/AutonomyModels.swift */,
+				A26F00000000000000000015 /* Domain/ContextBudgetModels.swift */,
+				A26F00000000000000000016 /* Domain/ContinuityV2Models.swift */,
+				A26F00000000000000000017 /* Domain/ManagedModelProvider.swift */,
+				A26F00000000000000000018 /* Domain/ProjectContextModels.swift */,
+				A26F00000000000000000019 /* Domain/RuntimeJobModels.swift */,
+				A26F00000000000000000020 /* Infrastructure/ProjectControlPlaneRepository.swift */,
+				A26F00000000000000000021 /* Infrastructure/RuntimeJobRepository.swift */,
+				A26F00000000000000000022 /* Infrastructure/RuntimeProcessSupervisor.swift */,
 				P10F00000000000000000001 /* Application/ContinuityCoordinator.swift */,
 				P10F00000000000000000002 /* Application/Tools/ContinuityLifecycleToolPack.swift */,
 				P10F00000000000000000003 /* Domain/ContinuityModels.swift */,
@@ -675,6 +878,7 @@
 			);
 			dependencies = (
 				C7B38FE38DB84BD889BDDFC8 /* PBXTargetDependency */,
+				F0A700000000000000000007 /* PBXTargetDependency */,
 			);
 			name = "forge-conductor";
 			productName = "forge-conductor";
@@ -713,6 +917,7 @@
 			dependencies = (
 				627D0EA7A73A40C980B61CAC /* PBXTargetDependency */,
 				1B20C9C218D54E71A69A1A02 /* PBXTargetDependency */,
+				F0A700000000000000000008 /* PBXTargetDependency */,
 			);
 			name = ForgeConductorTests;
 			productName = ForgeConductorTests;
@@ -736,6 +941,22 @@
 			productReference = E1FEBD9C424A4245A89601F6 /* ForgeConductorCore.framework */;
 			productType = "com.apple.product-type.framework";
 		};
+		F0A70000000000000000000E /* ForgeRuntimeLauncher */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F0A700000000000000000012 /* Build configuration list for PBXNativeTarget "ForgeRuntimeLauncher" */;
+			buildPhases = (
+				F0A70000000000000000000F /* Sources */,
+				F0A70000000000000000000C /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ForgeRuntimeLauncher;
+			productName = "forge-runtime-launcher";
+			productReference = F0A70000000000000000000B /* forge-runtime-launcher */;
+			productType = "com.apple.product-type.tool";
+		};
 		D574F9BCA1204936B158984B /* ForgeConductor */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 80CDA28A6A1140C4960F2655 /* Build configuration list for PBXNativeTarget "ForgeConductor" */;
@@ -744,11 +965,13 @@
 				BD46199A67854F19A9586E75 /* Resources */,
 				D2CE50ED41104B5E981F8DD0 /* Frameworks */,
 				98CBE8A3FF644D858AC1F1DA /* Embed Frameworks */,
+				F0A700000000000000000009 /* Embed Runtime Helper */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				7F8369FCE0FB4AF984DF68CB /* PBXTargetDependency */,
+				F0A700000000000000000006 /* PBXTargetDependency */,
 			);
 			name = ForgeConductor;
 			productName = ForgeConductor;
@@ -780,6 +1003,7 @@
 			targets = (
 				C596F91D22BA465F8D8290A1 /* ForgeConductorCore */,
 				05C234606560407787702A3C /* forge-conductor */,
+				F0A70000000000000000000E /* ForgeRuntimeLauncher */,
 				D574F9BCA1204936B158984B /* ForgeConductor */,
 				8897BF3640FD4CBEA73213FC /* ForgeConductorTests */,
 				7AEAA3E3769249359E346C15 /* ForgeConductorUITests */,
@@ -840,6 +1064,18 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A26B00000000000000000035 /* AutonomousContinuityAcceptanceTests.swift in Sources */,
+				A26B00000000000000000023 /* AutonomySupervisorTests.swift in Sources */,
+				A26B00000000000000000024 /* ContextBudgetSupervisorTests.swift in Sources */,
+				A26B00000000000000000025 /* ContinuityV2Tests.swift in Sources */,
+				A26B00000000000000000033 /* ManagedAutonomyRuntimeTests.swift in Sources */,
+				A26B00000000000000000034 /* ManagedContinuityWorkerTests.swift in Sources */,
+				A26B00000000000000000026 /* ManagedModelProviderBridgeTests.swift in Sources */,
+				A26B00000000000000000027 /* ManagedProjectRunStepExecutorTests.swift in Sources */,
+				A26B00000000000000000028 /* ProjectContextIntegrationTests.swift in Sources */,
+				A26B00000000000000000029 /* ProjectControlPlaneRepositoryTests.swift in Sources */,
+				A26B00000000000000000030 /* RuntimeExecutionJobTests.swift in Sources */,
+				A26B00000000000000000031 /* ToolDefinitionCatalogTests.swift in Sources */,
 				P11B00000000000000000001 /* ReleaseStressTests.swift in Sources */,
 				P10B00000000000000000014 /* ContinuityCoordinatorTests.swift in Sources */,
 				P10B00000000000000000015 /* LatestValueMailboxTests.swift in Sources */,
@@ -876,6 +1112,21 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A26B00000000000000000036 /* OperatorConsole/Models/OperatorConsoleModels.swift in Sources */,
+				A26B00000000000000000037 /* OperatorConsole/Services/OperatorManagerClient.swift in Sources */,
+				A26B00000000000000000038 /* OperatorConsole/ViewModels/AutonomyViewModel.swift in Sources */,
+				A26B00000000000000000039 /* OperatorConsole/ViewModels/ContinuityViewModel.swift in Sources */,
+				A26B00000000000000000040 /* OperatorConsole/ViewModels/EvidenceViewModel.swift in Sources */,
+				A26B00000000000000000041 /* OperatorConsole/ViewModels/ProjectsViewModel.swift in Sources */,
+				A26B00000000000000000042 /* OperatorConsole/ViewModels/ProviderViewModel.swift in Sources */,
+				A26B00000000000000000043 /* OperatorConsole/ViewModels/RuntimesViewModel.swift in Sources */,
+				A26B00000000000000000044 /* OperatorConsole/Views/AutonomyOperatorView.swift in Sources */,
+				A26B00000000000000000045 /* OperatorConsole/Views/ContinuityOperatorView.swift in Sources */,
+				A26B00000000000000000046 /* OperatorConsole/Views/EvidenceOperatorView.swift in Sources */,
+				A26B00000000000000000047 /* OperatorConsole/Views/OperatorConsoleComponents.swift in Sources */,
+				A26B00000000000000000048 /* OperatorConsole/Views/ProjectsOperatorView.swift in Sources */,
+				A26B00000000000000000049 /* OperatorConsole/Views/ProviderOperatorView.swift in Sources */,
+				A26B00000000000000000050 /* OperatorConsole/Views/RuntimesOperatorView.swift in Sources */,
 				P10B00000000000000000007 /* Metal/MetalGaugeResources.swift in Sources */,
 				36E0A9288A004103A772C778 /* Metal/MetalGaugeKit.swift in Sources */,
 				0D50172020A24DFFA4B22EBC /* Views/Rig/RigDashboardView.swift in Sources */,
@@ -919,6 +1170,29 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A26B00000000000000000001 /* Application/AutonomySupervisor.swift in Sources */,
+				A26B00000000000000000002 /* Application/ContextBudgetSupervisor.swift in Sources */,
+				A26B00000000000000000003 /* Application/ExecutionJobService.swift in Sources */,
+				A26B00000000000000000004 /* Application/LegacyContinuityMigrator.swift in Sources */,
+				A26B00000000000000000005 /* Application/ManagedAutonomyRuntime.swift in Sources */,
+				A26B00000000000000000032 /* Application/ManagedContinuityWorker.swift in Sources */,
+				A26B00000000000000000006 /* Application/ManagedProjectRunStepExecutor.swift in Sources */,
+				A26B00000000000000000007 /* Application/PersistedManagedRunBudgetEvaluator.swift in Sources */,
+				A26B00000000000000000008 /* Application/ProjectContextService.swift in Sources */,
+				A26B00000000000000000009 /* Application/ProjectRunCoordinator.swift in Sources */,
+				A26B00000000000000000010 /* Application/RuntimeJobSubsystem.swift in Sources */,
+				A26B00000000000000000011 /* Application/ToolDefinitionCatalog.swift in Sources */,
+				A26B00000000000000000012 /* Application/ToolInvocationBroker.swift in Sources */,
+				A26B00000000000000000013 /* Application/Tools/RuntimeJobToolPack.swift in Sources */,
+				A26B00000000000000000014 /* Domain/AutonomyModels.swift in Sources */,
+				A26B00000000000000000015 /* Domain/ContextBudgetModels.swift in Sources */,
+				A26B00000000000000000016 /* Domain/ContinuityV2Models.swift in Sources */,
+				A26B00000000000000000017 /* Domain/ManagedModelProvider.swift in Sources */,
+				A26B00000000000000000018 /* Domain/ProjectContextModels.swift in Sources */,
+				A26B00000000000000000019 /* Domain/RuntimeJobModels.swift in Sources */,
+				A26B00000000000000000020 /* Infrastructure/ProjectControlPlaneRepository.swift in Sources */,
+				A26B00000000000000000021 /* Infrastructure/RuntimeJobRepository.swift in Sources */,
+				A26B00000000000000000022 /* Infrastructure/RuntimeProcessSupervisor.swift in Sources */,
 				P10B00000000000000000001 /* Application/ContinuityCoordinator.swift in Sources */,
 				P10B00000000000000000002 /* Application/Tools/ContinuityLifecycleToolPack.swift in Sources */,
 				P10B00000000000000000003 /* Domain/ContinuityModels.swift in Sources */,
@@ -1003,6 +1277,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F0A70000000000000000000F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F0A700000000000000000001 /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -1030,6 +1312,21 @@
 			isa = PBXTargetDependency;
 			target = C596F91D22BA465F8D8290A1 /* ForgeConductorCore */;
 			targetProxy = D672C06D5F6A425C9C58FCB0 /* PBXContainerItemProxy */;
+		};
+		F0A700000000000000000006 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F0A70000000000000000000E /* ForgeRuntimeLauncher */;
+			targetProxy = F0A700000000000000000003 /* PBXContainerItemProxy */;
+		};
+		F0A700000000000000000007 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F0A70000000000000000000E /* ForgeRuntimeLauncher */;
+			targetProxy = F0A700000000000000000004 /* PBXContainerItemProxy */;
+		};
+		F0A700000000000000000008 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F0A70000000000000000000E /* ForgeRuntimeLauncher */;
+			targetProxy = F0A700000000000000000005 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -1390,6 +1687,52 @@
 			};
 			name = Debug;
 		};
+		F0A700000000000000000010 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 2Y25RTLZET;
+				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.9.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.runtime-launcher";
+				PRODUCT_NAME = "forge-runtime-launcher";
+				SKIP_INSTALL = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		F0A700000000000000000011 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 2Y25RTLZET;
+				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.9.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.runtime-launcher";
+				PRODUCT_NAME = "forge-runtime-launcher";
+				SKIP_INSTALL = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1443,6 +1786,15 @@
 			buildConfigurations = (
 				B8CD77AA9F924CC09529D817 /* Debug */,
 				000293C386CD4B1A99C9F861 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F0A700000000000000000012 /* Build configuration list for PBXNativeTarget "ForgeRuntimeLauncher" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F0A700000000000000000010 /* Debug */,
+				F0A700000000000000000011 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -1,0 +1,10 @@
+event: response.created
+data: {"type":"response.created","sequence_number":0,"response":{"id":"resp_lms_fixture_continuation","object":"response","created_at":1787760002,"status":"in_progress","model":"fixture/tool-model","output":[],"previous_response_id":"resp_lms_fixture_root","usage":null}}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":1,"item_id":"msg_lms_fixture_continuation","output_index":0,"content_index":0,"delta":"Continuation accepted."}
+
+event: response.completed
+data: {"type":"response.completed","sequence_number":2,"response":{"id":"resp_lms_fixture_continuation","object":"response","created_at":1787760002,"completed_at":1787760003,"status":"completed","model":"fixture/tool-model","output":[{"id":"msg_lms_fixture_continuation","type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","text":"Continuation accepted.","annotations":[]}]}],"previous_response_id":"resp_lms_fixture_root","usage":{"input_tokens":128,"output_tokens":8,"total_tokens":136}}}
+
+data: [DONE]

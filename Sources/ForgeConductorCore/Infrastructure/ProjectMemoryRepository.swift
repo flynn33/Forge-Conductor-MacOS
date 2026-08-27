@@ -7,7 +7,7 @@ import Foundation
 import SQLite3
 
 public final class ProjectMemoryRepository: @unchecked Sendable {
-    public static let schemaVersion = 1
+    public static let schemaVersion = 2
     private static let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
     public let projectID: String
@@ -328,8 +328,9 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
                 INSERT INTO rollover_operations(
                   operation_id,project_id,predecessor_session_id,successor_session_id,handoff_id,
                   state,attempt,adapter_id,idempotency_key,acknowledged_session_id,
-                  acknowledged_handoff_id,created_at,updated_at,last_error,retry_at,state_checksum
-                ) VALUES(?,?,?,NULL,?, ?,0,?,?,NULL,NULL,?,?,NULL,NULL,?)
+                  acknowledged_handoff_id,created_at,updated_at,last_error,retry_at,state_checksum,
+                  schema_version,quarantine_state,migration_source
+                ) VALUES(?,?,?,NULL,?, ?,0,?,?,NULL,NULL,?,?,NULL,NULL,?,1,NULL,'compatibility_v1')
                 """
             ) { statement in
                 bind(statement, 1, operationID); bind(statement, 2, projectID)
@@ -363,16 +364,24 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
             try withStatementUnlocked(
                 """
                 INSERT INTO continuity_handoffs(
-                  handoff_id,project_id,operation_id,payload_json,content_sha256,created_at
-                ) VALUES(?,?,?,?,?,?)
+                  handoff_id,project_id,operation_id,payload_json,content_sha256,created_at,
+                  schema_version,quarantine_state,migration_source
+                ) VALUES(?,?,?,?,?,?,'1.0',NULL,'compatibility_v1')
                 ON CONFLICT(handoff_id) DO UPDATE SET
-                  payload_json=excluded.payload_json,content_sha256=excluded.content_sha256
+                  payload_json=excluded.payload_json,content_sha256=excluded.content_sha256,
+                  schema_version='1.0',quarantine_state=NULL,
+                  migration_source='compatibility_v1'
+                WHERE continuity_handoffs.operation_id=excluded.operation_id
+                  AND continuity_handoffs.project_id=excluded.project_id
                 """
             ) { statement in
                 bind(statement, 1, validated.handoffID); bind(statement, 2, projectID)
                 bind(statement, 3, validated.operationID); bind(statement, 4, payload)
                 bind(statement, 5, validated.contentSHA256); bind(statement, 6, validated.createdAt)
                 try stepDone(statement)
+            }
+            guard sqlite3_changes(db) == 1 else {
+                throw ProjectMemoryError.conflict("handoff identifier is already bound to a different operation")
             }
         }
     }
@@ -522,7 +531,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
 
     public func continuityRecordRetry(operationID: String, error: String, retryAt: String?) throws {
         try withStatement(
-            "UPDATE rollover_operations SET last_error=?,retry_at=?,updated_at=? WHERE operation_id=? AND project_id=?"
+            "UPDATE rollover_operations SET last_error=?,retry_at=?,updated_at=? WHERE operation_id=? AND project_id=? AND quarantine_state IS NULL"
         ) { statement in
             bind(statement, 1, String(error.prefix(2048))); bind(statement, 2, retryAt)
             bind(statement, 3, ISO8601.string(from: clock.now())); bind(statement, 4, operationID)
@@ -538,8 +547,25 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         }
     }
 
+    public func continuityOperation(idempotencyKey: String) throws -> ContinuityOperation? {
+        try withStatement(
+            Self.continuityOperationSelect
+                + " WHERE project_id=? AND idempotency_key=? AND schema_version=1"
+                + " AND quarantine_state IS NULL LIMIT 1"
+        ) { statement in
+            bind(statement, 1, projectID)
+            bind(statement, 2, idempotencyKey)
+            guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+            return continuityOperation(statement)
+        }
+    }
+
     public func continuityActiveOperation() throws -> ContinuityOperation? {
-        try withStatement(Self.continuityOperationSelect + " WHERE project_id=? AND state<>'predecessorSealed' ORDER BY updated_at DESC LIMIT 1") { statement in
+        try withStatement(
+            Self.continuityOperationSelect
+                + " WHERE project_id=? AND state<>'predecessorSealed'"
+                + " AND quarantine_state IS NULL ORDER BY updated_at DESC LIMIT 1"
+        ) { statement in
             bind(statement, 1, projectID)
             guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
             return continuityOperation(statement)
@@ -557,6 +583,748 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         try scalarInt("SELECT COUNT(*) FROM rollover_transitions WHERE operation_id=?", value: operationID)
     }
 
+    // MARK: - Project continuity V2
+
+    public func continuityCreateOperationV2(
+        handoff: ContinuityHandoffV2,
+        predecessorSessionID: String,
+        predecessorProviderResponseID: String?,
+        adapterID: String,
+        idempotencyKey: String,
+        budgetObservationID: String? = nil
+    ) throws -> ContinuityOperationV2 {
+        let validated = try handoff.validated()
+        guard validated.projectID == projectID,
+              let generation = validated.projectGeneration,
+              let runID = validated.runID,
+              let nonce = validated.bootstrapNonce else {
+            throw ProjectMemoryError.projectScopeMismatch
+        }
+        let handoffPredecessorResponse: String?
+        if validated.predecessorSession["provider_response_id"] is NSNull {
+            handoffPredecessorResponse = nil
+        } else if let value = validated.predecessorSession["provider_response_id"] as? String {
+            handoffPredecessorResponse = value
+        } else {
+            throw ProjectMemoryError.invalidRequest("provider_response_id must be a string or null")
+        }
+        guard !predecessorSessionID.isEmpty, !adapterID.isEmpty, !idempotencyKey.isEmpty else {
+            throw ProjectMemoryError.invalidRequest("V2 operation identity is incomplete")
+        }
+        guard validated.predecessorSession["session_id"] as? String == predecessorSessionID,
+              validated.predecessorSession["adapter_id"] as? String == adapterID,
+              handoffPredecessorResponse == predecessorProviderResponseID else {
+            throw ProjectMemoryError.conflict(
+                "V2 operation predecessor identity does not match its handoff"
+            )
+        }
+        let payload = try JSONSupport.string(from: validated.asDictionary())
+        lock.lock()
+        let operation: ContinuityOperationV2
+        do {
+            operation = try transactionUnlocked {
+                if let existing = try continuityOperationV2ByIdempotencyUnlocked(idempotencyKey) {
+                    guard existing.operationID == validated.operationID,
+                          existing.handoffID == validated.handoffID,
+                          existing.projectGeneration == generation,
+                          existing.runID == runID,
+                          existing.predecessorSessionID == predecessorSessionID,
+                          existing.predecessorProviderResponseID == predecessorProviderResponseID,
+                          existing.adapterID == adapterID,
+                          existing.bootstrapNonce == nonce else {
+                        throw ProjectMemoryError.conflict("V2 idempotency key is already bound")
+                    }
+                    try continuityPersistHandoffV2Unlocked(
+                        validated,
+                        payload: payload,
+                        generation: generation,
+                        runID: runID,
+                        predecessorResponseID: handoffPredecessorResponse
+                    )
+                    return existing
+                }
+                if let active = try continuityActiveOperationUnlocked() {
+                    throw ProjectMemoryError.conflict("rollover already active: \(active.operationID)")
+                }
+                let timestamp = ISO8601.string(from: clock.now())
+                let checksum = Self.continuityChecksumV2(
+                    operationID: validated.operationID,
+                    projectGeneration: generation,
+                    runID: runID,
+                    state: .active,
+                    successorSessionID: nil,
+                    successorProviderResponseID: nil,
+                    handoffID: validated.handoffID,
+                    attempt: 0
+                )
+                try withStatementUnlocked(
+                    """
+                    INSERT INTO rollover_operations(
+                      operation_id,project_id,predecessor_session_id,successor_session_id,handoff_id,
+                      state,attempt,adapter_id,idempotency_key,acknowledged_session_id,
+                      acknowledged_handoff_id,created_at,updated_at,last_error,retry_at,state_checksum,
+                      schema_version,project_generation,run_id,predecessor_provider_response_id,
+                      successor_provider_response_id,bootstrap_nonce,acknowledgement_sha256,
+                      budget_observation_id,continuation_issued,quarantine_state,migration_source,
+                      legacy_record_id
+                    ) VALUES(?,?,?,NULL,?, 'active',0,?,?,NULL,NULL,?,?,NULL,NULL,?,
+                             2,?,?,?,NULL,?,NULL,?,0,NULL,NULL,NULL)
+                    """
+                ) { statement in
+                    bind(statement, 1, validated.operationID)
+                    bind(statement, 2, projectID)
+                    bind(statement, 3, predecessorSessionID)
+                    bind(statement, 4, validated.handoffID)
+                    bind(statement, 5, adapterID)
+                    bind(statement, 6, idempotencyKey)
+                    bind(statement, 7, timestamp)
+                    bind(statement, 8, timestamp)
+                    bind(statement, 9, checksum)
+                    sqlite3_bind_int64(statement, 10, Int64(generation))
+                    bind(statement, 11, runID)
+                    bind(statement, 12, predecessorProviderResponseID)
+                    bind(statement, 13, nonce)
+                    bind(statement, 14, budgetObservationID)
+                    try stepDone(statement)
+                }
+                try appendTransitionV2Unlocked(
+                    operationID: validated.operationID,
+                    projectGeneration: generation,
+                    runID: runID,
+                    from: nil,
+                    to: .active,
+                    attempt: 0,
+                    adapterID: adapterID,
+                    successorProviderResponseID: nil,
+                    evidence: "v2_operation_created",
+                    checksum: checksum
+                )
+                try continuityPersistHandoffV2Unlocked(
+                    validated,
+                    payload: payload,
+                    generation: generation,
+                    runID: runID,
+                    predecessorResponseID: handoffPredecessorResponse
+                )
+                guard let created = try continuityOperationV2Unlocked(validated.operationID) else {
+                    throw ProjectMemoryError.integrityFailure("created V2 rollover operation is unreadable")
+                }
+                return created
+            }
+            lock.unlock()
+        } catch {
+            lock.unlock()
+            throw error
+        }
+        try writeHandoffProjection(validated)
+        try writeOperationProjection(operation)
+        return operation
+    }
+
+    public func continuityStoreHandoffV2(_ handoff: ContinuityHandoffV2) throws {
+        let validated = try handoff.validated()
+        guard validated.projectID == projectID,
+              let generation = validated.projectGeneration,
+              let runID = validated.runID,
+              validated.bootstrapNonce != nil else {
+            throw ProjectMemoryError.projectScopeMismatch
+        }
+        let predecessorResponseID: String?
+        if validated.predecessorSession["provider_response_id"] is NSNull {
+            predecessorResponseID = nil
+        } else if let value = validated.predecessorSession["provider_response_id"] as? String {
+            predecessorResponseID = value
+        } else {
+            throw ProjectMemoryError.invalidRequest("provider_response_id must be a string or null")
+        }
+        let payload = try JSONSupport.string(from: validated.asDictionary())
+        lock.lock()
+        do {
+            try transactionUnlocked {
+                try continuityPersistHandoffV2Unlocked(
+                    validated,
+                    payload: payload,
+                    generation: generation,
+                    runID: runID,
+                    predecessorResponseID: predecessorResponseID
+                )
+            }
+            lock.unlock()
+        } catch {
+            lock.unlock()
+            throw error
+        }
+        try writeHandoffProjection(validated)
+    }
+
+    public func continuityHandoffV2(id: String) throws -> ContinuityHandoffV2? {
+        try withStatement(
+            """
+            SELECT payload_json,content_sha256 FROM continuity_handoffs
+            WHERE handoff_id=? AND project_id=? AND schema_version='2.0'
+              AND quarantine_state IS NULL LIMIT 1
+            """
+        ) { statement in
+            bind(statement, 1, id)
+            bind(statement, 2, projectID)
+            guard sqlite3_step(statement) == SQLITE_ROW,
+                  let payload = text(statement, 0),
+                  let data = payload.data(using: .utf8),
+                  let object = try? JSONSupport.object(from: data),
+                  let handoff = ContinuityHandoffV2.fromDictionary(object),
+                  handoff.contentSHA256 == text(statement, 1),
+                  handoff.calculatedSHA256() == handoff.contentSHA256,
+                  (try? handoff.validated()) != nil else {
+                return nil
+            }
+            return handoff
+        }
+    }
+
+    public func continuityOperationV2(id: String) throws -> ContinuityOperationV2? {
+        try withStatement(
+            Self.continuityOperationV2Select
+                + " WHERE operation_id=? AND project_id=? AND schema_version=2 LIMIT 1"
+        ) { statement in
+            bind(statement, 1, id)
+            bind(statement, 2, projectID)
+            guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+            return try continuityOperationV2(statement)
+        }
+    }
+
+    public func continuityOperationV2(
+        idempotencyKey: String
+    ) throws -> ContinuityOperationV2? {
+        try withStatement(
+            Self.continuityOperationV2Select
+                + " WHERE project_id=? AND idempotency_key=? AND schema_version=2"
+                + " AND quarantine_state IS NULL LIMIT 1"
+        ) { statement in
+            bind(statement, 1, projectID)
+            bind(statement, 2, idempotencyKey)
+            guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+            return try continuityOperationV2(statement)
+        }
+    }
+
+    public func continuityActiveOperationV2() throws -> ContinuityOperationV2? {
+        try withStatement(
+            Self.continuityOperationV2Select
+                + " WHERE project_id=? AND schema_version=2 AND quarantine_state IS NULL"
+                + " AND state<>'predecessorSealed' ORDER BY updated_at DESC LIMIT 1"
+        ) { statement in
+            bind(statement, 1, projectID)
+            guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+            return try continuityOperationV2(statement)
+        }
+    }
+
+    public func continuityTransitionV2(
+        operationID: String,
+        expected: ContinuityState,
+        to next: ContinuityState,
+        successorSessionID: String? = nil,
+        successorProviderResponseID: String? = nil,
+        evidence: String? = nil
+    ) throws -> ContinuityOperationV2 {
+        guard expected.next == next else {
+            throw ProjectMemoryError.invalidRequest("invalid V2 transition \(expected.rawValue) -> \(next.rawValue)")
+        }
+        lock.lock()
+        let operation: ContinuityOperationV2
+        do {
+            operation = try transactionUnlocked {
+                guard let current = try continuityOperationV2Unlocked(operationID) else {
+                    throw ProjectMemoryError.recordNotFound(operationID)
+                }
+                if current.state == next {
+                    if let successorSessionID,
+                       current.successorSessionID != successorSessionID {
+                        throw ProjectMemoryError.conflict(
+                            "V2 transition replay names a different successor"
+                        )
+                    }
+                    if let successorProviderResponseID,
+                       current.successorProviderResponseID != successorProviderResponseID {
+                        throw ProjectMemoryError.conflict(
+                            "V2 transition replay names a different provider response"
+                        )
+                    }
+                    return current
+                }
+                guard current.state == expected else {
+                    throw ProjectMemoryError.conflict(
+                        "expected \(expected.rawValue), current \(current.state.rawValue)"
+                    )
+                }
+                let successor = successorSessionID ?? current.successorSessionID
+                let providerResponse = successorProviderResponseID ?? current.successorProviderResponseID
+                if next == .successorCreated, (successor == nil || providerResponse == nil) {
+                    throw ProjectMemoryError.invalidRequest(
+                        "V2 successor and provider response identifiers are required"
+                    )
+                }
+                if next == .checkpointPersisted,
+                   !(try continuityV2HandoffExistsUnlocked(id: current.handoffID)) {
+                    throw ProjectMemoryError.integrityFailure("V2 checkpoint handoff is not durable")
+                }
+                let attempt = current.attempt + 1
+                let checksum = Self.continuityChecksumV2(
+                    operationID: current.operationID,
+                    projectGeneration: current.projectGeneration,
+                    runID: current.runID,
+                    state: next,
+                    successorSessionID: successor,
+                    successorProviderResponseID: providerResponse,
+                    handoffID: current.handoffID,
+                    attempt: attempt
+                )
+                let timestamp = ISO8601.string(from: clock.now())
+                try withStatementUnlocked(
+                    """
+                    UPDATE rollover_operations SET state=?,attempt=?,successor_session_id=?,
+                      successor_provider_response_id=?,updated_at=?,last_error=NULL,retry_at=NULL,
+                      state_checksum=? WHERE operation_id=? AND project_id=?
+                      AND schema_version=2 AND state=? AND quarantine_state IS NULL
+                    """
+                ) { statement in
+                    bind(statement, 1, next.rawValue)
+                    sqlite3_bind_int(statement, 2, Int32(attempt))
+                    bind(statement, 3, successor)
+                    bind(statement, 4, providerResponse)
+                    bind(statement, 5, timestamp)
+                    bind(statement, 6, checksum)
+                    bind(statement, 7, operationID)
+                    bind(statement, 8, projectID)
+                    bind(statement, 9, expected.rawValue)
+                    try stepDone(statement)
+                }
+                guard sqlite3_changes(db) == 1 else {
+                    throw ProjectMemoryError.conflict("V2 transition compare-and-set failed")
+                }
+                try appendTransitionV2Unlocked(
+                    operationID: operationID,
+                    projectGeneration: current.projectGeneration,
+                    runID: current.runID,
+                    from: expected,
+                    to: next,
+                    attempt: attempt,
+                    adapterID: current.adapterID,
+                    successorProviderResponseID: providerResponse,
+                    evidence: evidence,
+                    checksum: checksum
+                )
+                if next == .predecessorSealed, let successor {
+                    try withStatementUnlocked(
+                        """
+                        INSERT INTO project_active_sessions(project_id,session_id,updated_at)
+                        VALUES(?,?,?) ON CONFLICT(project_id) DO UPDATE SET
+                          session_id=excluded.session_id,updated_at=excluded.updated_at
+                        """
+                    ) { statement in
+                        bind(statement, 1, projectID)
+                        bind(statement, 2, successor)
+                        bind(statement, 3, timestamp)
+                        try stepDone(statement)
+                    }
+                }
+                guard let updated = try continuityOperationV2Unlocked(operationID) else {
+                    throw ProjectMemoryError.integrityFailure("V2 transition result is unreadable")
+                }
+                return updated
+            }
+            lock.unlock()
+        } catch {
+            lock.unlock()
+            throw error
+        }
+        try writeOperationProjection(operation)
+        return operation
+    }
+
+    public func continuityAcknowledgeV2(
+        operationID: String,
+        receipt: BootstrapReceipt
+    ) throws -> ContinuityOperationV2 {
+        guard let preflight = try continuityOperationV2(id: operationID),
+              receipt.acknowledgement.operationID.uuidString.caseInsensitiveCompare(operationID) == .orderedSame,
+              let handoff = try continuityHandoffV2(id: preflight.handoffID) else {
+            throw ProjectMemoryError.integrityFailure("V2 handoff is missing or invalid")
+        }
+        try receipt.acknowledgement.validate(handoff: handoff)
+        let acknowledgementSHA256 = Self.bootstrapAcknowledgementSHA256(receipt.acknowledgement)
+        lock.lock()
+        let operation: ContinuityOperationV2
+        do {
+            operation = try transactionUnlocked {
+                guard let current = try continuityOperationV2Unlocked(operationID) else {
+                    throw ProjectMemoryError.recordNotFound(operationID)
+                }
+                if current.state == .successorAcknowledged || current.state == .predecessorSealed {
+                    guard current.acknowledgedHandoffID == handoff.handoffID,
+                          current.acknowledgedSessionID == receipt.internalSessionID,
+                          current.acknowledgementSHA256 == acknowledgementSHA256 else {
+                        throw ProjectMemoryError.conflict("a different V2 acknowledgement is committed")
+                    }
+                    return current
+                }
+                guard current.state == .successorBootstrapping,
+                      current.projectGeneration == handoff.projectGeneration,
+                      current.runID == handoff.runID,
+                      current.handoffID == handoff.handoffID,
+                      current.bootstrapNonce == handoff.bootstrapNonce,
+                      current.adapterID == receipt.adapterID,
+                      current.successorSessionID == receipt.internalSessionID,
+                      current.successorProviderResponseID == receipt.providerResponseID else {
+                    throw ProjectMemoryError.conflict("V2 acknowledgement does not match the durable operation")
+                }
+                let attempt = current.attempt + 1
+                let next = ContinuityState.successorAcknowledged
+                let checksum = Self.continuityChecksumV2(
+                    operationID: current.operationID,
+                    projectGeneration: current.projectGeneration,
+                    runID: current.runID,
+                    state: next,
+                    successorSessionID: receipt.internalSessionID,
+                    successorProviderResponseID: receipt.providerResponseID,
+                    handoffID: current.handoffID,
+                    attempt: attempt
+                )
+                let timestamp = ISO8601.string(from: clock.now())
+                try withStatementUnlocked(
+                    """
+                    UPDATE rollover_operations SET state=?,attempt=?,acknowledged_session_id=?,
+                      acknowledged_handoff_id=?,acknowledgement_sha256=?,updated_at=?,
+                      state_checksum=?,last_error=NULL,retry_at=NULL
+                    WHERE operation_id=? AND project_id=? AND schema_version=2
+                      AND state='successorBootstrapping' AND quarantine_state IS NULL
+                    """
+                ) { statement in
+                    bind(statement, 1, next.rawValue)
+                    sqlite3_bind_int(statement, 2, Int32(attempt))
+                    bind(statement, 3, receipt.internalSessionID)
+                    bind(statement, 4, handoff.handoffID)
+                    bind(statement, 5, acknowledgementSHA256)
+                    bind(statement, 6, timestamp)
+                    bind(statement, 7, checksum)
+                    bind(statement, 8, operationID)
+                    bind(statement, 9, projectID)
+                    try stepDone(statement)
+                }
+                guard sqlite3_changes(db) == 1 else {
+                    throw ProjectMemoryError.conflict("V2 acknowledgement compare-and-set failed")
+                }
+                try withStatementUnlocked(
+                    """
+                    UPDATE continuity_handoffs SET acknowledged_session_id=?,acknowledged_at=?,
+                      acknowledgement_sha256=? WHERE handoff_id=? AND project_id=?
+                      AND schema_version='2.0' AND quarantine_state IS NULL
+                    """
+                ) { statement in
+                    bind(statement, 1, receipt.internalSessionID)
+                    bind(statement, 2, timestamp)
+                    bind(statement, 3, acknowledgementSHA256)
+                    bind(statement, 4, handoff.handoffID)
+                    bind(statement, 5, projectID)
+                    try stepDone(statement)
+                }
+                try appendTransitionV2Unlocked(
+                    operationID: operationID,
+                    projectGeneration: current.projectGeneration,
+                    runID: current.runID,
+                    from: .successorBootstrapping,
+                    to: next,
+                    attempt: attempt,
+                    adapterID: receipt.adapterID,
+                    successorProviderResponseID: receipt.providerResponseID,
+                    evidence: acknowledgementSHA256,
+                    checksum: checksum
+                )
+                guard let updated = try continuityOperationV2Unlocked(operationID) else {
+                    throw ProjectMemoryError.integrityFailure("V2 acknowledgement result is unreadable")
+                }
+                return updated
+            }
+            lock.unlock()
+        } catch {
+            lock.unlock()
+            throw error
+        }
+        try writeOperationProjection(operation)
+        return operation
+    }
+
+    @discardableResult
+    public func continuityMarkContinuationIssuedV2(operationID: String) throws -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return try transactionUnlocked {
+            guard let operation = try continuityOperationV2Unlocked(operationID) else {
+                throw ProjectMemoryError.recordNotFound(operationID)
+            }
+            guard operation.state == .predecessorSealed else {
+                throw ProjectMemoryError.conflict("automatic continuation requires a sealed predecessor")
+            }
+            if operation.continuationIssued { return false }
+            let timestamp = ISO8601.string(from: clock.now())
+            try withStatementUnlocked(
+                """
+                UPDATE rollover_operations SET continuation_issued=1,updated_at=?
+                WHERE operation_id=? AND project_id=? AND schema_version=2
+                  AND continuation_issued=0 AND state='predecessorSealed'
+                """
+            ) { statement in
+                bind(statement, 1, timestamp)
+                bind(statement, 2, operationID)
+                bind(statement, 3, projectID)
+                try stepDone(statement)
+            }
+            guard sqlite3_changes(db) == 1 else {
+                throw ProjectMemoryError.conflict("automatic continuation compare-and-set failed")
+            }
+            try withStatementUnlocked(
+                """
+                UPDATE continuity_handoffs SET continuation_issued=1
+                WHERE handoff_id=? AND project_id=? AND schema_version='2.0'
+                """
+            ) { statement in
+                bind(statement, 1, operation.handoffID)
+                bind(statement, 2, projectID)
+                try stepDone(statement)
+            }
+            return true
+        }
+    }
+
+    @discardableResult
+    public func continuityQuarantineLegacy(
+        payload: [String: Any],
+        sourcePath: String?,
+        reason: String
+    ) throws -> String {
+        let data = try JSONSupport.data(from: payload)
+        guard data.count <= ContinuityHandoffV2.maximumEncodedBytes else {
+            throw ProjectMemoryError.payloadTooLarge("legacy continuity payload exceeds the quarantine limit")
+        }
+        let boundedReason = String(reason.prefix(2_048))
+        guard !boundedReason.isEmpty else {
+            throw ProjectMemoryError.invalidRequest("legacy quarantine reason is required")
+        }
+        let checksum = JSONSupport.sha256Hex(data)
+        let identifier = UUID().uuidString.lowercased()
+        let timestamp = ISO8601.string(from: clock.now())
+        lock.lock()
+        let storedIdentifier: String
+        do {
+            storedIdentifier = try transactionUnlocked {
+                let existing: String? = try withStatementUnlocked(
+                    """
+                    SELECT quarantine_id FROM legacy_continuity_quarantine
+                    WHERE project_id=? AND source_sha256=? LIMIT 1
+                    """
+                ) { statement -> String? in
+                    bind(statement, 1, projectID)
+                    bind(statement, 2, checksum)
+                    return sqlite3_step(statement) == SQLITE_ROW ? text(statement, 0) : nil
+                }
+                if let existing {
+                    return existing
+                }
+                try withStatementUnlocked(
+                    """
+                    INSERT OR IGNORE INTO legacy_continuity_quarantine(
+                      quarantine_id,project_id,source_path,source_sha256,reason,payload_json,created_at
+                    ) VALUES(?,?,?,?,?,?,?)
+                    """
+                ) { statement in
+                    bind(statement, 1, identifier)
+                    bind(statement, 2, projectID)
+                    bind(statement, 3, sourcePath.map { String($0.prefix(4_096)) })
+                    bind(statement, 4, checksum)
+                    bind(statement, 5, boundedReason)
+                    bind(statement, 6, String(decoding: data, as: UTF8.self))
+                    bind(statement, 7, timestamp)
+                    try stepDone(statement)
+                }
+                return identifier
+            }
+            lock.unlock()
+        } catch {
+            lock.unlock()
+            throw error
+        }
+        let directory = continuityDirectory
+            .appendingPathComponent("LegacyContinuityQuarantine", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let projection = directory.appendingPathComponent("\(storedIdentifier).json")
+        try data.write(to: projection, options: [.atomic, .completeFileProtectionUnlessOpen])
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: projection.path)
+        return storedIdentifier
+    }
+
+    /// Imports an unambiguously project-scoped legacy record for read-only diagnostics.
+    /// Imported rows are always quarantined from managed selection, even when their
+    /// payload already uses the V2 envelope.
+    @discardableResult
+    public func continuityImportLegacyReadOnly(
+        payload: [String: Any],
+        handoffID: String,
+        operationID: String,
+        schemaVersion: String,
+        contentSHA256: String,
+        createdAt: String,
+        projectGeneration: UInt64?,
+        runID: String?,
+        predecessorProviderResponseID: String?,
+        bootstrapNonce: String?,
+        sourceRecordID: String
+    ) throws -> Bool {
+        guard UUID(uuidString: handoffID) != nil, UUID(uuidString: operationID) != nil,
+              ["1.0", ContinuityHandoffV2.schemaVersion].contains(schemaVersion),
+              ISO8601.date(from: createdAt) != nil,
+              !sourceRecordID.isEmpty, sourceRecordID.utf8.count <= 1_024 else {
+            throw ProjectMemoryError.invalidRequest("legacy continuity identity is invalid")
+        }
+        let hashRange = contentSHA256.startIndex..<contentSHA256.endIndex
+        guard contentSHA256.range(of: "^[0-9a-f]{64}$", options: .regularExpression) == hashRange else {
+            throw ProjectMemoryError.invalidRequest("legacy continuity SHA-256 is invalid")
+        }
+        if schemaVersion == ContinuityHandoffV2.schemaVersion {
+            guard let projectGeneration, projectGeneration > 0,
+                  let runID, UUID(uuidString: runID) != nil,
+                  let bootstrapNonce, !bootstrapNonce.isEmpty else {
+                throw ProjectMemoryError.invalidRequest("legacy V2 record lacks exact generation or run identity")
+            }
+        }
+        let payloadJSON = try JSONSupport.string(from: payload)
+        guard payloadJSON.utf8.count <= ContinuityHandoffV2.maximumEncodedBytes else {
+            throw ProjectMemoryError.payloadTooLarge("legacy continuity record is oversized")
+        }
+        lock.lock()
+        defer { lock.unlock() }
+        return try transactionUnlocked {
+            let existing = try withStatementUnlocked(
+                """
+                SELECT handoff_id,operation_id,content_sha256 FROM continuity_handoffs
+                WHERE (handoff_id=? OR operation_id=?) AND project_id=? LIMIT 1
+                """
+            ) { statement -> (String, String, String)? in
+                bind(statement, 1, handoffID)
+                bind(statement, 2, operationID)
+                bind(statement, 3, projectID)
+                guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+                return (
+                    text(statement, 0) ?? "",
+                    text(statement, 1) ?? "",
+                    text(statement, 2) ?? ""
+                )
+            }
+            if let existing {
+                guard existing.0 == handoffID,
+                      existing.1 == operationID,
+                      existing.2 == contentSHA256 else {
+                    throw ProjectMemoryError.conflict("legacy continuity identifier collision")
+                }
+                return false
+            }
+            try withStatementUnlocked(
+                """
+                INSERT INTO continuity_handoffs(
+                  handoff_id,project_id,operation_id,payload_json,content_sha256,created_at,
+                  schema_version,project_generation,run_id,predecessor_provider_response_id,
+                  bootstrap_nonce,continuation_issued,quarantine_state,migration_source,
+                  legacy_record_id
+                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,0,'legacy_read_only','legacy_global',?)
+                """
+            ) { statement in
+                bind(statement, 1, handoffID)
+                bind(statement, 2, projectID)
+                bind(statement, 3, operationID)
+                bind(statement, 4, payloadJSON)
+                bind(statement, 5, contentSHA256)
+                bind(statement, 6, createdAt)
+                bind(statement, 7, schemaVersion)
+                if let projectGeneration {
+                    sqlite3_bind_int64(statement, 8, Int64(projectGeneration))
+                } else {
+                    sqlite3_bind_null(statement, 8)
+                }
+                bind(statement, 9, runID)
+                bind(statement, 10, predecessorProviderResponseID)
+                bind(statement, 11, bootstrapNonce)
+                bind(statement, 12, sourceRecordID)
+                try stepDone(statement)
+            }
+            return true
+        }
+    }
+
+    public func continuityRecordLegacyMigration(
+        importedCount: Int,
+        skippedCount: Int,
+        quarantinedCount: Int,
+        startedAt: String,
+        details: [String: Any]
+    ) throws -> LegacyContinuityMigrationReceipt {
+        guard importedCount >= 0, skippedCount >= 0, quarantinedCount >= 0,
+              ISO8601.date(from: startedAt) != nil else {
+            throw ProjectMemoryError.invalidRequest("legacy migration counts or timestamp are invalid")
+        }
+        let detailsJSON = try JSONSupport.string(from: details)
+        guard detailsJSON.utf8.count <= 16 * 1_024 else {
+            throw ProjectMemoryError.payloadTooLarge("legacy migration details are oversized")
+        }
+        let receiptID = UUID().uuidString.lowercased()
+        let completedAt = ISO8601.string(from: clock.now())
+        lock.lock()
+        defer { lock.unlock() }
+        try transactionUnlocked {
+            try withStatementUnlocked(
+                """
+                INSERT INTO continuity_migration_receipts(
+                  receipt_id,project_id,source_version,target_version,imported_count,
+                  skipped_count,quarantined_count,integrity_result,details_json,
+                  started_at,completed_at
+                ) VALUES(?,?,'legacy_global','2.0',?,?,?,'ok',?,?,?)
+                """
+            ) { statement in
+                bind(statement, 1, receiptID)
+                bind(statement, 2, projectID)
+                sqlite3_bind_int(statement, 3, Int32(importedCount))
+                sqlite3_bind_int(statement, 4, Int32(skippedCount))
+                sqlite3_bind_int(statement, 5, Int32(quarantinedCount))
+                bind(statement, 6, detailsJSON)
+                bind(statement, 7, startedAt)
+                bind(statement, 8, completedAt)
+                try stepDone(statement)
+            }
+        }
+        return LegacyContinuityMigrationReceipt(
+            receiptID: receiptID,
+            projectID: projectID,
+            importedCount: importedCount,
+            skippedCount: skippedCount,
+            quarantinedCount: quarantinedCount,
+            startedAt: startedAt,
+            completedAt: completedAt
+        )
+    }
+
+    public func continuityLegacyQuarantineCount() throws -> Int {
+        try scalarInt(
+            "SELECT COUNT(*) FROM legacy_continuity_quarantine WHERE project_id=?",
+            value: projectID
+        )
+    }
+
+    public func continuityMigrationReceiptCount() throws -> Int {
+        try scalarInt(
+            "SELECT COUNT(*) FROM continuity_migration_receipts WHERE project_id=?",
+            value: projectID
+        )
+    }
+
     private static let continuityOperationSelect = """
     SELECT operation_id,project_id,predecessor_session_id,successor_session_id,handoff_id,
       state,attempt,adapter_id,idempotency_key,acknowledged_session_id,acknowledged_handoff_id,
@@ -564,7 +1332,10 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
     """
 
     private func continuityOperationUnlocked(_ id: String) throws -> ContinuityOperation? {
-        try withStatementUnlocked(Self.continuityOperationSelect + " WHERE operation_id=? AND project_id=? LIMIT 1") { statement in
+        try withStatementUnlocked(
+            Self.continuityOperationSelect
+                + " WHERE operation_id=? AND project_id=? AND quarantine_state IS NULL LIMIT 1"
+        ) { statement in
             bind(statement, 1, id); bind(statement, 2, projectID)
             guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
             return continuityOperation(statement)
@@ -572,7 +1343,10 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
     }
 
     private func continuityOperationByIdempotencyUnlocked(_ key: String) throws -> ContinuityOperation? {
-        try withStatementUnlocked(Self.continuityOperationSelect + " WHERE project_id=? AND idempotency_key=? LIMIT 1") { statement in
+        try withStatementUnlocked(
+            Self.continuityOperationSelect
+                + " WHERE project_id=? AND idempotency_key=? AND quarantine_state IS NULL LIMIT 1"
+        ) { statement in
             bind(statement, 1, projectID); bind(statement, 2, key)
             guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
             return continuityOperation(statement)
@@ -580,7 +1354,11 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
     }
 
     private func continuityActiveOperationUnlocked() throws -> ContinuityOperation? {
-        try withStatementUnlocked(Self.continuityOperationSelect + " WHERE project_id=? AND state<>'predecessorSealed' ORDER BY updated_at DESC LIMIT 1") { statement in
+        try withStatementUnlocked(
+            Self.continuityOperationSelect
+                + " WHERE project_id=? AND state<>'predecessorSealed'"
+                + " AND quarantine_state IS NULL ORDER BY updated_at DESC LIMIT 1"
+        ) { statement in
             bind(statement, 1, projectID)
             guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
             return continuityOperation(statement)
@@ -588,7 +1366,9 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
     }
 
     private func continuityHandoffExistsUnlocked(id: String) throws -> Bool {
-        try withStatementUnlocked("SELECT 1 FROM continuity_handoffs WHERE handoff_id=? AND project_id=? LIMIT 1") { statement in
+        try withStatementUnlocked(
+            "SELECT 1 FROM continuity_handoffs WHERE handoff_id=? AND project_id=? AND quarantine_state IS NULL LIMIT 1"
+        ) { statement in
             bind(statement, 1, id); bind(statement, 2, projectID)
             return sqlite3_step(statement) == SQLITE_ROW
         }
@@ -608,6 +1388,279 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         )
     }
 
+    private static let continuityOperationV2Select = """
+    SELECT operation_id,project_id,project_generation,run_id,predecessor_session_id,
+      predecessor_provider_response_id,successor_session_id,successor_provider_response_id,
+      handoff_id,state,attempt,adapter_id,idempotency_key,bootstrap_nonce,
+      acknowledgement_sha256,budget_observation_id,continuation_issued,quarantine_state,
+      migration_source,legacy_record_id,acknowledged_session_id,acknowledged_handoff_id,
+      created_at,updated_at,last_error,retry_at,state_checksum FROM rollover_operations
+    """
+
+    private func continuityPersistHandoffV2Unlocked(
+        _ handoff: ContinuityHandoffV2,
+        payload: String,
+        generation: UInt64,
+        runID: String,
+        predecessorResponseID: String?
+    ) throws {
+        guard let nonce = handoff.bootstrapNonce,
+              let operation = try continuityOperationV2Unlocked(handoff.operationID),
+              operation.projectID == projectID,
+              operation.projectGeneration == generation,
+              operation.runID == runID,
+              operation.handoffID == handoff.handoffID,
+              operation.bootstrapNonce == nonce else {
+            throw ProjectMemoryError.conflict(
+                "V2 handoff does not match its durable operation"
+            )
+        }
+        let existing = try withStatementUnlocked(
+            """
+            SELECT operation_id,payload_json,content_sha256,project_generation,run_id,
+                   predecessor_provider_response_id,bootstrap_nonce
+            FROM continuity_handoffs
+            WHERE handoff_id=? AND project_id=? AND schema_version='2.0' LIMIT 1
+            """
+        ) { statement -> (
+            operationID: String,
+            payload: String,
+            checksum: String,
+            generation: UInt64,
+            runID: String,
+            predecessorResponseID: String?,
+            nonce: String
+        )? in
+            bind(statement, 1, handoff.handoffID)
+            bind(statement, 2, projectID)
+            guard sqlite3_step(statement) == SQLITE_ROW,
+                  let storedOperationID = text(statement, 0),
+                  let storedPayload = text(statement, 1),
+                  let storedChecksum = text(statement, 2),
+                  sqlite3_column_int64(statement, 3) > 0,
+                  let storedRunID = text(statement, 4),
+                  let storedNonce = text(statement, 6) else {
+                return nil
+            }
+            return (
+                storedOperationID,
+                storedPayload,
+                storedChecksum,
+                UInt64(sqlite3_column_int64(statement, 3)),
+                storedRunID,
+                text(statement, 5),
+                storedNonce
+            )
+        }
+        if let existing {
+            guard existing.operationID == handoff.operationID,
+                  existing.payload == payload,
+                  existing.checksum == handoff.contentSHA256,
+                  existing.generation == generation,
+                  existing.runID == runID,
+                  existing.predecessorResponseID == predecessorResponseID,
+                  existing.nonce == nonce else {
+                throw ProjectMemoryError.conflict(
+                    "V2 handoff identifier is already bound to different content"
+                )
+            }
+            return
+        }
+        guard operation.state == .active || operation.state == .checkpointPreparing else {
+            throw ProjectMemoryError.integrityFailure(
+                "advanced V2 operation is missing its durable handoff"
+            )
+        }
+        try withStatementUnlocked(
+            """
+            INSERT INTO continuity_handoffs(
+              handoff_id,project_id,operation_id,payload_json,content_sha256,created_at,
+              schema_version,project_generation,run_id,predecessor_provider_response_id,
+              bootstrap_nonce,budget_observation_id,acknowledgement_sha256,
+              continuation_issued,quarantine_state,migration_source,legacy_record_id
+            ) VALUES(?,?,?,?,?,?,'2.0',?,?,?,?,NULL,NULL,0,NULL,NULL,NULL)
+            """
+        ) { statement in
+            bind(statement, 1, handoff.handoffID)
+            bind(statement, 2, projectID)
+            bind(statement, 3, handoff.operationID)
+            bind(statement, 4, payload)
+            bind(statement, 5, handoff.contentSHA256)
+            bind(statement, 6, handoff.createdAt)
+            sqlite3_bind_int64(statement, 7, Int64(generation))
+            bind(statement, 8, runID)
+            bind(statement, 9, predecessorResponseID)
+            bind(statement, 10, nonce)
+            try stepDone(statement)
+        }
+    }
+
+    private func continuityOperationV2Unlocked(_ id: String) throws -> ContinuityOperationV2? {
+        try withStatementUnlocked(
+            Self.continuityOperationV2Select
+                + " WHERE operation_id=? AND project_id=? AND schema_version=2"
+                + " AND quarantine_state IS NULL LIMIT 1"
+        ) { statement in
+            bind(statement, 1, id)
+            bind(statement, 2, projectID)
+            guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+            return try continuityOperationV2(statement)
+        }
+    }
+
+    private func continuityOperationV2ByIdempotencyUnlocked(
+        _ key: String
+    ) throws -> ContinuityOperationV2? {
+        try withStatementUnlocked(
+            Self.continuityOperationV2Select
+                + " WHERE project_id=? AND idempotency_key=? AND schema_version=2"
+                + " AND quarantine_state IS NULL LIMIT 1"
+        ) { statement in
+            bind(statement, 1, projectID)
+            bind(statement, 2, key)
+            guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+            return try continuityOperationV2(statement)
+        }
+    }
+
+    private func continuityV2HandoffExistsUnlocked(id: String) throws -> Bool {
+        try withStatementUnlocked(
+            """
+            SELECT 1 FROM continuity_handoffs WHERE handoff_id=? AND project_id=?
+              AND schema_version='2.0' AND quarantine_state IS NULL LIMIT 1
+            """
+        ) { statement in
+            bind(statement, 1, id)
+            bind(statement, 2, projectID)
+            return sqlite3_step(statement) == SQLITE_ROW
+        }
+    }
+
+    private func continuityOperationV2(_ statement: OpaquePointer) throws -> ContinuityOperationV2 {
+        guard let operationID = text(statement, 0),
+              let storedProjectID = text(statement, 1),
+              sqlite3_column_int64(statement, 2) > 0,
+              let runID = text(statement, 3), UUID(uuidString: runID) != nil,
+              let predecessorSessionID = text(statement, 4),
+              let handoffID = text(statement, 8),
+              let stateValue = text(statement, 9),
+              let state = ContinuityState(rawValue: stateValue),
+              let adapterID = text(statement, 11),
+              let idempotencyKey = text(statement, 12),
+              let bootstrapNonce = text(statement, 13),
+              let createdAt = text(statement, 22),
+              let updatedAt = text(statement, 23),
+              let stateChecksum = text(statement, 26) else {
+            throw ProjectMemoryError.integrityFailure("invalid V2 continuity operation row")
+        }
+        return ContinuityOperationV2(
+            operationID: operationID,
+            projectID: storedProjectID,
+            projectGeneration: UInt64(sqlite3_column_int64(statement, 2)),
+            runID: runID,
+            predecessorSessionID: predecessorSessionID,
+            predecessorProviderResponseID: text(statement, 5),
+            successorSessionID: text(statement, 6),
+            successorProviderResponseID: text(statement, 7),
+            handoffID: handoffID,
+            state: state,
+            attempt: Int(sqlite3_column_int(statement, 10)),
+            adapterID: adapterID,
+            idempotencyKey: idempotencyKey,
+            bootstrapNonce: bootstrapNonce,
+            acknowledgementSHA256: text(statement, 14),
+            budgetObservationID: text(statement, 15),
+            continuationIssued: sqlite3_column_int(statement, 16) == 1,
+            quarantineState: text(statement, 17),
+            migrationSource: text(statement, 18),
+            legacyRecordID: text(statement, 19),
+            acknowledgedSessionID: text(statement, 20),
+            acknowledgedHandoffID: text(statement, 21),
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            lastError: text(statement, 24),
+            retryAt: text(statement, 25),
+            stateChecksum: stateChecksum
+        )
+    }
+
+    private static func continuityChecksumV2(
+        operationID: String,
+        projectGeneration: UInt64,
+        runID: String,
+        state: ContinuityState,
+        successorSessionID: String?,
+        successorProviderResponseID: String?,
+        handoffID: String,
+        attempt: Int
+    ) -> String {
+        JSONSupport.sha256Hex([
+            "2", operationID, String(projectGeneration), runID, state.rawValue,
+            successorSessionID ?? "", successorProviderResponseID ?? "", handoffID,
+            String(attempt),
+        ].joined(separator: "|"))
+    }
+
+    private static func bootstrapAcknowledgementSHA256(
+        _ acknowledgement: BootstrapAcknowledgementV2
+    ) -> String {
+        let payload: [String: Any] = [
+            "acknowledgement_contract_version": acknowledgement.acknowledgementContractVersion,
+            "project_id": acknowledgement.projectID.description,
+            "project_generation": acknowledgement.projectGeneration.rawValue,
+            "run_id": acknowledgement.runID.description,
+            "operation_id": acknowledgement.operationID.uuidString.lowercased(),
+            "handoff_id": acknowledgement.handoffID.uuidString.lowercased(),
+            "handoff_sha256": acknowledgement.handoffSHA256,
+            "nonce": acknowledgement.nonce,
+            "accepted": acknowledgement.accepted,
+        ]
+        return JSONSupport.sha256Hex((try? JSONSupport.canonicalJSON(payload)) ?? "")
+    }
+
+    private var continuityDirectory: URL {
+        directory.appendingPathComponent("continuity", isDirectory: true)
+    }
+
+    private func writeHandoffProjection(_ handoff: ContinuityHandoffV2) throws {
+        guard UUID(uuidString: handoff.handoffID) != nil else {
+            throw ProjectMemoryError.invalidRequest("handoff_id must be a UUID")
+        }
+        let root = continuityDirectory
+        let handoffs = root.appendingPathComponent("handoffs", isDirectory: true)
+        try FileManager.default.createDirectory(at: handoffs, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(
+            at: root.appendingPathComponent("operations", isDirectory: true),
+            withIntermediateDirectories: true
+        )
+        try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: root.path)
+        let data = try handoff.encodedJSON()
+        let handoffURL = handoffs.appendingPathComponent("\(handoff.handoffID.lowercased()).json")
+        try data.write(to: handoffURL, options: [.atomic, .completeFileProtectionUnlessOpen])
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: handoffURL.path)
+        let latest = Data("\(handoff.handoffID.lowercased())\n".utf8)
+        let latestURL = root.appendingPathComponent("LATEST")
+        try latest.write(to: latestURL, options: [.atomic, .completeFileProtectionUnlessOpen])
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: latestURL.path)
+    }
+
+    private func writeOperationProjection(_ operation: ContinuityOperationV2) throws {
+        guard UUID(uuidString: operation.operationID) != nil else {
+            throw ProjectMemoryError.invalidRequest("operation_id must be a UUID")
+        }
+        let root = continuityDirectory
+        let operations = root.appendingPathComponent("operations", isDirectory: true)
+        try FileManager.default.createDirectory(at: operations, withIntermediateDirectories: true)
+        try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: root.path)
+        let data = try JSONSupport.data(from: operation.asDictionary())
+        let operationURL = operations.appendingPathComponent("\(operation.operationID.lowercased()).json")
+        try data.write(to: operationURL, options: [.atomic, .completeFileProtectionUnlessOpen])
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: operationURL.path)
+        let currentURL = root.appendingPathComponent("CURRENT.json")
+        try data.write(to: currentURL, options: [.atomic, .completeFileProtectionUnlessOpen])
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: currentURL.path)
+    }
+
     private func appendTransitionUnlocked(
         operationID: String,
         from: ContinuityState?,
@@ -624,6 +1677,47 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
             bind(statement, 4, to.rawValue); sqlite3_bind_int(statement, 5, Int32(attempt))
             bind(statement, 6, ISO8601.string(from: clock.now())); bind(statement, 7, adapterID)
             bind(statement, 8, evidence.map { String($0.prefix(2048)) }); bind(statement, 9, checksum)
+            try stepDone(statement)
+        }
+    }
+
+    private func appendTransitionV2Unlocked(
+        operationID: String,
+        projectGeneration: UInt64,
+        runID: String,
+        from: ContinuityState?,
+        to: ContinuityState,
+        attempt: Int,
+        adapterID: String,
+        successorProviderResponseID: String?,
+        evidence: String?,
+        checksum: String
+    ) throws {
+        guard projectGeneration > 0, projectGeneration <= UInt64(Int64.max),
+              UUID(uuidString: runID) != nil else {
+            throw ProjectMemoryError.integrityFailure("invalid V2 transition identity")
+        }
+        try withStatementUnlocked(
+            """
+            INSERT INTO rollover_transitions(
+              operation_id,project_id,from_state,to_state,attempt,created_at,adapter_id,
+              evidence,state_checksum,schema_version,project_generation,run_id,
+              successor_provider_response_id
+            ) VALUES(?,?,?,?,?,?,?,?,?,2,?,?,?)
+            """
+        ) { statement in
+            bind(statement, 1, operationID)
+            bind(statement, 2, projectID)
+            bind(statement, 3, from?.rawValue)
+            bind(statement, 4, to.rawValue)
+            sqlite3_bind_int(statement, 5, Int32(attempt))
+            bind(statement, 6, ISO8601.string(from: clock.now()))
+            bind(statement, 7, adapterID)
+            bind(statement, 8, evidence.map { String($0.prefix(2_048)) })
+            bind(statement, 9, checksum)
+            sqlite3_bind_int64(statement, 10, Int64(projectGeneration))
+            bind(statement, 11, runID)
+            bind(statement, 12, successorProviderResponseID)
             try stepDone(statement)
         }
     }
@@ -704,7 +1798,11 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
             CREATE TABLE IF NOT EXISTS continuity_handoffs(
               handoff_id TEXT PRIMARY KEY,project_id TEXT NOT NULL,operation_id TEXT NOT NULL UNIQUE,
               payload_json TEXT NOT NULL,content_sha256 TEXT NOT NULL,created_at TEXT NOT NULL,
-              acknowledged_session_id TEXT,acknowledged_at TEXT
+              acknowledged_session_id TEXT,acknowledged_at TEXT,
+              schema_version TEXT NOT NULL DEFAULT '1.0',project_generation INTEGER,run_id TEXT,
+              predecessor_provider_response_id TEXT,bootstrap_nonce TEXT,budget_observation_id TEXT,
+              acknowledgement_sha256 TEXT,continuation_issued INTEGER NOT NULL DEFAULT 0,
+              quarantine_state TEXT,migration_source TEXT,legacy_record_id TEXT
             );
             CREATE TABLE IF NOT EXISTS rollover_operations(
               operation_id TEXT PRIMARY KEY,project_id TEXT NOT NULL,predecessor_session_id TEXT NOT NULL,
@@ -712,25 +1810,107 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
               adapter_id TEXT NOT NULL,idempotency_key TEXT NOT NULL,acknowledged_session_id TEXT,
               acknowledged_handoff_id TEXT,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,
               last_error TEXT,retry_at TEXT,state_checksum TEXT NOT NULL,
+              schema_version INTEGER NOT NULL DEFAULT 1,project_generation INTEGER,run_id TEXT,
+              predecessor_provider_response_id TEXT,successor_provider_response_id TEXT,
+              bootstrap_nonce TEXT,acknowledgement_sha256 TEXT,budget_observation_id TEXT,
+              continuation_issued INTEGER NOT NULL DEFAULT 0,quarantine_state TEXT,
+              migration_source TEXT,legacy_record_id TEXT,
               UNIQUE(project_id,idempotency_key)
             );
             CREATE TABLE IF NOT EXISTS rollover_transitions(
               id INTEGER PRIMARY KEY AUTOINCREMENT,operation_id TEXT NOT NULL,project_id TEXT NOT NULL,
               from_state TEXT,to_state TEXT NOT NULL,attempt INTEGER NOT NULL,created_at TEXT NOT NULL,
-              adapter_id TEXT NOT NULL,evidence TEXT,state_checksum TEXT NOT NULL
+              adapter_id TEXT NOT NULL,evidence TEXT,state_checksum TEXT NOT NULL,
+              schema_version INTEGER NOT NULL DEFAULT 1,project_generation INTEGER,run_id TEXT,
+              successor_provider_response_id TEXT
             );
             CREATE TABLE IF NOT EXISTS project_active_sessions(
               project_id TEXT PRIMARY KEY,session_id TEXT NOT NULL,updated_at TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS legacy_continuity_quarantine(
+              quarantine_id TEXT PRIMARY KEY,project_id TEXT NOT NULL,source_path TEXT,
+              source_sha256 TEXT NOT NULL,reason TEXT NOT NULL,payload_json TEXT NOT NULL,
+              created_at TEXT NOT NULL,UNIQUE(project_id,source_sha256)
+            );
+            CREATE TABLE IF NOT EXISTS continuity_migration_receipts(
+              receipt_id TEXT PRIMARY KEY,project_id TEXT NOT NULL,source_version TEXT NOT NULL,
+              target_version TEXT NOT NULL,imported_count INTEGER NOT NULL DEFAULT 0,
+              skipped_count INTEGER NOT NULL DEFAULT 0,quarantined_count INTEGER NOT NULL DEFAULT 0,
+              integrity_result TEXT NOT NULL,details_json TEXT NOT NULL DEFAULT '{}',
+              started_at TEXT NOT NULL,completed_at TEXT NOT NULL
+            );
             CREATE UNIQUE INDEX IF NOT EXISTS idx_rollover_active_project
-              ON rollover_operations(project_id) WHERE state <> 'predecessorSealed';
+              ON rollover_operations(project_id)
+              WHERE state <> 'predecessorSealed' AND quarantine_state IS NULL;
             CREATE INDEX IF NOT EXISTS idx_rollover_project_updated
               ON rollover_operations(project_id,updated_at DESC);
             CREATE INDEX IF NOT EXISTS idx_memory_project_recent ON memory_records(project_id,is_tombstone,updated_at DESC);
             CREATE INDEX IF NOT EXISTS idx_memory_project_kind ON memory_records(project_id,kind,is_tombstone);
             CREATE INDEX IF NOT EXISTS idx_memory_project_session ON memory_records(project_id,session_id,is_tombstone);
-            PRAGMA user_version=1;
             """)
+            if prior == 1 {
+                try execUnlocked("""
+                ALTER TABLE continuity_handoffs ADD COLUMN schema_version TEXT NOT NULL DEFAULT '1.0';
+                ALTER TABLE continuity_handoffs ADD COLUMN project_generation INTEGER;
+                ALTER TABLE continuity_handoffs ADD COLUMN run_id TEXT;
+                ALTER TABLE continuity_handoffs ADD COLUMN predecessor_provider_response_id TEXT;
+                ALTER TABLE continuity_handoffs ADD COLUMN bootstrap_nonce TEXT;
+                ALTER TABLE continuity_handoffs ADD COLUMN budget_observation_id TEXT;
+                ALTER TABLE continuity_handoffs ADD COLUMN acknowledgement_sha256 TEXT;
+                ALTER TABLE continuity_handoffs ADD COLUMN continuation_issued INTEGER NOT NULL DEFAULT 0;
+                ALTER TABLE continuity_handoffs ADD COLUMN quarantine_state TEXT;
+                ALTER TABLE continuity_handoffs ADD COLUMN migration_source TEXT;
+                ALTER TABLE continuity_handoffs ADD COLUMN legacy_record_id TEXT;
+                ALTER TABLE rollover_operations ADD COLUMN schema_version INTEGER NOT NULL DEFAULT 1;
+                ALTER TABLE rollover_operations ADD COLUMN project_generation INTEGER;
+                ALTER TABLE rollover_operations ADD COLUMN run_id TEXT;
+                ALTER TABLE rollover_operations ADD COLUMN predecessor_provider_response_id TEXT;
+                ALTER TABLE rollover_operations ADD COLUMN successor_provider_response_id TEXT;
+                ALTER TABLE rollover_operations ADD COLUMN bootstrap_nonce TEXT;
+                ALTER TABLE rollover_operations ADD COLUMN acknowledgement_sha256 TEXT;
+                ALTER TABLE rollover_operations ADD COLUMN budget_observation_id TEXT;
+                ALTER TABLE rollover_operations ADD COLUMN continuation_issued INTEGER NOT NULL DEFAULT 0;
+                ALTER TABLE rollover_operations ADD COLUMN quarantine_state TEXT;
+                ALTER TABLE rollover_operations ADD COLUMN migration_source TEXT;
+                ALTER TABLE rollover_operations ADD COLUMN legacy_record_id TEXT;
+                ALTER TABLE rollover_transitions ADD COLUMN schema_version INTEGER NOT NULL DEFAULT 1;
+                ALTER TABLE rollover_transitions ADD COLUMN project_generation INTEGER;
+                ALTER TABLE rollover_transitions ADD COLUMN run_id TEXT;
+                ALTER TABLE rollover_transitions ADD COLUMN successor_provider_response_id TEXT;
+                UPDATE continuity_handoffs SET
+                  quarantine_state='legacy_read_only',migration_source='project_memory_v1'
+                  WHERE schema_version='1.0';
+                UPDATE rollover_operations SET
+                  quarantine_state='legacy_read_only',migration_source='project_memory_v1'
+                  WHERE schema_version=1;
+                """)
+            }
+            try execUnlocked("""
+            DROP INDEX IF EXISTS idx_rollover_active_project;
+            CREATE UNIQUE INDEX idx_rollover_active_project
+              ON rollover_operations(project_id)
+              WHERE state <> 'predecessorSealed' AND quarantine_state IS NULL;
+            """)
+            try execUnlocked("PRAGMA user_version=2;")
+            if prior < 2 {
+                try withStatementUnlocked(
+                    """
+                    INSERT OR IGNORE INTO continuity_migration_receipts(
+                      receipt_id,project_id,source_version,target_version,imported_count,
+                      skipped_count,quarantined_count,integrity_result,details_json,started_at,completed_at
+                    ) VALUES(?,?,?,?,0,0,0,'ok','{}',?,?)
+                    """
+                ) { statement in
+                    bind(statement, 1, "continuity-schema-v2")
+                    bind(statement, 2, projectID)
+                    bind(statement, 3, String(prior))
+                    bind(statement, 4, "2")
+                    let timestamp = ISO8601.string(from: clock.now())
+                    bind(statement, 5, timestamp)
+                    bind(statement, 6, timestamp)
+                    try stepDone(statement)
+                }
+            }
         }
         if enableFTS5 {
           do {

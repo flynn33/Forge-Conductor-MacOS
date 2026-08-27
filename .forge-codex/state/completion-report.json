@@ -21,7 +21,7 @@
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G00.json",
       "name": "gate-result-exists:G00",
       "passed": true
     },
@@ -66,7 +66,7 @@
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G01.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G01.json",
       "name": "gate-result-exists:G01",
       "passed": true
     },
@@ -111,7 +111,7 @@
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G02.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G02.json",
       "name": "gate-result-exists:G02",
       "passed": true
     },
@@ -156,7 +156,7 @@
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G03.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G03.json",
       "name": "gate-result-exists:G03",
       "passed": true
     },
@@ -201,7 +201,7 @@
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G04.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G04.json",
       "name": "gate-result-exists:G04",
       "passed": true
     },
@@ -246,7 +246,7 @@
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G05.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G05.json",
       "name": "gate-result-exists:G05",
       "passed": true
     },
@@ -291,7 +291,7 @@
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G06.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G06.json",
       "name": "gate-result-exists:G06",
       "passed": true
     },
@@ -336,7 +336,7 @@
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G07.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G07.json",
       "name": "gate-result-exists:G07",
       "passed": true
     },
@@ -381,7 +381,7 @@
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G08.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G08.json",
       "name": "gate-result-exists:G08",
       "passed": true
     },
@@ -426,32 +426,32 @@
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G09.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.json",
       "name": "gate-result-exists:G09",
       "passed": true
     },
     {
-      "detail": "passed",
+      "detail": "failed",
       "name": "gate-passed:G09",
-      "passed": true
+      "passed": false
     },
     {
-      "detail": "passed",
+      "detail": "failed",
       "name": "gate-ledger-passed:G09",
-      "passed": true
+      "passed": false
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G09.stdout.txt",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.stdout.txt",
       "name": "gate-artifact-exists:G09:G09.stdout.txt",
       "passed": true
     },
     {
-      "detail": "944c80f8d7b63d6d4298dd6fcd3c2b0122e6fc81e66aabfb483877a98bb9f47c",
+      "detail": "7c0e43fefabe58792777d34b8f7836772185bce75d49ad9ec826c053078c3848",
       "name": "gate-artifact-hash:G09:G09.stdout.txt",
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G09.stderr.txt",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.stderr.txt",
       "name": "gate-artifact-exists:G09:G09.stderr.txt",
       "passed": true
     },
@@ -461,42 +461,42 @@
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G09.criteria.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.criteria.json",
       "name": "gate-artifact-exists:G09:G09.criteria.json",
       "passed": true
     },
     {
-      "detail": "718134c59c7491b914c1325288df58ea28b3f803465b43539a15bc9e5c4e8b06",
+      "detail": "3a13aa54b872f78b815e84f1647b60062a064c87920d93e4d4a12eadc65b5bc9",
       "name": "gate-artifact-hash:G09:G09.criteria.json",
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G10.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G10.json",
       "name": "gate-result-exists:G10",
       "passed": true
     },
     {
-      "detail": "passed",
+      "detail": "blocked",
       "name": "gate-passed:G10",
-      "passed": true
+      "passed": false
     },
     {
-      "detail": "passed",
+      "detail": "blocked_dependency",
       "name": "gate-ledger-passed:G10",
-      "passed": true
+      "passed": false
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G10.stdout.txt",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G10.stdout.txt",
       "name": "gate-artifact-exists:G10:G10.stdout.txt",
       "passed": true
     },
     {
-      "detail": "e05955416a6162b75c469385f49c3beaaa90bf7f4dcbae1b5abedeafbc25cfd0",
+      "detail": "5bf76ffbb07513d1cc43cf0d3a983c47a6ad603f90587d0b521153c154ef382e",
       "name": "gate-artifact-hash:G10:G10.stdout.txt",
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G10.stderr.txt",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G10.stderr.txt",
       "name": "gate-artifact-exists:G10:G10.stderr.txt",
       "passed": true
     },
@@ -506,42 +506,42 @@
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G10.criteria.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G10.criteria.json",
       "name": "gate-artifact-exists:G10:G10.criteria.json",
       "passed": true
     },
     {
-      "detail": "1574239ab804b951325b8b5fcaf7f4f7528c787a1e1914fff941fe4ae6d34e2a",
+      "detail": "8567435662f008c740163ca3ad20bddd6d8c71f0fb892ed9c773157835c9afc5",
       "name": "gate-artifact-hash:G10:G10.criteria.json",
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G11.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.json",
       "name": "gate-result-exists:G11",
       "passed": true
     },
     {
-      "detail": "passed",
+      "detail": "blocked",
       "name": "gate-passed:G11",
-      "passed": true
+      "passed": false
     },
     {
-      "detail": "passed",
+      "detail": "blocked_dependency",
       "name": "gate-ledger-passed:G11",
-      "passed": true
+      "passed": false
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G11.stdout.txt",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.stdout.txt",
       "name": "gate-artifact-exists:G11:G11.stdout.txt",
       "passed": true
     },
     {
-      "detail": "5cb2d4f7609ff0bd794f80e137178eb2c10c9335b41d779b0756184a20d9e0c9",
+      "detail": "55fab8f7c2c55fef9ce6b0e47c8003fb2b645d05fd17c33f8cb43a399b442fdc",
       "name": "gate-artifact-hash:G11:G11.stdout.txt",
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G11.stderr.txt",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.stderr.txt",
       "name": "gate-artifact-exists:G11:G11.stderr.txt",
       "passed": true
     },
@@ -551,17 +551,17 @@
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G11.criteria.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.criteria.json",
       "name": "gate-artifact-exists:G11:G11.criteria.json",
       "passed": true
     },
     {
-      "detail": "24be3535df2a32ea3dcf5190b3113e96c11b71e00a98d1ae9ae5419489dffd01",
+      "detail": "7574917a10600271c1f4cfa7005c3573c8f449969ec130d96493cefde0f568ca",
       "name": "gate-artifact-hash:G11:G11.criteria.json",
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/feature-baseline.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/feature-baseline.json",
       "name": "feature-baseline-exists",
       "passed": true
     },
@@ -614,7 +614,7 @@
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/findings-resolution.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/findings-resolution.json",
       "name": "findings-resolution-exists",
       "passed": true
     },
@@ -624,7 +624,7 @@
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/host-capability-report.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/host-capability-report.json",
       "name": "host-capability-report-exists",
       "passed": true
     },
@@ -639,11 +639,18 @@
       "passed": true
     }
   ],
-  "commit": "082404ec42bf2adb775385dea85ad3b20d0076f4",
-  "errors": [],
-  "evaluated_at": "2026-08-23T22:20:44.701061+00:00",
-  "passed": true,
-  "repository": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+  "commit": "b72d6e8dc00681477224fb1b79859f553bc02558",
+  "errors": [
+    "gate-passed:G09: failed",
+    "gate-ledger-passed:G09: failed",
+    "gate-passed:G10: blocked",
+    "gate-ledger-passed:G10: blocked_dependency",
+    "gate-passed:G11: blocked",
+    "gate-ledger-passed:G11: blocked_dependency"
+  ],
+  "evaluated_at": "2026-08-27T03:11:46.308495+00:00",
+  "passed": false,
+  "repository": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
   "run_id": "aba90ab1-be80-4cc5-aa0b-23dd54d4a24d",
   "schema_version": 1
 }

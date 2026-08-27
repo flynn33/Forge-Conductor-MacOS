@@ -1,0 +1,190 @@
+{
+  "build" : "release",
+  "fixture" : {
+    "manager_recovery_states" : 4,
+    "manager_restarts" : 100,
+    "mcp_requests" : 100,
+    "memory_records" : 500,
+    "process_cycles" : 25,
+    "project_cycles" : 100,
+    "rollovers" : 50,
+    "seed" : 11
+  },
+  "hard_invariants" : {
+    "main_actor_blocking_process_waits" : 0,
+    "manager_cancellation_post_shutdown_owners" : 0,
+    "manager_recovery_peak_active_owners" : 1,
+    "manager_recovery_post_shutdown_owners" : 0,
+    "project_contexts_after_close" : 0,
+    "telemetry_maximum_logical_slots" : 2,
+    "telemetry_post_stop_slots" : 0,
+    "unbounded_collections" : 0,
+    "unbounded_retries" : 0
+  },
+  "latency_ms" : {
+    "cold_launch_ms" : {
+      "p50" : 49.552124999999997,
+      "p95" : 57.161917000000003,
+      "p99" : 57.161917000000003,
+      "samples" : 5
+    },
+    "manager_cancellation_ms" : {
+      "p50" : 39.469166999999999,
+      "p95" : 39.469166999999999,
+      "p99" : 39.469166999999999,
+      "samples" : 1
+    },
+    "manager_restart_ms" : {
+      "p50" : 7.824916,
+      "p95" : 8.2157090000000004,
+      "p99" : 8.4796250000000004,
+      "samples" : 100
+    },
+    "mcp_call_ms" : {
+      "p50" : 8.435041,
+      "p95" : 17.817834000000001,
+      "p99" : 21.112166999999999,
+      "samples" : 100
+    },
+    "memory_export_ms" : {
+      "p50" : 15.510583,
+      "p95" : 15.510583,
+      "p99" : 15.510583,
+      "samples" : 1
+    },
+    "memory_search_ms" : {
+      "p50" : 0.79962500000000003,
+      "p95" : 1.0714159999999999,
+      "p99" : 1.117,
+      "samples" : 25
+    },
+    "memory_update_ms" : {
+      "p50" : 0.59025000000000005,
+      "p95" : 1.1044579999999999,
+      "p99" : 5.3251670000000004,
+      "samples" : 50
+    },
+    "memory_write_batch_ms" : {
+      "p50" : 13.112083,
+      "p95" : 13.634292,
+      "p99" : 13.634292,
+      "samples" : 10
+    },
+    "process_cycle_ms" : {
+      "p50" : 1.3123750000000001,
+      "p95" : 12.566958,
+      "p99" : 12.713042,
+      "samples" : 25
+    },
+    "project_cycle_ms" : {
+      "p50" : 6.6011249999999997,
+      "p95" : 16.983625,
+      "p99" : 31.484375,
+      "samples" : 100
+    },
+    "rollover_ms" : {
+      "p50" : 9.4296670000000002,
+      "p95" : 16.279,
+      "p99" : 26.379000000000001,
+      "samples" : 50
+    },
+    "telemetry_burst_ms" : {
+      "p50" : 6.0326250000000003,
+      "p95" : 6.0326250000000003,
+      "p99" : 6.0326250000000003,
+      "samples" : 1
+    },
+    "warm_launch_ms" : {
+      "p50" : 45.538291000000001,
+      "p95" : 49.279541000000002,
+      "p99" : 49.279541000000002,
+      "samples" : 5
+    }
+  },
+  "memory_tiers" : {
+    "constrained_critical_execution_limits" : {
+      "maximum_active_managed_generations" : 1,
+      "maximum_active_runtime_jobs" : 1,
+      "maximum_cpu_heavy_runtime_jobs" : 1,
+      "maximum_in_memory_events" : 500,
+      "model_policy" : {
+        "auto_evict_required" : true,
+        "default_loaded_instances" : 1,
+        "idle_ttl_seconds" : 75,
+        "jit_loading_required" : true,
+        "maximum_loaded_instances" : 1,
+        "maximum_parallel_requests" : 1,
+        "serialize_successor_creation" : true
+      }
+    },
+    "constrained_critical_limits" : {
+      "active_gauge_fps" : 15,
+      "active_model_stream_bytes" : 1048576,
+      "decoded_memory_cache_bytes" : 4194304,
+      "diagnostic_ring_records" : 500,
+      "log_file_bytes" : 1048576,
+      "mcp_response_bytes" : 262144,
+      "memory_search_default_limit" : 10,
+      "memory_search_hard_limit" : 25,
+      "process_output_bytes_per_stream" : 1048576,
+      "retained_log_archives" : 1,
+      "search_cache_bytes" : 2097152,
+      "telemetry_history_points" : 300
+    },
+    "constrained_execution_limits" : {
+      "maximum_active_managed_generations" : 1,
+      "maximum_active_runtime_jobs" : 2,
+      "maximum_cpu_heavy_runtime_jobs" : 1,
+      "maximum_in_memory_events" : 1000,
+      "model_policy" : {
+        "auto_evict_required" : true,
+        "default_loaded_instances" : 1,
+        "idle_ttl_seconds" : 300,
+        "jit_loading_required" : true,
+        "maximum_loaded_instances" : 1,
+        "maximum_parallel_requests" : 1,
+        "serialize_successor_creation" : true
+      }
+    },
+    "constrained_limits" : {
+      "active_gauge_fps" : 30,
+      "active_model_stream_bytes" : 4194304,
+      "decoded_memory_cache_bytes" : 16777216,
+      "diagnostic_ring_records" : 1000,
+      "log_file_bytes" : 4194304,
+      "mcp_response_bytes" : 1048576,
+      "memory_search_default_limit" : 20,
+      "memory_search_hard_limit" : 100,
+      "process_output_bytes_per_stream" : 4194304,
+      "retained_log_archives" : 2,
+      "search_cache_bytes" : 8388608,
+      "telemetry_history_points" : 600
+    },
+    "host_physical_bytes" : 51539607552,
+    "host_tier" : "high_capacity",
+    "lowest_executed_tier" : "constrained"
+  },
+  "phase" : "P11",
+  "resource" : {
+    "cpu_system_seconds" : 0.012914376,
+    "cpu_user_seconds" : 0.034781741999999997,
+    "database_bytes" : 1081344,
+    "disk_read_bytes" : 73728,
+    "disk_written_bytes" : 91148288,
+    "interrupt_wakeups" : 137,
+    "package_idle_wakeups" : 1,
+    "resident_baseline_bytes" : 21446656,
+    "resident_peak_bytes" : 91373568,
+    "resident_post_release_bytes" : [
+      89292800,
+      89292800,
+      89292800,
+      89292800,
+      89292800
+    ],
+    "resident_post_release_slope_bytes_per_sample" : 0,
+    "wal_bytes" : 3341352
+  },
+  "schema_version" : 1,
+  "status" : "passed"
+}

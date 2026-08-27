@@ -50,10 +50,12 @@ public struct HostPluginManifest: Sendable, Equatable {
 public final class HostAdapterRegistry: @unchecked Sendable {
     public static let shared = HostAdapterRegistry()
     public typealias Factory = @Sendable (URL) throws -> any SessionHostAdapter
+    public typealias ManagedProviderFactory = @Sendable (URL) throws -> any ManagedModelProvider
 
     private struct Registration {
         var manifest: HostPluginManifest
         var factory: Factory
+        var managedProviderFactory: ManagedProviderFactory?
     }
 
     private let lock = NSLock()
@@ -61,9 +63,17 @@ public final class HostAdapterRegistry: @unchecked Sendable {
 
     public init() {}
 
-    public func register(manifest: HostPluginManifest, factory: @escaping Factory) {
+    public func register(
+        manifest: HostPluginManifest,
+        managedProviderFactory: ManagedProviderFactory? = nil,
+        factory: @escaping Factory
+    ) {
         lock.lock()
-        registrations[manifest.identifier] = Registration(manifest: manifest, factory: factory)
+        registrations[manifest.identifier] = Registration(
+            manifest: manifest,
+            factory: factory,
+            managedProviderFactory: managedProviderFactory
+        )
         lock.unlock()
     }
 
@@ -73,6 +83,19 @@ public final class HostAdapterRegistry: @unchecked Sendable {
         lock.unlock()
         guard let factory else { throw ContinuityRunError.hostCapabilityUnavailable }
         return try factory(storageDirectory)
+    }
+
+    /// Resolves the provider exposed by an adapter registration. `identifier` remains the
+    /// adapter selection identity; the returned provider's `providerID` identifies its upstream.
+    public func managedProvider(
+        identifier: String,
+        storageDirectory: URL
+    ) throws -> (any ManagedModelProvider)? {
+        lock.lock()
+        let registration = registrations[identifier]
+        lock.unlock()
+        guard let registration else { throw ContinuityRunError.hostCapabilityUnavailable }
+        return try registration.managedProviderFactory?(storageDirectory)
     }
 
     public var manifests: [HostPluginManifest] {

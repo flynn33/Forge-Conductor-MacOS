@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "work_package": "FC-CTX-001",
+  "captured_at": "2026-08-26T19:35:31.440263+00:00",
+  "results": [
+    {
+      "id": "FC-CTX-FOCUSED-SWIFTPM",
+      "command_id": "CMD-20260826T193515Z-706f5f0d9e",
+      "executed": 44,
+      "failures": 0,
+      "exit_code": 0,
+      "status": "passed",
+      "suites": {
+        "ManagerTests": 25,
+        "ProjectContextIntegrationTests": 4,
+        "ProjectControlPlaneRepositoryTests": 8,
+        "ProjectMemoryTests": 7
+      },
+      "coverage": [
+        "durable project registration and exact owner binding",
+        "manager-authorized register, bind, status, and generation-reset commands",
+        "missing binding stable error",
+        "two-project read, write, and execution isolation",
+        "generation compare-and-set reset and binding invalidation",
+        "delayed-result fence and bounded quarantine",
+        "control-plane WAL, foreign-key, timeout, integrity, and migration receipt",
+        "project-memory migration, corruption, lock, pagination, redaction, and cache regressions"
+      ]
+    }
+  ],
+  "acceptance": {
+    "missing_context_returns_project_context_required": "passed",
+    "stale_context_returns_stale_project_generation": "passed",
+    "two_concurrent_projects_remain_isolated": "passed",
+    "delayed_result_cannot_mutate_reset_project": "passed",
+    "manager_binding_and_generation_commands": "passed"
+  }
+}

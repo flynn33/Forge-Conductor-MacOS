@@ -1,0 +1,53 @@
+{
+  "artifacts": [
+    {
+      "bytes": 3537,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/P09-host-capability-report.json",
+      "sha256": "f21d7b311bc6a632e4bb2b996e6f7191e3ec6a0070decdb93d63ad480c0c00c9"
+    },
+    {
+      "bytes": 1871,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/P09-resource-owner-matrix.json",
+      "sha256": "967c73f5b924db0391a8bd557b24ed138dcdaa702354c5a7e3389b8b71bd2ff7"
+    },
+    {
+      "bytes": 384,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/P09-feature-parity.json",
+      "sha256": "e1d3339a54dc28980bb933753ff9535ffe5a81ca7dc393573b191b373eb1f937"
+    },
+    {
+      "bytes": 12100,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/P09-external-mcp-compatibility.json",
+      "sha256": "5495fbc9e99436894b12d6b67a3b9c80921323261cbdaf482d3e0259def13225"
+    },
+    {
+      "bytes": 393,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260826T235215Z-09978ce068.stdout.txt",
+      "sha256": "018182e3b54fff6e17ff694d5ccca3f1b1b029bdce6a66f3acd725df3744ddae"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260826T235215Z-09978ce068.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "command": "python3 .forge-codex/scripts/check_p09_completion.py",
+  "ended_at": "2026-08-26T23:52:15.561480+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260826T235215Z-09978ce068",
+  "kind": "g09-completion-validation",
+  "related_findings": [
+    "FC-AUTONOMY-001"
+  ],
+  "related_gates": [
+    "G09"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-26T23:52:15.516067+00:00",
+  "timed_out": false
+}

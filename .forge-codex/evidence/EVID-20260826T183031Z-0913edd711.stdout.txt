@@ -1,0 +1,24 @@
+Test Suite 'Selected tests' started at 2026-08-26 13:30:36.481.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-26 13:30:36.482.
+Test Suite 'LiveCollectorEvidenceTests' started at 2026-08-26 13:30:36.482.
+Test Case '-[ForgeConductorTests.LiveCollectorEvidenceTests testForgeSnapshotIncludesDiscoveredMCPServers]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Tests/ForgeConductorTests/LiveCollectorEvidenceTests.swift:218: error: -[ForgeConductorTests.LiveCollectorEvidenceTests testForgeSnapshotIncludesDiscoveredMCPServers] : XCTAssertTrue failed - missing card for LM Studio pid 41395
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Tests/ForgeConductorTests/LiveCollectorEvidenceTests.swift:218: error: -[ForgeConductorTests.LiveCollectorEvidenceTests testForgeSnapshotIncludesDiscoveredMCPServers] : XCTAssertTrue failed - missing card for LM Studio pid 41394
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Tests/ForgeConductorTests/LiveCollectorEvidenceTests.swift:218: error: -[ForgeConductorTests.LiveCollectorEvidenceTests testForgeSnapshotIncludesDiscoveredMCPServers] : XCTAssertTrue failed - missing card for LM Studio pid 81753
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Tests/ForgeConductorTests/LiveCollectorEvidenceTests.swift:218: error: -[ForgeConductorTests.LiveCollectorEvidenceTests testForgeSnapshotIncludesDiscoveredMCPServers] : XCTAssertTrue failed - missing card for LM Studio pid 81648
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Tests/ForgeConductorTests/LiveCollectorEvidenceTests.swift:218: error: -[ForgeConductorTests.LiveCollectorEvidenceTests testForgeSnapshotIncludesDiscoveredMCPServers] : XCTAssertTrue failed - missing card for LM Studio pid 81644
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Tests/ForgeConductorTests/LiveCollectorEvidenceTests.swift:218: error: -[ForgeConductorTests.LiveCollectorEvidenceTests testForgeSnapshotIncludesDiscoveredMCPServers] : XCTAssertTrue failed - missing card for LM Studio pid 81643
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Tests/ForgeConductorTests/LiveCollectorEvidenceTests.swift:218: error: -[ForgeConductorTests.LiveCollectorEvidenceTests testForgeSnapshotIncludesDiscoveredMCPServers] : XCTAssertTrue failed - missing card for LM Studio pid 81642
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Tests/ForgeConductorTests/LiveCollectorEvidenceTests.swift:218: error: -[ForgeConductorTests.LiveCollectorEvidenceTests testForgeSnapshotIncludesDiscoveredMCPServers] : XCTAssertTrue failed - missing card for LM Studio pid 81635
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Tests/ForgeConductorTests/LiveCollectorEvidenceTests.swift:218: error: -[ForgeConductorTests.LiveCollectorEvidenceTests testForgeSnapshotIncludesDiscoveredMCPServers] : XCTAssertTrue failed - missing card for LM Studio pid 81631
+Test Case '-[ForgeConductorTests.LiveCollectorEvidenceTests testForgeSnapshotIncludesDiscoveredMCPServers]' failed (0.411 seconds).
+Test Suite 'LiveCollectorEvidenceTests' failed at 2026-08-26 13:30:36.893.
+	 Executed 1 test, with 9 failures (0 unexpected) in 0.411 (0.411) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' failed at 2026-08-26 13:30:36.893.
+	 Executed 1 test, with 9 failures (0 unexpected) in 0.411 (0.411) seconds
+Test Suite 'Selected tests' failed at 2026-08-26 13:30:36.893.
+	 Executed 1 test, with 9 failures (0 unexpected) in 0.411 (0.412) seconds
+◇ Test run started.
+↳ Testing Library Version: 1501
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

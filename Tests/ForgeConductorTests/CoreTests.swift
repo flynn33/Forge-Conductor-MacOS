@@ -18,6 +18,42 @@ final class CoreTests: XCTestCase {
         try? FileManager.default.removeItem(at: tempHome)
     }
 
+    @discardableResult
+    private func bindProjectContext(
+        app: ForgeApp,
+        clientID: ClientID,
+        projectRoot: URL? = nil
+    ) throws -> ToolResult {
+        let result = try app.tools.call(
+            name: "project_memory.initialize",
+            arguments: ["project_path": (projectRoot ?? tempHome).path],
+            clientID: clientID
+        )
+        XCTAssertTrue(result.ok, "\(result.payload)")
+        return result
+    }
+
+    @discardableResult
+    private func startAgentRun(
+        app: ForgeApp,
+        clientID: ClientID,
+        agentID: String,
+        goal: String,
+        projectRoot: URL? = nil
+    ) throws -> ToolResult {
+        let result = try app.tools.call(
+            name: "agent_run_start",
+            arguments: [
+                "agent_id": agentID,
+                "goal": goal,
+                "cwd": (projectRoot ?? tempHome).path,
+            ],
+            clientID: clientID
+        )
+        XCTAssertTrue(result.ok, "\(result.payload)")
+        return result
+    }
+
     // MARK: - Bootstrap / paths
 
     func testBootstrapCreatesLayout() throws {
@@ -185,14 +221,16 @@ final class CoreTests: XCTestCase {
 
     func testFSWriteRead() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
+        let client = ClientID("t2")
+        try bindProjectContext(app: app, clientID: client)
         let path = tempHome.appendingPathComponent("note.txt").path
         let w = try app.tools.call(
             name: "fs_write",
             arguments: ["path": path, "content": "hello forge"],
-            clientID: ClientID("t2")
+            clientID: client
         )
         XCTAssertTrue(w.ok)
-        let r = try app.tools.call(name: "fs_read", arguments: ["path": path], clientID: ClientID("t2"))
+        let r = try app.tools.call(name: "fs_read", arguments: ["path": path], clientID: client)
         XCTAssertTrue(r.ok)
         XCTAssertEqual(r.payload["content"] as? String, "hello forge")
         XCTAssertEqual(r.payload["total_lines"] as? Int, 1)
@@ -204,17 +242,21 @@ final class CoreTests: XCTestCase {
         defer { app.shutdown() }
         let path = tempHome.appendingPathComponent("windowed.txt").path
         let body = (1...10).map { "line-\($0)" }.joined(separator: "\n")
+        let windowClient = ClientID("fs-window")
+        let eofClient = ClientID("fs-window-eof")
+        try bindProjectContext(app: app, clientID: windowClient)
+        try bindProjectContext(app: app, clientID: eofClient)
         let w = try app.tools.call(
             name: "fs_write",
             arguments: ["path": path, "content": body],
-            clientID: ClientID("fs-window")
+            clientID: windowClient
         )
         XCTAssertTrue(w.ok)
 
         let r = try app.tools.call(
             name: "fs_read",
             arguments: ["path": path, "offset": 3, "length": 2],
-            clientID: ClientID("fs-window")
+            clientID: windowClient
         )
         XCTAssertTrue(r.ok, "\(r.payload)")
         XCTAssertEqual(r.payload["content"] as? String, "line-3\nline-4")
@@ -227,7 +269,7 @@ final class CoreTests: XCTestCase {
         let pastEOF = try app.tools.call(
             name: "fs_read",
             arguments: ["path": path, "offset": 50, "length": 10],
-            clientID: ClientID("fs-window-eof")
+            clientID: eofClient
         )
         XCTAssertTrue(pastEOF.ok, "\(pastEOF.payload)")
         XCTAssertEqual(pastEOF.payload["content"] as? String, "")
@@ -239,15 +281,19 @@ final class CoreTests: XCTestCase {
         defer { app.shutdown() }
 
         let emptyPath = tempHome.appendingPathComponent("empty.txt").path
+        let emptyWriteClient = ClientID("fs-empty-write")
+        let emptyReadClient = ClientID("fs-empty-read")
+        try bindProjectContext(app: app, clientID: emptyWriteClient)
+        try bindProjectContext(app: app, clientID: emptyReadClient)
         _ = try app.tools.call(
             name: "fs_write",
             arguments: ["path": emptyPath, "content": ""],
-            clientID: ClientID("fs-empty-write")
+            clientID: emptyWriteClient
         )
         let empty = try app.tools.call(
             name: "fs_read",
             arguments: ["path": emptyPath],
-            clientID: ClientID("fs-empty-read")
+            clientID: emptyReadClient
         )
         XCTAssertTrue(empty.ok, "\(empty.payload)")
         XCTAssertEqual(empty.payload["content"] as? String, "")
@@ -256,15 +302,19 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(empty.payload["note"] as? String, "File is empty.")
 
         let boundedPath = tempHome.appendingPathComponent("bounded.txt").path
+        let boundedWriteClient = ClientID("fs-bounded-write")
+        let boundedReadClient = ClientID("fs-bounded-read")
+        try bindProjectContext(app: app, clientID: boundedWriteClient)
+        try bindProjectContext(app: app, clientID: boundedReadClient)
         _ = try app.tools.call(
             name: "fs_write",
             arguments: ["path": boundedPath, "content": "one\ntwo\nthree"],
-            clientID: ClientID("fs-bounded-write")
+            clientID: boundedWriteClient
         )
         let maximum = try app.tools.call(
             name: "fs_read",
             arguments: ["path": boundedPath, "offset": 1, "length": Int.max],
-            clientID: ClientID("fs-bounded-read")
+            clientID: boundedReadClient
         )
         XCTAssertTrue(maximum.ok, "\(maximum.payload)")
         XCTAssertEqual(maximum.payload["content"] as? String, "one\ntwo\nthree")
@@ -276,12 +326,15 @@ final class CoreTests: XCTestCase {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
         let path = tempHome.appendingPathComponent("loop.txt").path
+        let setupClient = ClientID("loop-setup")
+        let client = ClientID("loop-client")
+        try bindProjectContext(app: app, clientID: setupClient)
+        try bindProjectContext(app: app, clientID: client)
         _ = try app.tools.call(
             name: "fs_write",
             arguments: ["path": path, "content": "stable"],
-            clientID: ClientID("loop-setup")
+            clientID: setupClient
         )
-        let client = ClientID("loop-client")
         let args: [String: Any] = ["path": path, "offset": 1, "length": 1]
         var softHandoffID: String?
         for i in 1...8 {
@@ -304,6 +357,8 @@ final class CoreTests: XCTestCase {
 
     func testPDFWrite() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
+        let client = ClientID("t3")
+        try bindProjectContext(app: app, clientID: client)
         let path = tempHome.appendingPathComponent("manual.pdf").path
         let r = try app.tools.call(
             name: "pdf_write",
@@ -312,7 +367,7 @@ final class CoreTests: XCTestCase {
                 "content": "# Title\n\nHello PDF export from Forge.\n\n## Section\nBody text.",
                 "title": "Test Manual",
             ],
-            clientID: ClientID("t3")
+            clientID: client
         )
         XCTAssertTrue(r.ok, "\(r.payload)")
         XCTAssertTrue(FileManager.default.fileExists(atPath: path))
@@ -326,11 +381,13 @@ final class CoreTests: XCTestCase {
         defer { app.shutdown() }
         let outside = tempHome.deletingLastPathComponent()
             .appendingPathComponent("forge-outside-\(UUID().uuidString).txt")
+        let client = ClientID("path-denied")
+        try bindProjectContext(app: app, clientID: client)
 
         let result = try app.tools.call(
             name: "fs_write",
             arguments: ["path": outside.path, "content": "must not write"],
-            clientID: ClientID("path-denied")
+            clientID: client
         )
 
         XCTAssertFalse(result.ok)
@@ -347,11 +404,19 @@ final class CoreTests: XCTestCase {
         try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
         _ = try app.config.update(["allowed_roots": [workspace.path]], save: false)
         let output = workspace.appendingPathComponent("allowed.txt")
+        let client = ClientID("path-allowed")
+        try startAgentRun(
+            app: app,
+            clientID: client,
+            agentID: "implement",
+            goal: "write inside the configured workspace",
+            projectRoot: workspace
+        )
 
         let result = try app.tools.call(
             name: "fs_write",
             arguments: ["path": output.path, "content": "allowed"],
-            clientID: ClientID("path-allowed")
+            clientID: client
         )
 
         XCTAssertTrue(result.ok, "\(result.payload)")
@@ -367,11 +432,13 @@ final class CoreTests: XCTestCase {
         try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
         let link = tempHome.appendingPathComponent("escape")
         try FileManager.default.createSymbolicLink(at: link, withDestinationURL: outside)
+        let client = ClientID("symlink-denied")
+        try bindProjectContext(app: app, clientID: client)
 
         let result = try app.tools.call(
             name: "fs_write",
             arguments: ["path": link.appendingPathComponent("secret.txt").path, "content": "blocked"],
-            clientID: ClientID("symlink-denied")
+            clientID: client
         )
 
         XCTAssertFalse(result.ok)
@@ -383,11 +450,12 @@ final class CoreTests: XCTestCase {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
         let client = ClientID("explore-policy")
-        _ = try app.sessions.start(
+        try startAgentRun(
+            app: app,
+            clientID: client,
             agentID: "explore",
             goal: "read only",
-            clientID: client,
-            cwd: tempHome.path
+            projectRoot: tempHome
         )
 
         let result = try app.tools.call(
@@ -400,18 +468,19 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(result.payload["code"] as? String, "tool_forbidden")
     }
 
-    func testShellRequiresExplicitAgentWorkspace() throws {
+    func testShellRequiresExplicitProjectContext() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
+        let client = ClientID("no-session-shell")
 
-        let result = try app.tools.call(
+        let unboundResult = try app.tools.call(
             name: "shell_exec",
             arguments: ["command": "pwd"],
-            clientID: ClientID("no-session-shell")
+            clientID: client
         )
 
-        XCTAssertFalse(result.ok)
-        XCTAssertEqual(result.payload["code"] as? String, "active_session_required")
+        XCTAssertFalse(unboundResult.ok)
+        XCTAssertEqual(unboundResult.payload["code"] as? String, "project_context_required")
     }
 
     func testAgentRunStartCannotCreateAuthorizationRoot() throws {
@@ -430,11 +499,79 @@ final class CoreTests: XCTestCase {
         XCTAssertNil(app.sessions.binding(for: ClientID("untrusted-session-root")))
     }
 
-    func testShellIsDisabledUnlessTrustedConfigurationEnablesIt() throws {
+    func testShellExecutesByDefaultInsideAuthorizedProjectWorkspace() throws {
+        let projectRoot = tempHome.appendingPathComponent("shell-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
-        let client = ClientID("disabled-shell")
-        _ = try app.sessions.start(agentID: "implement", goal: "probe", clientID: client, cwd: tempHome.path)
+        let client = ClientID("default-shell")
+        try startAgentRun(
+            app: app,
+            clientID: client,
+            agentID: "implement",
+            goal: "probe",
+            projectRoot: projectRoot
+        )
+
+        let result = try app.tools.call(
+            name: "shell_exec",
+            arguments: ["command": "printf shell-ready", "cwd": projectRoot.path],
+            clientID: client
+        )
+
+        XCTAssertTrue(result.ok, "\(result.payload)")
+        XCTAssertEqual(result.payload["exit_code"] as? Int32, 0)
+        XCTAssertEqual(result.payload["stdout"] as? String, "shell-ready")
+    }
+
+    func testMigratedLegacyConfigExecutesAuthorizedShellByDefault() throws {
+        let projectRoot = tempHome.appendingPathComponent("legacy-shell-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+        let legacy: [String: Any] = [
+            "allowed_roots": [projectRoot.path],
+            "shell": [
+                "enabled": false,
+                "default_timeout_sec": 30,
+            ] as [String: Any],
+        ]
+        try JSONSupport.data(from: legacy).write(
+            to: tempHome.appendingPathComponent("config.json"),
+            options: .atomic
+        )
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let client = ClientID("migrated-shell")
+        try startAgentRun(
+            app: app,
+            clientID: client,
+            agentID: "implement",
+            goal: "migration probe",
+            projectRoot: projectRoot
+        )
+
+        let result = try app.tools.call(
+            name: "shell_exec",
+            arguments: ["command": "printf migrated-ready", "cwd": projectRoot.path],
+            clientID: client
+        )
+
+        XCTAssertTrue(result.ok, "\(result.payload)")
+        XCTAssertEqual(result.payload["stdout"] as? String, "migrated-ready")
+        XCTAssertEqual(app.config.model.shell.policyOrigin, "legacy_disabled_default_migrated")
+        XCTAssertTrue(app.config.shellMigrationStatus.receiptValid)
+    }
+
+    func testExplicitShellDisableUsesDistinctAuthorizationReason() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        _ = try app.config.update(ManagerSettingsPatch(shellEnabled: false), save: true)
+        let client = ClientID("user-disabled-shell")
+        try startAgentRun(
+            app: app,
+            clientID: client,
+            agentID: "implement",
+            goal: "probe"
+        )
 
         let result = try app.tools.call(
             name: "shell_exec",
@@ -443,7 +580,32 @@ final class CoreTests: XCTestCase {
         )
 
         XCTAssertFalse(result.ok)
-        XCTAssertEqual(result.payload["code"] as? String, "shell_disabled")
+        XCTAssertEqual(result.payload["code"] as? String, "shell_disabled_by_user")
+    }
+
+    func testShellExecPreservesLoginBashAndResponseContract() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let result = try XCTUnwrap(ShellToolPack().handle(
+            name: "shell_exec",
+            arguments: [
+                "command": "shopt -q login_shell || exit 97; printf '%s' \"$0\"",
+                "cwd": tempHome.path,
+                "timeout_sec": ShellToolPack.maximumTimeoutSec + 300,
+            ],
+            clientID: ClientID("shell-contract"),
+            app: app
+        ))
+
+        XCTAssertTrue(result.ok, "\(result.payload)")
+        XCTAssertTrue((result.payload["stdout"] as? String)?.contains("/bin/bash") == true)
+        for key in [
+            "ok", "exit_code", "stdout", "stderr", "timed_out",
+            "stdout_truncated", "stderr_truncated", "command", "cwd",
+        ] {
+            XCTAssertNotNil(result.payload[key], "missing shell_exec response key \(key)")
+        }
+        XCTAssertEqual(ShellToolPack.maximumTimeoutSec, 120)
     }
 
     func testShellRejectsNonFiniteTimeoutWhenEnabled() throws {

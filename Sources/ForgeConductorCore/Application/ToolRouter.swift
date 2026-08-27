@@ -36,7 +36,7 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
             ContinuityLifecycleToolPack(),
             FilesystemToolPack(),
             GitToolPack(),
-            ShellToolPack(),
+            RuntimeJobSynchronousToolPack(subsystem: app.runtimeJobs),
             DocsToolPack(),
             SearchToolPack(),
         ]
@@ -47,15 +47,90 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
     }
 
     public func call(name: String, arguments: [String: Any], clientID: ClientID) throws -> ToolResult {
+        let context: ToolInvocationContext?
+        do {
+            if Self.contextRequiredTools.contains(name) {
+                context = try app.projectContexts.invocationContext(for: clientID)
+            } else {
+                context = try? app.projectContexts.invocationContext(for: clientID)
+            }
+            if let context {
+                try app.projectContexts.validate(context)
+            }
+        } catch {
+            return projectContextFailure(
+                error,
+                tool: name,
+                arguments: arguments,
+                clientID: clientID,
+                start: Date()
+            )
+        }
+        return try callInternal(
+            name: name,
+            arguments: arguments,
+            context: context,
+            clientID: clientID
+        )
+    }
+
+    public func call(
+        name: String,
+        arguments: [String: Any],
+        context: ToolInvocationContext
+    ) throws -> ToolResult {
+        do {
+            try app.projectContexts.validate(context)
+        } catch {
+            return projectContextFailure(
+                error,
+                tool: name,
+                arguments: arguments,
+                clientID: context.clientID,
+                start: Date()
+            )
+        }
+        return try callInternal(
+            name: name,
+            arguments: arguments,
+            context: context,
+            clientID: context.clientID
+        )
+    }
+
+    private func callInternal(
+        name: String,
+        arguments: [String: Any],
+        context: ToolInvocationContext?,
+        clientID: ClientID
+    ) throws -> ToolResult {
         let start = Date()
         app.sessions.touchIfActive(clientID: clientID)
         let binding = try? app.sessions.rehydrate(clientID: clientID)
+
+        if let mismatch = projectScopeMismatch(
+            tool: name,
+            arguments: arguments,
+            context: context
+        ) {
+            return recordAndReturn(
+                mismatch,
+                tool: name,
+                arguments: arguments,
+                clientID: clientID,
+                start: start,
+                status: "denied",
+                auditError: mismatch.payload["message"] as? String,
+                mutating: Self.mutatingTools.contains(name)
+            )
+        }
 
         let routedArguments: [String: Any]
         let authorizationDenial: (code: String, message: String)?
         switch authorization.authorize(
             tool: name,
             arguments: arguments,
+            context: context,
             clientID: clientID,
             binding: binding
         ) {
@@ -140,7 +215,33 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
 
         let result: ToolResult
         do {
-            result = try dispatch(name: name, arguments: routedArguments, clientID: clientID)
+            let dispatched: ToolResult
+            if let context, Self.projectMemoryMutatingTools.contains(name) {
+                dispatched = try app.projectContexts.commitIfCurrent(
+                    context: context,
+                    resultKind: name
+                ) {
+                    try self.dispatch(
+                        name: name,
+                        arguments: routedArguments,
+                        context: context,
+                        clientID: clientID
+                    )
+                }
+            } else {
+                dispatched = try dispatch(
+                    name: name,
+                    arguments: routedArguments,
+                    context: context,
+                    clientID: clientID
+                )
+            }
+            result = try attachBootstrapProjectContextIfNeeded(
+                dispatched,
+                tool: name,
+                arguments: routedArguments,
+                clientID: clientID
+            )
         } catch {
             var fail = ToolResult.failure(code: "tool_exception", message: "\(error)", retryable: true)
             if !isContinuity, loopCount == Self.maxIdenticalConsecutiveCalls + 1 {
@@ -338,6 +439,30 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         "session_checkpoint", "session_handoff",
         "continuity.checkpoint", "continuity.prepare_handoff",
         "continuity.acknowledge_handoff", "continuity.resume", "continuity.request_rollover",
+        "process.run", "shell.run", "bash.run", "python.run", "powershell.run",
+        "job.cancel",
+    ]
+
+    private static let contextRequiredTools: Set<String> = [
+        "fs_write", "fs_edit", "fs_mkdir", "fs_delete", "fs_move",
+        "git_status", "git_diff", "git_log", "git_add", "git_commit",
+        "shell_exec", "pdf_write", "pdf_from_file",
+        "project_memory.remember", "project_memory.remember_batch",
+        "project_memory.search", "project_memory.get", "project_memory.update",
+        "project_memory.forget", "project_memory.list_recent", "project_memory.link",
+        "project_memory.export", "project_memory.import", "project_memory.status",
+        "continuity.checkpoint", "continuity.prepare_handoff",
+        "continuity.get_pending_handoff", "continuity.acknowledge_handoff",
+        "continuity.resume", "continuity.status", "continuity.request_rollover",
+        "runtime.capabilities", "process.run", "shell.run", "bash.run",
+        "python.run", "powershell.run", "job.status", "job.read_output",
+        "job.cancel", "job.list",
+    ]
+
+    private static let projectMemoryMutatingTools: Set<String> = [
+        "project_memory.remember", "project_memory.remember_batch",
+        "project_memory.update", "project_memory.forget", "project_memory.link",
+        "project_memory.export", "project_memory.import",
     ]
 
     private func applyRuntimeContinuity(
@@ -410,9 +535,136 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         return "error"
     }
 
-    private func dispatch(name: String, arguments: [String: Any], clientID: ClientID) throws -> ToolResult {
+    private func projectScopeMismatch(
+        tool: String,
+        arguments: [String: Any],
+        context: ToolInvocationContext?
+    ) -> ToolResult? {
+        guard let context else { return nil }
+        if let rawProjectID = ToolArgHelpers.string(arguments, "project_id"),
+           let supplied = UUID(uuidString: rawProjectID),
+           supplied != context.projectID.rawValue {
+            return .failure(
+                code: ProjectContextError.projectScopeMismatch.code,
+                message: "The requested project does not match the durable invocation context",
+                retryable: false
+            )
+        }
+        if tool == "project_memory.initialize",
+           let rawPath = ToolArgHelpers.string(arguments, "project_path")
+                ?? ToolArgHelpers.string(arguments, "path") {
+            let candidate = ToolArgHelpers.resolvePath(rawPath)
+                .resolvingSymlinksInPath().standardizedFileURL
+            guard context.authorizationScope.canonicalRoots.contains(where: {
+                $0.resolvingSymlinksInPath().standardizedFileURL == candidate
+            }) else {
+                return .failure(
+                    code: ProjectContextError.projectScopeMismatch.code,
+                    message: "The requested project root does not match the durable invocation context",
+                    retryable: false
+                )
+            }
+        }
+        return nil
+    }
+
+    private func attachBootstrapProjectContextIfNeeded(
+        _ result: ToolResult,
+        tool: String,
+        arguments: [String: Any],
+        clientID: ClientID
+    ) throws -> ToolResult {
+        guard result.ok else { return result }
+        let descriptor: ProjectMemoryDescriptor
+        let root: URL
+        switch tool {
+        case "project_memory.initialize":
+            guard let projectID = result.payload["project_id"] as? String,
+                  let rawPath = ToolArgHelpers.string(arguments, "project_path")
+                    ?? ToolArgHelpers.string(arguments, "path") else {
+                throw ProjectContextError.invalidIdentifier("initialized project context")
+            }
+            descriptor = try app.projectMemory.identities.descriptor(projectID: projectID)
+            root = ToolArgHelpers.resolvePath(rawPath)
+        case "agent_run_start":
+            guard let rawPath = ToolArgHelpers.string(arguments, "cwd") else {
+                return result
+            }
+            root = ToolArgHelpers.resolvePath(rawPath)
+            let initialized = try app.projectMemory.initialize(path: root.path)
+            guard let projectID = initialized["project_id"] as? String else {
+                throw ProjectContextError.invalidIdentifier("agent project context")
+            }
+            descriptor = try app.projectMemory.identities.descriptor(projectID: projectID)
+        default:
+            return result
+        }
+
+        let context = try app.projectContexts.registerAndBindMCPClient(
+            descriptor: descriptor,
+            canonicalRoot: root,
+            clientID: clientID
+        )
+        var payload = result.payload
+        payload["project_id"] = context.projectID.description
+        payload["project_generation"] = context.projectGeneration.rawValue
+        payload["project_context"] = [
+            "project_id": context.projectID.description,
+            "project_generation": context.projectGeneration.rawValue,
+            "client_id": context.clientID.rawValue,
+            "authorization_roots": context.authorizationScope.canonicalRoots.map(\.path),
+            "maximum_inline_output_bytes": context.authorizationScope.maximumInlineOutputBytes,
+        ] as [String: Any]
+        return ToolResult(ok: result.ok, payload: payload, isError: result.isError)
+    }
+
+    private func projectContextFailure(
+        _ error: Error,
+        tool: String,
+        arguments: [String: Any],
+        clientID: ClientID,
+        start: Date
+    ) -> ToolResult {
+        let code: String
+        let retryable: Bool
+        if let contextError = error as? ProjectContextError {
+            code = contextError.code
+            retryable = contextError == .databaseBusy
+        } else {
+            code = "project_context_failure"
+            retryable = false
+        }
+        let result = ToolResult.failure(
+            code: code,
+            message: error.localizedDescription,
+            retryable: retryable
+        )
+        return recordAndReturn(
+            result,
+            tool: tool,
+            arguments: arguments,
+            clientID: clientID,
+            start: start,
+            status: "denied",
+            auditError: error.localizedDescription,
+            mutating: Self.mutatingTools.contains(tool)
+        )
+    }
+
+    private func dispatch(
+        name: String,
+        arguments: [String: Any],
+        context: ToolInvocationContext?,
+        clientID: ClientID
+    ) throws -> ToolResult {
         for pack in packs {
-            if let result = try pack.handle(name: name, arguments: arguments, clientID: clientID, app: app) {
+            if let result = try pack.handle(
+                name: name,
+                arguments: arguments,
+                context: context,
+                clientID: clientID,
+                app: app
+            ) {
                 return result
             }
         }

@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "phase": "P09",
   "preserved": [
     "MCP-SERVER-STDIO",
@@ -8,8 +8,9 @@
   ],
   "additive": [
     "HOST-ADAPTER-REGISTRY",
-    "HOST-NATIVE-SESSION-PLUGIN",
-    "HOST-NATIVE-AUTONOMOUS-ROLLOVER"
+    "HOST-LMSTUDIO-MANAGED-PLUGIN",
+    "HOST-FRESH-ROOT-AUTONOMOUS-ROLLOVER",
+    "HOST-AUTOMATIC-SUCCESSOR-CONTINUATION"
   ],
   "removed": [],
   "unknown": [],

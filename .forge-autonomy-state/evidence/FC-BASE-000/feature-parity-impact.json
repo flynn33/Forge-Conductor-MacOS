@@ -1,0 +1,31 @@
+{
+  "classification": "test-only additive",
+  "current_mcp_tools_snapshotted": 53,
+  "features_removed": [],
+  "features_renamed": [],
+  "legacy_mcp_tools_preserved": 34,
+  "next_package_obligations": [
+    "dispose the shell_exec timeout schema delta explicitly",
+    "preserve legacy tools while adding project-bound context",
+    "keep the deterministic LM Studio transport test-only",
+    "resolve bundled playbook references to currently absent runtime tools"
+  ],
+  "preserved_surfaces": [
+    "all 53 current MCP tool names and descriptors",
+    "10 CLI commands and manager subcommands",
+    "seven native navigation routes and 29 accessibility identifiers",
+    "two LM Studio MCP connector roles",
+    "10 bundled agent identities",
+    "existing databases, settings, migrations, project formats, and UI behavior"
+  ],
+  "product_behavior_changed": false,
+  "schema_version": 1,
+  "test_fixture_paths": [
+    "Tests/ForgeConductorTests/Fixtures/LMStudio/models-loaded.json",
+    "Tests/ForgeConductorTests/Fixtures/LMStudio/responses-root.sse",
+    "Tests/ForgeConductorTests/Fixtures/LMStudio/responses-continuation.sse",
+    "Tests/ForgeConductorTests/LMStudioContractFixtureServer.swift",
+    "Tests/ForgeConductorTests/LMStudioContractFixtureTests.swift"
+  ],
+  "work_package": "FC-BASE-000"
+}

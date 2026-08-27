@@ -109,6 +109,18 @@ struct ContentView: View {
             ToolsView()
         case .feed:
             LiveFeedView()
+        case .projects:
+            ProjectsOperatorView(client: model.operatorManagerClient)
+        case .autonomy:
+            AutonomyOperatorView(client: model.operatorManagerClient)
+        case .continuity:
+            ContinuityOperatorView(client: model.operatorManagerClient)
+        case .runtimes:
+            RuntimesOperatorView(client: model.operatorManagerClient)
+        case .provider:
+            ProviderOperatorView(client: model.operatorManagerClient)
+        case .evidence:
+            EvidenceOperatorView(client: model.operatorManagerClient)
         case .diagnostics:
             DiagnosticsView()
         case .manager:

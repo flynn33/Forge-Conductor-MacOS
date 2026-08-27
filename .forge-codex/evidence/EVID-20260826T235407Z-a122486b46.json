@@ -1,0 +1,41 @@
+{
+  "artifacts": [
+    {
+      "bytes": 4474,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.json",
+      "sha256": "a8f526d5007a1d1c70835c25e3da4e55729c1ab3e8e85dbdc014ea75acadc0c6"
+    },
+    {
+      "bytes": 2910,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.criteria.json",
+      "sha256": "c403e7321a241f600e1b10832db8e7e5e3de7cac124d0eb911a32d9db4f058b4"
+    },
+    {
+      "bytes": 4474,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260826T235407Z-a122486b46.stdout.txt",
+      "sha256": "0ef3b49489fc5e74e5969a5ef823f3afb6b75d833ef188d75b899d340c10a782"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260826T235407Z-a122486b46.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "command": "python3 .forge-codex/scripts/run_gate.py G09 --repo . --timeout 300",
+  "ended_at": "2026-08-26T23:54:08.272866+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260826T235407Z-a122486b46",
+  "kind": "g09-gate-evaluation",
+  "related_findings": [],
+  "related_gates": [
+    "G09"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-26T23:54:07.614598+00:00",
+  "timed_out": false
+}

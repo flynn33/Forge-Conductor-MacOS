@@ -1,57 +1,119 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "gate_id": "G09",
-  "instructions": "Command-backed P09 host adapter evidence.",
+  "instructions": "Current-source P09 host-adapter qualification. Historical passes remain evidence but do not qualify the final runtime, security, and packaging source.",
   "criteria_results": [
     {
       "criterion": "host capability report exists",
       "passed": true,
       "evidence": [
-        {"path": ".forge-codex/evidence/P09-host-capability-report.json", "sha256": "47cd721c6629226b63d1cfab83164bf17c9389ff1b7e18f69f5df9fdc25a751c"},
-        {"path": ".forge-codex/evidence/EVID-20260823T205703Z-d353891c4a.json", "sha256": "4269b2ba2549b1701cc1e548640da04b1bc6a8c578c899ee03ec1bdbf41a334a"}
+        {
+          "path": ".forge-codex/evidence/P09-host-capability-report.json",
+          "sha256": "c0c7c4016a857c70ddb71c22f08d2b2eb511f804335f2b20044d40c24ef71860"
+        }
       ]
     },
     {
       "criterion": "required plugin target builds and tests",
-      "passed": true,
+      "passed": false,
       "evidence": [
-        {"path": ".forge-codex/evidence/EVID-20260823T205600Z-67248c9a56.json", "sha256": "cbe06847810d2fc3eb8c1d2d11c5bd92205c7410c2513aab456d0cee43a9e1e3"},
-        {"path": ".forge-codex/evidence/EVID-20260823T205539Z-7c10f18ca4.json", "sha256": "e89de0a8a1fc34c5850ce7b094c4557ed4f8ce821cbf3d9701004ec1abab9588"}
+        {
+          "path": ".forge-codex/evidence/P09-host-capability-report.json",
+          "sha256": "c0c7c4016a857c70ddb71c22f08d2b2eb511f804335f2b20044d40c24ef71860"
+        },
+        {
+          "path": ".forge-codex/evidence/EVID-20260826T234631Z-cae1c73a2f.json",
+          "sha256": "42d19e1586faea11970da0c0febe533bb708ad40ce59b4a269ee41b458884d40"
+        }
       ]
     },
     {
       "criterion": "full no-operator rollover passes in a supported mode",
-      "passed": true,
+      "passed": false,
       "evidence": [
-        {"path": ".forge-codex/evidence/P09-host-capability-report.json", "sha256": "47cd721c6629226b63d1cfab83164bf17c9389ff1b7e18f69f5df9fdc25a751c"},
-        {"path": ".forge-codex/evidence/EVID-20260823T205539Z-7c10f18ca4.json", "sha256": "e89de0a8a1fc34c5850ce7b094c4557ed4f8ce821cbf3d9701004ec1abab9588"}
+        {
+          "path": ".forge-codex/evidence/P09-host-capability-report.json",
+          "sha256": "c0c7c4016a857c70ddb71c22f08d2b2eb511f804335f2b20044d40c24ef71860"
+        },
+        {
+          "path": ".forge-autonomy-state/evidence/FC-E2E-001/live-lmstudio-managed-continuity.json",
+          "sha256": "cb90eec59b7129fd89dd4a88b597f59120d706c8de91133bb36f259f748f9c23"
+        },
+        {
+          "path": ".forge-autonomy-state/evidence/FC-RELEASE-001/test-results.json",
+          "sha256": "9f2a6a473bc09d3f09de9de33936635028a1427960d5ab47317f706fa1034472"
+        }
       ]
     },
     {
       "criterion": "external MCP-only compatibility passes",
-      "passed": true,
+      "passed": false,
       "evidence": [
-        {"path": ".forge-codex/evidence/P09-external-mcp-compatibility.json", "sha256": "2c3731350d23513991cfc0523d2c145ba00c60d9421ef84543c2f75112de5337"},
-        {"path": ".forge-codex/evidence/EVID-20260823T205325Z-8e4577190c.json", "sha256": "2b28507f1a7fad064c5401bfc44e2c635e432f76dfde4eddced24f1d2b1cbb79"}
+        {
+          "path": ".forge-codex/evidence/P09-host-capability-report.json",
+          "sha256": "c0c7c4016a857c70ddb71c22f08d2b2eb511f804335f2b20044d40c24ef71860"
+        },
+        {
+          "path": ".forge-codex/evidence/P09-external-mcp-compatibility.json",
+          "sha256": "5495fbc9e99436894b12d6b67a3b9c80921323261cbdaf482d3e0259def13225"
+        }
       ]
     },
     {
       "criterion": "private UI automation scan passes",
-      "passed": true,
+      "passed": false,
       "evidence": [
-        {"path": ".forge-codex/evidence/EVID-20260823T205330Z-dd887aaee2.json", "sha256": "e3557fbc5fe68e01818e828c7efb6da92fca7d282881fb2405c27a40ec975cd7"},
-        {"path": ".forge-codex/evidence/EVID-20260823T205709Z-3ba0d3d56b.json", "sha256": "d99a0d413c4547c4bbae30b6066930e9d897ca48e96683511ba82369084af8d0"}
+        {
+          "path": ".forge-codex/evidence/P09-host-capability-report.json",
+          "sha256": "c0c7c4016a857c70ddb71c22f08d2b2eb511f804335f2b20044d40c24ef71860"
+        },
+        {
+          "path": ".forge-codex/evidence/EVID-20260826T234718Z-32f5e2f934.json",
+          "sha256": "9183b99e765440514647170a09abb484559ca39d163cecf4e19af0f0267a4b6b"
+        }
       ]
     }
   ],
   "commands": [
-    {"command": "swift build -c release --target ForgeNativeSessionHostPlugin --jobs 4", "exit_code": 0, "evidence": ".forge-codex/evidence/EVID-20260823T205600Z-67248c9a56.json"},
-    {"command": "swift test --jobs 4 --filter NativeSessionHostPluginTests", "exit_code": 0, "evidence": ".forge-codex/evidence/EVID-20260823T205539Z-7c10f18ca4.json"},
-    {"command": "python3 .forge-codex/scripts/check_p08_continuity.py --binary .build/release/forge-conductor --output .forge-codex/evidence/P09-external-mcp-compatibility.json", "exit_code": 0, "evidence": ".forge-codex/evidence/EVID-20260823T205325Z-8e4577190c.json"},
-    {"command": "python3 .forge-codex/scripts/check_private_ui_automation.py", "exit_code": 0, "evidence": ".forge-codex/evidence/EVID-20260823T205330Z-dd887aaee2.json"},
-    {"command": "swift test --jobs 4 -Xswiftc -strict-concurrency=complete -Xswiftc -warnings-as-errors", "exit_code": 0, "evidence": ".forge-codex/evidence/EVID-20260823T205612Z-bbcdb66436.json"},
-    {"command": "python3 .forge-codex/scripts/check_p09_completion.py", "exit_code": 0, "evidence": ".forge-codex/evidence/EVID-20260823T205703Z-d353891c4a.json"},
-    {"command": "python3 .forge-codex/scripts/scan_attribution.py --root .", "exit_code": 0, "evidence": ".forge-codex/evidence/EVID-20260823T205709Z-3ba0d3d56b.json"},
-    {"command": "python3 .forge-codex/scripts/scan_secrets.py --root .", "exit_code": 0, "evidence": ".forge-codex/evidence/EVID-20260823T205726Z-683bd3177f.json"}
+    {
+      "command": "swift test --scratch-path /tmp/forge-g09-tests-20260826b -Xswiftc -warnings-as-errors --filter NativeSessionHostPluginTests",
+      "exit_code": 0,
+      "evidence": ".forge-codex/evidence/EVID-20260826T234631Z-cae1c73a2f.json"
+    },
+    {
+      "command": "python3 .forge-codex/scripts/check_p08_continuity.py --binary /tmp/forge-g09-release-20260826/release/forge-conductor --output .forge-codex/evidence/P09-external-mcp-compatibility.json",
+      "exit_code": 0,
+      "evidence": ".forge-codex/evidence/EVID-20260826T234711Z-f708331f5f.json"
+    },
+    {
+      "command": "python3 .forge-codex/scripts/check_private_ui_automation.py",
+      "exit_code": 0,
+      "evidence": ".forge-codex/evidence/EVID-20260826T234718Z-32f5e2f934.json"
+    },
+    {
+      "command": "env FORGE_LIVE_LMSTUDIO_MODEL=qwen/qwen3.8-27b swift test -Xswiftc -warnings-as-errors --filter NativeSessionHostPluginTests/testLiveLMStudioFreshRootAcknowledgementAndAutomaticContinuation",
+      "exit_code": 0,
+      "evidence": ".forge-autonomy-state/evidence/FC-E2E-001/commands.jsonl"
+    },
+    {
+      "command": "swift test -Xswiftc -warnings-as-errors",
+      "exit_code": 1,
+      "evidence": ".forge-autonomy-state/evidence/FC-RELEASE-001/commands.jsonl"
+    },
+    {
+      "command": "swift test -c release -Xswiftc -warnings-as-errors",
+      "exit_code": 1,
+      "evidence": ".forge-autonomy-state/evidence/FC-RELEASE-001/commands.jsonl"
+    },
+    {
+      "command": "swift test -Xswiftc -warnings-as-errors --filter RuntimeExecutionJobTests --skip RuntimeExecutionJobTests.testBootstrapRouter",
+      "exit_code": 0,
+      "evidence": ".forge-autonomy-state/evidence/FC-RUNTIME-001/commands.jsonl"
+    },
+    {
+      "command": "xcodebuild -only-testing:ForgeConductorTests/RuntimeExecutionJobTests test-without-building",
+      "exit_code": 0,
+      "evidence": ".forge-autonomy-state/evidence/FC-RUNTIME-001/commands.jsonl"
+    }
   ]
 }

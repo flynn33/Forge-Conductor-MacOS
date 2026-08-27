@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 93,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260826T235400Z-6930a4351d.stdout.txt",
+      "sha256": "f73b06819c46dca77f5594bea8d9e3db318aa004eb2260f3900d14db3d0b2a8c"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260826T235400Z-6930a4351d.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "command": "python3 .forge-codex/scripts/scan_attribution.py --root .",
+  "ended_at": "2026-08-26T23:54:00.668237+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260826T235400Z-6930a4351d",
+  "kind": "prohibited-attribution-scan",
+  "related_findings": [],
+  "related_gates": [
+    "G09"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-26T23:54:00.011582+00:00",
+  "timed_out": false
+}

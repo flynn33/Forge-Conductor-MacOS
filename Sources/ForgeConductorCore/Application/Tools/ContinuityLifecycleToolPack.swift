@@ -20,8 +20,12 @@ public struct ContinuityLifecycleToolPack: ToolPackHandling {
         do {
             let payload: [String: Any]
             switch name {
-            case "continuity.checkpoint", "continuity.prepare_handoff", "continuity.request_rollover":
-                payload = try app.continuityControl.prepare(arguments: arguments)
+            case "continuity.checkpoint":
+                payload = try app.continuityControl.checkpoint(arguments: arguments)
+            case "continuity.prepare_handoff":
+                payload = try app.continuityControl.prepareHandoff(arguments: arguments)
+            case "continuity.request_rollover":
+                payload = try app.continuityControl.requestRollover(arguments: arguments)
             case "continuity.get_pending_handoff":
                 payload = try app.continuityControl.pending(arguments: arguments)
             case "continuity.acknowledge_handoff":
@@ -49,7 +53,7 @@ public struct ContinuityLifecycleToolPack: ToolPackHandling {
             "continuity.acknowledge_handoff": "Compare-and-set acknowledgment for an exact successor and handoff.",
             "continuity.resume": "Seal an acknowledged rollover and atomically select the successor.",
             "continuity.status": "Report durable continuity state, retry metadata, and active session.",
-            "continuity.request_rollover": "Prepare rollover; reports memory-only readiness unless a host adapter confirms creation.",
+            "continuity.request_rollover": "Queue managed rollover work, or prepare an external handoff when the host is handoff-only.",
         ][name]
     }
 
@@ -71,7 +75,30 @@ public struct ContinuityLifecycleToolPack: ToolPackHandling {
                 "decisions": array, "passed_gates": array, "open_gates": array,
                 "memory_record_ids": array, "evidence_ids": array, "next_actions": array,
                 "adapter_id": string, "idempotency_key": string,
-                "context_budget_source": string, "remaining_budget_estimate": ["type": "number"],
+                "requested_by": string, "reason": string,
+                "project_generation": ["type": "integer", "minimum": 1],
+                "run_id": string,
+                "assignment_id": string,
+                "continuity_mode": [
+                    "type": "string",
+                    "enum": ContinuityMode.allCases.map(\.rawValue),
+                ],
+                "provider_id": string,
+                "provider_response_id": string,
+                "bootstrap_nonce": string,
+                "budget_observation_id": string,
+                "context_capacity": ["type": "integer", "minimum": 1],
+                "context_used": ["type": "integer", "minimum": 0],
+                "context_reserved": ["type": "integer", "minimum": 0],
+                "context_remaining": ["type": "integer"],
+                "context_confidence": ["type": "number", "minimum": 0, "maximum": 1],
+                "context_action": [
+                    "type": "string",
+                    "enum": ["checkpoint", "rollover", "emergency"],
+                ],
+                "context_trigger": string,
+                "context_budget_source": string,
+                "remaining_budget_estimate": ["type": "number"],
             ], required: ["project_id", "predecessor_session_id", "mission"])
         case "continuity.acknowledge_handoff":
             return object([

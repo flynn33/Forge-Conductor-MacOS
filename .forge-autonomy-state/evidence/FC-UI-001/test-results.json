@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "work_package": "FC-UI-001",
+  "captured_at": "2026-08-26T23:29:28.112021+00:00",
+  "overall_status": "blocked",
+  "evidence_complete": false,
+  "results": [
+    {
+      "id": "FC-UI-UNSIGNED-XCUI",
+      "command_id": "CMD-20260826T225735Z-0c70ad3cf6",
+      "exit_code": 65,
+      "status": "failed",
+      "result_bundle": ".forge-autonomy-state/evidence/FC-UI-001/ForgeConductorUITests.xcresult",
+      "observed": {
+        "total_tests": 1,
+        "passed_tests": 0,
+        "failed_tests": 1,
+        "failure": "test runner was killed before establishing the UI testing connection"
+      }
+    },
+    {
+      "id": "FC-UI-NORMAL-SIGNED-XCUI",
+      "command_id": "CMD-20260826T225905Z-1b04745fd0",
+      "exit_code": 65,
+      "status": "blocked",
+      "result_bundle": ".forge-autonomy-state/evidence/FC-UI-001/ForgeConductorUITests-signed.xcresult",
+      "observed": {
+        "total_tests": 0,
+        "failure": "no Mac Development signing certificate matching configured team 2Y25RTLZET with a private key"
+      }
+    },
+    {
+      "id": "FC-UI-ADHOC-SIGNED-XCUI",
+      "command_id": "CMD-20260826T225928Z-a91e5b14f6",
+      "exit_code": 65,
+      "status": "blocked",
+      "result_bundle": ".forge-autonomy-state/evidence/FC-UI-001/ForgeConductorUITests-adhoc.xcresult",
+      "observed": {
+        "total_tests": 1,
+        "passed_tests": 0,
+        "failed_tests": 1,
+        "failure": "test runner timed out while enabling automation mode"
+      }
+    },
+    {
+      "id": "FC-UI-HOST-PREREQUISITES",
+      "command_ids": [
+        "CMD-20260826T232713Z-c3f5ee2b0a",
+        "CMD-20260826T232713Z-f98d33c523"
+      ],
+      "status": "blocked",
+      "observed": {
+        "developer_mode": "disabled",
+        "required_team_signing_identity_present": false,
+        "other_code_signing_identities_present": true
+      }
+    }
+  ],
+  "acceptance": {
+    "gui_reconnects_without_duplicate_scheduler": "not_executed",
+    "accessibility_and_ui_tests_pass": "blocked",
+    "all_errors_and_states_are_represented": "implementation_present_but_behavioral_verification_pending",
+    "no_credentials_displayed": "behavioral_verification_pending"
+  },
+  "blockers": [
+    "macOS Developer mode is disabled and requires an authorized host configuration change",
+    "the configured development team has no matching usable Mac Development identity on this host"
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "work_package": "FC-UI-001",
+  "status": "blocked_environment",
+  "recorded_at": "2026-08-26T23:45:46Z",
+  "summary": "The native UI builds, but the accessibility test runner cannot establish an automation session on this Mac.",
+  "conditions": [
+    "DevToolsSecurity reports that Developer mode is disabled.",
+    "The configured development team has no matching Mac Development signing identity on this host.",
+    "The ad-hoc-signed runner starts but times out while enabling automation mode."
+  ],
+  "command_references": [
+    "CMD-20260826T225735Z-0c70ad3cf6",
+    "CMD-20260826T225905Z-1b04745fd0",
+    "CMD-20260826T225928Z-a91e5b14f6",
+    "CMD-20260826T232713Z-c3f5ee2b0a",
+    "CMD-20260826T232713Z-f98d33c523"
+  ],
+  "evidence": ".forge-autonomy-state/evidence/FC-UI-001",
+  "resume_condition": "Enable DevToolsSecurity with administrator authorization, install a valid Mac Development identity for the configured team, and rerun the recorded XCUITest command."
+}

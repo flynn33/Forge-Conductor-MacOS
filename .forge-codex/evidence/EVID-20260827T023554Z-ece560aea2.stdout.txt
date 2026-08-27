@@ -1,0 +1,386 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -project ForgeConductor.xcodeproj -scheme ForgeConductor -configuration Debug -derivedDataPath /tmp/forge-xcode-adhoc.8XAln2 CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- "-only-testing:ForgeConductorTests/RuntimeExecutionJobTests" "-skip-testing:ForgeConductorTests/RuntimeExecutionJobTests/testBootstrapRouterLegacyShellExecUsesBoundProjectAndCompatibilityContract" "-skip-testing:ForgeConductorTests/RuntimeExecutionJobTests/testBootstrapRouterRunsDurableShellJobAndReadsBoundedOutput" test-without-building
+
+Build settings from command line:
+    CODE_SIGN_IDENTITY = -
+    CODE_SIGNING_ALLOWED = YES
+
+Test Suite 'Selected tests' started at 2026-08-26 21:35:56.697.
+Test Suite 'ForgeConductorTests.xctest' started at 2026-08-26 21:35:56.697.
+Test Suite 'RuntimeExecutionJobTests' started at 2026-08-26 21:35:56.697.
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testAdvertisedPowerShellProfileExecutesWithoutProcessGroupEscape]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testAdvertisedPowerShellProfileExecutesWithoutProcessGroupEscape] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testAdvertisedPowerShellProfileExecutesWithoutProcessGroupEscape]' failed (0.550 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testAdvertisedPythonProfileExecutesTheRealInterpreterUnderContainment]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testAdvertisedPythonProfileExecutesTheRealInterpreterUnderContainment] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testAdvertisedPythonProfileExecutesTheRealInterpreterUnderContainment]' failed (0.026 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testArtifactReadRejectsInPlaceMutationByDigest]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testArtifactReadRejectsInPlaceMutationByDigest] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testArtifactReadRejectsInPlaceMutationByDigest]' failed (0.017 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testArtifactReadRejectsSameDirectoryReplacementEvenWhenDigestMatches]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testArtifactReadRejectsSameDirectoryReplacementEvenWhenDigestMatches] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testArtifactReadRejectsSameDirectoryReplacementEvenWhenDigestMatches]' failed (0.016 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testArtifactReadRejectsSymlinkReplacementOutsideArtifactRoot]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testArtifactReadRejectsSymlinkReplacementOutsideArtifactRoot] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testArtifactReadRejectsSymlinkReplacementOutsideArtifactRoot]' failed (0.016 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testArtifactReservationsKeepProjectAndGlobalRetentionWithinQuota]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testArtifactReservationsKeepProjectAndGlobalRetentionWithinQuota] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testArtifactReservationsKeepProjectAndGlobalRetentionWithinQuota]' failed (0.016 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testBashNoProfileIsNonLoginAndIgnoresInheritedBASHEnvironment]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testBashNoProfileIsNonLoginAndIgnoresInheritedBASHEnvironment] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testBashNoProfileIsNonLoginAndIgnoresInheritedBASHEnvironment]' failed (0.017 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testBootstrapDefaultRouterRegistersRuntimeSurfaceExactlyOnceAndMCPDescriptors]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Tests/ForgeConductorTests/RuntimeExecutionJobTests.swift:3471: error: -[ForgeConductorTests.RuntimeExecutionJobTests testBootstrapDefaultRouterRegistersRuntimeSurfaceExactlyOnceAndMCPDescriptors] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testBootstrapDefaultRouterRegistersRuntimeSurfaceExactlyOnceAndMCPDescriptors]' failed (0.031 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testCancelJobsForRunReleasesOnlyThatRunsQueuedAndActiveJobs]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testCancelJobsForRunReleasesOnlyThatRunsQueuedAndActiveJobs] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testCancelJobsForRunReleasesOnlyThatRunsQueuedAndActiveJobs]' failed (0.015 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testCancellationAfterIdentityCommitButBeforeGateReleaseNeverExecutesRequest]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testCancellationAfterIdentityCommitButBeforeGateReleaseNeverExecutesRequest] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testCancellationAfterIdentityCommitButBeforeGateReleaseNeverExecutesRequest]' failed (0.015 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testCancellationTerminatesDescendantProcessGroup]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testCancellationTerminatesDescendantProcessGroup] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testCancellationTerminatesDescendantProcessGroup]' failed (0.014 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testChildCannotUnlinkOrReplaceManagerOwnedOutputFiles]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testChildCannotUnlinkOrReplaceManagerOwnedOutputFiles] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testChildCannotUnlinkOrReplaceManagerOwnedOutputFiles]' failed (0.014 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testChildCanReadAuthorizedRootButCannotWriteWhenWritableRootsAreEmpty]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testChildCanReadAuthorizedRootButCannotWriteWhenWritableRootsAreEmpty] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testChildCanReadAuthorizedRootButCannotWriteWhenWritableRootsAreEmpty]' failed (0.013 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testClosingUnreleasedParentGateExitsLauncherWithoutExecutingTarget]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testClosingUnreleasedParentGateExitsLauncherWithoutExecutingTarget] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testClosingUnreleasedParentGateExitsLauncherWithoutExecutingTarget]' failed (0.008 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testCompactedIdempotencyReceiptLedgerHonorsProjectAndGlobalCaps]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testCompactedIdempotencyReceiptLedgerHonorsProjectAndGlobalCaps] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testCompactedIdempotencyReceiptLedgerHonorsProjectAndGlobalCaps]' failed (0.013 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testCompletedArtifactRetentionCompactsOldestJob]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testCompletedArtifactRetentionCompactsOldestJob] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testCompletedArtifactRetentionCompactsOldestJob]' failed (0.013 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testConcurrentStdoutAndStderrDrainWithoutDeadlockAndSpillWithinBudget]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testConcurrentStdoutAndStderrDrainWithoutDeadlockAndSpillWithinBudget] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testConcurrentStdoutAndStderrDrainWithoutDeadlockAndSpillWithinBudget]' failed (0.012 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testControlPlaneRejectsWritableRootOutsideReadAuthorization]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testControlPlaneRejectsWritableRootOutsideReadAuthorization] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testControlPlaneRejectsWritableRootOutsideReadAuthorization]' failed (0.012 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testDelayedResultAfterGenerationResetIsQuarantined]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testDelayedResultAfterGenerationResetIsQuarantined] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testDelayedResultAfterGenerationResetIsQuarantined]' failed (0.012 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testDirectProcessUsesArgumentVectorWithoutShellParsing]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testDirectProcessUsesArgumentVectorWithoutShellParsing] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testDirectProcessUsesArgumentVectorWithoutShellParsing]' failed (0.013 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testForkTreeExceedingPerJobDescendantBudgetIsTerminated]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testForkTreeExceedingPerJobDescendantBudgetIsTerminated] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testForkTreeExceedingPerJobDescendantBudgetIsTerminated]' failed (0.013 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testLauncherAppliesPerProcessCPUFileDescriptorFileSizeAndCoreLimits]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testLauncherAppliesPerProcessCPUFileDescriptorFileSizeAndCoreLimits] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testLauncherAppliesPerProcessCPUFileDescriptorFileSizeAndCoreLimits]' failed (0.012 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testLaunchGateParentCrashClosesGateWithoutExecutingTarget]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testLaunchGateParentCrashClosesGateWithoutExecutingTarget] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testLaunchGateParentCrashClosesGateWithoutExecutingTarget]' failed (0.007 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testLaunchGatePersistsExactIdentityBeforeRequestExecution]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testLaunchGatePersistsExactIdentityBeforeRequestExecution] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testLaunchGatePersistsExactIdentityBeforeRequestExecution]' failed (0.012 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testLaunchGateUsesServiceOwnedCopyAndRejectsWritableOverlap]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testLaunchGateUsesServiceOwnedCopyAndRejectsWritableOverlap] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testLaunchGateUsesServiceOwnedCopyAndRejectsWritableOverlap]' failed (0.007 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testLegacyAuthorizationJSONDefaultsWritableRootsToReadRoots]' started.
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testLegacyAuthorizationJSONDefaultsWritableRootsToReadRoots]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testLegacyBashLoginCompatibilityProfileIsExposedWithoutChangingShellToolPack]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testLegacyBashLoginCompatibilityProfileIsExposedWithoutChangingShellToolPack] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testLegacyBashLoginCompatibilityProfileIsExposedWithoutChangingShellToolPack]' failed (0.013 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testLiveTerminationFailurePersistsAndReaperEventuallyCompletes]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testLiveTerminationFailurePersistsAndReaperEventuallyCompletes] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testLiveTerminationFailurePersistsAndReaperEventuallyCompletes]' failed (0.012 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testMissingOptionalRuntimesAreDiscoveredIndependentlyWithoutDisablingShell]' started.
+Thread Performance Checker: Thread running at User-initiated quality-of-service class waiting on a lower QoS thread running at Default quality-of-service class. Investigate ways to avoid priority inversions
+PID: 7875, TID: 13030197
+Backtrace
+=================================================================
+0   ForgeConductorCore                  0x000000010e72b468 $s18ForgeConductorCore13ProcessRunnerC3run10executable9arguments16currentDirectory11environment10timeoutSec18maximumOutputBytesAA0D6ResultVSS_SaySSGSSSgSDyS2SGSgSdSitKF9BufferBoxL_C13stopCallbacks2onySo12NSFileHandleC_tF + 464
+1   ForgeConductorCore                  0x000000010e72993c $s18ForgeConductorCore13ProcessRunnerC3run10executable9arguments16currentDirectory11environment10timeoutSec18maximumOutputBytesAA0D6ResultVSS_SaySSGSSSgSDyS2SGSgSdSitKF + 4544
+2   ForgeConductorCore                  0x000000010e0f2efc $s18ForgeConductorCore27RuntimeCapabilityDiscovererV12boundedProbe020_A4AF4730ED0B756A3E1M11A7ED75252BALL_9argumentsAA13ProcessResultVSg10Foundation3URLV_SaySSGtFZ + 408
+3   ForgeConductorCore                  0x000000010e0f2484 $s18ForgeConductorCore27RuntimeCapabilityDiscovererV11probePython020_A4AF4730ED0B756A3E1M11A7ED75252BALLySb10Foundation3URLVFZ + 544
+4   ForgeConductorCore                  0x000000010e0f2250 $s18ForgeConductorCore27RuntimeCapabilityDiscovererV014verifiedPythonE0020_A4AF4730ED0B756A3E1M11A7ED75252BALL_18isolationAvailableAA0d10ExecutableE0V10Foundation3URLV_SbtFZSbAKcfu_ + 28
+5   ForgeConductorCore                  0x000000010e0f27c8 $s18ForgeConductorCore27RuntimeCapabilityDiscovererV016verifiedOptionalE0020_A4AF4730ED0B756A3E1M11A7ED75252BALL_18isolationAvailable5probeAA0d10ExecutableE0V10Foundation3URLV_S2bALXEtFZ + 364
+6   ForgeConductorCore                  0x000000010e0f21d0 $s18ForgeConductorCore27RuntimeCapabilityDiscovererV014verifiedPythonE0020_A4AF4730ED0B756A3E1M11A7ED75252BALL_18isolationAvailableAA0d10ExecutableE0V10Foundation3URLV_SbtFZ + 60
+7   ForgeConductorCore                  0x000000010e0f1838 $s18ForgeConductorCore27RuntimeCapabilityDiscovererV06pythonE0020_A4AF4730ED0B756A3E1L11A7ED75252BALL10configured18isolationAvailableAA0d10ExecutableE0V10Foundation3URLVSg_SbtFZ + 1456
+8   ForgeConductorCore                  0x000000010e0f1578 $s18ForgeConductorCore27RuntimeCapabilityDiscovererV06pythonE0020_A4AF4730ED0B756A3E1L11A7ED75252BALL10configured18isolationAvailableAA0d10ExecutableE0V10Foundation3URLVSg_SbtFZ + 752
+9   ForgeConductorCore                  0x000000010e0f0d4c $s18ForgeConductorCore27RuntimeCapabilityDiscovererV8discover6limitsAA0D12CapabilitiesVAA0D9JobLimitsV_tF + 620
+10  ForgeConductorTests                 0x000000010ccd433c $s19ForgeConductorTests019RuntimeExecutionJobC0C74testMissingOptionalRuntimesAreDiscoveredIndependentlyWithoutDisablingShellyyYaKFTY0_ + 2856
+11  libswift_Concurrency.dylib          0x0000000289351e18 _ZN5swift34runJobInEstablishedExecutorContextEPNS_3JobE + 472
+12  libswift_Concurrency.dylib          0x00000002893536ec _ZL17swift_job_runImplPN5swift3JobENS_17SerialExecutorRefE + 156
+13  libdispatch.dylib                   0x0000000183a95980 _dispatch_root_queue_drain + 360
+14  libdispatch.dylib                   0x0000000183a96120 _dispatch_worker_thread2 + 184
+15  libsystem_pthread.dylib             0x0000000183c3be84 _pthread_wqthread + 232
+16  libsystem_pthread.dylib             0x0000000183c3ac10 start_wqthread + 8
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testMissingOptionalRuntimesAreDiscoveredIndependentlyWithoutDisablingShell]' passed (0.105 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testNonUTF8OutputRetainsRawBytesWithConsistentCountAndReadback]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testNonUTF8OutputRetainsRawBytesWithConsistentCountAndReadback] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testNonUTF8OutputRetainsRawBytesWithConsistentCountAndReadback]' failed (0.015 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testOptionalRuntimeDiscoveryRejectsUnrelatedImmutableExecutables]' started.
+Thread Performance Checker: Thread running at User-interactive quality-of-service class waiting on a lower QoS thread running at Default quality-of-service class. Investigate ways to avoid priority inversions
+PID: 7875, TID: 13030038
+Backtrace
+=================================================================
+0   ForgeConductorCore                  0x000000010e72b468 $s18ForgeConductorCore13ProcessRunnerC3run10executable9arguments16currentDirectory11environment10timeoutSec18maximumOutputBytesAA0D6ResultVSS_SaySSGSSSgSDyS2SGSgSdSitKF9BufferBoxL_C13stopCallbacks2onySo12NSFileHandleC_tF + 464
+1   ForgeConductorCore                  0x000000010e72993c $s18ForgeConductorCore13ProcessRunnerC3run10executable9arguments16currentDirectory11environment10timeoutSec18maximumOutputBytesAA0D6ResultVSS_SaySSGSSSgSDyS2SGSgSdSitKF + 4544
+2   ForgeConductorCore                  0x000000010e0f2efc $s18ForgeConductorCore27RuntimeCapabilityDiscovererV12boundedProbe020_A4AF4730ED0B756A3E1M11A7ED75252BALL_9argumentsAA13ProcessResultVSg10Foundation3URLV_SaySSGtFZ + 408
+3   ForgeConductorCore                  0x000000010e0f2484 $s18ForgeConductorCore27RuntimeCapabilityDiscovererV11probePython020_A4AF4730ED0B756A3E1M11A7ED75252BALLySb10Foundation3URLVFZ + 544
+4   ForgeConductorCore                  0x000000010e0f2250 $s18ForgeConductorCore27RuntimeCapabilityDiscovererV014verifiedPythonE0020_A4AF4730ED0B756A3E1M11A7ED75252BALL_18isolationAvailableAA0d10ExecutableE0V10Foundation3URLV_SbtFZSbAKcfu_ + 28
+5   ForgeConductorCore                  0x000000010e0f27c8 $s18ForgeConductorCore27RuntimeCapabilityDiscovererV016verifiedOptionalE0020_A4AF4730ED0B756A3E1M11A7ED75252BALL_18isolationAvailable5probeAA0d10ExecutableE0V10Foundation3URLV_S2bALXEtFZ + 364
+6   ForgeConductorCore                  0x000000010e0f21d0 $s18ForgeConductorCore27RuntimeCapabilityDiscovererV014verifiedPythonE0020_A4AF4730ED0B756A3E1M11A7ED75252BALL_18isolationAvailableAA0d10ExecutableE0V10Foundation3URLV_SbtFZ + 60
+7   ForgeConductorCore                  0x000000010e0f161c $s18ForgeConductorCore27RuntimeCapabilityDiscovererV06pythonE0020_A4AF4730ED0B756A3E1L11A7ED75252BALL10configured18isolationAvailableAA0d10ExecutableE0V10Foundation3URLVSg_SbtFZ + 916
+8   ForgeConductorCore                  0x000000010e0f0d4c $s18ForgeConductorCore27RuntimeCapabilityDiscovererV8discover6limitsAA0D12CapabilitiesVAA0D9JobLimitsV_tF + 620
+9   ForgeConductorTests                 0x000000010ccd5210 $s19ForgeConductorTests019RuntimeExecutionJobC0C012testOptionalD45DiscoveryRejectsUnrelatedImmutableExecutablesyyF + 476
+10  ForgeConductorTests                 0x000000010ccd57cc $s19ForgeConductorTests019RuntimeExecutionJobC0C012testOptionalD45DiscoveryRejectsUnrelatedImmutableExecutablesyyFTo + 44
+11  CoreFoundation                      0x0000000183cdd664 __invoking___ + 148
+12  CoreFoundation                      0x0000000183cdd4f0 -[NSInvocation invoke] + 424
+13  XCTestCore                          0x00000001030e90c4 +[XCTFailableInvocation invokeStandardConventionInvocation:completion:] + 68
+14  XCTestCore                          0x00000001030e9078 __90+[XCTFailableInvocation invokeInvocation:withTestMethodConvention:lastObservedErrorIssue:]_block_invoke_3 + 28
+15  XCTestCore                          0x00000001030e87bc __81+[XCTFailableInvocation invokeWithAsynchronousWait:lastObservedErrorIssue:block:]_block_invoke + 364
+16  XCTestCore                          0x00000001030d94a4 __49+[XCTSwiftErrorObservation observeErrorsInBlock:]_block_invoke + 36
+17  XCTestCore                          0x00000001031026e4 $sSo24XCTSwiftErrorObservationC10XCTestCoreE14_observeErrors33_4641E344ACA55A25D2B1EC985574C54DLL2inSo0abC6ResultCSgyyXE_tFZ12$sIyB_Ieg_TRIyB_Tf1cn_n + 320
+18  XCTestCore                          0x000000010310279c $sSo24XCTSwiftErrorObservationC10XCTestCoreE14_observeErrors33_4641E344ACA55A25D2B1EC985574C54DLL2inSo0abC6ResultCSgyyXE_tFZTo + 48
+19  XCTestCore                          0x00000001030d939c +[XCTSwiftErrorObservation observeErrorsInBlock:] + 208
+20  XCTestCore                          0x00000001030e8550 +[XCTFailableInvocation invokeWithAsynchronousWait:lastObservedErrorIssue:block:] + 228
+21  XCTestCore                          0x00000001030e8d60 +[XCTFailableInvocation invokeInvocation:withTestMethodConvention:lastObservedErrorIssue:] + 540
+22  XCTestCore                          0x00000001030e9168 +[XCTFailableInvocation invokeInvocation:lastObservedErrorIssue:] + 72
+23  XCTestCore                          0x000000010307e0c4 -[XCTestCase invokeTestMethod:] + 64
+24  XCTestCore                          0x000000010307eb6c __24-[XCTestCase invokeTest]_block_invoke_2.116 + 56
+25  XCTestCore                          0x00000001030af268 -[XCTMemoryChecker _assertInvalidObjectsDeallocatedAfterScope:] + 84
+26  XCTestCore                          0x00000001030822c8 -[XCTestCase assertInvalidObjectsDeallocatedAfterScope:] + 92
+27  XCTestCore                          0x000000010307e950 __24-[XCTestCase invokeTest]_block_invoke.109 + 460
+28  XCTestCore                          0x0000000103084e1c -[XCTestCase(XCTIssueHandling) _caughtUnhandledDeveloperExceptionPermittingControlFlowInterruptions:caughtInterruptionException:whileExecutingBlock:] + 168
+29  XCTestCore                          0x000000010307e388 -[XCTestCase invokeTest] + 632
+30  XCTestCore                          0x00000001030801b4 __26-[XCTestCase performTest:]_block_invoke.167 + 36
+31  XCTestCore                          0x0000000103084e1c -[XCTestCase(XCTIssueHandling) _caughtUnhandledDeveloperExceptionPermittingControlFlowInterruptions:caughtInterruptionException:whileExecutingBlock:] + 168
+32  XCTestCore                          0x000000010307fbac __26-[XCTestCase performTest:]_block_invoke.152 + 552
+33  XCTestCore                          0x00000001030d6168 +[XCTContext _runInChildOfContext:forTestCase:markAsReportingBase:block:] + 180
+34  XCTestCore                          0x00000001030d6050 +[XCTContext runInContextForTestCase:markAsReportingBase:block:] + 104
+35  XCTestCore                          0x000000010307f644 -[XCTestCase performTest:] + 308
+36  XCTestCore                          0x000000010307affc -[XCTest runTest] + 48
+37  XCTestCore                          0x000000010308b600 -[XCTestSuite runTestBasedOnRepetitionPolicy:testRun:] + 68
+38  XCTestCore                          0x000000010308b378 __27-[XCTestSuite performTest:]_block_invoke + 180
+39  XCTestCore                          0x000000010308a888 __59-[XCTestSuite _performProtectedSectionForTest:testSection:]_block_invoke + 48
+40  XCTestCore                          0x00000001030d6168 +[XCTContext _runInChildOfContext:forTestCase:markAsReportingBase:block:] + 180
+41  XCTestCore                          0x00000001030d6050 +[XCTContext runInContextForTestCase:markAsReportingBase:block:] + 104
+42  XCTestCore                          0x000000010308a7f8 -[XCTestSuite _performProtectedSectionForTest:testSection:] + 180
+43  XCTestCore                          0x000000010308ae04 -[XCTestSuite performTest:] + 244
+44  XCTestCore                          0x000000010307affc -[XCTest runTest] + 48
+45  XCTestCore                          0x000000010308b600 -[XCTestSuite runTestBasedOnRepetitionPolicy:testRun:] + 68
+46  XCTestCore                          0x000000010308b378 __27-[XCTestSuite performTest:]_block_invoke + 180
+47  XCTestCore                          0x000000010308a888 __59-[XCTestSuite _performProtectedSectionForTest:testSection:]_block_invoke + 48
+48  XCTestCore                          0x00000001030d6168 +[XCTContext _runInChildOfContext:forTestCase:markAsReportingBase:block:] + 180
+49  XCTestCore                          0x00000001030d6050 +[XCTContext runInContextForTestCase:markAsReportingBase:block:] + 104
+50  XCTestCore                          0x000000010308a7f8 -[XCTestSuite _performProtectedSectionForTest:testSection:] + 180
+51  XCTestCore                          0x000000010308ae04 -[XCTestSuite performTest:] + 244
+52  XCTestCore                          0x000000010307affc -[XCTest runTest] + 48
+53  XCTestCore                          0x000000010308b600 -[XCTestSuite runTestBasedOnRepetitionPolicy:testRun:] + 68
+54  XCTestCore                          0x000000010308b378 __27-[XCTestSuite performTest:]_block_invoke + 180
+55  XCTestCore                          0x000000010308a888 __59-[XCTestSuite _performProtectedSectionForTest:testSection:]_block_invoke + 48
+56  XCTestCore                          0x00000001030d6168 +[XCTContext _runInChildOfContext:forTestCase:markAsReportingBase:block:] + 180
+57  XCTestCore                          0x00000001030d6050 +[XCTContext runInContextForTestCase:markAsReportingBase:block:] + 104
+58  XCTestCore                          0x000000010308a7f8 -[XCTestSuite _performProtectedSectionForTest:testSection:] + 180
+59  XCTestCore                          0x000000010308ae04 -[XCTestSuite performTest:] + 244
+60  XCTestCore                          0x000000010307affc -[XCTest runTest] + 48
+61  XCTestCore                          0x00000001030abfbc __89-[XCTTestRunSession executeTestsWithIdentifiers:skippingTestsWithIdentifiers:completion:]_block_invoke + 104
+62  XCTestCore                          0x00000001030d6168 +[XCTContext _runInChildOfContext:forTestCase:markAsReportingBase:block:] + 180
+63  XCTestCore                          0x00000001030d6050 +[XCTContext runInContextForTestCase:markAsReportingBase:block:] + 104
+64  XCTestCore                          0x00000001030abe68 -[XCTTestRunSession executeTestsWithIdentifiers:skippingTestsWithIdentifiers:completion:] + 344
+65  XCTestCore                          0x000000010309dd04 __72-[XCTExecutionWorker enqueueTestIdentifiersToRun:testIdentifiersToSkip:]_block_invoke_2 + 148
+66  XCTestCore                          0x000000010309f23c __XCTAsyncEnumerateWithWaiter_block_invoke + 256
+67  XCTestCore                          0x000000010309f3f4 __XCTAsyncEnumerate_block_invoke.116 + 64
+68  XCTestCore                          0x000000010309db68 XCTAsyncEnumerateWithWaiter + 576
+69  XCTestCore                          0x000000010309d8dc __72-[XCTExecutionWorker enqueueTestIdentifiersToRun:testIdentifiersToSkip:]_block_invoke + 136
+70  XCTestCore                          0x000000010309de48 -[XCTExecutionWorker runWithError:] + 84
+71  XCTestCore                          0x000000010309bc98 __25-[XCTestDriver _runTests]_block_invoke.340 + 56
+72  XCTestCore                          0x00000001030b6518 -[XCTestObservationCenter _observeTestExecutionForTestBundle:inBlock:] + 108
+73  XCTestCore                          0x000000010309b67c -[XCTestDriver _runTests] + 1160
+74  XCTestCore                          0x000000010309d55c _XCTestMain + 96
+75  xctest                              0x0000000102169e3c $s10xctesttool6xctestO4mainyyFZ + 320
+76  dyld                                0x00000001838744e4 start + 6992
+Thread Performance Checker: Thread running at User-interactive quality-of-service class waiting on a lower QoS thread running at Default quality-of-service class. Investigate ways to avoid priority inversions
+PID: 7875, TID: 13030038
+Backtrace
+=================================================================
+0   ForgeConductorCore                  0x000000010e72b468 $s18ForgeConductorCore13ProcessRunnerC3run10executable9arguments16currentDirectory11environment10timeoutSec18maximumOutputBytesAA0D6ResultVSS_SaySSGSSSgSDyS2SGSgSdSitKF9BufferBoxL_C13stopCallbacks2onySo12NSFileHandleC_tF + 464
+1   ForgeConductorCore                  0x000000010e729948 $s18ForgeConductorCore13ProcessRunnerC3run10executable9arguments16currentDirectory11environment10timeoutSec18maximumOutputBytesAA0D6ResultVSS_SaySSGSSSgSDyS2SGSgSdSitKF + 4556
+2   ForgeConductorCore                  0x000000010e0f2efc $s18ForgeConductorCore27RuntimeCapabilityDiscovererV12boundedProbe020_A4AF4730ED0B756A3E1M11A7ED75252BALL_9argumentsAA13ProcessResultVSg10Foundation3URLV_SaySSGtFZ + 408
+3   ForgeConductorCore                  0x000000010e0f2b5c $s18ForgeConductorCore27RuntimeCapabilityDiscovererV15probePowerShell020_A4AF4730ED0B756A3E1N11A7ED75252BALLySb10Foundation3URLVFZ + 580
+4   ForgeConductorCore                  0x000000010e0f2904 $s18ForgeConductorCore27RuntimeCapabilityDiscovererV018verifiedPowerShellE0020_A4AF4730ED0B756A3E1N11A7ED75252BALL_18isolationAvailableAA0d10ExecutableE0V10Foundation3URLV_SbtFZSbAKcfu_ + 28
+5   ForgeConductorCore                  0x000000010e0f27c8 $s18ForgeConductorCore27RuntimeCapabilityDiscovererV016verifiedOptionalE0020_A4AF4730ED0B756A3E1M11A7ED75252BALL_18isolationAvailable5probeAA0d10ExecutableE0V10Foundation3URLV_S2bALXEtFZ + 364
+6   ForgeConductorCore                  0x000000010e0f2220 $s18ForgeConductorCore27RuntimeCapabilityDiscovererV018verifiedPowerShellE0020_A4AF4730ED0B756A3E1N11A7ED75252BALL_18isolationAvailableAA0d10ExecutableE0V10Foundation3URLV_SbtFZ + 60
+7   ForgeConductorCore                  0x000000010e0f2034 $s18ForgeConductorCore27RuntimeCapabilityDiscovererV010powershellE0020_A4AF4730ED0B756A3E1L11A7ED75252BALL10configured18isolationAvailableAA0d10ExecutableE0V10Foundation3URLVSg_SbtFZ + 980
+8   ForgeConductorCore                  0x000000010e0f0dc0 $s18ForgeConductorCore27RuntimeCapabilityDiscovererV8discover6limitsAA0D12CapabilitiesVAA0D9JobLimitsV_tF + 736
+9   ForgeConductorTests                 0x000000010ccd5210 $s19ForgeConductorTests019RuntimeExecutionJobC0C012testOptionalD45DiscoveryRejectsUnrelatedImmutableExecutablesyyF + 476
+10  ForgeConductorTests                 0x000000010ccd57cc $s19ForgeConductorTests019RuntimeExecutionJobC0C012testOptionalD45DiscoveryRejectsUnrelatedImmutableExecutablesyyFTo + 44
+11  CoreFoundation                      0x0000000183cdd664 __invoking___ + 148
+12  CoreFoundation                      0x0000000183cdd4f0 -[NSInvocation invoke] + 424
+13  XCTestCore                          0x00000001030e90c4 +[XCTFailableInvocation invokeStandardConventionInvocation:completion:] + 68
+14  XCTestCore                          0x00000001030e9078 __90+[XCTFailableInvocation invokeInvocation:withTestMethodConvention:lastObservedErrorIssue:]_block_invoke_3 + 28
+15  XCTestCore                          0x00000001030e87bc __81+[XCTFailableInvocation invokeWithAsynchronousWait:lastObservedErrorIssue:block:]_block_invoke + 364
+16  XCTestCore                          0x00000001030d94a4 __49+[XCTSwiftErrorObservation observeErrorsInBlock:]_block_invoke + 36
+17  XCTestCore                          0x00000001031026e4 $sSo24XCTSwiftErrorObservationC10XCTestCoreE14_observeErrors33_4641E344ACA55A25D2B1EC985574C54DLL2inSo0abC6ResultCSgyyXE_tFZ12$sIyB_Ieg_TRIyB_Tf1cn_n + 320
+18  XCTestCore                          0x000000010310279c $sSo24XCTSwiftErrorObservationC10XCTestCoreE14_observeErrors33_4641E344ACA55A25D2B1EC985574C54DLL2inSo0abC6ResultCSgyyXE_tFZTo + 48
+19  XCTestCore                          0x00000001030d939c +[XCTSwiftErrorObservation observeErrorsInBlock:] + 208
+20  XCTestCore                          0x00000001030e8550 +[XCTFailableInvocation invokeWithAsynchronousWait:lastObservedErrorIssue:block:] + 228
+21  XCTestCore                          0x00000001030e8d60 +[XCTFailableInvocation invokeInvocation:withTestMethodConvention:lastObservedErrorIssue:] + 540
+22  XCTestCore                          0x00000001030e9168 +[XCTFailableInvocation invokeInvocation:lastObservedErrorIssue:] + 72
+23  XCTestCore                          0x000000010307e0c4 -[XCTestCase invokeTestMethod:] + 64
+24  XCTestCore                          0x000000010307eb6c __24-[XCTestCase invokeTest]_block_invoke_2.116 + 56
+25  XCTestCore                          0x00000001030af268 -[XCTMemoryChecker _assertInvalidObjectsDeallocatedAfterScope:] + 84
+26  XCTestCore                          0x00000001030822c8 -[XCTestCase assertInvalidObjectsDeallocatedAfterScope:] + 92
+27  XCTestCore                          0x000000010307e950 __24-[XCTestCase invokeTest]_block_invoke.109 + 460
+28  XCTestCore                          0x0000000103084e1c -[XCTestCase(XCTIssueHandling) _caughtUnhandledDeveloperExceptionPermittingControlFlowInterruptions:caughtInterruptionException:whileExecutingBlock:] + 168
+29  XCTestCore                          0x000000010307e388 -[XCTestCase invokeTest] + 632
+30  XCTestCore                          0x00000001030801b4 __26-[XCTestCase performTest:]_block_invoke.167 + 36
+31  XCTestCore                          0x0000000103084e1c -[XCTestCase(XCTIssueHandling) _caughtUnhandledDeveloperExceptionPermittingControlFlowInterruptions:caughtInterruptionException:whileExecutingBlock:] + 168
+32  XCTestCore                          0x000000010307fbac __26-[XCTestCase performTest:]_block_invoke.152 + 552
+33  XCTestCore                          0x00000001030d6168 +[XCTContext _runInChildOfContext:forTestCase:markAsReportingBase:block:] + 180
+34  XCTestCore                          0x00000001030d6050 +[XCTContext runInContextForTestCase:markAsReportingBase:block:] + 104
+35  XCTestCore                          0x000000010307f644 -[XCTestCase performTest:] + 308
+36  XCTestCore                          0x000000010307affc -[XCTest runTest] + 48
+37  XCTestCore                          0x000000010308b600 -[XCTestSuite runTestBasedOnRepetitionPolicy:testRun:] + 68
+38  XCTestCore                          0x000000010308b378 __27-[XCTestSuite performTest:]_block_invoke + 180
+39  XCTestCore                          0x000000010308a888 __59-[XCTestSuite _performProtectedSectionForTest:testSection:]_block_invoke + 48
+40  XCTestCore                          0x00000001030d6168 +[XCTContext _runInChildOfContext:forTestCase:markAsReportingBase:block:] + 180
+41  XCTestCore                          0x00000001030d6050 +[XCTContext runInContextForTestCase:markAsReportingBase:block:] + 104
+42  XCTestCore                          0x000000010308a7f8 -[XCTestSuite _performProtectedSectionForTest:testSection:] + 180
+43  XCTestCore                          0x000000010308ae04 -[XCTestSuite performTest:] + 244
+44  XCTestCore                          0x000000010307affc -[XCTest runTest] + 48
+45  XCTestCore                          0x000000010308b600 -[XCTestSuite runTestBasedOnRepetitionPolicy:testRun:] + 68
+46  XCTestCore                          0x000000010308b378 __27-[XCTestSuite performTest:]_block_invoke + 180
+47  XCTestCore                          0x000000010308a888 __59-[XCTestSuite _performProtectedSectionForTest:testSection:]_block_invoke + 48
+48  XCTestCore                          0x00000001030d6168 +[XCTContext _runInChildOfContext:forTestCase:markAsReportingBase:block:] + 180
+49  XCTestCore                          0x00000001030d6050 +[XCTContext runInContextForTestCase:markAsReportingBase:block:] + 104
+50  XCTestCore                          0x000000010308a7f8 -[XCTestSuite _performProtectedSectionForTest:testSection:] + 180
+51  XCTestCore                          0x000000010308ae04 -[XCTestSuite performTest:] + 244
+52  XCTestCore                          0x000000010307affc -[XCTest runTest] + 48
+53  XCTestCore                          0x000000010308b600 -[XCTestSuite runTestBasedOnRepetitionPolicy:testRun:] + 68
+54  XCTestCore                          0x000000010308b378 __27-[XCTestSuite performTest:]_block_invoke + 180
+55  XCTestCore                          0x000000010308a888 __59-[XCTestSuite _performProtectedSectionForTest:testSection:]_block_invoke + 48
+56  XCTestCore                          0x00000001030d6168 +[XCTContext _runInChildOfContext:forTestCase:markAsReportingBase:block:] + 180
+57  XCTestCore                          0x00000001030d6050 +[XCTContext runInContextForTestCase:markAsReportingBase:block:] + 104
+58  XCTestCore                          0x000000010308a7f8 -[XCTestSuite _performProtectedSectionForTest:testSection:] + 180
+59  XCTestCore                          0x000000010308ae04 -[XCTestSuite performTest:] + 244
+60  XCTestCore                          0x000000010307affc -[XCTest runTest] + 48
+61  XCTestCore                          0x00000001030abfbc __89-[XCTTestRunSession executeTestsWithIdentifiers:skippingTestsWithIdentifiers:completion:]_block_invoke + 104
+62  XCTestCore                          0x00000001030d6168 +[XCTContext _runInChildOfContext:forTestCase:markAsReportingBase:block:] + 180
+63  XCTestCore                          0x00000001030d6050 +[XCTContext runInContextForTestCase:markAsReportingBase:block:] + 104
+64  XCTestCore                          0x00000001030abe68 -[XCTTestRunSession executeTestsWithIdentifiers:skippingTestsWithIdentifiers:completion:] + 344
+65  XCTestCore                          0x000000010309dd04 __72-[XCTExecutionWorker enqueueTestIdentifiersToRun:testIdentifiersToSkip:]_block_invoke_2 + 148
+66  XCTestCore                          0x000000010309f23c __XCTAsyncEnumerateWithWaiter_block_invoke + 256
+67  XCTestCore                          0x000000010309f3f4 __XCTAsyncEnumerate_block_invoke.116 + 64
+68  XCTestCore                          0x000000010309db68 XCTAsyncEnumerateWithWaiter + 576
+69  XCTestCore                          0x000000010309d8dc __72-[XCTExecutionWorker enqueueTestIdentifiersToRun:testIdentifiersToSkip:]_block_invoke + 136
+70  XCTestCore                          0x000000010309de48 -[XCTExecutionWorker runWithError:] + 84
+71  XCTestCore                          0x000000010309bc98 __25-[XCTestDriver _runTests]_block_invoke.340 + 56
+72  XCTestCore                          0x00000001030b6518 -[XCTestObservationCenter _observeTestExecutionForTestBundle:inBlock:] + 108
+73  XCTestCore                          0x000000010309b67c -[XCTestDriver _runTests] + 1160
+74  XCTestCore                          0x000000010309d55c _XCTestMain + 96
+75  xctest                              0x0000000102169e3c $s10xctesttool6xctestO4mainyyFZ + 320
+76  dyld                                0x00000001838744e4 start + 6992
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testOptionalRuntimeDiscoveryRejectsUnrelatedImmutableExecutables]' passed (0.012 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testOutsideRootIsRejectedBeforeJobPersistence]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testOutsideRootIsRejectedBeforeJobPersistence] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testOutsideRootIsRejectedBeforeJobPersistence]' failed (0.015 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRecoveredProcessControllerKillsOwnedGroupAfterLeaderExit]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testRecoveredProcessControllerKillsOwnedGroupAfterLeaderExit] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRecoveredProcessControllerKillsOwnedGroupAfterLeaderExit]' failed (0.008 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRecoveredProcessControllerRejectsTamperedProcessStartIdentity]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testRecoveredProcessControllerRejectsTamperedProcessStartIdentity] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRecoveredProcessControllerRejectsTamperedProcessStartIdentity]' failed (0.008 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRecoveryKillsCommittedLauncherBeforeGateReleaseWithoutExecutingTarget]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testRecoveryKillsCommittedLauncherBeforeGateReleaseWithoutExecutingTarget] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRecoveryKillsCommittedLauncherBeforeGateReleaseWithoutExecutingTarget]' failed (0.014 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeLauncherClosesGateAndUnrelatedInheritedDescriptorsBeforeExec]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeLauncherClosesGateAndUnrelatedInheritedDescriptorsBeforeExec] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeLauncherClosesGateAndUnrelatedInheritedDescriptorsBeforeExec]' failed (0.014 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeLaunchGateAcceptsExactAdHocApplicationPair]' started.
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeLaunchGateAcceptsExactAdHocApplicationPair]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeLaunchGateRejectsAdHocApplicationHelperOutsideExactPath]' started.
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeLaunchGateRejectsAdHocApplicationHelperOutsideExactPath]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeLaunchGateRejectsAdHocApplicationIdentityMismatch]' started.
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeLaunchGateRejectsAdHocApplicationIdentityMismatch]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeLaunchGateRejectsApplicationSignedByUnapprovedTeam]' started.
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeLaunchGateRejectsApplicationSignedByUnapprovedTeam]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeLaunchGateRejectsUnrelatedSignedProductIdentity]' started.
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeLaunchGateRejectsUnrelatedSignedProductIdentity]' passed (0.009 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeNetworkAuthorizationStillDeniesUnixSocketBrokers]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeNetworkAuthorizationStillDeniesUnixSocketBrokers] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeNetworkAuthorizationStillDeniesUnixSocketBrokers]' failed (0.015 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeSandboxAncestorTraversalDoesNotPermitSiblingEnumeration]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeSandboxAncestorTraversalDoesNotPermitSiblingEnumeration] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeSandboxAncestorTraversalDoesNotPermitSiblingEnumeration]' failed (0.013 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeSandboxBlocksMachBrokerDelegationEvenWhenNetworkIsAllowed]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeSandboxBlocksMachBrokerDelegationEvenWhenNetworkIsAllowed] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeSandboxBlocksMachBrokerDelegationEvenWhenNetworkIsAllowed]' failed (0.014 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeSandboxDeniesFileAccessOutsideAuthorizedRoots]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeSandboxDeniesFileAccessOutsideAuthorizedRoots] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeSandboxDeniesFileAccessOutsideAuthorizedRoots]' failed (0.014 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeSandboxDeniesPosixSpawnWithNewProcessGroup]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeSandboxDeniesPosixSpawnWithNewProcessGroup] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeSandboxDeniesPosixSpawnWithNewProcessGroup]' failed (0.014 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeSandboxDeniesProcessGroupEscapeSyscalls]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeSandboxDeniesProcessGroupEscapeSyscalls] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeSandboxDeniesProcessGroupEscapeSyscalls]' failed (0.014 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeSandboxEnforcesNetworkAuthorizationBit]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeSandboxEnforcesNetworkAuthorizationBit] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeSandboxEnforcesNetworkAuthorizationBit]' failed (0.014 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeSandboxProfileIsDenyByDefaultAndExcludesMutableUSRPrefix]' started.
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeSandboxProfileIsDenyByDefaultAndExcludesMutableUSRPrefix]' passed (0.002 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeToolPackSubmitsAndReadsStatusThroughContextualToolPath]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeToolPackSubmitsAndReadsStatusThroughContextualToolPath] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeToolPackSubmitsAndReadsStatusThroughContextualToolPath]' failed (0.014 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testSchemaV2MigratesForwardWithProcessIdentityAndIdempotencyReceiptStorage]' started.
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testSchemaV2MigratesForwardWithProcessIdentityAndIdempotencyReceiptStorage]' passed (0.006 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testShutdownReportsOwnedProcessUntilPersistedReaperConfirmsDeath]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testShutdownReportsOwnedProcessUntilPersistedReaperConfirmsDeath] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testShutdownReportsOwnedProcessUntilPersistedReaperConfirmsDeath]' failed (0.014 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testStartupRecoveryKeepsJobNonterminalUntilProcessGroupDeathIsConfirmed]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testStartupRecoveryKeepsJobNonterminalUntilProcessGroupDeathIsConfirmed] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testStartupRecoveryKeepsJobNonterminalUntilProcessGroupDeathIsConfirmed]' failed (0.014 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testStartupRecoveryRemovesInterruptedArtifactsAndMarksDurableFailure]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testStartupRecoveryRemovesInterruptedArtifactsAndMarksDurableFailure] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testStartupRecoveryRemovesInterruptedArtifactsAndMarksDurableFailure]' failed (0.014 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testStartupRecoveryRetriesTransientIdentityUnavailableDuringForcedKill]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testStartupRecoveryRetriesTransientIdentityUnavailableDuringForcedKill] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testStartupRecoveryRetriesTransientIdentityUnavailableDuringForcedKill]' failed (0.014 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testStartupRecoveryWaitsThroughTransientIdentityUnavailableProbe]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testStartupRecoveryWaitsThroughTransientIdentityUnavailableProbe] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testStartupRecoveryWaitsThroughTransientIdentityUnavailableProbe]' failed (0.013 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testStartupRecoveryWithoutExactStartIdentityFailsClosedAndKeepsOwnership]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testStartupRecoveryWithoutExactStartIdentityFailsClosedAndKeepsOwnership] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testStartupRecoveryWithoutExactStartIdentityFailsClosedAndKeepsOwnership]' failed (0.014 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testStartupSweepsBoundedOrphanDurableAndScratchDirectories]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testStartupSweepsBoundedOrphanDurableAndScratchDirectories] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testStartupSweepsBoundedOrphanDurableAndScratchDirectories]' failed (0.013 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testTerminalLedgerCompactionRetainsBoundedIdempotencyReceiptAndPreventsReplay]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testTerminalLedgerCompactionRetainsBoundedIdempotencyReceiptAndPreventsReplay] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testTerminalLedgerCompactionRetainsBoundedIdempotencyReceiptAndPreventsReplay]' failed (0.013 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testTerminalLedgerDoesNotDeleteDependentsUntilArtifactIsEvicted]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testTerminalLedgerDoesNotDeleteDependentsUntilArtifactIsEvicted] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testTerminalLedgerDoesNotDeleteDependentsUntilArtifactIsEvicted]' failed (0.015 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testTerminalPersistenceFailureRetainsOwnershipAndLeavesRecoverableDurableState]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testTerminalPersistenceFailureRetainsOwnershipAndLeavesRecoverableDurableState] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testTerminalPersistenceFailureRetainsOwnershipAndLeavesRecoverableDurableState]' failed (0.013 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testTimeoutTerminatesDescendantProcessGroup]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testTimeoutTerminatesDescendantProcessGroup] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testTimeoutTerminatesDescendantProcessGroup]' failed (0.014 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testTransientTerminalPersistenceFailureRecoversInProcessAndReleasesConcurrencySlot]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testTransientTerminalPersistenceFailureRecoversInProcessAndReleasesConcurrencySlot] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testTransientTerminalPersistenceFailureRecoversInProcessAndReleasesConcurrencySlot]' failed (0.012 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testZshNoProfileDisablesRCSOption]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift:538: error: -[ForgeConductorTests.RuntimeExecutionJobTests testZshNoProfileDisablesRCSOption] : failed: caught error: "storageFailure("runtime launch gate has an unexpected development signature identity")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testZshNoProfileDisablesRCSOption]' failed (0.012 seconds).
+Test Suite 'RuntimeExecutionJobTests' failed at 2026-08-26 21:35:58.128.
+	 Executed 64 tests, with 54 failures (54 unexpected) in 1.421 (1.431) seconds
+Test Suite 'ForgeConductorTests.xctest' failed at 2026-08-26 21:35:58.128.
+	 Executed 64 tests, with 54 failures (54 unexpected) in 1.421 (1.431) seconds
+Test Suite 'Selected tests' failed at 2026-08-26 21:35:58.128.
+	 Executed 64 tests, with 54 failures (54 unexpected) in 1.421 (1.431) seconds
+
+Test session results, code coverage, and logs:
+	/tmp/forge-xcode-adhoc.8XAln2/Logs/Test/Test-ForgeConductor-2026.08.26_21-35-54--0500.xcresult
+
+Testing started

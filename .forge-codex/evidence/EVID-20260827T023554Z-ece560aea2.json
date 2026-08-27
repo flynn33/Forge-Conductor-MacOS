@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 64329,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T023554Z-ece560aea2.stdout.txt",
+      "sha256": "83cee102106665bae736a01cd771f85555c518c34743b564cebe6167e8a8c373"
+    },
+    {
+      "bytes": 650,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T023554Z-ece560aea2.stderr.txt",
+      "sha256": "3e70f96a4bb9bac9ef371932d90b77d2c5e3f0b77861e4aec359c23dd508d168"
+    }
+  ],
+  "command": "xcodebuild -project ForgeConductor.xcodeproj -scheme ForgeConductor -configuration Debug -derivedDataPath /tmp/forge-xcode-adhoc.8XAln2 CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- -only-testing:ForgeConductorTests/RuntimeExecutionJobTests -skip-testing:ForgeConductorTests/RuntimeExecutionJobTests/testBootstrapRouterLegacyShellExecUsesBoundProjectAndCompatibilityContract -skip-testing:ForgeConductorTests/RuntimeExecutionJobTests/testBootstrapRouterRunsDurableShellJobAndReadsBoundedOutput test-without-building",
+  "ended_at": "2026-08-27T02:36:04.389888+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 65,
+  "id": "EVID-20260827T023554Z-ece560aea2",
+  "kind": "xcode-runtime-tests-adhoc",
+  "related_findings": [],
+  "related_gates": [
+    "G09"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-27T02:35:54.337648+00:00",
+  "timed_out": false
+}

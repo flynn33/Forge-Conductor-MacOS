@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 291,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260826T234657Z-85411946cb.stdout.txt",
+      "sha256": "2fe1fc766305c851f53e654d1be4cd08999fbf47a0c5d90fee8a01ee8dcfa8be"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260826T234657Z-85411946cb.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "command": "swift build -c release --scratch-path /tmp/forge-g09-release-20260826 --product forge-conductor --jobs 4",
+  "ended_at": "2026-08-26T23:46:59.645608+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260826T234657Z-85411946cb",
+  "kind": "g09-external-mcp-release-build",
+  "related_findings": [],
+  "related_gates": [
+    "G09"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-26T23:46:57.497296+00:00",
+  "timed_out": false
+}

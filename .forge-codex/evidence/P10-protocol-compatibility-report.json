@@ -1,26 +1,30 @@
 {
   "schema_version": 1,
   "phase": "P10",
-  "status": "passed",
+  "status": "incomplete",
+  "reconciled_at": "2026-08-26T23:55:21Z",
   "transport": "stdio newline-delimited JSON-RPC",
   "protocol_versions": [
     "2025-11-25",
     "2024-11-05"
   ],
-  "compatibility_checks": [
+  "passing_current_scope": [
+    "strict Debug and Release suites pass current MCP and tool-routing tests",
+    "real LM Studio managed continuation passed with exact handoff acknowledgment",
+    "existing protocol and lifecycle tool tests remain green"
+  ],
+  "preserved_prior_checks": [
     "initialize negotiation",
     "tools/list descriptors",
     "tools/call success envelope",
-    "primary and fallback process continuity",
-    "legacy continuity tools retained",
-    "project-memory tools added without replacing legacy memory tools",
-    "continuity lifecycle schemas exposed",
-    "newline-delimited framing retained"
+    "legacy continuity and memory tools",
+    "newline-delimited framing"
   ],
-  "removed_tools": [],
-  "schema_breaks": [],
-  "evidence_ids": [
-    "EVID-20260823T210719Z-a3e959a8b6",
-    "EVID-20260823T210727Z-dd0087ce58"
+  "removed_tools_observed": [],
+  "known_schema_breaks_observed": [],
+  "remaining_requirement": "capture and compare current golden capability, tool-name, input-schema, output-schema, CLI, manager HTTP, and external-client snapshots before claiming complete compatibility",
+  "current_evidence": [
+    ".forge-autonomy-state/evidence/FC-RELEASE-001/test-results.json",
+    ".forge-autonomy-state/evidence/FC-E2E-001/test-results.json"
   ]
 }

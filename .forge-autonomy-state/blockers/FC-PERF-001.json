@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "work_package": "FC-PERF-001",
+  "status": "incomplete_external_gates",
+  "recorded_at": "2026-08-26T23:45:46Z",
+  "summary": "Deterministic resource stress passes, but required long-duration and privileged profiling evidence is incomplete.",
+  "completed": [
+    "50 automatic rollover fixture",
+    "100 manager restart fixture",
+    "bounded ownership, telemetry queue, cancellation, and post-release RSS checks",
+    "memory-tier policy tests including simulated lower tiers"
+  ],
+  "open": [
+    "8-hour idle soak",
+    "4-hour active tool-loop soak",
+    "representative 8 GB, 16 GB, and 32 GB or larger Macs",
+    "Leaks, Allocations, Time Profiler, Swift Concurrency, and UI energy or GPU traces",
+    "memgraph ownership proof",
+    "actual hidden SwiftUI and Metal cadence profiling"
+  ],
+  "authorization_block": {
+    "command_reference": "CMD-20260826T233844Z-f63f53c824",
+    "result": "xctrace remained in AuthorizationCopyRights while requesting task-for-pid access",
+    "sample": ".forge-autonomy-state/evidence/FC-PERF-001/instruments/xctrace-authorization-block.sample.txt"
+  },
+  "evidence": ".forge-autonomy-state/evidence/FC-PERF-001",
+  "resume_condition": "Grant Instruments task inspection authorization, run the specified traces and memgraph capture, and complete the duration and hardware-tier matrix."
+}

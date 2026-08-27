@@ -234,7 +234,13 @@ public final class DashboardServer: @unchecked Sendable {
                     return
                 }
                 try ManagerRoutes(manager: manager, http: http)
-                    .handle(method: m, path: path, body: body, connection: connection)
+                    .handle(
+                        method: m,
+                        path: rawPath.hasPrefix("/") ? rawPath : "/" + rawPath,
+                        headers: request.headers,
+                        body: body,
+                        connection: connection
+                    )
                 return
             }
 

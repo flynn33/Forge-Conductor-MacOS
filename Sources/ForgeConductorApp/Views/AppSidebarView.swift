@@ -86,6 +86,12 @@ private extension AppModel.AppTab {
         case .agents: "person.3"
         case .tools: "wrench.and.screwdriver"
         case .feed: "waveform.path.ecg"
+        case .projects: "folder"
+        case .autonomy: "bolt.horizontal.circle"
+        case .continuity: "arrow.trianglehead.2.clockwise.rotate.90"
+        case .runtimes: "terminal"
+        case .provider: "externaldrive.connected.to.line.below"
+        case .evidence: "list.bullet.rectangle"
         case .diagnostics: "doc.text.magnifyingglass"
         case .manager: "gearshape.2"
         }

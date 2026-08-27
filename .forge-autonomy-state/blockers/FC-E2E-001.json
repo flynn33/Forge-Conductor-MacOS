@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "work_package": "FC-E2E-001",
+  "status": "partial_dependency_blocked",
+  "recorded_at": "2026-08-26T23:45:46Z",
+  "summary": "Real LM Studio fresh-root acknowledgement and automatic continuation passed, but UI and performance dependencies and the remaining hard scenario matrix are incomplete.",
+  "passed_command_reference": "CMD-20260826T224938Z-9660289413",
+  "passed_evidence": ".forge-autonomy-state/evidence/FC-E2E-001/live-lmstudio-managed-continuity.json",
+  "open": [
+    "GUI closure and reconnect under an active managed run",
+    "emergency overflow recovery",
+    "auth failure and reset-fencing system scenarios",
+    "combined multi-project model and shell isolation",
+    "final feature-parity comparison",
+    "FC-UI-001 and FC-PERF-001 completion"
+  ],
+  "resume_condition": "Resolve the UI and profiling blockers, run the remaining hard scenarios, and repeat the real-provider proof if provider configuration changes."
+}

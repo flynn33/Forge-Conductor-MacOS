@@ -1,65 +1,21 @@
 {
   "schema_version": 1,
-  "scan_id": "96f20cd2-930e-4f31-8bd7-0dc9e7e0a954",
-  "scan_mode": "standard",
-  "scan_status": "complete",
-  "scanned_revision": "082404ec42bf2adb775385dea85ad3b20d0076f4",
-  "snapshot_digest": "codex-security-snapshot/v1:sha256:ee2d4d53f3c7611b46bb34728f1f15c26e11abb99235b2065f9b13c5d33e7f96",
-  "canonical_report": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/codex-security-scans-C2Q9mn/Forge-Conductor-MacOS/082404ec42bf2adb775385dea85ad3b20d0076f4_20260823T215554Z_8f361tbs/report.md",
-  "canonical_findings": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/codex-security-scans-C2Q9mn/Forge-Conductor-MacOS/082404ec42bf2adb775385dea85ad3b20d0076f4_20260823T215554Z_8f361tbs/findings.json",
-  "initial_counts": {
-    "high": 2,
-    "medium": 3,
-    "low": 1
+  "scan_status": "stale_prior_revision",
+  "reconciled_at": "2026-08-26T23:55:21Z",
+  "prior_scan": {
+    "scan_id": "96f20cd2-930e-4f31-8bd7-0dc9e7e0a954",
+    "scanned_revision": "082404ec42bf2adb775385dea85ad3b20d0076f4",
+    "unresolved_critical_or_high": 0,
+    "coverage_limit": "reduced-worker standard scan with partial source coverage",
+    "remaining_medium": 1,
+    "remaining_low": 1
   },
-  "remediation": [
-    {
-      "rule_id": "authorization-boundary.untrusted-workspace-root",
-      "severity": "high",
-      "status": "resolved_after_scan",
-      "changes": [
-        "agent_run_start.cwd now crosses centralized authorization",
-        "binding and continuity roots are filtered against independently trusted roots before use"
-      ],
-      "tests": ["CoreTests.testAgentRunStartCannotCreateAuthorizationRoot", "ContinuityTests.testContextGetAdoptsWorkspaceForShellWithoutNewAgent"]
-    },
-    {
-      "rule_id": "command-execution.shell-policy-bypass",
-      "severity": "high",
-      "status": "resolved_after_scan",
-      "changes": [
-        "unrestricted shell execution is disabled by default",
-        "enablement requires trusted local configuration and is not accepted by dashboard settings"
-      ],
-      "tests": ["CoreTests.testShellIsDisabledUnlessTrustedConfigurationEnablesIt"]
-    },
-    {
-      "rule_id": "resource-exhaustion.caller-controlled-timeout",
-      "severity": "medium",
-      "status": "resolved_after_scan",
-      "changes": ["timeout must be finite and positive and is capped at 120 seconds in implementation and schema"],
-      "tests": ["CoreTests.testShellRejectsNonFiniteTimeoutWhenEnabled"]
-    },
-    {
-      "rule_id": "resource-exhaustion.unbounded-directory-listing",
-      "severity": "medium",
-      "status": "resolved_after_scan",
-      "changes": ["fs_list returns no more than 1000 sorted entries and reports truncation", "fs_edit applies the 2 MiB text-file ceiling"]
-    },
-    {
-      "rule_id": "missing-authentication.loopback-control-plane",
-      "severity": "medium",
-      "status": "open_hardening",
-      "existing_controls": ["loopback-only bind", "exact loopback Host validation", "same-origin browser policy", "JSON-only mutation", "no general MCP tool route"]
-    },
-    {
-      "rule_id": "resource-exhaustion.incomplete-http-connections",
-      "severity": "low",
-      "status": "open_hardening",
-      "existing_controls": ["32 KiB header limit", "1 MiB body limit", "32 live SSE stream limit", "one pending SSE frame"]
-    }
-  ],
-  "unresolved_critical_or_high": 0,
-  "coverage_limit": "Reduced-worker standard scan used three review receipts and recorded partial source coverage.",
-  "tac_status": "unknown because the advisory connector was not authenticated"
+  "current_working_tree": {
+    "revision": "uncommitted working tree after b72d6e8dc00681477224fb1b79859f553bc02558",
+    "complete_security_scan_executed": false,
+    "unresolved_critical_or_high": "not_finally_determined",
+    "release_content_and_secret_scan_complete": false,
+    "result_qualifies_G12": false
+  },
+  "interpretation": "The prior scan and remediations remain useful historical evidence but cannot qualify the substantially changed autonomy working tree."
 }

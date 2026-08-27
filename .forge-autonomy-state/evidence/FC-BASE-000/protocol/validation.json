@@ -1,0 +1,23 @@
+{
+  "captured_at": "2026-08-26T18:32:22.405782Z",
+  "checks": {
+    "all_legacy_tools_preserved": true,
+    "baseline_declared_names_match_transcript": true,
+    "baseline_request_replayed_exactly": true,
+    "build_exit_zero": true,
+    "five_response_frames": true,
+    "legacy_tool_relative_order_preserved": true,
+    "no_json_rpc_errors": true,
+    "ping_unchanged": true,
+    "prompts_unchanged": true,
+    "protocol_version_preserved": true,
+    "resources_unchanged": true,
+    "response_ids_exact": true,
+    "serve_exit_zero": true,
+    "serve_stderr_empty": true,
+    "server_name_preserved": true,
+    "tool_names_unique": true
+  },
+  "ok": true,
+  "schema_version": 1
+}

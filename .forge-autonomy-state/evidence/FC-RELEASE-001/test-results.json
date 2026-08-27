@@ -1,0 +1,232 @@
+{
+  "schema_version": 1,
+  "work_package": "FC-RELEASE-001",
+  "captured_at": "2026-08-27T03:01:00.743220+00:00",
+  "overall_status": "not_passed",
+  "evidence_complete": false,
+  "command_log_scope": {
+    "source": ".forge-autonomy-state/command-logs/FC-RELEASE-001/commands.jsonl",
+    "entries": 35,
+    "first_command_id": "CMD-20260826T231108Z-1f8c4815f5",
+    "last_command_id": "CMD-20260827T030013Z-bf6e30761e",
+    "compact_log_matches_source": true,
+    "related_commands_from_other_work_packages_are_referenced_but_not_copied": true
+  },
+  "current_source_results": [
+    {
+      "id": "FC-RELEASE-DEBUG-STRICT-SWIFTPM",
+      "command_id": "CMD-20260827T025715Z-b42c01b23b",
+      "configuration": "debug_strict",
+      "compiled_with_warnings_as_errors": true,
+      "executed": 444,
+      "skipped": 3,
+      "assertion_failures": 137,
+      "unexpected_failures": 42,
+      "exit_code": 1,
+      "status": "blocked_by_locked_session_file_protection"
+    },
+    {
+      "id": "FC-RELEASE-RELEASE-STRICT-SWIFTPM",
+      "command_id": "CMD-20260827T025822Z-dc523f8bbf",
+      "configuration": "release_strict",
+      "compiled_with_warnings_as_errors": true,
+      "executed": 444,
+      "skipped": 3,
+      "assertion_failures": 137,
+      "unexpected_failures": 42,
+      "exit_code": 1,
+      "status": "blocked_by_locked_session_file_protection",
+      "failed_test_set_matches_debug": true
+    },
+    {
+      "id": "FC-RELEASE-PROJECT-LOCAL-BUILD-RUN-VERIFY",
+      "command_id": "CMD-20260827T025942Z-8af334d72e",
+      "configuration": "debug_project_local_app",
+      "exit_code": 0,
+      "status": "passed",
+      "source_scope": "exact frozen tree",
+      "observed": {
+        "product_build": "passed",
+        "app_bundle": "dist/Forge Conductor.app",
+        "nested_code_signature_validation": "passed",
+        "launch": "passed",
+        "launched_app_stopped_after_verification": true
+      }
+    },
+    {
+      "id": "FC-RELEASE-XCODE-BUILD-FOR-TESTING",
+      "command_id": "CMD-20260827T030013Z-bf6e30761e",
+      "configuration": "xcode_debug_adhoc",
+      "exit_code": 0,
+      "status": "passed",
+      "helper_identifier": "com.forge-conductor.runtime-launcher"
+    },
+    {
+      "id": "FC-RELEASE-XCODE-RUNTIME-TESTS",
+      "command_id": "CMD-20260827T030030Z-e106bb4ef2",
+      "recorded_under": "FC-RUNTIME-001",
+      "configuration": "xcode_debug_adhoc",
+      "executed": 64,
+      "skipped": 1,
+      "failures": 0,
+      "exit_code": 0,
+      "status": "passed"
+    },
+    {
+      "id": "FC-RELEASE-REAL-LMSTUDIO-MANAGED-CONTINUITY",
+      "command_id": "CMD-20260826T224938Z-9660289413",
+      "recorded_under": "FC-E2E-001",
+      "executed": 1,
+      "failures": 0,
+      "exit_code": 0,
+      "status": "historical_pass_before_final_source_freeze"
+    }
+  ],
+  "environment_blockers": [
+    {
+      "id": "FC-RELEASE-LOCKED-PROTECTED-FILES",
+      "diagnostic_command_id": "CMD-20260827T024229Z-92a78059b3",
+      "observed": "CGSSessionScreenIsLocked=Yes",
+      "error": "NSCocoaErrorDomain 257 with underlying EPERM when tests reopen complete-file-protected registry.json",
+      "scope": "the exact frozen-tree Debug and Release runs fail with the same test set and counts; focused runtime tests that exclude the two protected bootstrap fixtures pass under SwiftPM and Xcode",
+      "resolution": "rerun both full strict suites while the console session is unlocked; do not weaken file protection"
+    },
+    {
+      "id": "FC-RELEASE-UI-AUTOMATION",
+      "recorded_under": "FC-UI-001",
+      "status": "blocked",
+      "classification": "Developer mode is disabled, the configured team has no matching usable Mac Development identity, and no UI runner established an authorized automation session"
+    },
+    {
+      "id": "FC-RELEASE-INSTRUMENTS",
+      "recorded_under": "FC-PERF-001",
+      "command_id": "CMD-20260826T233844Z-f63f53c824",
+      "exit_code": 137,
+      "status": "blocked_before_valid_trace_capture",
+      "classification": "xctrace remained inside task-inspection authorization until sampled and killed; the partial trace is not gate proof"
+    }
+  ],
+  "remediated_diagnostics": [
+    {
+      "command_id": "CMD-20260826T231108Z-1f8c4815f5",
+      "classification": "Release compilation proved a temporary MCPServer could deallocate while its weak delegate remained in use",
+      "remediation": "ForgeProcessEntry retains MCPServer for the blocking serve lifetime"
+    },
+    {
+      "command_id": "CMD-20260827T021458Z-18f5a46f96",
+      "classification": "a load-sensitive unreaped-child interval produced a transient identity-unavailable recovery probe",
+      "remediation": "the persisted reaper retries only identity-unavailable samples within absolute TERM and KILL deadlines; mismatch and deadline exhaustion still fail closed",
+      "final_release_command_id": "CMD-20260827T025822Z-dc523f8bbf"
+    },
+    {
+      "command_ids": [
+        "CMD-20260827T023330Z-7bb5025d26",
+        "CMD-20260827T023342Z-bdb1417713"
+      ],
+      "classification": "an unsigned Xcode helper was correctly rejected by product identity validation",
+      "remediation": "the Xcode helper embeds its generated Info.plist so code signing binds the exact declared identifier",
+      "final_build_command_id": "CMD-20260827T030013Z-bf6e30761e",
+      "final_test_command_id": "CMD-20260827T030030Z-e106bb4ef2"
+    }
+  ],
+  "sanitizer_results": [
+    {
+      "id": "FC-RELEASE-ASAN-SWIFTPM",
+      "command_id": "CMD-20260826T231558Z-5314efd9b5",
+      "exit_code": -15,
+      "status": "blocked_before_test_execution",
+      "classification": "the instrumented process remained in Address Sanitizer shadow-memory initialization and was terminated after diagnostic sampling",
+      "product_test_count": 0,
+      "sample": ".forge-autonomy-state/evidence/FC-RELEASE-001/asan-swiftpm-startup-spin.sample.txt"
+    },
+    {
+      "id": "FC-RELEASE-ASAN-XCODE",
+      "command_id": "CMD-20260826T232746Z-278074fd92",
+      "exit_code": -15,
+      "status": "blocked_before_test_execution",
+      "classification": "the Xcode worker reproduced the Address Sanitizer initialization spin",
+      "product_test_count": 0,
+      "sample": ".forge-autonomy-state/evidence/FC-RELEASE-001/asan-xcode-startup-spin.sample.txt"
+    },
+    {
+      "id": "FC-RELEASE-TSAN-SWIFTPM",
+      "command_id": "CMD-20260826T233210Z-a494b24c35",
+      "exit_code": 1,
+      "status": "blocked_before_test_execution",
+      "classification": "dyld rejected the Thread Sanitizer runtime under current platform policy",
+      "product_test_count": 0
+    },
+    {
+      "id": "FC-RELEASE-TSAN-XCODE",
+      "command_id": "CMD-20260826T233250Z-e11abc6e37",
+      "exit_code": 65,
+      "status": "blocked_before_test_execution",
+      "classification": "the worker exited with signal SEGV before establishing its XCTest connection",
+      "product_test_count": 0
+    }
+  ],
+  "superseded_results": [
+    {
+      "command_id": "CMD-20260826T234913Z-2fdbb95e5d",
+      "configuration": "debug_strict",
+      "executed": 395,
+      "skipped": 2,
+      "failures": 0,
+      "reason": "passed before later runtime, security, packaging, and test changes"
+    },
+    {
+      "command_id": "CMD-20260826T231135Z-a82f5da923",
+      "configuration": "release_strict",
+      "executed": 395,
+      "skipped": 2,
+      "failures": 0,
+      "reason": "passed before later runtime, security, packaging, and test changes"
+    },
+    {
+      "command_id": "CMD-20260826T231358Z-db9cf5ac1c",
+      "configuration": "xcode_debug_unsigned_unit",
+      "executed": 373,
+      "skipped": 1,
+      "failures": 0,
+      "reason": "passed before the dedicated helper product and final source changes"
+    }
+  ],
+  "integrity_results": {
+    "command_record": ".forge-codex/evidence/EVID-20260827T030641Z-831d98c838.json",
+    "package_validation": "passed_395_checks",
+    "prohibited_attribution_scan": "passed",
+    "secret_scan": "passed",
+    "completion_verifier": "nonzero_only_for_G09_through_G11_and_dependency_statuses"
+  },
+  "acceptance": {
+    "strict_debug_swiftpm_suite": "blocked_environment_not_passed",
+    "strict_release_swiftpm_suite": "blocked_environment_not_passed",
+    "xcode_runtime_suite": "passed",
+    "project_local_build_and_run_verification": "passed",
+    "address_sanitizer": "blocked_not_passed",
+    "thread_sanitizer": "blocked_not_passed",
+    "ui_and_accessibility": "blocked_not_passed",
+    "instruments_and_memgraph": "blocked_not_passed",
+    "long_duration_resource_validation": "not_executed",
+    "signed_launchagent_and_app": "not_executed",
+    "notarization": "not_executed",
+    "package_validation": "passed",
+    "prohibited_attribution_scan": "passed",
+    "secret_scan": "passed",
+    "final_release_content_and_transport_scan": "not_executed",
+    "full_feature_parity": "incomplete",
+    "completion_verifier": "not_passed",
+    "every_hard_gate": "not_passed"
+  },
+  "remaining_required_evidence": [
+    "passing current-source Debug and Release strict suites from an unlocked console session",
+    "successful separate Address Sanitizer and Thread Sanitizer runs that execute the intended tests",
+    "successful accessibility and UI behavior tests after host developer authorization and signing are available",
+    "valid Instruments and memgraph captures, including hidden SwiftUI and Metal quiescence",
+    "8-hour idle and 4-hour active soaks plus representative lower-memory hardware evidence",
+    "signed app and LaunchAgent install, login start, restart, uninstall, migration, and recovery behavior",
+    "notarized package behavior",
+    "current-source real-provider and complete feature, protocol, migration, release-content, and prohibited-transport qualification",
+    "a zero exit from verify_completion.py after every hard gate passes"
+  ]
+}

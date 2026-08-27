@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "work_package": "FC-RELEASE-001",
+  "evidence_reconciliation_changed_product_source_or_tests": false,
+  "related_product_changes": [
+    {
+      "path": "Sources/ForgeConductorCore/Application/ForgeProcessEntry.swift",
+      "change": "retain MCPServer for the full blocking serve lifetime",
+      "compatibility_effect": "none intended; command, stdio MCP, exit, and tool-schema contracts are unchanged"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/ExecutionJobService.swift",
+      "change": "retry transient identity-unavailable recovery probes within persisted absolute termination deadlines",
+      "compatibility_effect": "no relaxed ownership boundary; mismatch and unconfirmed death remain fail-closed"
+    },
+    {
+      "path": "ForgeConductor.xcodeproj/project.pbxproj",
+      "change": "embed the runtime helper Info.plist identity in its Mach-O product",
+      "compatibility_effect": "the declared helper identifier is now enforceable in Xcode-built products"
+    }
+  ],
+  "verified_preserved_in_current_source_proofs": {
+    "focused_strict_swiftpm_runtime": true,
+    "focused_xcode_runtime": true,
+    "xcode_helper_exact_identifier": true,
+    "project_local_build_run_and_nested_signature_verification": true
+  },
+  "current_source_not_passed": [
+    "full strict Debug suite: blocked by locked-session protected-file reopen failures",
+    "full strict Release suite: blocked by the identical locked-session failure set"
+  ],
+  "historical_proof_requiring_current_source_refresh": [
+    "full Xcode unit target",
+    "real LM Studio fresh-root acknowledgement and automatic continuation scenario"
+  ],
+  "behavioral_parity_not_yet_verified": [
+    "accessibility identifiers and UI actions under a working automation session",
+    "GUI reconnect and hidden-view rendering quiescence in an authorized profile",
+    "signed app and LaunchAgent install, login, restart, recovery, and uninstall",
+    "notarized package behavior",
+    "representative lower-memory hardware behavior",
+    "complete MCP, CLI, manager HTTP, settings, project format, migration, import/export, and UI snapshot comparison"
+  ],
+  "release_validation_gaps": [
+    "current-source full suites from an unlocked console session",
+    "Address Sanitizer pass",
+    "Thread Sanitizer pass",
+    "valid Instruments and memgraph evidence",
+    "long-duration soaks",
+    "final release-content and prohibited-transport scans",
+    "completion verifier zero exit"
+  ],
+  "removed": [],
+  "result": "not_passed"
+}

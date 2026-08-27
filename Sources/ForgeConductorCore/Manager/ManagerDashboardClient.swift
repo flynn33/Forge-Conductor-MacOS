@@ -27,11 +27,18 @@ public final class ManagerDashboardClient: @unchecked Sendable {
     private let host: String
     private let port: Int
     private let session: URLSession
+    private let credentials: any ManagerMutationCredentialProviding
 
-    public init(host: String, port: Int, session: URLSession = .shared) {
+    public init(
+        host: String,
+        port: Int,
+        session: URLSession = .shared,
+        credentials: (any ManagerMutationCredentialProviding)? = nil
+    ) {
         self.host = host
         self.port = port
         self.session = session
+        self.credentials = credentials ?? ManagerControlCredentialStore()
     }
 
     public func status() async throws -> ManagerStatus {
@@ -82,6 +89,12 @@ public final class ManagerDashboardClient: @unchecked Sendable {
         request.httpMethod = method
         request.timeoutInterval = 2
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if ManagerMutationAuthorizer.requiresAuthorization(method: method, path: path) {
+            request.setValue(
+                "Bearer \(try credentials.bearerToken())",
+                forHTTPHeaderField: "Authorization"
+            )
+        }
         if let body {
             request.httpBody = try JSONSupport.data(from: body)
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")

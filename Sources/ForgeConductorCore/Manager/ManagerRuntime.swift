@@ -16,6 +16,7 @@ public final class ManagerRuntime: @unchecked Sendable {
     public var startedAt: Date?
     public var restartCount = 0
     public var watchdog: DispatchSourceTimer?
+    public var autonomyTickPending = false
     public var lastPresencePruneAt: Date?
     public var shutdownRequested = false
     public var signalSources: [any DispatchSourceSignal] = []
@@ -65,6 +66,7 @@ public final class ManagerRuntime: @unchecked Sendable {
         watchdog?.setEventHandler {}
         watchdog?.cancel()
         watchdog = nil
+        autonomyTickPending = false
     }
 
     /// Releases signal handlers owned by this runtime. The owner must hold its lock.

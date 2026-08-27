@@ -37,4 +37,23 @@ public protocol ToolPackHandling: Sendable {
     /// Tool names this pack owns.
     var toolNames: [String] { get }
     func handle(name: String, arguments: [String: Any], clientID: ClientID, app: ForgeApp) throws -> ToolResult?
+    func handle(
+        name: String,
+        arguments: [String: Any],
+        context: ToolInvocationContext?,
+        clientID: ClientID,
+        app: ForgeApp
+    ) throws -> ToolResult?
+}
+
+public extension ToolPackHandling {
+    func handle(
+        name: String,
+        arguments: [String: Any],
+        context: ToolInvocationContext?,
+        clientID: ClientID,
+        app: ForgeApp
+    ) throws -> ToolResult? {
+        try handle(name: name, arguments: arguments, clientID: clientID, app: app)
+    }
 }

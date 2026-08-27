@@ -203,21 +203,39 @@ final class LiveCollectorEvidenceTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: home) }
         let app = try ForgeApp.bootstrap(home: home)
         defer { app.shutdown() }
+        let processesBeforeSnapshot = ProcessDiscovery.scan().mcpProcesses
         let forge = try app.telemetry.snapshotTyped(force: true).forge
+        let processesAfterSnapshot = ProcessDiscovery.scan().mcpProcesses
         // Structure always present
         XCTAssertNotNil(forge.mcpServers)
-        // When host has live local-mcp servers, the typed snapshot must list them.
-        let live = ProcessDiscovery.scan().mcpProcesses
-        if !live.isEmpty {
+        // Require cards only for eligible MCP processes that remained the same
+        // throughout the enclosing observation window. Host and model-backend
+        // processes are intentionally reported elsewhere, and transient process
+        // churn outside the collector's own point-in-time scan is not a defect.
+        let beforeByPID = Dictionary(
+            uniqueKeysWithValues: processesBeforeSnapshot.map { ($0.pid, $0) }
+        )
+        let stableMCPProcesses = processesAfterSnapshot.filter { process in
+            guard process.hostKind != "lm-studio-host",
+                  process.hostKind != "model-backend",
+                  let before = beforeByPID[process.pid] else {
+                return false
+            }
+            return before.label == process.label
+                && before.hostKind == process.hostKind
+                && before.command == process.command
+        }
+        if !stableMCPProcesses.isEmpty {
             XCTAssertFalse(
                 forge.mcpServers.isEmpty,
-                "ForgeSnapshot.mcpServers empty but ProcessDiscovery found \(live.map(\.label))"
+                "ForgeSnapshot.mcpServers empty but stable MCP processes were observed: \(stableMCPProcesses.map(\.label))"
             )
-            let cardLabels = Set(forge.mcpServers.map(\.label))
-            for p in live {
+            for process in stableMCPProcesses {
                 XCTAssertTrue(
-                    cardLabels.contains(p.label) || forge.mcpServers.contains { $0.pid == Int(p.pid) },
-                    "missing card for \(p.label) pid \(p.pid)"
+                    forge.mcpServers.contains {
+                        $0.pid == Int(process.pid) && $0.live
+                    },
+                    "missing live card for stable MCP process \(process.label) pid \(process.pid)"
                 )
             }
         }

@@ -12,6 +12,7 @@ public enum ResourceMemoryTier: String, Sendable, Codable, CaseIterable {
     case constrained
     case standard
     case expanded
+    case highCapacity = "high_capacity"
 }
 
 public enum ResourcePressureLevel: String, Sendable, Codable {
@@ -35,6 +36,30 @@ public struct ResourceLimits: Sendable, Codable, Equatable {
     public let activeGaugeFPS: Int
 }
 
+/// Bounded provider-model defaults for one physical-memory tier. These values are
+/// ceilings, not scheduling targets; provider capacity and model-size estimates may
+/// lower them further at admission time.
+public struct ResourceModelPolicy: Sendable, Codable, Equatable {
+    public let defaultLoadedInstances: Int
+    public let maximumLoadedInstances: Int
+    public let maximumParallelRequests: Int
+    public let idleTTLSeconds: Int
+    public let jitLoadingRequired: Bool
+    public let autoEvictRequired: Bool
+    public let serializeSuccessorCreation: Bool
+}
+
+/// Manager/runtime/event limits that must be resolved from the same memory tier.
+/// Keeping these together prevents each long-lived owner from independently assuming
+/// that it can consume the machine's entire scheduling and retention budget.
+public struct ResourceExecutionLimits: Sendable, Codable, Equatable {
+    public let maximumActiveManagedGenerations: Int
+    public let maximumActiveRuntimeJobs: Int
+    public let maximumCPUHeavyRuntimeJobs: Int
+    public let maximumInMemoryEvents: Int
+    public let modelPolicy: ResourceModelPolicy
+}
+
 public struct ResourcePolicy: Sendable, Equatable {
     public static let gibibyte: UInt64 = 1_073_741_824
     public static var current: ResourcePolicy {
@@ -43,6 +68,7 @@ public struct ResourcePolicy: Sendable, Equatable {
 
     public let tier: ResourceMemoryTier
     public let nominalLimits: ResourceLimits
+    public let nominalExecutionLimits: ResourceExecutionLimits
 
     public init(physicalMemoryBytes: UInt64) {
         if physicalMemoryBytes <= 8 * Self.gibibyte {
@@ -61,6 +87,21 @@ public struct ResourcePolicy: Sendable, Equatable {
                 mcpResponseBytes: 1_048_576,
                 activeGaugeFPS: 30
             )
+            nominalExecutionLimits = ResourceExecutionLimits(
+                maximumActiveManagedGenerations: 1,
+                maximumActiveRuntimeJobs: 2,
+                maximumCPUHeavyRuntimeJobs: 1,
+                maximumInMemoryEvents: 1_000,
+                modelPolicy: ResourceModelPolicy(
+                    defaultLoadedInstances: 1,
+                    maximumLoadedInstances: 1,
+                    maximumParallelRequests: 1,
+                    idleTTLSeconds: 300,
+                    jitLoadingRequired: true,
+                    autoEvictRequired: true,
+                    serializeSuccessorCreation: true
+                )
+            )
         } else if physicalMemoryBytes <= 16 * Self.gibibyte {
             tier = .standard
             nominalLimits = ResourceLimits(
@@ -77,7 +118,22 @@ public struct ResourcePolicy: Sendable, Equatable {
                 mcpResponseBytes: 2 * 1_048_576,
                 activeGaugeFPS: 60
             )
-        } else {
+            nominalExecutionLimits = ResourceExecutionLimits(
+                maximumActiveManagedGenerations: 1,
+                maximumActiveRuntimeJobs: 2,
+                maximumCPUHeavyRuntimeJobs: 1,
+                maximumInMemoryEvents: 2_500,
+                modelPolicy: ResourceModelPolicy(
+                    defaultLoadedInstances: 1,
+                    maximumLoadedInstances: 1,
+                    maximumParallelRequests: 2,
+                    idleTTLSeconds: 600,
+                    jitLoadingRequired: true,
+                    autoEvictRequired: true,
+                    serializeSuccessorCreation: true
+                )
+            )
+        } else if physicalMemoryBytes <= 32 * Self.gibibyte {
             tier = .expanded
             nominalLimits = ResourceLimits(
                 telemetryHistoryPoints: 2_400,
@@ -92,6 +148,52 @@ public struct ResourcePolicy: Sendable, Equatable {
                 memorySearchHardLimit: 200,
                 mcpResponseBytes: 4 * 1_048_576,
                 activeGaugeFPS: 60
+            )
+            nominalExecutionLimits = ResourceExecutionLimits(
+                maximumActiveManagedGenerations: 2,
+                maximumActiveRuntimeJobs: 4,
+                maximumCPUHeavyRuntimeJobs: 2,
+                maximumInMemoryEvents: 5_000,
+                modelPolicy: ResourceModelPolicy(
+                    defaultLoadedInstances: 1,
+                    maximumLoadedInstances: 2,
+                    maximumParallelRequests: 2,
+                    idleTTLSeconds: 900,
+                    jitLoadingRequired: true,
+                    autoEvictRequired: true,
+                    serializeSuccessorCreation: false
+                )
+            )
+        } else {
+            tier = .highCapacity
+            nominalLimits = ResourceLimits(
+                telemetryHistoryPoints: 2_400,
+                diagnosticRingRecords: 4_000,
+                processOutputBytesPerStream: 16 * 1_048_576,
+                logFileBytes: 8 * 1_048_576,
+                retainedLogArchives: 3,
+                activeModelStreamBytes: 16 * 1_048_576,
+                decodedMemoryCacheBytes: 64 * 1_048_576,
+                searchCacheBytes: 32 * 1_048_576,
+                memorySearchDefaultLimit: 50,
+                memorySearchHardLimit: 200,
+                mcpResponseBytes: 4 * 1_048_576,
+                activeGaugeFPS: 60
+            )
+            nominalExecutionLimits = ResourceExecutionLimits(
+                maximumActiveManagedGenerations: 2,
+                maximumActiveRuntimeJobs: 6,
+                maximumCPUHeavyRuntimeJobs: 3,
+                maximumInMemoryEvents: 10_000,
+                modelPolicy: ResourceModelPolicy(
+                    defaultLoadedInstances: 1,
+                    maximumLoadedInstances: 2,
+                    maximumParallelRequests: 4,
+                    idleTTLSeconds: 1_200,
+                    jitLoadingRequired: true,
+                    autoEvictRequired: true,
+                    serializeSuccessorCreation: false
+                )
             )
         }
     }
@@ -117,6 +219,44 @@ public struct ResourcePolicy: Sendable, Equatable {
             memorySearchHardLimit: max(25, base.memorySearchHardLimit / divisor),
             mcpResponseBytes: max(262_144, base.mcpResponseBytes / divisor),
             activeGaugeFPS: max(15, base.activeGaugeFPS / divisor)
+        )
+    }
+
+    /// Pressure can only tighten scheduling, model, and event-retention ceilings.
+    /// Required capability remains available because every executable limit floors at one.
+    public func executionLimits(for pressure: ResourcePressureLevel) -> ResourceExecutionLimits {
+        let divisor: Int
+        switch pressure {
+        case .nominal: divisor = 1
+        case .warning: divisor = 2
+        case .critical: divisor = 4
+        }
+        let base = nominalExecutionLimits
+        let baseModel = base.modelPolicy
+        let maximumLoadedInstances = max(1, baseModel.maximumLoadedInstances / divisor)
+        return ResourceExecutionLimits(
+            maximumActiveManagedGenerations: max(
+                1, base.maximumActiveManagedGenerations / divisor
+            ),
+            maximumActiveRuntimeJobs: max(1, base.maximumActiveRuntimeJobs / divisor),
+            maximumCPUHeavyRuntimeJobs: min(
+                max(1, base.maximumCPUHeavyRuntimeJobs / divisor),
+                max(1, base.maximumActiveRuntimeJobs / divisor)
+            ),
+            maximumInMemoryEvents: max(500, base.maximumInMemoryEvents / divisor),
+            modelPolicy: ResourceModelPolicy(
+                defaultLoadedInstances: min(
+                    max(1, baseModel.defaultLoadedInstances / divisor),
+                    maximumLoadedInstances
+                ),
+                maximumLoadedInstances: maximumLoadedInstances,
+                maximumParallelRequests: max(1, baseModel.maximumParallelRequests / divisor),
+                idleTTLSeconds: max(60, baseModel.idleTTLSeconds / divisor),
+                jitLoadingRequired: baseModel.jitLoadingRequired,
+                autoEvictRequired: baseModel.autoEvictRequired,
+                serializeSuccessorCreation: baseModel.serializeSuccessorCreation
+                    || pressure != .nominal
+            )
         )
     }
 }

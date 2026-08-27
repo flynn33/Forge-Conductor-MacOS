@@ -75,6 +75,28 @@ final class G1G10AcceptanceTests: XCTestCase {
         try FileManager.default.copyItem(at: src, to: dest)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: dest.path)
 
+        // The CLI and launcher are one executable product boundary. Keep the
+        // helper beside the relocated CLI so the child process can verify the
+        // exact signed sibling before staging its private runtime copy.
+        let helperName = RuntimeLaunchGate.executableName
+        let sourceHelper = src.deletingLastPathComponent()
+            .appendingPathComponent(helperName)
+        let helper = try XCTUnwrap(
+            FileManager.default.isExecutableFile(atPath: sourceHelper.path)
+                ? sourceHelper
+                : nil,
+            "Active CLI product is missing its runtime launcher"
+        )
+        let installedHelper = bin.appendingPathComponent(helperName)
+        if FileManager.default.fileExists(atPath: installedHelper.path) {
+            try FileManager.default.removeItem(at: installedHelper)
+        }
+        try FileManager.default.copyItem(at: helper, to: installedHelper)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755],
+            ofItemAtPath: installedHelper.path
+        )
+
         // Framework next to CLI
         let fwName = "ForgeConductorCore.framework"
         let srcFW = src.deletingLastPathComponent().appendingPathComponent(fwName)
@@ -292,7 +314,7 @@ final class G1G10AcceptanceTests: XCTestCase {
             contentsOf: repository.appendingPathComponent("ForgeConductor.xcodeproj/project.pbxproj"),
             encoding: .utf8
         )
-        XCTAssertEqual(project.components(separatedBy: "MARKETING_VERSION = \(version);").count - 1, 6)
+        XCTAssertEqual(project.components(separatedBy: "MARKETING_VERSION = \(version);").count - 1, 8)
     }
 
     func testG9_ResolvePrefersExplicitBinary() {

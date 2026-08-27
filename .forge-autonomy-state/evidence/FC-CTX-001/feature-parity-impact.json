@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "work_package": "FC-CTX-001",
+  "preserved": {
+    "existing_mcp_tool_names": true,
+    "existing_project_memory_schemas": true,
+    "project_memory_restart_and_migration_behavior": true,
+    "project_memory_bounds_and_redaction": true,
+    "manager_lifecycle_and_settings_contracts": true,
+    "legacy_client_id_call_entrypoint": true
+  },
+  "additive": [
+    "control-plane SQLite schema v2",
+    "strong project, generation, run, owner, scope, and invocation-context values",
+    "explicit context-aware tool execution overload",
+    "projectContext MCP capability metadata",
+    "project ID, generation, and authorization roots on bootstrap responses",
+    "manager project registration, status, binding, and generation-reset commands",
+    "bounded stale-result quarantine"
+  ],
+  "intentional_security_changes": [
+    "project-scoped tools require an exact durable binding",
+    "one active owner cannot bind two projects",
+    "cross-project project IDs and paths are rejected",
+    "reset invalidates all bindings for the prior generation"
+  ],
+  "removed": [],
+  "result": "passed"
+}

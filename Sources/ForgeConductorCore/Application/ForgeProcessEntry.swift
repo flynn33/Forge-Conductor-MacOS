@@ -56,10 +56,20 @@ public enum ForgeProcessEntry {
     public static func runServe(home: URL? = nil) -> Never {
         do {
             let app = try ForgeApp.bootstrap(home: home ?? homeOverride())
-            defer { app.shutdown() }
             // MCP owns stdout. Normal lifecycle diagnostics are persisted by
             // DiagnosticLog; keep stderr quiet unless startup actually fails.
-            try MCPServer(app: app).run()
+            let server = MCPServer(app: app)
+            do {
+                try server.run()
+            } catch {
+                _ = app.shutdown()
+                throw error
+            }
+            let shutdownReport = app.shutdown()
+            guard shutdownReport.completed else {
+                fputs("forge-conductor serve shutdown incomplete\n", stderr)
+                exit(1)
+            }
             exit(0)
         } catch {
             fputs("forge-conductor serve error: \(error)\n", stderr)

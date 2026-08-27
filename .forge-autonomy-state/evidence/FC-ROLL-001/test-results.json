@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "work_package": "FC-ROLL-001",
+  "captured_at": "2026-08-26T23:10:51.879321+00:00",
+  "results": [
+    {
+      "id": "FC-ROLL-FOCUSED-STRICT-SWIFTPM",
+      "command_id": "CMD-20260826T231049Z-7b13acba2d",
+      "executed": 12,
+      "failures": 0,
+      "exit_code": 0,
+      "status": "passed",
+      "suites": {
+        "AutonomousContinuityAcceptanceTests": 3,
+        "ManagedContinuityWorkerTests": 3,
+        "ManagedProjectRunStepExecutorTests": 6
+      },
+      "crash_boundaries": [
+        "checkpointIntent",
+        "handoffPersistence",
+        "successorRequestIntent",
+        "providerRootSideEffect",
+        "candidateSessionPersistence",
+        "bootstrapRequest",
+        "providerBootstrapResponse",
+        "acknowledgementPersistence",
+        "successorAcceptance",
+        "predecessorFence",
+        "continuationEnqueue",
+        "continuationSideEffect"
+      ],
+      "coverage": [
+        "two projects automatically cross a threshold and continue under isolated successors",
+        "successor creation uses a fresh root without predecessor response continuation",
+        "handoff project, generation, run, operation, checksum, and nonce match exactly",
+        "one candidate is accepted and duplicate candidates are quarantined",
+        "predecessor authority is fenced before successor continuation",
+        "one canonical automatic continuation is consumed after restart",
+        "all twelve durable crash boundaries recover idempotently",
+        "transient provider outage survives manager restart without duplicate turns",
+        "provider configuration blocks remain quiescent across restart"
+      ]
+    }
+  ],
+  "acceptance": {
+    "rollover_requires_no_operator_action": "passed",
+    "successor_is_fresh_root": "passed",
+    "exact_checksum_and_nonce_acknowledged": "passed",
+    "predecessor_tools_are_rejected_after_fencing": "passed",
+    "all_twelve_crash_boundaries_recover": "passed",
+    "duplicate_roots_are_quarantined": "passed",
+    "exactly_one_automatic_continuation": "passed"
+  }
+}

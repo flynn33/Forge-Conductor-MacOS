@@ -1,3 +1,9 @@
+<!-- FORGE-AUTONOMOUS-CONTINUITY-DESIGN:BEGIN -->
+# Autonomous continuity implementation supplement
+
+Before autonomy, continuity, project context, provider, shell, or runtime work, read `.forge-continuity-design/AGENTS.md` and execute `.forge-continuity-design/schemas/work-packages.json`. This supplement requires shell enabled by default, exact project-generation binding, manager-owned context enforcement, a real LM Studio transport in the existing session-host plugin, automatic fresh-root rollover, predecessor fencing, crash recovery, and automatic continuation.
+<!-- FORGE-AUTONOMOUS-CONTINUITY-DESIGN:END -->
+
 <!-- FORGE-CONDUCTOR-AUTONOMOUS-CONTRACT:BEGIN -->
 # Forge Conductor repository execution contract
 

@@ -1,57 +1,99 @@
 {
   "schema_version": 1,
   "gate_id": "G11",
-  "instructions": "Command-backed release stress, native UI, profile, resource, and constrained-policy evidence.",
+  "instructions": "Current release stress, profile, resource, sanitizer, soak, and representative-hardware evidence. Short deterministic fixtures are retained without being promoted to a hard-gate pass.",
   "criteria_results": [
     {
       "criterion": "Release stress suite passes",
-      "passed": true,
+      "passed": false,
       "evidence": [
-        {"path": ".forge-codex/evidence/P11-release-stress-results.json", "sha256": "c1f39620b4a218f03323b6cc0f53f5525093afe0e59830108df4c97b741e6dcb"},
-        {"path": ".forge-codex/evidence/EVID-20260823T212034Z-4070dbd74c.json", "sha256": "e471b320b9598855baa77538a8aa40dcbaa5abec763c56870840e7a62bc50a1f"}
+        {
+          "path": ".forge-codex/evidence/P11-release-stress-results.json",
+          "sha256": "0dbcb3b5f8dfd6d81baad3f1eee7aa35f2ac40a94613dd716a63a221d741d600"
+        },
+        {
+          "path": ".forge-autonomy-state/evidence/FC-RELEASE-001/test-results.json",
+          "sha256": "9f2a6a473bc09d3f09de9de33936635028a1427960d5ab47317f706fa1034472"
+        }
       ]
     },
     {
       "criterion": "resident-size trajectories are bounded",
-      "passed": true,
+      "passed": false,
       "evidence": [
-        {"path": ".forge-codex/evidence/P11-resource-results.json", "sha256": "405832a52390a220626f3fbbf19dc94aa04c34bccbb2c641fc1ef471ce529ef1"},
-        {"path": ".forge-codex/evidence/EVID-20260823T213648Z-7ed720d512.json", "sha256": "51cd8033cd618a774a3f71aac6b16067b2445656391de6a2b1af2bdcaa105274"}
+        {
+          "path": ".forge-codex/evidence/P11-resource-results.json",
+          "sha256": "f9931767c1a2a36baf507f19c30ac4c3947ea2c82df2a322d53308b788bb7aef"
+        },
+        {
+          "path": ".forge-autonomy-state/evidence/FC-PERF-001/test-results.json",
+          "sha256": "61bb053178aa0f5daa1a8fb3f927fe7350ce73f860c5c8d57d1231bfbe667462"
+        }
       ]
     },
     {
       "criterion": "telemetry/gauge hard invariants pass under stress",
-      "passed": true,
+      "passed": false,
       "evidence": [
-        {"path": ".forge-codex/evidence/P04-metal-performance-report.json", "sha256": "4958c561b8ac484218edbbfb14dad86c2c4174e5d7da5cee7feecc67278c4de5"},
-        {"path": ".forge-codex/evidence/EVID-20260823T212139Z-5e0f9ed571.json", "sha256": "954954a13db38323e91b3961b15f40d0774a7f394c3bdbbb9e73e0e48815e1f7"},
-        {"path": ".forge-codex/evidence/P11-resource-results.json", "sha256": "405832a52390a220626f3fbbf19dc94aa04c34bccbb2c641fc1ef471ce529ef1"}
+        {
+          "path": ".forge-codex/evidence/P11-release-stress-results.json",
+          "sha256": "0dbcb3b5f8dfd6d81baad3f1eee7aa35f2ac40a94613dd716a63a221d741d600"
+        },
+        {
+          "path": ".forge-codex/evidence/P11-profile-report.json",
+          "sha256": "60d2ebb628350e0716823954cd19c5e7e59d3cc9201b6a7ca452f42ba7c33147"
+        }
       ]
     },
     {
       "criterion": "latency/CPU/GPU/wakeup/database budgets pass",
-      "passed": true,
+      "passed": false,
       "evidence": [
-        {"path": ".forge-codex/evidence/P11-profile-report.json", "sha256": "abe2fec04f5bdc9e15180d7dabe54fed69fbb0baf5fdbb90520398ba509d75ba"},
-        {"path": ".forge-codex/evidence/P11-resource-results.json", "sha256": "405832a52390a220626f3fbbf19dc94aa04c34bccbb2c641fc1ef471ce529ef1"},
-        {"path": ".forge-codex/evidence/EVID-20260823T213648Z-7ed720d512.json", "sha256": "51cd8033cd618a774a3f71aac6b16067b2445656391de6a2b1af2bdcaa105274"}
+        {
+          "path": ".forge-codex/evidence/P11-profile-report.json",
+          "sha256": "60d2ebb628350e0716823954cd19c5e7e59d3cc9201b6a7ca452f42ba7c33147"
+        },
+        {
+          "path": ".forge-autonomy-state/evidence/FC-PERF-001/test-results.json",
+          "sha256": "61bb053178aa0f5daa1a8fb3f927fe7350ce73f860c5c8d57d1231bfbe667462"
+        }
       ]
     },
     {
       "criterion": "lowest available representative memory tier evidence exists",
-      "passed": true,
+      "passed": false,
       "evidence": [
-        {"path": ".forge-codex/evidence/P11-release-stress-results.json", "sha256": "c1f39620b4a218f03323b6cc0f53f5525093afe0e59830108df4c97b741e6dcb"},
-        {"path": ".forge-codex/evidence/P11-resource-results.json", "sha256": "405832a52390a220626f3fbbf19dc94aa04c34bccbb2c641fc1ef471ce529ef1"}
+        {
+          "path": ".forge-codex/evidence/P11-resource-results.json",
+          "sha256": "f9931767c1a2a36baf507f19c30ac4c3947ea2c82df2a322d53308b788bb7aef"
+        },
+        {
+          "path": ".forge-autonomy-state/evidence/FC-PERF-001/feature-parity-impact.json",
+          "sha256": "0cfc9a94c9e531b66510b6a66cf3fe8081ff8531609ef05c706d1a20f1ee91b4"
+        }
       ]
     }
   ],
   "commands": [
-    {"command": "swift test -c release --no-parallel --filter ReleaseStressTests.testDeterministicReleaseStressAndResourceBudgets", "exit_code": 0, "evidence": ".forge-codex/evidence/EVID-20260823T212034Z-4070dbd74c.json"},
-    {"command": "xcodebuild test-without-building -only-testing:ForgeConductorUITests/ForgeConductorUITests/testHundredGaugeNavigationCyclesQuiesce", "exit_code": 0, "evidence": ".forge-codex/evidence/EVID-20260823T212139Z-5e0f9ed571.json"},
-    {"command": "profile_macos.sh Metal System Trace", "exit_code": 0, "evidence": ".forge-codex/evidence/EVID-20260823T213021Z-ff22ae46e0.json"},
-    {"command": "profile_macos.sh Allocations", "exit_code": 0, "evidence": ".forge-codex/evidence/EVID-20260823T213125Z-71f05795f9.json"},
-    {"command": "profile_macos.sh Time Profiler", "exit_code": 0, "evidence": ".forge-codex/evidence/EVID-20260823T213156Z-8cb418d293.json"},
-    {"command": "python3 .forge-codex/scripts/check_p11_completion.py", "exit_code": 0, "evidence": ".forge-codex/evidence/EVID-20260823T213648Z-7ed720d512.json"}
+    {
+      "command": "swift test -c release -Xswiftc -warnings-as-errors",
+      "exit_code": 1,
+      "evidence": ".forge-autonomy-state/evidence/FC-RELEASE-001/test-results.json"
+    },
+    {
+      "command": "swift test --sanitize address -Xswiftc -warnings-as-errors",
+      "exit_code": -15,
+      "evidence": ".forge-autonomy-state/evidence/FC-RELEASE-001/test-results.json"
+    },
+    {
+      "command": "swift test --sanitize thread -Xswiftc -warnings-as-errors --filter CoreTests.testBootstrapCreatesLayout",
+      "exit_code": 1,
+      "evidence": ".forge-autonomy-state/evidence/FC-RELEASE-001/test-results.json"
+    },
+    {
+      "command": "profile_macos.sh Allocations",
+      "exit_code": 137,
+      "evidence": ".forge-autonomy-state/evidence/FC-PERF-001/test-results.json"
+    }
   ]
 }

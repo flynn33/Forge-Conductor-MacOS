@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "work_package": "FC-PERF-001",
+  "captured_at": "2026-08-26T23:41:50.173919+00:00",
+  "overall_status": "incomplete",
+  "evidence_complete": false,
+  "artifact": {
+    "path": ".forge-autonomy-state/evidence/FC-PERF-001/release-stress-report.json",
+    "sha256": "cf645de409cdb021cdb58c8c20e4d8624c66ffdcb22b1bd6c1437975ad7e098f",
+    "source_path": "/tmp/forge-fc-perf-release-report.json",
+    "source_sha256": "5779b73cc683df601fc9df91f314758755d82e0511face76da911e243da2d4bc",
+    "copy_normalization": "apply_patch added one terminal newline without changing parsed JSON values",
+    "generator_command_recorded": false,
+    "interpretation": "supporting measurement only; not standalone gate proof"
+  },
+  "artifact_validation": [
+    {
+      "command_id": "CMD-20260826T232917Z-26361b0923",
+      "exit_code": 1,
+      "status": "tool_incompatible",
+      "classification": "this host's plutil rejected the JSON input before parsing"
+    },
+    {
+      "command_id": "CMD-20260826T232928Z-a092184230",
+      "exit_code": 0,
+      "status": "valid_json"
+    },
+    {
+      "command_id": "CMD-20260826T232917Z-8e8f9f911b",
+      "exit_code": 0,
+      "status": "source_hash_recorded"
+    },
+    {
+      "command_id": "CMD-20260826T233525Z-122a6306cc",
+      "exit_code": 0,
+      "status": "durable_copy_hash_recorded"
+    }
+  ],
+  "instruments_attempt": {
+    "command_id": "CMD-20260826T233844Z-f63f53c824",
+    "exit_code": 137,
+    "timed_out": false,
+    "status": "authorization_blocked",
+    "accepted_as_profiling_evidence": false,
+    "requested_template": "Allocations",
+    "requested_duration_seconds": 15,
+    "target_application": "/tmp/forge-xcode-unit-derived/Build/Products/Debug/Forge Conductor.app",
+    "observed": {
+      "xctrace_process_id": 77225,
+      "target_process_id": 77211,
+      "xctrace_was_killed": true,
+      "sample_count": 799,
+      "samples_in_authorization_path": 799,
+      "blocking_frame": "AuthorizationCopyRights",
+      "blocking_subframe": "_AuthorizationCopyRights_send_message",
+      "classification": "host authorization prevented xctrace from establishing a usable Allocations recording"
+    },
+    "diagnostic_sample": {
+      "path": ".forge-autonomy-state/evidence/FC-PERF-001/instruments/xctrace-authorization-block.sample.txt",
+      "sha256": "b01bd07630ac9aa1f65dd8513e06eb7d8d461a117ee0bdad1befac5ea4d443cc",
+      "interpretation": "authorization-block diagnosis only; not application performance evidence"
+    },
+    "incomplete_trace": {
+      "path": ".forge-autonomy-state/evidence/FC-PERF-001/instruments/20260826T233844Z-P02-TELEMETRY-BASELINE-Allocations.trace",
+      "tree_sha256": "be230f8f531598d7bc5c0c9125491a0bfcddc21344847cf54e817b10fa46007d",
+      "file_count": 2,
+      "retained_bytes": 57344,
+      "accepted": false,
+      "interpretation": "partial trace directory retained for diagnosis; no completed or usable Allocations capture"
+    }
+  },
+  "related_recorded_test_proof": [
+    {
+      "command_id": "CMD-20260826T230926Z-a55ef7d379",
+      "recorded_under": "FC-AUTO-001",
+      "configuration": "debug_strict",
+      "executed": 395,
+      "skipped": 2,
+      "failures": 0,
+      "release_stress_tests": 1,
+      "resource_policy_tests": 9
+    },
+    {
+      "command_id": "CMD-20260826T231135Z-a82f5da923",
+      "recorded_under": "FC-RELEASE-001",
+      "configuration": "release_strict",
+      "executed": 395,
+      "skipped": 2,
+      "failures": 0,
+      "release_stress_tests": 1,
+      "resource_policy_tests": 9
+    }
+  ],
+  "short_fixture_observations": {
+    "build": "release",
+    "host_physical_bytes": 51539607552,
+    "host_tier": "high_capacity",
+    "lowest_policy_tier_simulated": "constrained",
+    "rollovers": 50,
+    "manager_restarts": 100,
+    "project_cycles": 100,
+    "process_cycles": 25,
+    "memory_records": 500,
+    "telemetry_maximum_logical_slots": 2,
+    "telemetry_post_stop_slots": 0,
+    "manager_recovery_post_shutdown_owners": 0,
+    "manager_cancellation_post_shutdown_owners": 0,
+    "resident_baseline_bytes": 21446656,
+    "resident_peak_bytes": 91373568,
+    "resident_post_release_bytes": [89292800, 89292800, 89292800, 89292800, 89292800],
+    "resident_post_release_slope_bytes_per_sample": 0
+  },
+  "acceptance": {
+    "resource_budgets_pass_on_supported_tiers": "partial_simulated_policy_only",
+    "no_monotonic_unbounded_rollover_growth": "partial_short_fixture_only",
+    "hidden_ui_does_not_render_continuously": "not_profiled_in_actual_swiftui_metal_runtime",
+    "cancellation_releases_owners": "passed_in_deterministic_fixture_but_not_memgraph_verified"
+  },
+  "missing_required_evidence": [
+    "8-hour idle soak with manager and provider configured",
+    "4-hour active tool-loop soak",
+    "repeated GUI open/close cycles",
+    "multi-project interleaving under actual tier limits",
+    "successful Instruments Allocations, Leaks, Time Profiler, Swift Concurrency, Energy, SwiftUI, and Metal captures; the retained authorization-block attempt is diagnostic only",
+    "memgraph ownership and release-boundary proof",
+    "actual hidden SwiftUI and Metal rendering quiescence",
+    "representative 8 GB or smallest practical, 16 GB, and 32 GB or larger Macs"
+  ]
+}

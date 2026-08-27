@@ -1,0 +1,1092 @@
+{
+  "captured_at": "2026-08-26T18:50:58.700074+00:00",
+  "command_ledger": "commands.jsonl",
+  "deterministic_lm_studio_fixture": {
+    "focused_test": "LMStudioContractFixtureTests",
+    "paths": [
+      "Tests/ForgeConductorTests/Fixtures/LMStudio/models-loaded.json",
+      "Tests/ForgeConductorTests/Fixtures/LMStudio/responses-root.sse",
+      "Tests/ForgeConductorTests/Fixtures/LMStudio/responses-continuation.sse",
+      "Tests/ForgeConductorTests/LMStudioContractFixtureServer.swift",
+      "Tests/ForgeConductorTests/LMStudioContractFixtureTests.swift"
+    ],
+    "release_registered": false
+  },
+  "feature_parity_impact": "feature-parity-impact.json",
+  "inventory": {
+    "agents": {
+      "count": 10,
+      "entries": [
+        {
+          "declared_tools": [
+            "fs_read",
+            "fs_list",
+            "fs_glob",
+            "search_text",
+            "search_files",
+            "shell_exec",
+            "python_exec",
+            "python_info",
+            "git_status",
+            "git_diff",
+            "git_log"
+          ],
+          "declared_tools_missing_from_live_mcp": [
+            "python_exec",
+            "python_info",
+            "search_files"
+          ],
+          "display_name": "Debug",
+          "id": "debug",
+          "source": "Sources/ForgeConductorCore/Resources/Agents/debug.md",
+          "source_sha256": "4013e3cfa6a4af1b51d69d4dc8445cc1e0590b0658fb5d250b4a431c70224bef"
+        },
+        {
+          "declared_tools": [
+            "fs_read",
+            "fs_write",
+            "fs_edit",
+            "fs_list",
+            "fs_glob",
+            "fs_mkdir",
+            "search_text",
+            "search_files",
+            "git_status",
+            "git_diff",
+            "git_log",
+            "shell_exec",
+            "python_info",
+            "python_exec",
+            "pdf_write",
+            "pdf_from_file"
+          ],
+          "declared_tools_missing_from_live_mcp": [
+            "python_exec",
+            "python_info",
+            "search_files"
+          ],
+          "display_name": "Docs",
+          "id": "docs",
+          "source": "Sources/ForgeConductorCore/Resources/Agents/docs.md",
+          "source_sha256": "e1118265e19562bf5e470ad6de16cd0c4e009b01e55f263049b24f714649ee55"
+        },
+        {
+          "declared_tools": [
+            "fs_list",
+            "fs_read",
+            "fs_glob",
+            "search_text",
+            "git_status",
+            "git_log",
+            "git_diff",
+            "shell_exec"
+          ],
+          "declared_tools_missing_from_live_mcp": [],
+          "display_name": "Explore",
+          "id": "explore",
+          "source": "Sources/ForgeConductorCore/Resources/Agents/explore.md",
+          "source_sha256": "0cfd24d91a74e24a64a8716e7fb6f57bb4a5a6388f5f0d2d843bbc4775e09b92"
+        },
+        {
+          "declared_tools": [
+            "fs_read",
+            "fs_write",
+            "fs_edit",
+            "fs_list",
+            "fs_glob",
+            "fs_mkdir",
+            "search_text",
+            "shell_exec",
+            "git_status",
+            "git_diff",
+            "git_add",
+            "git_commit",
+            "session_checkpoint",
+            "session_handoff",
+            "context_get",
+            "memory_set",
+            "memory_get",
+            "memory_search"
+          ],
+          "declared_tools_missing_from_live_mcp": [],
+          "display_name": "Implement",
+          "id": "implement",
+          "source": "Sources/ForgeConductorCore/Resources/Agents/implement.md",
+          "source_sha256": "1459a82d77ceebd099a6fce5ef2504bffac451f0bd9e41c96318c3ff85a70142"
+        },
+        {
+          "declared_tools": [
+            "fs_read",
+            "fs_list",
+            "fs_glob",
+            "search_text",
+            "git_status",
+            "git_log",
+            "shell_exec"
+          ],
+          "declared_tools_missing_from_live_mcp": [],
+          "display_name": "Plan",
+          "id": "plan",
+          "source": "Sources/ForgeConductorCore/Resources/Agents/plan.md",
+          "source_sha256": "89e9ad8543beaa7a681c48a153569b9b340bdf7fd4f34a9164354c5a6874aaff"
+        },
+        {
+          "declared_tools": [
+            "git_status",
+            "git_diff",
+            "git_log",
+            "fs_read",
+            "search_text",
+            "search_files",
+            "shell_exec"
+          ],
+          "declared_tools_missing_from_live_mcp": [
+            "search_files"
+          ],
+          "display_name": "Pre-commit Audit",
+          "id": "precommit-audit",
+          "source": "Sources/ForgeConductorCore/Resources/Agents/precommit-audit.md",
+          "source_sha256": "9dc5693035148f124b1b990e8177aa799b5149fd818da7b9a1d447d537db8ea0"
+        },
+        {
+          "declared_tools": [
+            "fs_read",
+            "fs_list",
+            "fs_glob",
+            "search_text",
+            "git_log",
+            "git_status",
+            "shell_exec"
+          ],
+          "declared_tools_missing_from_live_mcp": [],
+          "display_name": "Research",
+          "id": "research",
+          "source": "Sources/ForgeConductorCore/Resources/Agents/research.md",
+          "source_sha256": "e5b0141797297ae5a5f647d9487445cfbffb43956ce1093e2edfad18ce4cb7e5"
+        },
+        {
+          "declared_tools": [
+            "git_status",
+            "git_diff",
+            "git_log",
+            "fs_read",
+            "search_text",
+            "shell_exec"
+          ],
+          "declared_tools_missing_from_live_mcp": [],
+          "display_name": "Review",
+          "id": "review",
+          "source": "Sources/ForgeConductorCore/Resources/Agents/review.md",
+          "source_sha256": "cfab52c5a3ecb384dba6bfa022db773729a0b48c2828e7716d970b873826a9cc"
+        },
+        {
+          "declared_tools": [
+            "git_status",
+            "git_diff",
+            "fs_read",
+            "fs_glob",
+            "search_text",
+            "shell_exec"
+          ],
+          "declared_tools_missing_from_live_mcp": [],
+          "display_name": "Security",
+          "id": "security",
+          "source": "Sources/ForgeConductorCore/Resources/Agents/security.md",
+          "source_sha256": "b7a7bd4a6174499b75ce095f9208cbec26f6e158a0cd7cffd9d204d782340c99"
+        },
+        {
+          "declared_tools": [
+            "shell_exec",
+            "fs_read",
+            "fs_list",
+            "fs_glob",
+            "search_text",
+            "git_status"
+          ],
+          "declared_tools_missing_from_live_mcp": [],
+          "display_name": "Test",
+          "id": "test",
+          "source": "Sources/ForgeConductorCore/Resources/Agents/test.md",
+          "source_sha256": "bc29c81555acd940eccfe692d4ded50717f43b87943a13644c62b11783d30cc0"
+        }
+      ]
+    },
+    "captured_at": "2026-08-26T18:36:03.475542Z",
+    "cli": {
+      "commands": [
+        "help",
+        "version",
+        "install",
+        "install-lmstudio-plugin",
+        "doctor",
+        "status",
+        "serve",
+        "dashboard",
+        "manager",
+        "agents"
+      ],
+      "help_artifact": "cli-help.txt",
+      "manager_subcommands": [
+        "run",
+        "start",
+        "stop",
+        "restart",
+        "status",
+        "install-login",
+        "uninstall-login",
+        "cleanup-stale",
+        "allowlist",
+        "help"
+      ],
+      "options": [
+        "--home",
+        "--from",
+        "--binary",
+        "--host",
+        "--port",
+        "--open",
+        "--keep-stale"
+      ],
+      "source": "Sources/ForgeConductorCLI/ForgeConductorMain.swift",
+      "version": "0.9.0"
+    },
+    "current_baseline_findings": [
+      {
+        "detail": "Typed and first-run config default shell.enabled to false; native settings exposes timeout but no enabled toggle.",
+        "evidence_class": "E1",
+        "id": "FC-BASE-SHELL-DEFAULT",
+        "source": [
+          "Sources/ForgeConductorCore/Domain/AppConfig.swift:24",
+          "Sources/ForgeConductorCore/Infrastructure/AppPaths.swift:68",
+          "Sources/ForgeConductorApp/Views/ManagerSettingsView.swift:64"
+        ],
+        "status": "present_broken"
+      },
+      {
+        "detail": "Release entry points call register(), which installs LocalLogicalSessionTransport and synthetic provider identifiers.",
+        "evidence_class": "E1",
+        "id": "FC-BASE-HOST-SYNTHETIC-REGISTRATION",
+        "source": [
+          "Sources/ForgeNativeSessionHostPlugin/ForgeNativeSessionHostPlugin.swift:73-104",
+          "Sources/ForgeNativeSessionHostPlugin/ForgeNativeSessionHostPlugin.swift:405-410",
+          "Sources/ForgeConductorCLI/ForgeConductorMain.swift:20",
+          "Sources/ForgeConductorApp/ForgeConductorApp.swift:20"
+        ],
+        "status": "present_broken"
+      },
+      {
+        "detail": "Some bundled playbooks declare search_files, python_exec, or python_info, none of which are registered in the live 53-tool MCP surface.",
+        "evidence_class": "E1",
+        "id": "FC-BASE-AGENT-TOOL-MISMATCH",
+        "source": [
+          "Sources/ForgeConductorCore/Resources/Agents/debug.md",
+          "Sources/ForgeConductorCore/Resources/Agents/docs.md",
+          "Sources/ForgeConductorCore/Resources/Agents/precommit-audit.md"
+        ],
+        "status": "present_broken"
+      }
+    ],
+    "environment": {
+      "architecture": "arm64",
+      "hardware_model": "Mac16,7",
+      "logical_cpu_count": 14,
+      "macos": [
+        "ProductName:\t\tmacOS",
+        "ProductVersion:\t\t26.6.2",
+        "BuildVersion:\t\t25G83"
+      ],
+      "macos_runtime_capable": true,
+      "physical_memory_bytes": 51539607552,
+      "platform": "macOS-26.6.2-arm64-arm-64bit",
+      "swift": [
+        "swift-driver version: 1.127.14.1 Apple Swift version 6.2.3 (swiftlang-6.2.3.3.21 clang-1700.6.3.2)",
+        "Target: arm64-apple-macosx26.0"
+      ],
+      "xcode": [
+        "Xcode 26.2",
+        "Build version 17C52"
+      ]
+    },
+    "feature_parity_impact": {
+      "baseline_only": true,
+      "control_files_changed_by_inventory": false,
+      "features_removed": [],
+      "features_renamed": [],
+      "next_packages_must_preserve": [
+        "all 53 live MCP tool names and schemas",
+        "10 CLI commands and manager subcommands",
+        "seven native routes and accessibility identifiers",
+        "two LM Studio MCP roles",
+        "10 bundled agent identities",
+        "existing data formats and migrations"
+      ],
+      "product_source_changed": false
+    },
+    "mcp": {
+      "capabilities": {
+        "projectMemory": {
+          "capabilityVersion": 1,
+          "limits": {
+            "batch_bytes": 1048576,
+            "batch_count": 50,
+            "body_bytes": 262144,
+            "open_projects": 8,
+            "page_count": 100,
+            "response_bytes": 262144,
+            "source_reference_bytes": 2048,
+            "summary_bytes": 4096,
+            "tag_bytes": 128,
+            "tag_count": 32,
+            "title_bytes": 512
+          },
+          "schemaVersion": 1
+        },
+        "tools": {
+          "listChanged": false
+        }
+      },
+      "prompts": [],
+      "protocol_version": "2025-11-25",
+      "resources": [],
+      "server_info": {
+        "name": "forge-conductor",
+        "version": "0.9.0"
+      },
+      "snapshot_artifact": "mcp-protocol-snapshot.json",
+      "snapshot_sha256": "c8be46bc794dd6ed191f16eddf02f334526bb664f8208deb1052ca24de461446",
+      "tool_count": 53,
+      "tool_descriptors_sha256": "fe76fe8bd094b2c5a54a9e39f27d361f4347683a24e638cfd5b2e5f568b8c974",
+      "tool_names": [
+        "agent_context",
+        "agent_get",
+        "agent_list",
+        "agent_recommend",
+        "agent_run_complete",
+        "agent_run_start",
+        "agent_run_status",
+        "context_get",
+        "context_list",
+        "continuity.acknowledge_handoff",
+        "continuity.checkpoint",
+        "continuity.get_pending_handoff",
+        "continuity.prepare_handoff",
+        "continuity.request_rollover",
+        "continuity.resume",
+        "continuity.status",
+        "forge_status",
+        "fs_delete",
+        "fs_edit",
+        "fs_glob",
+        "fs_list",
+        "fs_mkdir",
+        "fs_move",
+        "fs_read",
+        "fs_write",
+        "git_add",
+        "git_commit",
+        "git_diff",
+        "git_log",
+        "git_status",
+        "memory_delete",
+        "memory_get",
+        "memory_list",
+        "memory_search",
+        "memory_set",
+        "pdf_from_file",
+        "pdf_write",
+        "project_memory.export",
+        "project_memory.forget",
+        "project_memory.get",
+        "project_memory.import",
+        "project_memory.initialize",
+        "project_memory.link",
+        "project_memory.list_recent",
+        "project_memory.remember",
+        "project_memory.remember_batch",
+        "project_memory.search",
+        "project_memory.status",
+        "project_memory.update",
+        "search_text",
+        "session_checkpoint",
+        "session_handoff",
+        "shell_exec"
+      ],
+      "transports": [
+        "stdio newline-delimited JSON",
+        "stdio Content-Length"
+      ]
+    },
+    "persistence_and_migrations": {
+      "application_home": "$FORGE_CONDUCTOR_HOME (default ~/.forge-conductor)",
+      "formats": [
+        {
+          "format": "JSON",
+          "name": "AppConfig",
+          "version": "unversioned additive typed model"
+        },
+        {
+          "format": "JSON and Markdown projections",
+          "name": "HandoffPacket",
+          "version": 1
+        },
+        {
+          "format": "canonical JSON",
+          "name": "ContinuityHandoff",
+          "version": "1.0"
+        },
+        {
+          "format": "JSON",
+          "name": "Project registry",
+          "version": 1
+        },
+        {
+          "format": "JSON",
+          "name": "Native session ledger",
+          "version": 1
+        },
+        {
+          "format": "mcp.json and mcpBridge plugin JSON",
+          "name": "LM Studio registration",
+          "version": "deployment revision"
+        },
+        {
+          "format": "Markdown with metadata",
+          "name": "Agent playbook",
+          "version": "unversioned"
+        }
+      ],
+      "main_database": {
+        "journal_mode": "WAL",
+        "migration": "BEGIN IMMEDIATE transaction; add/backfill client_id and write_sequence; update versions below 5",
+        "path": "$FORGE_CONDUCTOR_HOME/store.sqlite",
+        "schema_version": 5,
+        "tables": [
+          "schema_version",
+          "memory_notes",
+          "agent_sessions",
+          "presence",
+          "audit_events",
+          "context_handoffs"
+        ]
+      },
+      "project_memory_database": {
+        "journal_mode": "WAL",
+        "migration": "backup prior nonzero version, transactionally create v1, quick_check, preserve corrupt database copy",
+        "optional_fts": "memory_records_fts with insert/update/delete triggers",
+        "path": "$FORGE_CONDUCTOR_HOME/Projects/<project-id>/memory.sqlite3",
+        "schema_version": 1,
+        "tables": [
+          "memory_records",
+          "memory_tags",
+          "memory_record_tags",
+          "memory_links",
+          "sessions",
+          "handoffs",
+          "artifacts",
+          "project_aliases",
+          "maintenance_state",
+          "event_journal",
+          "continuity_handoffs",
+          "rollover_operations",
+          "rollover_transitions",
+          "project_active_sessions"
+        ]
+      },
+      "project_registry": {
+        "path": "$FORGE_CONDUCTOR_HOME/Projects/registry.json",
+        "schema_version": 1
+      }
+    },
+    "prior_baseline": {
+      "feature_baseline": ".forge-codex/state/feature-baseline.json",
+      "feature_baseline_generated_at": "2026-08-23T18:43:40Z",
+      "feature_baseline_repository_root": "<prior-checkout>",
+      "feature_baseline_sha256": "39ff9c4014ad0e558568991aa641a47ee55470898bee2639fb81573193fc0f49",
+      "feature_count": 66,
+      "mcp_baseline": ".forge-codex/state/baseline/mcp-capabilities.json",
+      "mcp_baseline_captured_at": "2026-08-23T18:43:12Z",
+      "mcp_baseline_server_version": "0.8.0",
+      "mcp_baseline_sha256": "0e33ddd69eeb132495ec5e51261f137bd27d6ceab45f2b52d71cc9c7b0e3b1c8",
+      "mcp_baseline_tool_count": 34,
+      "reuse": "used as a feature-ID and coverage cross-check only; refreshed against the current branch and live 0.9.0 MCP server"
+    },
+    "project_shape": {
+      "build_entrypoint": "script/build_and_run.sh",
+      "build_evidence": {
+        "artifact": "swift-build.log",
+        "exit_code": 0
+      },
+      "platforms": [
+        {
+          "name": "macos",
+          "version": "26.0"
+        }
+      ],
+      "products": [
+        {
+          "name": "ForgeConductorCore",
+          "targets": [
+            "ForgeConductorCore"
+          ],
+          "type": {
+            "library": [
+              "automatic"
+            ]
+          }
+        },
+        {
+          "name": "ForgeNativeSessionHostPlugin",
+          "targets": [
+            "ForgeNativeSessionHostPlugin"
+          ],
+          "type": {
+            "library": [
+              "automatic"
+            ]
+          }
+        },
+        {
+          "name": "forge-conductor",
+          "targets": [
+            "ForgeConductorCLI"
+          ],
+          "type": {
+            "executable": null
+          }
+        },
+        {
+          "name": "forge-conductor-app",
+          "targets": [
+            "ForgeConductorApp"
+          ],
+          "type": {
+            "executable": null
+          }
+        }
+      ],
+      "swift_tools_version": "6.2",
+      "swiftpm_targets": [
+        {
+          "name": "ForgeNativeSessionHostPlugin",
+          "path": "Sources/ForgeNativeSessionHostPlugin",
+          "source_count": 1,
+          "type": "library"
+        },
+        {
+          "name": "ForgeConductorTests",
+          "path": "Tests/ForgeConductorTests",
+          "source_count": 29,
+          "type": "test"
+        },
+        {
+          "name": "ForgeConductorCore",
+          "path": "Sources/ForgeConductorCore",
+          "source_count": 80,
+          "type": "library"
+        },
+        {
+          "name": "ForgeConductorCLI",
+          "path": "Sources/ForgeConductorCLI",
+          "source_count": 1,
+          "type": "executable"
+        },
+        {
+          "name": "ForgeConductorApp",
+          "path": "Sources/ForgeConductorApp",
+          "source_count": 20,
+          "type": "executable"
+        }
+      ],
+      "workspace": {
+        "name": "ForgeConductor",
+        "schemes": [
+          "forge-conductor",
+          "ForgeConductor"
+        ]
+      },
+      "xcode_project": {
+        "configurations": [
+          "Debug",
+          "Release"
+        ],
+        "name": "ForgeConductor",
+        "schemes": [
+          "forge-conductor",
+          "ForgeConductor"
+        ],
+        "targets": [
+          "ForgeConductorCore",
+          "forge-conductor",
+          "ForgeConductor",
+          "ForgeConductorTests",
+          "ForgeConductorUITests"
+        ]
+      }
+    },
+    "provider_integrations": [
+      {
+        "id": "lmstudio-mcp-primary",
+        "mode": "external MCP stdio",
+        "server_id": "forge-conductor",
+        "source": "Sources/ForgeConductorCore/Telemetry/LMStudioEnvironment.swift",
+        "status": "present"
+      },
+      {
+        "id": "lmstudio-mcp-fallback",
+        "mode": "external MCP stdio",
+        "server_id": "forge-conductor-fallback",
+        "source": "Sources/ForgeConductorCore/Telemetry/LMStudioEnvironment.swift",
+        "status": "present"
+      },
+      {
+        "adapter_id": "forge.native-session-host",
+        "detail": "Production register() constructs LocalLogicalSessionTransport, which returns native-* identifiers and forge-logical-session instead of a real provider response.",
+        "id": "forge-native-session-host",
+        "mode": "compile-time registered host adapter",
+        "source": "Sources/ForgeNativeSessionHostPlugin/ForgeNativeSessionHostPlugin.swift:73-104,405-410",
+        "status": "present_broken",
+        "version": "1.0.0"
+      }
+    ],
+    "repository": {
+      "ahead": 0,
+      "behind": 0,
+      "branch": "repair/autonomous-continuity",
+      "commit": "1f39ee6bdf1d4f907c6e1cb31f6213f2945d3985",
+      "origin": "https://github.com/flynn33/Forge-Conductor-MacOS.git",
+      "product_source_dirty_paths": [],
+      "product_source_matches_head": true,
+      "root": ".",
+      "status": [
+        " M .forge-codex/state/environment.json",
+        " M .forge-codex/state/events.jsonl",
+        " M .forge-codex/state/run-state.json",
+        " M AGENTS.md",
+        "?? .forge-codex/evidence/EVID-20260826T182914Z-ecdd4775c1.json",
+        "?? .forge-codex/evidence/EVID-20260826T182914Z-ecdd4775c1.stderr.txt",
+        "?? .forge-codex/evidence/EVID-20260826T182914Z-ecdd4775c1.stdout.txt",
+        "?? .forge-codex/evidence/EVID-20260826T183031Z-0913edd711.json",
+        "?? .forge-codex/evidence/EVID-20260826T183031Z-0913edd711.stderr.txt",
+        "?? .forge-codex/evidence/EVID-20260826T183031Z-0913edd711.stdout.txt"
+      ],
+      "tree": "9eedcb8fa731ea05351d5e632242e4f1d7d43bb6",
+      "upstream": "origin/main"
+    },
+    "schema_version": 1,
+    "scope": "fresh current-branch repository, environment, feature, and protocol inventory",
+    "settings": {
+      "keychain_items": [],
+      "native_ui_editable": [
+        "dashboard.host",
+        "dashboard.port",
+        "dashboard.refresh_interval_sec",
+        "manager.watchdog_interval_sec",
+        "manager.auto_restart",
+        "sessions.idle_ttl_sec",
+        "shell.default_timeout_sec"
+      ],
+      "not_native_ui_editable": [
+        "shell.enabled",
+        "log_level",
+        "allowed_roots",
+        "manager.open_browser_on_start",
+        "mcp.role",
+        "coordinator.enabled",
+        "coordinator.lease_ttl_sec",
+        "coordinator.presence_ttl_sec"
+      ],
+      "source": [
+        "Sources/ForgeConductorCore/Domain/AppConfig.swift",
+        "Sources/ForgeConductorCore/Infrastructure/AppPaths.swift",
+        "Sources/ForgeConductorCore/Domain/ManagerModels.swift",
+        "Sources/ForgeConductorApp/Views/ManagerSettingsView.swift"
+      ],
+      "storage": "$FORGE_CONDUCTOR_HOME/config.json",
+      "typed_defaults": {
+        "allowed_roots": [],
+        "coordinator": {
+          "enabled": true,
+          "lease_ttl_sec": 60,
+          "presence_ttl_sec": 30
+        },
+        "dashboard": {
+          "host": "127.0.0.1",
+          "port": 7788,
+          "refresh_interval_sec": 8
+        },
+        "log_level": "info",
+        "manager": {
+          "auto_restart": true,
+          "open_browser_on_start": false,
+          "watchdog_interval_sec": 3
+        },
+        "mcp": {
+          "role": "primary"
+        },
+        "sessions": {
+          "idle_ttl_sec": 14400
+        },
+        "shell": {
+          "default_timeout_sec": 30,
+          "enabled": false
+        }
+      },
+      "user_defaults_keys": []
+    },
+    "source_snapshot": {
+      "aggregate_manifest_sha256": "75bf4dd734fb94fd0b85384bdd1268e49a6b814f56d56f4b60076d1cfec16472",
+      "excluded": [
+        ".forge-continuity-design",
+        ".forge-autonomy-state",
+        ".forge-codex",
+        ".agents",
+        ".git",
+        ".build"
+      ],
+      "scope": [
+        "Package.swift",
+        "Sources",
+        "Tests",
+        "ForgeConductor.xcodeproj",
+        "ForgeConductor.xcworkspace",
+        "script"
+      ],
+      "selected_evidence_hashes": [
+        {
+          "path": "Package.swift",
+          "sha256": "2b9da6f8c1debce8fcf55ad647f6efb209a8b8b73e0fe11778feb9362bcbd146"
+        },
+        {
+          "path": "Sources/ForgeConductorCLI/ForgeConductorMain.swift",
+          "sha256": "9421b521e241ba5365af1b66039492c92ea720ebef9e89306e3d281a8a68800a"
+        },
+        {
+          "path": "Sources/ForgeConductorCore/Domain/AppConfig.swift",
+          "sha256": "8d8b1bac46609e6541599312860106337d8c4f60ade2b176ddcca291e211bd24"
+        },
+        {
+          "path": "Sources/ForgeConductorCore/Infrastructure/AppPaths.swift",
+          "sha256": "8375fd682538cb1ec52db0a8c15f2605f0aa31fffc2c974d3be40052c1e63ccf"
+        },
+        {
+          "path": "Sources/ForgeConductorCore/Infrastructure/SQLiteStore.swift",
+          "sha256": "a5c7ec5750be9c5342dbc9fe5c1adde8e6c5a1f57d3009681b5ac1fb751f5ca0"
+        },
+        {
+          "path": "Sources/ForgeConductorCore/Infrastructure/ProjectMemoryRepository.swift",
+          "sha256": "0b6c85105b374a6275afccd735fc72b2938ddb38358753206a912aca606e9042"
+        },
+        {
+          "path": "Sources/ForgeConductorCore/MCP/MCPServer.swift",
+          "sha256": "511d2b1f438ffd223263fff4ed6899cfddb0d7fc768212ee575061ca60141765"
+        },
+        {
+          "path": "Sources/ForgeConductorCore/Application/ToolRouter.swift",
+          "sha256": "614e9ef0663b8e2a37eb02aa72b55717026aa7fcf84327e2641f3a24754cb190"
+        },
+        {
+          "path": "Sources/ForgeConductorCore/Application/Tools/ProjectMemoryToolPack.swift",
+          "sha256": "70e21d38ce0f0afed9472e6e2a7b9e15fc5c7cb28ef3254d6387af1e76cf60c2"
+        },
+        {
+          "path": "Sources/ForgeConductorCore/Application/Tools/ContinuityLifecycleToolPack.swift",
+          "sha256": "76e3b21f258fccb5a0a80ec75efc9c50528d951ebf2ca87caf8f44247a6ea28f"
+        },
+        {
+          "path": "Sources/ForgeNativeSessionHostPlugin/ForgeNativeSessionHostPlugin.swift",
+          "sha256": "12ec1e4eaae0a911948baa87115b95e44bcab42248136c99f1db30dc857b22d2"
+        },
+        {
+          "path": "Sources/ForgeConductorApp/AppModel.swift",
+          "sha256": "643b86a1f414bf4108465143bb902da0210f819f315e7490c5a6746bf7fe6e3e"
+        },
+        {
+          "path": "Sources/ForgeConductorApp/ForgeConductorApp.swift",
+          "sha256": "4002c420e272c519a0f7b109ee99225ad3f320201cb8818f9b9b6f112b0f5f80"
+        },
+        {
+          "path": "Sources/ForgeConductorApp/Views/ContentView.swift",
+          "sha256": "5b82f404e411dea5969ddc2576899a3c8423d4bc5e720b8c607ea4d7cf1de0d8"
+        },
+        {
+          "path": "Sources/ForgeConductorApp/Views/AppSidebarView.swift",
+          "sha256": "9d933ba30296554590d075208c2a13494c5381d9ef1d3b51dca03c0901470f76"
+        },
+        {
+          "path": "Sources/ForgeConductorApp/Views/ManagerSettingsView.swift",
+          "sha256": "1d5eed3796033dc09f00874ae3e48f49cc7979f51f67421ba0078a0c219bfbc5"
+        },
+        {
+          "path": "ForgeConductor.xcodeproj/project.pbxproj",
+          "sha256": "144b3ce3e06d94aaea8ebcb5458554031a8ebc7d0f421a341df3e7d85adbbf3d"
+        }
+      ],
+      "swift_file_count": 133,
+      "swift_line_count": 36964,
+      "tracked_file_count": 169
+    },
+    "test_surface": {
+      "full_test_suite": "not run by this inventory subtask",
+      "inventory_build": "passed",
+      "swift_test_file_count": 30,
+      "test_files": [
+        "Tests/ForgeConductorTests/AppConfigAndDoctorTests.swift",
+        "Tests/ForgeConductorTests/ContinuityCoordinatorTests.swift",
+        "Tests/ForgeConductorTests/ContinuityTests.swift",
+        "Tests/ForgeConductorTests/CoreTests.swift",
+        "Tests/ForgeConductorTests/DashboardSecurityTests.swift",
+        "Tests/ForgeConductorTests/DashboardTests.swift",
+        "Tests/ForgeConductorTests/Fixtures/telemetry_contract_keys.json",
+        "Tests/ForgeConductorTests/ForgeProcessEntryTests.swift",
+        "Tests/ForgeConductorTests/G1G10AcceptanceTests.swift",
+        "Tests/ForgeConductorTests/HTTPTestHelpers.swift",
+        "Tests/ForgeConductorTests/LMStudioConnectorReliabilityTests.swift",
+        "Tests/ForgeConductorTests/LatestValueMailboxTests.swift",
+        "Tests/ForgeConductorTests/LifecycleOwnershipTests.swift",
+        "Tests/ForgeConductorTests/LiveCollectorEvidenceTests.swift",
+        "Tests/ForgeConductorTests/MCPProtocolAndDiagnosticsTests.swift",
+        "Tests/ForgeConductorTests/MachHostMetricsTests.swift",
+        "Tests/ForgeConductorTests/ManagerTests.swift",
+        "Tests/ForgeConductorTests/MemoryToolTests.swift",
+        "Tests/ForgeConductorTests/NativeAppSmokeTests.swift",
+        "Tests/ForgeConductorTests/NativeSessionHostPluginTests.swift",
+        "Tests/ForgeConductorTests/NativeTelemetryTests.swift",
+        "Tests/ForgeConductorTests/ProcessRunnerTests.swift",
+        "Tests/ForgeConductorTests/ProductPathReliabilityTests.swift",
+        "Tests/ForgeConductorTests/ProjectMemoryTests.swift",
+        "Tests/ForgeConductorTests/RealtimeStreamTests.swift",
+        "Tests/ForgeConductorTests/ReleaseStressTests.swift",
+        "Tests/ForgeConductorTests/ResourcePolicyTests.swift",
+        "Tests/ForgeConductorTests/RigParityTests.swift",
+        "Tests/ForgeConductorTests/RuntimeObservabilityTests.swift",
+        "Tests/ForgeConductorTests/TelemetryContractTests.swift",
+        "Tests/ForgeConductorUITests/ForgeConductorUITests.swift"
+      ],
+      "test_method_count": 274
+    },
+    "ui": {
+      "accessibility_identifiers": [
+        "app-error",
+        "app-title",
+        "app-version",
+        "detail-agents",
+        "detail-diagnostics",
+        "detail-feed",
+        "detail-manager",
+        "detail-mcp",
+        "detail-rig",
+        "detail-tools",
+        "diagnostics-export",
+        "diagnostics-runtime-summary",
+        "forge-main-window",
+        "manager-version-mismatch",
+        "mcp-deploy-lmstudio",
+        "root-split",
+        "sidebar",
+        "tab-agents",
+        "tab-diagnostics",
+        "tab-feed",
+        "tab-manager",
+        "tab-mcp",
+        "tab-rig",
+        "tab-tools",
+        "toolbar-auto-refresh",
+        "toolbar-loading",
+        "toolbar-navigation",
+        "toolbar-refresh",
+        "toolbar-updated"
+      ],
+      "dashboard_http_routes": [
+        "GET /",
+        "GET /index.html",
+        "GET /control",
+        "GET /manager",
+        "GET /ping",
+        "GET /api/health",
+        "GET /api/live",
+        "GET /api/frame",
+        "GET /api/snapshot",
+        "GET /api/system",
+        "GET /api/forge",
+        "GET /api/stream",
+        "GET /static/<path>",
+        "GET /api/status",
+        "GET /api/doctor",
+        "GET /api/agents",
+        "GET /api/sessions",
+        "GET /api/audit",
+        "GET /api/diagnostics",
+        "POST /api/sessions/prune",
+        "POST /api/sessions/close",
+        "GET /api/manager/status",
+        "GET /api/manager/settings",
+        "POST /api/manager/start",
+        "POST /api/manager/stop",
+        "POST /api/manager/restart",
+        "POST /api/manager/shutdown",
+        "POST /api/manager/settings",
+        "PUT /api/manager/settings"
+      ],
+      "menu_commands": [
+        {
+          "command": "Hide Navigation / Show Navigation",
+          "menu": "Navigation",
+          "shortcut": "control-command-s"
+        },
+        {
+          "command": "Refresh Now",
+          "menu": "Telemetry",
+          "shortcut": "command-r"
+        },
+        {
+          "command": "Auto-refresh",
+          "menu": "Telemetry",
+          "shortcut": null
+        }
+      ],
+      "routes": [
+        {
+          "detail": "RigDashboardView",
+          "id": "rig",
+          "label": "FORGE RIG"
+        },
+        {
+          "detail": "MCPServersView",
+          "id": "mcp",
+          "label": "LM Studio MCP"
+        },
+        {
+          "detail": "AgentsView",
+          "id": "agents",
+          "label": "Agents"
+        },
+        {
+          "detail": "ToolsView",
+          "id": "tools",
+          "label": "Tools"
+        },
+        {
+          "detail": "LiveFeedView",
+          "id": "feed",
+          "label": "Live Feed"
+        },
+        {
+          "detail": "DiagnosticsView",
+          "id": "diagnostics",
+          "label": "Diagnostics"
+        },
+        {
+          "detail": "ManagerSettingsView",
+          "id": "manager",
+          "label": "Manager"
+        }
+      ],
+      "scenes": [
+        "Settings",
+        "single AppKit-owned main window"
+      ],
+      "window_identifier": "forge-main-window"
+    },
+    "work_package": "FC-BASE-000"
+  },
+  "package": {
+    "archive_sha256": "3e344d4b8b00d27f96d5d892dd9da7d3455604c3c15f5d6aa8e5825d2f0072dd",
+    "installed_validator_passed": true,
+    "live_source_finding_count": 15,
+    "live_source_hashes_match": true,
+    "live_source_proof": "EVID-20260826T182914Z-ecdd4775c1"
+  },
+  "protocol": {
+    "added_tools": [
+      "continuity.acknowledge_handoff",
+      "continuity.checkpoint",
+      "continuity.get_pending_handoff",
+      "continuity.prepare_handoff",
+      "continuity.request_rollover",
+      "continuity.resume",
+      "continuity.status",
+      "project_memory.export",
+      "project_memory.forget",
+      "project_memory.get",
+      "project_memory.import",
+      "project_memory.initialize",
+      "project_memory.link",
+      "project_memory.list_recent",
+      "project_memory.remember",
+      "project_memory.remember_batch",
+      "project_memory.search",
+      "project_memory.status",
+      "project_memory.update"
+    ],
+    "inventory_sha256": "1b164db7cc346da39977984dbc87c27a7066fed418ea2d287eb4b22bbcdf70e7",
+    "legacy_tools_preserved": 34,
+    "removed_tools": [],
+    "response_sha256": "94216e67c35bc818e92cf919cff67be9b4fdbc41bd5d1c4ebbf04719e0869a32",
+    "schema_changes": [
+      {
+        "after": {
+          "properties": {
+            "command": {
+              "type": "string"
+            },
+            "cwd": {
+              "type": "string"
+            },
+            "timeout_sec": {
+              "exclusiveMinimum": 0,
+              "maximum": 120,
+              "type": "number"
+            }
+          },
+          "required": [
+            "command"
+          ],
+          "type": "object"
+        },
+        "before": {
+          "properties": {
+            "command": {
+              "type": "string"
+            },
+            "cwd": {
+              "type": "string"
+            },
+            "timeout_sec": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "command"
+          ],
+          "type": "object"
+        },
+        "changes": [
+          {
+            "after": 0,
+            "operation": "added",
+            "path": "$.properties.timeout_sec.exclusiveMinimum"
+          },
+          {
+            "after": 120,
+            "operation": "added",
+            "path": "$.properties.timeout_sec.maximum"
+          }
+        ],
+        "name": "shell_exec"
+      }
+    ],
+    "tool_count": 53,
+    "validation_sha256": "52d9c65f8a65b6647f325554198aca4df41c69c7dda072d81d739f9a8b4cc772"
+  },
+  "repository": {
+    "branch": "repair/autonomous-continuity",
+    "commit": "1f39ee6bdf1d4f907c6e1cb31f6213f2945d3985",
+    "isolated_worktree": true,
+    "origin_baseline": "origin/main",
+    "pre_edit_product_source_sha256": "75bf4dd734fb94fd0b85384bdd1268e49a6b814f56d56f4b60076d1cfec16472"
+  },
+  "run_id": "1e48ce8e-c41f-4d6d-a0e6-c3201200671b",
+  "schema_version": 1,
+  "test_results": "test-results.json",
+  "work_package": "FC-BASE-000"
+}

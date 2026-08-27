@@ -1,94 +1,82 @@
 {
   "schema_version": 1,
   "phase": "P12",
-  "status": "passed_with_environment_limits",
-  "tested_revision": "082404ec42bf2adb775385dea85ad3b20d0076f4",
-  "full_matrix": {
-    "swift_release": {
+  "status": "blocked",
+  "reconciled_at": "2026-08-26T23:55:21Z",
+  "tested_tree": "uncommitted working tree after b72d6e8dc00681477224fb1b79859f553bc02558",
+  "passing_current_matrix": {
+    "swift_debug_strict": {
       "status": "passed",
-      "result": "266 tests, 2 intentional environment skips, 0 failures",
-      "evidence": ".forge-codex/evidence/EVID-20260823T214020Z-c24fd407d3.json"
+      "result": "395 tests, 2 skips, 0 failures",
+      "command_id": "CMD-20260826T234913Z-2fdbb95e5d"
     },
-    "swift_debug": {
+    "swift_release_strict": {
       "status": "passed",
-      "result": "266 tests, 2 intentional environment skips, 0 failures",
-      "evidence": ".forge-codex/evidence/EVID-20260823T214105Z-e462ac011e.json"
+      "result": "395 tests, 2 skips, 0 failures",
+      "command_id": "CMD-20260826T231135Z-a82f5da923"
     },
-    "project_local_launch": {
+    "xcode_debug_unit": {
       "status": "passed",
-      "result": "Application launched, verified, and its exact project-local process was terminated",
-      "evidence": ".forge-codex/evidence/EVID-20260823T214146Z-38e7461f37.json"
+      "result": "373 tests, 1 skip, 0 failures",
+      "command_id": "CMD-20260826T231358Z-db9cf5ac1c"
     },
-    "xcode_debug_build_for_testing": {
+    "project_local_build_and_run": {
       "status": "passed",
-      "evidence": ".forge-codex/evidence/EVID-20260823T214153Z-6e094e31a0.json"
+      "command_id": "CMD-20260826T235030Z-a764b7a9e1"
     },
-    "xcode_debug_full_test": {
-      "status": "passed",
-      "result": "266 unit and integration tests with 2 intentional skips and 0 failures; 5 native UI tests with 0 failures; 100-cycle navigation stress passed",
-      "evidence": ".forge-codex/evidence/EVID-20260823T214211Z-c4735e8f70.json"
-    },
-    "xcode_release_unsigned": {
-      "status": "passed",
-      "evidence": ".forge-codex/evidence/EVID-20260823T214932Z-0462547840.json"
-    },
-    "xcode_release_ad_hoc": {
-      "status": "passed",
-      "evidence": ".forge-codex/evidence/EVID-20260823T215008Z-913025eedf.json"
-    },
-    "strict_concurrency_warnings_as_errors": {
-      "status": "passed",
-      "result": "266 tests passed under complete strict concurrency and warnings-as-errors",
-      "evidence": ".forge-codex/evidence/EVID-20260823T215054Z-ec120595aa.json"
+    "real_lmstudio_managed_continuity": {
+      "status": "passed_within_scenario",
+      "command_id": "CMD-20260826T224938Z-9660289413"
     }
   },
-  "post_security_remediation": {
-    "swift_debug": {
-      "status": "passed",
-      "result": "269 tests, 2 intentional environment skips, 0 failures",
-      "evidence": ".forge-codex/evidence/EVID-20260823T221617Z-2cedb70293.json"
+  "blocked_or_incomplete_matrix": {
+    "native_ui_and_accessibility": {
+      "status": "blocked",
+      "detail": "Developer mode is disabled and the configured team has no usable Mac Development identity; three XCUITest attempts produced no passing UI test."
     },
-    "strict_concurrency_warnings_as_errors": {
-      "status": "passed",
-      "result": "269 tests, 2 intentional environment skips, 0 failures",
-      "evidence": ".forge-codex/evidence/EVID-20260823T221713Z-b90d9287c6.json"
+    "address_sanitizer": {
+      "status": "blocked_before_test_entry",
+      "detail": "SwiftPM and Xcode instrumented runners remained in sanitizer runtime initialization; zero product tests executed."
     },
-    "xcode_debug_unit_matrix": {
-      "status": "passed",
-      "result": "269 tests, 2 intentional environment skips, 0 failures",
-      "evidence": ".forge-codex/evidence/EVID-20260823T221805Z-1d35f43020.json"
+    "thread_sanitizer": {
+      "status": "blocked_before_test_entry",
+      "detail": "The SwiftPM runtime was rejected by platform policy and the Xcode runner crashed before connection; zero product tests executed."
     },
-    "security": {
-      "status": "passed_for_critical_high",
-      "result": "0 unresolved Critical or High findings; 1 Medium and 1 Low local-dashboard hardening item remain open",
-      "evidence": ".forge-codex/evidence/P12-security-scan-summary.json"
+    "instruments_and_memgraph": {
+      "status": "blocked",
+      "detail": "The current Allocations attempt remained in AuthorizationCopyRights and produced no usable trace; other required profiles and memgraph are absent."
+    },
+    "long_duration_soaks": {
+      "status": "not_executed"
+    },
+    "representative_lower_memory_hardware": {
+      "status": "not_executed"
+    },
+    "signed_launchagent_and_notarized_package": {
+      "status": "not_executed"
+    },
+    "complete_feature_protocol_migration_and_release_scans": {
+      "status": "incomplete"
     }
   },
-  "sanitizers": {
-    "address": {
-      "status": "blocked_environment_before_test_entry",
-      "build_status": "passed",
-      "test_status": "not_started",
-      "detail": "The instrumented package and test host built. XCTest and Swift Testing hosts then remained in pre-main sanitizer runtime initialization at sustained CPU and were terminated by exact PID; no product test began.",
-      "evidence": ".forge-codex/evidence/EVID-20260823T215148Z-d7bfd8b8ac.json"
-    },
-    "thread": {
-      "status": "blocked_environment_before_test_entry",
-      "build_status": "passed",
-      "test_status": "not_started",
-      "detail": "The instrumented package and test host built. macOS rejected the Xcode 26.2 Thread Sanitizer runtime dylib under platform policy before product initialization.",
-      "evidence": ".forge-codex/evidence/EVID-20260823T215500Z-12f8c5930c.json"
-    },
-    "supporting_lifecycle_proof": ".forge-codex/evidence/P05-sanitizer-and-lifecycle-report.json"
+  "hard_gate_status": {
+    "G10": "not_passed",
+    "G11": "not_passed",
+    "G12": "blocked"
   },
-  "shutdown": {
-    "simulator_started": false,
-    "application_and_test_processes_terminated_after_each_run": true,
-    "final_process_check_required": false
+  "completion_validator": {
+    "status": "must_not_pass_until_all_hard_gates_close",
+    "zero_exit_observed_for_current_tree": false
   },
   "distribution_boundaries": {
     "developer_id_signing": "not performed",
     "notarization": "not performed",
     "publishing": "not authorized and not performed"
-  }
+  },
+  "current_evidence": [
+    ".forge-autonomy-state/evidence/FC-RELEASE-001/test-results.json",
+    ".forge-autonomy-state/evidence/FC-UI-001/test-results.json",
+    ".forge-autonomy-state/evidence/FC-PERF-001/test-results.json",
+    ".forge-autonomy-state/evidence/FC-E2E-001/test-results.json"
+  ]
 }

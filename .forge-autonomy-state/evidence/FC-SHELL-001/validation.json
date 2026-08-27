@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "work_package": "FC-SHELL-001",
+  "status": "passed",
+  "hard_gate": true,
+  "evidence_complete": true,
+  "remaining_external_checks": ["full release XCUITest suite is retained for FC-UI-001 and FC-RELEASE-001"]
+}

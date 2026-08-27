@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "work_package": "FC-RUNTIME-001",
+  "preserved": {
+    "shell_exec_name": true,
+    "shell_exec_input_fields": [
+      "command",
+      "cwd",
+      "timeout_sec"
+    ],
+    "shell_exec_maximum_timeout_seconds": 120,
+    "shell_exec_compatibility_profile": "legacyBashLogin",
+    "existing_project_authorization_boundary": true,
+    "existing_mcp_descriptor_surface": true
+  },
+  "additive": [
+    "durable runtime job SQLite repository and execution actor",
+    "hash-addressed service-owned runtime launcher staged from the signed product helper",
+    "runtime.capabilities, process.run, shell.run, bash.run, python.run, and powershell.run",
+    "job.status, job.read_output, job.cancel, and job.list",
+    "separate manager-owned durable output and child-writable scratch roots",
+    "bounded stdout and stderr artifacts with startup orphan sweeping and quota compaction",
+    "process-group timeout, descendant census, resource limits, cancellation, and shutdown reaping",
+    "exact process-identity recovery with persisted TERM and KILL phases and bounded idempotency receipts",
+    "project-generation stale-result quarantine and run-scoped cancellation"
+  ],
+  "intentional_security_changes": [
+    "new runtime submissions require explicit replay classification",
+    "all jobs require an exact durable project context",
+    "read and write roots are authorized separately and child access is deny-by-default",
+    "artifact reads revalidate canonical containment, owner, device, inode, link count, size, and digest",
+    "children cannot replace manager-owned stdout and stderr artifacts",
+    "startup recovery signals only an exact persisted process identity and never treats an unconfirmed death as terminal",
+    "application, CLI, package-test, and helper identities are bound to exact product paths with narrow ad-hoc development allowances"
+  ],
+  "removed": [],
+  "result": "passed"
+}

@@ -2,30 +2,40 @@
   "criteria_results": [
     {
       "criterion": "Release stress suite passes",
-      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P11-release-stress-results.json#c1f39620b4a218f03323b6cc0f53f5525093afe0e59830108df4c97b741e6dcb; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T212034Z-4070dbd74c.json#e471b320b9598855baa77538a8aa40dcbaa5abec763c56870840e7a62bc50a1f",
-      "passed": true
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/P11-release-stress-results.json#0dbcb3b5f8dfd6d81baad3f1eee7aa35f2ac40a94613dd716a63a221d741d600; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-autonomy-state/evidence/FC-RELEASE-001/test-results.json#9f2a6a473bc09d3f09de9de33936635028a1427960d5ab47317f706fa1034472",
+      "passed": false
     },
     {
       "criterion": "resident-size trajectories are bounded",
-      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P11-resource-results.json#405832a52390a220626f3fbbf19dc94aa04c34bccbb2c641fc1ef471ce529ef1; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T213648Z-7ed720d512.json#51cd8033cd618a774a3f71aac6b16067b2445656391de6a2b1af2bdcaa105274",
-      "passed": true
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/P11-resource-results.json#f9931767c1a2a36baf507f19c30ac4c3947ea2c82df2a322d53308b788bb7aef; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-autonomy-state/evidence/FC-PERF-001/test-results.json#61bb053178aa0f5daa1a8fb3f927fe7350ce73f860c5c8d57d1231bfbe667462",
+      "passed": false
     },
     {
       "criterion": "telemetry/gauge hard invariants pass under stress",
-      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P04-metal-performance-report.json#4958c561b8ac484218edbbfb14dad86c2c4174e5d7da5cee7feecc67278c4de5; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T212139Z-5e0f9ed571.json#954954a13db38323e91b3961b15f40d0774a7f394c3bdbbb9e73e0e48815e1f7; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P11-resource-results.json#405832a52390a220626f3fbbf19dc94aa04c34bccbb2c641fc1ef471ce529ef1",
-      "passed": true
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/P11-release-stress-results.json#0dbcb3b5f8dfd6d81baad3f1eee7aa35f2ac40a94613dd716a63a221d741d600; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/P11-profile-report.json#60d2ebb628350e0716823954cd19c5e7e59d3cc9201b6a7ca452f42ba7c33147",
+      "passed": false
     },
     {
       "criterion": "latency/CPU/GPU/wakeup/database budgets pass",
-      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P11-profile-report.json#abe2fec04f5bdc9e15180d7dabe54fed69fbb0baf5fdbb90520398ba509d75ba; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P11-resource-results.json#405832a52390a220626f3fbbf19dc94aa04c34bccbb2c641fc1ef471ce529ef1; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T213648Z-7ed720d512.json#51cd8033cd618a774a3f71aac6b16067b2445656391de6a2b1af2bdcaa105274",
-      "passed": true
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/P11-profile-report.json#60d2ebb628350e0716823954cd19c5e7e59d3cc9201b6a7ca452f42ba7c33147; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-autonomy-state/evidence/FC-PERF-001/test-results.json#61bb053178aa0f5daa1a8fb3f927fe7350ce73f860c5c8d57d1231bfbe667462",
+      "passed": false
     },
     {
       "criterion": "lowest available representative memory tier evidence exists",
-      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P11-release-stress-results.json#c1f39620b4a218f03323b6cc0f53f5525093afe0e59830108df4c97b741e6dcb; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P11-resource-results.json#405832a52390a220626f3fbbf19dc94aa04c34bccbb2c641fc1ef471ce529ef1",
-      "passed": true
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/P11-resource-results.json#f9931767c1a2a36baf507f19c30ac4c3947ea2c82df2a322d53308b788bb7aef; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-autonomy-state/evidence/FC-PERF-001/feature-parity-impact.json#0cfc9a94c9e531b66510b6a66cf3fe8081ff8531609ef05c706d1a20f1ee91b4",
+      "passed": false
     }
   ],
-  "errors": [],
-  "valid": true
+  "errors": [
+    "criterion marked failed: Release stress suite passes",
+    "criterion marked failed: resident-size trajectories are bounded",
+    "criterion marked failed: telemetry/gauge hard invariants pass under stress",
+    "criterion marked failed: latency/CPU/GPU/wakeup/database budgets pass",
+    "criterion marked failed: lowest available representative memory tier evidence exists",
+    "command failed: swift test -c release -Xswiftc -warnings-as-errors",
+    "command failed: swift test --sanitize address -Xswiftc -warnings-as-errors",
+    "command failed: swift test --sanitize thread -Xswiftc -warnings-as-errors --filter CoreTests.testBootstrapCreatesLayout",
+    "command failed: profile_macos.sh Allocations"
+  ],
+  "valid": false
 }

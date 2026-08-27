@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "work_package": "FC-E2E-001",
+  "verified_preserved_paths": {
+    "project_scoped_successor_bootstrap": true,
+    "exact_handoff_acknowledgement": true,
+    "automatic_successor_continuation": true,
+    "real_provider_response_identifiers": true,
+    "provider_exact_usage_accounting": true,
+    "transient_provider_failure_is_fail_closed": true,
+    "deterministic_multi_project_generation_fencing": true
+  },
+  "additive": [
+    "real LM Studio fresh-root acknowledgment and automatic-continuation acceptance test",
+    "machine-readable live continuity transcript",
+    "deterministic multi-project and crash-boundary acceptance scenarios"
+  ],
+  "removed": [],
+  "feature_parity_not_yet_verified": [
+    "complete MCP tool-name and schema comparison",
+    "CLI and manager HTTP compatibility comparison",
+    "settings, project format, migration, and import/export comparison",
+    "UI navigation, commands, and accessibility comparison",
+    "GUI-independent shell and runtime behavior across a complete managed run",
+    "representative performance-tier behavior"
+  ],
+  "result": "partial"
+}

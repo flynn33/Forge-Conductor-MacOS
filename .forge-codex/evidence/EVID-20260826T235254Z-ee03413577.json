@@ -1,0 +1,33 @@
+{
+  "artifacts": [
+    {
+      "bytes": 1086,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260826T235254Z-ee03413577.stdout.txt",
+      "sha256": "11d0e2029d366ee529151a96a6a4c347a772f4945b64ae243eb29bdfba574991"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260826T235254Z-ee03413577.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "command": "rg -n 'enabled: Bool = true|legacy_disabled_default_migrated|settings-shell-enabled|runtime-shell-enabled' Sources/ForgeConductorCore/Domain/AppConfig.swift Sources/ForgeConductorCore/Infrastructure/ConfigStore.swift Sources/ForgeConductorApp/Views/ManagerSettingsView.swift Sources/ForgeConductorApp/OperatorConsole/Views/RuntimesOperatorView.swift",
+  "ended_at": "2026-08-26T23:52:54.361031+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260826T235254Z-ee03413577",
+  "kind": "shell-policy-source-audit",
+  "related_findings": [
+    "FC-SHELL-DEFAULT-001"
+  ],
+  "related_gates": [
+    "G09"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-26T23:52:54.349087+00:00",
+  "timed_out": false
+}

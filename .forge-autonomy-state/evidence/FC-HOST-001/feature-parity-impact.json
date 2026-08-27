@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "work_package": "FC-HOST-001",
+  "preserved": {
+    "existing_plugin_identifier_and_registration": true,
+    "existing_host_adapter_protocol": true,
+    "existing_continuity_tool_names_and_payloads": true,
+    "injected_test_transport": true,
+    "existing_configuration_file_location": true
+  },
+  "additive": [
+    "real LM Studio REST and SSE transport",
+    "strict function-tool capability negotiation",
+    "provider capability fingerprint",
+    "Keychain-backed bearer-token reference",
+    "typed deadline and provider failures",
+    "bounded reconciliation-ledger compaction",
+    "usage-reporting provenance"
+  ],
+  "intentional_security_changes": [
+    "synthetic provider identifiers are rejected",
+    "provider unavailability cannot be reported as successful session creation",
+    "partial or malformed streams never become continuation authority",
+    "credentials are loaded by opaque Keychain reference and redacted from failures"
+  ],
+  "removed": [],
+  "result": "passed"
+}

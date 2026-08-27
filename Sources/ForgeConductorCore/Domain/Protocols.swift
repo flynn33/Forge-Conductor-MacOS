@@ -70,6 +70,7 @@ public protocol AgentCatalogProviding: AnyObject, Sendable {
 public protocol ToolExecuting: AnyObject, Sendable {
     var toolNames: [String] { get }
     func call(name: String, arguments: [String: Any], clientID: ClientID) throws -> ToolResult
+    func call(name: String, arguments: [String: Any], context: ToolInvocationContext) throws -> ToolResult
 }
 
 // MARK: Telemetry collectors (strict SRP)

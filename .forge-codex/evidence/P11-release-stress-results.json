@@ -1,143 +1,43 @@
 {
-  "build" : "release",
-  "fixture" : {
-    "mcp_requests" : 100,
-    "memory_records" : 500,
-    "process_cycles" : 25,
-    "project_cycles" : 100,
-    "rollovers" : 25,
-    "seed" : 11
+  "schema_version": 1,
+  "phase": "P11",
+  "status": "incomplete",
+  "reconciled_at": "2026-08-26T23:55:21Z",
+  "build": "release",
+  "current_short_fixture": {
+    "rollovers": 50,
+    "manager_restarts": 100,
+    "manager_recovery_states": 4,
+    "mcp_requests": 100,
+    "memory_records": 500,
+    "project_cycles": 100,
+    "process_cycles": 25,
+    "telemetry_maximum_logical_slots": 2,
+    "telemetry_post_stop_slots": 0,
+    "manager_recovery_post_shutdown_owners": 0,
+    "manager_cancellation_post_shutdown_owners": 0,
+    "resident_baseline_bytes": 21446656,
+    "resident_peak_bytes": 91373568,
+    "resident_post_release_slope_bytes_per_sample": 0,
+    "status": "passed_within_short_deterministic_fixture"
   },
-  "hard_invariants" : {
-    "main_actor_blocking_process_waits" : 0,
-    "project_contexts_after_close" : 0,
-    "telemetry_maximum_logical_slots" : 2,
-    "telemetry_post_stop_slots" : 0,
-    "unbounded_collections" : 0,
-    "unbounded_retries" : 0
+  "current_suite_evidence": {
+    "swiftpm_debug_strict": "395 tests executed with 2 skips and 0 failures",
+    "swiftpm_release_strict": "395 tests executed with 2 skips and 0 failures",
+    "artifact": ".forge-autonomy-state/evidence/FC-PERF-001/release-stress-report.json",
+    "artifact_sha256": "cf645de409cdb021cdb58c8c20e4d8624c66ffdcb22b1bd6c1437975ad7e098f"
   },
-  "latency_ms" : {
-    "cold_launch_ms" : {
-      "p50" : 43.012708000000003,
-      "p95" : 53.817708000000003,
-      "p99" : 53.817708000000003,
-      "samples" : 5
-    },
-    "mcp_call_ms" : {
-      "p50" : 8.7237919999999995,
-      "p95" : 19.339167,
-      "p99" : 24.397625000000001,
-      "samples" : 100
-    },
-    "memory_export_ms" : {
-      "p50" : 15.665666999999999,
-      "p95" : 15.665666999999999,
-      "p99" : 15.665666999999999,
-      "samples" : 1
-    },
-    "memory_search_ms" : {
-      "p50" : 0.84395799999999999,
-      "p95" : 1.0257499999999999,
-      "p99" : 1.2680830000000001,
-      "samples" : 25
-    },
-    "memory_update_ms" : {
-      "p50" : 0.59270900000000004,
-      "p95" : 0.99308300000000005,
-      "p99" : 3.6204580000000002,
-      "samples" : 50
-    },
-    "memory_write_batch_ms" : {
-      "p50" : 13.114333,
-      "p95" : 13.879667,
-      "p99" : 13.879667,
-      "samples" : 10
-    },
-    "process_cycle_ms" : {
-      "p50" : 1.676917,
-      "p95" : 12.525499999999999,
-      "p99" : 12.731875,
-      "samples" : 25
-    },
-    "project_cycle_ms" : {
-      "p50" : 7.0025000000000004,
-      "p95" : 7.8657919999999999,
-      "p99" : 15.6395,
-      "samples" : 100
-    },
-    "rollover_ms" : {
-      "p50" : 9.7666249999999994,
-      "p95" : 13.945375,
-      "p99" : 16.901541999999999,
-      "samples" : 25
-    },
-    "telemetry_burst_ms" : {
-      "p50" : 6.3059589999999996,
-      "p95" : 6.3059589999999996,
-      "p99" : 6.3059589999999996,
-      "samples" : 1
-    },
-    "warm_launch_ms" : {
-      "p50" : 40.175417000000003,
-      "p95" : 43.044125000000001,
-      "p99" : 43.044125000000001,
-      "samples" : 5
-    }
+  "sanitizer_status": {
+    "address": "blocked before test entry in both SwiftPM and Xcode runners",
+    "thread": "blocked before test entry by platform policy or harness crash",
+    "passing_product_tests": 0
   },
-  "memory_tiers" : {
-    "constrained_critical_limits" : {
-      "active_gauge_fps" : 15,
-      "active_model_stream_bytes" : 1048576,
-      "decoded_memory_cache_bytes" : 4194304,
-      "diagnostic_ring_records" : 500,
-      "log_file_bytes" : 1048576,
-      "mcp_response_bytes" : 262144,
-      "memory_search_default_limit" : 10,
-      "memory_search_hard_limit" : 25,
-      "process_output_bytes_per_stream" : 1048576,
-      "retained_log_archives" : 1,
-      "search_cache_bytes" : 2097152,
-      "telemetry_history_points" : 300
-    },
-    "constrained_limits" : {
-      "active_gauge_fps" : 30,
-      "active_model_stream_bytes" : 4194304,
-      "decoded_memory_cache_bytes" : 16777216,
-      "diagnostic_ring_records" : 1000,
-      "log_file_bytes" : 4194304,
-      "mcp_response_bytes" : 1048576,
-      "memory_search_default_limit" : 20,
-      "memory_search_hard_limit" : 100,
-      "process_output_bytes_per_stream" : 4194304,
-      "retained_log_archives" : 2,
-      "search_cache_bytes" : 8388608,
-      "telemetry_history_points" : 600
-    },
-    "host_physical_bytes" : 51539607552,
-    "host_tier" : "expanded",
-    "lowest_executed_tier" : "constrained"
-  },
-  "phase" : "P11",
-  "resource" : {
-    "cpu_system_seconds" : 0.011342279,
-    "cpu_user_seconds" : 0.023472607999999999,
-    "database_bytes" : 1060864,
-    "disk_read_bytes" : 36864,
-    "disk_written_bytes" : 72294400,
-    "interrupt_wakeups" : 31,
-    "package_idle_wakeups" : 0,
-    "resident_baseline_bytes" : 21069824,
-    "resident_peak_bytes" : 47808512,
-    "resident_post_release_bytes" : [
-      46792704,
-      46792704,
-      46792704,
-      46792704,
-      46792704
-    ],
-    "resident_post_release_slope_bytes_per_sample" : 0,
-    "wal_bytes" : 3353712
-  },
-  "schema_version" : 1,
-  "status" : "passed"
+  "missing_hard_evidence": [
+    "8-hour idle soak",
+    "4-hour active tool-loop soak",
+    "repeated GUI open and close cycles",
+    "real multi-project interleaving under actual tier limits",
+    "successful separate Address Sanitizer and Thread Sanitizer executions"
+  ],
+  "interpretation": "The short deterministic fixture and current suites are preserved as passing evidence but do not constitute a complete release stress pass."
 }

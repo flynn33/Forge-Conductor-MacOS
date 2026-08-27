@@ -1,0 +1,33 @@
+{
+  "artifacts": [
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260826T234612Z-ed39c77f19.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 251816,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260826T234612Z-ed39c77f19.stderr.txt",
+      "sha256": "48833e42cb24c851f9828fed4469cc10c73b5b11f62379fb5889ea8ef154bb26"
+    }
+  ],
+  "command": "swift test --scratch-path /tmp/forge-g09-tests-20260826 -Xswiftc -strict-concurrency=complete -Xswiftc -warnings-as-errors --filter NativeSessionHostPluginTests",
+  "ended_at": "2026-08-26T23:46:18.515557+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 1,
+  "id": "EVID-20260826T234612Z-ed39c77f19",
+  "kind": "g09-plugin-contract-tests",
+  "related_findings": [
+    "FC-AUTONOMY-001"
+  ],
+  "related_gates": [
+    "G09"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-26T23:46:12.030174+00:00",
+  "timed_out": false
+}

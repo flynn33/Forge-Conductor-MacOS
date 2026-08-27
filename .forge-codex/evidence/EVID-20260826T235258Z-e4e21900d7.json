@@ -1,0 +1,33 @@
+{
+  "artifacts": [
+    {
+      "bytes": 1083,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260826T235258Z-e4e21900d7.stdout.txt",
+      "sha256": "1a35ef8055152157d4c36007de7a4fa063a2b52c809fb5012e87db727d77785f"
+    },
+    {
+      "bytes": 98,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260826T235258Z-e4e21900d7.stderr.txt",
+      "sha256": "e747f0c3660fab3fe3ff51568f4c65795998117c363342e1361f9012684ebd41"
+    }
+  ],
+  "command": "swift test --scratch-path /tmp/forge-g09-tests-20260826b -Xswiftc -warnings-as-errors --filter LiveCollectorEvidenceTests/testForgeSnapshotIncludesDiscoveredMCPServers",
+  "ended_at": "2026-08-26T23:52:59.707361+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260826T235258Z-e4e21900d7",
+  "kind": "live-mcp-snapshot-regression-test",
+  "related_findings": [
+    "FC-OBS-LIVE-MCP-001"
+  ],
+  "related_gates": [
+    "G09"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-26T23:52:58.802091+00:00",
+  "timed_out": false
+}

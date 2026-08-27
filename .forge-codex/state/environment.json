@@ -1,8 +1,10 @@
 {
-  "captured_at": "2026-08-23T22:00:18.847578+00:00",
+  "captured_at": "2026-08-27T01:09:31.695241+00:00",
   "environment_keys_present": [
+    "CODEX_APP_TOOLS_PIPE_PATH",
     "CODEX_CI",
     "CODEX_INTERNAL_ORIGINATOR_OVERRIDE",
+    "CODEX_MCP_NODE_PATH",
     "CODEX_PERMISSION_PROFILE",
     "CODEX_SESSION_ID",
     "CODEX_SHELL",
@@ -12,7 +14,7 @@
   "macos_runtime_capable": true,
   "platform": "macOS-26.6.2-arm64-arm-64bit",
   "project_markers": {
-    "package_swift": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Package.swift",
+    "package_swift": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Package.swift",
     "projects": [
       "ForgeConductor.xcodeproj"
     ],
@@ -20,7 +22,7 @@
       "ForgeConductor.xcworkspace"
     ]
   },
-  "repository_root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+  "repository_root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
   "schema_version": 1,
   "tools": {
     "bash": {
