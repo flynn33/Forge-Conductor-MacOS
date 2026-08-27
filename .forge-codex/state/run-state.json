@@ -26,7 +26,7 @@
     }
   ],
   "created_at": "2026-08-23T18:32:04.449808+00:00",
-  "current_work": null,
+  "current_work": "P10",
   "decisions": [],
   "evidence": [
     ".forge-codex/state/gate-results/G09.json",
@@ -39,6 +39,7 @@
     "1574239ab804b951325b8b5fcaf7f4f7528c787a1e1914fff941fe4ae6d34e2a",
     "1aa97c749b734a48dd19dfca93d250d454f0ee25c9496b2227c0ab6f8f7d842b",
     "1f33267dc6f77f755f5c8a2b537d600ba9f0b4218d3854af1f24263003af0b49",
+    "1f33d16848f966a2cfeae1e1cae73fa3912a9cf38e9c300b8318fb57160e49ad",
     "24be3535df2a32ea3dcf5190b3113e96c11b71e00a98d1ae9ae5419489dffd01",
     "2785d7f96e01c41cd8b27a380640d0fe31dddaf62cc9075819ee72c736a688f9",
     "34b987fe8c24d6f8ae00327251c853534350827868f48db6287c33eed2728b69",
@@ -217,6 +218,17 @@
     "EVID-20260827T030641Z-831d98c838",
     "EVID-20260827T031029Z-fdeb6a6226",
     "EVID-20260827T031144Z-dcf64dc5b4",
+    "EVID-20260827T100505Z-099fb2070c",
+    "EVID-20260827T100602Z-155cb4ac09",
+    "EVID-20260827T100625Z-0e6c307f55",
+    "EVID-20260827T100635Z-0c30766975",
+    "EVID-20260827T100640Z-568f10afeb",
+    "EVID-20260827T103142Z-31aeee7a3f",
+    "EVID-20260827T103242Z-f2a67a3569",
+    "EVID-20260827T103306Z-a585799235",
+    "EVID-20260827T103315Z-ea299d27a2",
+    "EVID-20260827T103321Z-9af37ac353",
+    "EVID-20260827T105148Z-30b18f1784",
     "a5466d4e5b4d7a10f87df64ddfdb58b6b8ca5159a57c20527e98802a822245d7",
     "a5d4276cbf14db3a91baa7f6b79fb8cdb3fb042a2eaf663d3219ff36b5451667",
     "b3dc11a8dc286fa33b6567ff62089692e64787b23a66718cfe1766dc27195724",
@@ -228,6 +240,7 @@
     "cceda1d1209095847a386a86f9048b1de62691c7e7d8ef6a1954b151b7ad759d",
     "d089777dd60c47b9c9d69a28a45445e4f67e4994098a5a65ff4e5d1a7c4ec048",
     "d35955092f94076cf65a68f7ac24f677303902ca70b1a7a7b65fa12524d948a6",
+    "d6e5a77279a6ade1d31a44a2ecc61451eddbe179b8c82c2a4cfd628e50b0b204",
     "d7a8b12bdc99903df39cbd9bde72c118c9c7eae9f68154429768a336b2b265ba",
     "db06fee93b77af7b76208f85e3c0c53c49c5be48c2f61047199f2120f2325daf",
     "ded439d6b183d7f8074fa2a4bb9d28d6eca6b31d03160a650085360b877dca5a",
@@ -328,9 +341,10 @@
       "updated_at": "2026-08-23T20:45:54.629465+00:00"
     },
     "G09": {
-      "evaluator": "forge-gate-handler",
+      "evaluator": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.json",
       "evidence_ids": [
         ".forge-codex/state/gate-results/G09.json",
+        "1f33d16848f966a2cfeae1e1cae73fa3912a9cf38e9c300b8318fb57160e49ad",
         "2785d7f96e01c41cd8b27a380640d0fe31dddaf62cc9075819ee72c736a688f9",
         "3a13aa54b872f78b815e84f1647b60062a064c87920d93e4d4a12eadc65b5bc9",
         "4619a59fc44d424718384ef4ac926720e1c359213b7bdfdd71d71ebbfad9553c",
@@ -344,10 +358,11 @@
         "a5d4276cbf14db3a91baa7f6b79fb8cdb3fb042a2eaf663d3219ff36b5451667",
         "b4a2923d8277f49deb4efcc4b52802550f2d42e6e476ad7c42c8226f26da3385",
         "c403e7321a241f600e1b10832db8e7e5e3de7cac124d0eb911a32d9db4f058b4",
+        "d6e5a77279a6ade1d31a44a2ecc61451eddbe179b8c82c2a4cfd628e50b0b204",
         "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       ],
-      "status": "failed",
-      "updated_at": "2026-08-27T03:10:09.380463+00:00"
+      "status": "passed",
+      "updated_at": "2026-08-27T10:55:48.906371+00:00"
     },
     "G10": {
       "evaluator": "forge-gate-handler",
@@ -432,12 +447,12 @@
       "created_at": "2026-08-26T18:29:37.546573+00:00",
       "evidence_class": "E1",
       "id": "FC-AUTONOMY-001",
-      "notes": "Resolved by production registration of the configuration-gated LM Studio managed v2 adapter. CMD-20260826T224938Z-9660289413 proves a real fresh root, exact acknowledgement, and automatic continuation; EVID-20260826T235215Z-09978ce068 validates production source, 15 plugin tests, and both current 395-test strict suites; G09 passed.",
+      "notes": "Resolved by production registration of the configuration-gated LM Studio managed v2 adapter. Exact published revision 52f8aca47463f88fa94276115fb5c2070ca683ef passed the Release plugin build, 16 plugin contract tests with one expected live skip, Debug and Release strict suites with 447 tests each, nine external MCP compatibility checks, zero private UI automation scan violations, and real fresh-root acknowledgement plus automatic continuation in CMD-20260827T103812Z-17ac760a12. G09 passed through EVID-20260827T105148Z-30b18f1784.",
       "path": "Sources/ForgeNativeSessionHostPlugin/ForgeNativeSessionHostPlugin.swift",
       "severity": "High",
       "status": "resolved",
       "title": "Release transport is synthetic and cannot prove autonomous rollover",
-      "updated_at": "2026-08-26T23:54:28.099481+00:00"
+      "updated_at": "2026-08-27T10:59:16.687167+00:00"
     },
     {
       "created_at": "2026-08-26T18:29:37.687402+00:00",
@@ -471,9 +486,20 @@
       "status": "resolved",
       "title": "Shell compatibility fixtures overlap protected runtime output",
       "updated_at": "2026-08-27T10:04:07.999945+00:00"
+    },
+    {
+      "created_at": "2026-08-27T10:16:25.080799+00:00",
+      "evidence_class": "E0",
+      "id": "FC-LIVE-ROLLOVER-001",
+      "notes": "Resolved by an enforced 4096-token provider output bound and an unambiguous bootstrap-to-continuation turn contract. Exact published revision 52f8aca47463f88fa94276115fb5c2070ca683ef passed the real LM Studio fresh-root, acknowledgement, marker-bearing automatic continuation, response ancestry, exact model identity, and provider-exact usage proof in CMD-20260827T103812Z-17ac760a12. The continuation used 82 output tokens and 2403 total tokens. Focused contract CMD-20260827T103019Z-caacf56201 and both 447-test strict suites passed. Cleanup CMD-20260827T104150Z-7623857663 and CMD-20260827T104156Z-7ba27baea0 restored the unloaded and stopped baseline.",
+      "path": "Tests/ForgeConductorTests/NativeSessionHostPluginTests.swift",
+      "severity": "High",
+      "status": "resolved",
+      "title": "Live automatic continuation exhausts bounded provider deadline",
+      "updated_at": "2026-08-27T10:59:24.626731+00:00"
     }
   ],
-  "last_event_sequence": 250,
+  "last_event_sequence": 270,
   "phases": {
     "P00": {
       "attempts": 1,
@@ -530,16 +556,16 @@
       "updated_at": "2026-08-23T21:39:10.724333+00:00"
     },
     "P09": {
-      "attempts": 0,
-      "last_error": "Current-source host-adapter qualification remains incomplete.",
-      "status": "ready",
-      "updated_at": "2026-08-27T03:10:09.456994+00:00"
+      "attempts": 1,
+      "last_error": null,
+      "status": "passed",
+      "updated_at": "2026-08-27T10:55:53.214102+00:00"
     },
     "P10": {
-      "attempts": 1,
-      "last_error": "Blocked by G09 and locked-session UI/protected-file prerequisites.",
-      "status": "blocked_dependency",
-      "updated_at": "2026-08-27T03:10:09.618751+00:00"
+      "attempts": 2,
+      "last_error": null,
+      "status": "running",
+      "updated_at": "2026-08-27T10:56:08.591000+00:00"
     },
     "P11": {
       "attempts": 1,
@@ -556,12 +582,12 @@
   },
   "repository": {
     "branch": "repair/autonomous-continuity",
-    "commit": "05d3a6cd9183c8bbf9a34a0f0a6e88d6ac00ce2a",
+    "commit": "52f8aca47463f88fa94276115fb5c2070ca683ef",
     "dirty": true,
     "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy"
   },
   "run_id": "aba90ab1-be80-4cc5-aa0b-23dd54d4a24d",
   "schema_version": 1,
   "status": "active",
-  "updated_at": "2026-08-27T10:04:08.000301+00:00"
+  "updated_at": "2026-08-27T10:59:24.626858+00:00"
 }

@@ -1,9 +1,28 @@
 {
   "schema_version": 1,
   "work_package": "FC-E2E-001",
-  "captured_at": "2026-08-26T23:29:28.112021+00:00",
+  "captured_at": "2026-08-27T10:41:56.508381+00:00",
   "overall_status": "partial",
   "evidence_complete": false,
+  "source_revision": {
+    "commit": "52f8aca47463f88fa94276115fb5c2070ca683ef",
+    "short_commit": "52f8aca",
+    "exact_commit_live_command_id": "CMD-20260827T103812Z-17ac760a12",
+    "final_debug_command_id": "CMD-20260827T103327Z-5d0a028f3d",
+    "final_release_command_id": "CMD-20260827T103455Z-4b3944647c"
+  },
+  "command_log_scope": {
+    "source": ".forge-autonomy-state/command-logs/FC-E2E-001/commands.jsonl",
+    "source_entries": 20,
+    "compact_entries": 20,
+    "first_command_id": "CMD-20260826T224759Z-929a788156",
+    "last_command_id": "CMD-20260827T104156Z-7ba27baea0",
+    "raw_entries_appended": 18,
+    "all_source_command_ids_present": true,
+    "source_order_preserved": true,
+    "historical_records_modified": false,
+    "historical_note": "The first two pre-existing compact records retain their original relative cwd value; later records are exact raw-ledger lines."
+  },
   "dependencies": {
     "FC-UI-001": "blocked",
     "FC-PERF-001": "incomplete"
@@ -19,16 +38,17 @@
       "classification": "LM Studio endpoint or loaded model was unavailable and the adapter failed closed with providerUnavailable"
     },
     {
-      "id": "FC-E2E-LIVE-LMSTUDIO-ROLLOVER",
+      "id": "FC-E2E-LIVE-LMSTUDIO-HISTORICAL-PASS",
       "command_id": "CMD-20260826T224938Z-9660289413",
       "executed": 1,
       "failures": 0,
       "exit_code": 0,
       "duration_seconds": 376.679,
-      "status": "passed_within_scenario",
-      "artifact": {
-        "path": ".forge-autonomy-state/evidence/FC-E2E-001/live-lmstudio-managed-continuity.json",
-        "sha256": "cb90eec59b7129fd89dd4a88b597f59120d706c8de91133bb36f259f748f9c23"
+      "status": "superseded_pass_before_output_bound_repair",
+      "historical_artifact": {
+        "recorded_path": ".forge-autonomy-state/evidence/FC-E2E-001/live-lmstudio-managed-continuity.json",
+        "recorded_sha256": "cb90eec59b7129fd89dd4a88b597f59120d706c8de91133bb36f259f748f9c23",
+        "current_path_content_superseded": true
       },
       "observed": {
         "provider": "lmstudio",
@@ -43,6 +63,138 @@
         "automatic_continuation_output_tokens": 3478,
         "automatic_continuation_total_tokens": 4932
       }
+    },
+    {
+      "id": "FC-E2E-LIVE-LMSTUDIO-DEADLINE-FAILURE",
+      "command_id": "CMD-20260827T100722Z-8515b5f9b3",
+      "executed": 1,
+      "failures": 1,
+      "exit_code": 1,
+      "duration_seconds": 379.940,
+      "status": "failed_then_repaired",
+      "classification": "The automatic continuation kept streaming without a provider output-token bound until the preserved 300-second total transport deadline raised deadlineExceeded(phase: total)."
+    },
+    {
+      "id": "FC-E2E-OUTPUT-BOUND-FOCUSED-COMPILE-ITERATION",
+      "command_id": "CMD-20260827T102141Z-75855aa527",
+      "executed": 0,
+      "failures": 1,
+      "exit_code": 1,
+      "status": "repair_iteration_compile_failure",
+      "classification": "The first focused repair build referenced a nonexistent ProviderTurn.assistantText property; no tests executed."
+    },
+    {
+      "id": "FC-E2E-OUTPUT-BOUND-FOCUSED-PASS",
+      "command_id": "CMD-20260827T102227Z-947a6aa63e",
+      "configuration": "debug_strict_focused",
+      "executed": 27,
+      "skipped": 1,
+      "failures": 0,
+      "exit_code": 0,
+      "duration_seconds": 0.462,
+      "status": "passed"
+    },
+    {
+      "id": "FC-E2E-LIVE-LMSTUDIO-REPAIRED-CANDIDATE",
+      "command_id": "CMD-20260827T102419Z-ba036e7505",
+      "executed": 1,
+      "failures": 0,
+      "exit_code": 0,
+      "duration_seconds": 166.766,
+      "status": "passed_candidate_before_final_commit",
+      "artifact": {
+        "path": ".forge-autonomy-state/evidence/FC-E2E-001/live-lmstudio-managed-continuity-candidate-20260827.json",
+        "sha256": "a5c34149df02d4deaf46b66be79bc9a87c7e433942f83502317e584c7098e666"
+      },
+      "observed": {
+        "maximum_output_tokens": 4096,
+        "automatic_continuation_marker_validated": true,
+        "automatic_continuation_input_tokens": 2035,
+        "automatic_continuation_output_tokens": 202,
+        "automatic_continuation_total_tokens": 2237
+      }
+    },
+    {
+      "id": "FC-E2E-OUTPUT-BOUND-FINAL-FOCUSED-PASS",
+      "command_id": "CMD-20260827T103019Z-caacf56201",
+      "configuration": "debug_strict_focused",
+      "executed": 27,
+      "skipped": 1,
+      "failures": 0,
+      "exit_code": 0,
+      "duration_seconds": 0.449,
+      "status": "passed"
+    },
+    {
+      "id": "FC-E2E-FINAL-DEBUG-STRICT-SUITE",
+      "command_id": "CMD-20260827T103327Z-5d0a028f3d",
+      "recorded_under": "FC-RELEASE-001",
+      "configuration": "debug_strict",
+      "compiled_with_warnings_as_errors": true,
+      "live_environment_explicitly_unset": true,
+      "executed": 447,
+      "skipped": 3,
+      "failures": 0,
+      "exit_code": 0,
+      "duration_seconds": 79.212,
+      "status": "passed"
+    },
+    {
+      "id": "FC-E2E-FINAL-RELEASE-STRICT-SUITE",
+      "command_id": "CMD-20260827T103455Z-4b3944647c",
+      "recorded_under": "FC-RELEASE-001",
+      "configuration": "release_strict",
+      "compiled_with_warnings_as_errors": true,
+      "live_environment_explicitly_unset": true,
+      "executed": 447,
+      "skipped": 4,
+      "failures": 0,
+      "exit_code": 0,
+      "duration_seconds": 72.118,
+      "status": "passed"
+    },
+    {
+      "id": "FC-E2E-LIVE-LMSTUDIO-FINAL-EXACT-COMMIT",
+      "command_id": "CMD-20260827T103812Z-17ac760a12",
+      "source_commit": "52f8aca47463f88fa94276115fb5c2070ca683ef",
+      "executed": 1,
+      "failures": 0,
+      "exit_code": 0,
+      "duration_seconds": 170.832,
+      "status": "passed",
+      "artifact": {
+        "path": ".forge-autonomy-state/evidence/FC-E2E-001/live-lmstudio-managed-continuity-52f8aca.json",
+        "sha256": "f870f77cd2036f60dac6ca8c8ac434eef31cae9b04b001e4fee6854a47d2c9bb"
+      },
+      "observed": {
+        "provider": "lmstudio",
+        "model_key": "qwen/qwen3.8-27b",
+        "context_length": 119552,
+        "maximum_output_tokens": 4096,
+        "real_response_identifiers": true,
+        "provider_exact_usage": true,
+        "fresh_root_validated": true,
+        "acknowledgement_validated": true,
+        "automatic_continuation_validated": true,
+        "automatic_continuation_marker_validated": true,
+        "automatic_continuation_input_tokens": 2321,
+        "automatic_continuation_output_tokens": 82,
+        "automatic_continuation_total_tokens": 2403
+      }
+    }
+  ],
+  "final_cleanup": [
+    {
+      "command_id": "CMD-20260827T104150Z-7623857663",
+      "action": "unload qwen/qwen3.8-27b",
+      "exit_code": 0,
+      "status": "passed"
+    },
+    {
+      "command_id": "CMD-20260827T104156Z-7ba27baea0",
+      "action": "stop LM Studio server on port 1234",
+      "exit_code": 0,
+      "status": "passed"
     }
   ],
   "related_recorded_deterministic_proof": [
@@ -59,28 +211,16 @@
         "context-overflow rollover request",
         "terminal and transient provider failure persistence"
       ]
-    },
-    {
-      "command_id": "CMD-20260826T230926Z-a55ef7d379",
-      "recorded_under": "FC-AUTO-001",
-      "executed": 395,
-      "skipped": 2,
-      "failures": 0,
-      "configuration": "debug_strict"
-    },
-    {
-      "command_id": "CMD-20260826T231135Z-a82f5da923",
-      "recorded_under": "FC-RELEASE-001",
-      "executed": 395,
-      "skipped": 2,
-      "failures": 0,
-      "configuration": "release_strict"
     }
   ],
   "acceptance": {
-    "all_hard_scenarios_pass": "incomplete",
+    "current_source_debug_strict_suite": "passed",
+    "current_source_release_strict_suite": "passed",
+    "current_source_real_provider_rollover": "passed_at_exact_commit",
+    "provider_output_is_explicitly_bounded": "passed_for_final_live_scenario",
     "real_response_ids_and_usage_recorded": "passed",
     "zero_operator_action_during_executed_rollover": "passed_for_live_scenario_with_provider_preconfigured",
+    "all_hard_scenarios_pass": "incomplete",
     "all_existing_features_preserved": "feature_parity_comparison_incomplete"
   },
   "remaining_scenarios": [

@@ -1,0 +1,21 @@
+Building for production...
+[0/17] Write sources
+[1/17] Copying test.md
+[1/17] Copying tools-catalog.js
+[3/17] Copying style.css
+[4/17] Copying security.md
+[5/17] Copying review.md
+[6/17] Copying research.md
+[7/17] Copying precommit-audit.md
+[7/17] Copying plan.md
+[8/17] Copying index.html
+[10/17] Copying explore.md
+[10/17] Copying implement.md
+[11/17] Copying docs.md
+[13/17] Copying debug.md
+[13/17] Copying app.js
+[15/17] Write sources
+[16/17] Write swift-version--58304C5D6DBC2206.txt
+[18/18] Compiling ForgeConductorCore AgentCatalog.swift
+[19/19] Compiling ForgeNativeSessionHostPlugin ForgeNativeSessionHostPlugin.swift
+Build of target: 'ForgeNativeSessionHostPlugin' complete! (50.06s)

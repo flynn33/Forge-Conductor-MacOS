@@ -887,6 +887,61 @@
     },
     {
       "detail": "valid",
+      "name": "json:evidence/EVID-20260827T100505Z-099fb2070c.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T100602Z-155cb4ac09.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T100625Z-0e6c307f55.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T100635Z-0c30766975.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T100640Z-568f10afeb.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T103142Z-31aeee7a3f.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T103242Z-f2a67a3569.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T103306Z-a585799235.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T103315Z-ea299d27a2.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T103321Z-9af37ac353.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T105148Z-30b18f1784.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
       "name": "json:evidence/P02-telemetry-baseline.json",
       "passed": true
     },
@@ -1995,6 +2050,6 @@
   "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex",
   "schema_version": 1,
   "valid": true,
-  "validated_at": "2026-08-27T03:15:05.116174+00:00",
+  "validated_at": "2026-08-27T10:58:26.225824+00:00",
   "warnings": []
 }

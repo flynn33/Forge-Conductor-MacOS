@@ -1,9 +1,10 @@
 {
   "schema_version": 2,
   "phase": "P09",
-  "captured_at": "2026-08-27T02:42:29Z",
-  "status": "unqualified_current_source",
-  "status_reason": "The supported host mode and historical live-provider proof remain present, but final runtime, security, and packaging changes postdate that proof. Current-source full Debug and Release suites are blocked by locked-session file protection.",
+  "captured_at": "2026-08-27T10:41:04.799117+00:00",
+  "source_revision": "52f8aca47463f88fa94276115fb5c2070ca683ef",
+  "status": "passed",
+  "status_reason": "The exact committed revision passed the native plugin build and contract tests, unfiltered strict Debug and Release suites, external MCP compatibility, the private UI automation scan, and a live LM Studio fresh-root acknowledgement with bounded automatic continuation.",
   "selected_mode": "B",
   "selected_adapter": {
     "identifier": "forge.native-session-host",
@@ -32,7 +33,7 @@
       "mode": "B",
       "name": "Forge-native LM Studio managed host",
       "memory_and_handoffs": "supported",
-      "autonomous_rollover": "supported; current-source qualification pending",
+      "autonomous_rollover": "supported and qualified",
       "provider_boundary": "LM Studio REST responses API",
       "production_registration": "configuration-gated and fail-closed"
     },
@@ -46,14 +47,28 @@
   "live_provider_proof": {
     "provider": "lmstudio",
     "model_key": "qwen/qwen3.8-27b",
+    "loaded_instance_id": "qwen/qwen3.8-27b",
     "context_length": 119552,
+    "maximum_output_tokens": 4096,
     "fresh_root_validated": true,
     "acknowledgement_validated": true,
     "automatic_continuation_validated": true,
+    "automatic_continuation_marker_validated": true,
     "provider_exact_usage": true,
+    "bootstrap_response_id": "resp_e3cdc3ca3ada982b611151440e5fa49d5e3e402fabcc20bc",
+    "automatic_continuation_previous_response_id": "resp_e3cdc3ca3ada982b611151440e5fa49d5e3e402fabcc20bc",
+    "automatic_continuation_response_id": "resp_a298c38e128737df155e4def290e2d2fc74d20e409bca75d",
+    "automatic_continuation_usage": {
+      "input_tokens": 2321,
+      "output_tokens": 82,
+      "total_tokens": 2403,
+      "source": "provider_exact"
+    },
     "artifact": ".forge-autonomy-state/evidence/FC-E2E-001/live-lmstudio-managed-continuity.json",
-    "command_id": "CMD-20260826T224938Z-9660289413",
-    "source_scope": "historical pass before final source freeze"
+    "artifact_sha256": "7861db2e43dff59892b85b6bb914540b891a630c07f7ae882c69954f5e01702b",
+    "command_index": ".forge-autonomy-state/command-logs/FC-E2E-001/commands.jsonl",
+    "command_id": "CMD-20260827T103812Z-17ac760a12",
+    "source_scope": "exact committed revision 52f8aca47463f88fa94276115fb5c2070ca683ef"
   },
   "privacy": {
     "complete_transcripts_persisted": false,
@@ -70,52 +85,54 @@
     "active_records": 1024,
     "reconciliation_records": 4096,
     "live_terminal_records": 128,
-    "provider_attempts": 3
+    "provider_attempts": 3,
+    "maximum_output_tokens": 4096
   },
   "qualification": {
     "plugin_contract_tests": {
-      "record": ".forge-codex/evidence/EVID-20260826T234631Z-cae1c73a2f.json"
+      "record": ".forge-codex/evidence/EVID-20260827T103242Z-f2a67a3569.json",
+      "executed": 16,
+      "skipped": 1,
+      "failures": 0
     },
     "plugin_release_build": {
-      "record": ".forge-codex/evidence/EVID-20260826T234519Z-288f365061.json"
+      "record": ".forge-codex/evidence/EVID-20260827T103142Z-31aeee7a3f.json"
+    },
+    "external_mcp_release_build": {
+      "record": ".forge-codex/evidence/EVID-20260827T103306Z-a585799235.json"
     },
     "external_mcp": {
-      "record": ".forge-codex/evidence/EVID-20260826T234711Z-f708331f5f.json",
-      "artifact": ".forge-codex/evidence/P09-external-mcp-compatibility.json"
+      "record": ".forge-codex/evidence/EVID-20260827T103315Z-ea299d27a2.json",
+      "artifact": ".forge-codex/evidence/P09-external-mcp-compatibility.json",
+      "artifact_sha256": "e567663b11502ec6707a1737826a5ebc0a81f274586180d14db5a480106c9820"
     },
     "private_ui_scan": {
-      "record": ".forge-codex/evidence/EVID-20260826T234718Z-32f5e2f934.json"
+      "record": ".forge-codex/evidence/EVID-20260827T103321Z-9af37ac353.json",
+      "violations": 0
     },
     "debug_strict_suite": {
       "command_index": ".forge-autonomy-state/command-logs/FC-RELEASE-001/commands.jsonl",
-      "command_id": "CMD-20260827T025715Z-b42c01b23b",
-      "status": "blocked_by_locked_session_file_protection"
+      "command_id": "CMD-20260827T103327Z-5d0a028f3d",
+      "executed": 447,
+      "skipped": 3,
+      "failures": 0,
+      "status": "passed"
     },
     "release_strict_suite": {
       "command_index": ".forge-autonomy-state/command-logs/FC-RELEASE-001/commands.jsonl",
-      "command_id": "CMD-20260827T025822Z-dc523f8bbf",
-      "status": "blocked_by_locked_session_file_protection"
-    },
-    "current_runtime_swiftpm": {
-      "command_index": ".forge-autonomy-state/command-logs/FC-RUNTIME-001/commands.jsonl",
-      "command_id": "CMD-20260827T030159Z-301b553f6b",
-      "status": "passed"
-    },
-    "current_runtime_xcode": {
-      "command_index": ".forge-autonomy-state/command-logs/FC-RUNTIME-001/commands.jsonl",
-      "command_id": "CMD-20260827T030030Z-e106bb4ef2",
+      "command_id": "CMD-20260827T103455Z-4b3944647c",
+      "executed": 447,
+      "skipped": 4,
+      "failures": 0,
       "status": "passed"
     },
     "live_lmstudio": {
-      "command_index": ".forge-autonomy-state/evidence/FC-E2E-001/commands.jsonl",
-      "command_id": "CMD-20260826T224938Z-9660289413",
+      "command_index": ".forge-autonomy-state/command-logs/FC-E2E-001/commands.jsonl",
+      "command_id": "CMD-20260827T103812Z-17ac760a12",
       "artifact": ".forge-autonomy-state/evidence/FC-E2E-001/live-lmstudio-managed-continuity.json",
-      "status": "historical_pass_before_final_source_freeze"
+      "artifact_sha256": "7861db2e43dff59892b85b6bb914540b891a630c07f7ae882c69954f5e01702b",
+      "status": "passed"
     }
   },
-  "current_source_resume_conditions": [
-    "rerun full strict Debug and Release suites while the console session is unlocked",
-    "rerun the live LM Studio fresh-root acknowledgement and automatic continuation scenario",
-    "rerun plugin, external MCP compatibility, and private UI automation scans after the source is otherwise frozen"
-  ]
+  "current_source_resume_conditions": []
 }

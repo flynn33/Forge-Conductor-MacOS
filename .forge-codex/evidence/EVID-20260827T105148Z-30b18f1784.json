@@ -1,0 +1,53 @@
+{
+  "artifacts": [
+    {
+      "bytes": 5441,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/P09-host-capability-report.json",
+      "sha256": "b7c7ae9a1d8d9302448e31c8673142e66cbc4e1080ddf6152d8067ddb56b2d75"
+    },
+    {
+      "bytes": 2790,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/P09-resource-owner-matrix.json",
+      "sha256": "be9f2d9b9d711e5852f7a17ea2d6ffd52b540cc3e85c1242df2363797e3a5104"
+    },
+    {
+      "bytes": 2060,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/P09-feature-parity.json",
+      "sha256": "3f9b9f26cd42c153b537e007ac0317c8bf7c3074b91f7e0bdf268a4b2696601f"
+    },
+    {
+      "bytes": 12098,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/P09-external-mcp-compatibility.json",
+      "sha256": "e567663b11502ec6707a1737826a5ebc0a81f274586180d14db5a480106c9820"
+    },
+    {
+      "bytes": 393,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T105148Z-30b18f1784.stdout.txt",
+      "sha256": "f5c0996894ab598af899fe6980940b6a376a1dc90aba995e5059b47d0115d60a"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T105148Z-30b18f1784.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "command": "python3 .forge-codex/scripts/check_p09_completion.py",
+  "ended_at": "2026-08-27T10:51:48.237310+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260827T105148Z-30b18f1784",
+  "kind": "g09-completion-validation",
+  "related_findings": [
+    "FC-AUTONOMY-001"
+  ],
+  "related_gates": [
+    "G09"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-27T10:51:48.193551+00:00",
+  "timed_out": false
+}
