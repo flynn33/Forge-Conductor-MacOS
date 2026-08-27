@@ -331,6 +331,25 @@
     "EVID-20260827T192348Z-20d5fd93cc",
     "EVID-20260827T192358Z-70c269abf8",
     "EVID-20260827T192529Z-d093ae9d1f",
+    "EVID-20260827T211934Z-a744b1e1d1",
+    "EVID-20260827T211935Z-0edebe128b",
+    "EVID-20260827T211945Z-695f17ed45",
+    "EVID-20260827T212011Z-dcbc2f4541",
+    "EVID-20260827T212114Z-8a65f1e92b",
+    "EVID-20260827T212325Z-24175c9913",
+    "EVID-20260827T212325Z-bf0c4e2418",
+    "EVID-20260827T212325Z-d7c34d9501",
+    "EVID-20260827T212528Z-518ab7b892",
+    "EVID-20260827T212528Z-674475b1bd",
+    "EVID-20260827T212538Z-c17d5d9b6c",
+    "EVID-20260827T212604Z-2853075aa5",
+    "EVID-20260827T212606Z-ce5c409c24",
+    "EVID-20260827T212608Z-5b1f4f27b0",
+    "EVID-20260827T215814Z-89ce0c1520",
+    "EVID-20260827T215814Z-ebeefc3719",
+    "EVID-20260827T233859Z-44a7b8fe31",
+    "EVID-20260827T233917Z-a20d351011",
+    "EVID-20260827T234534Z-7538388418",
     "a5466d4e5b4d7a10f87df64ddfdb58b6b8ca5159a57c20527e98802a822245d7",
     "a5d4276cbf14db3a91baa7f6b79fb8cdb3fb042a2eaf663d3219ff36b5451667",
     "b3dc11a8dc286fa33b6567ff62089692e64787b23a66718cfe1766dc27195724",
@@ -725,15 +744,26 @@
       "created_at": "2026-08-27T19:18:35.253826+00:00",
       "evidence_class": "E1",
       "id": "FC-MCP-LEGACY-CANCELLATION-001",
-      "notes": "All tool calls must support cancellation and a deadline. The default ToolPackHandling path checks cancellation only before invoking a synchronous handler and propagates no request deadline. Active git_commit cancellation demonstrably leaves the request occupying capacity until the handler completes, while project_memory deadline_ms is only range-validated and never enforced. Implement cooperative cancellation and per-call deadline propagation across applicable synchronous packs, preserve truthful results after irreversible mutations, and add executable non-shell cancellation and deadline probes.",
+      "notes": "Resolved with bounded per-request cancellation and deadlines across synchronous MCP paths, pre-commit revocation, exact committed-result reconciliation for irreversible mutations, closed-delivery request admission, and preserved legacy shell cancellation responses. Focused MCP passed 20/20; runtime passed 85 tests with one PowerShell host skip; final serial passed 626 tests with four host-dependent skips; parallel passed 626/626; Xcode Debug build passed as EVID-20260827T233859Z-44a7b8fe31; committed-source release executable P10 passed as EVID-20260827T234534Z-7538388418 on manifest 51eef96aa7b01c71ddba8d0446923a1e4ced268711f4810ebda1e1cc95bc9b28.",
       "path": "Sources/ForgeConductorCore/Application/Tools/ToolArgHelpers.swift",
       "severity": "High",
-      "status": "open",
+      "status": "resolved",
       "title": "Synchronous MCP tool packs lack in-flight cancellation and enforced deadlines",
-      "updated_at": "2026-08-27T19:20:43.658225+00:00"
+      "updated_at": "2026-08-27T23:45:57.470267+00:00"
+    },
+    {
+      "created_at": "2026-08-27T23:39:59.864993+00:00",
+      "evidence_class": "E2",
+      "id": "FC-FILESYSTEM-PATH-TOCTOU-001",
+      "notes": "Cross-volume source identity, parent durability, bounded hard-link indexing, and cleanup reporting are repaired and covered by 41 focused filesystem tests. Residual E2 risk remains in descriptor-by-path intermediate-parent traversal plus verify-to-unlink/rename windows, and in the narrow hard-link ctime ambiguity exactly between sibling unlink and ctime refresh. Close with a pinned descriptor-relative openat/unlinkat/renameat design and dedicated race probes; do not infer a confirmed exploit or leak without E0 reachability.",
+      "path": "Sources/ForgeConductorCore/Application/Tools/FilesystemToolPack.swift",
+      "severity": "High",
+      "status": "deferred",
+      "title": "Filesystem mutation paths retain descriptor-relative race windows",
+      "updated_at": "2026-08-27T23:39:59.864861+00:00"
     }
   ],
-  "last_event_sequence": 420,
+  "last_event_sequence": 443,
   "phases": {
     "P00": {
       "attempts": 1,
@@ -816,12 +846,12 @@
   },
   "repository": {
     "branch": "repair/autonomous-continuity",
-    "commit": "167c4419d87b63b4f4427e07c620be7ea67cb5a3",
+    "commit": "6e00f250da4c1a6bd9347c539f53237f283e2e11",
     "dirty": true,
     "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy"
   },
   "run_id": "aba90ab1-be80-4cc5-aa0b-23dd54d4a24d",
   "schema_version": 1,
   "status": "active",
-  "updated_at": "2026-08-27T19:26:08.969291+00:00"
+  "updated_at": "2026-08-27T23:45:57.470409+00:00"
 }

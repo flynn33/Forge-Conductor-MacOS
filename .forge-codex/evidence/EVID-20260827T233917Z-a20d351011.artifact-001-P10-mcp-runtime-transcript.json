@@ -10536,13 +10536,13 @@
       "fixture": {
         "converted_pdf_sha256": "3b62cf388e57e4b13f34256426ed5ad8ca41d823d3a9d6dad57f4fdc64b10407",
         "direct_pdf_sha256": "8eb089a7944bd6c17fee402001570733a4ee39667e83e861bb6ef67990bfe3a2",
-        "final_git_revision": "7df0055ffd0ecad4335dfec555f1925cea57fe18",
-        "handoff_projection_sha256": "4e2829450ee60ff40b2a422d7ff2c5f1c2cb66e7bfcc6a594e206eafd2077a26",
-        "initial_git_revision": "3ce172deb2a37e1b48c18b1dedc367915d239d14",
+        "final_git_revision": "fd64ef901273b5c10c3c964625850780faee0f19",
+        "handoff_projection_sha256": "8c63a41f2368638da63e4ec4be8a9c37ccafb22f4903ece02a2e38f6ba4aab3e",
+        "initial_git_revision": "48922a6795eeace29474e93d73ae864231e53633",
         "playbook_sha256": "98b54ad58554542c62f33fbc862b34fe5e807612959a8eff754b8c22cafa1884"
       },
       "name": "legacy_tool_success_matrix",
-      "normalized_probe_payload_sha256": "635773f58559ec54ff343d7264b75cb9c771aace9925ca6e1c0a78bb0f3f9c12",
+      "normalized_probe_payload_sha256": "41aeff89acbca670f6eb5b646fc907ca47ddc95c77c8e96a76f5772258f484fc",
       "requests": [
         {
           "id": 1,
@@ -10569,7 +10569,7 @@
           "params": {
             "arguments": {
               "agent_id": "compatibility-fixture",
-              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project",
+              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project",
               "goal": "Exercise preserved tool behavior"
             },
             "name": "agent_run_start"
@@ -10632,7 +10632,7 @@
           "method": "tools/call",
           "params": {
             "arguments": {
-              "session_id": "73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC"
+              "session_id": "CEDDF474-7FA3-4515-8345-3A8AE8BDC20A"
             },
             "name": "agent_run_status"
           }
@@ -10643,7 +10643,7 @@
           "method": "tools/call",
           "params": {
             "arguments": {
-              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project/delete-me"
+              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project/delete-me"
             },
             "name": "fs_mkdir"
           }
@@ -10655,7 +10655,7 @@
           "params": {
             "arguments": {
               "content": "# Fixture\nlegacy matrix needle\n",
-              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project/source.md"
+              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project/source.md"
             },
             "name": "fs_write"
           }
@@ -10666,7 +10666,7 @@
           "method": "tools/call",
           "params": {
             "arguments": {
-              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project/source.md"
+              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project/source.md"
             },
             "name": "fs_read"
           }
@@ -10679,7 +10679,7 @@
             "arguments": {
               "new": "tracked after",
               "old": "tracked before",
-              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project/tracked.txt"
+              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project/tracked.txt"
             },
             "name": "fs_edit"
           }
@@ -10690,7 +10690,7 @@
           "method": "tools/call",
           "params": {
             "arguments": {
-              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project"
+              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project"
             },
             "name": "fs_list"
           }
@@ -10701,7 +10701,7 @@
           "method": "tools/call",
           "params": {
             "arguments": {
-              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project",
+              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project",
               "pattern": "*.md"
             },
             "name": "fs_glob"
@@ -10713,7 +10713,7 @@
           "method": "tools/call",
           "params": {
             "arguments": {
-              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project",
+              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project",
               "pattern": "legacy matrix needle"
             },
             "name": "search_text"
@@ -10725,8 +10725,8 @@
           "method": "tools/call",
           "params": {
             "arguments": {
-              "dest_path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project/from-file.pdf",
-              "source_path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project/source.md",
+              "dest_path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project/from-file.pdf",
+              "source_path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project/source.md",
               "title": "Fixture"
             },
             "name": "pdf_from_file"
@@ -10739,7 +10739,7 @@
           "params": {
             "arguments": {
               "content": "# Direct\nFixture body",
-              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project/direct.pdf",
+              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project/direct.pdf",
               "title": "Fixture"
             },
             "name": "pdf_write"
@@ -10751,8 +10751,8 @@
           "method": "tools/call",
           "params": {
             "arguments": {
-              "destination": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project/moved.md",
-              "source": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project/source.md"
+              "destination": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project/moved.md",
+              "source": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project/source.md"
             },
             "name": "fs_move"
           }
@@ -10763,7 +10763,7 @@
           "method": "tools/call",
           "params": {
             "arguments": {
-              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project/delete-me"
+              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project/delete-me"
             },
             "name": "fs_delete"
           }
@@ -10774,7 +10774,7 @@
           "method": "tools/call",
           "params": {
             "arguments": {
-              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project"
+              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project"
             },
             "name": "git_status"
           }
@@ -10785,7 +10785,7 @@
           "method": "tools/call",
           "params": {
             "arguments": {
-              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project"
+              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project"
             },
             "name": "git_diff"
           }
@@ -10796,7 +10796,7 @@
           "method": "tools/call",
           "params": {
             "arguments": {
-              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project",
+              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project",
               "path": "tracked.txt"
             },
             "name": "git_add"
@@ -10808,7 +10808,7 @@
           "method": "tools/call",
           "params": {
             "arguments": {
-              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project",
+              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project",
               "message": "Validate compatibility fixture"
             },
             "name": "git_commit"
@@ -10820,7 +10820,7 @@
           "method": "tools/call",
           "params": {
             "arguments": {
-              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project",
+              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project",
               "limit": 2
             },
             "name": "git_log"
@@ -10833,7 +10833,7 @@
           "params": {
             "arguments": {
               "command": "printf 'runtime-ok\\n'",
-              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project",
+              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project",
               "timeout_sec": 10
             },
             "name": "shell_exec"
@@ -10910,13 +10910,13 @@
             "arguments": {
               "blockers": [],
               "chat_label": "P10 fixture",
-              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project",
+              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project",
               "decisions": [
                 "Use isolated files."
               ],
               "goal": "Exercise preserved tool behavior",
               "key_files": [
-                "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project/tracked.txt"
+                "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project/tracked.txt"
               ],
               "narrative": "Protocol fixture progress.",
               "next_actions": [
@@ -10934,7 +10934,7 @@
           "method": "tools/call",
           "params": {
             "arguments": {
-              "handoff_id": "b519a0e9-2491-4c46-8d24-ab70c8a9f28f",
+              "handoff_id": "1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b",
               "narrative": "Protocol fixture completed.",
               "next_actions": [
                 "verify evidence"
@@ -10950,7 +10950,7 @@
           "method": "tools/call",
           "params": {
             "arguments": {
-              "handoff_id": "b519a0e9-2491-4c46-8d24-ab70c8a9f28f",
+              "handoff_id": "1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b",
               "resume_ready": true
             },
             "name": "context_get"
@@ -10976,7 +10976,7 @@
               "report": {
                 "result": "passed"
               },
-              "session_id": "73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC"
+              "session_id": "CEDDF474-7FA3-4515-8345-3A8AE8BDC20A"
             },
             "name": "agent_run_complete"
           }
@@ -11028,7 +11028,7 @@
           "result": {
             "content": [
               {
-                "text": "{\"agent\":{\"body\":\"# Compatibility fixture\\n\\nUse only for the isolated protocol matrix.\",\"description\":\"Isolated protocol fixture.\",\"display_name\":\"Compatibility Fixture\",\"id\":\"compatibility-fixture\",\"playbook\":{\"done_definition\":[],\"first_moves\":[],\"handoff\":[],\"output_schema\":[\"result\"],\"quality_bar\":[],\"tools_forbidden\":[],\"tools_primary\":[\"agent_context\",\"agent_get\",\"agent_list\",\"agent_recommend\",\"agent_run_complete\",\"agent_run_start\",\"agent_run_status\",\"context_get\",\"context_list\",\"forge_status\",\"fs_delete\",\"fs_edit\",\"fs_glob\",\"fs_list\",\"fs_mkdir\",\"fs_move\",\"fs_read\",\"fs_write\",\"git_add\",\"git_commit\",\"git_diff\",\"git_log\",\"git_status\",\"memory_delete\",\"memory_get\",\"memory_list\",\"memory_search\",\"memory_set\",\"pdf_from_file\",\"pdf_write\",\"search_text\",\"session_checkpoint\",\"session_handoff\",\"shell_exec\"],\"when_to_use\":[]},\"source\":\"custom\",\"tools\":[\"agent_context\",\"agent_get\",\"agent_list\",\"agent_recommend\",\"agent_run_complete\",\"agent_run_start\",\"agent_run_status\",\"context_get\",\"context_list\",\"forge_status\",\"fs_delete\",\"fs_edit\",\"fs_glob\",\"fs_list\",\"fs_mkdir\",\"fs_move\",\"fs_read\",\"fs_write\",\"git_add\",\"git_commit\",\"git_diff\",\"git_log\",\"git_status\",\"memory_delete\",\"memory_get\",\"memory_list\",\"memory_search\",\"memory_set\",\"pdf_from_file\",\"pdf_write\",\"search_text\",\"session_checkpoint\",\"session_handoff\",\"shell_exec\"]},\"auto_continuity\":\"checkpoint\",\"auto_handoff_id\":\"b519a0e9-2491-4c46-8d24-ab70c8a9f28f\",\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\",\"done_definition\":[],\"first_moves\":[],\"goal\":\"Exercise preserved tool behavior\",\"must_complete\":true,\"next\":[\"Adopt agent.body as role instructions\",\"Execute first_moves\",\"Prefer tools_primary\",\"REQUIRED: agent_run_complete(session_id: '73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC', report: {…output_schema})\"],\"ok\":true,\"output_schema\":[\"result\"],\"project_context\":{\"authorization_roots\":[\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\"],\"client_id\":\"6293C140-0152-4802-883C-150287F9B762\",\"maximum_inline_output_bytes\":65536,\"project_generation\":1,\"project_id\":\"02d0d2bf-0a84-4933-855e-270db4d5d490\"},\"project_context_attached\":true,\"project_generation\":1,\"project_id\":\"02d0d2bf-0a84-4933-855e-270db4d5d490\",\"session\":{\"agent_id\":\"compatibility-fixture\",\"client_id\":\"6293C140-0152-4802-883C-150287F9B762\",\"created_at\":\"2026-08-27T23:45:36Z\",\"id\":\"73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC\",\"status\":\"open\",\"summary\":null,\"updated_at\":\"2026-08-27T23:45:36Z\"},\"session_id\":\"73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC\",\"token_policy\":\"Large context host: do not skip specialists to save tokens.\",\"tools_forbidden\":[],\"tools_primary\":[\"agent_context\",\"agent_get\",\"agent_list\",\"agent_recommend\",\"agent_run_complete\",\"agent_run_start\",\"agent_run_status\",\"context_get\",\"context_list\",\"forge_status\",\"fs_delete\",\"fs_edit\",\"fs_glob\",\"fs_list\",\"fs_mkdir\",\"fs_move\",\"fs_read\",\"fs_write\",\"git_add\",\"git_commit\",\"git_diff\",\"git_log\",\"git_status\",\"memory_delete\",\"memory_get\",\"memory_list\",\"memory_search\",\"memory_set\",\"pdf_from_file\",\"pdf_write\",\"search_text\",\"session_checkpoint\",\"session_handoff\",\"shell_exec\"]}",
+                "text": "{\"agent\":{\"body\":\"# Compatibility fixture\\n\\nUse only for the isolated protocol matrix.\",\"description\":\"Isolated protocol fixture.\",\"display_name\":\"Compatibility Fixture\",\"id\":\"compatibility-fixture\",\"playbook\":{\"done_definition\":[],\"first_moves\":[],\"handoff\":[],\"output_schema\":[\"result\"],\"quality_bar\":[],\"tools_forbidden\":[],\"tools_primary\":[\"agent_context\",\"agent_get\",\"agent_list\",\"agent_recommend\",\"agent_run_complete\",\"agent_run_start\",\"agent_run_status\",\"context_get\",\"context_list\",\"forge_status\",\"fs_delete\",\"fs_edit\",\"fs_glob\",\"fs_list\",\"fs_mkdir\",\"fs_move\",\"fs_read\",\"fs_write\",\"git_add\",\"git_commit\",\"git_diff\",\"git_log\",\"git_status\",\"memory_delete\",\"memory_get\",\"memory_list\",\"memory_search\",\"memory_set\",\"pdf_from_file\",\"pdf_write\",\"search_text\",\"session_checkpoint\",\"session_handoff\",\"shell_exec\"],\"when_to_use\":[]},\"source\":\"custom\",\"tools\":[\"agent_context\",\"agent_get\",\"agent_list\",\"agent_recommend\",\"agent_run_complete\",\"agent_run_start\",\"agent_run_status\",\"context_get\",\"context_list\",\"forge_status\",\"fs_delete\",\"fs_edit\",\"fs_glob\",\"fs_list\",\"fs_mkdir\",\"fs_move\",\"fs_read\",\"fs_write\",\"git_add\",\"git_commit\",\"git_diff\",\"git_log\",\"git_status\",\"memory_delete\",\"memory_get\",\"memory_list\",\"memory_search\",\"memory_set\",\"pdf_from_file\",\"pdf_write\",\"search_text\",\"session_checkpoint\",\"session_handoff\",\"shell_exec\"]},\"auto_continuity\":\"checkpoint\",\"auto_handoff_id\":\"1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b\",\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\",\"done_definition\":[],\"first_moves\":[],\"goal\":\"Exercise preserved tool behavior\",\"must_complete\":true,\"next\":[\"Adopt agent.body as role instructions\",\"Execute first_moves\",\"Prefer tools_primary\",\"REQUIRED: agent_run_complete(session_id: 'CEDDF474-7FA3-4515-8345-3A8AE8BDC20A', report: {…output_schema})\"],\"ok\":true,\"output_schema\":[\"result\"],\"project_context\":{\"authorization_roots\":[\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\"],\"client_id\":\"AB2D0CF5-8B0F-4FCB-8DFD-147D102DF947\",\"maximum_inline_output_bytes\":65536,\"project_generation\":1,\"project_id\":\"28835aff-5b10-445c-a15e-8d692e952cf3\"},\"project_context_attached\":true,\"project_generation\":1,\"project_id\":\"28835aff-5b10-445c-a15e-8d692e952cf3\",\"session\":{\"agent_id\":\"compatibility-fixture\",\"client_id\":\"AB2D0CF5-8B0F-4FCB-8DFD-147D102DF947\",\"created_at\":\"2026-08-27T23:39:18Z\",\"id\":\"CEDDF474-7FA3-4515-8345-3A8AE8BDC20A\",\"status\":\"open\",\"summary\":null,\"updated_at\":\"2026-08-27T23:39:18Z\"},\"session_id\":\"CEDDF474-7FA3-4515-8345-3A8AE8BDC20A\",\"token_policy\":\"Large context host: do not skip specialists to save tokens.\",\"tools_forbidden\":[],\"tools_primary\":[\"agent_context\",\"agent_get\",\"agent_list\",\"agent_recommend\",\"agent_run_complete\",\"agent_run_start\",\"agent_run_status\",\"context_get\",\"context_list\",\"forge_status\",\"fs_delete\",\"fs_edit\",\"fs_glob\",\"fs_list\",\"fs_mkdir\",\"fs_move\",\"fs_read\",\"fs_write\",\"git_add\",\"git_commit\",\"git_diff\",\"git_log\",\"git_status\",\"memory_delete\",\"memory_get\",\"memory_list\",\"memory_search\",\"memory_set\",\"pdf_from_file\",\"pdf_write\",\"search_text\",\"session_checkpoint\",\"session_handoff\",\"shell_exec\"]}",
                 "type": "text"
               }
             ],
@@ -11125,8 +11125,8 @@
                 ]
               },
               "auto_continuity": "checkpoint",
-              "auto_handoff_id": "b519a0e9-2491-4c46-8d24-ab70c8a9f28f",
-              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project",
+              "auto_handoff_id": "1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b",
+              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project",
               "done_definition": [],
               "first_moves": [],
               "goal": "Exercise preserved tool behavior",
@@ -11135,7 +11135,7 @@
                 "Adopt agent.body as role instructions",
                 "Execute first_moves",
                 "Prefer tools_primary",
-                "REQUIRED: agent_run_complete(session_id: '73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC', report: {…output_schema})"
+                "REQUIRED: agent_run_complete(session_id: 'CEDDF474-7FA3-4515-8345-3A8AE8BDC20A', report: {…output_schema})"
               ],
               "ok": true,
               "output_schema": [
@@ -11143,26 +11143,26 @@
               ],
               "project_context": {
                 "authorization_roots": [
-                  "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project"
+                  "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project"
                 ],
-                "client_id": "6293C140-0152-4802-883C-150287F9B762",
+                "client_id": "AB2D0CF5-8B0F-4FCB-8DFD-147D102DF947",
                 "maximum_inline_output_bytes": 65536,
                 "project_generation": 1,
-                "project_id": "02d0d2bf-0a84-4933-855e-270db4d5d490"
+                "project_id": "28835aff-5b10-445c-a15e-8d692e952cf3"
               },
               "project_context_attached": true,
               "project_generation": 1,
-              "project_id": "02d0d2bf-0a84-4933-855e-270db4d5d490",
+              "project_id": "28835aff-5b10-445c-a15e-8d692e952cf3",
               "session": {
                 "agent_id": "compatibility-fixture",
-                "client_id": "6293C140-0152-4802-883C-150287F9B762",
-                "created_at": "2026-08-27T23:45:36Z",
-                "id": "73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC",
+                "client_id": "AB2D0CF5-8B0F-4FCB-8DFD-147D102DF947",
+                "created_at": "2026-08-27T23:39:18Z",
+                "id": "CEDDF474-7FA3-4515-8345-3A8AE8BDC20A",
                 "status": "open",
                 "summary": null,
-                "updated_at": "2026-08-27T23:45:36Z"
+                "updated_at": "2026-08-27T23:39:18Z"
               },
-              "session_id": "73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC",
+              "session_id": "CEDDF474-7FA3-4515-8345-3A8AE8BDC20A",
               "token_policy": "Large context host: do not skip specialists to save tokens.",
               "tools_forbidden": [],
               "tools_primary": [
@@ -11210,7 +11210,7 @@
           "result": {
             "content": [
               {
-                "text": "{\"agents\":[\"compatibility-fixture\",\"debug\",\"docs\",\"explore\",\"implement\",\"plan\",\"precommit-audit\",\"research\",\"review\",\"security\",\"test\"],\"auto_continuity\":{\"blocked\":false,\"checkpoint_every_tools\":50,\"enabled\":true,\"handoff_every_tools\":200,\"handoff_id\":null,\"implicit_roots\":[\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\"],\"progress_count\":1},\"client_id\":\"6293C140-0152-4802-883C-150287F9B762\",\"continuity\":{\"auto\":{\"checkpoint_every_tools\":50,\"handoff_every_tools\":200,\"note\":\"Forge writes checkpoints and handoffs from tool progress; the model does not have to call session_*.\"},\"latest_id\":\"b519a0e9-2491-4c46-8d24-ab70c8a9f28f\",\"latest_updated_at\":\"2026-08-27T23:45:36Z\",\"note\":\"New chat bootstrap: call context_get over stdio MCP (forge-conductor).\",\"open_agent_sessions\":1,\"resume_id\":null,\"resume_ready\":false,\"tools\":[\"session_checkpoint\",\"session_handoff\",\"context_get\",\"context_list\"]},\"home\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\",\"memory_note_count\":0,\"ok\":true,\"open_session_ids\":[\"73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC\"],\"open_sessions\":1,\"pid\":42033,\"presence_count\":1,\"runtime\":\"swift\",\"tools\":[\"agent_context\",\"agent_get\",\"agent_list\",\"agent_recommend\",\"agent_run_complete\",\"agent_run_start\",\"agent_run_status\",\"bash.run\",\"context_get\",\"context_list\",\"continuity.acknowledge_handoff\",\"continuity.checkpoint\",\"continuity.get_pending_handoff\",\"continuity.prepare_handoff\",\"continuity.request_rollover\",\"continuity.resume\",\"continuity.status\",\"forge_status\",\"fs_delete\",\"fs_edit\",\"fs_glob\",\"fs_list\",\"fs_mkdir\",\"fs_move\",\"fs_read\",\"fs_write\",\"git_add\",\"git_commit\",\"git_diff\",\"git_log\",\"git_status\",\"job.cancel\",\"job.list\",\"job.read_output\",\"job.status\",\"memory_delete\",\"memory_get\",\"memory_list\",\"memory_search\",\"memory_set\",\"pdf_from_file\",\"pdf_write\",\"powershell.run\",\"process.run\",\"project_memory.export\",\"project_memory.forget\",\"project_memory.get\",\"project_memory.import\",\"project_memory.initialize\",\"project_memory.link\",\"project_memory.list_recent\",\"project_memory.remember\",\"project_memory.remember_batch\",\"project_memory.search\",\"project_memory.status\",\"project_memory.update\",\"python.run\",\"runtime.capabilities\",\"search_text\",\"session_checkpoint\",\"session_handoff\",\"shell.run\",\"shell_exec\"],\"version\":\"0.9.0\"}",
+                "text": "{\"agents\":[\"compatibility-fixture\",\"debug\",\"docs\",\"explore\",\"implement\",\"plan\",\"precommit-audit\",\"research\",\"review\",\"security\",\"test\"],\"auto_continuity\":{\"blocked\":false,\"checkpoint_every_tools\":50,\"enabled\":true,\"handoff_every_tools\":200,\"handoff_id\":null,\"implicit_roots\":[\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\"],\"progress_count\":1},\"client_id\":\"AB2D0CF5-8B0F-4FCB-8DFD-147D102DF947\",\"continuity\":{\"auto\":{\"checkpoint_every_tools\":50,\"handoff_every_tools\":200,\"note\":\"Forge writes checkpoints and handoffs from tool progress; the model does not have to call session_*.\"},\"latest_id\":\"1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b\",\"latest_updated_at\":\"2026-08-27T23:39:18Z\",\"note\":\"New chat bootstrap: call context_get over stdio MCP (forge-conductor).\",\"open_agent_sessions\":1,\"resume_id\":null,\"resume_ready\":false,\"tools\":[\"session_checkpoint\",\"session_handoff\",\"context_get\",\"context_list\"]},\"home\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\",\"memory_note_count\":0,\"ok\":true,\"open_session_ids\":[\"CEDDF474-7FA3-4515-8345-3A8AE8BDC20A\"],\"open_sessions\":1,\"pid\":38942,\"presence_count\":1,\"runtime\":\"swift\",\"tools\":[\"agent_context\",\"agent_get\",\"agent_list\",\"agent_recommend\",\"agent_run_complete\",\"agent_run_start\",\"agent_run_status\",\"bash.run\",\"context_get\",\"context_list\",\"continuity.acknowledge_handoff\",\"continuity.checkpoint\",\"continuity.get_pending_handoff\",\"continuity.prepare_handoff\",\"continuity.request_rollover\",\"continuity.resume\",\"continuity.status\",\"forge_status\",\"fs_delete\",\"fs_edit\",\"fs_glob\",\"fs_list\",\"fs_mkdir\",\"fs_move\",\"fs_read\",\"fs_write\",\"git_add\",\"git_commit\",\"git_diff\",\"git_log\",\"git_status\",\"job.cancel\",\"job.list\",\"job.read_output\",\"job.status\",\"memory_delete\",\"memory_get\",\"memory_list\",\"memory_search\",\"memory_set\",\"pdf_from_file\",\"pdf_write\",\"powershell.run\",\"process.run\",\"project_memory.export\",\"project_memory.forget\",\"project_memory.get\",\"project_memory.import\",\"project_memory.initialize\",\"project_memory.link\",\"project_memory.list_recent\",\"project_memory.remember\",\"project_memory.remember_batch\",\"project_memory.search\",\"project_memory.status\",\"project_memory.update\",\"python.run\",\"runtime.capabilities\",\"search_text\",\"session_checkpoint\",\"session_handoff\",\"shell.run\",\"shell_exec\"],\"version\":\"0.9.0\"}",
                 "type": "text"
               }
             ],
@@ -11236,19 +11236,19 @@
                 "handoff_every_tools": 200,
                 "handoff_id": null,
                 "implicit_roots": [
-                  "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project"
+                  "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project"
                 ],
                 "progress_count": 1
               },
-              "client_id": "6293C140-0152-4802-883C-150287F9B762",
+              "client_id": "AB2D0CF5-8B0F-4FCB-8DFD-147D102DF947",
               "continuity": {
                 "auto": {
                   "checkpoint_every_tools": 50,
                   "handoff_every_tools": 200,
                   "note": "Forge writes checkpoints and handoffs from tool progress; the model does not have to call session_*."
                 },
-                "latest_id": "b519a0e9-2491-4c46-8d24-ab70c8a9f28f",
-                "latest_updated_at": "2026-08-27T23:45:36Z",
+                "latest_id": "1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b",
+                "latest_updated_at": "2026-08-27T23:39:18Z",
                 "note": "New chat bootstrap: call context_get over stdio MCP (forge-conductor).",
                 "open_agent_sessions": 1,
                 "resume_id": null,
@@ -11260,14 +11260,14 @@
                   "context_list"
                 ]
               },
-              "home": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix",
+              "home": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix",
               "memory_note_count": 0,
               "ok": true,
               "open_session_ids": [
-                "73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC"
+                "CEDDF474-7FA3-4515-8345-3A8AE8BDC20A"
               ],
               "open_sessions": 1,
-              "pid": 42033,
+              "pid": 38942,
               "presence_count": 1,
               "runtime": "swift",
               "tools": [
@@ -12472,7 +12472,7 @@
           "result": {
             "content": [
               {
-                "text": "{\"abandon_risk\":false,\"active_binding\":{\"agent_id\":\"compatibility-fixture\",\"goal\":\"Exercise preserved tool behavior\",\"session_id\":\"73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC\"},\"idle_sec\":0,\"must_complete\":true,\"ok\":true,\"reattached\":false,\"reminder\":\"Session 73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC is still OPEN. You MUST call agent_run_complete before finishing.\",\"session\":{\"agent_id\":\"compatibility-fixture\",\"client_id\":\"6293C140-0152-4802-883C-150287F9B762\",\"created_at\":\"2026-08-27T23:45:36Z\",\"id\":\"73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC\",\"status\":\"open\",\"summary\":null,\"updated_at\":\"2026-08-27T23:45:36Z\"}}",
+                "text": "{\"abandon_risk\":false,\"active_binding\":{\"agent_id\":\"compatibility-fixture\",\"goal\":\"Exercise preserved tool behavior\",\"session_id\":\"CEDDF474-7FA3-4515-8345-3A8AE8BDC20A\"},\"idle_sec\":0,\"must_complete\":true,\"ok\":true,\"reattached\":false,\"reminder\":\"Session CEDDF474-7FA3-4515-8345-3A8AE8BDC20A is still OPEN. You MUST call agent_run_complete before finishing.\",\"session\":{\"agent_id\":\"compatibility-fixture\",\"client_id\":\"AB2D0CF5-8B0F-4FCB-8DFD-147D102DF947\",\"created_at\":\"2026-08-27T23:39:18Z\",\"id\":\"CEDDF474-7FA3-4515-8345-3A8AE8BDC20A\",\"status\":\"open\",\"summary\":null,\"updated_at\":\"2026-08-27T23:39:18Z\"}}",
                 "type": "text"
               }
             ],
@@ -12482,21 +12482,21 @@
               "active_binding": {
                 "agent_id": "compatibility-fixture",
                 "goal": "Exercise preserved tool behavior",
-                "session_id": "73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC"
+                "session_id": "CEDDF474-7FA3-4515-8345-3A8AE8BDC20A"
               },
               "idle_sec": 0,
               "must_complete": true,
               "ok": true,
               "reattached": false,
-              "reminder": "Session 73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC is still OPEN. You MUST call agent_run_complete before finishing.",
+              "reminder": "Session CEDDF474-7FA3-4515-8345-3A8AE8BDC20A is still OPEN. You MUST call agent_run_complete before finishing.",
               "session": {
                 "agent_id": "compatibility-fixture",
-                "client_id": "6293C140-0152-4802-883C-150287F9B762",
-                "created_at": "2026-08-27T23:45:36Z",
-                "id": "73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC",
+                "client_id": "AB2D0CF5-8B0F-4FCB-8DFD-147D102DF947",
+                "created_at": "2026-08-27T23:39:18Z",
+                "id": "CEDDF474-7FA3-4515-8345-3A8AE8BDC20A",
                 "status": "open",
                 "summary": null,
-                "updated_at": "2026-08-27T23:45:36Z"
+                "updated_at": "2026-08-27T23:39:18Z"
               }
             }
           }
@@ -12507,14 +12507,14 @@
           "result": {
             "content": [
               {
-                "text": "{\"ok\":true,\"path\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\/delete-me\"}",
+                "text": "{\"ok\":true,\"path\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\/delete-me\"}",
                 "type": "text"
               }
             ],
             "isError": false,
             "structuredContent": {
               "ok": true,
-              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project/delete-me"
+              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project/delete-me"
             }
           }
         },
@@ -12524,7 +12524,7 @@
           "result": {
             "content": [
               {
-                "text": "{\"bytes_written\":31,\"ok\":true,\"path\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\/source.md\"}",
+                "text": "{\"bytes_written\":31,\"ok\":true,\"path\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\/source.md\"}",
                 "type": "text"
               }
             ],
@@ -12532,7 +12532,7 @@
             "structuredContent": {
               "bytes_written": 31,
               "ok": true,
-              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project/source.md"
+              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project/source.md"
             }
           }
         },
@@ -12542,7 +12542,7 @@
           "result": {
             "content": [
               {
-                "text": "{\"content\":\"# Fixture\\nlegacy matrix needle\\n\",\"end_line\":3,\"has_more\":false,\"line_count\":3,\"note\":\"Complete file contents (3 lines). Do not re-read this path unless the file changes.\",\"ok\":true,\"path\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\/source.md\",\"size\":31,\"start_line\":1,\"total_lines\":3}",
+                "text": "{\"content\":\"# Fixture\\nlegacy matrix needle\\n\",\"end_line\":3,\"has_more\":false,\"line_count\":3,\"note\":\"Complete file contents (3 lines). Do not re-read this path unless the file changes.\",\"ok\":true,\"path\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\/source.md\",\"size\":31,\"start_line\":1,\"total_lines\":3}",
                 "type": "text"
               }
             ],
@@ -12554,7 +12554,7 @@
               "line_count": 3,
               "note": "Complete file contents (3 lines). Do not re-read this path unless the file changes.",
               "ok": true,
-              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project/source.md",
+              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project/source.md",
               "size": 31,
               "start_line": 1,
               "total_lines": 3
@@ -12567,14 +12567,14 @@
           "result": {
             "content": [
               {
-                "text": "{\"ok\":true,\"path\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\/tracked.txt\",\"replacements\":1}",
+                "text": "{\"ok\":true,\"path\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\/tracked.txt\",\"replacements\":1}",
                 "type": "text"
               }
             ],
             "isError": false,
             "structuredContent": {
               "ok": true,
-              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project/tracked.txt",
+              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project/tracked.txt",
               "replacements": 1
             }
           }
@@ -12585,7 +12585,7 @@
           "result": {
             "content": [
               {
-                "text": "{\"entries\":[\".git\",\"delete-me\",\"source.md\",\"tracked.txt\"],\"maximum_entries\":1000,\"ok\":true,\"path\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\",\"truncated\":false}",
+                "text": "{\"entries\":[\".git\",\"delete-me\",\"source.md\",\"tracked.txt\"],\"maximum_entries\":1000,\"ok\":true,\"path\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\",\"truncated\":false}",
                 "type": "text"
               }
             ],
@@ -12599,7 +12599,7 @@
               ],
               "maximum_entries": 1000,
               "ok": true,
-              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project",
+              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project",
               "truncated": false
             }
           }
@@ -12610,17 +12610,17 @@
           "result": {
             "content": [
               {
-                "text": "{\"matches\":[\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\/source.md\"],\"ok\":true,\"path\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\",\"pattern\":\"*.md\"}",
+                "text": "{\"matches\":[\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\/source.md\"],\"ok\":true,\"path\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\",\"pattern\":\"*.md\"}",
                 "type": "text"
               }
             ],
             "isError": false,
             "structuredContent": {
               "matches": [
-                "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project/source.md"
+                "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project/source.md"
               ],
               "ok": true,
-              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project",
+              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project",
               "pattern": "*.md"
             }
           }
@@ -12631,7 +12631,7 @@
           "result": {
             "content": [
               {
-                "text": "{\"count\":1,\"exit_code\":0,\"matches\":[\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\/source.md:2:legacy matrix needle\"],\"ok\":true,\"pattern\":\"legacy matrix needle\",\"stderr\":\"\",\"timed_out\":false}",
+                "text": "{\"count\":1,\"exit_code\":0,\"matches\":[\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\/source.md:2:legacy matrix needle\"],\"ok\":true,\"pattern\":\"legacy matrix needle\",\"stderr\":\"\",\"timed_out\":false}",
                 "type": "text"
               }
             ],
@@ -12640,7 +12640,7 @@
               "count": 1,
               "exit_code": 0,
               "matches": [
-                "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project/source.md:2:legacy matrix needle"
+                "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project/source.md:2:legacy matrix needle"
               ],
               "ok": true,
               "pattern": "legacy matrix needle",
@@ -12655,7 +12655,7 @@
           "result": {
             "content": [
               {
-                "text": "{\"bytes_written\":740,\"engine\":\"swift-pdf-writer\",\"ok\":true,\"pages\":1,\"path\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\/from-file.pdf\",\"source_path\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\/source.md\",\"title\":\"Fixture\"}",
+                "text": "{\"bytes_written\":740,\"engine\":\"swift-pdf-writer\",\"ok\":true,\"pages\":1,\"path\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\/from-file.pdf\",\"source_path\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\/source.md\",\"title\":\"Fixture\"}",
                 "type": "text"
               }
             ],
@@ -12665,8 +12665,8 @@
               "engine": "swift-pdf-writer",
               "ok": true,
               "pages": 1,
-              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project/from-file.pdf",
-              "source_path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project/source.md",
+              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project/from-file.pdf",
+              "source_path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project/source.md",
               "title": "Fixture"
             }
           }
@@ -12677,7 +12677,7 @@
           "result": {
             "content": [
               {
-                "text": "{\"bytes_written\":731,\"engine\":\"swift-pdf-writer\",\"ok\":true,\"pages\":1,\"path\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\/direct.pdf\",\"title\":\"Fixture\"}",
+                "text": "{\"bytes_written\":731,\"engine\":\"swift-pdf-writer\",\"ok\":true,\"pages\":1,\"path\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\/direct.pdf\",\"title\":\"Fixture\"}",
                 "type": "text"
               }
             ],
@@ -12687,7 +12687,7 @@
               "engine": "swift-pdf-writer",
               "ok": true,
               "pages": 1,
-              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project/direct.pdf",
+              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project/direct.pdf",
               "title": "Fixture"
             }
           }
@@ -12698,19 +12698,19 @@
           "result": {
             "content": [
               {
-                "text": "{\"committed\":true,\"dest\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\/moved.md\",\"destination_exists\":true,\"durability_confirmed\":true,\"ok\":true,\"source_exists\":false,\"src\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\/source.md\"}",
+                "text": "{\"committed\":true,\"dest\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\/moved.md\",\"destination_exists\":true,\"durability_confirmed\":true,\"ok\":true,\"source_exists\":false,\"src\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\/source.md\"}",
                 "type": "text"
               }
             ],
             "isError": false,
             "structuredContent": {
               "committed": true,
-              "dest": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project/moved.md",
+              "dest": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project/moved.md",
               "destination_exists": true,
               "durability_confirmed": true,
               "ok": true,
               "source_exists": false,
-              "src": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project/source.md"
+              "src": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project/source.md"
             }
           }
         },
@@ -12720,7 +12720,7 @@
           "result": {
             "content": [
               {
-                "text": "{\"deleted\":true,\"deleted_entries\":1,\"ok\":true,\"path\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\/delete-me\"}",
+                "text": "{\"deleted\":true,\"deleted_entries\":1,\"ok\":true,\"path\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\/delete-me\"}",
                 "type": "text"
               }
             ],
@@ -12729,7 +12729,7 @@
               "deleted": true,
               "deleted_entries": 1,
               "ok": true,
-              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project/delete-me"
+              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project/delete-me"
             }
           }
         },
@@ -12739,13 +12739,13 @@
           "result": {
             "content": [
               {
-                "text": "{\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\",\"exit_code\":0,\"ok\":true,\"stderr\":\"\",\"stdout\":\"## main\\n M tracked.txt\\n?? direct.pdf\\n?? from-file.pdf\\n?? moved.md\\n\",\"timed_out\":false}",
+                "text": "{\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\",\"exit_code\":0,\"ok\":true,\"stderr\":\"\",\"stdout\":\"## main\\n M tracked.txt\\n?? direct.pdf\\n?? from-file.pdf\\n?? moved.md\\n\",\"timed_out\":false}",
                 "type": "text"
               }
             ],
             "isError": false,
             "structuredContent": {
-              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project",
+              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project",
               "exit_code": 0,
               "ok": true,
               "stderr": "",
@@ -12760,13 +12760,13 @@
           "result": {
             "content": [
               {
-                "text": "{\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\",\"exit_code\":0,\"ok\":true,\"stderr\":\"\",\"stdout\":\"diff --git a\\/tracked.txt b\\/tracked.txt\\nindex e0c369f..1fbe32c 100644\\n--- a\\/tracked.txt\\n+++ b\\/tracked.txt\\n@@ -1 +1 @@\\n-tracked before\\n+tracked after\\n\",\"timed_out\":false}",
+                "text": "{\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\",\"exit_code\":0,\"ok\":true,\"stderr\":\"\",\"stdout\":\"diff --git a\\/tracked.txt b\\/tracked.txt\\nindex e0c369f..1fbe32c 100644\\n--- a\\/tracked.txt\\n+++ b\\/tracked.txt\\n@@ -1 +1 @@\\n-tracked before\\n+tracked after\\n\",\"timed_out\":false}",
                 "type": "text"
               }
             ],
             "isError": false,
             "structuredContent": {
-              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project",
+              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project",
               "exit_code": 0,
               "ok": true,
               "stderr": "",
@@ -12781,13 +12781,13 @@
           "result": {
             "content": [
               {
-                "text": "{\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\",\"exit_code\":0,\"ok\":true,\"stderr\":\"\",\"stdout\":\"\",\"timed_out\":false}",
+                "text": "{\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\",\"exit_code\":0,\"ok\":true,\"stderr\":\"\",\"stdout\":\"\",\"timed_out\":false}",
                 "type": "text"
               }
             ],
             "isError": false,
             "structuredContent": {
-              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project",
+              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project",
               "exit_code": 0,
               "ok": true,
               "stderr": "",
@@ -12802,17 +12802,17 @@
           "result": {
             "content": [
               {
-                "text": "{\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\",\"exit_code\":0,\"ok\":true,\"stderr\":\"\",\"stdout\":\"[main 7df0055] Validate compatibility fixture\\n 1 file changed, 1 insertion(+), 1 deletion(-)\\n\",\"timed_out\":false}",
+                "text": "{\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\",\"exit_code\":0,\"ok\":true,\"stderr\":\"\",\"stdout\":\"[main fd64ef9] Validate compatibility fixture\\n 1 file changed, 1 insertion(+), 1 deletion(-)\\n\",\"timed_out\":false}",
                 "type": "text"
               }
             ],
             "isError": false,
             "structuredContent": {
-              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project",
+              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project",
               "exit_code": 0,
               "ok": true,
               "stderr": "",
-              "stdout": "[main 7df0055] Validate compatibility fixture\n 1 file changed, 1 insertion(+), 1 deletion(-)\n",
+              "stdout": "[main fd64ef9] Validate compatibility fixture\n 1 file changed, 1 insertion(+), 1 deletion(-)\n",
               "timed_out": false
             }
           }
@@ -12823,17 +12823,17 @@
           "result": {
             "content": [
               {
-                "text": "{\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\",\"exit_code\":0,\"ok\":true,\"stderr\":\"\",\"stdout\":\"7df0055 Validate compatibility fixture\\n3ce172d Seed compatibility fixture\\n\",\"timed_out\":false}",
+                "text": "{\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\",\"exit_code\":0,\"ok\":true,\"stderr\":\"\",\"stdout\":\"fd64ef9 Validate compatibility fixture\\n48922a6 Seed compatibility fixture\\n\",\"timed_out\":false}",
                 "type": "text"
               }
             ],
             "isError": false,
             "structuredContent": {
-              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project",
+              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project",
               "exit_code": 0,
               "ok": true,
               "stderr": "",
-              "stdout": "7df0055 Validate compatibility fixture\n3ce172d Seed compatibility fixture\n",
+              "stdout": "fd64ef9 Validate compatibility fixture\n48922a6 Seed compatibility fixture\n",
               "timed_out": false
             }
           }
@@ -12844,14 +12844,14 @@
           "result": {
             "content": [
               {
-                "text": "{\"command\":\"printf 'runtime-ok\\\\n'\",\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\",\"exit_code\":0,\"ok\":true,\"stderr\":\"\",\"stderr_truncated\":false,\"stdout\":\"runtime-ok\\n\",\"stdout_truncated\":false,\"timed_out\":false}",
+                "text": "{\"command\":\"printf 'runtime-ok\\\\n'\",\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\",\"exit_code\":0,\"ok\":true,\"stderr\":\"\",\"stderr_truncated\":false,\"stdout\":\"runtime-ok\\n\",\"stdout_truncated\":false,\"timed_out\":false}",
                 "type": "text"
               }
             ],
             "isError": false,
             "structuredContent": {
               "command": "printf 'runtime-ok\\n'",
-              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project",
+              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project",
               "exit_code": 0,
               "ok": true,
               "stderr": "",
@@ -12868,21 +12868,21 @@
           "result": {
             "content": [
               {
-                "text": "{\"home\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\",\"note\":{\"body\":\"legacy matrix needle\",\"created_at\":\"2026-08-27T23:45:36Z\",\"key\":\"compatibility\\/legacy\",\"tags\":[\"p10-fixture\"],\"updated_at\":\"2026-08-27T23:45:36Z\"},\"ok\":true,\"stored\":true}",
+                "text": "{\"home\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\",\"note\":{\"body\":\"legacy matrix needle\",\"created_at\":\"2026-08-27T23:39:19Z\",\"key\":\"compatibility\\/legacy\",\"tags\":[\"p10-fixture\"],\"updated_at\":\"2026-08-27T23:39:19Z\"},\"ok\":true,\"stored\":true}",
                 "type": "text"
               }
             ],
             "isError": false,
             "structuredContent": {
-              "home": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix",
+              "home": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix",
               "note": {
                 "body": "legacy matrix needle",
-                "created_at": "2026-08-27T23:45:36Z",
+                "created_at": "2026-08-27T23:39:19Z",
                 "key": "compatibility/legacy",
                 "tags": [
                   "p10-fixture"
                 ],
-                "updated_at": "2026-08-27T23:45:36Z"
+                "updated_at": "2026-08-27T23:39:19Z"
               },
               "ok": true,
               "stored": true
@@ -12895,30 +12895,30 @@
           "result": {
             "content": [
               {
-                "text": "{\"body\":\"legacy matrix needle\",\"created_at\":\"2026-08-27T23:45:36Z\",\"found\":true,\"key\":\"compatibility\\/legacy\",\"note\":{\"body\":\"legacy matrix needle\",\"created_at\":\"2026-08-27T23:45:36Z\",\"key\":\"compatibility\\/legacy\",\"tags\":[\"p10-fixture\"],\"updated_at\":\"2026-08-27T23:45:36Z\"},\"ok\":true,\"tags\":[\"p10-fixture\"],\"updated_at\":\"2026-08-27T23:45:36Z\"}",
+                "text": "{\"body\":\"legacy matrix needle\",\"created_at\":\"2026-08-27T23:39:19Z\",\"found\":true,\"key\":\"compatibility\\/legacy\",\"note\":{\"body\":\"legacy matrix needle\",\"created_at\":\"2026-08-27T23:39:19Z\",\"key\":\"compatibility\\/legacy\",\"tags\":[\"p10-fixture\"],\"updated_at\":\"2026-08-27T23:39:19Z\"},\"ok\":true,\"tags\":[\"p10-fixture\"],\"updated_at\":\"2026-08-27T23:39:19Z\"}",
                 "type": "text"
               }
             ],
             "isError": false,
             "structuredContent": {
               "body": "legacy matrix needle",
-              "created_at": "2026-08-27T23:45:36Z",
+              "created_at": "2026-08-27T23:39:19Z",
               "found": true,
               "key": "compatibility/legacy",
               "note": {
                 "body": "legacy matrix needle",
-                "created_at": "2026-08-27T23:45:36Z",
+                "created_at": "2026-08-27T23:39:19Z",
                 "key": "compatibility/legacy",
                 "tags": [
                   "p10-fixture"
                 ],
-                "updated_at": "2026-08-27T23:45:36Z"
+                "updated_at": "2026-08-27T23:39:19Z"
               },
               "ok": true,
               "tags": [
                 "p10-fixture"
               ],
-              "updated_at": "2026-08-27T23:45:36Z"
+              "updated_at": "2026-08-27T23:39:19Z"
             }
           }
         },
@@ -12928,7 +12928,7 @@
           "result": {
             "content": [
               {
-                "text": "{\"count\":1,\"include_system\":false,\"notes\":[{\"body\":\"legacy matrix needle\",\"created_at\":\"2026-08-27T23:45:36Z\",\"key\":\"compatibility\\/legacy\",\"tags\":[\"p10-fixture\"],\"updated_at\":\"2026-08-27T23:45:36Z\"}],\"ok\":true,\"prefix\":\"compatibility\\/\",\"tag\":null,\"total\":1}",
+                "text": "{\"count\":1,\"include_system\":false,\"notes\":[{\"body\":\"legacy matrix needle\",\"created_at\":\"2026-08-27T23:39:19Z\",\"key\":\"compatibility\\/legacy\",\"tags\":[\"p10-fixture\"],\"updated_at\":\"2026-08-27T23:39:19Z\"}],\"ok\":true,\"prefix\":\"compatibility\\/\",\"tag\":null,\"total\":1}",
                 "type": "text"
               }
             ],
@@ -12939,12 +12939,12 @@
               "notes": [
                 {
                   "body": "legacy matrix needle",
-                  "created_at": "2026-08-27T23:45:36Z",
+                  "created_at": "2026-08-27T23:39:19Z",
                   "key": "compatibility/legacy",
                   "tags": [
                     "p10-fixture"
                   ],
-                  "updated_at": "2026-08-27T23:45:36Z"
+                  "updated_at": "2026-08-27T23:39:19Z"
                 }
               ],
               "ok": true,
@@ -12960,7 +12960,7 @@
           "result": {
             "content": [
               {
-                "text": "{\"count\":1,\"include_system\":false,\"notes\":[{\"body\":\"legacy matrix needle\",\"created_at\":\"2026-08-27T23:45:36Z\",\"key\":\"compatibility\\/legacy\",\"tags\":[\"p10-fixture\"],\"updated_at\":\"2026-08-27T23:45:36Z\"}],\"ok\":true,\"query\":\"legacy matrix needle\"}",
+                "text": "{\"count\":1,\"include_system\":false,\"notes\":[{\"body\":\"legacy matrix needle\",\"created_at\":\"2026-08-27T23:39:19Z\",\"key\":\"compatibility\\/legacy\",\"tags\":[\"p10-fixture\"],\"updated_at\":\"2026-08-27T23:39:19Z\"}],\"ok\":true,\"query\":\"legacy matrix needle\"}",
                 "type": "text"
               }
             ],
@@ -12971,12 +12971,12 @@
               "notes": [
                 {
                   "body": "legacy matrix needle",
-                  "created_at": "2026-08-27T23:45:36Z",
+                  "created_at": "2026-08-27T23:39:19Z",
                   "key": "compatibility/legacy",
                   "tags": [
                     "p10-fixture"
                   ],
-                  "updated_at": "2026-08-27T23:45:36Z"
+                  "updated_at": "2026-08-27T23:39:19Z"
                 }
               ],
               "ok": true,
@@ -13010,36 +13010,36 @@
           "result": {
             "content": [
               {
-                "text": "{\"action\":\"checkpoint\",\"handoff_id\":\"b519a0e9-2491-4c46-8d24-ab70c8a9f28f\",\"ok\":true,\"packet\":{\"agents\":[{\"agent_id\":\"compatibility-fixture\",\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\",\"goal\":\"Exercise preserved tool behavior\",\"resume_hint\":\"agent_run_status(session_id: \\\"73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC\\\"); if stale, agent_run_complete then agent_run_start with same goal\\/cwd\",\"session_id\":\"73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC\",\"status\":\"open\",\"updated_at\":\"2026-08-27T23:45:36Z\"}],\"meta\":{\"chat_label\":\"P10 fixture\",\"client_id\":\"6293C140-0152-4802-883C-150287F9B762\",\"created_at\":\"2026-08-27T23:45:36Z\",\"id\":\"b519a0e9-2491-4c46-8d24-ab70c8a9f28f\",\"resume_ready\":false,\"schema_version\":1,\"source\":\"model\",\"updated_at\":\"2026-08-27T23:45:36Z\"},\"narrative\":\"Protocol fixture progress.\",\"resume\":{\"custom\":false,\"instructions\":[\"Call context_get if you need the full packet again\",\"Pass this handoff id to session_checkpoint\\/session_handoff when continuing it\",\"Reattach open agents with agent_run_status(session_id) or complete and restart\",\"Update memory\\/current-task.md via session_checkpoint as you progress\"],\"seed\":\"Forge Continuity resume (handoff b519a0e9-2491-4c46-8d24-ab70c8a9f28f).\\nGoal: Exercise preserved tool behavior\\nStatus: checking\\ncwd: \\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\nproject: fixture\\nNext actions:\\n- finish matrix\\nOpen agents:\\n- compatibility-fixture session=73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC status=open goal=Exercise preserved tool behavior\\nUse agent_run_status \\/ agent_run_complete then continue; do not invent session state.\\nSummary: Protocol fixture progress.\\nContinue this packet with handoff_id: b519a0e9-2491-4c46-8d24-ab70c8a9f28f on later checkpoints or handoffs.\\nCall context_get for the full structured packet, then continue the task.\"},\"schema_version\":1,\"task\":{\"blockers\":[],\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\",\"goal\":\"Exercise preserved tool behavior\",\"next_actions\":[\"finish matrix\"],\"project_slug\":\"fixture\",\"status\":\"checking\"},\"working_set\":{\"decisions\":[\"Use isolated files.\"],\"key_files\":[\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\/tracked.txt\"]}},\"paths\":{\"current_task\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/memory\\/current-task.md\",\"json\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/memory\\/handoffs\\/b519a0e9-2491-4c46-8d24-ab70c8a9f28f.json\"},\"projection_ok\":true,\"projection_repair_pending\":false,\"resume_ready\":false,\"resume_seed\":\"Forge Continuity resume (handoff b519a0e9-2491-4c46-8d24-ab70c8a9f28f).\\nGoal: Exercise preserved tool behavior\\nStatus: checking\\ncwd: \\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\nproject: fixture\\nNext actions:\\n- finish matrix\\nOpen agents:\\n- compatibility-fixture session=73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC status=open goal=Exercise preserved tool behavior\\nUse agent_run_status \\/ agent_run_complete then continue; do not invent session state.\\nSummary: Protocol fixture progress.\\nContinue this packet with handoff_id: b519a0e9-2491-4c46-8d24-ab70c8a9f28f on later checkpoints or handoffs.\\nCall context_get for the full structured packet, then continue the task.\"}",
+                "text": "{\"action\":\"checkpoint\",\"handoff_id\":\"1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b\",\"ok\":true,\"packet\":{\"agents\":[{\"agent_id\":\"compatibility-fixture\",\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\",\"goal\":\"Exercise preserved tool behavior\",\"resume_hint\":\"agent_run_status(session_id: \\\"CEDDF474-7FA3-4515-8345-3A8AE8BDC20A\\\"); if stale, agent_run_complete then agent_run_start with same goal\\/cwd\",\"session_id\":\"CEDDF474-7FA3-4515-8345-3A8AE8BDC20A\",\"status\":\"open\",\"updated_at\":\"2026-08-27T23:39:19Z\"}],\"meta\":{\"chat_label\":\"P10 fixture\",\"client_id\":\"AB2D0CF5-8B0F-4FCB-8DFD-147D102DF947\",\"created_at\":\"2026-08-27T23:39:18Z\",\"id\":\"1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b\",\"resume_ready\":false,\"schema_version\":1,\"source\":\"model\",\"updated_at\":\"2026-08-27T23:39:19Z\"},\"narrative\":\"Protocol fixture progress.\",\"resume\":{\"custom\":false,\"instructions\":[\"Call context_get if you need the full packet again\",\"Pass this handoff id to session_checkpoint\\/session_handoff when continuing it\",\"Reattach open agents with agent_run_status(session_id) or complete and restart\",\"Update memory\\/current-task.md via session_checkpoint as you progress\"],\"seed\":\"Forge Continuity resume (handoff 1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b).\\nGoal: Exercise preserved tool behavior\\nStatus: checking\\ncwd: \\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\nproject: fixture\\nNext actions:\\n- finish matrix\\nOpen agents:\\n- compatibility-fixture session=CEDDF474-7FA3-4515-8345-3A8AE8BDC20A status=open goal=Exercise preserved tool behavior\\nUse agent_run_status \\/ agent_run_complete then continue; do not invent session state.\\nSummary: Protocol fixture progress.\\nContinue this packet with handoff_id: 1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b on later checkpoints or handoffs.\\nCall context_get for the full structured packet, then continue the task.\"},\"schema_version\":1,\"task\":{\"blockers\":[],\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\",\"goal\":\"Exercise preserved tool behavior\",\"next_actions\":[\"finish matrix\"],\"project_slug\":\"fixture\",\"status\":\"checking\"},\"working_set\":{\"decisions\":[\"Use isolated files.\"],\"key_files\":[\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\/tracked.txt\"]}},\"paths\":{\"current_task\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/memory\\/current-task.md\",\"json\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/memory\\/handoffs\\/1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b.json\"},\"projection_ok\":true,\"projection_repair_pending\":false,\"resume_ready\":false,\"resume_seed\":\"Forge Continuity resume (handoff 1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b).\\nGoal: Exercise preserved tool behavior\\nStatus: checking\\ncwd: \\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\nproject: fixture\\nNext actions:\\n- finish matrix\\nOpen agents:\\n- compatibility-fixture session=CEDDF474-7FA3-4515-8345-3A8AE8BDC20A status=open goal=Exercise preserved tool behavior\\nUse agent_run_status \\/ agent_run_complete then continue; do not invent session state.\\nSummary: Protocol fixture progress.\\nContinue this packet with handoff_id: 1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b on later checkpoints or handoffs.\\nCall context_get for the full structured packet, then continue the task.\"}",
                 "type": "text"
               }
             ],
             "isError": false,
             "structuredContent": {
               "action": "checkpoint",
-              "handoff_id": "b519a0e9-2491-4c46-8d24-ab70c8a9f28f",
+              "handoff_id": "1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b",
               "ok": true,
               "packet": {
                 "agents": [
                   {
                     "agent_id": "compatibility-fixture",
-                    "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project",
+                    "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project",
                     "goal": "Exercise preserved tool behavior",
-                    "resume_hint": "agent_run_status(session_id: \"73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC\"); if stale, agent_run_complete then agent_run_start with same goal/cwd",
-                    "session_id": "73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC",
+                    "resume_hint": "agent_run_status(session_id: \"CEDDF474-7FA3-4515-8345-3A8AE8BDC20A\"); if stale, agent_run_complete then agent_run_start with same goal/cwd",
+                    "session_id": "CEDDF474-7FA3-4515-8345-3A8AE8BDC20A",
                     "status": "open",
-                    "updated_at": "2026-08-27T23:45:36Z"
+                    "updated_at": "2026-08-27T23:39:19Z"
                   }
                 ],
                 "meta": {
                   "chat_label": "P10 fixture",
-                  "client_id": "6293C140-0152-4802-883C-150287F9B762",
-                  "created_at": "2026-08-27T23:45:36Z",
-                  "id": "b519a0e9-2491-4c46-8d24-ab70c8a9f28f",
+                  "client_id": "AB2D0CF5-8B0F-4FCB-8DFD-147D102DF947",
+                  "created_at": "2026-08-27T23:39:18Z",
+                  "id": "1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b",
                   "resume_ready": false,
                   "schema_version": 1,
                   "source": "model",
-                  "updated_at": "2026-08-27T23:45:36Z"
+                  "updated_at": "2026-08-27T23:39:19Z"
                 },
                 "narrative": "Protocol fixture progress.",
                 "resume": {
@@ -13050,12 +13050,12 @@
                     "Reattach open agents with agent_run_status(session_id) or complete and restart",
                     "Update memory/current-task.md via session_checkpoint as you progress"
                   ],
-                  "seed": "Forge Continuity resume (handoff b519a0e9-2491-4c46-8d24-ab70c8a9f28f).\nGoal: Exercise preserved tool behavior\nStatus: checking\ncwd: /var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project\nproject: fixture\nNext actions:\n- finish matrix\nOpen agents:\n- compatibility-fixture session=73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC status=open goal=Exercise preserved tool behavior\nUse agent_run_status / agent_run_complete then continue; do not invent session state.\nSummary: Protocol fixture progress.\nContinue this packet with handoff_id: b519a0e9-2491-4c46-8d24-ab70c8a9f28f on later checkpoints or handoffs.\nCall context_get for the full structured packet, then continue the task."
+                  "seed": "Forge Continuity resume (handoff 1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b).\nGoal: Exercise preserved tool behavior\nStatus: checking\ncwd: /var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project\nproject: fixture\nNext actions:\n- finish matrix\nOpen agents:\n- compatibility-fixture session=CEDDF474-7FA3-4515-8345-3A8AE8BDC20A status=open goal=Exercise preserved tool behavior\nUse agent_run_status / agent_run_complete then continue; do not invent session state.\nSummary: Protocol fixture progress.\nContinue this packet with handoff_id: 1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b on later checkpoints or handoffs.\nCall context_get for the full structured packet, then continue the task."
                 },
                 "schema_version": 1,
                 "task": {
                   "blockers": [],
-                  "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project",
+                  "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project",
                   "goal": "Exercise preserved tool behavior",
                   "next_actions": [
                     "finish matrix"
@@ -13068,18 +13068,18 @@
                     "Use isolated files."
                   ],
                   "key_files": [
-                    "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project/tracked.txt"
+                    "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project/tracked.txt"
                   ]
                 }
               },
               "paths": {
-                "current_task": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/memory/current-task.md",
-                "json": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/memory/handoffs/b519a0e9-2491-4c46-8d24-ab70c8a9f28f.json"
+                "current_task": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/memory/current-task.md",
+                "json": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/memory/handoffs/1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b.json"
               },
               "projection_ok": true,
               "projection_repair_pending": false,
               "resume_ready": false,
-              "resume_seed": "Forge Continuity resume (handoff b519a0e9-2491-4c46-8d24-ab70c8a9f28f).\nGoal: Exercise preserved tool behavior\nStatus: checking\ncwd: /var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project\nproject: fixture\nNext actions:\n- finish matrix\nOpen agents:\n- compatibility-fixture session=73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC status=open goal=Exercise preserved tool behavior\nUse agent_run_status / agent_run_complete then continue; do not invent session state.\nSummary: Protocol fixture progress.\nContinue this packet with handoff_id: b519a0e9-2491-4c46-8d24-ab70c8a9f28f on later checkpoints or handoffs.\nCall context_get for the full structured packet, then continue the task."
+              "resume_seed": "Forge Continuity resume (handoff 1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b).\nGoal: Exercise preserved tool behavior\nStatus: checking\ncwd: /var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project\nproject: fixture\nNext actions:\n- finish matrix\nOpen agents:\n- compatibility-fixture session=CEDDF474-7FA3-4515-8345-3A8AE8BDC20A status=open goal=Exercise preserved tool behavior\nUse agent_run_status / agent_run_complete then continue; do not invent session state.\nSummary: Protocol fixture progress.\nContinue this packet with handoff_id: 1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b on later checkpoints or handoffs.\nCall context_get for the full structured packet, then continue the task."
             }
           }
         },
@@ -13089,14 +13089,14 @@
           "result": {
             "content": [
               {
-                "text": "{\"action\":\"handoff\",\"handoff_id\":\"b519a0e9-2491-4c46-8d24-ab70c8a9f28f\",\"handoff_required\":true,\"message\":\"Handoff saved. Start a new LM Studio chat with Forge MCP enabled, then call context_get (or use resume.seed as the first user message).\",\"ok\":true,\"packet\":{\"agents\":[{\"agent_id\":\"compatibility-fixture\",\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\",\"goal\":\"Exercise preserved tool behavior\",\"resume_hint\":\"agent_run_status(session_id: \\\"73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC\\\"); if stale, agent_run_complete then agent_run_start with same goal\\/cwd\",\"session_id\":\"73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC\",\"status\":\"open\",\"updated_at\":\"2026-08-27T23:45:36Z\"}],\"meta\":{\"chat_label\":\"P10 fixture\",\"client_id\":\"6293C140-0152-4802-883C-150287F9B762\",\"created_at\":\"2026-08-27T23:45:36Z\",\"id\":\"b519a0e9-2491-4c46-8d24-ab70c8a9f28f\",\"resume_ready\":true,\"schema_version\":1,\"source\":\"model\",\"updated_at\":\"2026-08-27T23:45:36Z\"},\"narrative\":\"Protocol fixture completed.\",\"resume\":{\"custom\":false,\"instructions\":[\"Call context_get if you need the full packet again\",\"Pass this handoff id to session_checkpoint\\/session_handoff when continuing it\",\"Reattach open agents with agent_run_status(session_id) or complete and restart\",\"Update memory\\/current-task.md via session_checkpoint as you progress\"],\"seed\":\"Forge Continuity resume (handoff b519a0e9-2491-4c46-8d24-ab70c8a9f28f).\\nGoal: Exercise preserved tool behavior\\nStatus: ready\\ncwd: \\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\nproject: fixture\\nNext actions:\\n- verify evidence\\nOpen agents:\\n- compatibility-fixture session=73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC status=open goal=Exercise preserved tool behavior\\nUse agent_run_status \\/ agent_run_complete then continue; do not invent session state.\\nSummary: Protocol fixture completed.\\nContinue this packet with handoff_id: b519a0e9-2491-4c46-8d24-ab70c8a9f28f on later checkpoints or handoffs.\\nCall context_get for the full structured packet, then continue the task.\"},\"schema_version\":1,\"task\":{\"blockers\":[],\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\",\"goal\":\"Exercise preserved tool behavior\",\"next_actions\":[\"verify evidence\"],\"project_slug\":\"fixture\",\"status\":\"ready\"},\"working_set\":{\"decisions\":[\"Use isolated files.\"],\"key_files\":[\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\/tracked.txt\"]}},\"paths\":{\"current_task\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/memory\\/current-task.md\",\"json\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/memory\\/handoffs\\/b519a0e9-2491-4c46-8d24-ab70c8a9f28f.json\"},\"projection_ok\":true,\"projection_repair_pending\":false,\"resume_ready\":true,\"resume_seed\":\"Forge Continuity resume (handoff b519a0e9-2491-4c46-8d24-ab70c8a9f28f).\\nGoal: Exercise preserved tool behavior\\nStatus: ready\\ncwd: \\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\nproject: fixture\\nNext actions:\\n- verify evidence\\nOpen agents:\\n- compatibility-fixture session=73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC status=open goal=Exercise preserved tool behavior\\nUse agent_run_status \\/ agent_run_complete then continue; do not invent session state.\\nSummary: Protocol fixture completed.\\nContinue this packet with handoff_id: b519a0e9-2491-4c46-8d24-ab70c8a9f28f on later checkpoints or handoffs.\\nCall context_get for the full structured packet, then continue the task.\"}",
+                "text": "{\"action\":\"handoff\",\"handoff_id\":\"1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b\",\"handoff_required\":true,\"message\":\"Handoff saved. Start a new LM Studio chat with Forge MCP enabled, then call context_get (or use resume.seed as the first user message).\",\"ok\":true,\"packet\":{\"agents\":[{\"agent_id\":\"compatibility-fixture\",\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\",\"goal\":\"Exercise preserved tool behavior\",\"resume_hint\":\"agent_run_status(session_id: \\\"CEDDF474-7FA3-4515-8345-3A8AE8BDC20A\\\"); if stale, agent_run_complete then agent_run_start with same goal\\/cwd\",\"session_id\":\"CEDDF474-7FA3-4515-8345-3A8AE8BDC20A\",\"status\":\"open\",\"updated_at\":\"2026-08-27T23:39:19Z\"}],\"meta\":{\"chat_label\":\"P10 fixture\",\"client_id\":\"AB2D0CF5-8B0F-4FCB-8DFD-147D102DF947\",\"created_at\":\"2026-08-27T23:39:18Z\",\"id\":\"1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b\",\"resume_ready\":true,\"schema_version\":1,\"source\":\"model\",\"updated_at\":\"2026-08-27T23:39:19Z\"},\"narrative\":\"Protocol fixture completed.\",\"resume\":{\"custom\":false,\"instructions\":[\"Call context_get if you need the full packet again\",\"Pass this handoff id to session_checkpoint\\/session_handoff when continuing it\",\"Reattach open agents with agent_run_status(session_id) or complete and restart\",\"Update memory\\/current-task.md via session_checkpoint as you progress\"],\"seed\":\"Forge Continuity resume (handoff 1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b).\\nGoal: Exercise preserved tool behavior\\nStatus: ready\\ncwd: \\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\nproject: fixture\\nNext actions:\\n- verify evidence\\nOpen agents:\\n- compatibility-fixture session=CEDDF474-7FA3-4515-8345-3A8AE8BDC20A status=open goal=Exercise preserved tool behavior\\nUse agent_run_status \\/ agent_run_complete then continue; do not invent session state.\\nSummary: Protocol fixture completed.\\nContinue this packet with handoff_id: 1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b on later checkpoints or handoffs.\\nCall context_get for the full structured packet, then continue the task.\"},\"schema_version\":1,\"task\":{\"blockers\":[],\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\",\"goal\":\"Exercise preserved tool behavior\",\"next_actions\":[\"verify evidence\"],\"project_slug\":\"fixture\",\"status\":\"ready\"},\"working_set\":{\"decisions\":[\"Use isolated files.\"],\"key_files\":[\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\/tracked.txt\"]}},\"paths\":{\"current_task\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/memory\\/current-task.md\",\"json\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/memory\\/handoffs\\/1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b.json\"},\"projection_ok\":true,\"projection_repair_pending\":false,\"resume_ready\":true,\"resume_seed\":\"Forge Continuity resume (handoff 1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b).\\nGoal: Exercise preserved tool behavior\\nStatus: ready\\ncwd: \\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\nproject: fixture\\nNext actions:\\n- verify evidence\\nOpen agents:\\n- compatibility-fixture session=CEDDF474-7FA3-4515-8345-3A8AE8BDC20A status=open goal=Exercise preserved tool behavior\\nUse agent_run_status \\/ agent_run_complete then continue; do not invent session state.\\nSummary: Protocol fixture completed.\\nContinue this packet with handoff_id: 1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b on later checkpoints or handoffs.\\nCall context_get for the full structured packet, then continue the task.\"}",
                 "type": "text"
               }
             ],
             "isError": false,
             "structuredContent": {
               "action": "handoff",
-              "handoff_id": "b519a0e9-2491-4c46-8d24-ab70c8a9f28f",
+              "handoff_id": "1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b",
               "handoff_required": true,
               "message": "Handoff saved. Start a new LM Studio chat with Forge MCP enabled, then call context_get (or use resume.seed as the first user message).",
               "ok": true,
@@ -13104,23 +13104,23 @@
                 "agents": [
                   {
                     "agent_id": "compatibility-fixture",
-                    "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project",
+                    "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project",
                     "goal": "Exercise preserved tool behavior",
-                    "resume_hint": "agent_run_status(session_id: \"73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC\"); if stale, agent_run_complete then agent_run_start with same goal/cwd",
-                    "session_id": "73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC",
+                    "resume_hint": "agent_run_status(session_id: \"CEDDF474-7FA3-4515-8345-3A8AE8BDC20A\"); if stale, agent_run_complete then agent_run_start with same goal/cwd",
+                    "session_id": "CEDDF474-7FA3-4515-8345-3A8AE8BDC20A",
                     "status": "open",
-                    "updated_at": "2026-08-27T23:45:36Z"
+                    "updated_at": "2026-08-27T23:39:19Z"
                   }
                 ],
                 "meta": {
                   "chat_label": "P10 fixture",
-                  "client_id": "6293C140-0152-4802-883C-150287F9B762",
-                  "created_at": "2026-08-27T23:45:36Z",
-                  "id": "b519a0e9-2491-4c46-8d24-ab70c8a9f28f",
+                  "client_id": "AB2D0CF5-8B0F-4FCB-8DFD-147D102DF947",
+                  "created_at": "2026-08-27T23:39:18Z",
+                  "id": "1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b",
                   "resume_ready": true,
                   "schema_version": 1,
                   "source": "model",
-                  "updated_at": "2026-08-27T23:45:36Z"
+                  "updated_at": "2026-08-27T23:39:19Z"
                 },
                 "narrative": "Protocol fixture completed.",
                 "resume": {
@@ -13131,12 +13131,12 @@
                     "Reattach open agents with agent_run_status(session_id) or complete and restart",
                     "Update memory/current-task.md via session_checkpoint as you progress"
                   ],
-                  "seed": "Forge Continuity resume (handoff b519a0e9-2491-4c46-8d24-ab70c8a9f28f).\nGoal: Exercise preserved tool behavior\nStatus: ready\ncwd: /var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project\nproject: fixture\nNext actions:\n- verify evidence\nOpen agents:\n- compatibility-fixture session=73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC status=open goal=Exercise preserved tool behavior\nUse agent_run_status / agent_run_complete then continue; do not invent session state.\nSummary: Protocol fixture completed.\nContinue this packet with handoff_id: b519a0e9-2491-4c46-8d24-ab70c8a9f28f on later checkpoints or handoffs.\nCall context_get for the full structured packet, then continue the task."
+                  "seed": "Forge Continuity resume (handoff 1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b).\nGoal: Exercise preserved tool behavior\nStatus: ready\ncwd: /var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project\nproject: fixture\nNext actions:\n- verify evidence\nOpen agents:\n- compatibility-fixture session=CEDDF474-7FA3-4515-8345-3A8AE8BDC20A status=open goal=Exercise preserved tool behavior\nUse agent_run_status / agent_run_complete then continue; do not invent session state.\nSummary: Protocol fixture completed.\nContinue this packet with handoff_id: 1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b on later checkpoints or handoffs.\nCall context_get for the full structured packet, then continue the task."
                 },
                 "schema_version": 1,
                 "task": {
                   "blockers": [],
-                  "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project",
+                  "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project",
                   "goal": "Exercise preserved tool behavior",
                   "next_actions": [
                     "verify evidence"
@@ -13149,18 +13149,18 @@
                     "Use isolated files."
                   ],
                   "key_files": [
-                    "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project/tracked.txt"
+                    "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project/tracked.txt"
                   ]
                 }
               },
               "paths": {
-                "current_task": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/memory/current-task.md",
-                "json": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/memory/handoffs/b519a0e9-2491-4c46-8d24-ab70c8a9f28f.json"
+                "current_task": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/memory/current-task.md",
+                "json": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/memory/handoffs/1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b.json"
               },
               "projection_ok": true,
               "projection_repair_pending": false,
               "resume_ready": true,
-              "resume_seed": "Forge Continuity resume (handoff b519a0e9-2491-4c46-8d24-ab70c8a9f28f).\nGoal: Exercise preserved tool behavior\nStatus: ready\ncwd: /var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project\nproject: fixture\nNext actions:\n- verify evidence\nOpen agents:\n- compatibility-fixture session=73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC status=open goal=Exercise preserved tool behavior\nUse agent_run_status / agent_run_complete then continue; do not invent session state.\nSummary: Protocol fixture completed.\nContinue this packet with handoff_id: b519a0e9-2491-4c46-8d24-ab70c8a9f28f on later checkpoints or handoffs.\nCall context_get for the full structured packet, then continue the task."
+              "resume_seed": "Forge Continuity resume (handoff 1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b).\nGoal: Exercise preserved tool behavior\nStatus: ready\ncwd: /var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project\nproject: fixture\nNext actions:\n- verify evidence\nOpen agents:\n- compatibility-fixture session=CEDDF474-7FA3-4515-8345-3A8AE8BDC20A status=open goal=Exercise preserved tool behavior\nUse agent_run_status / agent_run_complete then continue; do not invent session state.\nSummary: Protocol fixture completed.\nContinue this packet with handoff_id: 1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b on later checkpoints or handoffs.\nCall context_get for the full structured packet, then continue the task."
             }
           }
         },
@@ -13170,7 +13170,7 @@
           "result": {
             "content": [
               {
-                "text": "{\"action\":\"get\",\"auto_continuity\":{\"blocked\":false,\"checkpoint_every_tools\":50,\"enabled\":true,\"handoff_every_tools\":200,\"handoff_id\":null,\"implicit_roots\":[\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\",\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\/delete-me\",\"\\/Users\\/jimdaley\\/GitHub\\/Forge-Conductor-MacOS-Autonomy\"],\"progress_count\":0},\"context_budget_cleared\":true,\"found\":true,\"handoff_id\":\"b519a0e9-2491-4c46-8d24-ab70c8a9f28f\",\"ok\":true,\"packet\":{\"agents\":[{\"agent_id\":\"compatibility-fixture\",\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\",\"goal\":\"Exercise preserved tool behavior\",\"resume_hint\":\"agent_run_status(session_id: \\\"73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC\\\"); if stale, agent_run_complete then agent_run_start with same goal\\/cwd\",\"session_id\":\"73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC\",\"status\":\"open\",\"updated_at\":\"2026-08-27T23:45:36Z\"}],\"meta\":{\"chat_label\":\"P10 fixture\",\"client_id\":\"6293C140-0152-4802-883C-150287F9B762\",\"created_at\":\"2026-08-27T23:45:36Z\",\"id\":\"b519a0e9-2491-4c46-8d24-ab70c8a9f28f\",\"resume_ready\":true,\"schema_version\":1,\"source\":\"model\",\"updated_at\":\"2026-08-27T23:45:36Z\"},\"narrative\":\"Protocol fixture completed.\",\"resume\":{\"custom\":false,\"instructions\":[\"Call context_get if you need the full packet again\",\"Pass this handoff id to session_checkpoint\\/session_handoff when continuing it\",\"Reattach open agents with agent_run_status(session_id) or complete and restart\",\"Update memory\\/current-task.md via session_checkpoint as you progress\"],\"seed\":\"Forge Continuity resume (handoff b519a0e9-2491-4c46-8d24-ab70c8a9f28f).\\nGoal: Exercise preserved tool behavior\\nStatus: ready\\ncwd: \\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\nproject: fixture\\nNext actions:\\n- verify evidence\\nOpen agents:\\n- compatibility-fixture session=73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC status=open goal=Exercise preserved tool behavior\\nUse agent_run_status \\/ agent_run_complete then continue; do not invent session state.\\nSummary: Protocol fixture completed.\\nContinue this packet with handoff_id: b519a0e9-2491-4c46-8d24-ab70c8a9f28f on later checkpoints or handoffs.\\nCall context_get for the full structured packet, then continue the task.\"},\"schema_version\":1,\"task\":{\"blockers\":[],\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\",\"goal\":\"Exercise preserved tool behavior\",\"next_actions\":[\"verify evidence\"],\"project_slug\":\"fixture\",\"status\":\"ready\"},\"working_set\":{\"decisions\":[\"Use isolated files.\"],\"key_files\":[\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\/tracked.txt\"]}},\"paths\":{\"current_task\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/memory\\/current-task.md\",\"json\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/memory\\/handoffs\\/b519a0e9-2491-4c46-8d24-ab70c8a9f28f.json\"},\"projection_ok\":true,\"projection_repair_pending\":false,\"resume_ready\":true,\"resume_seed\":\"Forge Continuity resume (handoff b519a0e9-2491-4c46-8d24-ab70c8a9f28f).\\nGoal: Exercise preserved tool behavior\\nStatus: ready\\ncwd: \\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\nproject: fixture\\nNext actions:\\n- verify evidence\\nOpen agents:\\n- compatibility-fixture session=73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC status=open goal=Exercise preserved tool behavior\\nUse agent_run_status \\/ agent_run_complete then continue; do not invent session state.\\nSummary: Protocol fixture completed.\\nContinue this packet with handoff_id: b519a0e9-2491-4c46-8d24-ab70c8a9f28f on later checkpoints or handoffs.\\nCall context_get for the full structured packet, then continue the task.\",\"workspace_adopted\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\"}",
+                "text": "{\"action\":\"get\",\"auto_continuity\":{\"blocked\":false,\"checkpoint_every_tools\":50,\"enabled\":true,\"handoff_every_tools\":200,\"handoff_id\":null,\"implicit_roots\":[\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\",\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\/delete-me\",\"\\/Users\\/jimdaley\\/GitHub\\/Forge-Conductor-MacOS-Autonomy\"],\"progress_count\":0},\"context_budget_cleared\":true,\"found\":true,\"handoff_id\":\"1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b\",\"ok\":true,\"packet\":{\"agents\":[{\"agent_id\":\"compatibility-fixture\",\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\",\"goal\":\"Exercise preserved tool behavior\",\"resume_hint\":\"agent_run_status(session_id: \\\"CEDDF474-7FA3-4515-8345-3A8AE8BDC20A\\\"); if stale, agent_run_complete then agent_run_start with same goal\\/cwd\",\"session_id\":\"CEDDF474-7FA3-4515-8345-3A8AE8BDC20A\",\"status\":\"open\",\"updated_at\":\"2026-08-27T23:39:19Z\"}],\"meta\":{\"chat_label\":\"P10 fixture\",\"client_id\":\"AB2D0CF5-8B0F-4FCB-8DFD-147D102DF947\",\"created_at\":\"2026-08-27T23:39:18Z\",\"id\":\"1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b\",\"resume_ready\":true,\"schema_version\":1,\"source\":\"model\",\"updated_at\":\"2026-08-27T23:39:19Z\"},\"narrative\":\"Protocol fixture completed.\",\"resume\":{\"custom\":false,\"instructions\":[\"Call context_get if you need the full packet again\",\"Pass this handoff id to session_checkpoint\\/session_handoff when continuing it\",\"Reattach open agents with agent_run_status(session_id) or complete and restart\",\"Update memory\\/current-task.md via session_checkpoint as you progress\"],\"seed\":\"Forge Continuity resume (handoff 1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b).\\nGoal: Exercise preserved tool behavior\\nStatus: ready\\ncwd: \\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\nproject: fixture\\nNext actions:\\n- verify evidence\\nOpen agents:\\n- compatibility-fixture session=CEDDF474-7FA3-4515-8345-3A8AE8BDC20A status=open goal=Exercise preserved tool behavior\\nUse agent_run_status \\/ agent_run_complete then continue; do not invent session state.\\nSummary: Protocol fixture completed.\\nContinue this packet with handoff_id: 1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b on later checkpoints or handoffs.\\nCall context_get for the full structured packet, then continue the task.\"},\"schema_version\":1,\"task\":{\"blockers\":[],\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\",\"goal\":\"Exercise preserved tool behavior\",\"next_actions\":[\"verify evidence\"],\"project_slug\":\"fixture\",\"status\":\"ready\"},\"working_set\":{\"decisions\":[\"Use isolated files.\"],\"key_files\":[\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\/tracked.txt\"]}},\"paths\":{\"current_task\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/memory\\/current-task.md\",\"json\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/memory\\/handoffs\\/1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b.json\"},\"projection_ok\":true,\"projection_repair_pending\":false,\"resume_ready\":true,\"resume_seed\":\"Forge Continuity resume (handoff 1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b).\\nGoal: Exercise preserved tool behavior\\nStatus: ready\\ncwd: \\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\\nproject: fixture\\nNext actions:\\n- verify evidence\\nOpen agents:\\n- compatibility-fixture session=CEDDF474-7FA3-4515-8345-3A8AE8BDC20A status=open goal=Exercise preserved tool behavior\\nUse agent_run_status \\/ agent_run_complete then continue; do not invent session state.\\nSummary: Protocol fixture completed.\\nContinue this packet with handoff_id: 1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b on later checkpoints or handoffs.\\nCall context_get for the full structured packet, then continue the task.\",\"workspace_adopted\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/legacy_tool_success_matrix\\/fixture-project\"}",
                 "type": "text"
               }
             ],
@@ -13184,37 +13184,37 @@
                 "handoff_every_tools": 200,
                 "handoff_id": null,
                 "implicit_roots": [
-                  "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project",
-                  "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project/delete-me",
+                  "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project",
+                  "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project/delete-me",
                   "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy"
                 ],
                 "progress_count": 0
               },
               "context_budget_cleared": true,
               "found": true,
-              "handoff_id": "b519a0e9-2491-4c46-8d24-ab70c8a9f28f",
+              "handoff_id": "1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b",
               "ok": true,
               "packet": {
                 "agents": [
                   {
                     "agent_id": "compatibility-fixture",
-                    "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project",
+                    "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project",
                     "goal": "Exercise preserved tool behavior",
-                    "resume_hint": "agent_run_status(session_id: \"73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC\"); if stale, agent_run_complete then agent_run_start with same goal/cwd",
-                    "session_id": "73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC",
+                    "resume_hint": "agent_run_status(session_id: \"CEDDF474-7FA3-4515-8345-3A8AE8BDC20A\"); if stale, agent_run_complete then agent_run_start with same goal/cwd",
+                    "session_id": "CEDDF474-7FA3-4515-8345-3A8AE8BDC20A",
                     "status": "open",
-                    "updated_at": "2026-08-27T23:45:36Z"
+                    "updated_at": "2026-08-27T23:39:19Z"
                   }
                 ],
                 "meta": {
                   "chat_label": "P10 fixture",
-                  "client_id": "6293C140-0152-4802-883C-150287F9B762",
-                  "created_at": "2026-08-27T23:45:36Z",
-                  "id": "b519a0e9-2491-4c46-8d24-ab70c8a9f28f",
+                  "client_id": "AB2D0CF5-8B0F-4FCB-8DFD-147D102DF947",
+                  "created_at": "2026-08-27T23:39:18Z",
+                  "id": "1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b",
                   "resume_ready": true,
                   "schema_version": 1,
                   "source": "model",
-                  "updated_at": "2026-08-27T23:45:36Z"
+                  "updated_at": "2026-08-27T23:39:19Z"
                 },
                 "narrative": "Protocol fixture completed.",
                 "resume": {
@@ -13225,12 +13225,12 @@
                     "Reattach open agents with agent_run_status(session_id) or complete and restart",
                     "Update memory/current-task.md via session_checkpoint as you progress"
                   ],
-                  "seed": "Forge Continuity resume (handoff b519a0e9-2491-4c46-8d24-ab70c8a9f28f).\nGoal: Exercise preserved tool behavior\nStatus: ready\ncwd: /var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project\nproject: fixture\nNext actions:\n- verify evidence\nOpen agents:\n- compatibility-fixture session=73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC status=open goal=Exercise preserved tool behavior\nUse agent_run_status / agent_run_complete then continue; do not invent session state.\nSummary: Protocol fixture completed.\nContinue this packet with handoff_id: b519a0e9-2491-4c46-8d24-ab70c8a9f28f on later checkpoints or handoffs.\nCall context_get for the full structured packet, then continue the task."
+                  "seed": "Forge Continuity resume (handoff 1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b).\nGoal: Exercise preserved tool behavior\nStatus: ready\ncwd: /var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project\nproject: fixture\nNext actions:\n- verify evidence\nOpen agents:\n- compatibility-fixture session=CEDDF474-7FA3-4515-8345-3A8AE8BDC20A status=open goal=Exercise preserved tool behavior\nUse agent_run_status / agent_run_complete then continue; do not invent session state.\nSummary: Protocol fixture completed.\nContinue this packet with handoff_id: 1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b on later checkpoints or handoffs.\nCall context_get for the full structured packet, then continue the task."
                 },
                 "schema_version": 1,
                 "task": {
                   "blockers": [],
-                  "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project",
+                  "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project",
                   "goal": "Exercise preserved tool behavior",
                   "next_actions": [
                     "verify evidence"
@@ -13243,19 +13243,19 @@
                     "Use isolated files."
                   ],
                   "key_files": [
-                    "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project/tracked.txt"
+                    "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project/tracked.txt"
                   ]
                 }
               },
               "paths": {
-                "current_task": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/memory/current-task.md",
-                "json": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/memory/handoffs/b519a0e9-2491-4c46-8d24-ab70c8a9f28f.json"
+                "current_task": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/memory/current-task.md",
+                "json": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/memory/handoffs/1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b.json"
               },
               "projection_ok": true,
               "projection_repair_pending": false,
               "resume_ready": true,
-              "resume_seed": "Forge Continuity resume (handoff b519a0e9-2491-4c46-8d24-ab70c8a9f28f).\nGoal: Exercise preserved tool behavior\nStatus: ready\ncwd: /var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project\nproject: fixture\nNext actions:\n- verify evidence\nOpen agents:\n- compatibility-fixture session=73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC status=open goal=Exercise preserved tool behavior\nUse agent_run_status / agent_run_complete then continue; do not invent session state.\nSummary: Protocol fixture completed.\nContinue this packet with handoff_id: b519a0e9-2491-4c46-8d24-ab70c8a9f28f on later checkpoints or handoffs.\nCall context_get for the full structured packet, then continue the task.",
-              "workspace_adopted": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/legacy_tool_success_matrix/fixture-project"
+              "resume_seed": "Forge Continuity resume (handoff 1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b).\nGoal: Exercise preserved tool behavior\nStatus: ready\ncwd: /var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project\nproject: fixture\nNext actions:\n- verify evidence\nOpen agents:\n- compatibility-fixture session=CEDDF474-7FA3-4515-8345-3A8AE8BDC20A status=open goal=Exercise preserved tool behavior\nUse agent_run_status / agent_run_complete then continue; do not invent session state.\nSummary: Protocol fixture completed.\nContinue this packet with handoff_id: 1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b on later checkpoints or handoffs.\nCall context_get for the full structured packet, then continue the task.",
+              "workspace_adopted": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/legacy_tool_success_matrix/fixture-project"
             }
           }
         },
@@ -13265,7 +13265,7 @@
           "result": {
             "content": [
               {
-                "text": "{\"count\":1,\"handoffs\":[{\"agent_count\":1,\"goal\":\"Exercise preserved tool behavior\",\"id\":\"b519a0e9-2491-4c46-8d24-ab70c8a9f28f\",\"resume_ready\":true,\"source\":\"model\",\"status\":\"ready\",\"updated_at\":\"2026-08-27T23:45:36Z\"}],\"ok\":true}",
+                "text": "{\"count\":1,\"handoffs\":[{\"agent_count\":1,\"goal\":\"Exercise preserved tool behavior\",\"id\":\"1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b\",\"resume_ready\":true,\"source\":\"model\",\"status\":\"ready\",\"updated_at\":\"2026-08-27T23:39:19Z\"}],\"ok\":true}",
                 "type": "text"
               }
             ],
@@ -13276,11 +13276,11 @@
                 {
                   "agent_count": 1,
                   "goal": "Exercise preserved tool behavior",
-                  "id": "b519a0e9-2491-4c46-8d24-ab70c8a9f28f",
+                  "id": "1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b",
                   "resume_ready": true,
                   "source": "model",
                   "status": "ready",
-                  "updated_at": "2026-08-27T23:45:36Z"
+                  "updated_at": "2026-08-27T23:39:19Z"
                 }
               ],
               "ok": true
@@ -13293,14 +13293,14 @@
           "result": {
             "content": [
               {
-                "text": "{\"auto_continuity\":\"checkpoint\",\"auto_handoff_id\":\"b519a0e9-2491-4c46-8d24-ab70c8a9f28f\",\"message\":\"Run complete.\",\"missing_schema_keys\":[],\"ok\":true,\"report\":{\"result\":\"passed\"},\"schema_complete\":true,\"session\":{\"agent_id\":\"compatibility-fixture\",\"client_id\":\"6293C140-0152-4802-883C-150287F9B762\",\"created_at\":\"2026-08-27T23:45:36Z\",\"id\":\"73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC\",\"status\":\"closed\",\"summary\":\"{\\\"goal\\\":\\\"Exercise preserved tool behavior\\\",\\\"missing_schema_keys\\\":[],\\\"report\\\":{\\\"result\\\":\\\"passed\\\"}}\",\"updated_at\":\"2026-08-27T23:45:36Z\"}}",
+                "text": "{\"auto_continuity\":\"checkpoint\",\"auto_handoff_id\":\"1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b\",\"message\":\"Run complete.\",\"missing_schema_keys\":[],\"ok\":true,\"report\":{\"result\":\"passed\"},\"schema_complete\":true,\"session\":{\"agent_id\":\"compatibility-fixture\",\"client_id\":\"AB2D0CF5-8B0F-4FCB-8DFD-147D102DF947\",\"created_at\":\"2026-08-27T23:39:18Z\",\"id\":\"CEDDF474-7FA3-4515-8345-3A8AE8BDC20A\",\"status\":\"closed\",\"summary\":\"{\\\"goal\\\":\\\"Exercise preserved tool behavior\\\",\\\"missing_schema_keys\\\":[],\\\"report\\\":{\\\"result\\\":\\\"passed\\\"}}\",\"updated_at\":\"2026-08-27T23:39:19Z\"}}",
                 "type": "text"
               }
             ],
             "isError": false,
             "structuredContent": {
               "auto_continuity": "checkpoint",
-              "auto_handoff_id": "b519a0e9-2491-4c46-8d24-ab70c8a9f28f",
+              "auto_handoff_id": "1920bb86-b884-4d5f-ae63-e4e7ae7f1a3b",
               "message": "Run complete.",
               "missing_schema_keys": [],
               "ok": true,
@@ -13310,12 +13310,12 @@
               "schema_complete": true,
               "session": {
                 "agent_id": "compatibility-fixture",
-                "client_id": "6293C140-0152-4802-883C-150287F9B762",
-                "created_at": "2026-08-27T23:45:36Z",
-                "id": "73EAF58D-ABCC-4661-9D6A-65F96D5FC0FC",
+                "client_id": "AB2D0CF5-8B0F-4FCB-8DFD-147D102DF947",
+                "created_at": "2026-08-27T23:39:18Z",
+                "id": "CEDDF474-7FA3-4515-8345-3A8AE8BDC20A",
                 "status": "closed",
                 "summary": "{\"goal\":\"Exercise preserved tool behavior\",\"missing_schema_keys\":[],\"report\":{\"result\":\"passed\"}}",
-                "updated_at": "2026-08-27T23:45:36Z"
+                "updated_at": "2026-08-27T23:39:19Z"
               }
             }
           }
@@ -13331,7 +13331,7 @@
       "wire_input": {
         "bytes": 8039,
         "framing": "ndjson",
-        "sha256": "8fbff3980b67577e6db13ce67fd367e3700c2ed9d89f60bb8686c56e8a48b30d"
+        "sha256": "3f157229a39dbdf473c97f515343d62f349a5b10808c87d43289543d535f0ba7"
       }
     },
     {
@@ -13581,7 +13581,7 @@
         0
       ],
       "name": "concurrent_mixed_request_correlation",
-      "normalized_probe_payload_sha256": "0b2d11198751e142d4f642822bfd650296679c1ac4f08566671467ce44696bbe",
+      "normalized_probe_payload_sha256": "fce4a1cefa9410ad1b1d76d549cfea8f0bd05df02f05bbd2a23fc60e89f2d072",
       "requests": [
         {
           "id": 1,
@@ -13608,7 +13608,7 @@
           "params": {
             "arguments": {
               "agent_id": "compatibility-fixture",
-              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/concurrent_mixed_request_correlation/fixture-project",
+              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/concurrent_mixed_request_correlation/fixture-project",
               "goal": "Exercise concurrent protocol behavior"
             },
             "name": "agent_run_start"
@@ -13621,7 +13621,7 @@
           "params": {
             "arguments": {
               "command": "sleep 1; printf 'slow\\n'",
-              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/concurrent_mixed_request_correlation/fixture-project",
+              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/concurrent_mixed_request_correlation/fixture-project",
               "timeout_sec": 10
             },
             "name": "shell_exec"
@@ -13684,7 +13684,7 @@
           "result": {
             "content": [
               {
-                "text": "{\"agent\":{\"body\":\"# Compatibility fixture\\n\\nUse only for the isolated protocol matrix.\",\"description\":\"Isolated protocol fixture.\",\"display_name\":\"Compatibility Fixture\",\"id\":\"compatibility-fixture\",\"playbook\":{\"done_definition\":[],\"first_moves\":[],\"handoff\":[],\"output_schema\":[\"result\"],\"quality_bar\":[],\"tools_forbidden\":[],\"tools_primary\":[\"shell_exec\"],\"when_to_use\":[]},\"source\":\"custom\",\"tools\":[\"shell_exec\"]},\"auto_continuity\":\"checkpoint\",\"auto_handoff_id\":\"7204c5ec-e65f-480c-9ac4-bc6fe247259f\",\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/concurrent_mixed_request_correlation\\/fixture-project\",\"done_definition\":[],\"first_moves\":[],\"goal\":\"Exercise concurrent protocol behavior\",\"must_complete\":true,\"next\":[\"Adopt agent.body as role instructions\",\"Execute first_moves\",\"Prefer tools_primary\",\"REQUIRED: agent_run_complete(session_id: '273FD557-81BC-4730-8EDC-5CFE13E2BE6D', report: {…output_schema})\"],\"ok\":true,\"output_schema\":[\"result\"],\"project_context\":{\"authorization_roots\":[\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/concurrent_mixed_request_correlation\\/fixture-project\"],\"client_id\":\"3C957BBF-07F5-4333-861A-9E8820FF0E1F\",\"maximum_inline_output_bytes\":65536,\"project_generation\":1,\"project_id\":\"b486cd96-0f2c-43b5-9723-0096b5389af1\"},\"project_context_attached\":true,\"project_generation\":1,\"project_id\":\"b486cd96-0f2c-43b5-9723-0096b5389af1\",\"session\":{\"agent_id\":\"compatibility-fixture\",\"client_id\":\"3C957BBF-07F5-4333-861A-9E8820FF0E1F\",\"created_at\":\"2026-08-27T23:45:37Z\",\"id\":\"273FD557-81BC-4730-8EDC-5CFE13E2BE6D\",\"status\":\"open\",\"summary\":null,\"updated_at\":\"2026-08-27T23:45:37Z\"},\"session_id\":\"273FD557-81BC-4730-8EDC-5CFE13E2BE6D\",\"token_policy\":\"Large context host: do not skip specialists to save tokens.\",\"tools_forbidden\":[],\"tools_primary\":[\"shell_exec\"]}",
+                "text": "{\"agent\":{\"body\":\"# Compatibility fixture\\n\\nUse only for the isolated protocol matrix.\",\"description\":\"Isolated protocol fixture.\",\"display_name\":\"Compatibility Fixture\",\"id\":\"compatibility-fixture\",\"playbook\":{\"done_definition\":[],\"first_moves\":[],\"handoff\":[],\"output_schema\":[\"result\"],\"quality_bar\":[],\"tools_forbidden\":[],\"tools_primary\":[\"shell_exec\"],\"when_to_use\":[]},\"source\":\"custom\",\"tools\":[\"shell_exec\"]},\"auto_continuity\":\"checkpoint\",\"auto_handoff_id\":\"b7c1ffe3-94ae-4487-95ef-4bd5601ee683\",\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/concurrent_mixed_request_correlation\\/fixture-project\",\"done_definition\":[],\"first_moves\":[],\"goal\":\"Exercise concurrent protocol behavior\",\"must_complete\":true,\"next\":[\"Adopt agent.body as role instructions\",\"Execute first_moves\",\"Prefer tools_primary\",\"REQUIRED: agent_run_complete(session_id: '60E29ED3-D4DC-41AE-8F2F-46D31CB8F06F', report: {…output_schema})\"],\"ok\":true,\"output_schema\":[\"result\"],\"project_context\":{\"authorization_roots\":[\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/concurrent_mixed_request_correlation\\/fixture-project\"],\"client_id\":\"C28470D5-E3B7-4340-846C-D752189DE4A2\",\"maximum_inline_output_bytes\":65536,\"project_generation\":1,\"project_id\":\"8e881f7b-5063-4379-8a59-74f242268f42\"},\"project_context_attached\":true,\"project_generation\":1,\"project_id\":\"8e881f7b-5063-4379-8a59-74f242268f42\",\"session\":{\"agent_id\":\"compatibility-fixture\",\"client_id\":\"C28470D5-E3B7-4340-846C-D752189DE4A2\",\"created_at\":\"2026-08-27T23:39:20Z\",\"id\":\"60E29ED3-D4DC-41AE-8F2F-46D31CB8F06F\",\"status\":\"open\",\"summary\":null,\"updated_at\":\"2026-08-27T23:39:20Z\"},\"session_id\":\"60E29ED3-D4DC-41AE-8F2F-46D31CB8F06F\",\"token_policy\":\"Large context host: do not skip specialists to save tokens.\",\"tools_forbidden\":[],\"tools_primary\":[\"shell_exec\"]}",
                 "type": "text"
               }
             ],
@@ -13715,8 +13715,8 @@
                 ]
               },
               "auto_continuity": "checkpoint",
-              "auto_handoff_id": "7204c5ec-e65f-480c-9ac4-bc6fe247259f",
-              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/concurrent_mixed_request_correlation/fixture-project",
+              "auto_handoff_id": "b7c1ffe3-94ae-4487-95ef-4bd5601ee683",
+              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/concurrent_mixed_request_correlation/fixture-project",
               "done_definition": [],
               "first_moves": [],
               "goal": "Exercise concurrent protocol behavior",
@@ -13725,7 +13725,7 @@
                 "Adopt agent.body as role instructions",
                 "Execute first_moves",
                 "Prefer tools_primary",
-                "REQUIRED: agent_run_complete(session_id: '273FD557-81BC-4730-8EDC-5CFE13E2BE6D', report: {…output_schema})"
+                "REQUIRED: agent_run_complete(session_id: '60E29ED3-D4DC-41AE-8F2F-46D31CB8F06F', report: {…output_schema})"
               ],
               "ok": true,
               "output_schema": [
@@ -13733,26 +13733,26 @@
               ],
               "project_context": {
                 "authorization_roots": [
-                  "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/concurrent_mixed_request_correlation/fixture-project"
+                  "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/concurrent_mixed_request_correlation/fixture-project"
                 ],
-                "client_id": "3C957BBF-07F5-4333-861A-9E8820FF0E1F",
+                "client_id": "C28470D5-E3B7-4340-846C-D752189DE4A2",
                 "maximum_inline_output_bytes": 65536,
                 "project_generation": 1,
-                "project_id": "b486cd96-0f2c-43b5-9723-0096b5389af1"
+                "project_id": "8e881f7b-5063-4379-8a59-74f242268f42"
               },
               "project_context_attached": true,
               "project_generation": 1,
-              "project_id": "b486cd96-0f2c-43b5-9723-0096b5389af1",
+              "project_id": "8e881f7b-5063-4379-8a59-74f242268f42",
               "session": {
                 "agent_id": "compatibility-fixture",
-                "client_id": "3C957BBF-07F5-4333-861A-9E8820FF0E1F",
-                "created_at": "2026-08-27T23:45:37Z",
-                "id": "273FD557-81BC-4730-8EDC-5CFE13E2BE6D",
+                "client_id": "C28470D5-E3B7-4340-846C-D752189DE4A2",
+                "created_at": "2026-08-27T23:39:20Z",
+                "id": "60E29ED3-D4DC-41AE-8F2F-46D31CB8F06F",
                 "status": "open",
                 "summary": null,
-                "updated_at": "2026-08-27T23:45:37Z"
+                "updated_at": "2026-08-27T23:39:20Z"
               },
-              "session_id": "273FD557-81BC-4730-8EDC-5CFE13E2BE6D",
+              "session_id": "60E29ED3-D4DC-41AE-8F2F-46D31CB8F06F",
               "token_policy": "Large context host: do not skip specialists to save tokens.",
               "tools_forbidden": [],
               "tools_primary": [
@@ -13772,14 +13772,14 @@
           "result": {
             "content": [
               {
-                "text": "{\"command\":\"sleep 1; printf 'slow\\\\n'\",\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/concurrent_mixed_request_correlation\\/fixture-project\",\"exit_code\":0,\"ok\":true,\"stderr\":\"\",\"stderr_truncated\":false,\"stdout\":\"slow\\n\",\"stdout_truncated\":false,\"timed_out\":false}",
+                "text": "{\"command\":\"sleep 1; printf 'slow\\\\n'\",\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/concurrent_mixed_request_correlation\\/fixture-project\",\"exit_code\":0,\"ok\":true,\"stderr\":\"\",\"stderr_truncated\":false,\"stdout\":\"slow\\n\",\"stdout_truncated\":false,\"timed_out\":false}",
                 "type": "text"
               }
             ],
             "isError": false,
             "structuredContent": {
               "command": "sleep 1; printf 'slow\\n'",
-              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/concurrent_mixed_request_correlation/fixture-project",
+              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/concurrent_mixed_request_correlation/fixture-project",
               "exit_code": 0,
               "ok": true,
               "stderr": "",
@@ -13801,11 +13801,11 @@
       "wire_input": {
         "bytes": 914,
         "framing": "ndjson",
-        "sha256": "92b7b45e7b21e8f32529886cb1810659e3af94f21db58f133b7924525654e531"
+        "sha256": "e58c5ed75ca4c4df5d64ccef7427bf7a4a61ef516df6a019d28500cdb3edb690"
       }
     },
     {
-      "cancellation_milliseconds": 89,
+      "cancellation_milliseconds": 83,
       "checks": [
         "active_in_flight_cancellation",
         "cancelled_error_code",
@@ -13819,7 +13819,7 @@
         0
       ],
       "name": "active_in_flight_cancellation",
-      "normalized_probe_payload_sha256": "d836cc6043dbf232569e7a20d0468170642e584f98100cb4cf73d5b459bb6eb5",
+      "normalized_probe_payload_sha256": "4032401efe012458f9a5bbbf7d611a6b54c15ed3f0f23547c3155bc8b2720da2",
       "requests": [
         {
           "id": 1,
@@ -13846,7 +13846,7 @@
           "params": {
             "arguments": {
               "agent_id": "compatibility-fixture",
-              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/active_in_flight_cancellation/fixture-project",
+              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/active_in_flight_cancellation/fixture-project",
               "goal": "Exercise concurrent protocol behavior"
             },
             "name": "agent_run_start"
@@ -13858,8 +13858,8 @@
           "method": "tools/call",
           "params": {
             "arguments": {
-              "command": "/bin/sleep 10 & child=$!; printf '%s\\n' \"$child\" > /private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/active_in_flight_cancellation/fixture-project/cancel-child.pid; : > /private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/active_in_flight_cancellation/fixture-project/cancel-ready; wait \"$child\"",
-              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/active_in_flight_cancellation/fixture-project",
+              "command": "/bin/sleep 10 & child=$!; printf '%s\\n' \"$child\" > /private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/active_in_flight_cancellation/fixture-project/cancel-child.pid; : > /private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/active_in_flight_cancellation/fixture-project/cancel-ready; wait \"$child\"",
+              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/active_in_flight_cancellation/fixture-project",
               "timeout_sec": 20
             },
             "name": "shell_exec"
@@ -13920,7 +13920,7 @@
           "result": {
             "content": [
               {
-                "text": "{\"agent\":{\"body\":\"# Compatibility fixture\\n\\nUse only for the isolated protocol matrix.\",\"description\":\"Isolated protocol fixture.\",\"display_name\":\"Compatibility Fixture\",\"id\":\"compatibility-fixture\",\"playbook\":{\"done_definition\":[],\"first_moves\":[],\"handoff\":[],\"output_schema\":[\"result\"],\"quality_bar\":[],\"tools_forbidden\":[],\"tools_primary\":[\"shell_exec\"],\"when_to_use\":[]},\"source\":\"custom\",\"tools\":[\"shell_exec\"]},\"auto_continuity\":\"checkpoint\",\"auto_handoff_id\":\"71482c0e-f97d-4db3-bd66-40cce3980f62\",\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/active_in_flight_cancellation\\/fixture-project\",\"done_definition\":[],\"first_moves\":[],\"goal\":\"Exercise concurrent protocol behavior\",\"must_complete\":true,\"next\":[\"Adopt agent.body as role instructions\",\"Execute first_moves\",\"Prefer tools_primary\",\"REQUIRED: agent_run_complete(session_id: '7D9B5280-6B78-4C68-BF52-B077A6173212', report: {…output_schema})\"],\"ok\":true,\"output_schema\":[\"result\"],\"project_context\":{\"authorization_roots\":[\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/active_in_flight_cancellation\\/fixture-project\"],\"client_id\":\"DFB7E9E3-1F91-4E5A-8F93-0C21765BA842\",\"maximum_inline_output_bytes\":65536,\"project_generation\":1,\"project_id\":\"678980f2-1933-405b-b7fd-c11ddcdb0fb2\"},\"project_context_attached\":true,\"project_generation\":1,\"project_id\":\"678980f2-1933-405b-b7fd-c11ddcdb0fb2\",\"session\":{\"agent_id\":\"compatibility-fixture\",\"client_id\":\"DFB7E9E3-1F91-4E5A-8F93-0C21765BA842\",\"created_at\":\"2026-08-27T23:45:38Z\",\"id\":\"7D9B5280-6B78-4C68-BF52-B077A6173212\",\"status\":\"open\",\"summary\":null,\"updated_at\":\"2026-08-27T23:45:38Z\"},\"session_id\":\"7D9B5280-6B78-4C68-BF52-B077A6173212\",\"token_policy\":\"Large context host: do not skip specialists to save tokens.\",\"tools_forbidden\":[],\"tools_primary\":[\"shell_exec\"]}",
+                "text": "{\"agent\":{\"body\":\"# Compatibility fixture\\n\\nUse only for the isolated protocol matrix.\",\"description\":\"Isolated protocol fixture.\",\"display_name\":\"Compatibility Fixture\",\"id\":\"compatibility-fixture\",\"playbook\":{\"done_definition\":[],\"first_moves\":[],\"handoff\":[],\"output_schema\":[\"result\"],\"quality_bar\":[],\"tools_forbidden\":[],\"tools_primary\":[\"shell_exec\"],\"when_to_use\":[]},\"source\":\"custom\",\"tools\":[\"shell_exec\"]},\"auto_continuity\":\"checkpoint\",\"auto_handoff_id\":\"790b9d68-aefe-448c-9d64-857ac1b2a60b\",\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/active_in_flight_cancellation\\/fixture-project\",\"done_definition\":[],\"first_moves\":[],\"goal\":\"Exercise concurrent protocol behavior\",\"must_complete\":true,\"next\":[\"Adopt agent.body as role instructions\",\"Execute first_moves\",\"Prefer tools_primary\",\"REQUIRED: agent_run_complete(session_id: 'A0244B88-5E44-47D5-9571-8B7BB2AB5C2A', report: {…output_schema})\"],\"ok\":true,\"output_schema\":[\"result\"],\"project_context\":{\"authorization_roots\":[\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/active_in_flight_cancellation\\/fixture-project\"],\"client_id\":\"0B7E618B-1D26-41CC-B37B-FDC161DDC211\",\"maximum_inline_output_bytes\":65536,\"project_generation\":1,\"project_id\":\"8c0c840b-0162-4c21-a735-f8cbb1cc8b48\"},\"project_context_attached\":true,\"project_generation\":1,\"project_id\":\"8c0c840b-0162-4c21-a735-f8cbb1cc8b48\",\"session\":{\"agent_id\":\"compatibility-fixture\",\"client_id\":\"0B7E618B-1D26-41CC-B37B-FDC161DDC211\",\"created_at\":\"2026-08-27T23:39:21Z\",\"id\":\"A0244B88-5E44-47D5-9571-8B7BB2AB5C2A\",\"status\":\"open\",\"summary\":null,\"updated_at\":\"2026-08-27T23:39:21Z\"},\"session_id\":\"A0244B88-5E44-47D5-9571-8B7BB2AB5C2A\",\"token_policy\":\"Large context host: do not skip specialists to save tokens.\",\"tools_forbidden\":[],\"tools_primary\":[\"shell_exec\"]}",
                 "type": "text"
               }
             ],
@@ -13951,8 +13951,8 @@
                 ]
               },
               "auto_continuity": "checkpoint",
-              "auto_handoff_id": "71482c0e-f97d-4db3-bd66-40cce3980f62",
-              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/active_in_flight_cancellation/fixture-project",
+              "auto_handoff_id": "790b9d68-aefe-448c-9d64-857ac1b2a60b",
+              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/active_in_flight_cancellation/fixture-project",
               "done_definition": [],
               "first_moves": [],
               "goal": "Exercise concurrent protocol behavior",
@@ -13961,7 +13961,7 @@
                 "Adopt agent.body as role instructions",
                 "Execute first_moves",
                 "Prefer tools_primary",
-                "REQUIRED: agent_run_complete(session_id: '7D9B5280-6B78-4C68-BF52-B077A6173212', report: {…output_schema})"
+                "REQUIRED: agent_run_complete(session_id: 'A0244B88-5E44-47D5-9571-8B7BB2AB5C2A', report: {…output_schema})"
               ],
               "ok": true,
               "output_schema": [
@@ -13969,26 +13969,26 @@
               ],
               "project_context": {
                 "authorization_roots": [
-                  "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/active_in_flight_cancellation/fixture-project"
+                  "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/active_in_flight_cancellation/fixture-project"
                 ],
-                "client_id": "DFB7E9E3-1F91-4E5A-8F93-0C21765BA842",
+                "client_id": "0B7E618B-1D26-41CC-B37B-FDC161DDC211",
                 "maximum_inline_output_bytes": 65536,
                 "project_generation": 1,
-                "project_id": "678980f2-1933-405b-b7fd-c11ddcdb0fb2"
+                "project_id": "8c0c840b-0162-4c21-a735-f8cbb1cc8b48"
               },
               "project_context_attached": true,
               "project_generation": 1,
-              "project_id": "678980f2-1933-405b-b7fd-c11ddcdb0fb2",
+              "project_id": "8c0c840b-0162-4c21-a735-f8cbb1cc8b48",
               "session": {
                 "agent_id": "compatibility-fixture",
-                "client_id": "DFB7E9E3-1F91-4E5A-8F93-0C21765BA842",
-                "created_at": "2026-08-27T23:45:38Z",
-                "id": "7D9B5280-6B78-4C68-BF52-B077A6173212",
+                "client_id": "0B7E618B-1D26-41CC-B37B-FDC161DDC211",
+                "created_at": "2026-08-27T23:39:21Z",
+                "id": "A0244B88-5E44-47D5-9571-8B7BB2AB5C2A",
                 "status": "open",
                 "summary": null,
-                "updated_at": "2026-08-27T23:45:38Z"
+                "updated_at": "2026-08-27T23:39:21Z"
               },
-              "session_id": "7D9B5280-6B78-4C68-BF52-B077A6173212",
+              "session_id": "A0244B88-5E44-47D5-9571-8B7BB2AB5C2A",
               "token_policy": "Large context host: do not skip specialists to save tokens.",
               "tools_forbidden": [],
               "tools_primary": [
@@ -14016,11 +14016,11 @@
       "wire_input": {
         "bytes": 1324,
         "framing": "ndjson",
-        "sha256": "21c44f826212731412a3c1397e875dcd819146df30ddad67143d5caa72f8d6a4"
+        "sha256": "f3cbb3b24aaa25b9a67517b7a4dbf47c1cbf1ac2f7aee239a34ef1caac95a620"
       }
     },
     {
-      "cancellation_milliseconds": 55,
+      "cancellation_milliseconds": 56,
       "checks": [
         "non_shell_active_cancellation",
         "non_shell_request_deadline",
@@ -14034,14 +14034,14 @@
         "exactly_one_response_per_request",
         "bounded_eof_shutdown"
       ],
-      "deadline_milliseconds": 2036,
+      "deadline_milliseconds": 2029,
       "exit_codes": [
         0
       ],
       "maximum_cancellation_milliseconds": 2000,
       "maximum_deadline_response_milliseconds": 3000,
       "name": "non_shell_search_control",
-      "normalized_probe_payload_sha256": "8f4cc4d666ac9cceafa848b8db6460a14532056c3d16327f4628766ed34a900a",
+      "normalized_probe_payload_sha256": "c5d3a7913d5c828652bb51cd9a479dbf2497474a13c4fd6c93526f5bca1733c3",
       "requested_deadline_milliseconds": 2000,
       "requests": [
         {
@@ -14069,7 +14069,7 @@
           "params": {
             "arguments": {
               "agent_id": "compatibility-fixture",
-              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/non_shell_search_control/fixture-project",
+              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/non_shell_search_control/fixture-project",
               "goal": "Exercise concurrent protocol behavior"
             },
             "name": "agent_run_start"
@@ -14081,7 +14081,7 @@
           "method": "tools/call",
           "params": {
             "arguments": {
-              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/non_shell_search_control/fixture-project/blocking-cancel-search",
+              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/non_shell_search_control/fixture-project/blocking-cancel-search",
               "pattern": "never-written-needle"
             },
             "name": "search_text"
@@ -14108,7 +14108,7 @@
           "params": {
             "arguments": {
               "deadline_ms": 2000,
-              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/non_shell_search_control/fixture-project/blocking-deadline-search",
+              "path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/non_shell_search_control/fixture-project/blocking-deadline-search",
               "pattern": "never-written-needle"
             },
             "name": "search_text"
@@ -14173,7 +14173,7 @@
           "result": {
             "content": [
               {
-                "text": "{\"agent\":{\"body\":\"# Compatibility fixture\\n\\nUse only for the isolated protocol matrix.\",\"description\":\"Isolated protocol fixture.\",\"display_name\":\"Compatibility Fixture\",\"id\":\"compatibility-fixture\",\"playbook\":{\"done_definition\":[],\"first_moves\":[],\"handoff\":[],\"output_schema\":[\"result\"],\"quality_bar\":[],\"tools_forbidden\":[],\"tools_primary\":[\"search_text\"],\"when_to_use\":[]},\"source\":\"custom\",\"tools\":[\"search_text\"]},\"auto_continuity\":\"checkpoint\",\"auto_handoff_id\":\"7f8549c8-13d2-4ab1-bb9e-52075e0b6f03\",\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/non_shell_search_control\\/fixture-project\",\"done_definition\":[],\"first_moves\":[],\"goal\":\"Exercise concurrent protocol behavior\",\"must_complete\":true,\"next\":[\"Adopt agent.body as role instructions\",\"Execute first_moves\",\"Prefer tools_primary\",\"REQUIRED: agent_run_complete(session_id: 'D8B7BB40-2737-43F9-8794-AC7A3BF8C6E4', report: {…output_schema})\"],\"ok\":true,\"output_schema\":[\"result\"],\"project_context\":{\"authorization_roots\":[\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/non_shell_search_control\\/fixture-project\"],\"client_id\":\"AC42F63E-D4FF-4226-971F-CDD4B76CF4C2\",\"maximum_inline_output_bytes\":65536,\"project_generation\":1,\"project_id\":\"27506b84-e74b-41f3-97ad-dfe4efab30a7\"},\"project_context_attached\":true,\"project_generation\":1,\"project_id\":\"27506b84-e74b-41f3-97ad-dfe4efab30a7\",\"session\":{\"agent_id\":\"compatibility-fixture\",\"client_id\":\"AC42F63E-D4FF-4226-971F-CDD4B76CF4C2\",\"created_at\":\"2026-08-27T23:45:39Z\",\"id\":\"D8B7BB40-2737-43F9-8794-AC7A3BF8C6E4\",\"status\":\"open\",\"summary\":null,\"updated_at\":\"2026-08-27T23:45:39Z\"},\"session_id\":\"D8B7BB40-2737-43F9-8794-AC7A3BF8C6E4\",\"token_policy\":\"Large context host: do not skip specialists to save tokens.\",\"tools_forbidden\":[],\"tools_primary\":[\"search_text\"]}",
+                "text": "{\"agent\":{\"body\":\"# Compatibility fixture\\n\\nUse only for the isolated protocol matrix.\",\"description\":\"Isolated protocol fixture.\",\"display_name\":\"Compatibility Fixture\",\"id\":\"compatibility-fixture\",\"playbook\":{\"done_definition\":[],\"first_moves\":[],\"handoff\":[],\"output_schema\":[\"result\"],\"quality_bar\":[],\"tools_forbidden\":[],\"tools_primary\":[\"search_text\"],\"when_to_use\":[]},\"source\":\"custom\",\"tools\":[\"search_text\"]},\"auto_continuity\":\"checkpoint\",\"auto_handoff_id\":\"d48a0cb0-9115-4324-bbe6-153d05d1a7f6\",\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/non_shell_search_control\\/fixture-project\",\"done_definition\":[],\"first_moves\":[],\"goal\":\"Exercise concurrent protocol behavior\",\"must_complete\":true,\"next\":[\"Adopt agent.body as role instructions\",\"Execute first_moves\",\"Prefer tools_primary\",\"REQUIRED: agent_run_complete(session_id: 'B0290D0D-6EA7-440F-9EEA-65438B44E890', report: {…output_schema})\"],\"ok\":true,\"output_schema\":[\"result\"],\"project_context\":{\"authorization_roots\":[\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/non_shell_search_control\\/fixture-project\"],\"client_id\":\"B989622F-8723-4412-8810-D2E01AB1D90B\",\"maximum_inline_output_bytes\":65536,\"project_generation\":1,\"project_id\":\"3b6bfe9e-aebc-4216-bf8d-d11bbabc1dfb\"},\"project_context_attached\":true,\"project_generation\":1,\"project_id\":\"3b6bfe9e-aebc-4216-bf8d-d11bbabc1dfb\",\"session\":{\"agent_id\":\"compatibility-fixture\",\"client_id\":\"B989622F-8723-4412-8810-D2E01AB1D90B\",\"created_at\":\"2026-08-27T23:39:22Z\",\"id\":\"B0290D0D-6EA7-440F-9EEA-65438B44E890\",\"status\":\"open\",\"summary\":null,\"updated_at\":\"2026-08-27T23:39:22Z\"},\"session_id\":\"B0290D0D-6EA7-440F-9EEA-65438B44E890\",\"token_policy\":\"Large context host: do not skip specialists to save tokens.\",\"tools_forbidden\":[],\"tools_primary\":[\"search_text\"]}",
                 "type": "text"
               }
             ],
@@ -14204,8 +14204,8 @@
                 ]
               },
               "auto_continuity": "checkpoint",
-              "auto_handoff_id": "7f8549c8-13d2-4ab1-bb9e-52075e0b6f03",
-              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/non_shell_search_control/fixture-project",
+              "auto_handoff_id": "d48a0cb0-9115-4324-bbe6-153d05d1a7f6",
+              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/non_shell_search_control/fixture-project",
               "done_definition": [],
               "first_moves": [],
               "goal": "Exercise concurrent protocol behavior",
@@ -14214,7 +14214,7 @@
                 "Adopt agent.body as role instructions",
                 "Execute first_moves",
                 "Prefer tools_primary",
-                "REQUIRED: agent_run_complete(session_id: 'D8B7BB40-2737-43F9-8794-AC7A3BF8C6E4', report: {…output_schema})"
+                "REQUIRED: agent_run_complete(session_id: 'B0290D0D-6EA7-440F-9EEA-65438B44E890', report: {…output_schema})"
               ],
               "ok": true,
               "output_schema": [
@@ -14222,26 +14222,26 @@
               ],
               "project_context": {
                 "authorization_roots": [
-                  "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/non_shell_search_control/fixture-project"
+                  "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/non_shell_search_control/fixture-project"
                 ],
-                "client_id": "AC42F63E-D4FF-4226-971F-CDD4B76CF4C2",
+                "client_id": "B989622F-8723-4412-8810-D2E01AB1D90B",
                 "maximum_inline_output_bytes": 65536,
                 "project_generation": 1,
-                "project_id": "27506b84-e74b-41f3-97ad-dfe4efab30a7"
+                "project_id": "3b6bfe9e-aebc-4216-bf8d-d11bbabc1dfb"
               },
               "project_context_attached": true,
               "project_generation": 1,
-              "project_id": "27506b84-e74b-41f3-97ad-dfe4efab30a7",
+              "project_id": "3b6bfe9e-aebc-4216-bf8d-d11bbabc1dfb",
               "session": {
                 "agent_id": "compatibility-fixture",
-                "client_id": "AC42F63E-D4FF-4226-971F-CDD4B76CF4C2",
-                "created_at": "2026-08-27T23:45:39Z",
-                "id": "D8B7BB40-2737-43F9-8794-AC7A3BF8C6E4",
+                "client_id": "B989622F-8723-4412-8810-D2E01AB1D90B",
+                "created_at": "2026-08-27T23:39:22Z",
+                "id": "B0290D0D-6EA7-440F-9EEA-65438B44E890",
                 "status": "open",
                 "summary": null,
-                "updated_at": "2026-08-27T23:45:39Z"
+                "updated_at": "2026-08-27T23:39:22Z"
               },
-              "session_id": "D8B7BB40-2737-43F9-8794-AC7A3BF8C6E4",
+              "session_id": "B0290D0D-6EA7-440F-9EEA-65438B44E890",
               "token_policy": "Large context host: do not skip specialists to save tokens.",
               "tools_forbidden": [],
               "tools_primary": [
@@ -14298,7 +14298,7 @@
       "wire_input": {
         "bytes": 1369,
         "framing": "ndjson",
-        "sha256": "e856f36d439af523396d969d3e68ffdc7bfeb14569a2766cf5a93fd866d51717"
+        "sha256": "78f4f5c8eca6357895167addaa3cc6db6445290cd3becfb30178a9382ed55981"
       }
     },
     {
@@ -14311,13 +14311,13 @@
         "exactly_one_response_per_request",
         "bounded_eof_shutdown"
       ],
-      "committed_head": "2d25c4b12907a330ef48775338dec866198c09fa",
+      "committed_head": "6364cbdbd54aaf32a9e7309e9f03e34813c8f506",
       "exit_codes": [
         0
       ],
-      "initial_head": "2b616bf3fff0da90781750b713a6f22084cb7c90",
+      "initial_head": "8d0f450a6cb14e2d26d28c9a616f9b511104b3b5",
       "name": "git_post_commit_reconciliation",
-      "normalized_probe_payload_sha256": "0f3c10765af55d998438f302cf7bfced28aee7aa7323926f2dfcfb7418ca41d4",
+      "normalized_probe_payload_sha256": "854308ddaa77938b636ceae1701f3a44df8e5c7f62d07594ddd1c5c5269c837b",
       "requests": [
         {
           "id": 1,
@@ -14344,7 +14344,7 @@
           "params": {
             "arguments": {
               "agent_id": "compatibility-fixture",
-              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/git_post_commit_reconciliation/fixture-project",
+              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/git_post_commit_reconciliation/fixture-project",
               "goal": "Exercise concurrent protocol behavior"
             },
             "name": "agent_run_start"
@@ -14356,7 +14356,7 @@
           "method": "tools/call",
           "params": {
             "arguments": {
-              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/git_post_commit_reconciliation/fixture-project",
+              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/git_post_commit_reconciliation/fixture-project",
               "message": "Validate post-commit reconciliation"
             },
             "name": "git_commit"
@@ -14427,7 +14427,7 @@
           "result": {
             "content": [
               {
-                "text": "{\"agent\":{\"body\":\"# Compatibility fixture\\n\\nUse only for the isolated protocol matrix.\",\"description\":\"Isolated protocol fixture.\",\"display_name\":\"Compatibility Fixture\",\"id\":\"compatibility-fixture\",\"playbook\":{\"done_definition\":[],\"first_moves\":[],\"handoff\":[],\"output_schema\":[\"result\"],\"quality_bar\":[],\"tools_forbidden\":[],\"tools_primary\":[\"git_commit\"],\"when_to_use\":[]},\"source\":\"custom\",\"tools\":[\"git_commit\"]},\"auto_continuity\":\"checkpoint\",\"auto_handoff_id\":\"2a49f159-9c88-4479-9b00-c0a386b1544f\",\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/git_post_commit_reconciliation\\/fixture-project\",\"done_definition\":[],\"first_moves\":[],\"goal\":\"Exercise concurrent protocol behavior\",\"must_complete\":true,\"next\":[\"Adopt agent.body as role instructions\",\"Execute first_moves\",\"Prefer tools_primary\",\"REQUIRED: agent_run_complete(session_id: '28149382-E6A5-426D-A1E9-7EC1A1BB285C', report: {…output_schema})\"],\"ok\":true,\"output_schema\":[\"result\"],\"project_context\":{\"authorization_roots\":[\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/git_post_commit_reconciliation\\/fixture-project\"],\"client_id\":\"5125A101-6D92-4009-AC2C-58AD6DF622E4\",\"maximum_inline_output_bytes\":65536,\"project_generation\":1,\"project_id\":\"742d745b-634e-4083-a62b-3ec216f38e0a\"},\"project_context_attached\":true,\"project_generation\":1,\"project_id\":\"742d745b-634e-4083-a62b-3ec216f38e0a\",\"session\":{\"agent_id\":\"compatibility-fixture\",\"client_id\":\"5125A101-6D92-4009-AC2C-58AD6DF622E4\",\"created_at\":\"2026-08-27T23:45:41Z\",\"id\":\"28149382-E6A5-426D-A1E9-7EC1A1BB285C\",\"status\":\"open\",\"summary\":null,\"updated_at\":\"2026-08-27T23:45:41Z\"},\"session_id\":\"28149382-E6A5-426D-A1E9-7EC1A1BB285C\",\"token_policy\":\"Large context host: do not skip specialists to save tokens.\",\"tools_forbidden\":[],\"tools_primary\":[\"git_commit\"]}",
+                "text": "{\"agent\":{\"body\":\"# Compatibility fixture\\n\\nUse only for the isolated protocol matrix.\",\"description\":\"Isolated protocol fixture.\",\"display_name\":\"Compatibility Fixture\",\"id\":\"compatibility-fixture\",\"playbook\":{\"done_definition\":[],\"first_moves\":[],\"handoff\":[],\"output_schema\":[\"result\"],\"quality_bar\":[],\"tools_forbidden\":[],\"tools_primary\":[\"git_commit\"],\"when_to_use\":[]},\"source\":\"custom\",\"tools\":[\"git_commit\"]},\"auto_continuity\":\"checkpoint\",\"auto_handoff_id\":\"d2ec268f-a8ab-496c-9c8e-a1b9cf427ca4\",\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/git_post_commit_reconciliation\\/fixture-project\",\"done_definition\":[],\"first_moves\":[],\"goal\":\"Exercise concurrent protocol behavior\",\"must_complete\":true,\"next\":[\"Adopt agent.body as role instructions\",\"Execute first_moves\",\"Prefer tools_primary\",\"REQUIRED: agent_run_complete(session_id: 'CE1FC422-476C-44FE-A0B7-5C490173F232', report: {…output_schema})\"],\"ok\":true,\"output_schema\":[\"result\"],\"project_context\":{\"authorization_roots\":[\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/git_post_commit_reconciliation\\/fixture-project\"],\"client_id\":\"BB914A5E-89FB-4AC3-8154-66D0D9B373E8\",\"maximum_inline_output_bytes\":65536,\"project_generation\":1,\"project_id\":\"6b38c3b6-e583-4143-afcf-43544216ebc1\"},\"project_context_attached\":true,\"project_generation\":1,\"project_id\":\"6b38c3b6-e583-4143-afcf-43544216ebc1\",\"session\":{\"agent_id\":\"compatibility-fixture\",\"client_id\":\"BB914A5E-89FB-4AC3-8154-66D0D9B373E8\",\"created_at\":\"2026-08-27T23:39:24Z\",\"id\":\"CE1FC422-476C-44FE-A0B7-5C490173F232\",\"status\":\"open\",\"summary\":null,\"updated_at\":\"2026-08-27T23:39:24Z\"},\"session_id\":\"CE1FC422-476C-44FE-A0B7-5C490173F232\",\"token_policy\":\"Large context host: do not skip specialists to save tokens.\",\"tools_forbidden\":[],\"tools_primary\":[\"git_commit\"]}",
                 "type": "text"
               }
             ],
@@ -14458,8 +14458,8 @@
                 ]
               },
               "auto_continuity": "checkpoint",
-              "auto_handoff_id": "2a49f159-9c88-4479-9b00-c0a386b1544f",
-              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/git_post_commit_reconciliation/fixture-project",
+              "auto_handoff_id": "d2ec268f-a8ab-496c-9c8e-a1b9cf427ca4",
+              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/git_post_commit_reconciliation/fixture-project",
               "done_definition": [],
               "first_moves": [],
               "goal": "Exercise concurrent protocol behavior",
@@ -14468,7 +14468,7 @@
                 "Adopt agent.body as role instructions",
                 "Execute first_moves",
                 "Prefer tools_primary",
-                "REQUIRED: agent_run_complete(session_id: '28149382-E6A5-426D-A1E9-7EC1A1BB285C', report: {…output_schema})"
+                "REQUIRED: agent_run_complete(session_id: 'CE1FC422-476C-44FE-A0B7-5C490173F232', report: {…output_schema})"
               ],
               "ok": true,
               "output_schema": [
@@ -14476,26 +14476,26 @@
               ],
               "project_context": {
                 "authorization_roots": [
-                  "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/git_post_commit_reconciliation/fixture-project"
+                  "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/git_post_commit_reconciliation/fixture-project"
                 ],
-                "client_id": "5125A101-6D92-4009-AC2C-58AD6DF622E4",
+                "client_id": "BB914A5E-89FB-4AC3-8154-66D0D9B373E8",
                 "maximum_inline_output_bytes": 65536,
                 "project_generation": 1,
-                "project_id": "742d745b-634e-4083-a62b-3ec216f38e0a"
+                "project_id": "6b38c3b6-e583-4143-afcf-43544216ebc1"
               },
               "project_context_attached": true,
               "project_generation": 1,
-              "project_id": "742d745b-634e-4083-a62b-3ec216f38e0a",
+              "project_id": "6b38c3b6-e583-4143-afcf-43544216ebc1",
               "session": {
                 "agent_id": "compatibility-fixture",
-                "client_id": "5125A101-6D92-4009-AC2C-58AD6DF622E4",
-                "created_at": "2026-08-27T23:45:41Z",
-                "id": "28149382-E6A5-426D-A1E9-7EC1A1BB285C",
+                "client_id": "BB914A5E-89FB-4AC3-8154-66D0D9B373E8",
+                "created_at": "2026-08-27T23:39:24Z",
+                "id": "CE1FC422-476C-44FE-A0B7-5C490173F232",
                 "status": "open",
                 "summary": null,
-                "updated_at": "2026-08-27T23:45:41Z"
+                "updated_at": "2026-08-27T23:39:24Z"
               },
-              "session_id": "28149382-E6A5-426D-A1E9-7EC1A1BB285C",
+              "session_id": "CE1FC422-476C-44FE-A0B7-5C490173F232",
               "token_policy": "Large context host: do not skip specialists to save tokens.",
               "tools_forbidden": [],
               "tools_primary": [
@@ -14510,19 +14510,19 @@
           "result": {
             "content": [
               {
-                "text": "{\"commit\":\"2d25c4b12907a330ef48775338dec866198c09fa\",\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/git_post_commit_reconciliation\\/fixture-project\",\"exit_code\":0,\"ok\":true,\"reconciled\":true,\"stderr\":\"\",\"stdout\":\"Committed 2d25c4b12907a330ef48775338dec866198c09fa\\n\"}",
+                "text": "{\"commit\":\"6364cbdbd54aaf32a9e7309e9f03e34813c8f506\",\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/git_post_commit_reconciliation\\/fixture-project\",\"exit_code\":0,\"ok\":true,\"reconciled\":true,\"stderr\":\"\",\"stdout\":\"Committed 6364cbdbd54aaf32a9e7309e9f03e34813c8f506\\n\"}",
                 "type": "text"
               }
             ],
             "isError": false,
             "structuredContent": {
-              "commit": "2d25c4b12907a330ef48775338dec866198c09fa",
-              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/git_post_commit_reconciliation/fixture-project",
+              "commit": "6364cbdbd54aaf32a9e7309e9f03e34813c8f506",
+              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/git_post_commit_reconciliation/fixture-project",
               "exit_code": 0,
               "ok": true,
               "reconciled": true,
               "stderr": "",
-              "stdout": "Committed 2d25c4b12907a330ef48775338dec866198c09fa\n"
+              "stdout": "Committed 6364cbdbd54aaf32a9e7309e9f03e34813c8f506\n"
             }
           }
         },
@@ -14542,7 +14542,7 @@
       "wire_input": {
         "bytes": 1011,
         "framing": "ndjson",
-        "sha256": "5cdaaada7e75e051db5370a659fc2c73c4caf1c141d1676a8533874cce342552"
+        "sha256": "ddabff092f8200bffb083aaef3808502c226d78b9335b7baa49a4d27c30b2dbc"
       }
     },
     {
@@ -14555,12 +14555,12 @@
         "bounded_eof_shutdown"
       ],
       "child_process_terminated": true,
-      "eof_shutdown_milliseconds": 85,
+      "eof_shutdown_milliseconds": 134,
       "exit_codes": [
         0
       ],
       "name": "active_request_eof_shutdown",
-      "normalized_probe_payload_sha256": "4ebaac8146108c51928ee81c9ad12d3818f85a3f8da310ff3f53423297b921cc",
+      "normalized_probe_payload_sha256": "9ade546a9e73e82f327555de9f3ee966d170737c8e3a8bf498925fa6cc982a27",
       "requests": [
         {
           "id": 1,
@@ -14587,7 +14587,7 @@
           "params": {
             "arguments": {
               "agent_id": "compatibility-fixture",
-              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/active_request_eof_shutdown/fixture-project",
+              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/active_request_eof_shutdown/fixture-project",
               "goal": "Exercise concurrent protocol behavior"
             },
             "name": "agent_run_start"
@@ -14599,8 +14599,8 @@
           "method": "tools/call",
           "params": {
             "arguments": {
-              "command": "/bin/sleep 10 & child=$!; printf '%s\\n' \"$child\" > /private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/active_request_eof_shutdown/fixture-project/eof-child.pid; : > /private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/active_request_eof_shutdown/fixture-project/eof-ready; wait \"$child\"",
-              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/active_request_eof_shutdown/fixture-project",
+              "command": "/bin/sleep 10 & child=$!; printf '%s\\n' \"$child\" > /private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/active_request_eof_shutdown/fixture-project/eof-child.pid; : > /private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/active_request_eof_shutdown/fixture-project/eof-ready; wait \"$child\"",
+              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/active_request_eof_shutdown/fixture-project",
               "timeout_sec": 20
             },
             "name": "shell_exec"
@@ -14653,7 +14653,7 @@
           "result": {
             "content": [
               {
-                "text": "{\"agent\":{\"body\":\"# Compatibility fixture\\n\\nUse only for the isolated protocol matrix.\",\"description\":\"Isolated protocol fixture.\",\"display_name\":\"Compatibility Fixture\",\"id\":\"compatibility-fixture\",\"playbook\":{\"done_definition\":[],\"first_moves\":[],\"handoff\":[],\"output_schema\":[\"result\"],\"quality_bar\":[],\"tools_forbidden\":[],\"tools_primary\":[\"shell_exec\"],\"when_to_use\":[]},\"source\":\"custom\",\"tools\":[\"shell_exec\"]},\"auto_continuity\":\"checkpoint\",\"auto_handoff_id\":\"4b9742c5-90ee-4489-9ae7-47a98f438dcd\",\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/active_request_eof_shutdown\\/fixture-project\",\"done_definition\":[],\"first_moves\":[],\"goal\":\"Exercise concurrent protocol behavior\",\"must_complete\":true,\"next\":[\"Adopt agent.body as role instructions\",\"Execute first_moves\",\"Prefer tools_primary\",\"REQUIRED: agent_run_complete(session_id: 'B14724F5-1727-4443-8D82-DD2EC43009C2', report: {…output_schema})\"],\"ok\":true,\"output_schema\":[\"result\"],\"project_context\":{\"authorization_roots\":[\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/active_request_eof_shutdown\\/fixture-project\"],\"client_id\":\"D197EA21-D9DA-4690-AA10-36C8DD5D2EC6\",\"maximum_inline_output_bytes\":65536,\"project_generation\":1,\"project_id\":\"e99ac035-28a4-43bb-9be6-1c6c5d5bba30\"},\"project_context_attached\":true,\"project_generation\":1,\"project_id\":\"e99ac035-28a4-43bb-9be6-1c6c5d5bba30\",\"session\":{\"agent_id\":\"compatibility-fixture\",\"client_id\":\"D197EA21-D9DA-4690-AA10-36C8DD5D2EC6\",\"created_at\":\"2026-08-27T23:45:42Z\",\"id\":\"B14724F5-1727-4443-8D82-DD2EC43009C2\",\"status\":\"open\",\"summary\":null,\"updated_at\":\"2026-08-27T23:45:42Z\"},\"session_id\":\"B14724F5-1727-4443-8D82-DD2EC43009C2\",\"token_policy\":\"Large context host: do not skip specialists to save tokens.\",\"tools_forbidden\":[],\"tools_primary\":[\"shell_exec\"]}",
+                "text": "{\"agent\":{\"body\":\"# Compatibility fixture\\n\\nUse only for the isolated protocol matrix.\",\"description\":\"Isolated protocol fixture.\",\"display_name\":\"Compatibility Fixture\",\"id\":\"compatibility-fixture\",\"playbook\":{\"done_definition\":[],\"first_moves\":[],\"handoff\":[],\"output_schema\":[\"result\"],\"quality_bar\":[],\"tools_forbidden\":[],\"tools_primary\":[\"shell_exec\"],\"when_to_use\":[]},\"source\":\"custom\",\"tools\":[\"shell_exec\"]},\"auto_continuity\":\"checkpoint\",\"auto_handoff_id\":\"7f6ab096-9614-4987-ac3b-b337501ebe5a\",\"cwd\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/active_request_eof_shutdown\\/fixture-project\",\"done_definition\":[],\"first_moves\":[],\"goal\":\"Exercise concurrent protocol behavior\",\"must_complete\":true,\"next\":[\"Adopt agent.body as role instructions\",\"Execute first_moves\",\"Prefer tools_primary\",\"REQUIRED: agent_run_complete(session_id: '4D14C292-BEB6-4432-A1B6-DB6CC9155567', report: {…output_schema})\"],\"ok\":true,\"output_schema\":[\"result\"],\"project_context\":{\"authorization_roots\":[\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/active_request_eof_shutdown\\/fixture-project\"],\"client_id\":\"D2C81CA5-67CE-4547-8CAF-4EDDA5A3A4FD\",\"maximum_inline_output_bytes\":65536,\"project_generation\":1,\"project_id\":\"7fc3943b-2f86-426e-89ea-ad7be83f0bcc\"},\"project_context_attached\":true,\"project_generation\":1,\"project_id\":\"7fc3943b-2f86-426e-89ea-ad7be83f0bcc\",\"session\":{\"agent_id\":\"compatibility-fixture\",\"client_id\":\"D2C81CA5-67CE-4547-8CAF-4EDDA5A3A4FD\",\"created_at\":\"2026-08-27T23:39:25Z\",\"id\":\"4D14C292-BEB6-4432-A1B6-DB6CC9155567\",\"status\":\"open\",\"summary\":null,\"updated_at\":\"2026-08-27T23:39:25Z\"},\"session_id\":\"4D14C292-BEB6-4432-A1B6-DB6CC9155567\",\"token_policy\":\"Large context host: do not skip specialists to save tokens.\",\"tools_forbidden\":[],\"tools_primary\":[\"shell_exec\"]}",
                 "type": "text"
               }
             ],
@@ -14684,8 +14684,8 @@
                 ]
               },
               "auto_continuity": "checkpoint",
-              "auto_handoff_id": "4b9742c5-90ee-4489-9ae7-47a98f438dcd",
-              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/active_request_eof_shutdown/fixture-project",
+              "auto_handoff_id": "7f6ab096-9614-4987-ac3b-b337501ebe5a",
+              "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/active_request_eof_shutdown/fixture-project",
               "done_definition": [],
               "first_moves": [],
               "goal": "Exercise concurrent protocol behavior",
@@ -14694,7 +14694,7 @@
                 "Adopt agent.body as role instructions",
                 "Execute first_moves",
                 "Prefer tools_primary",
-                "REQUIRED: agent_run_complete(session_id: 'B14724F5-1727-4443-8D82-DD2EC43009C2', report: {…output_schema})"
+                "REQUIRED: agent_run_complete(session_id: '4D14C292-BEB6-4432-A1B6-DB6CC9155567', report: {…output_schema})"
               ],
               "ok": true,
               "output_schema": [
@@ -14702,26 +14702,26 @@
               ],
               "project_context": {
                 "authorization_roots": [
-                  "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/active_request_eof_shutdown/fixture-project"
+                  "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/active_request_eof_shutdown/fixture-project"
                 ],
-                "client_id": "D197EA21-D9DA-4690-AA10-36C8DD5D2EC6",
+                "client_id": "D2C81CA5-67CE-4547-8CAF-4EDDA5A3A4FD",
                 "maximum_inline_output_bytes": 65536,
                 "project_generation": 1,
-                "project_id": "e99ac035-28a4-43bb-9be6-1c6c5d5bba30"
+                "project_id": "7fc3943b-2f86-426e-89ea-ad7be83f0bcc"
               },
               "project_context_attached": true,
               "project_generation": 1,
-              "project_id": "e99ac035-28a4-43bb-9be6-1c6c5d5bba30",
+              "project_id": "7fc3943b-2f86-426e-89ea-ad7be83f0bcc",
               "session": {
                 "agent_id": "compatibility-fixture",
-                "client_id": "D197EA21-D9DA-4690-AA10-36C8DD5D2EC6",
-                "created_at": "2026-08-27T23:45:42Z",
-                "id": "B14724F5-1727-4443-8D82-DD2EC43009C2",
+                "client_id": "D2C81CA5-67CE-4547-8CAF-4EDDA5A3A4FD",
+                "created_at": "2026-08-27T23:39:25Z",
+                "id": "4D14C292-BEB6-4432-A1B6-DB6CC9155567",
                 "status": "open",
                 "summary": null,
-                "updated_at": "2026-08-27T23:45:42Z"
+                "updated_at": "2026-08-27T23:39:25Z"
               },
-              "session_id": "B14724F5-1727-4443-8D82-DD2EC43009C2",
+              "session_id": "4D14C292-BEB6-4432-A1B6-DB6CC9155567",
               "token_policy": "Large context host: do not skip specialists to save tokens.",
               "tools_forbidden": [],
               "tools_primary": [
@@ -14745,7 +14745,7 @@
       "wire_input": {
         "bytes": 1197,
         "framing": "ndjson",
-        "sha256": "35b7ed434c3417ae5382a941325c800d1124a00efae1c7369cd835efbbd100dc"
+        "sha256": "0ad9e1df23d8d750e3d3eef7ac1b24cc981144f1666f2f2a8c54be3fce6c824c"
       }
     },
     {
@@ -14958,9 +14958,9 @@
       "exit_codes": [
         0
       ],
-      "inserted_record_ids_sha256": "71cc5eb1326793ad7781fd0d4267bccf9ad2c95114b1a4d178201f192004cd7f",
+      "inserted_record_ids_sha256": "2a751eb9679bcfe8b125f34d0cc84696fe0383abd12d16056e27fef429bee98d",
       "name": "pagination",
-      "normalized_probe_payload_sha256": "55927769e904f6278e6ce2e26cc139e49dc70bb540286b8ba7886413cd28f44c",
+      "normalized_probe_payload_sha256": "7b3bb1d49fbb14437264cd06bbd9ee57b7a500c71524182390d2eaed9d055f28",
       "requests": [
         {
           "id": 1,
@@ -14986,7 +14986,7 @@
           "method": "tools/call",
           "params": {
             "arguments": {
-              "project_path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/pagination/fixture-project"
+              "project_path": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/pagination/fixture-project"
             },
             "name": "project_memory.initialize"
           }
@@ -14999,7 +14999,7 @@
             "arguments": {
               "idempotency_key": "p10-pagination-0",
               "kind": "fact",
-              "project_id": "0e433344-ec4c-4251-9848-bac660f12cf2",
+              "project_id": "e70cbc5e-052d-475c-beca-6ec27161a68a",
               "summary": "Bounded pagination record 0",
               "title": "Pagination fixture 0"
             },
@@ -15014,7 +15014,7 @@
             "arguments": {
               "idempotency_key": "p10-pagination-1",
               "kind": "fact",
-              "project_id": "0e433344-ec4c-4251-9848-bac660f12cf2",
+              "project_id": "e70cbc5e-052d-475c-beca-6ec27161a68a",
               "summary": "Bounded pagination record 1",
               "title": "Pagination fixture 1"
             },
@@ -15029,7 +15029,7 @@
             "arguments": {
               "idempotency_key": "p10-pagination-2",
               "kind": "fact",
-              "project_id": "0e433344-ec4c-4251-9848-bac660f12cf2",
+              "project_id": "e70cbc5e-052d-475c-beca-6ec27161a68a",
               "summary": "Bounded pagination record 2",
               "title": "Pagination fixture 2"
             },
@@ -15044,7 +15044,7 @@
             "arguments": {
               "limit": 2,
               "maximum_response_bytes": 4096,
-              "project_id": "0e433344-ec4c-4251-9848-bac660f12cf2"
+              "project_id": "e70cbc5e-052d-475c-beca-6ec27161a68a"
             },
             "name": "project_memory.list_recent"
           }
@@ -15058,7 +15058,7 @@
               "cursor": "djE6Mg==",
               "limit": 2,
               "maximum_response_bytes": 4096,
-              "project_id": "0e433344-ec4c-4251-9848-bac660f12cf2"
+              "project_id": "e70cbc5e-052d-475c-beca-6ec27161a68a"
             },
             "name": "project_memory.list_recent"
           }
@@ -15110,7 +15110,7 @@
           "result": {
             "content": [
               {
-                "text": "{\"capabilities\":[\"lexical_search\",\"transactions\",\"redaction\",\"exports\",\"fts5\"],\"capability_version\":1,\"limits\":{\"batch_bytes\":1048576,\"batch_count\":50,\"body_bytes\":262144,\"open_projects\":8,\"page_count\":100,\"response_bytes\":262144,\"source_reference_bytes\":2048,\"summary_bytes\":4096,\"tag_bytes\":128,\"tag_count\":32,\"title_bytes\":512},\"migration_status\":\"current\",\"ok\":true,\"project\":{\"aliases\":[\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/pagination\\/fixture-project\"],\"display_name\":\"fixture-project\",\"project_id\":\"0e433344-ec4c-4251-9848-bac660f12cf2\",\"repository_identity\":null},\"project_context\":{\"authorization_roots\":[\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-2ktjep7d\\/wire-probes\\/pagination\\/fixture-project\"],\"client_id\":\"0AF46035-1282-417B-B72B-FF862E0F70B6\",\"maximum_inline_output_bytes\":65536,\"project_generation\":1,\"project_id\":\"0e433344-ec4c-4251-9848-bac660f12cf2\"},\"project_context_attached\":true,\"project_generation\":1,\"project_id\":\"0e433344-ec4c-4251-9848-bac660f12cf2\",\"schema_version\":2}",
+                "text": "{\"capabilities\":[\"lexical_search\",\"transactions\",\"redaction\",\"exports\",\"fts5\"],\"capability_version\":1,\"limits\":{\"batch_bytes\":1048576,\"batch_count\":50,\"body_bytes\":262144,\"open_projects\":8,\"page_count\":100,\"response_bytes\":262144,\"source_reference_bytes\":2048,\"summary_bytes\":4096,\"tag_bytes\":128,\"tag_count\":32,\"title_bytes\":512},\"migration_status\":\"current\",\"ok\":true,\"project\":{\"aliases\":[\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/pagination\\/fixture-project\"],\"display_name\":\"fixture-project\",\"project_id\":\"e70cbc5e-052d-475c-beca-6ec27161a68a\",\"repository_identity\":null},\"project_context\":{\"authorization_roots\":[\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-p10-protocol-_b8exay2\\/wire-probes\\/pagination\\/fixture-project\"],\"client_id\":\"FA858792-862B-4B99-A1BE-4A0F9DA78C1B\",\"maximum_inline_output_bytes\":65536,\"project_generation\":1,\"project_id\":\"e70cbc5e-052d-475c-beca-6ec27161a68a\"},\"project_context_attached\":true,\"project_generation\":1,\"project_id\":\"e70cbc5e-052d-475c-beca-6ec27161a68a\",\"schema_version\":2}",
                 "type": "text"
               }
             ],
@@ -15141,24 +15141,24 @@
               "ok": true,
               "project": {
                 "aliases": [
-                  "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/pagination/fixture-project"
+                  "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/pagination/fixture-project"
                 ],
                 "display_name": "fixture-project",
-                "project_id": "0e433344-ec4c-4251-9848-bac660f12cf2",
+                "project_id": "e70cbc5e-052d-475c-beca-6ec27161a68a",
                 "repository_identity": null
               },
               "project_context": {
                 "authorization_roots": [
-                  "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-2ktjep7d/wire-probes/pagination/fixture-project"
+                  "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-protocol-_b8exay2/wire-probes/pagination/fixture-project"
                 ],
-                "client_id": "0AF46035-1282-417B-B72B-FF862E0F70B6",
+                "client_id": "FA858792-862B-4B99-A1BE-4A0F9DA78C1B",
                 "maximum_inline_output_bytes": 65536,
                 "project_generation": 1,
-                "project_id": "0e433344-ec4c-4251-9848-bac660f12cf2"
+                "project_id": "e70cbc5e-052d-475c-beca-6ec27161a68a"
               },
               "project_context_attached": true,
               "project_generation": 1,
-              "project_id": "0e433344-ec4c-4251-9848-bac660f12cf2",
+              "project_id": "e70cbc5e-052d-475c-beca-6ec27161a68a",
               "schema_version": 2
             }
           }
@@ -15169,7 +15169,7 @@
           "result": {
             "content": [
               {
-                "text": "{\"capability_version\":1,\"content_hash\":\"12c431c5878d6523019e867f137107a64fa863405b2b41e50d1c29c51c81e707\",\"disposition\":\"inserted\",\"ok\":true,\"project_id\":\"0e433344-ec4c-4251-9848-bac660f12cf2\",\"record_id\":\"4baa15a7-1b0d-4e76-94e4-c1d6513ac1da\",\"record_version\":1,\"schema_version\":2}",
+                "text": "{\"capability_version\":1,\"content_hash\":\"12c431c5878d6523019e867f137107a64fa863405b2b41e50d1c29c51c81e707\",\"disposition\":\"inserted\",\"ok\":true,\"project_id\":\"e70cbc5e-052d-475c-beca-6ec27161a68a\",\"record_id\":\"32f77e5e-8f29-4d8e-92aa-837bc22b7524\",\"record_version\":1,\"schema_version\":2}",
                 "type": "text"
               }
             ],
@@ -15179,8 +15179,8 @@
               "content_hash": "12c431c5878d6523019e867f137107a64fa863405b2b41e50d1c29c51c81e707",
               "disposition": "inserted",
               "ok": true,
-              "project_id": "0e433344-ec4c-4251-9848-bac660f12cf2",
-              "record_id": "4baa15a7-1b0d-4e76-94e4-c1d6513ac1da",
+              "project_id": "e70cbc5e-052d-475c-beca-6ec27161a68a",
+              "record_id": "32f77e5e-8f29-4d8e-92aa-837bc22b7524",
               "record_version": 1,
               "schema_version": 2
             }
@@ -15192,7 +15192,7 @@
           "result": {
             "content": [
               {
-                "text": "{\"capability_version\":1,\"content_hash\":\"72d41c6e1fd45ae8b13f7c1ea3231e6d3956747958891578dc2706a169e62008\",\"disposition\":\"inserted\",\"ok\":true,\"project_id\":\"0e433344-ec4c-4251-9848-bac660f12cf2\",\"record_id\":\"9d210bf7-184a-4757-8375-63cb7ea52517\",\"record_version\":1,\"schema_version\":2}",
+                "text": "{\"capability_version\":1,\"content_hash\":\"72d41c6e1fd45ae8b13f7c1ea3231e6d3956747958891578dc2706a169e62008\",\"disposition\":\"inserted\",\"ok\":true,\"project_id\":\"e70cbc5e-052d-475c-beca-6ec27161a68a\",\"record_id\":\"68a6d4f8-bc2d-4a5d-9eaf-6fd5628ff134\",\"record_version\":1,\"schema_version\":2}",
                 "type": "text"
               }
             ],
@@ -15202,8 +15202,8 @@
               "content_hash": "72d41c6e1fd45ae8b13f7c1ea3231e6d3956747958891578dc2706a169e62008",
               "disposition": "inserted",
               "ok": true,
-              "project_id": "0e433344-ec4c-4251-9848-bac660f12cf2",
-              "record_id": "9d210bf7-184a-4757-8375-63cb7ea52517",
+              "project_id": "e70cbc5e-052d-475c-beca-6ec27161a68a",
+              "record_id": "68a6d4f8-bc2d-4a5d-9eaf-6fd5628ff134",
               "record_version": 1,
               "schema_version": 2
             }
@@ -15215,7 +15215,7 @@
           "result": {
             "content": [
               {
-                "text": "{\"capability_version\":1,\"content_hash\":\"cb8643fbbc649e3948d3c7a0f43f2f0b1437b2a818b36cf33e871ab1aa1892f0\",\"disposition\":\"inserted\",\"ok\":true,\"project_id\":\"0e433344-ec4c-4251-9848-bac660f12cf2\",\"record_id\":\"fb7c51ad-3439-44dd-b6d0-0f5195a6606b\",\"record_version\":1,\"schema_version\":2}",
+                "text": "{\"capability_version\":1,\"content_hash\":\"cb8643fbbc649e3948d3c7a0f43f2f0b1437b2a818b36cf33e871ab1aa1892f0\",\"disposition\":\"inserted\",\"ok\":true,\"project_id\":\"e70cbc5e-052d-475c-beca-6ec27161a68a\",\"record_id\":\"b08565a6-0acb-49e3-aa3b-00760d822d53\",\"record_version\":1,\"schema_version\":2}",
                 "type": "text"
               }
             ],
@@ -15225,8 +15225,8 @@
               "content_hash": "cb8643fbbc649e3948d3c7a0f43f2f0b1437b2a818b36cf33e871ab1aa1892f0",
               "disposition": "inserted",
               "ok": true,
-              "project_id": "0e433344-ec4c-4251-9848-bac660f12cf2",
-              "record_id": "fb7c51ad-3439-44dd-b6d0-0f5195a6606b",
+              "project_id": "e70cbc5e-052d-475c-beca-6ec27161a68a",
+              "record_id": "b08565a6-0acb-49e3-aa3b-00760d822d53",
               "record_version": 1,
               "schema_version": 2
             }
@@ -15238,7 +15238,7 @@
           "result": {
             "content": [
               {
-                "text": "{\"capability_version\":1,\"count\":2,\"encoded_bytes\":1394,\"maximum_response_bytes\":4096,\"next_cursor\":\"djE6Mg==\",\"ok\":true,\"project_id\":\"0e433344-ec4c-4251-9848-bac660f12cf2\",\"records\":[{\"confidence\":1,\"content_hash\":\"12c431c5878d6523019e867f137107a64fa863405b2b41e50d1c29c51c81e707\",\"created_at\":\"2026-08-27T23:45:43Z\",\"expires_at\":null,\"id\":\"4baa15a7-1b0d-4e76-94e4-c1d6513ac1da\",\"importance\":0.5,\"is_tombstone\":false,\"kind\":\"fact\",\"last_accessed_at\":\"2026-08-27T23:45:43Z\",\"project_id\":\"0e433344-ec4c-4251-9848-bac660f12cf2\",\"schema_version\":2,\"session_id\":null,\"source_kind\":\"external_integration\",\"source_reference\":null,\"summary\":\"Bounded pagination record 0\",\"tags\":[],\"title\":\"Pagination fixture 0\",\"updated_at\":\"2026-08-27T23:45:43Z\",\"version\":1},{\"confidence\":1,\"content_hash\":\"72d41c6e1fd45ae8b13f7c1ea3231e6d3956747958891578dc2706a169e62008\",\"created_at\":\"2026-08-27T23:45:43Z\",\"expires_at\":null,\"id\":\"9d210bf7-184a-4757-8375-63cb7ea52517\",\"importance\":0.5,\"is_tombstone\":false,\"kind\":\"fact\",\"last_accessed_at\":\"2026-08-27T23:45:43Z\",\"project_id\":\"0e433344-ec4c-4251-9848-bac660f12cf2\",\"schema_version\":2,\"session_id\":null,\"source_kind\":\"external_integration\",\"source_reference\":null,\"summary\":\"Bounded pagination record 1\",\"tags\":[],\"title\":\"Pagination fixture 1\",\"updated_at\":\"2026-08-27T23:45:43Z\",\"version\":1}],\"schema_version\":2,\"truncated\":true}",
+                "text": "{\"capability_version\":1,\"count\":2,\"encoded_bytes\":1394,\"maximum_response_bytes\":4096,\"next_cursor\":\"djE6Mg==\",\"ok\":true,\"project_id\":\"e70cbc5e-052d-475c-beca-6ec27161a68a\",\"records\":[{\"confidence\":1,\"content_hash\":\"12c431c5878d6523019e867f137107a64fa863405b2b41e50d1c29c51c81e707\",\"created_at\":\"2026-08-27T23:39:25Z\",\"expires_at\":null,\"id\":\"32f77e5e-8f29-4d8e-92aa-837bc22b7524\",\"importance\":0.5,\"is_tombstone\":false,\"kind\":\"fact\",\"last_accessed_at\":\"2026-08-27T23:39:25Z\",\"project_id\":\"e70cbc5e-052d-475c-beca-6ec27161a68a\",\"schema_version\":2,\"session_id\":null,\"source_kind\":\"external_integration\",\"source_reference\":null,\"summary\":\"Bounded pagination record 0\",\"tags\":[],\"title\":\"Pagination fixture 0\",\"updated_at\":\"2026-08-27T23:39:25Z\",\"version\":1},{\"confidence\":1,\"content_hash\":\"72d41c6e1fd45ae8b13f7c1ea3231e6d3956747958891578dc2706a169e62008\",\"created_at\":\"2026-08-27T23:39:25Z\",\"expires_at\":null,\"id\":\"68a6d4f8-bc2d-4a5d-9eaf-6fd5628ff134\",\"importance\":0.5,\"is_tombstone\":false,\"kind\":\"fact\",\"last_accessed_at\":\"2026-08-27T23:39:25Z\",\"project_id\":\"e70cbc5e-052d-475c-beca-6ec27161a68a\",\"schema_version\":2,\"session_id\":null,\"source_kind\":\"external_integration\",\"source_reference\":null,\"summary\":\"Bounded pagination record 1\",\"tags\":[],\"title\":\"Pagination fixture 1\",\"updated_at\":\"2026-08-27T23:39:25Z\",\"version\":1}],\"schema_version\":2,\"truncated\":true}",
                 "type": "text"
               }
             ],
@@ -15250,19 +15250,19 @@
               "maximum_response_bytes": 4096,
               "next_cursor": "djE6Mg==",
               "ok": true,
-              "project_id": "0e433344-ec4c-4251-9848-bac660f12cf2",
+              "project_id": "e70cbc5e-052d-475c-beca-6ec27161a68a",
               "records": [
                 {
                   "confidence": 1,
                   "content_hash": "12c431c5878d6523019e867f137107a64fa863405b2b41e50d1c29c51c81e707",
-                  "created_at": "2026-08-27T23:45:43Z",
+                  "created_at": "2026-08-27T23:39:25Z",
                   "expires_at": null,
-                  "id": "4baa15a7-1b0d-4e76-94e4-c1d6513ac1da",
+                  "id": "32f77e5e-8f29-4d8e-92aa-837bc22b7524",
                   "importance": 0.5,
                   "is_tombstone": false,
                   "kind": "fact",
-                  "last_accessed_at": "2026-08-27T23:45:43Z",
-                  "project_id": "0e433344-ec4c-4251-9848-bac660f12cf2",
+                  "last_accessed_at": "2026-08-27T23:39:25Z",
+                  "project_id": "e70cbc5e-052d-475c-beca-6ec27161a68a",
                   "schema_version": 2,
                   "session_id": null,
                   "source_kind": "external_integration",
@@ -15270,20 +15270,20 @@
                   "summary": "Bounded pagination record 0",
                   "tags": [],
                   "title": "Pagination fixture 0",
-                  "updated_at": "2026-08-27T23:45:43Z",
+                  "updated_at": "2026-08-27T23:39:25Z",
                   "version": 1
                 },
                 {
                   "confidence": 1,
                   "content_hash": "72d41c6e1fd45ae8b13f7c1ea3231e6d3956747958891578dc2706a169e62008",
-                  "created_at": "2026-08-27T23:45:43Z",
+                  "created_at": "2026-08-27T23:39:25Z",
                   "expires_at": null,
-                  "id": "9d210bf7-184a-4757-8375-63cb7ea52517",
+                  "id": "68a6d4f8-bc2d-4a5d-9eaf-6fd5628ff134",
                   "importance": 0.5,
                   "is_tombstone": false,
                   "kind": "fact",
-                  "last_accessed_at": "2026-08-27T23:45:43Z",
-                  "project_id": "0e433344-ec4c-4251-9848-bac660f12cf2",
+                  "last_accessed_at": "2026-08-27T23:39:25Z",
+                  "project_id": "e70cbc5e-052d-475c-beca-6ec27161a68a",
                   "schema_version": 2,
                   "session_id": null,
                   "source_kind": "external_integration",
@@ -15291,7 +15291,7 @@
                   "summary": "Bounded pagination record 1",
                   "tags": [],
                   "title": "Pagination fixture 1",
-                  "updated_at": "2026-08-27T23:45:43Z",
+                  "updated_at": "2026-08-27T23:39:25Z",
                   "version": 1
                 }
               ],
@@ -15306,7 +15306,7 @@
           "result": {
             "content": [
               {
-                "text": "{\"capability_version\":1,\"count\":1,\"encoded_bytes\":825,\"maximum_response_bytes\":4096,\"next_cursor\":null,\"ok\":true,\"project_id\":\"0e433344-ec4c-4251-9848-bac660f12cf2\",\"records\":[{\"confidence\":1,\"content_hash\":\"cb8643fbbc649e3948d3c7a0f43f2f0b1437b2a818b36cf33e871ab1aa1892f0\",\"created_at\":\"2026-08-27T23:45:43Z\",\"expires_at\":null,\"id\":\"fb7c51ad-3439-44dd-b6d0-0f5195a6606b\",\"importance\":0.5,\"is_tombstone\":false,\"kind\":\"fact\",\"last_accessed_at\":\"2026-08-27T23:45:43Z\",\"project_id\":\"0e433344-ec4c-4251-9848-bac660f12cf2\",\"schema_version\":2,\"session_id\":null,\"source_kind\":\"external_integration\",\"source_reference\":null,\"summary\":\"Bounded pagination record 2\",\"tags\":[],\"title\":\"Pagination fixture 2\",\"updated_at\":\"2026-08-27T23:45:43Z\",\"version\":1}],\"schema_version\":2,\"truncated\":false}",
+                "text": "{\"capability_version\":1,\"count\":1,\"encoded_bytes\":825,\"maximum_response_bytes\":4096,\"next_cursor\":null,\"ok\":true,\"project_id\":\"e70cbc5e-052d-475c-beca-6ec27161a68a\",\"records\":[{\"confidence\":1,\"content_hash\":\"cb8643fbbc649e3948d3c7a0f43f2f0b1437b2a818b36cf33e871ab1aa1892f0\",\"created_at\":\"2026-08-27T23:39:25Z\",\"expires_at\":null,\"id\":\"b08565a6-0acb-49e3-aa3b-00760d822d53\",\"importance\":0.5,\"is_tombstone\":false,\"kind\":\"fact\",\"last_accessed_at\":\"2026-08-27T23:39:25Z\",\"project_id\":\"e70cbc5e-052d-475c-beca-6ec27161a68a\",\"schema_version\":2,\"session_id\":null,\"source_kind\":\"external_integration\",\"source_reference\":null,\"summary\":\"Bounded pagination record 2\",\"tags\":[],\"title\":\"Pagination fixture 2\",\"updated_at\":\"2026-08-27T23:39:25Z\",\"version\":1}],\"schema_version\":2,\"truncated\":false}",
                 "type": "text"
               }
             ],
@@ -15318,19 +15318,19 @@
               "maximum_response_bytes": 4096,
               "next_cursor": null,
               "ok": true,
-              "project_id": "0e433344-ec4c-4251-9848-bac660f12cf2",
+              "project_id": "e70cbc5e-052d-475c-beca-6ec27161a68a",
               "records": [
                 {
                   "confidence": 1,
                   "content_hash": "cb8643fbbc649e3948d3c7a0f43f2f0b1437b2a818b36cf33e871ab1aa1892f0",
-                  "created_at": "2026-08-27T23:45:43Z",
+                  "created_at": "2026-08-27T23:39:25Z",
                   "expires_at": null,
-                  "id": "fb7c51ad-3439-44dd-b6d0-0f5195a6606b",
+                  "id": "b08565a6-0acb-49e3-aa3b-00760d822d53",
                   "importance": 0.5,
                   "is_tombstone": false,
                   "kind": "fact",
-                  "last_accessed_at": "2026-08-27T23:45:43Z",
-                  "project_id": "0e433344-ec4c-4251-9848-bac660f12cf2",
+                  "last_accessed_at": "2026-08-27T23:39:25Z",
+                  "project_id": "e70cbc5e-052d-475c-beca-6ec27161a68a",
                   "schema_version": 2,
                   "session_id": null,
                   "source_kind": "external_integration",
@@ -15338,7 +15338,7 @@
                   "summary": "Bounded pagination record 2",
                   "tags": [],
                   "title": "Pagination fixture 2",
-                  "updated_at": "2026-08-27T23:45:43Z",
+                  "updated_at": "2026-08-27T23:39:25Z",
                   "version": 1
                 }
               ],
@@ -15358,7 +15358,7 @@
       "wire_input": {
         "bytes": 1730,
         "framing": "ndjson",
-        "sha256": "192b380c0c5761b9f69ad64cb33e10fed2fd3de27625f71dc443c4e3570914e7"
+        "sha256": "c0edc64683377580774e066e7c225677c675447f65093f8ef7fc8df94dee9d6b"
       }
     }
   ]

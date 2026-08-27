@@ -1,0 +1,53 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 64845,
+      "path": ".forge-codex/evidence/EVID-20260827T211945Z-695f17ed45.stdout.txt",
+      "sha256": "ec23d0124159c5f92cb6d4021c6b0199e095c37ee0c95cea208c3669b7beb459",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 3763,
+      "path": ".forge-codex/evidence/EVID-20260827T211945Z-695f17ed45.stderr.txt",
+      "sha256": "3b727307e21e79d14729261fa13ccb6e92f7def62afdc579e6b7c5af201e864a",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "command": "swift test --parallel",
+  "ended_at": "2026-08-27T21:20:11.073364+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260827T211945Z-695f17ed45",
+  "kind": "swift-test-debug",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [],
+  "related_gates": [
+    "G12"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 8594313,
+    "file_count": 241,
+    "schema_version": 1,
+    "sha256": "b0c42c58a1dfeecae539e5412fbd0e83af1c0c843cfd31de432214ad385a670c"
+  },
+  "source_manifest_after": {
+    "bytes": 8594313,
+    "file_count": 241,
+    "schema_version": 1,
+    "sha256": "b0c42c58a1dfeecae539e5412fbd0e83af1c0c843cfd31de432214ad385a670c"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-27T21:19:45.466468+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}
