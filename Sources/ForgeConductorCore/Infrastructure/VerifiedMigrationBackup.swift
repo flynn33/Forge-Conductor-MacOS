@@ -7,14 +7,78 @@ import Foundation
 import SQLite3
 
 public struct VerifiedMigrationBackupMetadata: Sendable, Equatable {
+    fileprivate enum Origin: Sendable {
+        case file
+        case sqliteSnapshot
+    }
+
     public let url: URL
     public let sha256: String
     public let bytes: UInt64
+    fileprivate let origin: Origin
 
-    public init(url: URL, sha256: String, bytes: UInt64) {
+    fileprivate init(
+        url: URL,
+        sha256: String,
+        bytes: UInt64,
+        origin: Origin
+    ) {
         self.url = url
         self.sha256 = sha256
         self.bytes = bytes
+        self.origin = origin
+    }
+}
+
+public enum VerifiedMigrationStorageKind: String, Codable, Sendable {
+    case file
+    case sqlite
+}
+
+public enum VerifiedMigrationManifestState: String, Codable, Sendable {
+    case prepared
+    case completed
+}
+
+public struct VerifiedMigrationBackupManifest: Codable, Sendable, Equatable {
+    public let schemaVersion: Int
+    public let migrationID: String
+    public let state: VerifiedMigrationManifestState
+    public let storageKind: VerifiedMigrationStorageKind
+    public let sourceFilename: String
+    public let sourceVersion: Int
+    public let sourceSHA256: String
+    public let sourceBytes: UInt64
+    public let backupFilename: String
+    public let backupSHA256: String
+    public let backupBytes: UInt64
+    public let targetVersion: Int
+    public let targetSHA256: String?
+    public let targetBytes: UInt64?
+    public let targetArtifactFilename: String?
+    public let rollbackInstructions: [String]
+    public let preparedAt: String
+    public let completedAt: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion = "schema_version"
+        case migrationID = "migration_id"
+        case state
+        case storageKind = "storage_kind"
+        case sourceFilename = "source_filename"
+        case sourceVersion = "source_version"
+        case sourceSHA256 = "source_sha256"
+        case sourceBytes = "source_bytes"
+        case backupFilename = "backup_filename"
+        case backupSHA256 = "backup_sha256"
+        case backupBytes = "backup_bytes"
+        case targetVersion = "target_version"
+        case targetSHA256 = "target_sha256"
+        case targetBytes = "target_bytes"
+        case targetArtifactFilename = "target_artifact_filename"
+        case rollbackInstructions = "rollback_instructions"
+        case preparedAt = "prepared_at"
+        case completedAt = "completed_at"
     }
 }
 
@@ -23,6 +87,7 @@ public enum VerifiedMigrationBackupError: Error, LocalizedError, Sendable {
     case corruptSource(String)
     case creationFailed(String)
     case verificationFailed(String)
+    case reconciliationFailed(String)
 
     public var errorDescription: String? {
         switch self {
@@ -30,6 +95,7 @@ public enum VerifiedMigrationBackupError: Error, LocalizedError, Sendable {
         case .corruptSource(let detail): "Migration backup source is corrupt: \(detail)"
         case .creationFailed(let detail): "Migration backup could not be created: \(detail)"
         case .verificationFailed(let detail): "Migration backup verification failed: \(detail)"
+        case .reconciliationFailed(let detail): "Migration backup reconciliation failed: \(detail)"
         }
     }
 }
@@ -61,6 +127,19 @@ struct SQLitePreflightDatabase {
             )
         }
     }
+
+    func migrationSnapshot(
+        to backupURL: URL,
+        expectedVersion: Int,
+        versionQuery: String
+    ) throws -> VerifiedMigrationBackupMetadata {
+        try VerifiedMigrationBackup.snapshotSQLite(
+            database: database,
+            to: backupURL,
+            expectedVersion: expectedVersion,
+            versionQuery: versionQuery
+        )
+    }
 }
 
 struct SQLiteOpenRegistration {
@@ -76,6 +155,9 @@ public enum VerifiedMigrationBackup {
     private static let openRegistrationLock = NSLock()
     private static var openRegistrationCounts: [SQLiteFileIdentity: Int] = [:]
     private static let preflightAttemptLimit = 3
+    private static let manifestSchemaVersion = 1
+    private static let maximumManifestBytes = 64 * 1024
+    private static let maximumSQLiteBackupLineagesPerSourceVersion = 4
 
     fileprivate struct SQLiteFileIdentity: Hashable {
         let device: UInt64
@@ -101,7 +183,7 @@ public enum VerifiedMigrationBackup {
     }
 
     /// Serializes migration setup within this process and against other Forge processes.
-    static func withMigrationLock<T>(
+    public static func withMigrationLock<T>(
         databaseURL: URL,
         timeoutSeconds: TimeInterval,
         _ body: () throws -> T
@@ -205,14 +287,9 @@ public enum VerifiedMigrationBackup {
                     return
                 }
 
-                let stagingRoot = FileManager.default.temporaryDirectory.appendingPathComponent(
-                    "forge-sqlite-preflight-\(UUID().uuidString.lowercased())",
-                    isDirectory: true
-                )
-                try FileManager.default.createDirectory(
-                    at: stagingRoot,
-                    withIntermediateDirectories: false,
-                    attributes: [.posixPermissions: 0o700]
+                let stagingRoot = try resetTemporaryDirectory(
+                    kind: "sqlite-preflight",
+                    key: databaseURL.standardizedFileURL.path
                 )
                 defer { try? FileManager.default.removeItem(at: stagingRoot) }
                 let stagedDatabaseURL = stagingRoot.appendingPathComponent("candidate.sqlite3")
@@ -381,6 +458,642 @@ public enum VerifiedMigrationBackup {
         }
     }
 
+    public static func activeManifestURL(for sourceURL: URL) -> URL {
+        sourceURL.appendingPathExtension("migration-manifest.json")
+    }
+
+    public static func archivedManifestURL(
+        for backupURL: URL,
+        targetVersion: Int
+    ) -> URL {
+        backupURL.appendingPathExtension("to-v\(targetVersion).manifest.json")
+    }
+
+    /// Writes a bounded owner-only file or verifies an identical fixed artifact already exists.
+    public static func writeFile(
+        _ data: Data,
+        to destinationURL: URL,
+        maximumBytes: Int
+    ) throws -> VerifiedMigrationBackupMetadata {
+        guard maximumBytes > 0, !data.isEmpty, data.count <= maximumBytes else {
+            throw VerifiedMigrationBackupError.invalidSource(
+                "file data is empty or exceeds the migration backup limit"
+            )
+        }
+        if FileManager.default.fileExists(atPath: destinationURL.path) {
+            let existing = try boundedRegularFileData(
+                at: destinationURL,
+                maximumBytes: maximumBytes
+            )
+            guard existing == data else {
+                throw VerifiedMigrationBackupError.verificationFailed(
+                    "existing fixed migration artifact differs from the requested bytes"
+                )
+            }
+            try hardenAndVerifyPermissions(at: destinationURL)
+            return try metadata(for: destinationURL)
+        }
+
+        try FileManager.default.createDirectory(
+            at: destinationURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let temporaryURL = try temporarySibling(of: destinationURL)
+        defer { try? FileManager.default.removeItem(at: temporaryURL) }
+        try writeOwnerOnlyFile(data, to: temporaryURL)
+        try install(temporaryURL: temporaryURL, backupURL: destinationURL)
+        let installed = try boundedRegularFileData(
+            at: destinationURL,
+            maximumBytes: maximumBytes
+        )
+        guard installed == data else {
+            throw VerifiedMigrationBackupError.verificationFailed(
+                "installed fixed migration artifact differs from the requested bytes"
+            )
+        }
+        try hardenAndVerifyPermissions(at: destinationURL)
+        return try metadata(for: destinationURL)
+    }
+
+    /// Selects one of a bounded set of immutable file-migration lineages. The preferred
+    /// filenames remain the first lineage; later lineages insert a deterministic suffix before
+    /// the extension. A source already captured by a lineage reuses its exact artifacts, while
+    /// occupied lineages with different source bytes are never overwritten.
+    public static func prepareFileMigrationArtifacts(
+        sourceURL: URL,
+        preferredBackupURL: URL,
+        preferredTargetArtifactURL: URL,
+        maximumBytes: Int,
+        maximumLineages: Int,
+        targetDataForBackup: (VerifiedMigrationBackupMetadata) throws -> Data
+    ) throws -> (
+        backup: VerifiedMigrationBackupMetadata,
+        targetArtifact: VerifiedMigrationBackupMetadata
+    ) {
+        guard maximumBytes > 0,
+              maximumLineages > 0,
+              maximumLineages <= 32 else {
+            throw VerifiedMigrationBackupError.invalidSource(
+                "file migration lineage limits are invalid"
+            )
+        }
+        try requireSameDirectory(sourceURL, preferredBackupURL)
+        try requireSameDirectory(sourceURL, preferredTargetArtifactURL)
+        guard preferredBackupURL.lastPathComponent
+                != preferredTargetArtifactURL.lastPathComponent else {
+            throw VerifiedMigrationBackupError.invalidSource(
+                "file migration backup and target artifact must be distinct"
+            )
+        }
+
+        let source = try boundedRegularFileData(
+            at: sourceURL,
+            maximumBytes: maximumBytes
+        )
+        for lineage in 1...maximumLineages {
+            let backupURL = fileMigrationLineageURL(
+                preferredURL: preferredBackupURL,
+                lineage: lineage
+            )
+            let targetArtifactURL = fileMigrationLineageURL(
+                preferredURL: preferredTargetArtifactURL,
+                lineage: lineage
+            )
+            if FileManager.default.fileExists(atPath: backupURL.path) {
+                let existing = try boundedRegularFileData(
+                    at: backupURL,
+                    maximumBytes: maximumBytes
+                )
+                guard existing == source else { continue }
+            } else if FileManager.default.fileExists(atPath: targetArtifactURL.path) {
+                throw VerifiedMigrationBackupError.reconciliationFailed(
+                    "file migration target artifact exists without its source lineage"
+                )
+            }
+
+            let backup = try copyFile(
+                from: sourceURL,
+                to: backupURL,
+                maximumBytes: maximumBytes
+            )
+            let targetData = try targetDataForBackup(backup)
+            let targetArtifact = try writeFile(
+                targetData,
+                to: targetArtifactURL,
+                maximumBytes: maximumBytes
+            )
+            return (backup: backup, targetArtifact: targetArtifact)
+        }
+        throw VerifiedMigrationBackupError.reconciliationFailed(
+            "all bounded file migration lineages are occupied by different sources"
+        )
+    }
+
+    /// Persists the durable precondition for an in-place migration.
+    /// Call only while holding the migration lock and after the source backup is verified.
+    public static func prepareMigrationManifest(
+        sourceURL: URL,
+        backup: VerifiedMigrationBackupMetadata,
+        sourceVersion: Int,
+        targetVersion: Int,
+        storageKind: VerifiedMigrationStorageKind,
+        targetArtifact: VerifiedMigrationBackupMetadata? = nil,
+        preparedAt: Date = Date()
+    ) throws -> VerifiedMigrationBackupManifest {
+        guard sourceVersion >= 0,
+              targetVersion > sourceVersion,
+              sourceVersion > 0 || storageKind == .sqlite else {
+            throw VerifiedMigrationBackupError.invalidSource(
+                "migration source version must be nonnegative and lower than the target version"
+            )
+        }
+        try requireSameDirectory(sourceURL, backup.url)
+        let verifiedBackup = try metadata(
+            for: backup.url,
+            maximumBytes: backup.bytes
+        )
+        guard verifiedBackup.sha256 == backup.sha256,
+              verifiedBackup.bytes == backup.bytes,
+              backup.bytes > 0 else {
+            throw VerifiedMigrationBackupError.verificationFailed(
+                "migration backup metadata changed before manifest preparation"
+            )
+        }
+
+        let verifiedTargetArtifact: VerifiedMigrationBackupMetadata?
+        if let targetArtifact {
+            try requireSameDirectory(sourceURL, targetArtifact.url)
+            let verified = try metadata(
+                for: targetArtifact.url,
+                maximumBytes: targetArtifact.bytes
+            )
+            guard verified.sha256 == targetArtifact.sha256,
+                  verified.bytes == targetArtifact.bytes,
+                  verified.bytes > 0 else {
+                throw VerifiedMigrationBackupError.verificationFailed(
+                    "migration target artifact metadata changed before manifest preparation"
+                )
+            }
+            verifiedTargetArtifact = verified
+        } else {
+            verifiedTargetArtifact = nil
+        }
+        guard storageKind == .file || verifiedTargetArtifact == nil else {
+            throw VerifiedMigrationBackupError.invalidSource(
+                "SQLite migration preparation cannot reference a file target artifact"
+            )
+        }
+        guard storageKind == .sqlite || verifiedTargetArtifact != nil else {
+            throw VerifiedMigrationBackupError.invalidSource(
+                "file migration preparation requires a verified target artifact"
+            )
+        }
+
+        let migrationID = migrationIdentifier(
+            sourceFilename: sourceURL.lastPathComponent,
+            backupFilename: backup.url.lastPathComponent,
+            sourceVersion: sourceVersion,
+            targetVersion: targetVersion,
+            storageKind: storageKind,
+            sourceSHA256: backup.sha256,
+            sourceBytes: backup.bytes,
+            targetSHA256: verifiedTargetArtifact?.sha256,
+            targetBytes: verifiedTargetArtifact?.bytes
+        )
+        var desired = VerifiedMigrationBackupManifest(
+            schemaVersion: manifestSchemaVersion,
+            migrationID: migrationID,
+            state: .prepared,
+            storageKind: storageKind,
+            sourceFilename: sourceURL.lastPathComponent,
+            sourceVersion: sourceVersion,
+            sourceSHA256: backup.sha256,
+            sourceBytes: backup.bytes,
+            backupFilename: backup.url.lastPathComponent,
+            backupSHA256: backup.sha256,
+            backupBytes: backup.bytes,
+            targetVersion: targetVersion,
+            targetSHA256: verifiedTargetArtifact?.sha256,
+            targetBytes: verifiedTargetArtifact?.bytes,
+            targetArtifactFilename: verifiedTargetArtifact?.url.lastPathComponent,
+            rollbackInstructions: rollbackInstructions(
+                sourceFilename: sourceURL.lastPathComponent,
+                backupFilename: backup.url.lastPathComponent,
+                sourceVersion: sourceVersion,
+                sha256: backup.sha256,
+                bytes: backup.bytes,
+                storageKind: storageKind
+            ),
+            preparedAt: ISO8601.string(from: preparedAt),
+            completedAt: nil
+        )
+        try validateManifest(desired)
+
+        if let existing = try reconcileMigrationManifest(
+            sourceURL: sourceURL,
+            observedVersion: sourceVersion,
+            allowCompletedFileLineageRestart: storageKind == .file
+        ) {
+            if existing.state == .prepared {
+                guard hasSameMigrationIdentity(existing, desired) else {
+                    throw VerifiedMigrationBackupError.reconciliationFailed(
+                        "an unrelated prepared migration already owns this source"
+                    )
+                }
+                return existing
+            }
+            if existing.sourceVersion == sourceVersion {
+                if hasSameMigrationIdentity(existing, desired) {
+                    desired = preparedManifest(
+                        from: desired,
+                        preparedAt: existing.preparedAt
+                    )
+                } else if existing.storageKind == .sqlite,
+                          desired.storageKind == .sqlite,
+                          existing.backupFilename != desired.backupFilename,
+                          existing.sourceSHA256 != desired.sourceSHA256 {
+                    // A restored old-format database may receive legitimate writes before it is
+                    // migrated again. Keep the prior immutable lineage and start a bounded new
+                    // lineage instead of overwriting its recovery artifact.
+                } else {
+                    throw VerifiedMigrationBackupError.reconciliationFailed(
+                        "completed migration lineage conflicts with the restored source"
+                    )
+                }
+            } else if existing.targetVersion != sourceVersion {
+                throw VerifiedMigrationBackupError.reconciliationFailed(
+                    "the completed migration manifest does not precede this source version"
+                )
+            }
+        }
+
+        let activeURL = activeManifestURL(for: sourceURL)
+        try writeManifestReplacing(desired, to: activeURL)
+        let installed = try requireManifest(at: activeURL)
+        guard installed == desired else {
+            throw VerifiedMigrationBackupError.verificationFailed(
+                "installed prepared migration manifest differs from the requested state"
+            )
+        }
+        try validateManifestArtifacts(installed, sourceURL: sourceURL)
+        return installed
+    }
+
+    /// Reconciles a prior durable manifest without guessing about intermediate source versions.
+    /// A prepared target is completed only when the caller supplies a verified logical target.
+    @discardableResult
+    public static func reconcileMigrationManifest(
+        sourceURL: URL,
+        observedVersion: Int,
+        targetMetadata: VerifiedMigrationBackupMetadata? = nil,
+        completedAt: Date = Date(),
+        allowCompletedFileLineageRestart: Bool = false
+    ) throws -> VerifiedMigrationBackupManifest? {
+        let activeURL = activeManifestURL(for: sourceURL)
+        guard let manifest = try readManifestIfPresent(at: activeURL) else { return nil }
+        try validateManifestArtifacts(manifest, sourceURL: sourceURL)
+
+        switch manifest.state {
+        case .prepared:
+            if observedVersion == manifest.sourceVersion {
+                if manifest.storageKind == .file {
+                    let liveSource = try metadata(
+                        for: sourceURL,
+                        maximumBytes: manifest.sourceBytes
+                    )
+                    guard liveSource.sha256 == manifest.sourceSHA256,
+                          liveSource.bytes == manifest.sourceBytes else {
+                        throw VerifiedMigrationBackupError.reconciliationFailed(
+                            "prepared file migration source no longer matches its verified backup"
+                        )
+                    }
+                }
+                return manifest
+            }
+            if observedVersion == manifest.targetVersion {
+                if manifest.storageKind == .sqlite, targetMetadata == nil {
+                    return manifest
+                }
+                let verifiedTarget = try completionMetadata(
+                    for: manifest,
+                    sourceURL: sourceURL,
+                    supplied: targetMetadata
+                )
+                return try completeMigrationManifest(
+                    sourceURL: sourceURL,
+                    preparedManifest: manifest,
+                    observedVersion: observedVersion,
+                    targetMetadata: verifiedTarget,
+                    completedAt: completedAt
+                )
+            }
+        case .completed:
+            try archiveCompletedManifest(manifest, sourceURL: sourceURL)
+            if observedVersion == manifest.targetVersion {
+                return manifest
+            }
+            if observedVersion == manifest.sourceVersion {
+                if manifest.storageKind == .file {
+                    let liveSource = try metadata(
+                        for: sourceURL
+                    )
+                    if liveSource.sha256 != manifest.sourceSHA256
+                        || liveSource.bytes != manifest.sourceBytes {
+                        if allowCompletedFileLineageRestart {
+                            return nil
+                        }
+                        throw VerifiedMigrationBackupError.reconciliationFailed(
+                            "restored file migration source does not match its verified backup"
+                        )
+                    }
+                }
+                return manifest
+            }
+        }
+        throw VerifiedMigrationBackupError.reconciliationFailed(
+            "manifest versions \(manifest.sourceVersion)->\(manifest.targetVersion) do not match observed version \(observedVersion)"
+        )
+    }
+
+    @discardableResult
+    public static func completeMigrationManifest(
+        sourceURL: URL,
+        preparedManifest: VerifiedMigrationBackupManifest,
+        observedVersion: Int,
+        targetMetadata: VerifiedMigrationBackupMetadata,
+        completedAt: Date = Date()
+    ) throws -> VerifiedMigrationBackupManifest {
+        guard observedVersion == preparedManifest.targetVersion else {
+            throw VerifiedMigrationBackupError.reconciliationFailed(
+                "migration completion requires the exact target schema version"
+            )
+        }
+        let activeURL = activeManifestURL(for: sourceURL)
+        let current = try requireManifest(at: activeURL)
+        guard hasSameMigrationIdentity(current, preparedManifest) else {
+            throw VerifiedMigrationBackupError.reconciliationFailed(
+                "active migration manifest identity changed before completion"
+            )
+        }
+        if current.state == .completed {
+            return try archiveCompletedManifest(current, sourceURL: sourceURL)
+        }
+        let verifiedTarget = try completionMetadata(
+            for: current,
+            sourceURL: sourceURL,
+            supplied: targetMetadata
+        )
+        let completed = VerifiedMigrationBackupManifest(
+            schemaVersion: current.schemaVersion,
+            migrationID: current.migrationID,
+            state: .completed,
+            storageKind: current.storageKind,
+            sourceFilename: current.sourceFilename,
+            sourceVersion: current.sourceVersion,
+            sourceSHA256: current.sourceSHA256,
+            sourceBytes: current.sourceBytes,
+            backupFilename: current.backupFilename,
+            backupSHA256: current.backupSHA256,
+            backupBytes: current.backupBytes,
+            targetVersion: current.targetVersion,
+            targetSHA256: verifiedTarget.sha256,
+            targetBytes: verifiedTarget.bytes,
+            targetArtifactFilename: current.targetArtifactFilename,
+            rollbackInstructions: current.rollbackInstructions,
+            preparedAt: current.preparedAt,
+            completedAt: ISO8601.string(from: completedAt)
+        )
+        try validateManifest(completed)
+        let archived = try archiveCompletedManifest(completed, sourceURL: sourceURL)
+        try writeManifestReplacing(archived, to: activeURL)
+        let installed = try requireManifest(at: activeURL)
+        guard installed == archived else {
+            throw VerifiedMigrationBackupError.verificationFailed(
+                "installed completed migration manifest differs from the requested state"
+            )
+        }
+        return installed
+    }
+
+    /// Installs the exact durable target artifact for a prepared or explicitly restored
+    /// file migration. The verified source backup remains untouched for rollback.
+    @discardableResult
+    public static func installFileMigrationTarget(
+        sourceURL: URL,
+        manifest: VerifiedMigrationBackupManifest
+    ) throws -> VerifiedMigrationBackupMetadata {
+        guard manifest.storageKind == .file,
+              observedSourceCanInstallFileTarget(manifest.state),
+              let targetArtifactFilename = manifest.targetArtifactFilename,
+              let targetBytes = manifest.targetBytes,
+              max(targetBytes, manifest.sourceBytes) <= UInt64(Int.max) else {
+            throw VerifiedMigrationBackupError.reconciliationFailed(
+                "file migration target installation metadata is invalid"
+            )
+        }
+        try validateManifestArtifacts(manifest, sourceURL: sourceURL)
+        let liveSource = try metadata(
+            for: sourceURL,
+            maximumBytes: manifest.sourceBytes
+        )
+        guard liveSource.sha256 == manifest.sourceSHA256,
+              liveSource.bytes == manifest.sourceBytes else {
+            throw VerifiedMigrationBackupError.reconciliationFailed(
+                "file migration source changed before target installation"
+            )
+        }
+        let targetURL = sourceURL.deletingLastPathComponent().appendingPathComponent(
+            targetArtifactFilename
+        )
+        let targetData = try boundedRegularFileData(
+            at: targetURL,
+            maximumBytes: Int(targetBytes)
+        )
+        guard UInt64(targetData.count) == targetBytes,
+              JSONSupport.sha256Hex(targetData) == manifest.targetSHA256 else {
+            throw VerifiedMigrationBackupError.reconciliationFailed(
+                "file migration target artifact changed before installation"
+            )
+        }
+        try replaceOwnerOnlyFile(
+            targetData,
+            at: sourceURL,
+            maximumBytes: Int(max(targetBytes, manifest.sourceBytes))
+        )
+        let installed = try metadata(for: sourceURL, maximumBytes: targetBytes)
+        guard installed.sha256 == manifest.targetSHA256,
+              installed.bytes == targetBytes else {
+            throw VerifiedMigrationBackupError.verificationFailed(
+                "installed file migration target differs from its verified artifact"
+            )
+        }
+        return installed
+    }
+
+    static func logicalSQLiteMetadata(
+        database: OpaquePointer,
+        sourceURL: URL,
+        expectedVersion: Int,
+        versionQuery: String
+    ) throws -> VerifiedMigrationBackupMetadata {
+        let root = try resetTemporaryDirectory(
+            kind: "migration-target",
+            key: sourceURL.standardizedFileURL.path
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+        return try snapshotSQLite(
+            database: database,
+            to: root.appendingPathComponent("target.sqlite3"),
+            expectedVersion: expectedVersion,
+            versionQuery: versionQuery
+        )
+    }
+
+    /// Captures the exact live logical source while the caller holds SQLite's write boundary,
+    /// then durably prepares the manifest before any schema DDL runs.
+    static func prepareSQLiteMigrationAtWriteBoundary(
+        database: OpaquePointer,
+        sourceURL: URL,
+        backupURL: URL,
+        sourceVersion: Int,
+        targetVersion: Int,
+        versionQuery: String
+    ) throws -> VerifiedMigrationBackupManifest {
+        guard sqlite3_get_autocommit(database) == 0 else {
+            throw VerifiedMigrationBackupError.reconciliationFailed(
+                "SQLite source backup requires an active write transaction"
+            )
+        }
+        var reader: OpaquePointer?
+        let opened = sqlite3_open_v2(
+            sourceURL.path,
+            &reader,
+            SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX,
+            nil
+        )
+        guard opened == SQLITE_OK, let reader else {
+            if let reader { sqlite3_close(reader) }
+            throw VerifiedMigrationBackupError.creationFailed(
+                "SQLite source could not be reopened at the write boundary"
+            )
+        }
+        defer { sqlite3_close(reader) }
+        sqlite3_busy_timeout(reader, 5_000)
+        let backup = try snapshotSQLite(
+            database: reader,
+            to: backupURL,
+            expectedVersion: sourceVersion,
+            versionQuery: versionQuery,
+            allowAlternateLineages: true
+        )
+        return try prepareMigrationManifest(
+            sourceURL: sourceURL,
+            backup: backup,
+            sourceVersion: sourceVersion,
+            targetVersion: targetVersion,
+            storageKind: .sqlite
+        )
+    }
+
+    /// Writes the lineage marker in the same SQLite transaction as the target schema version.
+    static func recordSQLiteMigrationReceipt(
+        database: OpaquePointer,
+        sourceURL: URL,
+        manifest: VerifiedMigrationBackupManifest
+    ) throws {
+        guard manifest.storageKind == .sqlite, manifest.state == .prepared else {
+            throw VerifiedMigrationBackupError.reconciliationFailed(
+                "SQLite migration receipt requires a prepared SQLite manifest"
+            )
+        }
+        try validateManifestArtifacts(manifest, sourceURL: sourceURL)
+        try sqliteExecute(
+            """
+            CREATE TABLE IF NOT EXISTS forge_migration_receipts(
+              migration_id TEXT PRIMARY KEY,
+              receipt_schema_version INTEGER NOT NULL CHECK(receipt_schema_version=1),
+              source_filename TEXT NOT NULL,
+              backup_filename TEXT NOT NULL,
+              source_version INTEGER NOT NULL,
+              target_version INTEGER NOT NULL,
+              source_sha256 TEXT NOT NULL,
+              source_bytes INTEGER NOT NULL
+            ) WITHOUT ROWID;
+            """,
+            database: database
+        )
+        var statement: OpaquePointer?
+        let sql = """
+        INSERT OR IGNORE INTO forge_migration_receipts(
+          migration_id,receipt_schema_version,source_filename,backup_filename,
+          source_version,target_version,source_sha256,source_bytes
+        ) VALUES(?,1,?,?,?,?,?,?);
+        """
+        guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK,
+              let statement else {
+            throw VerifiedMigrationBackupError.reconciliationFailed(
+                "SQLite migration receipt insert could not be prepared"
+            )
+        }
+        defer { sqlite3_finalize(statement) }
+        try bindMigrationReceipt(manifest, to: statement)
+        guard sqlite3_step(statement) == SQLITE_DONE else {
+            throw VerifiedMigrationBackupError.reconciliationFailed(
+                "SQLite migration receipt could not be recorded: "
+                    + String(cString: sqlite3_errmsg(database))
+            )
+        }
+        _ = try requireSQLiteMigrationReceipt(
+            database: database,
+            sourceURL: sourceURL,
+            manifest: manifest,
+            validateArtifacts: false,
+            reconcileArchivedCompletion: false
+        )
+    }
+
+    /// Requires the exact receipt written by the source-to-target transaction. Schema version
+    /// alone is insufficient because an unrelated current-version database can be substituted.
+    @discardableResult
+    static func requireSQLiteMigrationReceipt(
+        database: OpaquePointer,
+        sourceURL: URL,
+        manifest: VerifiedMigrationBackupManifest
+    ) throws -> VerifiedMigrationBackupManifest {
+        try requireSQLiteMigrationReceipt(
+            database: database,
+            sourceURL: sourceURL,
+            manifest: manifest,
+            validateArtifacts: true,
+            reconcileArchivedCompletion: true
+        )
+    }
+
+    /// Ensures SQLite's committed migration is checkpointed before completed evidence is fsynced.
+    static func checkpointSQLiteMigration(
+        database: OpaquePointer,
+        sourceURL: URL
+    ) throws {
+        var logFrames: Int32 = 0
+        var checkpointedFrames: Int32 = 0
+        let result = sqlite3_wal_checkpoint_v2(
+            database,
+            nil,
+            SQLITE_CHECKPOINT_TRUNCATE,
+            &logFrames,
+            &checkpointedFrames
+        )
+        guard result == SQLITE_OK,
+              logFrames < 0 || checkpointedFrames >= logFrames else {
+            throw VerifiedMigrationBackupError.creationFailed(
+                "SQLite migration checkpoint did not complete: result \(result), "
+                    + "frames \(checkpointedFrames)/\(logFrames)"
+            )
+        }
+        try synchronizeFile(at: sourceURL)
+        try synchronizeDirectory(at: sourceURL.deletingLastPathComponent())
+    }
+
     /// Copies one bounded file exactly and fails closed if a prior recovery artifact differs.
     public static func copyFile(
         from sourceURL: URL,
@@ -406,7 +1119,7 @@ public enum VerifiedMigrationBackup {
             at: backupURL.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
-        let temporaryURL = temporarySibling(of: backupURL)
+        let temporaryURL = try temporarySibling(of: backupURL)
         defer { try? FileManager.default.removeItem(at: temporaryURL) }
         do {
             try writeOwnerOnlyFile(source, to: temporaryURL)
@@ -450,7 +1163,7 @@ public enum VerifiedMigrationBackup {
             at: backupURL.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
-        let temporaryURL = temporarySibling(of: backupURL)
+        let temporaryURL = try temporarySibling(of: backupURL)
         defer { try? FileManager.default.removeItem(at: temporaryURL) }
         let deadline = ProcessInfo.processInfo.systemUptime + timeoutSeconds
         let source = try streamCopyForPreflight(
@@ -459,7 +1172,7 @@ public enum VerifiedMigrationBackup {
             maximumBytes: maximumBytes,
             deadline: deadline
         )
-        let staged = try metadata(for: temporaryURL)
+        let staged = try metadata(for: temporaryURL, allowEmpty: true)
         guard staged.bytes == source.bytes, staged.sha256 == source.sha256 else {
             throw VerifiedMigrationBackupError.verificationFailed(
                 "staged recovery artifact differs from the stable source"
@@ -467,7 +1180,7 @@ public enum VerifiedMigrationBackup {
         }
         try install(temporaryURL: temporaryURL, backupURL: backupURL)
         try hardenAndVerifyPermissions(at: backupURL)
-        let installed = try metadata(for: backupURL)
+        let installed = try metadata(for: backupURL, allowEmpty: true)
         guard installed.bytes == source.bytes, installed.sha256 == source.sha256 else {
             throw VerifiedMigrationBackupError.verificationFailed(
                 "installed recovery artifact differs from the stable source"
@@ -483,15 +1196,17 @@ public enum VerifiedMigrationBackup {
         expectedVersion: Int,
         versionQuery: String,
         maximumBytes: UInt64 = maximumSQLiteBackupBytes,
-        timeoutSeconds: TimeInterval = sqliteBackupDeadline
+        timeoutSeconds: TimeInterval = sqliteBackupDeadline,
+        allowAlternateLineages: Bool = false
     ) throws -> VerifiedMigrationBackupMetadata {
-        guard expectedVersion > 0, !versionQuery.isEmpty,
+        guard expectedVersion >= 0, !versionQuery.isEmpty,
               maximumBytes > 0,
               timeoutSeconds.isFinite, timeoutSeconds > 0 else {
             throw VerifiedMigrationBackupError.invalidSource(
-                "SQLite source version, version query, byte limit, and deadline are required"
+                "SQLite source version, version query, byte limit, and deadline are invalid"
             )
         }
+        let deadlineUptime = ProcessInfo.processInfo.systemUptime + timeoutSeconds
         let pageSize = try sqlitePositiveUInt64("PRAGMA page_size;", database: database)
         let sourcePageCount = try sqlitePositiveUInt64("PRAGMA page_count;", database: database)
         let (sourceBytes, sourceSizeOverflowed) = pageSize.multipliedReportingOverflow(
@@ -507,7 +1222,7 @@ public enum VerifiedMigrationBackup {
             at: backupURL.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
-        let temporaryURL = temporarySibling(of: backupURL)
+        let temporaryURL = try temporarySibling(of: backupURL)
         defer { try? FileManager.default.removeItem(at: temporaryURL) }
 
         let creationDescriptor = try createOwnerOnlyFile(at: temporaryURL)
@@ -540,7 +1255,6 @@ public enum VerifiedMigrationBackup {
             )
         }
 
-        let deadlineUptime = ProcessInfo.processInfo.systemUptime + timeoutSeconds
         var stepResult = SQLITE_OK
         var exceededByteLimit = false
         var exceededDeadline = false
@@ -597,53 +1311,89 @@ public enum VerifiedMigrationBackup {
             at: temporaryURL,
             expectedVersion: expectedVersion,
             versionQuery: versionQuery,
-            maximumBytes: maximumBytes
+            maximumBytes: maximumBytes,
+            deadlineUptime: deadlineUptime
         )
         try synchronizeFile(at: temporaryURL)
         try hardenAndVerifyPermissions(at: temporaryURL)
-        if FileManager.default.fileExists(atPath: backupURL.path) {
-            let existing = try verifySQLiteBackup(
-                at: backupURL,
+        let lineageCount = allowAlternateLineages
+            ? maximumSQLiteBackupLineagesPerSourceVersion
+            : 1
+        for slot in 1...lineageCount {
+            let candidateURL = sqliteBackupLineageURL(
+                preferredURL: backupURL,
+                slot: slot
+            )
+            if FileManager.default.fileExists(atPath: candidateURL.path) {
+                let existing = try verifySQLiteBackup(
+                    at: candidateURL,
+                    expectedVersion: expectedVersion,
+                    versionQuery: versionQuery,
+                    maximumBytes: maximumBytes,
+                    deadlineUptime: deadlineUptime
+                )
+                if existing.bytes == snapshot.bytes,
+                   existing.sha256 == snapshot.sha256 {
+                    return existing
+                }
+                continue
+            }
+            do {
+                try install(temporaryURL: temporaryURL, backupURL: candidateURL)
+            } catch let error as VerifiedMigrationBackupError {
+                throw error
+            } catch {
+                throw VerifiedMigrationBackupError.creationFailed(error.localizedDescription)
+            }
+            let installed = try verifySQLiteBackup(
+                at: candidateURL,
                 expectedVersion: expectedVersion,
                 versionQuery: versionQuery,
-                maximumBytes: maximumBytes
+                maximumBytes: maximumBytes,
+                deadlineUptime: deadlineUptime
             )
-            guard existing.bytes == snapshot.bytes,
-                  existing.sha256 == snapshot.sha256 else {
+            guard installed.bytes == snapshot.bytes,
+                  installed.sha256 == snapshot.sha256 else {
                 throw VerifiedMigrationBackupError.verificationFailed(
-                    "existing SQLite recovery artifact differs from the current logical source"
+                    "installed SQLite recovery artifact differs from the current logical source"
                 )
             }
-            return existing
+            return installed
         }
-        do {
-            try install(temporaryURL: temporaryURL, backupURL: backupURL)
-        } catch let error as VerifiedMigrationBackupError {
-            throw error
-        } catch {
-            throw VerifiedMigrationBackupError.creationFailed(error.localizedDescription)
-        }
-        let installed = try verifySQLiteBackup(
-            at: backupURL,
-            expectedVersion: expectedVersion,
-            versionQuery: versionQuery,
-            maximumBytes: maximumBytes
+        throw VerifiedMigrationBackupError.verificationFailed(
+            "bounded SQLite recovery lineage slots are exhausted for this source version"
         )
-        guard installed.bytes == snapshot.bytes,
-              installed.sha256 == snapshot.sha256 else {
-            throw VerifiedMigrationBackupError.verificationFailed(
-                "installed SQLite recovery artifact differs from the current logical source"
-            )
-        }
-        return installed
+    }
+
+    private static func sqliteBackupLineageURL(
+        preferredURL: URL,
+        slot: Int
+    ) -> URL {
+        guard slot > 1 else { return preferredURL }
+        let extensionName = preferredURL.pathExtension
+        let base = extensionName.isEmpty
+            ? preferredURL
+            : preferredURL.deletingPathExtension()
+        let filename = base.lastPathComponent + ".lineage-\(slot)"
+            + (extensionName.isEmpty ? "" : ".\(extensionName)")
+        return preferredURL.deletingLastPathComponent().appendingPathComponent(
+            filename,
+            isDirectory: false
+        )
     }
 
     private static func verifySQLiteBackup(
         at url: URL,
         expectedVersion: Int,
         versionQuery: String,
-        maximumBytes: UInt64
+        maximumBytes: UInt64,
+        deadlineUptime: TimeInterval
     ) throws -> VerifiedMigrationBackupMetadata {
+        guard ProcessInfo.processInfo.systemUptime < deadlineUptime else {
+            throw VerifiedMigrationBackupError.creationFailed(
+                "SQLite recovery artifact verification exceeded its deadline"
+            )
+        }
         let attributes = try regularFileAttributes(at: url)
         guard let size = attributes[.size] as? NSNumber,
               size.uint64Value > 0,
@@ -653,7 +1403,7 @@ public enum VerifiedMigrationBackup {
             )
         }
         let validationDescriptor = url.path.withCString {
-            Darwin.open($0, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+            Darwin.open($0, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK)
         }
         guard validationDescriptor >= 0 else {
             throw VerifiedMigrationBackupError.verificationFailed(
@@ -675,6 +1425,14 @@ public enum VerifiedMigrationBackup {
             )
         }
         defer { sqlite3_close(database) }
+        let remainingMilliseconds = max(
+            1,
+            min(
+                5_000,
+                Int((deadlineUptime - ProcessInfo.processInfo.systemUptime) * 1_000)
+            )
+        )
+        sqlite3_busy_timeout(database, Int32(remainingMilliseconds))
         var openedStatus = stat()
         let statusResult = url.path.withCString { Darwin.lstat($0, &openedStatus) }
         guard statusResult == 0,
@@ -684,20 +1442,26 @@ public enum VerifiedMigrationBackup {
                 "SQLite recovery artifact changed while it was opened"
             )
         }
-        let integrity = try sqliteText("PRAGMA quick_check;", database: database)
-        guard integrity?.lowercased() == "ok" else {
-            throw VerifiedMigrationBackupError.verificationFailed(
-                "SQLite recovery artifact failed quick_check"
-            )
-        }
-        let version = try sqliteInt(versionQuery, database: database)
-        guard version == expectedVersion else {
-            throw VerifiedMigrationBackupError.verificationFailed(
-                "SQLite recovery artifact has schema version \(version.map(String.init) ?? "missing")"
-            )
+        try withSQLiteProgressDeadline(database: database, deadline: deadlineUptime) {
+            let integrity = try sqliteText("PRAGMA quick_check;", database: database)
+            guard integrity?.lowercased() == "ok" else {
+                throw VerifiedMigrationBackupError.verificationFailed(
+                    "SQLite recovery artifact failed quick_check"
+                )
+            }
+            let version = try sqliteInt(versionQuery, database: database)
+            guard version == expectedVersion else {
+                throw VerifiedMigrationBackupError.verificationFailed(
+                    "SQLite recovery artifact has schema version \(version.map(String.init) ?? "missing")"
+                )
+            }
         }
         try hardenAndVerifyPermissions(at: url)
-        return try metadata(for: url)
+        return try metadata(
+            for: url,
+            origin: .sqliteSnapshot,
+            deadlineUptime: deadlineUptime
+        )
     }
 
     fileprivate static func preflightSQLiteInt(
@@ -886,7 +1650,7 @@ public enum VerifiedMigrationBackup {
         requireStableMetadata: Bool
     ) throws -> SQLiteSourceFileDigest? {
         let descriptor = url.path.withCString {
-            Darwin.open($0, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+            Darwin.open($0, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK)
         }
         if descriptor < 0, errno == ENOENT { return nil }
         guard descriptor >= 0 else {
@@ -971,7 +1735,7 @@ public enum VerifiedMigrationBackup {
             )
         }
         let source = sourceURL.path.withCString {
-            Darwin.open($0, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+            Darwin.open($0, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK)
         }
         guard source >= 0 else {
             throw VerifiedMigrationBackupError.creationFailed(
@@ -1043,12 +1807,588 @@ public enum VerifiedMigrationBackup {
         )
     }
 
+    private static func requireSameDirectory(_ first: URL, _ second: URL) throws {
+        let firstDirectory = first.deletingLastPathComponent().standardizedFileURL.path
+        let secondDirectory = second.deletingLastPathComponent().standardizedFileURL.path
+        guard firstDirectory == secondDirectory,
+              isSimpleFilename(first.lastPathComponent),
+              isSimpleFilename(second.lastPathComponent) else {
+            throw VerifiedMigrationBackupError.invalidSource(
+                "migration artifacts must use simple filenames in the source directory"
+            )
+        }
+    }
+
+    private static func migrationIdentifier(
+        sourceFilename: String,
+        backupFilename: String,
+        sourceVersion: Int,
+        targetVersion: Int,
+        storageKind: VerifiedMigrationStorageKind,
+        sourceSHA256: String,
+        sourceBytes: UInt64,
+        targetSHA256: String?,
+        targetBytes: UInt64?
+    ) -> String {
+        let fileTargetSHA = storageKind == .file ? targetSHA256 ?? "" : ""
+        let fileTargetBytes = storageKind == .file ? String(targetBytes ?? 0) : "0"
+        return JSONSupport.sha256Hex([
+            "forge-migration-manifest-v1",
+            storageKind.rawValue,
+            sourceFilename,
+            backupFilename,
+            String(sourceVersion),
+            String(targetVersion),
+            sourceSHA256,
+            String(sourceBytes),
+            fileTargetSHA,
+            fileTargetBytes,
+        ].joined(separator: "|"))
+    }
+
+    private static func rollbackInstructions(
+        sourceFilename: String,
+        backupFilename: String,
+        sourceVersion: Int,
+        sha256: String,
+        bytes: UInt64,
+        storageKind: VerifiedMigrationStorageKind
+    ) -> [String] {
+        var instructions = [
+            "Stop every Forge Conductor process that can access \(sourceFilename).",
+            "Preserve the current \(sourceFilename) before restoring an earlier format.",
+        ]
+        if storageKind == .sqlite {
+            instructions.append(
+                "Move any \(sourceFilename)-wal, \(sourceFilename)-shm, and \(sourceFilename)-journal sidecars aside before restore."
+            )
+        }
+        instructions.append(
+            "Restore \(backupFilename) as \(sourceFilename) with owner-only permissions."
+        )
+        instructions.append(
+            "Verify the restored file is \(bytes) bytes with SHA-256 \(sha256)."
+        )
+        instructions.append(
+            "Reopen it only with a build that supports schema version \(sourceVersion)."
+        )
+        return instructions
+    }
+
+    private static func validateManifest(_ manifest: VerifiedMigrationBackupManifest) throws {
+        guard manifest.schemaVersion == manifestSchemaVersion,
+              isSHA256(manifest.migrationID),
+              isSimpleFilename(manifest.sourceFilename),
+              isSimpleFilename(manifest.backupFilename),
+              manifest.sourceFilename != manifest.backupFilename,
+              manifest.sourceVersion >= 0,
+              manifest.sourceVersion > 0 || manifest.storageKind == .sqlite,
+              manifest.targetVersion > manifest.sourceVersion,
+              isSHA256(manifest.sourceSHA256),
+              isSHA256(manifest.backupSHA256),
+              manifest.sourceSHA256 == manifest.backupSHA256,
+              manifest.sourceBytes > 0,
+              manifest.sourceBytes <= maximumSQLiteBackupBytes,
+              manifest.sourceBytes == manifest.backupBytes,
+              ISO8601.date(from: manifest.preparedAt) != nil,
+              !manifest.rollbackInstructions.isEmpty,
+              manifest.rollbackInstructions.count <= 8,
+              manifest.rollbackInstructions.allSatisfy({ !$0.isEmpty && $0.utf8.count <= 4_096 }),
+              manifest.rollbackInstructions.reduce(0, { $0 + $1.utf8.count }) <= 16_384 else {
+            throw VerifiedMigrationBackupError.reconciliationFailed(
+                "migration manifest identity, bounds, or source metadata is invalid"
+            )
+        }
+        let targetPairIsComplete = (manifest.targetSHA256 == nil) == (manifest.targetBytes == nil)
+        guard targetPairIsComplete else {
+            throw VerifiedMigrationBackupError.reconciliationFailed(
+                "migration manifest target digest and byte count must be recorded together"
+            )
+        }
+        if let targetSHA256 = manifest.targetSHA256,
+           let targetBytes = manifest.targetBytes {
+            guard isSHA256(targetSHA256),
+                  targetBytes > 0,
+                  targetBytes <= maximumSQLiteBackupBytes else {
+                throw VerifiedMigrationBackupError.reconciliationFailed(
+                    "migration manifest target metadata is invalid"
+                )
+            }
+        }
+        switch manifest.storageKind {
+        case .file:
+            guard let artifact = manifest.targetArtifactFilename,
+                  isSimpleFilename(artifact),
+                  artifact != manifest.sourceFilename,
+                  artifact != manifest.backupFilename,
+                  manifest.targetSHA256 != nil,
+                  manifest.targetBytes != nil else {
+                throw VerifiedMigrationBackupError.reconciliationFailed(
+                    "file migration manifest target artifact is invalid"
+                )
+            }
+        case .sqlite:
+            guard manifest.targetArtifactFilename == nil else {
+                throw VerifiedMigrationBackupError.reconciliationFailed(
+                    "SQLite migration manifest cannot reference a file target artifact"
+                )
+            }
+        }
+        switch manifest.state {
+        case .prepared:
+            guard manifest.completedAt == nil else {
+                throw VerifiedMigrationBackupError.reconciliationFailed(
+                    "prepared migration manifest has a completion timestamp"
+                )
+            }
+        case .completed:
+            guard manifest.targetSHA256 != nil,
+                  manifest.targetBytes != nil,
+                  let completedAt = manifest.completedAt,
+                  ISO8601.date(from: completedAt) != nil else {
+                throw VerifiedMigrationBackupError.reconciliationFailed(
+                    "completed migration manifest lacks verified target metadata"
+                )
+            }
+        }
+        let expectedID = migrationIdentifier(
+            sourceFilename: manifest.sourceFilename,
+            backupFilename: manifest.backupFilename,
+            sourceVersion: manifest.sourceVersion,
+            targetVersion: manifest.targetVersion,
+            storageKind: manifest.storageKind,
+            sourceSHA256: manifest.sourceSHA256,
+            sourceBytes: manifest.sourceBytes,
+            targetSHA256: manifest.targetSHA256,
+            targetBytes: manifest.targetBytes
+        )
+        guard manifest.migrationID == expectedID else {
+            throw VerifiedMigrationBackupError.reconciliationFailed(
+                "migration manifest identifier does not match its immutable fields"
+            )
+        }
+    }
+
+    private static func validateManifestArtifacts(
+        _ manifest: VerifiedMigrationBackupManifest,
+        sourceURL: URL
+    ) throws {
+        try validateManifest(manifest)
+        guard sourceURL.lastPathComponent == manifest.sourceFilename else {
+            throw VerifiedMigrationBackupError.reconciliationFailed(
+                "migration manifest belongs to a different source file"
+            )
+        }
+        let directory = sourceURL.deletingLastPathComponent()
+        let backupURL = directory.appendingPathComponent(manifest.backupFilename)
+        try requireSameDirectory(sourceURL, backupURL)
+        let backup = try metadata(
+            for: backupURL,
+            maximumBytes: manifest.backupBytes
+        )
+        guard backup.sha256 == manifest.backupSHA256,
+              backup.bytes == manifest.backupBytes else {
+            throw VerifiedMigrationBackupError.reconciliationFailed(
+                "migration backup no longer matches its manifest"
+            )
+        }
+        if let targetArtifactFilename = manifest.targetArtifactFilename {
+            let targetURL = directory.appendingPathComponent(targetArtifactFilename)
+            try requireSameDirectory(sourceURL, targetURL)
+            let target = try metadata(
+                for: targetURL,
+                maximumBytes: manifest.targetBytes ?? maximumSQLiteBackupBytes
+            )
+            guard target.sha256 == manifest.targetSHA256,
+                  target.bytes == manifest.targetBytes else {
+                throw VerifiedMigrationBackupError.reconciliationFailed(
+                    "migration target artifact no longer matches its manifest"
+                )
+            }
+        }
+    }
+
+    private static func completionMetadata(
+        for manifest: VerifiedMigrationBackupManifest,
+        sourceURL: URL,
+        supplied: VerifiedMigrationBackupMetadata?
+    ) throws -> VerifiedMigrationBackupMetadata {
+        switch manifest.storageKind {
+        case .file:
+            guard let targetArtifactFilename = manifest.targetArtifactFilename else {
+                throw VerifiedMigrationBackupError.reconciliationFailed(
+                    "file migration target artifact is missing"
+                )
+            }
+            let targetURL = sourceURL.deletingLastPathComponent().appendingPathComponent(
+                targetArtifactFilename
+            )
+            let target = try metadata(
+                for: targetURL,
+                maximumBytes: manifest.targetBytes ?? maximumSQLiteBackupBytes
+            )
+            guard target.sha256 == manifest.targetSHA256,
+                  target.bytes == manifest.targetBytes else {
+                throw VerifiedMigrationBackupError.reconciliationFailed(
+                    "file migration target artifact changed before completion"
+                )
+            }
+            if let supplied {
+                guard supplied.sha256 == target.sha256,
+                      supplied.bytes == target.bytes else {
+                    throw VerifiedMigrationBackupError.reconciliationFailed(
+                        "supplied file migration target metadata is inconsistent"
+                    )
+                }
+            }
+            let live = try metadata(
+                for: sourceURL,
+                maximumBytes: manifest.targetBytes ?? maximumSQLiteBackupBytes
+            )
+            guard live.sha256 == target.sha256, live.bytes == target.bytes else {
+                throw VerifiedMigrationBackupError.reconciliationFailed(
+                    "installed file migration target does not match its verified artifact"
+                )
+            }
+            return target
+        case .sqlite:
+            guard let supplied,
+                  supplied.origin == .sqliteSnapshot,
+                  isSHA256(supplied.sha256),
+                  supplied.bytes > 0,
+                  supplied.bytes <= maximumSQLiteBackupBytes else {
+                throw VerifiedMigrationBackupError.reconciliationFailed(
+                    "SQLite migration completion requires verified logical target metadata"
+                )
+            }
+            return supplied
+        }
+    }
+
+    private static func hasSameMigrationIdentity(
+        _ first: VerifiedMigrationBackupManifest,
+        _ second: VerifiedMigrationBackupManifest
+    ) -> Bool {
+        first.migrationID == second.migrationID
+            && first.schemaVersion == second.schemaVersion
+            && first.storageKind == second.storageKind
+            && first.sourceFilename == second.sourceFilename
+            && first.sourceVersion == second.sourceVersion
+            && first.sourceSHA256 == second.sourceSHA256
+            && first.sourceBytes == second.sourceBytes
+            && first.backupFilename == second.backupFilename
+            && first.backupSHA256 == second.backupSHA256
+            && first.backupBytes == second.backupBytes
+            && first.targetVersion == second.targetVersion
+            && first.targetArtifactFilename == second.targetArtifactFilename
+            && first.rollbackInstructions == second.rollbackInstructions
+    }
+
+    private static func preparedManifest(
+        from manifest: VerifiedMigrationBackupManifest,
+        preparedAt: String
+    ) -> VerifiedMigrationBackupManifest {
+        VerifiedMigrationBackupManifest(
+            schemaVersion: manifest.schemaVersion,
+            migrationID: manifest.migrationID,
+            state: .prepared,
+            storageKind: manifest.storageKind,
+            sourceFilename: manifest.sourceFilename,
+            sourceVersion: manifest.sourceVersion,
+            sourceSHA256: manifest.sourceSHA256,
+            sourceBytes: manifest.sourceBytes,
+            backupFilename: manifest.backupFilename,
+            backupSHA256: manifest.backupSHA256,
+            backupBytes: manifest.backupBytes,
+            targetVersion: manifest.targetVersion,
+            targetSHA256: manifest.storageKind == .file ? manifest.targetSHA256 : nil,
+            targetBytes: manifest.storageKind == .file ? manifest.targetBytes : nil,
+            targetArtifactFilename: manifest.targetArtifactFilename,
+            rollbackInstructions: manifest.rollbackInstructions,
+            preparedAt: preparedAt,
+            completedAt: nil
+        )
+    }
+
+    private static func fileMigrationLineageURL(
+        preferredURL: URL,
+        lineage: Int
+    ) -> URL {
+        guard lineage > 1 else { return preferredURL }
+        let extensionName = preferredURL.pathExtension
+        let stemURL = extensionName.isEmpty
+            ? preferredURL
+            : preferredURL.deletingPathExtension()
+        let lineageURL = stemURL.deletingLastPathComponent().appendingPathComponent(
+            "\(stemURL.lastPathComponent).lineage-\(lineage)",
+            isDirectory: false
+        )
+        return extensionName.isEmpty
+            ? lineageURL
+            : lineageURL.appendingPathExtension(extensionName)
+    }
+
+    @discardableResult
+    private static func archiveCompletedManifest(
+        _ manifest: VerifiedMigrationBackupManifest,
+        sourceURL: URL
+    ) throws -> VerifiedMigrationBackupManifest {
+        guard manifest.state == .completed else {
+            throw VerifiedMigrationBackupError.reconciliationFailed(
+                "only completed migration manifests can be archived"
+            )
+        }
+        try validateManifestArtifacts(manifest, sourceURL: sourceURL)
+        let backupURL = sourceURL.deletingLastPathComponent().appendingPathComponent(
+            manifest.backupFilename
+        )
+        let archiveURL = archivedManifestURL(
+            for: backupURL,
+            targetVersion: manifest.targetVersion
+        )
+        if let archived = try readManifestIfPresent(at: archiveURL) {
+            try validateManifestArtifacts(archived, sourceURL: sourceURL)
+            guard archived.state == .completed,
+                  hasSameMigrationIdentity(archived, manifest),
+                  archived.targetSHA256 == manifest.targetSHA256,
+                  archived.targetBytes == manifest.targetBytes else {
+                throw VerifiedMigrationBackupError.reconciliationFailed(
+                    "archived migration manifest conflicts with the active lineage"
+                )
+            }
+            return archived
+        }
+        let data = try encodedManifest(manifest)
+        _ = try writeFile(data, to: archiveURL, maximumBytes: maximumManifestBytes)
+        let archived = try requireManifest(at: archiveURL)
+        guard archived == manifest else {
+            throw VerifiedMigrationBackupError.verificationFailed(
+                "archived migration manifest differs from the completed state"
+            )
+        }
+        return archived
+    }
+
+    private static func promoteArchivedSQLiteCompletionIfPresent(
+        _ manifest: VerifiedMigrationBackupManifest,
+        sourceURL: URL
+    ) throws -> VerifiedMigrationBackupManifest {
+        guard manifest.state == .prepared else { return manifest }
+        let backupURL = sourceURL.deletingLastPathComponent().appendingPathComponent(
+            manifest.backupFilename
+        )
+        let archiveURL = archivedManifestURL(
+            for: backupURL,
+            targetVersion: manifest.targetVersion
+        )
+        guard let archived = try readManifestIfPresent(at: archiveURL) else {
+            return manifest
+        }
+        try validateManifestArtifacts(archived, sourceURL: sourceURL)
+        guard archived.state == .completed,
+              archived.storageKind == .sqlite,
+              hasSameMigrationIdentity(archived, manifest),
+              archived.preparedAt == manifest.preparedAt,
+              archived.targetSHA256 != nil,
+              archived.targetBytes != nil else {
+            throw VerifiedMigrationBackupError.reconciliationFailed(
+                "archived SQLite completion conflicts with the prepared lineage"
+            )
+        }
+        let activeURL = activeManifestURL(for: sourceURL)
+        let active = try requireManifest(at: activeURL)
+        if active == archived { return archived }
+        guard active.state == .prepared,
+              hasSameMigrationIdentity(active, archived),
+              active.preparedAt == archived.preparedAt else {
+            throw VerifiedMigrationBackupError.reconciliationFailed(
+                "active SQLite lineage changed before archived completion recovery"
+            )
+        }
+        try writeManifestReplacing(archived, to: activeURL)
+        let installed = try requireManifest(at: activeURL)
+        guard installed == archived else {
+            throw VerifiedMigrationBackupError.verificationFailed(
+                "archived SQLite completion could not be restored as the active manifest"
+            )
+        }
+        return installed
+    }
+
+    private static func writeManifestReplacing(
+        _ manifest: VerifiedMigrationBackupManifest,
+        to url: URL
+    ) throws {
+        try validateManifest(manifest)
+        _ = try readManifestIfPresent(at: url)
+        let data = try encodedManifest(manifest)
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let temporaryURL = try temporarySibling(of: url)
+        defer { try? FileManager.default.removeItem(at: temporaryURL) }
+        try writeOwnerOnlyFile(data, to: temporaryURL)
+        let renameResult = temporaryURL.path.withCString { sourcePath in
+            url.path.withCString { destinationPath in
+                Darwin.rename(sourcePath, destinationPath)
+            }
+        }
+        guard renameResult == 0 else {
+            throw VerifiedMigrationBackupError.creationFailed(
+                "migration manifest could not be atomically replaced: "
+                    + String(cString: strerror(errno))
+            )
+        }
+        try synchronizeDirectory(at: url.deletingLastPathComponent())
+        try hardenAndVerifyPermissions(at: url)
+        let installed = try boundedRegularFileData(at: url, maximumBytes: maximumManifestBytes)
+        guard installed == data else {
+            throw VerifiedMigrationBackupError.verificationFailed(
+                "migration manifest changed during atomic installation"
+            )
+        }
+    }
+
+    private static func replaceOwnerOnlyFile(
+        _ data: Data,
+        at url: URL,
+        maximumBytes: Int
+    ) throws {
+        guard maximumBytes > 0, !data.isEmpty, data.count <= maximumBytes else {
+            throw VerifiedMigrationBackupError.invalidSource(
+                "replacement file is empty or exceeds its migration limit"
+            )
+        }
+        _ = try boundedRegularFileData(at: url, maximumBytes: maximumBytes)
+        let temporaryURL = try temporarySibling(of: url)
+        defer { try? FileManager.default.removeItem(at: temporaryURL) }
+        try writeOwnerOnlyFile(data, to: temporaryURL)
+        let renameResult = temporaryURL.path.withCString { sourcePath in
+            url.path.withCString { destinationPath in
+                Darwin.rename(sourcePath, destinationPath)
+            }
+        }
+        guard renameResult == 0 else {
+            throw VerifiedMigrationBackupError.creationFailed(
+                "migration target could not be atomically installed: "
+                    + String(cString: strerror(errno))
+            )
+        }
+        try synchronizeDirectory(at: url.deletingLastPathComponent())
+        try hardenAndVerifyPermissions(at: url)
+        let installed = try boundedRegularFileData(at: url, maximumBytes: maximumBytes)
+        guard installed == data else {
+            throw VerifiedMigrationBackupError.verificationFailed(
+                "migration target changed during atomic installation"
+            )
+        }
+    }
+
+    private static func encodedManifest(
+        _ manifest: VerifiedMigrationBackupManifest
+    ) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let data = try encoder.encode(manifest)
+        guard !data.isEmpty, data.count <= maximumManifestBytes else {
+            throw VerifiedMigrationBackupError.creationFailed(
+                "migration manifest exceeds its byte limit"
+            )
+        }
+        return data
+    }
+
+    private static func requireManifest(at url: URL) throws -> VerifiedMigrationBackupManifest {
+        guard let manifest = try readManifestIfPresent(at: url) else {
+            throw VerifiedMigrationBackupError.reconciliationFailed(
+                "required migration manifest is missing"
+            )
+        }
+        return manifest
+    }
+
+    private static func readManifestIfPresent(
+        at url: URL
+    ) throws -> VerifiedMigrationBackupManifest? {
+        var status = stat()
+        let result = url.path.withCString { Darwin.lstat($0, &status) }
+        if result != 0, errno == ENOENT { return nil }
+        guard result == 0,
+              (status.st_mode & S_IFMT) == S_IFREG,
+              status.st_uid == Darwin.geteuid(),
+              status.st_nlink == 1 else {
+            throw VerifiedMigrationBackupError.reconciliationFailed(
+                "migration manifest path is not an owner-controlled regular file"
+            )
+        }
+        let data = try boundedRegularFileData(at: url, maximumBytes: maximumManifestBytes)
+        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw VerifiedMigrationBackupError.reconciliationFailed(
+                "migration manifest is not a JSON object"
+            )
+        }
+        let requiredKeys: Set<String> = [
+            "schema_version", "migration_id", "state", "storage_kind",
+            "source_filename", "source_version", "source_sha256", "source_bytes",
+            "backup_filename", "backup_sha256", "backup_bytes", "target_version",
+            "rollback_instructions", "prepared_at",
+        ]
+        let allowedKeys = requiredKeys.union([
+            "target_sha256", "target_bytes", "target_artifact_filename", "completed_at",
+        ])
+        let keys = Set(object.keys)
+        guard requiredKeys.isSubset(of: keys), keys.isSubset(of: allowedKeys) else {
+            throw VerifiedMigrationBackupError.reconciliationFailed(
+                "migration manifest fields are missing or unknown"
+            )
+        }
+        let manifest: VerifiedMigrationBackupManifest
+        do {
+            manifest = try JSONDecoder().decode(VerifiedMigrationBackupManifest.self, from: data)
+        } catch {
+            throw VerifiedMigrationBackupError.reconciliationFailed(
+                "migration manifest cannot be decoded"
+            )
+        }
+        try validateManifest(manifest)
+        try hardenAndVerifyPermissions(at: url)
+        return manifest
+    }
+
+    private static func isSimpleFilename(_ value: String) -> Bool {
+        !value.isEmpty
+            && value.utf8.count <= 255
+            && value != "."
+            && value != ".."
+            && !value.contains("/")
+            && value == URL(fileURLWithPath: value).lastPathComponent
+    }
+
+    private static func observedSourceCanInstallFileTarget(
+        _ state: VerifiedMigrationManifestState
+    ) -> Bool {
+        state == .prepared || state == .completed
+    }
+
+    private static func isSHA256(_ value: String) -> Bool {
+        value.utf8.count == 64
+            && value.unicodeScalars.allSatisfy {
+                ($0.value >= 48 && $0.value <= 57) || ($0.value >= 97 && $0.value <= 102)
+            }
+    }
+
     private static func boundedRegularFileData(
         at url: URL,
         maximumBytes: Int
     ) throws -> Data {
+        guard maximumBytes > 0 else {
+            throw VerifiedMigrationBackupError.invalidSource(
+                "migration backup byte limit must be positive"
+            )
+        }
         let descriptor = url.path.withCString {
-            Darwin.open($0, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+            Darwin.open($0, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK)
         }
         guard descriptor >= 0 else {
             throw VerifiedMigrationBackupError.invalidSource(
@@ -1226,7 +2566,7 @@ public enum VerifiedMigrationBackup {
 
     private static func hardenAndVerifyPermissions(at url: URL) throws {
         let descriptor = url.path.withCString {
-            Darwin.open($0, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+            Darwin.open($0, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK)
         }
         guard descriptor >= 0 else {
             throw VerifiedMigrationBackupError.verificationFailed(
@@ -1237,36 +2577,162 @@ public enum VerifiedMigrationBackup {
         try validateAndHardenOwnerOnlyDescriptor(descriptor, purpose: "recovery artifact")
     }
 
-    private static func metadata(for url: URL) throws -> VerifiedMigrationBackupMetadata {
+    private static func metadata(
+        for url: URL,
+        maximumBytes: UInt64 = maximumSQLiteBackupBytes,
+        timeoutSeconds: TimeInterval = sqliteBackupDeadline,
+        allowEmpty: Bool = false,
+        origin: VerifiedMigrationBackupMetadata.Origin = .file,
+        deadlineUptime suppliedDeadlineUptime: TimeInterval? = nil
+    ) throws -> VerifiedMigrationBackupMetadata {
+        guard maximumBytes > 0, timeoutSeconds.isFinite, timeoutSeconds > 0 else {
+            throw VerifiedMigrationBackupError.invalidSource(
+                "migration artifact byte limit and deadline must be positive"
+            )
+        }
         let descriptor = url.path.withCString {
-            Darwin.open($0, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+            Darwin.open($0, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK)
         }
         guard descriptor >= 0 else {
             throw VerifiedMigrationBackupError.verificationFailed(
                 "recovery artifact could not be opened without following links"
             )
         }
-        var descriptorIsOpen = true
-        defer {
-            if descriptorIsOpen { _ = Darwin.close(descriptor) }
-        }
+        defer { _ = Darwin.close(descriptor) }
         let status = try validatedOwnerControlledDescriptor(
             descriptor,
             purpose: "recovery artifact"
         )
+        guard (allowEmpty || status.st_size > 0),
+              UInt64(status.st_size) <= maximumBytes else {
+            throw VerifiedMigrationBackupError.invalidSource(
+                "migration artifact is empty or exceeds its byte limit"
+            )
+        }
+        try validateAndHardenOwnerOnlyDescriptor(
+            descriptor,
+            purpose: "recovery artifact"
+        )
         var digest = SHA256()
-        let stream = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
-        descriptorIsOpen = false
-        defer { try? stream.close() }
-        while let block = try stream.read(upToCount: 1024 * 1024), !block.isEmpty {
-            digest.update(data: block)
+        let deadline = suppliedDeadlineUptime
+            ?? ProcessInfo.processInfo.systemUptime + timeoutSeconds
+        guard ProcessInfo.processInfo.systemUptime < deadline else {
+            throw VerifiedMigrationBackupError.creationFailed(
+                "migration artifact hashing exceeded its deadline"
+            )
+        }
+        var consumed: Int64 = 0
+        var buffer = [UInt8](repeating: 0, count: 1024 * 1024)
+        while consumed < status.st_size {
+            guard ProcessInfo.processInfo.systemUptime < deadline else {
+                throw VerifiedMigrationBackupError.creationFailed(
+                    "migration artifact hashing exceeded its deadline"
+                )
+            }
+            let requested = min(buffer.count, Int(status.st_size - consumed))
+            let count = Darwin.read(descriptor, &buffer, requested)
+            if count < 0, errno == EINTR { continue }
+            guard count > 0 else {
+                throw VerifiedMigrationBackupError.verificationFailed(
+                    "migration artifact changed while it was hashed"
+                )
+            }
+            digest.update(data: Data(buffer[0..<count]))
+            consumed += Int64(count)
+        }
+        var finalStatus = stat()
+        guard Darwin.fstat(descriptor, &finalStatus) == 0,
+              finalStatus.st_dev == status.st_dev,
+              finalStatus.st_ino == status.st_ino,
+              finalStatus.st_size == status.st_size,
+              finalStatus.st_mtimespec.tv_sec == status.st_mtimespec.tv_sec,
+              finalStatus.st_mtimespec.tv_nsec == status.st_mtimespec.tv_nsec else {
+            throw VerifiedMigrationBackupError.verificationFailed(
+                "migration artifact changed while it was hashed"
+            )
         }
         let sha256 = digest.finalize().map { String(format: "%02x", $0) }.joined()
         return VerifiedMigrationBackupMetadata(
             url: url,
             sha256: sha256,
-            bytes: UInt64(status.st_size)
+            bytes: UInt64(status.st_size),
+            origin: origin
         )
+    }
+
+    private static func requireSQLiteMigrationReceipt(
+        database: OpaquePointer,
+        sourceURL: URL,
+        manifest: VerifiedMigrationBackupManifest,
+        validateArtifacts: Bool,
+        reconcileArchivedCompletion: Bool
+    ) throws -> VerifiedMigrationBackupManifest {
+        guard manifest.storageKind == .sqlite,
+              manifest.state == .prepared || manifest.state == .completed else {
+            throw VerifiedMigrationBackupError.reconciliationFailed(
+                "SQLite migration receipt belongs to an invalid manifest"
+            )
+        }
+        if validateArtifacts {
+            try validateManifestArtifacts(manifest, sourceURL: sourceURL)
+        } else {
+            try validateManifest(manifest)
+        }
+        var statement: OpaquePointer?
+        let sql = """
+        SELECT COUNT(*) FROM forge_migration_receipts
+        WHERE migration_id=? AND receipt_schema_version=1
+          AND source_filename=? AND backup_filename=?
+          AND source_version=? AND target_version=?
+          AND source_sha256=? AND source_bytes=?;
+        """
+        guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK,
+              let statement else {
+            throw VerifiedMigrationBackupError.reconciliationFailed(
+                "SQLite target is missing its migration receipt"
+            )
+        }
+        defer { sqlite3_finalize(statement) }
+        try bindMigrationReceipt(manifest, to: statement)
+        guard sqlite3_step(statement) == SQLITE_ROW,
+              sqlite3_column_int64(statement, 0) == 1 else {
+            throw VerifiedMigrationBackupError.reconciliationFailed(
+                "SQLite target migration receipt does not match its manifest"
+            )
+        }
+        guard reconcileArchivedCompletion else { return manifest }
+        return try promoteArchivedSQLiteCompletionIfPresent(
+            manifest,
+            sourceURL: sourceURL
+        )
+    }
+
+    private static func bindMigrationReceipt(
+        _ manifest: VerifiedMigrationBackupManifest,
+        to statement: OpaquePointer
+    ) throws {
+        let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+        let bindings: [(Int32, String)] = [
+            (1, manifest.migrationID),
+            (2, manifest.sourceFilename),
+            (3, manifest.backupFilename),
+            (6, manifest.sourceSHA256),
+        ]
+        for (index, value) in bindings {
+            guard sqlite3_bind_text(statement, index, value, -1, transient) == SQLITE_OK else {
+                throw VerifiedMigrationBackupError.reconciliationFailed(
+                    "SQLite migration receipt text could not be bound"
+                )
+            }
+        }
+        guard sqlite3_bind_int64(statement, 4, Int64(manifest.sourceVersion)) == SQLITE_OK,
+              sqlite3_bind_int64(statement, 5, Int64(manifest.targetVersion)) == SQLITE_OK,
+              manifest.sourceBytes <= UInt64(Int64.max),
+              sqlite3_bind_int64(statement, 7, Int64(manifest.sourceBytes)) == SQLITE_OK else {
+            throw VerifiedMigrationBackupError.reconciliationFailed(
+                "SQLite migration receipt numeric value could not be bound"
+            )
+        }
     }
 
     private static func sqliteText(_ sql: String, database: OpaquePointer) throws -> String? {
@@ -1342,10 +2808,65 @@ public enum VerifiedMigrationBackup {
         }
     }
 
-    private static func temporarySibling(of url: URL) -> URL {
-        url.deletingLastPathComponent().appendingPathComponent(
-            ".\(url.lastPathComponent).tmp-\(UUID().uuidString.lowercased())",
+    private static func temporarySibling(of url: URL) throws -> URL {
+        let temporaryURL = url.deletingLastPathComponent().appendingPathComponent(
+            ".\(url.lastPathComponent).migration-tmp",
             isDirectory: false
         )
+        var status = stat()
+        let result = temporaryURL.path.withCString { Darwin.lstat($0, &status) }
+        if result == 0 {
+            guard (status.st_mode & S_IFMT) == S_IFREG,
+                  status.st_uid == Darwin.geteuid(),
+                  status.st_nlink == 1 else {
+                throw VerifiedMigrationBackupError.creationFailed(
+                    "stale migration temporary path is not an owner-controlled regular file"
+                )
+            }
+            guard temporaryURL.path.withCString({ Darwin.unlink($0) }) == 0 else {
+                throw VerifiedMigrationBackupError.creationFailed(
+                    "stale migration temporary file could not be removed"
+                )
+            }
+            try synchronizeDirectory(at: temporaryURL.deletingLastPathComponent())
+        } else if errno != ENOENT {
+            throw VerifiedMigrationBackupError.creationFailed(
+                "migration temporary path could not be inspected"
+            )
+        }
+        return temporaryURL
+    }
+
+    private static func resetTemporaryDirectory(
+        kind: String,
+        key: String
+    ) throws -> URL {
+        let suffix = String(JSONSupport.sha256Hex(key).prefix(32))
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "forge-\(kind)-\(suffix)",
+            isDirectory: true
+        )
+        var status = stat()
+        let result = url.path.withCString { Darwin.lstat($0, &status) }
+        if result == 0 {
+            guard (status.st_mode & S_IFMT) == S_IFDIR,
+                  status.st_uid == Darwin.geteuid() else {
+                throw VerifiedMigrationBackupError.creationFailed(
+                    "stale migration temporary directory is not owner-controlled"
+                )
+            }
+            try FileManager.default.removeItem(at: url)
+        } else if errno != ENOENT {
+            throw VerifiedMigrationBackupError.creationFailed(
+                "migration temporary directory could not be inspected"
+            )
+        }
+        try FileManager.default.createDirectory(
+            at: url,
+            withIntermediateDirectories: false,
+            attributes: [.posixPermissions: 0o700]
+        )
+        try synchronizeDirectory(at: url.deletingLastPathComponent())
+        return url
     }
 }

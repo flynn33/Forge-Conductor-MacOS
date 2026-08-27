@@ -1795,6 +1795,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
     // MARK: - Schema and writes
 
     private func openAndMigrate() throws {
+        var migrationManifest: VerifiedMigrationBackupManifest?
         try VerifiedMigrationBackup.withMigrationLock(
             databaseURL: databaseURL,
             timeoutSeconds: 60
@@ -1803,7 +1804,13 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
                 try VerifiedMigrationBackup.withNonMutatingSQLitePreflight(
                     databaseURL: databaseURL
                 ) { candidate in
-                    guard let candidate else { return }
+                    guard let candidate else {
+                        _ = try VerifiedMigrationBackup.reconcileMigrationManifest(
+                            sourceURL: databaseURL,
+                            observedVersion: 0
+                        )
+                        return
+                    }
                     let version = try candidate.integer("PRAGMA user_version;") ?? 0
                     guard version <= Self.schemaVersion else {
                         throw ProjectMemoryError.unsupportedVersion(version)
@@ -1811,6 +1818,11 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
                     try candidate.requireEmptySchemaWhenUnversioned(
                         reportedVersion: version
                     )
+                    migrationManifest = try VerifiedMigrationBackup
+                        .reconcileMigrationManifest(
+                            sourceURL: databaseURL,
+                            observedVersion: version
+                        )
                 }
             } catch let error as ProjectMemoryError {
                 throw error
@@ -1822,11 +1834,13 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
             } catch {
                 throw ProjectMemoryError.invalidRequest(error.localizedDescription)
             }
-            try openAndMigrateLocked()
+            try openAndMigrateLocked(migrationManifest: migrationManifest)
         }
     }
 
-    private func openAndMigrateLocked() throws {
+    private func openAndMigrateLocked(
+        migrationManifest initialManifest: VerifiedMigrationBackupManifest?
+    ) throws {
         var handle: OpaquePointer?
         let flags = SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
         guard sqlite3_open_v2(databaseURL.path, &handle, flags, nil) == SQLITE_OK, let handle else {
@@ -1848,8 +1862,21 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
             } catch {
                 throw ProjectMemoryError.invalidRequest(error.localizedDescription)
             }
+            var migrationManifest = try initialManifest
+                ?? VerifiedMigrationBackup.reconcileMigrationManifest(
+                    sourceURL: databaseURL,
+                    observedVersion: initialVersion
+                )
+            if initialVersion == Self.schemaVersion,
+               let currentManifest = migrationManifest {
+                migrationManifest = try VerifiedMigrationBackup.requireSQLiteMigrationReceipt(
+                    database: handle,
+                    sourceURL: databaseURL,
+                    manifest: currentManifest
+                )
+            }
             try execUnlocked("PRAGMA busy_timeout=3000; PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA synchronous=NORMAL;")
-            try migrateUnlocked()
+            try migrateUnlocked(migrationManifest: migrationManifest)
             try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: databaseURL.path)
             openRegistration = try VerifiedMigrationBackup.registerOpenDatabase(at: databaseURL)
         } catch {
@@ -1870,7 +1897,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
 
     private func corruptDatabaseRecoveryError() -> ProjectMemoryError {
         let artifact = directory.appendingPathComponent(
-            "memory.corrupt-\(UUID().uuidString.lowercased()).sqlite3"
+            "memory.corrupt-recovery.sqlite3"
         )
         do {
             _ = try VerifiedMigrationBackup.preserveStableFile(
@@ -1894,21 +1921,43 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         }
     }
 
-    private func migrateUnlocked() throws {
+    private func migrateUnlocked(
+        migrationManifest initialManifest: VerifiedMigrationBackupManifest?
+    ) throws {
         let prior = try pragmaUserVersionUnlocked()
         guard prior <= Self.schemaVersion else { throw ProjectMemoryError.unsupportedVersion(prior) }
-        if prior > 0, prior < Self.schemaVersion,
-           FileManager.default.fileExists(atPath: databaseURL.path) {
-            let backup = directory.appendingPathComponent("memory.pre-migration-v\(prior).sqlite3")
-            guard let db else { throw StoreError.openFailed("nil project memory database") }
-            _ = try VerifiedMigrationBackup.snapshotSQLite(
-                database: db,
-                to: backup,
-                expectedVersion: prior,
-                versionQuery: "PRAGMA user_version;"
-            )
+        var migrationManifest = initialManifest
+        let isSchemaMigration = prior > 0 && prior < Self.schemaVersion
+        let needsDurableCompletion = isSchemaMigration
+            || migrationManifest?.state == .prepared
+        if needsDurableCompletion {
+            try execUnlocked("PRAGMA synchronous=FULL;")
+        }
+        defer {
+            if needsDurableCompletion {
+                try? execUnlocked("PRAGMA synchronous=NORMAL;")
+            }
         }
         try transactionUnlocked {
+            guard let db else { throw StoreError.openFailed("nil project memory database") }
+            if isSchemaMigration {
+                migrationManifest = try VerifiedMigrationBackup
+                    .prepareSQLiteMigrationAtWriteBoundary(
+                        database: db,
+                        sourceURL: databaseURL,
+                        backupURL: migrationBackupURL(sourceVersion: prior),
+                        sourceVersion: prior,
+                        targetVersion: Self.schemaVersion,
+                        versionQuery: "PRAGMA user_version;"
+                    )
+            } else if prior == Self.schemaVersion,
+                      let currentManifest = migrationManifest {
+                migrationManifest = try VerifiedMigrationBackup.requireSQLiteMigrationReceipt(
+                    database: db,
+                    sourceURL: databaseURL,
+                    manifest: currentManifest
+                )
+            }
             try execUnlocked("""
             CREATE TABLE IF NOT EXISTS memory_records(
                 id TEXT PRIMARY KEY, project_id TEXT NOT NULL, version INTEGER NOT NULL,
@@ -2039,11 +2088,19 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
                     bind(statement, 2, projectID)
                     bind(statement, 3, String(prior))
                     bind(statement, 4, "2")
-                    let timestamp = ISO8601.string(from: clock.now())
+                    let timestamp = migrationManifest?.preparedAt
+                        ?? ISO8601.string(from: clock.now())
                     bind(statement, 5, timestamp)
                     bind(statement, 6, timestamp)
                     try stepDone(statement)
                 }
+            }
+            if isSchemaMigration, let migrationManifest {
+                try VerifiedMigrationBackup.recordSQLiteMigrationReceipt(
+                    database: db,
+                    sourceURL: databaseURL,
+                    manifest: migrationManifest
+                )
             }
         }
         if enableFTS5 {
@@ -2071,6 +2128,33 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         guard try quickCheckUnlocked() else {
             throw ProjectMemoryError.integrityFailure("quick_check failed after migration")
         }
+        if let migrationManifest, migrationManifest.state == .prepared {
+            let observedVersion = try pragmaUserVersionUnlocked()
+            guard let db else { throw StoreError.openFailed("nil project memory database") }
+            try VerifiedMigrationBackup.checkpointSQLiteMigration(
+                database: db,
+                sourceURL: databaseURL
+            )
+            let target = try VerifiedMigrationBackup.logicalSQLiteMetadata(
+                database: db,
+                sourceURL: databaseURL,
+                expectedVersion: Self.schemaVersion,
+                versionQuery: "PRAGMA user_version;"
+            )
+            _ = try VerifiedMigrationBackup.completeMigrationManifest(
+                sourceURL: databaseURL,
+                preparedManifest: migrationManifest,
+                observedVersion: observedVersion,
+                targetMetadata: target
+            )
+        }
+    }
+
+    private func migrationBackupURL(sourceVersion: Int) -> URL {
+        directory.appendingPathComponent(
+            "memory.pre-migration-v\(sourceVersion).sqlite3",
+            isDirectory: false
+        )
     }
 
     private func rememberUnlocked(_ write: ProjectMemoryWrite) throws -> (ProjectMemoryRecord, String) {

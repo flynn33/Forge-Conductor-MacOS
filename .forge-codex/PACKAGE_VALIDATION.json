@@ -1412,6 +1412,61 @@
     },
     {
       "detail": "valid",
+      "name": "json:evidence/EVID-20260827T161138Z-6e4e0134f8.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T161328Z-2a835789ec.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T161653Z-671fc6f5e4.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T161806Z-0acce7939b.artifact-000-P10-cli-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T161806Z-0acce7939b.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T161816Z-0a2cf31412.artifact-000-P10-protocol-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T161816Z-0a2cf31412.artifact-001-P10-mcp-runtime-transcript.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T161816Z-0a2cf31412.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T161831Z-64cf524597.artifact-000-P10-manager-http-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T161831Z-64cf524597.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T162026Z-657b44b26e.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
       "name": "json:evidence/P02-telemetry-baseline.json",
       "passed": true
     },
@@ -2570,6 +2625,6 @@
   "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex",
   "schema_version": 1,
   "valid": true,
-  "validated_at": "2026-08-27T14:37:50.494072+00:00",
+  "validated_at": "2026-08-27T16:21:46.096470+00:00",
   "warnings": []
 }

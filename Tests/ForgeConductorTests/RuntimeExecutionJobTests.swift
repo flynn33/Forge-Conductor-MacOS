@@ -829,6 +829,37 @@ final class RuntimeExecutionJobTests: XCTestCase {
                 as? NSNumber)?.intValue,
             0o600
         )
+        let migrationManifest = try JSONDecoder().decode(
+            VerifiedMigrationBackupManifest.self,
+            from: Data(
+                contentsOf: VerifiedMigrationBackup.activeManifestURL(for: databaseURL)
+            )
+        )
+        XCTAssertEqual(migrationManifest.state, .completed)
+        XCTAssertEqual(migrationManifest.storageKind, .sqlite)
+        XCTAssertEqual(migrationManifest.sourceVersion, 2)
+        XCTAssertEqual(migrationManifest.targetVersion, RuntimeJobRepository.schemaVersion)
+        XCTAssertEqual(
+            migrationManifest.backupSHA256,
+            JSONSupport.sha256Hex(try Data(contentsOf: backupURL))
+        )
+        XCTAssertNotNil(migrationManifest.targetSHA256)
+        XCTAssertEqual(
+            try Self.sqliteCount(
+                databaseURL: databaseURL,
+                sql: "SELECT COUNT(*) FROM forge_migration_receipts WHERE migration_id=?",
+                textBinding: migrationManifest.migrationID
+            ),
+            1
+        )
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: VerifiedMigrationBackup.archivedManifestURL(
+                    for: backupURL,
+                    targetVersion: RuntimeJobRepository.schemaVersion
+                ).path
+            )
+        )
         let firstBackupData = try Data(contentsOf: backupURL)
 
         let columns = try Self.sqliteColumnNames(
@@ -864,6 +895,26 @@ final class RuntimeExecutionJobTests: XCTestCase {
         )
         await rerun.close()
         XCTAssertEqual(try Data(contentsOf: backupURL), firstBackupData)
+
+        try firstBackupData.write(to: databaseURL, options: .atomic)
+        for suffix in ["-wal", "-shm", "-journal"] {
+            let sidecar = URL(fileURLWithPath: databaseURL.path + suffix)
+            if FileManager.default.fileExists(atPath: sidecar.path) {
+                try FileManager.default.removeItem(at: sidecar)
+            }
+        }
+        let restored = try RuntimeJobRepository(databaseURL: databaseURL)
+        try await assertLegacyJob(in: restored)
+        await restored.close()
+        XCTAssertEqual(
+            try JSONDecoder().decode(
+                VerifiedMigrationBackupManifest.self,
+                from: Data(
+                    contentsOf: VerifiedMigrationBackup.activeManifestURL(for: databaseURL)
+                )
+            ),
+            migrationManifest
+        )
     }
 
     func testNonemptyUnversionedRuntimeDatabaseFailsClosedWithoutMutation() async throws {
@@ -1085,6 +1136,123 @@ final class RuntimeExecutionJobTests: XCTestCase {
             1
         )
         XCTAssertEqual(try Self.sqliteText(databaseURL: backupURL, sql: "PRAGMA quick_check"), "ok")
+    }
+
+    func testRegisteredRuntimeVersionTwoMigrationStillCreatesRecoveryManifest() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "forge-runtime-v2-registered-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let databaseURL = root.appendingPathComponent("control-plane.sqlite3")
+        let legacyJobID = UUID()
+        try Self.createRuntimeSchemaV2(
+            at: databaseURL,
+            jobID: legacyJobID,
+            projectID: ProjectID()
+        )
+        let registration = try VerifiedMigrationBackup.registerOpenDatabase(at: databaseURL)
+        defer { VerifiedMigrationBackup.unregisterOpenDatabase(registration) }
+
+        let repository = try RuntimeJobRepository(databaseURL: databaseURL)
+        let health = try await repository.health()
+        XCTAssertEqual(
+            health.schemaVersion,
+            RuntimeJobRepository.schemaVersion
+        )
+        let migratedJob = try await repository.job(legacyJobID)
+        XCTAssertNotNil(migratedJob)
+        await repository.close()
+
+        let backupURL = root.appendingPathComponent(
+            "control-plane.pre-migration-v2.sqlite3"
+        )
+        XCTAssertEqual(
+            try Self.sqliteCount(
+                databaseURL: backupURL,
+                sql: "SELECT version FROM runtime_job_schema_version WHERE singleton=1"
+            ),
+            2
+        )
+        let manifest = try JSONDecoder().decode(
+            VerifiedMigrationBackupManifest.self,
+            from: Data(
+                contentsOf: VerifiedMigrationBackup.activeManifestURL(for: databaseURL)
+            )
+        )
+        XCTAssertEqual(manifest.state, .completed)
+        XCTAssertEqual(manifest.sourceVersion, 2)
+        XCTAssertEqual(manifest.targetVersion, RuntimeJobRepository.schemaVersion)
+        XCTAssertEqual(
+            try Self.sqliteCount(
+                databaseURL: databaseURL,
+                sql: "SELECT COUNT(*) FROM forge_migration_receipts WHERE migration_id=?",
+                textBinding: manifest.migrationID
+            ),
+            1
+        )
+    }
+
+    func testCoResidentControlPlaneRuntimeBootstrapCreatesVersionZeroRecoveryManifest() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "forge-runtime-control-plane-bootstrap-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let databaseURL = root.appendingPathComponent("control-plane.sqlite3")
+        let controlPlane = try ProjectControlPlaneRepository(databaseURL: databaseURL)
+
+        let runtime = try RuntimeJobRepository(databaseURL: databaseURL)
+        let health = try await runtime.health()
+        XCTAssertEqual(health.schemaVersion, RuntimeJobRepository.schemaVersion)
+        await runtime.close()
+
+        let backupURL = root.appendingPathComponent(
+            "control-plane.pre-migration-v0.sqlite3"
+        )
+        XCTAssertEqual(
+            try Self.sqliteCount(
+                databaseURL: backupURL,
+                sql: "SELECT version FROM control_schema_version WHERE singleton=1"
+            ),
+            ProjectControlPlaneRepository.schemaVersion
+        )
+        XCTAssertEqual(
+            try Self.sqliteCount(
+                databaseURL: backupURL,
+                sql: "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='runtime_job_schema_version'"
+            ),
+            0
+        )
+        let manifest = try JSONDecoder().decode(
+            VerifiedMigrationBackupManifest.self,
+            from: Data(
+                contentsOf: VerifiedMigrationBackup.activeManifestURL(for: databaseURL)
+            )
+        )
+        XCTAssertEqual(manifest.state, .completed)
+        XCTAssertEqual(manifest.sourceVersion, 0)
+        XCTAssertEqual(manifest.targetVersion, RuntimeJobRepository.schemaVersion)
+        XCTAssertEqual(manifest.backupFilename, backupURL.lastPathComponent)
+        XCTAssertEqual(
+            try Self.sqliteCount(
+                databaseURL: databaseURL,
+                sql: "SELECT COUNT(*) FROM forge_migration_receipts WHERE migration_id=?",
+                textBinding: manifest.migrationID
+            ),
+            1
+        )
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: VerifiedMigrationBackup.archivedManifestURL(
+                    for: backupURL,
+                    targetVersion: RuntimeJobRepository.schemaVersion
+                ).path
+            )
+        )
+        await controlPlane.close()
     }
 
     func testTerminalLedgerCompactionRetainsBoundedIdempotencyReceiptAndPreventsReplay() async throws {
