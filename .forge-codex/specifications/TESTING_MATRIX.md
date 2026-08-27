@@ -53,6 +53,20 @@ Do not silently change the deployment target or drop an architecture.
 - schema migrations;
 - corruption and disk errors.
 
+### Migration pathname qualification
+
+- exercise the production `SQLITE_FCNTL_HAS_MOVED` guard with a distinct valid
+  database left at the pathname of an already open migration database;
+- prove entry-boundary substitution fails closed before backup, manifest,
+  schema, or receipt side effects and preserves both database payloads;
+- prove pre-COMMIT substitution rolls back authoritative schema and receipt
+  changes while retaining the prepared backup and manifest needed for recovery;
+- record the current VFS result for an A-to-B-to-A restoration cycle and,
+  regardless of that result, do not treat sequential checks as qualification
+  against hostile same-user namespace substitution or direct file mutation;
+- do not broaden the trust claim without a custom VFS that pins the
+  main/WAL/journal family and/or an independent privilege boundary.
+
 ### Continuity
 
 - context policy;

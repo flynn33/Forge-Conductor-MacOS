@@ -31,6 +31,7 @@ MIGRATION_FIXTURE_TESTS = {
     ),
     "global-sqlite-v2-to-v5": (
         "testVersionTwoStoreMigratesPopulatedDataReopensAndRerunsIdempotently",
+        "testSQLiteStorePreCommitGuardRejectsAtomicPathReplacementAndRollsBackMigration",
         "testRestoredChangedSQLiteSourceCreatesBoundedSecondMigrationLineage",
         "testSQLiteMigrationPromotesArchivedCompletionAfterPreparedManifestCrash",
     ),
@@ -42,6 +43,7 @@ MIGRATION_FIXTURE_TESTS = {
     ),
     "project-memory-v1-to-v2": (
         "testVersionOneDatabaseMigratesPopulatedDataReopensAndRerunsIdempotently",
+        "testVersionOneMigrationRejectsStablePathReplacementBeforeCommit",
         "testConcurrentInitializersSerializeVersionOneMigration",
     ),
     "legacy-continuity-v1-import": (
@@ -62,6 +64,7 @@ MIGRATION_FIXTURE_TESTS = {
     ),
     "runtime-job-v2-to-v5": (
         "testSchemaV2MigratesForwardWithProcessIdentityAndIdempotencyReceiptStorage",
+        "testRuntimeVersionTwoMigrationRejectsStablePathReplacementBeforeCommit",
         "testConcurrentInitializersSerializeVersionTwoMigration",
         "testRegisteredRuntimeVersionTwoMigrationStillCreatesRecoveryManifest",
     ),
@@ -77,11 +80,29 @@ MIGRATION_SAFEGUARD_TESTS = (
     "testSQLiteStoreDoesNotRecreateMissingSourceOwnedByManifest",
     "testSQLiteStoreRejectsSourceChangedAfterPreparedBackup",
     "testSQLiteStoreRejectsUnrelatedTargetWithoutMigrationReceipt",
+    "testSQLiteMainFileMovedGuardRejectsStablePathnameReplacement",
+    "testPrepareSQLiteMigrationRejectsMovedMainFileBeforeArtifacts",
     "testMigrationArtifactsRejectFIFOsWithoutBlockingAndRecoverStaleTemporaryFile",
     "testVerifiedMigrationManifestRejectsTamperedBackupAndLinkedManifest",
     "testVerifiedMigrationBackupEnforcesBoundsAndRejectsLinkedArtifacts",
     "testVerifiedMigrationLockIsBoundedAndOwnerOnly",
 )
+MIGRATION_PLATFORM_OBSERVATION_TESTS = (
+    "testSQLiteMainFileMovedGuardRecordsRestoredPathCycleWithoutTrustClaim",
+)
+RESTORED_PATH_OBSERVATION_PREFIX = "FORGE_SQLITE_RESTORED_PATH_OBSERVATION="
+RESTORED_PATH_OBSERVATION_VALUES = {
+    "accepted_after_restore",
+    "failed_closed_after_restore",
+}
+EXPECTED_PATHNAME_EXCLUSIONS = {
+    "hostile_same_user_between_check_namespace_substitution",
+    "hostile_same_user_direct_database_family_mutation",
+}
+EXPECTED_PATHNAME_BOUNDARY_REQUIREMENTS = {
+    "custom_sqlite_vfs_for_database_family_identity",
+    "independent_privilege_boundary_for_direct_mutation",
+}
 failures: list[str] = []
 
 
@@ -318,6 +339,50 @@ for configuration, output in strict_outputs.items():
             f"{test_name}]' passed" in output,
             f"{configuration} strict suite has no passing migration safeguard: {test_name}",
         )
+    for test_name in MIGRATION_PLATFORM_OBSERVATION_TESTS:
+        check(
+            f"{test_name}]' passed" in output,
+            f"{configuration} strict suite has no passing migration platform observation: {test_name}",
+        )
+restored_path_observations: dict[str, str | None] = {}
+for configuration, output in strict_outputs.items():
+    matches = {
+        value
+        for value in RESTORED_PATH_OBSERVATION_VALUES
+        if f"{RESTORED_PATH_OBSERVATION_PREFIX}{value}" in output
+    }
+    check(
+        len(matches) == 1,
+        f"{configuration} strict suite has no unambiguous restored-path observation",
+    )
+    restored_path_observations[configuration] = next(iter(matches), None)
+pathname_boundary = migration.get("pathname_trust_boundary", {})
+check(
+    pathname_boundary.get("status") == "qualified",
+    "migration pathname trust boundary is not qualified",
+)
+check(
+    pathname_boundary.get("stable_replacement") == "fails_closed",
+    "stable SQLite pathname replacement is not fail-closed",
+)
+check(
+    pathname_boundary.get("precommit_transaction")
+    == "rolls_back_schema_and_receipts_with_prepared_recovery_artifacts_retained",
+    "pre-COMMIT pathname replacement disposition is incomplete",
+)
+check(
+    pathname_boundary.get("platform_observations") == restored_path_observations,
+    "migration pathname platform observations do not match strict-suite output",
+)
+check(
+    set(pathname_boundary.get("excluded_threats", [])) == EXPECTED_PATHNAME_EXCLUSIONS,
+    "migration pathname trust-boundary exclusions are incomplete or changed",
+)
+check(
+    set(pathname_boundary.get("requirements_to_broaden", []))
+    == EXPECTED_PATHNAME_BOUNDARY_REQUIREMENTS,
+    "migration pathname trust-boundary requirements are incomplete or changed",
+)
 check(migration.get("backup_qualification", {}).get("status") == "passed", "migration backup qualification is not passed")
 check(migration.get("remaining_requirements") == [], "migration report has remaining requirements")
 if migration.get("status") == "passed":

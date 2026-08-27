@@ -964,6 +964,11 @@ public enum VerifiedMigrationBackup {
                 "SQLite source backup requires an active write transaction"
             )
         }
+        try requireSQLiteMainFileUnmoved(
+            database: database,
+            sourceURL: sourceURL,
+            purpose: "migration backup writer entry"
+        )
         var reader: OpaquePointer?
         let opened = sqlite3_open_v2(
             sourceURL.path,
@@ -979,12 +984,32 @@ public enum VerifiedMigrationBackup {
         }
         defer { sqlite3_close(reader) }
         sqlite3_busy_timeout(reader, 5_000)
+        try requireSQLiteMainFileUnmoved(
+            database: database,
+            sourceURL: sourceURL,
+            purpose: "migration backup reader open"
+        )
+        try requireSQLiteMainFileUnmoved(
+            database: reader,
+            sourceURL: sourceURL,
+            purpose: "migration backup reader open"
+        )
         let backup = try snapshotSQLite(
             database: reader,
             to: backupURL,
             expectedVersion: sourceVersion,
             versionQuery: versionQuery,
             allowAlternateLineages: true
+        )
+        try requireSQLiteMainFileUnmoved(
+            database: reader,
+            sourceURL: sourceURL,
+            purpose: "migration backup snapshot completion"
+        )
+        try requireSQLiteMainFileUnmoved(
+            database: database,
+            sourceURL: sourceURL,
+            purpose: "migration backup snapshot completion"
         )
         return try prepareMigrationManifest(
             sourceURL: sourceURL,
@@ -993,6 +1018,59 @@ public enum VerifiedMigrationBackup {
             targetVersion: targetVersion,
             storageKind: .sqlite
         )
+    }
+
+    /// Fails closed when an open SQLite connection no longer owns the main file currently
+    /// reachable through its expected pathname. Call this at narrow durable-write boundaries.
+    static func requireSQLiteMainFileUnmoved(
+        database: OpaquePointer,
+        sourceURL: URL,
+        purpose: String
+    ) throws {
+        let normalizedPurpose = purpose.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard sourceURL.isFileURL,
+              !normalizedPurpose.isEmpty,
+              normalizedPurpose.utf8.count <= 256 else {
+            throw VerifiedMigrationBackupError.invalidSource(
+                "SQLite main-file movement check arguments are invalid"
+            )
+        }
+        guard let filename = sqlite3_db_filename(database, "main"), filename.pointee != 0 else {
+            throw VerifiedMigrationBackupError.reconciliationFailed(
+                "SQLite main database filename is unavailable during \(normalizedPurpose)"
+            )
+        }
+        let connectedURL = URL(fileURLWithPath: String(cString: filename))
+        let connectedPath = connectedURL.standardizedFileURL.resolvingSymlinksInPath().path
+        let expectedPath = sourceURL.standardizedFileURL.resolvingSymlinksInPath().path
+        guard connectedPath == expectedPath else {
+            throw VerifiedMigrationBackupError.reconciliationFailed(
+                "SQLite main database path differs from the expected source during "
+                    + normalizedPurpose
+            )
+        }
+
+        let identityBefore = try sqliteFileIdentity(at: sourceURL)
+        var hasMoved: Int32 = 0
+        let controlResult = sqlite3_file_control(
+            database,
+            "main",
+            SQLITE_FCNTL_HAS_MOVED,
+            &hasMoved
+        )
+        guard controlResult == SQLITE_OK else {
+            throw VerifiedMigrationBackupError.reconciliationFailed(
+                "SQLite main file moved or was replaced, or its identity could not be verified "
+                    + "during \(normalizedPurpose) "
+                    + "with result \(controlResult)"
+            )
+        }
+        let identityAfter = try sqliteFileIdentity(at: sourceURL)
+        guard hasMoved == 0, identityBefore == identityAfter else {
+            throw VerifiedMigrationBackupError.reconciliationFailed(
+                "SQLite main file moved or was replaced during \(normalizedPurpose)"
+            )
+        }
     }
 
     /// Writes the lineage marker in the same SQLite transaction as the target schema version.

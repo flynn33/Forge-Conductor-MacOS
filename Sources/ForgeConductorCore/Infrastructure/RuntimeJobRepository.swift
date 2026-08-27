@@ -185,6 +185,20 @@ public actor RuntimeJobRepository {
         clock: any Clock = SystemClock(),
         busyTimeoutMilliseconds: Int = 5_000
     ) throws {
+        try self.init(
+            databaseURL: databaseURL,
+            clock: clock,
+            busyTimeoutMilliseconds: busyTimeoutMilliseconds,
+            beforeMigrationCommitObserver: nil
+        )
+    }
+
+    init(
+        databaseURL: URL,
+        clock: any Clock = SystemClock(),
+        busyTimeoutMilliseconds: Int = 5_000,
+        beforeMigrationCommitObserver: (@Sendable () throws -> Void)?
+    ) throws {
         guard (1...30_000).contains(busyTimeoutMilliseconds) else {
             throw RuntimeJobError.storageFailure("busy timeout must be between 1 and 30000 milliseconds")
         }
@@ -199,7 +213,8 @@ public actor RuntimeJobRepository {
         let opened = try Self.openAndMigrate(
             databaseURL: standardizedDatabaseURL,
             busyTimeoutMilliseconds: busyTimeoutMilliseconds,
-            timestamp: ISO8601.string(from: clock.now())
+            timestamp: ISO8601.string(from: clock.now()),
+            beforeMigrationCommitObserver: beforeMigrationCommitObserver
         )
         do {
             openRegistration = try VerifiedMigrationBackup.registerOpenDatabase(
@@ -1350,7 +1365,8 @@ public actor RuntimeJobRepository {
     private static func openAndMigrate(
         databaseURL: URL,
         busyTimeoutMilliseconds: Int,
-        timestamp: String
+        timestamp: String,
+        beforeMigrationCommitObserver: (@Sendable () throws -> Void)?
     ) throws -> OpaquePointer {
         var migrationManifest: VerifiedMigrationBackupManifest?
         return try VerifiedMigrationBackup.withMigrationLock(
@@ -1413,7 +1429,8 @@ public actor RuntimeJobRepository {
                 databaseURL: databaseURL,
                 busyTimeoutMilliseconds: busyTimeoutMilliseconds,
                 timestamp: timestamp,
-                migrationManifest: migrationManifest
+                migrationManifest: migrationManifest,
+                beforeMigrationCommitObserver: beforeMigrationCommitObserver
             )
         }
     }
@@ -1422,7 +1439,8 @@ public actor RuntimeJobRepository {
         databaseURL: URL,
         busyTimeoutMilliseconds: Int,
         timestamp: String,
-        migrationManifest initialManifest: VerifiedMigrationBackupManifest?
+        migrationManifest initialManifest: VerifiedMigrationBackupManifest?,
+        beforeMigrationCommitObserver: (@Sendable () throws -> Void)?
     ) throws -> OpaquePointer {
         var connection: OpaquePointer?
         let flags = SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
@@ -1638,6 +1656,14 @@ public actor RuntimeJobRepository {
                 let integrity = try rawScalarText("PRAGMA quick_check", database: connection) ?? "missing"
                 guard integrity.lowercased() == "ok" else {
                     throw RuntimeJobError.storageFailure("SQLite quick check failed: \(integrity)")
+                }
+                if needsDurableCompletion {
+                    try beforeMigrationCommitObserver?()
+                    try VerifiedMigrationBackup.requireSQLiteMainFileUnmoved(
+                        database: connection,
+                        sourceURL: databaseURL,
+                        purpose: "runtime job migration commit"
+                    )
                 }
                 try rawExecute("COMMIT", database: connection)
             } catch {

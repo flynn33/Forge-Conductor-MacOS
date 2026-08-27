@@ -34,6 +34,7 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
     private var countedAsOpen = false
     public let path: URL
     private let clock: any Clock
+    private let beforeMigrationCommitObserver: (@Sendable () throws -> Void)?
     private let postMigrationCommitObserver: (
         @Sendable (VerifiedMigrationBackupManifest) throws -> Void
     )?
@@ -45,6 +46,7 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
         try self.init(
             path: path,
             clock: clock,
+            beforeMigrationCommitObserver: nil,
             postMigrationCommitObserver: nil
         )
     }
@@ -52,12 +54,14 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
     init(
         path: URL,
         clock: any Clock = SystemClock(),
+        beforeMigrationCommitObserver: (@Sendable () throws -> Void)? = nil,
         postMigrationCommitObserver: (
             @Sendable (VerifiedMigrationBackupManifest) throws -> Void
         )?
     ) throws {
         self.path = path
         self.clock = clock
+        self.beforeMigrationCommitObserver = beforeMigrationCommitObserver
         self.postMigrationCommitObserver = postMigrationCommitObserver
         try FileManager.default.createDirectory(
             at: path.deletingLastPathComponent(),
@@ -242,6 +246,14 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
                     database: db,
                     sourceURL: path,
                     manifest: migrationManifest
+                )
+            }
+            if needsDurableCompletion {
+                try beforeMigrationCommitObserver?()
+                try VerifiedMigrationBackup.requireSQLiteMainFileUnmoved(
+                    database: db,
+                    sourceURL: path,
+                    purpose: "SQLite store migration commit"
                 )
             }
             try execUnlocked("COMMIT;")
