@@ -2,27 +2,27 @@
   "schema_version": 2,
   "phase": "P10",
   "status": "incomplete",
-  "generated_at": "2026-08-27T16:19:12Z",
+  "generated_at": "2026-08-27T17:23:17Z",
   "tested_tree": {
-    "head": "283b38a7b671dfcc1337104ff14eac9288aa28a3",
+    "head": "3a13dceb034ca36ad6aa56d2fbe8cfa5e8531a7c",
     "working_tree": true
   },
   "source_manifest": {
-    "bytes": 8023721,
+    "bytes": 8112698,
     "file_count": 234,
     "schema_version": 1,
-    "sha256": "6fb4a5445c13a49e1c6c54240eecf4dec110022cfbbcbfd8479f087567a5f11b"
+    "sha256": "efcfeb6512f07dc42ee4fd33b0893febaae342a3690207739ec091f5292e10fc"
   },
   "strict_suites": {
     "debug": {
-      "evidence_id": "EVID-20260827T161138Z-6e4e0134f8",
-      "executed": 477,
+      "evidence_id": "EVID-20260827T171828Z-ee74ab54ac",
+      "executed": 484,
       "skipped": 4,
       "failures": 0
     },
     "release": {
-      "evidence_id": "EVID-20260827T161328Z-2a835789ec",
-      "executed": 477,
+      "evidence_id": "EVID-20260827T172012Z-a901c12095",
+      "executed": 484,
       "skipped": 4,
       "failures": 0
     }
@@ -41,8 +41,8 @@
         "idempotent concurrent rerun"
       ],
       "evidence_ids": [
-        "EVID-20260827T161138Z-6e4e0134f8",
-        "EVID-20260827T161328Z-2a835789ec"
+        "EVID-20260827T171828Z-ee74ab54ac",
+        "EVID-20260827T172012Z-a901c12095"
       ]
     },
     {
@@ -60,8 +60,8 @@
         "idempotent rerun"
       ],
       "evidence_ids": [
-        "EVID-20260827T161138Z-6e4e0134f8",
-        "EVID-20260827T161328Z-2a835789ec"
+        "EVID-20260827T171828Z-ee74ab54ac",
+        "EVID-20260827T172012Z-a901c12095"
       ]
     },
     {
@@ -76,12 +76,14 @@
         "real child-process SIGKILL after durable preparation",
         "kernel interprocess lock exclusion and release after process death",
         "prepared manifest recovery with exact receipt and matching active and archived completion",
+        "real child-process SIGKILL after schema and receipt COMMIT but before manifest completion",
+        "post-COMMIT restart preserves the exact handoff, receipt, backup, lineage, and manifest identity",
         "close and reopen",
         "idempotent rerun"
       ],
       "evidence_ids": [
-        "EVID-20260827T161138Z-6e4e0134f8",
-        "EVID-20260827T161328Z-2a835789ec"
+        "EVID-20260827T171828Z-ee74ab54ac",
+        "EVID-20260827T172012Z-a901c12095"
       ]
     },
     {
@@ -98,44 +100,50 @@
         "idempotent rerun"
       ],
       "evidence_ids": [
-        "EVID-20260827T161138Z-6e4e0134f8",
-        "EVID-20260827T161328Z-2a835789ec"
+        "EVID-20260827T171828Z-ee74ab54ac",
+        "EVID-20260827T172012Z-a901c12095"
       ]
     },
     {
       "id": "legacy-continuity-v1-import",
       "source_format": "legacy continuity v1 JSON",
       "target_version": 2,
-      "status": "passed_with_open_receipt_recovery",
+      "status": "passed",
       "proof": [
         "exact-project import",
         "ambiguous-record quarantine",
         "source bytes preserved",
+        "bounded canonical classification before mutation",
+        "import, quarantine, per-candidate outcome ledger, exact counts, and receipt commit atomically",
+        "receipt-insert failure rolls back every authoritative side effect",
+        "derived quarantine projection is repaired exactly on replay",
+        "concurrent identical migration converges on one unsplit receipt",
+        "aliased filenames share one verified imported row across restart",
+        "malformed exact rows and tampered outcome, count, hash, or ledger fields fail closed",
+        "verified legacy receipt details upgrade transactionally to schema v2",
         "completed replay is idempotent"
       ],
       "evidence_ids": [
-        "EVID-20260827T161138Z-6e4e0134f8",
-        "EVID-20260827T161328Z-2a835789ec",
-        "EVID-20260827T114018Z-bf8c321d41"
-      ],
-      "open_requirement": "atomically journal or reconcile a crash between imported side effects and the durable migration receipt"
+        "EVID-20260827T171828Z-ee74ab54ac",
+        "EVID-20260827T172012Z-a901c12095"
+      ]
     },
     {
       "id": "legacy-continuity-v2-import",
       "source_format": "legacy continuity v2 JSON",
       "target_version": 2,
-      "status": "passed_with_open_receipt_recovery",
+      "status": "passed",
       "proof": [
         "binding preserved across restart",
         "source bytes preserved",
+        "atomic side effects and schema-v2 per-candidate receipt outcomes",
+        "verified legacy receipt details upgrade transactionally",
         "completed replay is idempotent"
       ],
       "evidence_ids": [
-        "EVID-20260827T161138Z-6e4e0134f8",
-        "EVID-20260827T161328Z-2a835789ec",
-        "EVID-20260827T114018Z-bf8c321d41"
-      ],
-      "open_requirement": "atomically journal or reconcile a crash between imported side effects and the durable migration receipt"
+        "EVID-20260827T171828Z-ee74ab54ac",
+        "EVID-20260827T172012Z-a901c12095"
+      ]
     },
     {
       "id": "native-ledger-v1-to-v2",
@@ -152,8 +160,8 @@
         "idempotent rerun"
       ],
       "evidence_ids": [
-        "EVID-20260827T161138Z-6e4e0134f8",
-        "EVID-20260827T161328Z-2a835789ec"
+        "EVID-20260827T171828Z-ee74ab54ac",
+        "EVID-20260827T172012Z-a901c12095"
       ]
     },
     {
@@ -171,8 +179,8 @@
         "idempotent rerun"
       ],
       "evidence_ids": [
-        "EVID-20260827T161138Z-6e4e0134f8",
-        "EVID-20260827T161328Z-2a835789ec"
+        "EVID-20260827T171828Z-ee74ab54ac",
+        "EVID-20260827T172012Z-a901c12095"
       ]
     }
   ],
@@ -182,7 +190,7 @@
       "disposition": "not_applicable",
       "reason": "the control-plane repository was introduced at schema v2 and has no shipped v1 fixture",
       "current_behavior": "fresh empty version 0 and exact current version 2 are accepted; fictional v1 and nonempty unversioned databases fail closed without mutation",
-      "evidence_id": "EVID-20260827T161138Z-6e4e0134f8"
+      "evidence_id": "EVID-20260827T171828Z-ee74ab54ac"
     }
   ],
   "backup_qualification": {
@@ -196,17 +204,15 @@
       "SQLite receipts are committed with the target schema transaction",
       "restored changed sources use four bounded immutable recovery lineages",
       "a real child-process SIGKILL proves prepared-manifest recovery and kernel lock release",
+      "a second real child-process SIGKILL proves committed-schema and receipt recovery before manifest completion",
       "completed archive promotion repairs an interrupted active manifest while preserving later writes",
       "project-memory, runtime, and native-ledger migrations use bounded process and interprocess initialization locks"
     ],
     "remaining": [
-      "exercise the distinct post-COMMIT and pre-completion-manifest process-death boundary",
       "close or explicitly exclude the same-owner SQLite pathname replacement race from the production trust boundary"
     ]
   },
   "remaining_requirements": [
-    "close the legacy continuity crash window between side effects and receipt persistence",
-    "complete the distinct post-COMMIT and pre-completion-manifest abrupt-process proof",
     "resolve or explicitly scope the same-owner SQLite pathname replacement qualification gap",
     "rerun exact-revision evidence after the checkpoint commit"
   ]

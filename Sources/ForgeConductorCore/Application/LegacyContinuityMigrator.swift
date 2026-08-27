@@ -30,167 +30,195 @@ public final class LegacyContinuityMigrator: @unchecked Sendable {
                 .keys.sorted().prefix(Self.maximumCandidateCount)
                 .map { URL(fileURLWithPath: $0) }
         )
-        var imported = 0
-        var skipped = max(0, candidateFiles.count - candidates.count)
-        var quarantined = 0
-        var importedHashes: [String] = []
-        var quarantineHashes: [String] = []
-        var candidateIdentities: [[String: Any]] = []
+        var candidateIdentities: [LegacyContinuityCandidateIdentity] = []
+        var actions: [LegacyContinuityMigrationAction] = []
+        candidateIdentities.reserveCapacity(candidates.count)
+        actions.reserveCapacity(candidates.count)
 
         for candidate in candidates {
-            var candidateIdentity: [String: Any] = [
-                "path_sha256": JSONSupport.sha256Hex(candidate.path),
-                "content_state": "unreadable_or_invalid",
-            ]
-            defer { candidateIdentities.append(candidateIdentity) }
+            var candidateIdentity = LegacyContinuityCandidateIdentity(
+                pathSHA256: JSONSupport.sha256Hex(candidate.path),
+                contentState: "unreadable_or_invalid",
+                sourceSHA256: nil
+            )
+            let action: LegacyContinuityMigrationAction
             do {
-                let values = try candidate.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
-                guard values.isRegularFile == true else {
-                    candidateIdentity["content_state"] = "not_regular"
-                    skipped += 1
-                    continue
-                }
-                guard let fileSize = values.fileSize,
-                      fileSize > 0,
-                      fileSize <= ContinuityHandoffV2.maximumEncodedBytes else {
-                    candidateIdentity["content_state"] = "empty_or_oversized"
-                    throw ProjectMemoryError.payloadTooLarge("legacy continuity file is empty or oversized")
-                }
-                let data = try Data(contentsOf: candidate, options: [.mappedIfSafe])
-                let sourceSHA256 = JSONSupport.sha256Hex(data)
-                candidateIdentity["content_state"] = "read"
-                candidateIdentity["source_sha256"] = sourceSHA256
-                let object = try JSONSupport.object(from: data)
-                let sanitized: [String: Any]
-                do {
-                    sanitized = try sanitize(object)
-                } catch {
-                    let envelope: [String: Any] = [
-                        "schema_version": "legacy-quarantine-1",
-                        "source_sha256": sourceSHA256,
-                        "reason": "sensitive content could not be safely retained",
-                    ]
-                    _ = try repository.continuityQuarantineLegacy(
-                        payload: envelope,
-                        sourcePath: candidate.path,
-                        reason: "sensitive legacy payload"
-                    )
-                    quarantined += 1
-                    quarantineHashes.append(sourceSHA256)
-                    continue
-                }
-                guard try JSONSupport.canonicalJSON(sanitized) == JSONSupport.canonicalJSON(object) else {
-                    _ = try repository.continuityQuarantineLegacy(
-                        payload: sanitized,
-                        sourcePath: candidate.path,
-                        reason: "legacy payload required redaction"
-                    )
-                    quarantined += 1
-                    quarantineHashes.append(sourceSHA256)
-                    continue
-                }
-
-                if let handoff = ContinuityHandoffV2.fromDictionary(object) {
-                    guard handoff.projectID == repository.projectID,
-                          handoff.projectGeneration == expectedProjectGeneration,
-                          let boundRunID,
-                          handoff.runID == boundRunID else {
-                        _ = try repository.continuityQuarantineLegacy(
-                            payload: object,
-                            sourcePath: candidate.path,
-                            reason: "V2 legacy location lacks an exact current project/run binding"
-                        )
-                        quarantined += 1
-                        quarantineHashes.append(sourceSHA256)
-                        continue
-                    }
-                    let didImport = try repository.continuityImportLegacyReadOnly(
-                        payload: handoff.asDictionary(),
-                        handoffID: handoff.handoffID,
-                        operationID: handoff.operationID,
-                        schemaVersion: ContinuityHandoffV2.schemaVersion,
-                        contentSHA256: handoff.contentSHA256,
-                        createdAt: handoff.createdAt,
-                        projectGeneration: expectedProjectGeneration,
-                        runID: boundRunID,
-                        predecessorProviderResponseID: handoff.predecessorSession["provider_response_id"] as? String,
-                        bootstrapNonce: handoff.bootstrapNonce,
-                        sourceRecordID: candidate.lastPathComponent
-                    )
-                    if didImport { imported += 1; importedHashes.append(sourceSHA256) }
-                    else { skipped += 1 }
-                    continue
-                }
-
-                if let handoff = ContinuityHandoff.fromDictionary(object),
-                   handoff.project["project_id"] as? String == repository.projectID,
-                   handoff.redactionComplete,
-                   handoff.contentSHA256 == handoff.calculatedSHA256() {
-                    let didImport = try repository.continuityImportLegacyReadOnly(
-                        payload: handoff.asDictionary(),
-                        handoffID: handoff.handoffID,
-                        operationID: handoff.operationID,
-                        schemaVersion: ContinuityHandoff.schemaVersion,
-                        contentSHA256: handoff.contentSHA256,
-                        createdAt: handoff.createdAt,
-                        projectGeneration: nil,
-                        runID: nil,
-                        predecessorProviderResponseID: nil,
-                        bootstrapNonce: nil,
-                        sourceRecordID: candidate.lastPathComponent
-                    )
-                    if didImport { imported += 1; importedHashes.append(sourceSHA256) }
-                    else { skipped += 1 }
-                    continue
-                }
-
-                _ = try repository.continuityQuarantineLegacy(
-                    payload: object,
-                    sourcePath: candidate.path,
-                    reason: "legacy project identity or integrity is ambiguous"
+                action = try classify(
+                    candidate,
+                    expectedProjectGeneration: expectedProjectGeneration,
+                    boundRunID: boundRunID,
+                    identity: &candidateIdentity
                 )
-                quarantined += 1
-                quarantineHashes.append(sourceSHA256)
             } catch {
                 let envelope: [String: Any] = [
                     "schema_version": "legacy-quarantine-1",
                     "source_name": candidate.lastPathComponent,
                     "reason": String(error.localizedDescription.prefix(1_024)),
                 ]
-                _ = try repository.continuityQuarantineLegacy(
-                    payload: envelope,
-                    sourcePath: candidate.path,
-                    reason: "legacy candidate could not be validated"
+                action = .quarantine(
+                    try LegacyContinuityQuarantineWrite(
+                        payload: envelope,
+                        sourcePath: candidate.path,
+                        reason: "legacy candidate could not be validated",
+                        receiptSourceSHA256: nil
+                    )
                 )
-                quarantined += 1
             }
+            candidateIdentities.append(candidateIdentity)
+            actions.append(action)
         }
 
-        let receiptFingerprint = JSONSupport.sha256Hex(
-            try JSONSupport.canonicalJSON([
-                "schema_version": 1,
-                "project_id": repository.projectID,
-                "expected_project_generation": Int64(expectedProjectGeneration),
-                "bound_run_id": boundRunID ?? NSNull(),
-                "submitted_candidate_count": candidateFiles.count,
-                "selected_candidates": candidateIdentities,
-            ])
-        )
-
-        return try repository.continuityRecordLegacyMigration(
-            importedCount: imported,
-            skippedCount: skipped,
-            quarantinedCount: quarantined,
+        let batch = try LegacyContinuityMigrationBatch(
             startedAt: startedAt,
-            migrationFingerprintSHA256: receiptFingerprint,
-            details: [
-                "candidate_count": candidates.count,
-                "imported_source_sha256": Array(importedHashes.prefix(Self.maximumCandidateCount)),
-                "quarantined_source_sha256": Array(quarantineHashes.prefix(Self.maximumCandidateCount)),
-                "migration_fingerprint_sha256": receiptFingerprint,
-                "global_latest_used_as_authority": false,
-            ]
+            submittedCandidateCount: candidateFiles.count,
+            expectedProjectGeneration: expectedProjectGeneration,
+            boundRunID: boundRunID,
+            identities: candidateIdentities,
+            actions: actions
         )
+        return try repository.continuityApplyLegacyMigration(batch)
+    }
+
+    private func classify(
+        _ candidate: URL,
+        expectedProjectGeneration: UInt64,
+        boundRunID: String?,
+        identity: inout LegacyContinuityCandidateIdentity
+    ) throws -> LegacyContinuityMigrationAction {
+        let values = try candidate.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+        guard values.isRegularFile == true else {
+            identity.contentState = "not_regular"
+            return .skip
+        }
+        guard let fileSize = values.fileSize,
+              fileSize > 0,
+              fileSize <= ContinuityHandoffV2.maximumEncodedBytes else {
+            identity.contentState = "empty_or_oversized"
+            throw ProjectMemoryError.payloadTooLarge(
+                "legacy continuity file is empty or oversized"
+            )
+        }
+        let data = try boundedCandidateData(candidate)
+        guard !data.isEmpty, data.count <= ContinuityHandoffV2.maximumEncodedBytes else {
+            identity.contentState = "empty_or_oversized"
+            throw ProjectMemoryError.payloadTooLarge(
+                "legacy continuity file is empty or oversized"
+            )
+        }
+        let sourceSHA256 = JSONSupport.sha256Hex(data)
+        identity.contentState = "read"
+        identity.sourceSHA256 = sourceSHA256
+        let object = try JSONSupport.object(from: data)
+        let sanitized: [String: Any]
+        do {
+            sanitized = try sanitize(object)
+        } catch {
+            return .quarantine(
+                try LegacyContinuityQuarantineWrite(
+                    payload: [
+                        "schema_version": "legacy-quarantine-1",
+                        "source_sha256": sourceSHA256,
+                        "reason": "sensitive content could not be safely retained",
+                    ],
+                    sourcePath: candidate.path,
+                    reason: "sensitive legacy payload",
+                    receiptSourceSHA256: sourceSHA256
+                )
+            )
+        }
+        guard try JSONSupport.canonicalJSON(sanitized) == JSONSupport.canonicalJSON(object) else {
+            return .quarantine(
+                try LegacyContinuityQuarantineWrite(
+                    payload: sanitized,
+                    sourcePath: candidate.path,
+                    reason: "legacy payload required redaction",
+                    receiptSourceSHA256: sourceSHA256
+                )
+            )
+        }
+
+        if let handoff = ContinuityHandoffV2.fromDictionary(object) {
+            guard handoff.projectID == repository.projectID,
+                  handoff.projectGeneration == expectedProjectGeneration,
+                  let boundRunID,
+                  handoff.runID == boundRunID else {
+                return .quarantine(
+                    try LegacyContinuityQuarantineWrite(
+                        payload: object,
+                        sourcePath: candidate.path,
+                        reason: "V2 legacy location lacks an exact current project/run binding",
+                        receiptSourceSHA256: sourceSHA256
+                    )
+                )
+            }
+            return .importReadOnly(
+                try LegacyContinuityImportWrite(
+                    payload: handoff.asDictionary(),
+                    handoffID: handoff.handoffID,
+                    operationID: handoff.operationID,
+                    schemaVersion: ContinuityHandoffV2.schemaVersion,
+                    contentSHA256: handoff.contentSHA256,
+                    createdAt: handoff.createdAt,
+                    projectGeneration: expectedProjectGeneration,
+                    runID: boundRunID,
+                    predecessorProviderResponseID: handoff.predecessorSession[
+                        "provider_response_id"
+                    ] as? String,
+                    bootstrapNonce: handoff.bootstrapNonce,
+                    sourceRecordID: candidate.lastPathComponent,
+                    sourcePath: candidate.path,
+                    receiptSourceSHA256: sourceSHA256
+                )
+            )
+        }
+
+        if let handoff = ContinuityHandoff.fromDictionary(object),
+           handoff.project["project_id"] as? String == repository.projectID,
+           handoff.redactionComplete,
+           handoff.contentSHA256 == handoff.calculatedSHA256() {
+            return .importReadOnly(
+                try LegacyContinuityImportWrite(
+                    payload: handoff.asDictionary(),
+                    handoffID: handoff.handoffID,
+                    operationID: handoff.operationID,
+                    schemaVersion: ContinuityHandoff.schemaVersion,
+                    contentSHA256: handoff.contentSHA256,
+                    createdAt: handoff.createdAt,
+                    projectGeneration: nil,
+                    runID: nil,
+                    predecessorProviderResponseID: nil,
+                    bootstrapNonce: nil,
+                    sourceRecordID: candidate.lastPathComponent,
+                    sourcePath: candidate.path,
+                    receiptSourceSHA256: sourceSHA256
+                )
+            )
+        }
+
+        return .quarantine(
+            try LegacyContinuityQuarantineWrite(
+                payload: object,
+                sourcePath: candidate.path,
+                reason: "legacy project identity or integrity is ambiguous",
+                receiptSourceSHA256: sourceSHA256
+            )
+        )
+    }
+
+    private func boundedCandidateData(_ candidate: URL) throws -> Data {
+        let handle = try FileHandle(forReadingFrom: candidate)
+        defer { try? handle.close() }
+        let maximum = ContinuityHandoffV2.maximumEncodedBytes
+        var result = Data()
+        result.reserveCapacity(min(maximum + 1, 16 * 1_024))
+        while result.count <= maximum {
+            let remaining = maximum + 1 - result.count
+            guard let chunk = try handle.read(upToCount: remaining), !chunk.isEmpty else {
+                break
+            }
+            result.append(chunk)
+        }
+        return result
     }
 
     private func sanitize(_ object: [String: Any]) throws -> [String: Any] {

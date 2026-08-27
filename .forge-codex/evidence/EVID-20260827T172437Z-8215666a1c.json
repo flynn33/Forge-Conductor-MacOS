@@ -1,0 +1,55 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 632,
+      "path": ".forge-codex/evidence/EVID-20260827T172437Z-8215666a1c.stdout.txt",
+      "sha256": "8c3aa0f326a08bf4740828aaaaacbd5846d9e71b529310878d192b9db2c6b72e",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260827T172437Z-8215666a1c.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "command": "env FORGE_SKIP_PS=1 swift build -c release -Xswiftc -warnings-as-errors",
+  "ended_at": "2026-08-27T17:25:33.145854+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260827T172437Z-8215666a1c",
+  "kind": "p10-release-build",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [
+    "FC-MIGRATION-MATRIX-001"
+  ],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 8112698,
+    "file_count": 234,
+    "schema_version": 1,
+    "sha256": "efcfeb6512f07dc42ee4fd33b0893febaae342a3690207739ec091f5292e10fc"
+  },
+  "source_manifest_after": {
+    "bytes": 8112698,
+    "file_count": 234,
+    "schema_version": 1,
+    "sha256": "efcfeb6512f07dc42ee4fd33b0893febaae342a3690207739ec091f5292e10fc"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-27T17:24:37.058427+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

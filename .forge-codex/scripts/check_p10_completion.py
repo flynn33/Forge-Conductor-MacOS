@@ -38,6 +38,7 @@ MIGRATION_FIXTURE_TESTS = {
         "testVersionThreeStoreMigratesWithoutLosingHandoff",
         "testConcurrentVersionThreeMigrationIsIdempotent",
         "testSQLitePreparedMigrationRecoversAfterSIGKILLAndReleasesInterprocessLock",
+        "testSQLiteCommittedMigrationRecoversAfterSIGKILLBeforeManifestCompletion",
     ),
     "project-memory-v1-to-v2": (
         "testVersionOneDatabaseMigratesPopulatedDataReopensAndRerunsIdempotently",
@@ -45,6 +46,12 @@ MIGRATION_FIXTURE_TESTS = {
     ),
     "legacy-continuity-v1-import": (
         "testLegacyMigrationImportsExactProjectReadOnlyAndQuarantinesAmbiguous",
+        "testLegacyMigrationReceiptFailureRollsBackSideEffectsAndReplayRepairsProjection",
+        "testConcurrentIdenticalLegacyMigrationsCommitOneUnsplittableReceipt",
+        "testLegacyMigrationAliasesOnePayloadAcrossFilenamesAndReplaysAfterRestart",
+        "testLegacyMigrationRejectsMalformedExactRowBeforeRecordingReceipt",
+        "testLegacyMigrationRejectsReceiptCountAndHashCategoryTampering",
+        "testLegacyMigrationReconcilesVerifiedVersionOneReceiptDetails",
     ),
     "legacy-continuity-v2-import": (
         "testLegacyLocationV2MigrationPreservesBindingAcrossRestartAndIdempotentReplay",
@@ -66,6 +73,7 @@ MIGRATION_SAFEGUARD_TESTS = (
     "testVerifiedMigrationBackupCapturesWALAndRejectsTamperedReuse",
     "testVerifiedMigrationManifestReconcilesPreparedSQLiteCompletion",
     "testSQLitePreparedMigrationRecoversAfterSIGKILLAndReleasesInterprocessLock",
+    "testSQLiteCommittedMigrationRecoversAfterSIGKILLBeforeManifestCompletion",
     "testSQLiteStoreDoesNotRecreateMissingSourceOwnedByManifest",
     "testSQLiteStoreRejectsSourceChangedAfterPreparedBackup",
     "testSQLiteStoreRejectsUnrelatedTargetWithoutMigrationReceipt",

@@ -6,6 +6,250 @@
 import Foundation
 import SQLite3
 
+struct LegacyContinuityCandidateIdentity: Sendable {
+    var pathSHA256: String
+    var contentState: String
+    var sourceSHA256: String?
+
+    func asDictionary() -> [String: Any] {
+        var value: [String: Any] = [
+            "path_sha256": pathSHA256,
+            "content_state": contentState,
+        ]
+        if let sourceSHA256 {
+            value["source_sha256"] = sourceSHA256
+        }
+        return value
+    }
+}
+
+struct LegacyContinuityQuarantineWrite: Sendable {
+    let payloadData: Data
+    let sourcePath: String?
+    let reason: String
+    let receiptSourceSHA256: String?
+
+    init(
+        payload: [String: Any],
+        sourcePath: String?,
+        reason: String,
+        receiptSourceSHA256: String?
+    ) throws {
+        let data = try JSONSupport.data(from: payload)
+        guard data.count <= ContinuityHandoffV2.maximumEncodedBytes else {
+            throw ProjectMemoryError.payloadTooLarge(
+                "legacy continuity payload exceeds the quarantine limit"
+            )
+        }
+        let boundedReason = String(reason.prefix(2_048))
+        guard !boundedReason.isEmpty else {
+            throw ProjectMemoryError.invalidRequest("legacy quarantine reason is required")
+        }
+        self.payloadData = data
+        self.sourcePath = sourcePath
+        self.reason = boundedReason
+        self.receiptSourceSHA256 = receiptSourceSHA256
+    }
+
+    var payloadSHA256: String { JSONSupport.sha256Hex(payloadData) }
+}
+
+struct LegacyContinuityImportWrite: Sendable {
+    let payloadJSON: String
+    let handoffID: String
+    let operationID: String
+    let schemaVersion: String
+    let contentSHA256: String
+    let createdAt: String
+    let projectGeneration: UInt64?
+    let runID: String?
+    let predecessorProviderResponseID: String?
+    let bootstrapNonce: String?
+    let sourceRecordID: String
+    let sourcePath: String?
+    let receiptSourceSHA256: String
+
+    init(
+        payload: [String: Any],
+        handoffID: String,
+        operationID: String,
+        schemaVersion: String,
+        contentSHA256: String,
+        createdAt: String,
+        projectGeneration: UInt64?,
+        runID: String?,
+        predecessorProviderResponseID: String?,
+        bootstrapNonce: String?,
+        sourceRecordID: String,
+        sourcePath: String?,
+        receiptSourceSHA256: String
+    ) throws {
+        guard UUID(uuidString: handoffID) != nil, UUID(uuidString: operationID) != nil,
+              ["1.0", ContinuityHandoffV2.schemaVersion].contains(schemaVersion),
+              ISO8601.date(from: createdAt) != nil,
+              !sourceRecordID.isEmpty, sourceRecordID.utf8.count <= 1_024 else {
+            throw ProjectMemoryError.invalidRequest("legacy continuity identity is invalid")
+        }
+        guard Self.isLowercaseSHA256(contentSHA256),
+              Self.isLowercaseSHA256(receiptSourceSHA256) else {
+            throw ProjectMemoryError.invalidRequest("legacy continuity SHA-256 is invalid")
+        }
+        if schemaVersion == ContinuityHandoffV2.schemaVersion {
+            guard let projectGeneration, projectGeneration > 0,
+                  let runID, UUID(uuidString: runID) != nil,
+                  let bootstrapNonce, !bootstrapNonce.isEmpty else {
+                throw ProjectMemoryError.invalidRequest(
+                    "legacy V2 record lacks exact generation or run identity"
+                )
+            }
+        }
+        let payloadJSON = try JSONSupport.string(from: payload)
+        guard payloadJSON.utf8.count <= ContinuityHandoffV2.maximumEncodedBytes else {
+            throw ProjectMemoryError.payloadTooLarge("legacy continuity record is oversized")
+        }
+        self.payloadJSON = payloadJSON
+        self.handoffID = handoffID
+        self.operationID = operationID
+        self.schemaVersion = schemaVersion
+        self.contentSHA256 = contentSHA256
+        self.createdAt = createdAt
+        self.projectGeneration = projectGeneration
+        self.runID = runID
+        self.predecessorProviderResponseID = predecessorProviderResponseID
+        self.bootstrapNonce = bootstrapNonce
+        self.sourceRecordID = sourceRecordID
+        self.sourcePath = sourcePath
+        self.receiptSourceSHA256 = receiptSourceSHA256
+    }
+
+    private static func isLowercaseSHA256(_ value: String) -> Bool {
+        value.count == 64
+            && value == value.lowercased()
+            && value.allSatisfy { $0.isHexDigit }
+    }
+}
+
+enum LegacyContinuityMigrationAction: Sendable {
+    case importReadOnly(LegacyContinuityImportWrite)
+    case quarantine(LegacyContinuityQuarantineWrite)
+    case skip
+
+    var encodedBytes: Int {
+        switch self {
+        case .importReadOnly(let write): write.payloadJSON.utf8.count
+        case .quarantine(let write): write.payloadData.count
+        case .skip: 0
+        }
+    }
+}
+
+fileprivate enum LegacyContinuityMigrationOutcome: String, Sendable {
+    case imported
+    case skipped
+    case quarantined
+}
+
+struct LegacyContinuityMigrationBatch: Sendable {
+    static let maximumCandidateCount = 128
+    static let maximumEncodedBytes = maximumCandidateCount
+        * ContinuityHandoffV2.maximumEncodedBytes
+
+    let startedAt: String
+    let submittedCandidateCount: Int
+    let expectedProjectGeneration: UInt64
+    let boundRunID: String?
+    let identities: [LegacyContinuityCandidateIdentity]
+    let actions: [LegacyContinuityMigrationAction]
+
+    init(
+        startedAt: String,
+        submittedCandidateCount: Int,
+        expectedProjectGeneration: UInt64,
+        boundRunID: String?,
+        identities: [LegacyContinuityCandidateIdentity],
+        actions: [LegacyContinuityMigrationAction]
+    ) throws {
+        guard ISO8601.date(from: startedAt) != nil,
+              submittedCandidateCount >= identities.count,
+              identities.count == actions.count,
+              identities.count <= Self.maximumCandidateCount,
+              expectedProjectGeneration > 0,
+              expectedProjectGeneration <= UInt64(Int64.max),
+              boundRunID.map({ UUID(uuidString: $0) != nil }) ?? true else {
+            throw ProjectMemoryError.invalidRequest("legacy migration batch identity is invalid")
+        }
+        let contentStates = Set([
+            "unreadable_or_invalid", "not_regular", "empty_or_oversized", "read",
+        ])
+        for identity in identities {
+            guard Self.isLowercaseSHA256(identity.pathSHA256),
+                  contentStates.contains(identity.contentState),
+                  identity.sourceSHA256.map(Self.isLowercaseSHA256) ?? true,
+                  (identity.contentState == "read") == (identity.sourceSHA256 != nil) else {
+                throw ProjectMemoryError.invalidRequest(
+                    "legacy migration candidate identity is invalid"
+                )
+            }
+        }
+        var encodedBytes = 0
+        for action in actions {
+            let (sum, overflow) = encodedBytes.addingReportingOverflow(action.encodedBytes)
+            guard !overflow, sum <= Self.maximumEncodedBytes else {
+                throw ProjectMemoryError.payloadTooLarge(
+                    "legacy migration batch exceeds the aggregate payload limit"
+                )
+            }
+            encodedBytes = sum
+        }
+        self.startedAt = startedAt
+        self.submittedCandidateCount = submittedCandidateCount
+        self.expectedProjectGeneration = expectedProjectGeneration
+        self.boundRunID = boundRunID
+        self.identities = identities
+        self.actions = actions
+    }
+
+    func fingerprint(projectID: String) throws -> String {
+        JSONSupport.sha256Hex(
+            try JSONSupport.canonicalJSON([
+                "schema_version": 1,
+                "project_id": projectID,
+                "expected_project_generation": Int64(expectedProjectGeneration),
+                "bound_run_id": boundRunID ?? NSNull(),
+                "submitted_candidate_count": submittedCandidateCount,
+                "selected_candidates": identities.map { $0.asDictionary() },
+            ])
+        )
+    }
+
+    fileprivate func outcomeLedgerSHA256(
+        _ outcomes: [LegacyContinuityMigrationOutcome]
+    ) throws -> String {
+        guard outcomes.count == identities.count else {
+            throw ProjectMemoryError.integrityFailure(
+                "legacy migration outcome count does not match its candidate batch"
+            )
+        }
+        let candidates: [[String: Any]] = zip(identities, outcomes).map { pair in
+            var candidate = pair.0.asDictionary()
+            candidate["outcome"] = pair.1.rawValue
+            return candidate
+        }
+        return JSONSupport.sha256Hex(
+            try JSONSupport.canonicalJSON([
+                "schema_version": 1,
+                "candidates": candidates,
+            ])
+        )
+    }
+
+    private static func isLowercaseSHA256(_ value: String) -> Bool {
+        value.count == 64
+            && value == value.lowercased()
+            && value.allSatisfy { $0.isHexDigit }
+    }
+}
+
 public final class ProjectMemoryRepository: @unchecked Sendable {
     public static let schemaVersion = 2
     private static let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
@@ -1107,70 +1351,52 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         }
     }
 
+    private struct LegacyQuarantineProjection {
+        let identifier: String
+        let data: Data
+    }
+
+    private struct LegacyMigrationCommit {
+        let receipt: LegacyContinuityMigrationReceipt
+        let projections: [LegacyQuarantineProjection]
+    }
+
+    private struct LegacyMigrationReceiptReadback {
+        let receipt: LegacyContinuityMigrationReceipt
+        let projections: [LegacyQuarantineProjection]
+    }
+
+    private enum LegacyImportDisposition: Equatable {
+        case missing
+        case exact
+        case collision
+    }
+
     @discardableResult
     public func continuityQuarantineLegacy(
         payload: [String: Any],
         sourcePath: String?,
         reason: String
     ) throws -> String {
-        let data = try JSONSupport.data(from: payload)
-        guard data.count <= ContinuityHandoffV2.maximumEncodedBytes else {
-            throw ProjectMemoryError.payloadTooLarge("legacy continuity payload exceeds the quarantine limit")
-        }
-        let boundedReason = String(reason.prefix(2_048))
-        guard !boundedReason.isEmpty else {
-            throw ProjectMemoryError.invalidRequest("legacy quarantine reason is required")
-        }
-        let checksum = JSONSupport.sha256Hex(data)
-        let identifier = UUID().uuidString.lowercased()
-        let timestamp = ISO8601.string(from: clock.now())
+        let write = try LegacyContinuityQuarantineWrite(
+            payload: payload,
+            sourcePath: sourcePath,
+            reason: reason,
+            receiptSourceSHA256: nil
+        )
         lock.lock()
-        let storedIdentifier: String
+        let projection: LegacyQuarantineProjection
         do {
-            storedIdentifier = try transactionUnlocked {
-                let existing: String? = try withStatementUnlocked(
-                    """
-                    SELECT quarantine_id FROM legacy_continuity_quarantine
-                    WHERE project_id=? AND source_sha256=? LIMIT 1
-                    """
-                ) { statement -> String? in
-                    bind(statement, 1, projectID)
-                    bind(statement, 2, checksum)
-                    return sqlite3_step(statement) == SQLITE_ROW ? text(statement, 0) : nil
-                }
-                if let existing {
-                    return existing
-                }
-                try withStatementUnlocked(
-                    """
-                    INSERT OR IGNORE INTO legacy_continuity_quarantine(
-                      quarantine_id,project_id,source_path,source_sha256,reason,payload_json,created_at
-                    ) VALUES(?,?,?,?,?,?,?)
-                    """
-                ) { statement in
-                    bind(statement, 1, identifier)
-                    bind(statement, 2, projectID)
-                    bind(statement, 3, sourcePath.map { String($0.prefix(4_096)) })
-                    bind(statement, 4, checksum)
-                    bind(statement, 5, boundedReason)
-                    bind(statement, 6, String(decoding: data, as: UTF8.self))
-                    bind(statement, 7, timestamp)
-                    try stepDone(statement)
-                }
-                return identifier
+            projection = try transactionUnlocked {
+                try quarantineLegacyUnlocked(write, insertIfMissing: true)
             }
             lock.unlock()
         } catch {
             lock.unlock()
             throw error
         }
-        let directory = continuityDirectory
-            .appendingPathComponent("LegacyContinuityQuarantine", isDirectory: true)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let projection = directory.appendingPathComponent("\(storedIdentifier).json")
-        try data.write(to: projection, options: [.atomic, .completeFileProtectionUnlessOpen])
-        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: projection.path)
-        return storedIdentifier
+        try materializeLegacyQuarantineProjections([projection])
+        return projection.identifier
     }
 
     /// Imports an unambiguously project-scoped legacy record for read-only diagnostics.
@@ -1190,84 +1416,145 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         bootstrapNonce: String?,
         sourceRecordID: String
     ) throws -> Bool {
-        guard UUID(uuidString: handoffID) != nil, UUID(uuidString: operationID) != nil,
-              ["1.0", ContinuityHandoffV2.schemaVersion].contains(schemaVersion),
-              ISO8601.date(from: createdAt) != nil,
-              !sourceRecordID.isEmpty, sourceRecordID.utf8.count <= 1_024 else {
-            throw ProjectMemoryError.invalidRequest("legacy continuity identity is invalid")
-        }
-        let hashRange = contentSHA256.startIndex..<contentSHA256.endIndex
-        guard contentSHA256.range(of: "^[0-9a-f]{64}$", options: .regularExpression) == hashRange else {
-            throw ProjectMemoryError.invalidRequest("legacy continuity SHA-256 is invalid")
-        }
-        if schemaVersion == ContinuityHandoffV2.schemaVersion {
-            guard let projectGeneration, projectGeneration > 0,
-                  let runID, UUID(uuidString: runID) != nil,
-                  let bootstrapNonce, !bootstrapNonce.isEmpty else {
-                throw ProjectMemoryError.invalidRequest("legacy V2 record lacks exact generation or run identity")
-            }
-        }
-        let payloadJSON = try JSONSupport.string(from: payload)
-        guard payloadJSON.utf8.count <= ContinuityHandoffV2.maximumEncodedBytes else {
-            throw ProjectMemoryError.payloadTooLarge("legacy continuity record is oversized")
-        }
+        let payloadSourceSHA256 = JSONSupport.sha256Hex(try JSONSupport.data(from: payload))
+        let write = try LegacyContinuityImportWrite(
+            payload: payload,
+            handoffID: handoffID,
+            operationID: operationID,
+            schemaVersion: schemaVersion,
+            contentSHA256: contentSHA256,
+            createdAt: createdAt,
+            projectGeneration: projectGeneration,
+            runID: runID,
+            predecessorProviderResponseID: predecessorProviderResponseID,
+            bootstrapNonce: bootstrapNonce,
+            sourceRecordID: sourceRecordID,
+            sourcePath: nil,
+            receiptSourceSHA256: payloadSourceSHA256
+        )
         lock.lock()
         defer { lock.unlock() }
-        return try transactionUnlocked {
-            let existing = try withStatementUnlocked(
-                """
-                SELECT handoff_id,operation_id,content_sha256 FROM continuity_handoffs
-                WHERE (handoff_id=? OR operation_id=?) AND project_id=? LIMIT 1
-                """
-            ) { statement -> (String, String, String)? in
-                bind(statement, 1, handoffID)
-                bind(statement, 2, operationID)
-                bind(statement, 3, projectID)
-                guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
-                return (
-                    text(statement, 0) ?? "",
-                    text(statement, 1) ?? "",
-                    text(statement, 2) ?? ""
+        return try transactionUnlocked { try importLegacyUnlocked(write) }
+    }
+
+    func continuityApplyLegacyMigration(
+        _ batch: LegacyContinuityMigrationBatch
+    ) throws -> LegacyContinuityMigrationReceipt {
+        let fingerprint = try batch.fingerprint(projectID: projectID)
+        let receiptID = legacyMigrationReceiptID(fingerprint: fingerprint)
+        let commit: LegacyMigrationCommit
+        lock.lock()
+        var changedSynchronousMode = false
+        do {
+            try execUnlocked("PRAGMA synchronous=FULL;")
+            changedSynchronousMode = true
+            commit = try transactionUnlocked {
+                if let readback = try legacyMigrationReceiptUnlocked(
+                    receiptID: receiptID,
+                    fingerprint: fingerprint,
+                    expectedBatch: batch
+                ) {
+                    return LegacyMigrationCommit(
+                        receipt: readback.receipt,
+                        projections: readback.projections
+                    )
+                }
+
+                var importedCount = 0
+                var skippedCount = batch.submittedCandidateCount - batch.actions.count
+                var quarantinedCount = 0
+                var importedHashes: [String] = []
+                var quarantineHashes: [String] = []
+                var outcomes: [LegacyContinuityMigrationOutcome] = []
+                outcomes.reserveCapacity(batch.actions.count)
+
+                for action in batch.actions {
+                    switch action {
+                    case .skip:
+                        skippedCount += 1
+                        outcomes.append(.skipped)
+                    case .quarantine(let write):
+                        _ = try quarantineLegacyUnlocked(write, insertIfMissing: true)
+                        quarantinedCount += 1
+                        outcomes.append(.quarantined)
+                        if let sourceSHA256 = write.receiptSourceSHA256 {
+                            quarantineHashes.append(sourceSHA256)
+                        }
+                    case .importReadOnly(let write):
+                        do {
+                            if try importLegacyUnlocked(write) {
+                                importedCount += 1
+                                importedHashes.append(write.receiptSourceSHA256)
+                                outcomes.append(.imported)
+                            } else {
+                                try verifyCommittedLegacyImportUnlocked(
+                                    write,
+                                    allowSourceAlias: true
+                                )
+                                skippedCount += 1
+                                outcomes.append(.skipped)
+                            }
+                        } catch let error as ProjectMemoryError {
+                            guard case .conflict(let reason) = error,
+                                  reason == "legacy continuity identifier collision" else {
+                                throw error
+                            }
+                            let fallback = try importFailureQuarantine(
+                                write,
+                                error: error
+                            )
+                            _ = try quarantineLegacyUnlocked(fallback, insertIfMissing: true)
+                            quarantinedCount += 1
+                            outcomes.append(.quarantined)
+                            quarantineHashes.append(write.receiptSourceSHA256)
+                        }
+                    }
+                }
+
+                let details = try legacyMigrationOutcomeDetails(
+                    batch: batch,
+                    outcomes: outcomes,
+                    fingerprint: fingerprint
+                )
+                guard details["imported_source_sha256"] as? [String] == importedHashes,
+                      details["quarantined_source_sha256"] as? [String] == quarantineHashes else {
+                    throw ProjectMemoryError.integrityFailure(
+                        "legacy migration staged hashes do not match its outcomes"
+                    )
+                }
+                let detailsJSON = try legacyMigrationDetailsJSON(details)
+                try insertLegacyMigrationReceiptUnlocked(
+                    receiptID: receiptID,
+                    importedCount: importedCount,
+                    skippedCount: skippedCount,
+                    quarantinedCount: quarantinedCount,
+                    detailsJSON: detailsJSON,
+                    startedAt: batch.startedAt,
+                    completedAt: ISO8601.string(from: clock.now())
+                )
+                guard let readback = try legacyMigrationReceiptUnlocked(
+                    receiptID: receiptID,
+                    fingerprint: fingerprint,
+                    expectedBatch: batch
+                ) else {
+                    throw ProjectMemoryError.integrityFailure(
+                        "legacy migration receipt could not be read back"
+                    )
+                }
+                return LegacyMigrationCommit(
+                    receipt: readback.receipt,
+                    projections: readback.projections
                 )
             }
-            if let existing {
-                guard existing.0 == handoffID,
-                      existing.1 == operationID,
-                      existing.2 == contentSHA256 else {
-                    throw ProjectMemoryError.conflict("legacy continuity identifier collision")
-                }
-                return false
-            }
-            try withStatementUnlocked(
-                """
-                INSERT INTO continuity_handoffs(
-                  handoff_id,project_id,operation_id,payload_json,content_sha256,created_at,
-                  schema_version,project_generation,run_id,predecessor_provider_response_id,
-                  bootstrap_nonce,continuation_issued,quarantine_state,migration_source,
-                  legacy_record_id
-                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,0,'legacy_read_only','legacy_global',?)
-                """
-            ) { statement in
-                bind(statement, 1, handoffID)
-                bind(statement, 2, projectID)
-                bind(statement, 3, operationID)
-                bind(statement, 4, payloadJSON)
-                bind(statement, 5, contentSHA256)
-                bind(statement, 6, createdAt)
-                bind(statement, 7, schemaVersion)
-                if let projectGeneration {
-                    sqlite3_bind_int64(statement, 8, Int64(projectGeneration))
-                } else {
-                    sqlite3_bind_null(statement, 8)
-                }
-                bind(statement, 9, runID)
-                bind(statement, 10, predecessorProviderResponseID)
-                bind(statement, 11, bootstrapNonce)
-                bind(statement, 12, sourceRecordID)
-                try stepDone(statement)
-            }
-            return true
+            if changedSynchronousMode { try? execUnlocked("PRAGMA synchronous=NORMAL;") }
+            lock.unlock()
+        } catch {
+            if changedSynchronousMode { try? execUnlocked("PRAGMA synchronous=NORMAL;") }
+            lock.unlock()
+            throw error
         }
+        try materializeLegacyQuarantineProjections(commit.projections)
+        return commit.receipt
     }
 
     public func continuityRecordLegacyMigration(
@@ -1287,48 +1574,375 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
                 "legacy migration counts, timestamp, or fingerprint are invalid"
             )
         }
+        let detailsJSON = try legacyMigrationDetailsJSON(details)
+        let receiptID = legacyMigrationReceiptID(fingerprint: migrationFingerprintSHA256)
+        lock.lock()
+        defer { lock.unlock() }
+        return try transactionUnlocked {
+            if let existing = try legacyMigrationReceiptUnlocked(
+                receiptID: receiptID,
+                fingerprint: migrationFingerprintSHA256
+            ) {
+                return existing.receipt
+            }
+            try insertLegacyMigrationReceiptUnlocked(
+                receiptID: receiptID,
+                importedCount: importedCount,
+                skippedCount: skippedCount,
+                quarantinedCount: quarantinedCount,
+                detailsJSON: detailsJSON,
+                startedAt: startedAt,
+                completedAt: ISO8601.string(from: clock.now())
+            )
+            guard let readback = try legacyMigrationReceiptUnlocked(
+                receiptID: receiptID,
+                fingerprint: migrationFingerprintSHA256
+            ) else {
+                throw ProjectMemoryError.integrityFailure(
+                    "legacy migration receipt could not be read back"
+                )
+            }
+            return readback.receipt
+        }
+    }
+
+    private func quarantineLegacyUnlocked(
+        _ write: LegacyContinuityQuarantineWrite,
+        insertIfMissing: Bool
+    ) throws -> LegacyQuarantineProjection {
+        let existing = try withStatementUnlocked(
+            """
+            SELECT quarantine_id,payload_json FROM legacy_continuity_quarantine
+            WHERE project_id=? AND source_sha256=? LIMIT 1
+            """
+        ) { statement -> (String, String)? in
+            bind(statement, 1, projectID)
+            bind(statement, 2, write.payloadSHA256)
+            guard sqlite3_step(statement) == SQLITE_ROW,
+                  let identifier = text(statement, 0),
+                  let payloadJSON = text(statement, 1) else { return nil }
+            return (identifier, payloadJSON)
+        }
+        if let existing {
+            guard UUID(uuidString: existing.0) != nil,
+                  Data(existing.1.utf8) == write.payloadData else {
+                throw ProjectMemoryError.integrityFailure(
+                    "legacy quarantine row does not match its payload identity"
+                )
+            }
+            return LegacyQuarantineProjection(identifier: existing.0, data: write.payloadData)
+        }
+        guard insertIfMissing else {
+            throw ProjectMemoryError.integrityFailure(
+                "legacy migration receipt is missing a quarantined side effect"
+            )
+        }
+        let identifier = UUID().uuidString.lowercased()
+        try withStatementUnlocked(
+            """
+            INSERT INTO legacy_continuity_quarantine(
+              quarantine_id,project_id,source_path,source_sha256,reason,payload_json,created_at
+            ) VALUES(?,?,?,?,?,?,?)
+            """
+        ) { statement in
+            bind(statement, 1, identifier)
+            bind(statement, 2, projectID)
+            bind(statement, 3, write.sourcePath.map { String($0.prefix(4_096)) })
+            bind(statement, 4, write.payloadSHA256)
+            bind(statement, 5, write.reason)
+            bind(statement, 6, String(decoding: write.payloadData, as: UTF8.self))
+            bind(statement, 7, ISO8601.string(from: clock.now()))
+            try stepDone(statement)
+        }
+        return LegacyQuarantineProjection(identifier: identifier, data: write.payloadData)
+    }
+
+    private func importDispositionUnlocked(
+        _ write: LegacyContinuityImportWrite
+    ) throws -> LegacyImportDisposition {
+        let existing = try withStatementUnlocked(
+            """
+            SELECT handoff_id,operation_id,content_sha256 FROM continuity_handoffs
+            WHERE (handoff_id=? OR operation_id=?) AND project_id=? LIMIT 1
+            """
+        ) { statement -> (String, String, String)? in
+            bind(statement, 1, write.handoffID)
+            bind(statement, 2, write.operationID)
+            bind(statement, 3, projectID)
+            guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+            return (
+                text(statement, 0) ?? "",
+                text(statement, 1) ?? "",
+                text(statement, 2) ?? ""
+            )
+        }
+        guard let existing else { return .missing }
+        return existing.0 == write.handoffID
+            && existing.1 == write.operationID
+            && existing.2 == write.contentSHA256 ? .exact : .collision
+    }
+
+    private func importLegacyUnlocked(_ write: LegacyContinuityImportWrite) throws -> Bool {
+        switch try importDispositionUnlocked(write) {
+        case .exact:
+            return false
+        case .collision:
+            throw ProjectMemoryError.conflict("legacy continuity identifier collision")
+        case .missing:
+            break
+        }
+        try withStatementUnlocked(
+            """
+            INSERT INTO continuity_handoffs(
+              handoff_id,project_id,operation_id,payload_json,content_sha256,created_at,
+              schema_version,project_generation,run_id,predecessor_provider_response_id,
+              bootstrap_nonce,continuation_issued,quarantine_state,migration_source,
+              legacy_record_id
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,0,'legacy_read_only','legacy_global',?)
+            """
+        ) { statement in
+            bind(statement, 1, write.handoffID)
+            bind(statement, 2, projectID)
+            bind(statement, 3, write.operationID)
+            bind(statement, 4, write.payloadJSON)
+            bind(statement, 5, write.contentSHA256)
+            bind(statement, 6, write.createdAt)
+            bind(statement, 7, write.schemaVersion)
+            if let projectGeneration = write.projectGeneration {
+                sqlite3_bind_int64(statement, 8, Int64(projectGeneration))
+            } else {
+                sqlite3_bind_null(statement, 8)
+            }
+            bind(statement, 9, write.runID)
+            bind(statement, 10, write.predecessorProviderResponseID)
+            bind(statement, 11, write.bootstrapNonce)
+            bind(statement, 12, write.sourceRecordID)
+            try stepDone(statement)
+        }
+        return true
+    }
+
+    private func importFailureQuarantine(
+        _ write: LegacyContinuityImportWrite,
+        error: Error
+    ) throws -> LegacyContinuityQuarantineWrite {
+        try LegacyContinuityQuarantineWrite(
+            payload: [
+                "schema_version": "legacy-quarantine-1",
+                "source_name": write.sourceRecordID,
+                "reason": String(error.localizedDescription.prefix(1_024)),
+            ],
+            sourcePath: write.sourcePath,
+            reason: "legacy candidate could not be validated",
+            receiptSourceSHA256: write.receiptSourceSHA256
+        )
+    }
+
+    private func committedLegacyProjectionsUnlocked(
+        _ actions: [LegacyContinuityMigrationAction],
+        outcomes: [LegacyContinuityMigrationOutcome]
+    ) throws -> [LegacyQuarantineProjection] {
+        guard actions.count == outcomes.count else {
+            throw ProjectMemoryError.integrityFailure(
+                "legacy migration outcome count does not match its candidate batch"
+            )
+        }
+        var projections: [LegacyQuarantineProjection] = []
+        for (action, outcome) in zip(actions, outcomes) {
+            switch (action, outcome) {
+            case (.skip, .skipped):
+                continue
+            case (.quarantine(let write), .quarantined):
+                projections.append(try quarantineLegacyUnlocked(write, insertIfMissing: false))
+            case (.importReadOnly(let write), .imported):
+                guard try importDispositionUnlocked(write) == .exact else {
+                    throw ProjectMemoryError.integrityFailure(
+                        "legacy migration receipt is missing an imported side effect"
+                    )
+                }
+                try verifyCommittedLegacyImportUnlocked(write, allowSourceAlias: false)
+            case (.importReadOnly(let write), .skipped):
+                guard try importDispositionUnlocked(write) == .exact else {
+                    throw ProjectMemoryError.integrityFailure(
+                        "legacy migration receipt is missing its shared imported side effect"
+                    )
+                }
+                try verifyCommittedLegacyImportUnlocked(write, allowSourceAlias: true)
+            case (.importReadOnly(let write), .quarantined):
+                guard try importDispositionUnlocked(write) == .collision else {
+                    throw ProjectMemoryError.integrityFailure(
+                        "legacy migration receipt no longer matches its collision quarantine"
+                    )
+                }
+                let error = ProjectMemoryError.conflict(
+                    "legacy continuity identifier collision"
+                )
+                let fallback = try importFailureQuarantine(write, error: error)
+                projections.append(
+                    try quarantineLegacyUnlocked(fallback, insertIfMissing: false)
+                )
+            default:
+                throw ProjectMemoryError.integrityFailure(
+                    "legacy migration receipt outcome does not match its candidate action"
+                )
+            }
+        }
+        return projections
+    }
+
+    private func verifyCommittedLegacyImportUnlocked(
+        _ write: LegacyContinuityImportWrite,
+        allowSourceAlias: Bool
+    ) throws {
+        guard try committedLegacyImportMatchesUnlocked(
+            write,
+            allowSourceAlias: allowSourceAlias
+        ) else {
+            throw ProjectMemoryError.integrityFailure(
+                "legacy migration receipt does not match its imported side effect"
+            )
+        }
+    }
+
+    private func committedLegacyImportMatchesUnlocked(
+        _ write: LegacyContinuityImportWrite,
+        allowSourceAlias: Bool
+    ) throws -> Bool {
+        try withStatementUnlocked(
+            """
+            SELECT payload_json,created_at,acknowledged_session_id,acknowledged_at,
+                   schema_version,project_generation,run_id,predecessor_provider_response_id,
+                   bootstrap_nonce,budget_observation_id,acknowledgement_sha256,
+                   continuation_issued,quarantine_state,migration_source,legacy_record_id
+            FROM continuity_handoffs
+            WHERE handoff_id=? AND operation_id=? AND project_id=? AND content_sha256=? LIMIT 1
+            """
+        ) { statement -> Bool in
+            bind(statement, 1, write.handoffID)
+            bind(statement, 2, write.operationID)
+            bind(statement, 3, projectID)
+            bind(statement, 4, write.contentSHA256)
+            guard sqlite3_step(statement) == SQLITE_ROW else { return false }
+            let storedGeneration: UInt64?
+            if sqlite3_column_type(statement, 5) == SQLITE_NULL {
+                storedGeneration = nil
+            } else {
+                let value = sqlite3_column_int64(statement, 5)
+                guard value >= 0 else { return false }
+                storedGeneration = UInt64(value)
+            }
+            guard let storedSourceRecordID = text(statement, 14),
+                  !storedSourceRecordID.isEmpty,
+                  storedSourceRecordID.utf8.count <= 1_024 else {
+                return false
+            }
+            return text(statement, 0) == write.payloadJSON
+                && text(statement, 1) == write.createdAt
+                && text(statement, 2) == nil
+                && text(statement, 3) == nil
+                && text(statement, 4) == write.schemaVersion
+                && storedGeneration == write.projectGeneration
+                && text(statement, 6) == write.runID
+                && text(statement, 7) == write.predecessorProviderResponseID
+                && text(statement, 8) == write.bootstrapNonce
+                && text(statement, 9) == nil
+                && text(statement, 10) == nil
+                && sqlite3_column_int(statement, 11) == 0
+                && text(statement, 12) == "legacy_read_only"
+                && text(statement, 13) == "legacy_global"
+                && (allowSourceAlias || storedSourceRecordID == write.sourceRecordID)
+        }
+    }
+
+    private func materializeLegacyQuarantineProjections(
+        _ projections: [LegacyQuarantineProjection]
+    ) throws {
+        guard !projections.isEmpty else { return }
+        var unique: [String: Data] = [:]
+        for projection in projections {
+            guard UUID(uuidString: projection.identifier) != nil else {
+                throw ProjectMemoryError.integrityFailure(
+                    "legacy quarantine projection identity is invalid"
+                )
+            }
+            if let existing = unique[projection.identifier], existing != projection.data {
+                throw ProjectMemoryError.integrityFailure(
+                    "legacy quarantine projection identity is ambiguous"
+                )
+            }
+            unique[projection.identifier] = projection.data
+        }
+        let directory = continuityDirectory
+            .appendingPathComponent("LegacyContinuityQuarantine", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        for identifier in unique.keys.sorted() {
+            guard let data = unique[identifier] else { continue }
+            let projection = directory.appendingPathComponent("\(identifier).json")
+            try data.write(to: projection, options: [.atomic, .completeFileProtectionUnlessOpen])
+            try? FileManager.default.setAttributes(
+                [.posixPermissions: 0o600],
+                ofItemAtPath: projection.path
+            )
+        }
+    }
+
+    private func legacyMigrationReceiptID(fingerprint: String) -> String {
+        "legacy-global-" + JSONSupport.sha256Hex("\(projectID)|\(fingerprint)")
+    }
+
+    private func legacyMigrationDetailsJSON(_ details: [String: Any]) throws -> String {
         let detailsJSON = try JSONSupport.string(from: details)
         guard detailsJSON.utf8.count <= 16 * 1_024 else {
             throw ProjectMemoryError.payloadTooLarge("legacy migration details are oversized")
         }
-        let receiptID = "legacy-global-" + JSONSupport.sha256Hex(
-            "\(projectID)|\(migrationFingerprintSHA256)"
-        )
-        let completedAt = ISO8601.string(from: clock.now())
-        lock.lock()
-        defer { lock.unlock() }
-        try transactionUnlocked {
-            try withStatementUnlocked(
-                """
-                INSERT INTO continuity_migration_receipts(
-                  receipt_id,project_id,source_version,target_version,imported_count,
-                  skipped_count,quarantined_count,integrity_result,details_json,
-                  started_at,completed_at
-                ) VALUES(?,?,'legacy_global','2.0',?,?,?,'ok',?,?,?)
-                ON CONFLICT(receipt_id) DO NOTHING
-                """
-            ) { statement in
-                bind(statement, 1, receiptID)
-                bind(statement, 2, projectID)
-                sqlite3_bind_int(statement, 3, Int32(importedCount))
-                sqlite3_bind_int(statement, 4, Int32(skippedCount))
-                sqlite3_bind_int(statement, 5, Int32(quarantinedCount))
-                bind(statement, 6, detailsJSON)
-                bind(statement, 7, startedAt)
-                bind(statement, 8, completedAt)
-                try stepDone(statement)
-            }
+        return detailsJSON
+    }
+
+    private func insertLegacyMigrationReceiptUnlocked(
+        receiptID: String,
+        importedCount: Int,
+        skippedCount: Int,
+        quarantinedCount: Int,
+        detailsJSON: String,
+        startedAt: String,
+        completedAt: String
+    ) throws {
+        try withStatementUnlocked(
+            """
+            INSERT INTO continuity_migration_receipts(
+              receipt_id,project_id,source_version,target_version,imported_count,
+              skipped_count,quarantined_count,integrity_result,details_json,
+              started_at,completed_at
+            ) VALUES(?,?,'legacy_global','2.0',?,?,?,'ok',?,?,?)
+            """
+        ) { statement in
+            bind(statement, 1, receiptID)
+            bind(statement, 2, projectID)
+            sqlite3_bind_int64(statement, 3, Int64(importedCount))
+            sqlite3_bind_int64(statement, 4, Int64(skippedCount))
+            sqlite3_bind_int64(statement, 5, Int64(quarantinedCount))
+            bind(statement, 6, detailsJSON)
+            bind(statement, 7, startedAt)
+            bind(statement, 8, completedAt)
+            try stepDone(statement)
         }
-        return try withStatementUnlocked(
+    }
+
+    private func legacyMigrationReceiptUnlocked(
+        receiptID: String,
+        fingerprint: String,
+        expectedBatch: LegacyContinuityMigrationBatch? = nil
+    ) throws -> LegacyMigrationReceiptReadback? {
+        try withStatementUnlocked(
             """
             SELECT project_id,source_version,target_version,imported_count,skipped_count,
                    quarantined_count,integrity_result,details_json,started_at,completed_at
             FROM continuity_migration_receipts WHERE receipt_id=? LIMIT 1
             """
-        ) { statement in
+        ) { statement -> LegacyMigrationReceiptReadback? in
             bind(statement, 1, receiptID)
-            guard sqlite3_step(statement) == SQLITE_ROW,
-                  let storedProjectID = text(statement, 0),
+            guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+            guard let storedProjectID = text(statement, 0),
                   text(statement, 1) == "legacy_global",
                   text(statement, 2) == ContinuityHandoffV2.schemaVersion,
                   text(statement, 6) == "ok",
@@ -1342,9 +1956,8 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
                     "legacy migration receipt could not be read back"
                 )
             }
-            let storedDetails = try JSONSupport.object(from: Data(storedDetailsJSON.utf8))
-            guard storedDetails["migration_fingerprint_sha256"] as? String
-                    == migrationFingerprintSHA256 else {
+            var storedDetails = try JSONSupport.object(from: Data(storedDetailsJSON.utf8))
+            guard storedDetails["migration_fingerprint_sha256"] as? String == fingerprint else {
                 throw ProjectMemoryError.integrityFailure(
                     "legacy migration receipt fingerprint does not match"
                 )
@@ -1356,10 +1969,10 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
                   storedSkippedCount >= 0,
                   storedQuarantinedCount >= 0 else {
                 throw ProjectMemoryError.integrityFailure(
-                    "legacy migration receipt counts are invalid"
+                    "legacy migration receipt details or counts are invalid"
                 )
             }
-            return LegacyContinuityMigrationReceipt(
+            let receipt = LegacyContinuityMigrationReceipt(
                 receiptID: receiptID,
                 projectID: storedProjectID,
                 importedCount: storedImportedCount,
@@ -1368,7 +1981,276 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
                 startedAt: storedStartedAt,
                 completedAt: storedCompletedAt
             )
+            guard let expectedBatch else {
+                return LegacyMigrationReceiptReadback(receipt: receipt, projections: [])
+            }
+            let legacyDetailKeys: Set<String> = [
+                "candidate_count", "imported_source_sha256",
+                "quarantined_source_sha256", "migration_fingerprint_sha256",
+                "global_latest_used_as_authority",
+            ]
+            if Set(storedDetails.keys) == legacyDetailKeys {
+                let outcomes = try reconcileLegacyMigrationOutcomesV1Unlocked(
+                    batch: expectedBatch,
+                    details: storedDetails,
+                    importedCount: storedImportedCount,
+                    skippedCount: storedSkippedCount,
+                    quarantinedCount: storedQuarantinedCount
+                )
+                storedDetails = try legacyMigrationOutcomeDetails(
+                    batch: expectedBatch,
+                    outcomes: outcomes,
+                    fingerprint: fingerprint
+                )
+                let upgradedDetailsJSON = try legacyMigrationDetailsJSON(storedDetails)
+                try withStatementUnlocked(
+                    """
+                    UPDATE continuity_migration_receipts SET details_json=?
+                    WHERE receipt_id=? AND project_id=? AND details_json=?
+                    """
+                ) { update in
+                    bind(update, 1, upgradedDetailsJSON)
+                    bind(update, 2, receiptID)
+                    bind(update, 3, projectID)
+                    bind(update, 4, storedDetailsJSON)
+                    try stepDone(update)
+                }
+                guard sqlite3_changes(db) == 1 else {
+                    throw ProjectMemoryError.conflict(
+                        "legacy migration receipt details changed during reconciliation"
+                    )
+                }
+            }
+            let expectedDetailKeys: Set<String> = [
+                "receipt_details_schema_version",
+                "candidate_count", "candidate_outcomes", "imported_source_sha256",
+                "quarantined_source_sha256", "migration_fingerprint_sha256",
+                "outcome_ledger_sha256", "global_latest_used_as_authority",
+            ]
+            guard Set(storedDetails.keys) == expectedDetailKeys,
+                  storedDetails["receipt_details_schema_version"] as? Int == 2,
+                  let candidateCount = storedDetails["candidate_count"] as? Int,
+                  let rawOutcomes = storedDetails["candidate_outcomes"] as? [String],
+                  let importedHashes = storedDetails[
+                    "imported_source_sha256"
+                  ] as? [String],
+                  let quarantineHashes = storedDetails[
+                    "quarantined_source_sha256"
+                  ] as? [String],
+                  let outcomeLedgerSHA256 = storedDetails[
+                    "outcome_ledger_sha256"
+                  ] as? String,
+                  storedDetails["global_latest_used_as_authority"] as? Bool == false,
+                  candidateCount == expectedBatch.actions.count,
+                  candidateCount <= LegacyContinuityMigrationBatch.maximumCandidateCount,
+                  rawOutcomes.count == candidateCount,
+                  importedHashes.allSatisfy(Self.isLowercaseSHA256),
+                  quarantineHashes.allSatisfy(Self.isLowercaseSHA256),
+                  Self.isLowercaseSHA256(outcomeLedgerSHA256) else {
+                throw ProjectMemoryError.integrityFailure(
+                    "legacy migration receipt details or counts are invalid"
+                )
+            }
+            let outcomes = rawOutcomes.compactMap(LegacyContinuityMigrationOutcome.init(rawValue:))
+            guard outcomes.count == rawOutcomes.count else {
+                throw ProjectMemoryError.integrityFailure(
+                    "legacy migration receipt contains an invalid candidate outcome"
+                )
+            }
+            var expectedImportedHashes: [String] = []
+            var expectedQuarantineHashes: [String] = []
+            for (action, outcome) in zip(expectedBatch.actions, outcomes) {
+                switch (action, outcome) {
+                case (.importReadOnly(let write), .imported):
+                    expectedImportedHashes.append(write.receiptSourceSHA256)
+                case (.importReadOnly(let write), .quarantined):
+                    expectedQuarantineHashes.append(write.receiptSourceSHA256)
+                case (.quarantine(let write), .quarantined):
+                    if let sourceSHA256 = write.receiptSourceSHA256 {
+                        expectedQuarantineHashes.append(sourceSHA256)
+                    }
+                case (.skip, .skipped), (.importReadOnly(_), .skipped):
+                    break
+                default:
+                    throw ProjectMemoryError.integrityFailure(
+                        "legacy migration receipt outcome does not match its candidate action"
+                    )
+                }
+            }
+            let expectedImportedCount = outcomes.reduce(0) {
+                $0 + ($1 == .imported ? 1 : 0)
+            }
+            let expectedQuarantinedCount = outcomes.reduce(0) {
+                $0 + ($1 == .quarantined ? 1 : 0)
+            }
+            let selectedSkippedCount = outcomes.reduce(0) {
+                $0 + ($1 == .skipped ? 1 : 0)
+            }
+            let unselectedCount = expectedBatch.submittedCandidateCount
+                - expectedBatch.actions.count
+            let (expectedSkippedCount, skippedOverflow) = selectedSkippedCount
+                .addingReportingOverflow(unselectedCount)
+            guard !skippedOverflow,
+                  storedImportedCount == expectedImportedCount,
+                  storedSkippedCount == expectedSkippedCount,
+                  storedQuarantinedCount == expectedQuarantinedCount,
+                  importedHashes == expectedImportedHashes,
+                  quarantineHashes == expectedQuarantineHashes,
+                  outcomeLedgerSHA256 == (try expectedBatch.outcomeLedgerSHA256(outcomes)) else {
+                throw ProjectMemoryError.integrityFailure(
+                    "legacy migration receipt does not match its committed outcomes"
+                )
+            }
+            return LegacyMigrationReceiptReadback(
+                receipt: receipt,
+                projections: try committedLegacyProjectionsUnlocked(
+                    expectedBatch.actions,
+                    outcomes: outcomes
+                )
+            )
         }
+    }
+
+    private func legacyMigrationOutcomeDetails(
+        batch: LegacyContinuityMigrationBatch,
+        outcomes: [LegacyContinuityMigrationOutcome],
+        fingerprint: String
+    ) throws -> [String: Any] {
+        guard outcomes.count == batch.actions.count else {
+            throw ProjectMemoryError.integrityFailure(
+                "legacy migration outcome count does not match its candidate batch"
+            )
+        }
+        var importedHashes: [String] = []
+        var quarantineHashes: [String] = []
+        for (action, outcome) in zip(batch.actions, outcomes) {
+            switch (action, outcome) {
+            case (.importReadOnly(let write), .imported):
+                importedHashes.append(write.receiptSourceSHA256)
+            case (.importReadOnly(let write), .quarantined):
+                quarantineHashes.append(write.receiptSourceSHA256)
+            case (.quarantine(let write), .quarantined):
+                if let sourceSHA256 = write.receiptSourceSHA256 {
+                    quarantineHashes.append(sourceSHA256)
+                }
+            case (.skip, .skipped), (.importReadOnly(_), .skipped):
+                break
+            default:
+                throw ProjectMemoryError.integrityFailure(
+                    "legacy migration receipt outcome does not match its candidate action"
+                )
+            }
+        }
+        return [
+            "receipt_details_schema_version": 2,
+            "candidate_count": batch.actions.count,
+            "candidate_outcomes": outcomes.map(\.rawValue),
+            "imported_source_sha256": importedHashes,
+            "quarantined_source_sha256": quarantineHashes,
+            "migration_fingerprint_sha256": fingerprint,
+            "outcome_ledger_sha256": try batch.outcomeLedgerSHA256(outcomes),
+            "global_latest_used_as_authority": false,
+        ]
+    }
+
+    private func reconcileLegacyMigrationOutcomesV1Unlocked(
+        batch: LegacyContinuityMigrationBatch,
+        details: [String: Any],
+        importedCount: Int,
+        skippedCount: Int,
+        quarantinedCount: Int
+    ) throws -> [LegacyContinuityMigrationOutcome] {
+        guard let candidateCount = details["candidate_count"] as? Int,
+              let importedHashes = details["imported_source_sha256"] as? [String],
+              let quarantineHashes = details["quarantined_source_sha256"] as? [String],
+              details["global_latest_used_as_authority"] as? Bool == false,
+              candidateCount == batch.actions.count,
+              importedHashes.count == importedCount,
+              importedHashes.allSatisfy(Self.isLowercaseSHA256),
+              quarantineHashes.allSatisfy(Self.isLowercaseSHA256) else {
+            throw ProjectMemoryError.integrityFailure(
+                "legacy migration v1 receipt details or counts are invalid"
+            )
+        }
+        var outcomes: [LegacyContinuityMigrationOutcome] = []
+        var importedIndex = 0
+        var quarantineIndex = 0
+        outcomes.reserveCapacity(batch.actions.count)
+        for action in batch.actions {
+            switch action {
+            case .skip:
+                outcomes.append(.skipped)
+            case .quarantine(let write):
+                outcomes.append(.quarantined)
+                if let sourceSHA256 = write.receiptSourceSHA256 {
+                    guard quarantineIndex < quarantineHashes.count,
+                          quarantineHashes[quarantineIndex] == sourceSHA256 else {
+                        throw ProjectMemoryError.integrityFailure(
+                            "legacy migration v1 quarantine hashes do not match"
+                        )
+                    }
+                    quarantineIndex += 1
+                }
+            case .importReadOnly(let write):
+                switch try importDispositionUnlocked(write) {
+                case .missing:
+                    throw ProjectMemoryError.integrityFailure(
+                        "legacy migration v1 receipt is missing an imported side effect"
+                    )
+                case .collision:
+                    outcomes.append(.quarantined)
+                case .exact:
+                    guard try committedLegacyImportMatchesUnlocked(
+                        write,
+                        allowSourceAlias: true
+                    ) else {
+                        throw ProjectMemoryError.integrityFailure(
+                            "legacy migration v1 receipt matches a malformed imported row"
+                        )
+                    }
+                    if importedIndex < importedHashes.count,
+                       importedHashes[importedIndex] == write.receiptSourceSHA256,
+                       try committedLegacyImportMatchesUnlocked(
+                        write,
+                        allowSourceAlias: false
+                       ) {
+                        outcomes.append(.imported)
+                        importedIndex += 1
+                    } else {
+                        outcomes.append(.skipped)
+                    }
+                }
+            }
+        }
+        let expectedImportedCount = outcomes.reduce(0) {
+            $0 + ($1 == .imported ? 1 : 0)
+        }
+        let expectedQuarantinedCount = outcomes.reduce(0) {
+            $0 + ($1 == .quarantined ? 1 : 0)
+        }
+        let selectedSkippedCount = outcomes.reduce(0) {
+            $0 + ($1 == .skipped ? 1 : 0)
+        }
+        let unselectedCount = batch.submittedCandidateCount - batch.actions.count
+        let (expectedSkippedCount, skippedOverflow) = selectedSkippedCount
+            .addingReportingOverflow(unselectedCount)
+        guard !skippedOverflow,
+              importedIndex == importedHashes.count,
+              quarantineIndex == quarantineHashes.count,
+              importedCount == expectedImportedCount,
+              skippedCount == expectedSkippedCount,
+              quarantinedCount == expectedQuarantinedCount else {
+            throw ProjectMemoryError.integrityFailure(
+                "legacy migration v1 receipt does not match committed outcomes"
+            )
+        }
+        return outcomes
+    }
+
+    private static func isLowercaseSHA256(_ value: String) -> Bool {
+        value.count == 64
+            && value == value.lowercased()
+            && value.allSatisfy { $0.isHexDigit }
     }
 
     public func continuityLegacyQuarantineCount() throws -> Int {
