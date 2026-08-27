@@ -1,0 +1,55 @@
+Test Suite 'Selected tests' started at 2026-08-27 08:34:26.105.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-27 08:34:26.105.
+Test Suite 'ContinuityTests' started at 2026-08-27 08:34:26.105.
+Test Case '-[ForgeConductorTests.ContinuityTests testConcurrentVersionThreeMigrationIsIdempotent]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testConcurrentVersionThreeMigrationIsIdempotent]' passed (0.031 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testNonemptyUnversionedStoreFailsClosedWithoutMutatingDatabase]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testNonemptyUnversionedStoreFailsClosedWithoutMutatingDatabase]' passed (0.007 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testNonMutatingSQLitePreflightReadsWALCloneWithoutChangingSourceFamily]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testNonMutatingSQLitePreflightReadsWALCloneWithoutChangingSourceFamily]' passed (0.006 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testNonMutatingSQLitePreflightRejectsInterruptedJournalWithoutChangingBytes]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testNonMutatingSQLitePreflightRejectsInterruptedJournalWithoutChangingBytes]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testVersionThreeStoreMigratesWithoutLosingHandoff]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testVersionThreeStoreMigratesWithoutLosingHandoff]' passed (0.236 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testVersionTwoStoreMigratesPopulatedDataReopensAndRerunsIdempotently]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testVersionTwoStoreMigratesPopulatedDataReopensAndRerunsIdempotently]' passed (0.016 seconds).
+Test Suite 'ContinuityTests' passed at 2026-08-27 08:34:26.402.
+	 Executed 6 tests, with 0 failures (0 unexpected) in 0.296 (0.297) seconds
+Test Suite 'ContinuityV2Tests' started at 2026-08-27 08:34:26.402.
+Test Case '-[ForgeConductorTests.ContinuityV2Tests testProductionReconcilerCompletesContinuityFromExactDurableHandoff]' started.
+Test Case '-[ForgeConductorTests.ContinuityV2Tests testProductionReconcilerCompletesContinuityFromExactDurableHandoff]' passed (0.053 seconds).
+Test Suite 'ContinuityV2Tests' passed at 2026-08-27 08:34:26.456.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.053 (0.053) seconds
+Test Suite 'ProjectControlPlaneRepositoryTests' started at 2026-08-27 08:34:26.456.
+Test Case '-[ForgeConductorTests.ProjectControlPlaneRepositoryTests testSchemaIntegrityPragmasAndMigrationReceiptAreIdempotent]' started.
+Test Case '-[ForgeConductorTests.ProjectControlPlaneRepositoryTests testSchemaIntegrityPragmasAndMigrationReceiptAreIdempotent]' passed (0.011 seconds).
+Test Case '-[ForgeConductorTests.ProjectControlPlaneRepositoryTests testUnshippedAndUnversionedControlPlaneSchemasFailClosedWithoutMutation]' started.
+Test Case '-[ForgeConductorTests.ProjectControlPlaneRepositoryTests testUnshippedAndUnversionedControlPlaneSchemasFailClosedWithoutMutation]' passed (0.009 seconds).
+Test Suite 'ProjectControlPlaneRepositoryTests' passed at 2026-08-27 08:34:26.476.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.020 (0.021) seconds
+Test Suite 'ProjectMemoryTests' started at 2026-08-27 08:34:26.476.
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testConcurrentInitializersSerializeVersionOneMigration]' started.
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testConcurrentInitializersSerializeVersionOneMigration]' passed (0.027 seconds).
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testNonemptyUnversionedDatabaseFailsClosedWithoutMutatingDatabase]' started.
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testNonemptyUnversionedDatabaseFailsClosedWithoutMutatingDatabase]' passed (0.008 seconds).
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testVersionOneDatabaseMigratesPopulatedDataReopensAndRerunsIdempotently]' started.
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testVersionOneDatabaseMigratesPopulatedDataReopensAndRerunsIdempotently]' passed (0.035 seconds).
+Test Suite 'ProjectMemoryTests' passed at 2026-08-27 08:34:26.546.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.069 (0.069) seconds
+Test Suite 'RuntimeExecutionJobTests' started at 2026-08-27 08:34:26.546.
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testConcurrentInitializersSerializeVersionTwoMigration]' started.
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testConcurrentInitializersSerializeVersionTwoMigration]' passed (0.020 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testNonemptyUnversionedRuntimeDatabaseFailsClosedWithoutMutation]' started.
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testNonemptyUnversionedRuntimeDatabaseFailsClosedWithoutMutation]' passed (0.007 seconds).
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testSchemaV2MigratesForwardWithProcessIdentityAndIdempotencyReceiptStorage]' started.
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testSchemaV2MigratesForwardWithProcessIdentityAndIdempotencyReceiptStorage]' passed (0.017 seconds).
+Test Suite 'RuntimeExecutionJobTests' passed at 2026-08-27 08:34:26.590.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.044 (0.044) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-08-27 08:34:26.590.
+	 Executed 15 tests, with 0 failures (0 unexpected) in 0.483 (0.485) seconds
+Test Suite 'Selected tests' passed at 2026-08-27 08:34:26.590.
+	 Executed 15 tests, with 0 failures (0 unexpected) in 0.483 (0.485) seconds
+◇ Test run started.
+↳ Testing Library Version: 1501
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

@@ -1,16 +1,6 @@
 {
   "artifacts": [
     {
-      "bytes": 21109,
-      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/completion-report.json",
-      "sha256": "d7a8b12bdc99903df39cbd9bde72c118c9c7eae9f68154429768a336b2b265ba"
-    },
-    {
-      "bytes": 13597,
-      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/completion-report.md",
-      "sha256": "ede39c431ec30b57e1d2295a18b066acbbeb80136a9192704da0377a6919b166"
-    },
-    {
       "bytes": 384,
       "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T030641Z-831d98c838.stdout.txt",
       "sha256": "74d83117c863b933645df88777b0f27f4a43df1edcebc7603b5d0115cd7361c6"
@@ -21,6 +11,24 @@
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     }
   ],
+  "artifact_integrity_reconciliation": {
+    "preserved_artifacts": [],
+    "status": "partially_preserved",
+    "unavailable_artifacts": [
+      {
+        "bytes": 21109,
+        "original_path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/completion-report.json",
+        "reason": "shared completion report path was overwritten before an evidence-ID-specific copy was preserved",
+        "sha256": "d7a8b12bdc99903df39cbd9bde72c118c9c7eae9f68154429768a336b2b265ba"
+      },
+      {
+        "bytes": 13597,
+        "original_path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/completion-report.md",
+        "reason": "shared completion report path was overwritten before an evidence-ID-specific copy was preserved",
+        "sha256": "ede39c431ec30b57e1d2295a18b066acbbeb80136a9192704da0377a6919b166"
+      }
+    ]
+  },
   "command": "./.forge-codex/scripts/verify_completion.py --repo . --no-finalize",
   "ended_at": "2026-08-27T03:06:43.616188+00:00",
   "environment": {

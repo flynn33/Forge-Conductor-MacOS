@@ -783,13 +783,52 @@ final class NativeSessionHostPluginTests: XCTestCase {
             storageDirectory: legacyRoot,
             transport: legacyTransport
         )
+        let backupURL = legacyRoot.appendingPathComponent(
+            "native-session-ledger.pre-migration-v1.json"
+        )
+        XCTAssertEqual(try Data(contentsOf: backupURL), legacyData)
+        XCTAssertEqual(
+            (try FileManager.default.attributesOfItem(atPath: backupURL.path)[.posixPermissions]
+                as? NSNumber)?.intValue,
+            0o600
+        )
+        let firstBackupData = try Data(contentsOf: backupURL)
         let legacyCount = await migrated.legacyQuarantineCount()
         XCTAssertEqual(legacyCount, 1)
-        let migratedText = try String(contentsOf: legacyLedgerURL, encoding: .utf8)
+        let firstMigrationData = try Data(contentsOf: legacyLedgerURL)
+        let migratedText = try XCTUnwrap(String(data: firstMigrationData, encoding: .utf8))
         XCTAssertTrue(migratedText.contains("legacy_v1_untrusted_provider_identity"))
         XCTAssertFalse(migratedText.contains("forge-logical-session-private"))
         XCTAssertFalse(migratedText.contains("native-fabricated-private"))
         XCTAssertFalse(migratedText.contains("legacy-private-key"))
+        let migratedObject = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: firstMigrationData) as? [String: Any]
+        )
+        XCTAssertEqual(migratedObject["schema_version"] as? Int, 2)
+        XCTAssertEqual((migratedObject["records"] as? [[String: Any]])?.count, 0)
+        XCTAssertEqual((migratedObject["legacy_quarantine"] as? [[String: Any]])?.count, 1)
+
+        let reopenedTransport = ScriptedManagedTransport(
+            mode: .normal,
+            ledgerURL: legacyLedgerURL
+        )
+        let reopened = try LMStudioManagedSessionHostAdapterV2(
+            storageDirectory: legacyRoot,
+            transport: reopenedTransport
+        )
+        let reopenedLegacyCount = await reopened.legacyQuarantineCount()
+        XCTAssertEqual(reopenedLegacyCount, 1)
+        XCTAssertEqual(try Data(contentsOf: legacyLedgerURL), firstMigrationData)
+        XCTAssertEqual(try Data(contentsOf: backupURL), firstBackupData)
+
+        let rerun = try LMStudioManagedSessionHostAdapterV2(
+            storageDirectory: legacyRoot,
+            transport: reopenedTransport
+        )
+        let rerunLegacyCount = await rerun.legacyQuarantineCount()
+        XCTAssertEqual(rerunLegacyCount, 1)
+        XCTAssertEqual(try Data(contentsOf: legacyLedgerURL), firstMigrationData)
+        XCTAssertEqual(try Data(contentsOf: backupURL), firstBackupData)
     }
 
     func testLiveLMStudioFreshRootAcknowledgementAndAutomaticContinuation() async throws {

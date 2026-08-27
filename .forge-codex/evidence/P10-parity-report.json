@@ -1,39 +1,96 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "phase": "P10",
   "status": "incomplete",
-  "reconciled_at": "2026-08-26T23:55:21Z",
-  "tested_tree": "working tree after b72d6e8dc00681477224fb1b79859f553bc02558",
-  "superseded_snapshot": {
-    "baseline_features": 66,
-    "status": "passed",
-    "scope": "pre-autonomy implementation at the prior repository revision"
+  "generated_at": "2026-08-27T14:36:30Z",
+  "tested_tree": {
+    "head": "749bdf2c974f574897ae444639df2702026c5cba",
+    "working_tree": true
+  },
+  "source_manifest": {
+    "bytes": 7881723,
+    "file_count": 234,
+    "schema_version": 1,
+    "sha256": "dbf675217b391ece4bd4f08353158693717f073650e8d520562deb860a92d9ef"
+  },
+  "baseline": {
+    "curated_feature_count": 66,
+    "source": ".forge-codex/state/feature-baseline.json",
+    "declared_preserved": 66
   },
   "current_automated_results": {
-    "swiftpm_debug_strict": "395 tests executed with 2 skips and 0 failures",
-    "swiftpm_release_strict": "395 tests executed with 2 skips and 0 failures",
-    "xcode_unit": "373 tests executed with 1 skip and 0 failures",
-    "project_local_build_and_run": "passed"
+    "swiftpm_debug_strict": {
+      "evidence_id": "EVID-20260827T142943Z-91834eb1f1",
+      "executed": 465,
+      "skipped": 4,
+      "failures": 0
+    },
+    "swiftpm_release_strict": {
+      "evidence_id": "EVID-20260827T143212Z-8ca31604b8",
+      "executed": 465,
+      "skipped": 4,
+      "failures": 0
+    },
+    "cli_compatibility": {
+      "status": "passed",
+      "evidence_id": "EVID-20260827T143556Z-c6d39ea4ac",
+      "runtime_cases": 16,
+      "preserved_help_arguments": 9
+    },
+    "mcp_compatibility": {
+      "status": "partial",
+      "evidence_id": "EVID-20260827T143605Z-cfa4328943",
+      "legacy_tools_preserved": 34,
+      "current_tools": 63,
+      "removed_tools": [],
+      "schema_breaks": [],
+      "description_breaks": [],
+      "uncovered": [
+        "active in-flight cancellation",
+        "concurrent mixed-request correlation",
+        "successful executable semantics for every legacy tool"
+      ]
+    },
+    "manager_http_compatibility": {
+      "status": "partial",
+      "evidence_id": "EVID-20260827T143614Z-159edd265d",
+      "report_path": ".forge-codex/evidence/P10-manager-http-compatibility-report.json",
+      "baseline_success_semantics": "8 of 8",
+      "current_success_semantics": "14 of 17",
+      "all_current_routes_observed": true,
+      "uncovered": [
+        "POST /api/manager/runs/start success",
+        "POST /api/manager/runs/status success",
+        "POST /api/manager/runs/control success"
+      ]
+    },
+    "host_safe_ui": {
+      "status": "passed",
+      "evidence_id": "EVID-20260827T113923Z-2c6fd79219",
+      "executed": 13,
+      "failures": 0
+    }
   },
-  "preserved_by_current_suites": [
+  "preserved_or_additive_surfaces": [
     "project-scoped durable memory",
     "managed continuity and crash recovery",
     "native session host plugin",
     "bounded runtime jobs and resource policies",
-    "existing unit-tested application, MCP, settings, and migration behavior"
-  ],
-  "additive_surfaces": [
+    "legacy CLI command and option help contract",
+    "all historical manager HTTP success semantics",
+    "all historical MCP tool names, descriptions, and non-narrowed schemas",
     "native operator console",
     "managed autonomous continuation",
     "runtime v3 execution and run-scoped cancellation",
     "four-tier resource admission policy"
   ],
   "removed": [],
-  "current_gaps": [
-    "the complete baseline feature inventory has not been regenerated and compared against the current working tree",
-    "MCP tool-name and schema, CLI, manager HTTP, settings, project format, import, and export comparisons are incomplete",
-    "native UI commands, accessibility actions, reconnect behavior, state presentation, and credential redaction are not behaviorally verified",
-    "performance-tier and hidden-view quiescence parity are incomplete"
+  "unknown": [],
+  "untested": [
+    "native signed UI command, settings, accessibility, reconnect, and redaction flow",
+    "three autonomous-run manager HTTP success semantics",
+    "active MCP cancellation and concurrent request correlation",
+    "successful executable semantics for every historical MCP tool"
   ],
   "ui": {
     "implementation_present": true,
@@ -42,11 +99,17 @@
     "configured_team_signing_identity_present": false,
     "xctest_attempts": 3,
     "passing_xctest_attempts": 0,
+    "issue_id": "FC-UI-QUALIFICATION-001",
     "evidence": ".forge-autonomy-state/evidence/FC-UI-001/test-results.json"
   },
-  "current_evidence": [
-    ".forge-autonomy-state/evidence/FC-RELEASE-001/test-results.json",
-    ".forge-autonomy-state/evidence/FC-UI-001/test-results.json",
-    ".forge-autonomy-state/evidence/FC-E2E-001/feature-parity-impact.json"
+  "migration_report": {
+    "status": "incomplete",
+    "path": ".forge-codex/evidence/P10-migration-report.json"
+  },
+  "remaining_requirements": [
+    "authorize and pass the native signed UI lane",
+    "close all protocol and manager uncovered checks",
+    "close interrupted migration backup and legacy receipt recovery",
+    "regenerate exact-revision evidence after the checkpoint commit"
   ]
 }

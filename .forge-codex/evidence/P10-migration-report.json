@@ -1,27 +1,207 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "phase": "P10",
   "status": "incomplete",
-  "reconciled_at": "2026-08-26T23:55:21Z",
-  "passing_current_scope": {
-    "suite": "strict Debug and Release SwiftPM suites",
-    "executed_each": 395,
-    "skipped_each": 2,
-    "failures_each": 0,
-    "covered_fixtures": [
-      "continuity schema migration and restart",
-      "legacy continuity handoff migration",
-      "project memory restart and recovery",
-      "unsupported and corrupt project-memory preservation",
-      "native session ledger restart",
-      "managed continuity v2 crash recovery"
+  "generated_at": "2026-08-27T14:36:30Z",
+  "tested_tree": {
+    "head": "749bdf2c974f574897ae444639df2702026c5cba",
+    "working_tree": true
+  },
+  "source_manifest": {
+    "bytes": 7881723,
+    "file_count": 234,
+    "schema_version": 1,
+    "sha256": "dbf675217b391ece4bd4f08353158693717f073650e8d520562deb860a92d9ef"
+  },
+  "strict_suites": {
+    "debug": {
+      "evidence_id": "EVID-20260827T142943Z-91834eb1f1",
+      "executed": 465,
+      "skipped": 4,
+      "failures": 0
+    },
+    "release": {
+      "evidence_id": "EVID-20260827T143212Z-8ca31604b8",
+      "executed": 465,
+      "skipped": 4,
+      "failures": 0
+    }
+  },
+  "fixtures": [
+    {
+      "id": "config-v1-to-v2",
+      "source_format": "configuration v1 or unversioned JSON",
+      "target_version": 2,
+      "status": "passed",
+      "proof": [
+        "populated migration",
+        "verified exact backup",
+        "prepared receipt reconciliation",
+        "close and reopen",
+        "idempotent concurrent rerun"
+      ],
+      "evidence_ids": [
+        "EVID-20260827T113114Z-ae0d7d93fe",
+        "EVID-20260827T113141Z-d65692a2a6"
+      ]
+    },
+    {
+      "id": "global-sqlite-v2-to-v5",
+      "source_format": "global SQLite schema v2",
+      "target_version": 5,
+      "status": "passed",
+      "proof": [
+        "populated semantic fixture",
+        "online WAL-aware owner-only backup",
+        "quick_check and source-version verification",
+        "close and reopen",
+        "idempotent rerun"
+      ],
+      "evidence_ids": [
+        "EVID-20260827T113114Z-ae0d7d93fe",
+        "EVID-20260827T113141Z-d65692a2a6",
+        "EVID-20260827T122519Z-9b81cdf7f2",
+        "EVID-20260827T122542Z-5ccf3cea22"
+      ]
+    },
+    {
+      "id": "global-sqlite-v3-to-v5",
+      "source_format": "global SQLite schema v3",
+      "target_version": 5,
+      "status": "passed",
+      "proof": [
+        "populated handoff fixture",
+        "online WAL-aware owner-only backup",
+        "concurrent initialization",
+        "close and reopen",
+        "idempotent rerun"
+      ],
+      "evidence_ids": [
+        "EVID-20260827T113114Z-ae0d7d93fe",
+        "EVID-20260827T113141Z-d65692a2a6",
+        "EVID-20260827T122519Z-9b81cdf7f2",
+        "EVID-20260827T122542Z-5ccf3cea22"
+      ]
+    },
+    {
+      "id": "project-memory-v1-to-v2",
+      "source_format": "project-memory SQLite schema v1",
+      "target_version": 2,
+      "status": "passed",
+      "proof": [
+        "populated records, tags, handoff, and rollover fixture",
+        "online WAL-aware owner-only backup",
+        "eight-way serialized initialization",
+        "close and reopen",
+        "idempotent rerun"
+      ],
+      "evidence_ids": [
+        "EVID-20260827T113114Z-ae0d7d93fe",
+        "EVID-20260827T113141Z-d65692a2a6",
+        "EVID-20260827T122519Z-9b81cdf7f2",
+        "EVID-20260827T122542Z-5ccf3cea22"
+      ]
+    },
+    {
+      "id": "legacy-continuity-v1-import",
+      "source_format": "legacy continuity v1 JSON",
+      "target_version": 2,
+      "status": "passed_with_open_receipt_recovery",
+      "proof": [
+        "exact-project import",
+        "ambiguous-record quarantine",
+        "source bytes preserved",
+        "completed replay is idempotent"
+      ],
+      "evidence_ids": [
+        "EVID-20260827T113114Z-ae0d7d93fe",
+        "EVID-20260827T113141Z-d65692a2a6",
+        "EVID-20260827T114018Z-bf8c321d41"
+      ],
+      "open_requirement": "atomically journal or reconcile a crash between imported side effects and the durable migration receipt"
+    },
+    {
+      "id": "legacy-continuity-v2-import",
+      "source_format": "legacy continuity v2 JSON",
+      "target_version": 2,
+      "status": "passed_with_open_receipt_recovery",
+      "proof": [
+        "binding preserved across restart",
+        "source bytes preserved",
+        "completed replay is idempotent"
+      ],
+      "evidence_ids": [
+        "EVID-20260827T113114Z-ae0d7d93fe",
+        "EVID-20260827T113141Z-d65692a2a6",
+        "EVID-20260827T114018Z-bf8c321d41"
+      ],
+      "open_requirement": "atomically journal or reconcile a crash between imported side effects and the durable migration receipt"
+    },
+    {
+      "id": "native-ledger-v1-to-v2",
+      "source_format": "native managed-session ledger v1 JSON",
+      "target_version": 2,
+      "status": "passed",
+      "proof": [
+        "exact owner-only legacy-byte backup",
+        "synthetic provider identity quarantined",
+        "close and reopen",
+        "idempotent rerun"
+      ],
+      "evidence_ids": [
+        "EVID-20260827T113114Z-ae0d7d93fe",
+        "EVID-20260827T113141Z-d65692a2a6",
+        "EVID-20260827T122519Z-9b81cdf7f2",
+        "EVID-20260827T122542Z-5ccf3cea22"
+      ]
+    },
+    {
+      "id": "runtime-job-v2-to-v5",
+      "source_format": "runtime-job SQLite schema v2",
+      "target_version": 5,
+      "status": "passed",
+      "proof": [
+        "populated terminal-job fixture",
+        "online WAL-aware owner-only backup",
+        "eight-way serialized initialization",
+        "close and reopen",
+        "idempotent rerun"
+      ],
+      "evidence_ids": [
+        "EVID-20260827T113114Z-ae0d7d93fe",
+        "EVID-20260827T113141Z-d65692a2a6",
+        "EVID-20260827T122519Z-9b81cdf7f2",
+        "EVID-20260827T122542Z-5ccf3cea22"
+      ]
+    }
+  ],
+  "excluded_surfaces": [
+    {
+      "id": "project-control-plane-v1",
+      "disposition": "not_applicable",
+      "reason": "the control-plane repository was introduced at schema v2 and has no shipped v1 fixture",
+      "current_behavior": "fresh empty version 0 and exact current version 2 are accepted; fictional v1 and nonempty unversioned databases fail closed without mutation",
+      "evidence_id": "EVID-20260827T120131Z-1b4103b7ef"
+    }
+  ],
+  "backup_qualification": {
+    "status": "partial",
+    "completed": [
+      "bounded online SQLite backup includes WAL state",
+      "backup files are owner-only from creation",
+      "symlink and hard-link artifacts fail closed",
+      "byte and time limits fail closed",
+      "fixed backup reuse requires exact logical snapshot equality",
+      "project-memory and runtime migrations use bounded process and interprocess initialization locks"
+    ],
+    "remaining": [
+      "prepared and completed backup manifests with source and target versions, SHA-256, bytes, and rollback instructions",
+      "deterministic interrupted-migration manifest reconciliation"
     ]
   },
-  "preserved_prior_evidence": [
-    "EVID-20260823T210632Z-016869a17f",
-    "EVID-20260823T210727Z-dd0087ce58"
-  ],
-  "rollback_policy": "transactions roll back on failure and source databases are preserved rather than deleted",
-  "remaining_requirement": "regenerate the complete legacy fixture inventory for the current data model and prove every fixture migrates and reopens before marking the all-fixtures criterion passed",
-  "current_evidence": ".forge-autonomy-state/evidence/FC-RELEASE-001/test-results.json"
+  "remaining_requirements": [
+    "close the legacy continuity crash window between side effects and receipt persistence",
+    "complete backup manifest and interrupted-state reconciliation",
+    "rerun exact-revision evidence after the checkpoint commit"
+  ]
 }

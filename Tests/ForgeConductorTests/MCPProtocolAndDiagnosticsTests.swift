@@ -35,14 +35,16 @@ final class MCPProtocolAndDiagnosticsTests: XCTestCase {
     }
 
     func testProtocolNegotiationEchoesLMStudioVersion() {
-        XCTAssertEqual(
-            MCPServer.negotiateProtocolVersion("2025-11-25"),
-            "2025-11-25"
-        )
-        XCTAssertEqual(
-            MCPServer.negotiateProtocolVersion("2024-11-05"),
-            "2024-11-05"
-        )
+        let expectedVersions = [
+            "2025-11-25",
+            "2025-06-18",
+            "2025-03-26",
+            "2024-11-05",
+        ]
+        XCTAssertEqual(MCPServer.supportedProtocolVersions, expectedVersions)
+        for version in expectedVersions {
+            XCTAssertEqual(MCPServer.negotiateProtocolVersion(version), version)
+        }
         // Unknown → newest supported
         XCTAssertEqual(
             MCPServer.negotiateProtocolVersion("2099-01-01"),

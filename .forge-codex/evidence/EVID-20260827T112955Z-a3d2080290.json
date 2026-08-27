@@ -1,0 +1,33 @@
+{
+  "artifacts": [
+    {
+      "bytes": 1658,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T112955Z-a3d2080290.stdout.txt",
+      "sha256": "f55f01b731e11026f75c6ac9fc541c851e4a1b4f596d313cb3ba67c5cd507f51"
+    },
+    {
+      "bytes": 98,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T112955Z-a3d2080290.stderr.txt",
+      "sha256": "e0606cbaa65d2b0312db79f47a538d11abb943541dce8b7c2d3c688f77be782c"
+    }
+  ],
+  "command": "swift test -Xswiftc -warnings-as-errors --filter 'RuntimeExecutionJobTests.testSchemaV2MigratesForwardWithProcessIdentityAndIdempotencyReceiptStorage|NativeSessionHostPluginTests.testV2BlockedCredentialFailureAndLegacySyntheticQuarantinePersist'",
+  "ended_at": "2026-08-27T11:29:55.666704+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260827T112955Z-a3d2080290",
+  "kind": "p10-runtime-and-native-ledger-migration-lifecycle",
+  "related_findings": [
+    "FC-MIGRATION-MATRIX-001"
+  ],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-27T11:29:55.101656+00:00",
+  "timed_out": false
+}

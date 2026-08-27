@@ -1,0 +1,251 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-08-23T18:43:40Z",
+  "baseline_revision": "1fce9e0188698167564056ee8ace266342f97c7b",
+  "baseline_source_sha256": "c8cac41fd648b848b162ac193f5f32a67768ad864b4f66017147268e7aa9f7cf",
+  "source_path": "Sources/ForgeConductorCLI/ForgeConductorMain.swift",
+  "baseline_version": "0.8.0",
+  "limits": {
+    "case_timeout_seconds": 15,
+    "termination_grace_seconds": 1,
+    "maximum_stdout_bytes": 262144,
+    "maximum_stderr_bytes": 65536
+  },
+  "top_level_commands": [
+    "install",
+    "install-lmstudio-plugin",
+    "doctor",
+    "status",
+    "serve",
+    "dashboard",
+    "manager",
+    "agents",
+    "version",
+    "help"
+  ],
+  "manager_subcommands": [
+    "run",
+    "start",
+    "stop",
+    "restart",
+    "status",
+    "install-login",
+    "uninstall-login",
+    "cleanup-stale",
+    "allowlist"
+  ],
+  "preserved_options": {
+    "shared_after_command": [
+      "--home PATH"
+    ],
+    "install": [
+      "--from PATH"
+    ],
+    "install-lmstudio-plugin": [
+      "--binary PATH"
+    ],
+    "dashboard": [
+      "--host HOST",
+      "--port PORT",
+      "--open"
+    ],
+    "manager": [
+      "--open",
+      "--home PATH",
+      "install-login --keep-stale"
+    ]
+  },
+  "exit_code_contract": {
+    "success": 0,
+    "runtime_failure": 1,
+    "unknown_command": 2
+  },
+  "equivalence_groups": [
+    {
+      "id": "top_level_help",
+      "case_ids": [
+        "no_arguments_help",
+        "help",
+        "short_help",
+        "long_help"
+      ]
+    },
+    {
+      "id": "version",
+      "case_ids": [
+        "version",
+        "long_version"
+      ]
+    },
+    {
+      "id": "manager_help",
+      "case_ids": [
+        "manager_help",
+        "manager_short_help",
+        "manager_long_help"
+      ]
+    }
+  ],
+  "runtime_cases": [
+    {
+      "id": "no_arguments_help",
+      "arguments": [],
+      "validator": "top_level_help",
+      "expected_exit": 0,
+      "expected_stderr": ""
+    },
+    {
+      "id": "help",
+      "arguments": [
+        "help"
+      ],
+      "validator": "top_level_help",
+      "expected_exit": 0,
+      "expected_stderr": ""
+    },
+    {
+      "id": "short_help",
+      "arguments": [
+        "-h"
+      ],
+      "validator": "top_level_help",
+      "expected_exit": 0,
+      "expected_stderr": ""
+    },
+    {
+      "id": "long_help",
+      "arguments": [
+        "--help"
+      ],
+      "validator": "top_level_help",
+      "expected_exit": 0,
+      "expected_stderr": ""
+    },
+    {
+      "id": "version",
+      "arguments": [
+        "version"
+      ],
+      "validator": "version",
+      "expected_exit": 0,
+      "expected_stderr": ""
+    },
+    {
+      "id": "long_version",
+      "arguments": [
+        "--version"
+      ],
+      "validator": "version",
+      "expected_exit": 0,
+      "expected_stderr": ""
+    },
+    {
+      "id": "unknown_command",
+      "arguments": [
+        "__forge_unknown_command__"
+      ],
+      "validator": "top_level_help",
+      "expected_exit": 2,
+      "expected_stderr": "Unknown command: __forge_unknown_command__\n\n"
+    },
+    {
+      "id": "manager_help",
+      "arguments": [
+        "manager",
+        "help"
+      ],
+      "validator": "manager_help",
+      "expected_exit": 0,
+      "expected_stderr": ""
+    },
+    {
+      "id": "manager_short_help",
+      "arguments": [
+        "manager",
+        "-h"
+      ],
+      "validator": "manager_help",
+      "expected_exit": 0,
+      "expected_stderr": ""
+    },
+    {
+      "id": "manager_long_help",
+      "arguments": [
+        "manager",
+        "--help"
+      ],
+      "validator": "manager_help",
+      "expected_exit": 0,
+      "expected_stderr": ""
+    },
+    {
+      "id": "manager_unknown_command",
+      "arguments": [
+        "manager",
+        "__forge_unknown_manager_command__"
+      ],
+      "validator": "empty_stdout",
+      "expected_exit": 2,
+      "expected_stdout": "",
+      "expected_stderr": "Unknown manager subcommand: __forge_unknown_manager_command__\n"
+    },
+    {
+      "id": "status",
+      "arguments": [
+        "status",
+        "--home",
+        "{home}"
+      ],
+      "validator": "status_json",
+      "expected_exit": 0,
+      "expected_stderr": ""
+    },
+    {
+      "id": "doctor",
+      "arguments": [
+        "doctor",
+        "--home",
+        "{home}"
+      ],
+      "validator": "doctor_json",
+      "expected_exit": "json_ok",
+      "expected_stderr": ""
+    },
+    {
+      "id": "agents",
+      "arguments": [
+        "agents",
+        "--home",
+        "{home}"
+      ],
+      "validator": "agents_tsv",
+      "expected_exit": 0,
+      "expected_stderr": ""
+    },
+    {
+      "id": "manager_status",
+      "arguments": [
+        "manager",
+        "status",
+        "--home",
+        "{home}"
+      ],
+      "validator": "manager_status_json",
+      "expected_exit": 0,
+      "expected_stderr": ""
+    },
+    {
+      "id": "manager_stop_idle",
+      "arguments": [
+        "manager",
+        "stop",
+        "--home",
+        "{home}"
+      ],
+      "validator": "manager_stop_idle",
+      "expected_exit": 0,
+      "expected_stdout": "Manager is not running\n",
+      "expected_stderr": ""
+    }
+  ]
+}

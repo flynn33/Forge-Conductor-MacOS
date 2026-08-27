@@ -1,0 +1,9 @@
+usage: check_p10_protocol_compatibility.py [-h] --binary BINARY
+                                           [--baseline-transcript BASELINE_TRANSCRIPT]
+                                           [--requests REQUESTS]
+                                           [--output OUTPUT]
+                                           [--transcript-output TRANSCRIPT_OUTPUT]
+                                           [--response-timeout RESPONSE_TIMEOUT]
+                                           [--shutdown-timeout SHUTDOWN_TIMEOUT]
+                                           [--require-clean]
+check_p10_protocol_compatibility.py: error: the following arguments are required: --binary

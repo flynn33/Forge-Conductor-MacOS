@@ -1,0 +1,17 @@
+Test Suite 'Selected tests' started at 2026-08-27 06:21:32.815.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-27 06:21:32.816.
+Test Suite 'ContinuityTests' started at 2026-08-27 06:21:32.816.
+Test Case '-[ForgeConductorTests.ContinuityTests testConcurrentVersionThreeMigrationIsIdempotent]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testConcurrentVersionThreeMigrationIsIdempotent]' passed (0.034 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testVersionThreeStoreMigratesWithoutLosingHandoff]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testVersionThreeStoreMigratesWithoutLosingHandoff]' passed (0.250 seconds).
+Test Suite 'ContinuityTests' passed at 2026-08-27 06:21:33.100.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.285 (0.285) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-08-27 06:21:33.100.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.285 (0.285) seconds
+Test Suite 'Selected tests' passed at 2026-08-27 06:21:33.100.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.285 (0.286) seconds
+◇ Test run started.
+↳ Testing Library Version: 1501
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

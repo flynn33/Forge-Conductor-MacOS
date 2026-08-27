@@ -1,0 +1,44 @@
+Test Suite 'Selected tests' started at 2026-08-27 06:53:00.029.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-27 06:53:00.030.
+Test Suite 'ContinuityTests' started at 2026-08-27 06:53:00.030.
+Test Case '-[ForgeConductorTests.ContinuityTests testConcurrentVersionThreeMigrationIsIdempotent]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Tests/ForgeConductorTests/ContinuityTests.swift:1249: error: -[ForgeConductorTests.ContinuityTests testConcurrentVersionThreeMigrationIsIdempotent] : XCTAssertEqual failed: ("["migration 0: verificationFailed(\"SQLite recovery artifact query could not be prepared\")", "migration 1: verificationFailed(\"SQLite recovery artifact query could not be prepared\")"]") is not equal to ("[]")
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Tests/ForgeConductorTests/ContinuityTests.swift:1251: error: -[ForgeConductorTests.ContinuityTests testConcurrentVersionThreeMigrationIsIdempotent] : XCTAssertEqual failed: threw error "failure("no such table: schema_version")"
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/SQLiteStore.swift:69: error: -[ForgeConductorTests.ContinuityTests testConcurrentVersionThreeMigrationIsIdempotent] : failed: caught error: "verificationFailed("SQLite recovery artifact query could not be prepared")"
+Test Case '-[ForgeConductorTests.ContinuityTests testConcurrentVersionThreeMigrationIsIdempotent]' failed (0.136 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testVerifiedMigrationBackupCapturesWALAndRejectsTamperedReuse]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/VerifiedMigrationBackup.swift:314: error: -[ForgeConductorTests.ContinuityTests testVerifiedMigrationBackupCapturesWALAndRejectsTamperedReuse] : failed: caught error: "verificationFailed("SQLite recovery artifact query could not be prepared")"
+Test Case '-[ForgeConductorTests.ContinuityTests testVerifiedMigrationBackupCapturesWALAndRejectsTamperedReuse]' failed (0.034 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testVersionThreeStoreMigratesWithoutLosingHandoff]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/SQLiteStore.swift:69: error: -[ForgeConductorTests.ContinuityTests testVersionThreeStoreMigratesWithoutLosingHandoff] : failed: caught error: "verificationFailed("SQLite recovery artifact query could not be prepared")"
+Test Case '-[ForgeConductorTests.ContinuityTests testVersionThreeStoreMigratesWithoutLosingHandoff]' failed (0.009 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testVersionTwoStoreMigratesPopulatedDataReopensAndRerunsIdempotently]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/SQLiteStore.swift:69: error: -[ForgeConductorTests.ContinuityTests testVersionTwoStoreMigratesPopulatedDataReopensAndRerunsIdempotently] : failed: caught error: "verificationFailed("SQLite recovery artifact query could not be prepared")"
+Test Case '-[ForgeConductorTests.ContinuityTests testVersionTwoStoreMigratesPopulatedDataReopensAndRerunsIdempotently]' failed (0.005 seconds).
+Test Suite 'ContinuityTests' failed at 2026-08-27 06:53:00.215.
+	 Executed 4 tests, with 6 failures (5 unexpected) in 0.185 (0.185) seconds
+Test Suite 'NativeSessionHostPluginTests' started at 2026-08-27 06:53:00.215.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testV2BlockedCredentialFailureAndLegacySyntheticQuarantinePersist]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testV2BlockedCredentialFailureAndLegacySyntheticQuarantinePersist]' passed (0.021 seconds).
+Test Suite 'NativeSessionHostPluginTests' passed at 2026-08-27 06:53:00.236.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.021 (0.021) seconds
+Test Suite 'ProjectMemoryTests' started at 2026-08-27 06:53:00.236.
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testVersionOneDatabaseMigratesPopulatedDataReopensAndRerunsIdempotently]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectMemoryRepository.swift:1814: error: -[ForgeConductorTests.ProjectMemoryTests testVersionOneDatabaseMigratesPopulatedDataReopensAndRerunsIdempotently] : failed: caught error: "verificationFailed("SQLite recovery artifact query could not be prepared")"
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testVersionOneDatabaseMigratesPopulatedDataReopensAndRerunsIdempotently]' failed (0.013 seconds).
+Test Suite 'ProjectMemoryTests' failed at 2026-08-27 06:53:00.249.
+	 Executed 1 test, with 1 failure (1 unexpected) in 0.013 (0.013) seconds
+Test Suite 'RuntimeExecutionJobTests' started at 2026-08-27 06:53:00.249.
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testSchemaV2MigratesForwardWithProcessIdentityAndIdempotencyReceiptStorage]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeJobRepository.swift:1350: error: -[ForgeConductorTests.RuntimeExecutionJobTests testSchemaV2MigratesForwardWithProcessIdentityAndIdempotencyReceiptStorage] : failed: caught error: "verificationFailed("SQLite recovery artifact query could not be prepared")"
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testSchemaV2MigratesForwardWithProcessIdentityAndIdempotencyReceiptStorage]' failed (0.004 seconds).
+Test Suite 'RuntimeExecutionJobTests' failed at 2026-08-27 06:53:00.253.
+	 Executed 1 test, with 1 failure (1 unexpected) in 0.004 (0.004) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' failed at 2026-08-27 06:53:00.253.
+	 Executed 7 tests, with 8 failures (7 unexpected) in 0.222 (0.223) seconds
+Test Suite 'Selected tests' failed at 2026-08-27 06:53:00.253.
+	 Executed 7 tests, with 8 failures (7 unexpected) in 0.222 (0.224) seconds
+◇ Test run started.
+↳ Testing Library Version: 1501
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

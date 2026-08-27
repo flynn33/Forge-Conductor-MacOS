@@ -1,0 +1,35 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 127715,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T130609Z-095131732b.stdout.txt",
+      "sha256": "8381e8d6828b0d823ec9e6e9b4c06df73e5326df730ad0d73817360f6256b9a8"
+    },
+    {
+      "bytes": 120,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T130609Z-095131732b.stderr.txt",
+      "sha256": "f520526871f762416be50708e3b286b4e336b879185363a2d24f535b6e463e00"
+    }
+  ],
+  "command": "env FORGE_SKIP_PS=1 swift test -c release --no-parallel -Xswiftc -warnings-as-errors",
+  "ended_at": "2026-08-27T13:07:16.565719+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260827T130609Z-095131732b",
+  "kind": "p10-post-preflight-full-release",
+  "related_findings": [
+    "FC-MIGRATION-MATRIX-001",
+    "FC-MIGRATION-BACKUP-001"
+  ],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-27T13:06:09.560851+00:00",
+  "timed_out": false
+}

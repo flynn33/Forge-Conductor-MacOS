@@ -1,0 +1,364 @@
+{
+  "baseline_revision": "1fce9e0188698167564056ee8ace266342f97c7b",
+  "baseline_version": "0.8.0",
+  "current_version": "0.9.0",
+  "generated_at": "2026-08-27T13:56:33.520715+00:00",
+  "hashes": {
+    "baseline_sha256": "edf08598ccf98f606ae0617528a714910d06cfd9e9a37dea0fd947874e7f2825",
+    "binary_sha256": "3280100d31572f031a01c3b75772ccdf6956f641814b6ef038c5dcb10242d855",
+    "source_sha256": "f46124943a38b73720590a6f7db54bcea1a71390897384a0f4b2476353a75824"
+  },
+  "limits": {
+    "case_timeout_seconds": 15,
+    "maximum_stderr_bytes": 65536,
+    "maximum_stdout_bytes": 262144,
+    "termination_grace_seconds": 1
+  },
+  "manager_subcommands": [
+    "run",
+    "start",
+    "stop",
+    "restart",
+    "status",
+    "install-login",
+    "uninstall-login",
+    "cleanup-stale",
+    "allowlist"
+  ],
+  "paths": {
+    "baseline": ".forge-codex/state/baseline/cli-contract.json",
+    "binary": ".build/arm64-apple-macosx/release/forge-conductor",
+    "source": "Sources/ForgeConductorCLI/ForgeConductorMain.swift"
+  },
+  "phase": "P10",
+  "preserved_help_arguments": [
+    {
+      "argument": "--home PATH",
+      "group": "shared_after_command",
+      "help_cases": [
+        "no_arguments_help",
+        "manager_help"
+      ],
+      "present": true,
+      "scope": "shared_after_command"
+    },
+    {
+      "argument": "--from PATH",
+      "group": "install",
+      "help_cases": [
+        "no_arguments_help"
+      ],
+      "present": true,
+      "scope": "top_level_command:install"
+    },
+    {
+      "argument": "--binary PATH",
+      "group": "install-lmstudio-plugin",
+      "help_cases": [
+        "no_arguments_help"
+      ],
+      "present": true,
+      "scope": "top_level_command:install-lmstudio-plugin"
+    },
+    {
+      "argument": "--host HOST",
+      "group": "dashboard",
+      "help_cases": [
+        "no_arguments_help"
+      ],
+      "present": true,
+      "scope": "top_level_command:dashboard"
+    },
+    {
+      "argument": "--port PORT",
+      "group": "dashboard",
+      "help_cases": [
+        "no_arguments_help"
+      ],
+      "present": true,
+      "scope": "top_level_command:dashboard"
+    },
+    {
+      "argument": "--open",
+      "group": "dashboard",
+      "help_cases": [
+        "no_arguments_help"
+      ],
+      "present": true,
+      "scope": "top_level_command:dashboard"
+    },
+    {
+      "argument": "--open",
+      "group": "manager",
+      "help_cases": [
+        "manager_help"
+      ],
+      "present": true,
+      "scope": "manager"
+    },
+    {
+      "argument": "--home PATH",
+      "group": "manager",
+      "help_cases": [
+        "manager_help"
+      ],
+      "present": true,
+      "scope": "manager"
+    },
+    {
+      "argument": "install-login --keep-stale",
+      "group": "manager",
+      "help_cases": [
+        "manager_help"
+      ],
+      "present": true,
+      "scope": "manager"
+    }
+  ],
+  "runtime_case_count": 16,
+  "runtime_cases": [
+    {
+      "arguments": [],
+      "duration_ms": 370,
+      "exit_code": 0,
+      "id": "no_arguments_help",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 1769,
+      "stdout_sha256": "606a53e6c8c35e9342933226e277caf089cab97ac3758698b21322a32b4bf7d7",
+      "validator": "top_level_help"
+    },
+    {
+      "arguments": [
+        "help"
+      ],
+      "duration_ms": 7,
+      "exit_code": 0,
+      "id": "help",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 1769,
+      "stdout_sha256": "606a53e6c8c35e9342933226e277caf089cab97ac3758698b21322a32b4bf7d7",
+      "validator": "top_level_help"
+    },
+    {
+      "arguments": [
+        "-h"
+      ],
+      "duration_ms": 6,
+      "exit_code": 0,
+      "id": "short_help",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 1769,
+      "stdout_sha256": "606a53e6c8c35e9342933226e277caf089cab97ac3758698b21322a32b4bf7d7",
+      "validator": "top_level_help"
+    },
+    {
+      "arguments": [
+        "--help"
+      ],
+      "duration_ms": 6,
+      "exit_code": 0,
+      "id": "long_help",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 1769,
+      "stdout_sha256": "606a53e6c8c35e9342933226e277caf089cab97ac3758698b21322a32b4bf7d7",
+      "validator": "top_level_help"
+    },
+    {
+      "arguments": [
+        "version"
+      ],
+      "duration_ms": 5,
+      "exit_code": 0,
+      "id": "version",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 6,
+      "stdout_sha256": "9d8c94f1ad3ea96b1e2ac4914fda4cb93c76b4a3e0d8cc6dd8976d6c0b227d15",
+      "validator": "version"
+    },
+    {
+      "arguments": [
+        "--version"
+      ],
+      "duration_ms": 5,
+      "exit_code": 0,
+      "id": "long_version",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 6,
+      "stdout_sha256": "9d8c94f1ad3ea96b1e2ac4914fda4cb93c76b4a3e0d8cc6dd8976d6c0b227d15",
+      "validator": "version"
+    },
+    {
+      "arguments": [
+        "__forge_unknown_command__"
+      ],
+      "duration_ms": 5,
+      "exit_code": 2,
+      "id": "unknown_command",
+      "stderr_bytes": 44,
+      "stderr_sha256": "6b086654eafb7d8e233e00447749ace0edfbe7c0f05cdfb594e017e52f89bf4e",
+      "stdout_bytes": 1769,
+      "stdout_sha256": "606a53e6c8c35e9342933226e277caf089cab97ac3758698b21322a32b4bf7d7",
+      "validator": "top_level_help"
+    },
+    {
+      "arguments": [
+        "manager",
+        "help"
+      ],
+      "duration_ms": 5,
+      "exit_code": 0,
+      "id": "manager_help",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 621,
+      "stdout_sha256": "e6d7d065df800e7d807c45a6ed30742de76b656b7521298426f06a02f3a3ae19",
+      "validator": "manager_help"
+    },
+    {
+      "arguments": [
+        "manager",
+        "-h"
+      ],
+      "duration_ms": 5,
+      "exit_code": 0,
+      "id": "manager_short_help",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 621,
+      "stdout_sha256": "e6d7d065df800e7d807c45a6ed30742de76b656b7521298426f06a02f3a3ae19",
+      "validator": "manager_help"
+    },
+    {
+      "arguments": [
+        "manager",
+        "--help"
+      ],
+      "duration_ms": 4,
+      "exit_code": 0,
+      "id": "manager_long_help",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 621,
+      "stdout_sha256": "e6d7d065df800e7d807c45a6ed30742de76b656b7521298426f06a02f3a3ae19",
+      "validator": "manager_help"
+    },
+    {
+      "arguments": [
+        "manager",
+        "__forge_unknown_manager_command__"
+      ],
+      "duration_ms": 5,
+      "exit_code": 2,
+      "id": "manager_unknown_command",
+      "stderr_bytes": 62,
+      "stderr_sha256": "740d6ab35b6e4b8d7028b98b45892c8a0e27a2ee774ffb9082c0ef8f7a8862e4",
+      "stdout_bytes": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "validator": "empty_stdout"
+    },
+    {
+      "arguments": [
+        "status",
+        "--home",
+        "{home}"
+      ],
+      "duration_ms": 125,
+      "exit_code": 0,
+      "id": "status",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 3708,
+      "stdout_sha256": "e148ae63968f4893447191d40e7bfdbd8231d2bdb3f1f91e54cc92442e8ca443",
+      "validator": "status_json"
+    },
+    {
+      "arguments": [
+        "doctor",
+        "--home",
+        "{home}"
+      ],
+      "duration_ms": 115,
+      "exit_code": 0,
+      "id": "doctor",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 3538,
+      "stdout_sha256": "b5a1d388168821176276eae92d85f7ef8621df21115091dd9f2ccb250ee78e1d",
+      "validator": "doctor_json"
+    },
+    {
+      "arguments": [
+        "agents",
+        "--home",
+        "{home}"
+      ],
+      "duration_ms": 102,
+      "exit_code": 0,
+      "id": "agents",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 241,
+      "stdout_sha256": "36e5ae70ed49a203b02e0d92f04fa9dba6e8c36d20227b174fb762971d05ad4d",
+      "validator": "agents_tsv"
+    },
+    {
+      "arguments": [
+        "manager",
+        "status",
+        "--home",
+        "{home}"
+      ],
+      "duration_ms": 103,
+      "exit_code": 0,
+      "id": "manager_status",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 201,
+      "stdout_sha256": "6680377060d73a639199dea8180df4fc67ce866ca0ce5c78f0a653bf3a6c617b",
+      "validator": "manager_status_json"
+    },
+    {
+      "arguments": [
+        "manager",
+        "stop",
+        "--home",
+        "{home}"
+      ],
+      "duration_ms": 9,
+      "exit_code": 0,
+      "id": "manager_stop_idle",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 23,
+      "stdout_sha256": "e434fe8769bb4916756e4d6510ce7a8205b62de608148a6007cc067a036ae8da",
+      "validator": "manager_stop_idle"
+    }
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 7856396,
+    "file_count": 234,
+    "schema_version": 1,
+    "sha256": "586ee8ab00d621acb78c88270e3d65cb538b7562d67ed47c60fca4941d218d7c"
+  },
+  "status": "passed",
+  "top_level_commands": [
+    "install",
+    "install-lmstudio-plugin",
+    "doctor",
+    "status",
+    "serve",
+    "dashboard",
+    "manager",
+    "agents",
+    "version",
+    "help"
+  ],
+  "user_mutating_commands_executed": []
+}

@@ -1,0 +1,758 @@
+{
+  "additive_tool_count": 29,
+  "additive_tools": [
+    "bash.run",
+    "continuity.acknowledge_handoff",
+    "continuity.checkpoint",
+    "continuity.get_pending_handoff",
+    "continuity.prepare_handoff",
+    "continuity.request_rollover",
+    "continuity.resume",
+    "continuity.status",
+    "job.cancel",
+    "job.list",
+    "job.read_output",
+    "job.status",
+    "powershell.run",
+    "process.run",
+    "project_memory.export",
+    "project_memory.forget",
+    "project_memory.get",
+    "project_memory.import",
+    "project_memory.initialize",
+    "project_memory.link",
+    "project_memory.list_recent",
+    "project_memory.remember",
+    "project_memory.remember_batch",
+    "project_memory.search",
+    "project_memory.status",
+    "project_memory.update",
+    "python.run",
+    "runtime.capabilities",
+    "shell.run"
+  ],
+  "artifacts": {
+    "baseline_transcript": {
+      "bytes": 8568,
+      "path": ".forge-codex/evidence/EVID-20260823T184311Z-0dccfacc9f.stdout.txt",
+      "sha256": "332c4bc6124e9792eaf8d9aad109c79948ddff52f0cd56c228ad1abe01f4781b"
+    },
+    "binary": {
+      "bytes": 11632320,
+      "path": ".build/arm64-apple-macosx/release/forge-conductor",
+      "sha256": "3280100d31572f031a01c3b75772ccdf6956f641814b6ef038c5dcb10242d855"
+    },
+    "request_fixture": {
+      "bytes": 470,
+      "path": ".forge-codex/state/baseline/mcp-baseline-requests.ndjson",
+      "sha256": "3847873ebea36d3f0bf5f408cd1f72fad9fc45b948a68960b036f42072408d53"
+    },
+    "runtime_transcript": {
+      "bytes": 333764,
+      "path": ".forge-codex/evidence/P10-mcp-runtime-transcript.json",
+      "sha256": "cdb582de9fb199ba0d053b0b17c0268f87f50bc623e2e6c6831c56370fc16131"
+    }
+  },
+  "compatibility_checks": [
+    "p01_baseline_artifacts_valid",
+    "initialize_all_supported_versions",
+    "tools_list_all_supported_versions",
+    "resources_list_all_supported_versions",
+    "prompts_list_all_supported_versions",
+    "ping_all_supported_versions",
+    "legacy_tool_inventory_preserved",
+    "legacy_descriptions_preserved",
+    "legacy_schemas_recursively_non_narrowing",
+    "protocol_tool_descriptors_identical",
+    "additive_tools_inventoried",
+    "bounded_process_shutdown",
+    "valid_content_length_input",
+    "malformed_content_length_rejected",
+    "oversized_content_length_rejected",
+    "unknown_method_negative_32601",
+    "legacy_tool_call_success_envelope",
+    "typed_tool_error_envelope",
+    "pre_cancelled_request_negative_32800",
+    "fresh_process_restart_and_eof",
+    "project_memory_cursor_pagination"
+  ],
+  "current_tool_count": 63,
+  "description_breaks": [],
+  "generated_at": "2026-08-27T13:57:20.669915+00:00",
+  "legacy_tool_count": 34,
+  "legacy_tools": [
+    "agent_context",
+    "agent_get",
+    "agent_list",
+    "agent_recommend",
+    "agent_run_complete",
+    "agent_run_start",
+    "agent_run_status",
+    "context_get",
+    "context_list",
+    "forge_status",
+    "fs_delete",
+    "fs_edit",
+    "fs_glob",
+    "fs_list",
+    "fs_mkdir",
+    "fs_move",
+    "fs_read",
+    "fs_write",
+    "git_add",
+    "git_commit",
+    "git_diff",
+    "git_log",
+    "git_status",
+    "memory_delete",
+    "memory_get",
+    "memory_list",
+    "memory_search",
+    "memory_set",
+    "pdf_from_file",
+    "pdf_write",
+    "search_text",
+    "session_checkpoint",
+    "session_handoff",
+    "shell_exec"
+  ],
+  "normalized_hashes": {
+    "additive_descriptors": "dcf8d8c603b1558898d8bc3755928baea4fbfe7e330464c6779484be34e52c27",
+    "additive_inventory": "382b1714f4897f1756f25455b40d7808e3a3f46bc91e8ec4e3db5e64015ec9b0",
+    "baseline_legacy_descriptors": "7a8536746326a55dd68d5614d41936144b1a39b5c74742637c7703613d5ca997",
+    "baseline_transcript": "62d64fa6b7ee95b59ee605e9e05b324f0c9f29690e9bb38abc144d3a6bd8a829",
+    "current_legacy_descriptors": "7a8536746326a55dd68d5614d41936144b1a39b5c74742637c7703613d5ca997",
+    "report_payload_without_self_hash": "5624b4bcfde19908523905b8f5bc2e87358e62225ad29efb246feb242609fb6b",
+    "request_fixture": "01557938fbacb4cbad69ac843867445c83dd9fe72a218bbbdbf1f68ba3e3c945",
+    "runtime_transcript": "9462d7d36324cad38438a53e8551175b2239826854855a5ab6adb5883b5ec84d",
+    "tool_descriptors_by_protocol": {
+      "2024-11-05": "676b0330c8b979c80d436f4d3af5912c91518ede01e63fc5e1dbafe8865af109",
+      "2025-03-26": "676b0330c8b979c80d436f4d3af5912c91518ede01e63fc5e1dbafe8865af109",
+      "2025-06-18": "676b0330c8b979c80d436f4d3af5912c91518ede01e63fc5e1dbafe8865af109",
+      "2025-11-25": "676b0330c8b979c80d436f4d3af5912c91518ede01e63fc5e1dbafe8865af109"
+    },
+    "tool_inventories_by_protocol": {
+      "2024-11-05": "032199f74fca9992e133098374ff5b104525d2351513d2220fdb0d64b12c922b",
+      "2025-03-26": "032199f74fca9992e133098374ff5b104525d2351513d2220fdb0d64b12c922b",
+      "2025-06-18": "032199f74fca9992e133098374ff5b104525d2351513d2220fdb0d64b12c922b",
+      "2025-11-25": "032199f74fca9992e133098374ff5b104525d2351513d2220fdb0d64b12c922b"
+    },
+    "wire_probes": "8da4690a753c383fb39399d03222dd8f359b77621de5f8d4934f5fa130bb00a5",
+    "wire_probes_by_name": {
+      "cancellation": "807d3b701db526fc6b191aaf3e43b8fd7475ac6360b2a3f222d422880e36b8f6",
+      "content_length_input": "1b988f5ad1b5b2771bd7f5484530b1f37275b8bbe01a8c8137964a904e6f081a",
+      "legacy_tool_success": "3561c4348fee87147ae458c2c5113f0c2bd877ec7b338daf7be69cdea98910b3",
+      "malformed_content_length": "474beed5ebc1e7c7f326ed44b52eb977262ffcb00205b1aeff53122d4dd4ecde",
+      "oversized_content_length": "b26669c67ec7aeb08a22070a12644ccafd11670c05541ea137f1b5ff2f240119",
+      "pagination": "9e4f762648bcdd3c2386cf6b411c2eb7fc8d21ce5320d2c7db4340621cd91531",
+      "restart_and_eof": "e2dd94320cda0de6703482a89cd72cb76218c75deb9184e5af64d4def107775a",
+      "typed_tool_error": "38e0ac9dcef0378561dbb288a55e0230193e82355e2460d782468abf5f753f4e",
+      "unknown_method": "4cd00362b0a6fad976e5ef5e6734819098f908137b1f7c1e055b49a73a9aec17"
+    }
+  },
+  "ok": false,
+  "protocol_runs": [
+    {
+      "exit_code": 0,
+      "normalized_transcript_sha256": "583f37df6061ead9f69342fbd41f99796c1eeabc4c565728655f710848410c67",
+      "prompts_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "protocol_version": "2025-11-25",
+      "resources_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "tool_count": 63,
+      "tool_descriptors_sha256": "676b0330c8b979c80d436f4d3af5912c91518ede01e63fc5e1dbafe8865af109"
+    },
+    {
+      "exit_code": 0,
+      "normalized_transcript_sha256": "031c75adb7d8fd61d3017536a574a06273d8afa2a24d1195a9996a15aae6414b",
+      "prompts_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "protocol_version": "2025-06-18",
+      "resources_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "tool_count": 63,
+      "tool_descriptors_sha256": "676b0330c8b979c80d436f4d3af5912c91518ede01e63fc5e1dbafe8865af109"
+    },
+    {
+      "exit_code": 0,
+      "normalized_transcript_sha256": "a17be626e5343ae40d700e5b438d6c4c2e7176359af6bbed76433764f2325e48",
+      "prompts_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "protocol_version": "2025-03-26",
+      "resources_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "tool_count": 63,
+      "tool_descriptors_sha256": "676b0330c8b979c80d436f4d3af5912c91518ede01e63fc5e1dbafe8865af109"
+    },
+    {
+      "exit_code": 0,
+      "normalized_transcript_sha256": "2e4c906f85733394c988fb2958f4c8ca47d2216763f0f6f9bc0689e78d1e8bd6",
+      "prompts_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "protocol_version": "2024-11-05",
+      "resources_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "tool_count": 63,
+      "tool_descriptors_sha256": "676b0330c8b979c80d436f4d3af5912c91518ede01e63fc5e1dbafe8865af109"
+    }
+  ],
+  "protocol_versions": [
+    "2025-11-25",
+    "2025-06-18",
+    "2025-03-26",
+    "2024-11-05"
+  ],
+  "removed_tools": [],
+  "schema_breaks": [],
+  "schema_version": 1,
+  "scope": "descriptor compatibility and bounded single-request wire probes",
+  "source": {
+    "dirty": true,
+    "repository_root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "revision": "749bdf2c974f574897ae444639df2702026c5cba",
+    "status": [
+      "M  .forge-codex/PACKAGE_VALIDATION.json",
+      " M .forge-codex/evidence/EVID-20260827T025525Z-76eee5d27c.json",
+      " M .forge-codex/evidence/EVID-20260827T030358Z-22c36dd272.json",
+      " M .forge-codex/evidence/EVID-20260827T030641Z-831d98c838.json",
+      " M .forge-codex/evidence/EVID-20260827T031029Z-fdeb6a6226.json",
+      " M .forge-codex/evidence/EVID-20260827T100635Z-0c30766975.json",
+      "A  .forge-codex/evidence/EVID-20260827T110620Z-8e7143e237.json",
+      "A  .forge-codex/evidence/EVID-20260827T110620Z-8e7143e237.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T110620Z-8e7143e237.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T111100Z-bf65158d11.json",
+      "A  .forge-codex/evidence/EVID-20260827T111100Z-bf65158d11.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T111100Z-bf65158d11.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T111352Z-4905c61d4d.json",
+      "A  .forge-codex/evidence/EVID-20260827T111352Z-4905c61d4d.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T111352Z-4905c61d4d.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T111912Z-5250ad10ed.json",
+      "A  .forge-codex/evidence/EVID-20260827T111912Z-5250ad10ed.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T111912Z-5250ad10ed.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T112130Z-a6055a30d0.json",
+      "A  .forge-codex/evidence/EVID-20260827T112130Z-a6055a30d0.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T112130Z-a6055a30d0.stdout.txt",
+      "AM .forge-codex/evidence/EVID-20260827T112221Z-678531195f.json",
+      "A  .forge-codex/evidence/EVID-20260827T112221Z-678531195f.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T112221Z-678531195f.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T112622Z-4d5aea029d.json",
+      "A  .forge-codex/evidence/EVID-20260827T112622Z-4d5aea029d.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T112622Z-4d5aea029d.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T112943Z-4d9a2700de.json",
+      "A  .forge-codex/evidence/EVID-20260827T112943Z-4d9a2700de.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T112943Z-4d9a2700de.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T112955Z-a3d2080290.json",
+      "A  .forge-codex/evidence/EVID-20260827T112955Z-a3d2080290.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T112955Z-a3d2080290.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T113114Z-ae0d7d93fe.json",
+      "A  .forge-codex/evidence/EVID-20260827T113114Z-ae0d7d93fe.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T113114Z-ae0d7d93fe.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T113141Z-d65692a2a6.json",
+      "A  .forge-codex/evidence/EVID-20260827T113141Z-d65692a2a6.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T113141Z-d65692a2a6.stdout.txt",
+      "AM .forge-codex/evidence/EVID-20260827T113325Z-48cf0c4330.json",
+      "A  .forge-codex/evidence/EVID-20260827T113325Z-48cf0c4330.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T113325Z-48cf0c4330.stdout.txt",
+      "AM .forge-codex/evidence/EVID-20260827T113335Z-74c3caadd6.json",
+      "A  .forge-codex/evidence/EVID-20260827T113335Z-74c3caadd6.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T113335Z-74c3caadd6.stdout.txt",
+      "AM .forge-codex/evidence/EVID-20260827T113708Z-c44fecb9ea.json",
+      "A  .forge-codex/evidence/EVID-20260827T113708Z-c44fecb9ea.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T113708Z-c44fecb9ea.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T113923Z-2c6fd79219.json",
+      "A  .forge-codex/evidence/EVID-20260827T113923Z-2c6fd79219.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T113923Z-2c6fd79219.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T114018Z-bf8c321d41.json",
+      "A  .forge-codex/evidence/EVID-20260827T114018Z-bf8c321d41.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T114018Z-bf8c321d41.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T115248Z-271e31b2db.json",
+      "A  .forge-codex/evidence/EVID-20260827T115248Z-271e31b2db.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T115248Z-271e31b2db.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T115532Z-50cd86d07e.json",
+      "A  .forge-codex/evidence/EVID-20260827T115532Z-50cd86d07e.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T115532Z-50cd86d07e.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T115848Z-56a5f22a1d.json",
+      "A  .forge-codex/evidence/EVID-20260827T115848Z-56a5f22a1d.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T115848Z-56a5f22a1d.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T120131Z-1b4103b7ef.json",
+      "A  .forge-codex/evidence/EVID-20260827T120131Z-1b4103b7ef.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T120131Z-1b4103b7ef.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T120140Z-2bfd43e9d5.json",
+      "A  .forge-codex/evidence/EVID-20260827T120140Z-2bfd43e9d5.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T120140Z-2bfd43e9d5.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T120248Z-21127b46c1.json",
+      "A  .forge-codex/evidence/EVID-20260827T120248Z-21127b46c1.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T120248Z-21127b46c1.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T120259Z-01fd5f7224.json",
+      "A  .forge-codex/evidence/EVID-20260827T120259Z-01fd5f7224.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T120259Z-01fd5f7224.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T120259Z-281be14e9d.json",
+      "A  .forge-codex/evidence/EVID-20260827T120259Z-281be14e9d.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T120259Z-281be14e9d.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T120316Z-cf926da54b.json",
+      "A  .forge-codex/evidence/EVID-20260827T120316Z-cf926da54b.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T120316Z-cf926da54b.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T120316Z-dc97141420.json",
+      "A  .forge-codex/evidence/EVID-20260827T120316Z-dc97141420.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T120316Z-dc97141420.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T120334Z-6aca4d4ce0.json",
+      "A  .forge-codex/evidence/EVID-20260827T120334Z-6aca4d4ce0.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T120334Z-6aca4d4ce0.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T120358Z-66046e15c8.json",
+      "A  .forge-codex/evidence/EVID-20260827T120358Z-66046e15c8.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T120358Z-66046e15c8.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T120520Z-f760b1722f.json",
+      "A  .forge-codex/evidence/EVID-20260827T120520Z-f760b1722f.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T120520Z-f760b1722f.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T122519Z-9b81cdf7f2.json",
+      "A  .forge-codex/evidence/EVID-20260827T122519Z-9b81cdf7f2.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T122519Z-9b81cdf7f2.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T122542Z-5ccf3cea22.json",
+      "A  .forge-codex/evidence/EVID-20260827T122542Z-5ccf3cea22.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T122542Z-5ccf3cea22.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T122706Z-901dbb73bb.json",
+      "A  .forge-codex/evidence/EVID-20260827T122706Z-901dbb73bb.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T122706Z-901dbb73bb.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T122813Z-1b6f5e3041.json",
+      "A  .forge-codex/evidence/EVID-20260827T122813Z-1b6f5e3041.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T122813Z-1b6f5e3041.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T122849Z-3ecd07786f.json",
+      "A  .forge-codex/evidence/EVID-20260827T122849Z-3ecd07786f.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T122849Z-3ecd07786f.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T122858Z-337d7f1d3c.json",
+      "A  .forge-codex/evidence/EVID-20260827T122858Z-337d7f1d3c.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T122858Z-337d7f1d3c.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T122907Z-cfb21c9859.json",
+      "A  .forge-codex/evidence/EVID-20260827T122907Z-cfb21c9859.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T122907Z-cfb21c9859.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T122926Z-e45900e86c.json",
+      "A  .forge-codex/evidence/EVID-20260827T122926Z-e45900e86c.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T122926Z-e45900e86c.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T123016Z-08444ba4fb.json",
+      "A  .forge-codex/evidence/EVID-20260827T123016Z-08444ba4fb.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T123016Z-08444ba4fb.stdout.txt",
+      "A  .forge-codex/evidence/EVID-20260827T123143Z-c5bdb99352.json",
+      "A  .forge-codex/evidence/EVID-20260827T123143Z-c5bdb99352.stderr.txt",
+      "A  .forge-codex/evidence/EVID-20260827T123143Z-c5bdb99352.stdout.txt",
+      "AM .forge-codex/evidence/P10-cli-compatibility-report.json",
+      "A  .forge-codex/evidence/P10-mcp-runtime-transcript.json",
+      "M  .forge-codex/evidence/P10-migration-report.json",
+      "MM .forge-codex/evidence/P10-parity-report.json",
+      "M  .forge-codex/evidence/P10-protocol-compatibility-report.json",
+      "AM .forge-codex/scripts/check_p10_cli_compatibility.py",
+      "MM .forge-codex/scripts/check_p10_completion.py",
+      "AM .forge-codex/scripts/check_p10_manager_http_compatibility.py",
+      "AM .forge-codex/scripts/check_p10_protocol_compatibility.py",
+      " M .forge-codex/scripts/record_command.py",
+      "A  .forge-codex/state/baseline/cli-contract.json",
+      "A  .forge-codex/state/baseline/manager-http-contract.json",
+      "M  .forge-codex/state/environment.json",
+      "MM .forge-codex/state/events.jsonl",
+      "MM .forge-codex/state/run-state.json",
+      "M  ForgeConductor.xcodeproj/project.pbxproj",
+      "M  Sources/ForgeConductorCLI/ForgeConductorMain.swift",
+      "M  Sources/ForgeConductorCore/Application/LegacyContinuityMigrator.swift",
+      "M  Sources/ForgeConductorCore/Application/ToolDefinitionCatalog.swift",
+      "MM Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift",
+      "MM Sources/ForgeConductorCore/Infrastructure/ProjectMemoryRepository.swift",
+      "MM Sources/ForgeConductorCore/Infrastructure/RuntimeJobRepository.swift",
+      "MM Sources/ForgeConductorCore/Infrastructure/SQLiteStore.swift",
+      "AM Sources/ForgeConductorCore/Infrastructure/VerifiedMigrationBackup.swift",
+      "M  Sources/ForgeNativeSessionHostPlugin/ForgeNativeSessionHostPlugin.swift",
+      "MM Tests/ForgeConductorTests/ContinuityTests.swift",
+      "M  Tests/ForgeConductorTests/ContinuityV2Tests.swift",
+      "M  Tests/ForgeConductorTests/MCPProtocolAndDiagnosticsTests.swift",
+      "M  Tests/ForgeConductorTests/NativeSessionHostPluginTests.swift",
+      "MM Tests/ForgeConductorTests/ProjectControlPlaneRepositoryTests.swift",
+      "MM Tests/ForgeConductorTests/ProjectMemoryTests.swift",
+      "MM Tests/ForgeConductorTests/RuntimeExecutionJobTests.swift",
+      "M  Tests/ForgeConductorTests/ToolDefinitionCatalogTests.swift",
+      "?? .forge-codex/evidence/EVID-20260827T125155Z-b9d68d8e9b.json",
+      "?? .forge-codex/evidence/EVID-20260827T125155Z-b9d68d8e9b.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T125155Z-b9d68d8e9b.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T125329Z-dc9fc7a51d.json",
+      "?? .forge-codex/evidence/EVID-20260827T125329Z-dc9fc7a51d.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T125329Z-dc9fc7a51d.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T125513Z-3d2feb7bae.json",
+      "?? .forge-codex/evidence/EVID-20260827T125513Z-3d2feb7bae.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T125513Z-3d2feb7bae.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T125532Z-257b8d98ca.json",
+      "?? .forge-codex/evidence/EVID-20260827T125532Z-257b8d98ca.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T125532Z-257b8d98ca.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T125659Z-881cfd353e.json",
+      "?? .forge-codex/evidence/EVID-20260827T125659Z-881cfd353e.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T125659Z-881cfd353e.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T125820Z-22fc7d7bd5.json",
+      "?? .forge-codex/evidence/EVID-20260827T125820Z-22fc7d7bd5.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T125820Z-22fc7d7bd5.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T125832Z-a99dd8bff7.json",
+      "?? .forge-codex/evidence/EVID-20260827T125832Z-a99dd8bff7.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T125832Z-a99dd8bff7.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T130046Z-3047d59e40.json",
+      "?? .forge-codex/evidence/EVID-20260827T130046Z-3047d59e40.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T130046Z-3047d59e40.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T130101Z-63d3fc7ea6.json",
+      "?? .forge-codex/evidence/EVID-20260827T130101Z-63d3fc7ea6.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T130101Z-63d3fc7ea6.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T130445Z-e9daab704c.json",
+      "?? .forge-codex/evidence/EVID-20260827T130445Z-e9daab704c.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T130445Z-e9daab704c.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T130609Z-095131732b.json",
+      "?? .forge-codex/evidence/EVID-20260827T130609Z-095131732b.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T130609Z-095131732b.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T130742Z-371bcb04b8.json",
+      "?? .forge-codex/evidence/EVID-20260827T130742Z-371bcb04b8.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T130742Z-371bcb04b8.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T133242Z-ab3bd07aeb.artifact-000-P10-manager-http-compatibility-report.json",
+      "?? .forge-codex/evidence/EVID-20260827T133242Z-ab3bd07aeb.json",
+      "?? .forge-codex/evidence/EVID-20260827T133242Z-ab3bd07aeb.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T133242Z-ab3bd07aeb.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T133250Z-25ae715e69.json",
+      "?? .forge-codex/evidence/EVID-20260827T133250Z-25ae715e69.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T133250Z-25ae715e69.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T133313Z-ff0a88379f.json",
+      "?? .forge-codex/evidence/EVID-20260827T133313Z-ff0a88379f.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T133313Z-ff0a88379f.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T133447Z-11bd9e2ec8.artifact-000-P10-manager-http-compatibility-report.json",
+      "?? .forge-codex/evidence/EVID-20260827T133447Z-11bd9e2ec8.json",
+      "?? .forge-codex/evidence/EVID-20260827T133447Z-11bd9e2ec8.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T133447Z-11bd9e2ec8.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T133650Z-0c68aea973.artifact-000-P10-manager-http-compatibility-report.json",
+      "?? .forge-codex/evidence/EVID-20260827T133650Z-0c68aea973.json",
+      "?? .forge-codex/evidence/EVID-20260827T133650Z-0c68aea973.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T133650Z-0c68aea973.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T133822Z-cb9e048a14.artifact-000-P10-manager-http-compatibility-report.json",
+      "?? .forge-codex/evidence/EVID-20260827T133822Z-cb9e048a14.json",
+      "?? .forge-codex/evidence/EVID-20260827T133822Z-cb9e048a14.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T133822Z-cb9e048a14.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T134318Z-8d9cc542be.json",
+      "?? .forge-codex/evidence/EVID-20260827T134318Z-8d9cc542be.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T134318Z-8d9cc542be.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T135047Z-6efbeed7d9.json",
+      "?? .forge-codex/evidence/EVID-20260827T135047Z-6efbeed7d9.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T135047Z-6efbeed7d9.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T135227Z-5a11fa6b34.json",
+      "?? .forge-codex/evidence/EVID-20260827T135227Z-5a11fa6b34.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T135227Z-5a11fa6b34.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T135451Z-c5e612c716.json",
+      "?? .forge-codex/evidence/EVID-20260827T135451Z-c5e612c716.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T135451Z-c5e612c716.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T135632Z-f613fa8741.artifact-000-P10-cli-compatibility-report.json",
+      "?? .forge-codex/evidence/EVID-20260827T135632Z-f613fa8741.json",
+      "?? .forge-codex/evidence/EVID-20260827T135632Z-f613fa8741.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T135632Z-f613fa8741.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T135718Z-044963baf2.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T135718Z-044963baf2.stdout.txt",
+      "?? .forge-codex/evidence/P10-manager-http-compatibility-report.json",
+      "?? .forge-codex/scripts/evidence_support.py",
+      "?? .forge-codex/scripts/test_evidence_controls.py"
+    ],
+    "status_sha256": "fe483ba87397d467453de347e4214c8695e70732c53959aea080cb8563cc2600"
+  },
+  "source_manifest": {
+    "bytes": 7856396,
+    "file_count": 234,
+    "schema_version": 1,
+    "sha256": "586ee8ab00d621acb78c88270e3d65cb538b7562d67ed47c60fca4941d218d7c"
+  },
+  "status": "partial",
+  "uncovered_checks": [
+    "active_in_flight_cancellation",
+    "concurrent_mixed_request_correlation",
+    "legacy_tool_success_all_baseline_methods"
+  ],
+  "wire_coverage": {
+    "cancellation": {
+      "probe": "cancellation",
+      "status": "passed"
+    },
+    "content_length_input": {
+      "probe": "content_length_input",
+      "status": "passed"
+    },
+    "legacy_tool_success": {
+      "probe": "legacy_tool_success",
+      "status": "passed"
+    },
+    "malformed_content_length": {
+      "probe": "malformed_content_length",
+      "status": "passed"
+    },
+    "oversized_content_length": {
+      "probe": "oversized_content_length",
+      "status": "passed"
+    },
+    "pagination": {
+      "probe": "pagination",
+      "status": "passed"
+    },
+    "restart_and_eof": {
+      "probe": "restart_and_eof",
+      "status": "passed"
+    },
+    "typed_tool_error": {
+      "probe": "typed_tool_error",
+      "status": "passed"
+    },
+    "unknown_method": {
+      "probe": "unknown_method",
+      "status": "passed"
+    }
+  },
+  "wire_probe_results": [
+    {
+      "checks": [
+        "valid_content_length_input",
+        "ndjson_response",
+        "bounded_eof_shutdown"
+      ],
+      "cycle_wire_inputs": [],
+      "exit_codes": [
+        0
+      ],
+      "name": "content_length_input",
+      "normalized_probe_payload_sha256": "1b988f5ad1b5b2771bd7f5484530b1f37275b8bbe01a8c8137964a904e6f081a",
+      "status": "passed",
+      "stderr": [
+        {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "wire_input": {
+        "bytes": 129,
+        "declared_content_length": 106,
+        "framing": "content_length",
+        "sha256": "a7de7253e8ba0a4680c3438403b0393a40e72db743250b9af136c5b1b8c34ba3"
+      }
+    },
+    {
+      "checks": [
+        "malformed_content_length_rejected",
+        "no_response_before_rejection",
+        "bounded_failure_exit"
+      ],
+      "cycle_wire_inputs": [],
+      "exit_codes": [
+        1
+      ],
+      "name": "malformed_content_length",
+      "normalized_probe_payload_sha256": "474beed5ebc1e7c7f326ed44b52eb977262ffcb00205b1aeff53122d4dd4ecde",
+      "status": "passed",
+      "stderr": [
+        {
+          "bytes": 332,
+          "sha256": "e7c0daea774a3b068caaa51f9347e819943979e007049259885860dad3dc3d33",
+          "utf8_tail": "error: Error Domain=NSCocoaErrorDomain Code=3840 \"JSON text did not start with array or object and option to allow fragments not set. around line 1, column 0.\" UserInfo={NSDebugDescription=JSON text did not start with array or object and option to allow fragments not set. around line 1, column 0., NSJSONSerializationErrorIndex=0}\n"
+        }
+      ],
+      "wire_input": {
+        "bytes": 34,
+        "framing": "content_length",
+        "sha256": "d26a2850f1fe200db1fd1cb9526e989bea531a53aedaea778a04bedcefb1bdc8"
+      }
+    },
+    {
+      "checks": [
+        "oversized_content_length_rejected",
+        "no_body_read",
+        "bounded_failure_exit"
+      ],
+      "cycle_wire_inputs": [],
+      "exit_codes": [
+        1
+      ],
+      "name": "oversized_content_length",
+      "normalized_probe_payload_sha256": "b26669c67ec7aeb08a22070a12644ccafd11670c05541ea137f1b5ff2f240119",
+      "status": "passed",
+      "stderr": [
+        {
+          "bytes": 32,
+          "sha256": "ade9dd011c36d2eecfbd960b4fa8f5f90f1ec87454441d5419fb6d41cb1515c3",
+          "utf8_tail": "error: messageTooLarge(4194304)\n"
+        }
+      ],
+      "wire_input": {
+        "bytes": 27,
+        "framing": "content_length",
+        "sha256": "247e6cdbf8dc6bb06e53f95584b0bd2c3c7d24ce7242b4b0fb0119b18544f740"
+      }
+    },
+    {
+      "checks": [
+        "unknown_method_error_code",
+        "unknown_method_error_envelope",
+        "bounded_eof_shutdown"
+      ],
+      "cycle_wire_inputs": [],
+      "exit_codes": [
+        0
+      ],
+      "name": "unknown_method",
+      "normalized_probe_payload_sha256": "4cd00362b0a6fad976e5ef5e6734819098f908137b1f7c1e055b49a73a9aec17",
+      "status": "passed",
+      "stderr": [
+        {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "wire_input": {
+        "bytes": 314,
+        "framing": "ndjson",
+        "sha256": "35e34b40ca37ef34c823bb79364637b5c81fc8a52f52d2b992d3637d477f6f32"
+      }
+    },
+    {
+      "checks": [
+        "legacy_tool_call_success",
+        "text_and_structured_content_match",
+        "is_error_false"
+      ],
+      "cycle_wire_inputs": [],
+      "exit_codes": [
+        0
+      ],
+      "name": "legacy_tool_success",
+      "normalized_probe_payload_sha256": "3561c4348fee87147ae458c2c5113f0c2bd877ec7b338daf7be69cdea98910b3",
+      "status": "passed",
+      "stderr": [
+        {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "wire_input": {
+        "bytes": 327,
+        "framing": "ndjson",
+        "sha256": "49846483363b3300ec0fa24313d23a2f1f22d0a75331e0b11ccbe7ff2d520f0a"
+      }
+    },
+    {
+      "checks": [
+        "typed_tool_error",
+        "invalid_key_code",
+        "text_and_structured_content_match",
+        "is_error_true"
+      ],
+      "cycle_wire_inputs": [],
+      "exit_codes": [
+        0
+      ],
+      "name": "typed_tool_error",
+      "normalized_probe_payload_sha256": "38e0ac9dcef0378561dbb288a55e0230193e82355e2460d782468abf5f753f4e",
+      "status": "passed",
+      "stderr": [
+        {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "wire_input": {
+        "bytes": 326,
+        "framing": "ndjson",
+        "sha256": "b554348815c5e5e3fc4cada798f4bf037f2fcc5dc941a4dcdcafa37b563c5b20"
+      }
+    },
+    {
+      "checks": [
+        "cancellation_notification",
+        "cancelled_error_code",
+        "bounded_eof_shutdown"
+      ],
+      "cycle_wire_inputs": [],
+      "exit_codes": [
+        0
+      ],
+      "name": "cancellation",
+      "normalized_probe_payload_sha256": "807d3b701db526fc6b191aaf3e43b8fd7475ac6360b2a3f222d422880e36b8f6",
+      "status": "passed",
+      "stderr": [
+        {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "wire_input": {
+        "bytes": 390,
+        "framing": "ndjson",
+        "sha256": "7b423ad814d8c4a708a6623f14c10fe6070a579532e56b2a827e937dbb8bea5c"
+      }
+    },
+    {
+      "checks": [
+        "bounded_eof_shutdown",
+        "durable_home_reopen",
+        "fresh_process_restart",
+        "post_restart_ping"
+      ],
+      "cycle_wire_inputs": [
+        {
+          "bytes": 286,
+          "framing": "ndjson",
+          "sha256": "35133a7782401dc85d6014128bc4289d25469ae341c51bd9e50f8f69669844bc"
+        },
+        {
+          "bytes": 286,
+          "framing": "ndjson",
+          "sha256": "35133a7782401dc85d6014128bc4289d25469ae341c51bd9e50f8f69669844bc"
+        }
+      ],
+      "exit_codes": [
+        0,
+        0
+      ],
+      "name": "restart_and_eof",
+      "normalized_probe_payload_sha256": "e2dd94320cda0de6703482a89cd72cb76218c75deb9184e5af64d4def107775a",
+      "status": "passed",
+      "stderr": [
+        {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "wire_input": null
+    },
+    {
+      "checks": [
+        "project_memory_fixture_seeded",
+        "opaque_cursor_returned",
+        "cursor_page_has_no_duplicates",
+        "cursor_page_has_no_omissions",
+        "terminal_page_has_no_cursor",
+        "bounded_eof_shutdown"
+      ],
+      "cycle_wire_inputs": [],
+      "exit_codes": [
+        0
+      ],
+      "name": "pagination",
+      "normalized_probe_payload_sha256": "9e4f762648bcdd3c2386cf6b411c2eb7fc8d21ce5320d2c7db4340621cd91531",
+      "status": "passed",
+      "stderr": [
+        {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "wire_input": {
+        "bytes": 1730,
+        "framing": "ndjson",
+        "sha256": "5e82ed412adf5b12e523decd98a7b402636dc5761a05b4db742b9035541831bf"
+      }
+    }
+  ]
+}

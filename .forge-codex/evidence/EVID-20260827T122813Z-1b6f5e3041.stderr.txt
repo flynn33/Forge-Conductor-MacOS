@@ -1,0 +1,1 @@
+error: current help omits baseline preserved options/arguments: manager: install-login --keep-stale

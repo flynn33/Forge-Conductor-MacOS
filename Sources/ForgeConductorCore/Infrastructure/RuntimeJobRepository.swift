@@ -20,10 +20,165 @@ public actor RuntimeJobRepository {
     public static let maximumIdempotencyReceiptsPerProject = 512
     public static let maximumIdempotencyReceiptsGlobal = 4_096
 
+    private struct ControlPlaneV2TableSurface: Sendable {
+        let name: String
+        let columns: [String]
+    }
+
+    private static let controlPlaneV2RequiredSurfaces = [
+        ControlPlaneV2TableSurface(
+            name: "control_schema_version",
+            columns: ["singleton", "version", "applied_at"]
+        ),
+        ControlPlaneV2TableSurface(
+            name: "control_projects",
+            columns: [
+                "project_id", "display_name", "canonical_root", "generation",
+                "lifecycle_state", "repository_fingerprint", "bookmark_reference",
+                "created_at", "updated_at",
+            ]
+        ),
+        ControlPlaneV2TableSurface(
+            name: "project_bindings",
+            columns: [
+                "binding_id", "owner_kind", "owner_id", "project_id",
+                "project_generation", "run_id", "authorization_scope_json",
+                "lease_owner", "lease_expires_at", "active", "created_at", "updated_at",
+            ]
+        ),
+        ControlPlaneV2TableSurface(
+            name: "autonomous_runs",
+            columns: [
+                "run_id", "project_id", "project_generation", "assignment_id", "mission",
+                "state", "continuity_mode", "provider_id", "model_key", "active_session_id",
+                "active_operation_id", "current_work_json", "completion_request_json",
+                "last_error_code", "last_error_summary", "retry_at", "continuation_pending",
+                "revision", "created_at", "updated_at",
+            ]
+        ),
+        ControlPlaneV2TableSurface(
+            name: "run_leases",
+            columns: [
+                "run_id", "lease_owner", "lease_epoch", "acquired_at", "renewed_at", "expires_at",
+            ]
+        ),
+        ControlPlaneV2TableSurface(
+            name: "provider_sessions",
+            columns: [
+                "session_id", "run_id", "project_id", "project_generation", "provider_id",
+                "adapter_id", "model_key", "provider_response_id", "predecessor_session_id",
+                "handoff_id", "operation_id", "idempotency_key", "bootstrap_nonce_hash",
+                "handoff_sha256", "status", "accepted", "context_capacity", "created_at",
+                "updated_at",
+            ]
+        ),
+        ControlPlaneV2TableSurface(
+            name: "provider_turns",
+            columns: [
+                "turn_id", "run_id", "session_id", "operation_id", "project_id",
+                "project_generation", "request_kind", "idempotency_key", "previous_response_id",
+                "input_sha256", "tool_schema_sha256", "state", "provider_request_id",
+                "provider_response_id", "request_artifact_id", "result_artifact_id", "usage_json",
+                "attempt", "retry_at", "last_error_code", "last_error_summary", "created_at",
+                "updated_at",
+            ]
+        ),
+        ControlPlaneV2TableSurface(
+            name: "tool_invocations",
+            columns: [
+                "invocation_id", "turn_id", "run_id", "session_id", "project_id",
+                "project_generation", "provider_call_id", "tool_name", "replay_class",
+                "idempotency_key", "arguments_sha256", "arguments_artifact_id", "state",
+                "result_sha256", "result_artifact_id", "result_summary", "last_error_code",
+                "last_error_summary", "created_at", "updated_at",
+            ]
+        ),
+        ControlPlaneV2TableSurface(
+            name: "context_budget_observations",
+            columns: [
+                "observation_id", "run_id", "session_id", "provider_response_id", "capacity",
+                "used", "output_reserve", "schema_reserve", "handoff_reserve", "recovery_reserve",
+                "remaining", "projected_next_turn", "source", "confidence", "estimator_version",
+                "action", "created_at",
+            ]
+        ),
+        ControlPlaneV2TableSurface(
+            name: "context_budget_observation_details",
+            columns: [
+                "observation_id", "project_id", "project_generation", "trigger_point",
+                "checkpoint_threshold", "rollover_threshold", "emergency_floor", "hysteresis",
+                "action_epoch", "created_at",
+            ]
+        ),
+        ControlPlaneV2TableSurface(
+            name: "context_budget_supervisor_state",
+            columns: [
+                "run_id", "session_id", "project_id", "project_generation", "state_json",
+                "latest_observation_id", "revision", "updated_at",
+            ]
+        ),
+        ControlPlaneV2TableSurface(
+            name: "context_budget_action_requests",
+            columns: [
+                "request_id", "continuity_operation_id", "run_id", "session_id", "project_id",
+                "project_generation", "observation_id", "requested_action", "fulfilled_action",
+                "action_epoch", "reason", "revision", "created_at", "updated_at",
+            ]
+        ),
+        ControlPlaneV2TableSurface(
+            name: "continuity_commands",
+            columns: [
+                "command_id", "operation_id", "run_id", "project_id", "project_generation",
+                "command_type", "requested_by", "reason", "state", "idempotency_key",
+                "payload_sha256", "attempt", "retry_at", "last_error_code", "last_error_summary",
+                "created_at", "updated_at",
+            ]
+        ),
+        ControlPlaneV2TableSurface(
+            name: "execution_jobs",
+            columns: [
+                "job_id", "run_id", "project_id", "project_generation", "runtime_kind",
+                "execution_profile", "replay_class", "idempotency_key", "state", "canonical_cwd",
+                "command_summary", "timeout_seconds", "exit_code", "stdout_inline", "stderr_inline",
+                "output_artifact_id", "output_bytes", "process_identifier",
+                "process_group_identifier", "created_at", "started_at", "completed_at", "updated_at",
+            ]
+        ),
+        ControlPlaneV2TableSurface(
+            name: "autonomy_events",
+            columns: [
+                "sequence", "event_id", "run_id", "project_id", "operation_id", "session_id",
+                "job_id", "event_type", "severity", "summary", "metadata_json",
+                "previous_event_sha256", "event_sha256", "created_at",
+            ]
+        ),
+        ControlPlaneV2TableSurface(
+            name: "stale_result_quarantine_events",
+            columns: [
+                "sequence", "event_id", "project_id", "stale_generation", "current_generation",
+                "run_id", "result_kind", "result_sha256", "created_at",
+            ]
+        ),
+        ControlPlaneV2TableSurface(
+            name: "migration_receipts",
+            columns: [
+                "receipt_id", "migration_name", "source_version", "target_version", "source_sha256",
+                "backup_path", "backup_sha256", "imported_count", "skipped_count",
+                "quarantined_count", "integrity_result", "details_json", "started_at", "completed_at",
+            ]
+        ),
+    ]
+
+    private static let controlPlaneV2RequiredTableCountSQL =
+        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ("
+        + controlPlaneV2RequiredSurfaces.map { "'\($0.name)'" }.joined(separator: ",")
+        + ")"
+
     public let databaseURL: URL
 
     private let clock: any Clock
     private var database: OpaquePointer?
+    private var openRegistration: SQLiteOpenRegistration?
 
     public init(
         databaseURL: URL,
@@ -33,28 +188,41 @@ public actor RuntimeJobRepository {
         guard (1...30_000).contains(busyTimeoutMilliseconds) else {
             throw RuntimeJobError.storageFailure("busy timeout must be between 1 and 30000 milliseconds")
         }
-        self.databaseURL = databaseURL.standardizedFileURL
+        let standardizedDatabaseURL = databaseURL.standardizedFileURL
+        self.databaseURL = standardizedDatabaseURL
         self.clock = clock
         try FileManager.default.createDirectory(
-            at: databaseURL.deletingLastPathComponent(),
+            at: standardizedDatabaseURL.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
 
-        database = try Self.openAndMigrate(
-            databaseURL: databaseURL,
+        let opened = try Self.openAndMigrate(
+            databaseURL: standardizedDatabaseURL,
             busyTimeoutMilliseconds: busyTimeoutMilliseconds,
             timestamp: ISO8601.string(from: clock.now())
         )
+        do {
+            openRegistration = try VerifiedMigrationBackup.registerOpenDatabase(
+                at: standardizedDatabaseURL
+            )
+            database = opened
+        } catch {
+            sqlite3_close(opened)
+            throw RuntimeJobError.storageFailure(error.localizedDescription)
+        }
     }
 
     deinit {
         if let database { sqlite3_close(database) }
+        VerifiedMigrationBackup.unregisterOpenDatabase(openRegistration)
     }
 
     public func close() {
         guard let database else { return }
         sqlite3_close(database)
         self.database = nil
+        VerifiedMigrationBackup.unregisterOpenDatabase(openRegistration)
+        openRegistration = nil
     }
 
     public func health() throws -> (schemaVersion: Int, integrity: String, journalMode: String) {
@@ -1184,6 +1352,55 @@ public actor RuntimeJobRepository {
         busyTimeoutMilliseconds: Int,
         timestamp: String
     ) throws -> OpaquePointer {
+        try VerifiedMigrationBackup.withMigrationLock(
+            databaseURL: databaseURL,
+            timeoutSeconds: 60
+        ) {
+            do {
+                try VerifiedMigrationBackup.withNonMutatingSQLitePreflight(
+                    databaseURL: databaseURL
+                ) { candidate in
+                    guard let candidate else { return }
+                    let hasRuntimeVersion = try candidate.integer(
+                        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='runtime_job_schema_version'"
+                    ) == 1
+                    if hasRuntimeVersion {
+                        let rowCount = try candidate.integer(
+                            "SELECT COUNT(*) FROM runtime_job_schema_version"
+                        ) ?? 0
+                        let version = try candidate.integer(
+                            "SELECT version FROM runtime_job_schema_version WHERE singleton=1"
+                        ) ?? 0
+                        guard rowCount == 1, (1...schemaVersion).contains(version) else {
+                            throw RuntimeJobError.storageFailure(
+                                "unsupported runtime job schema version \(version)"
+                            )
+                        }
+                        return
+                    }
+                    if try isExactCoResidentControlPlaneV2(candidate) {
+                        return
+                    }
+                    try candidate.requireEmptySchemaWhenUnversioned(reportedVersion: 0)
+                }
+            } catch let error as RuntimeJobError {
+                throw error
+            } catch {
+                throw RuntimeJobError.storageFailure(error.localizedDescription)
+            }
+            return try openAndMigrateLocked(
+                databaseURL: databaseURL,
+                busyTimeoutMilliseconds: busyTimeoutMilliseconds,
+                timestamp: timestamp
+            )
+        }
+    }
+
+    private static func openAndMigrateLocked(
+        databaseURL: URL,
+        busyTimeoutMilliseconds: Int,
+        timestamp: String
+    ) throws -> OpaquePointer {
         var connection: OpaquePointer?
         let flags = SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
         let result = sqlite3_open_v2(databaseURL.path, &connection, flags, nil)
@@ -1193,22 +1410,58 @@ public actor RuntimeJobRepository {
             throw RuntimeJobError.storageFailure(message)
         }
         do {
+            sqlite3_busy_timeout(connection, Int32(busyTimeoutMilliseconds))
+            let hasVersionTable = try rawScalarInt(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='runtime_job_schema_version'",
+                database: connection
+            ) == 1
+            let prior = hasVersionTable
+                ? try rawScalarInt(
+                    "SELECT version FROM runtime_job_schema_version WHERE singleton=1",
+                    database: connection
+                ) ?? 0
+                : 0
+            let isCurrentCoResidentControlPlane: Bool
+            if hasVersionTable {
+                isCurrentCoResidentControlPlane = false
+            } else {
+                isCurrentCoResidentControlPlane = try isExactCoResidentControlPlaneV2(connection)
+            }
+            if !isCurrentCoResidentControlPlane {
+                do {
+                    try VerifiedMigrationBackup.requireEmptySQLiteSchemaWhenUnversioned(
+                        database: connection,
+                        reportedVersion: prior
+                    )
+                } catch {
+                    throw RuntimeJobError.storageFailure(error.localizedDescription)
+                }
+            }
+            guard prior <= schemaVersion else {
+                throw RuntimeJobError.storageFailure(
+                    "unsupported runtime job schema version \(prior)"
+                )
+            }
             try rawExecute("PRAGMA foreign_keys=ON", database: connection)
             try rawExecute("PRAGMA journal_mode=WAL", database: connection)
             try rawExecute("PRAGMA synchronous=NORMAL", database: connection)
             try rawExecute("PRAGMA busy_timeout=\(busyTimeoutMilliseconds)", database: connection)
+            if prior > 0, prior < schemaVersion {
+                let stem = databaseURL.deletingPathExtension().lastPathComponent
+                let backupURL = databaseURL.deletingLastPathComponent().appendingPathComponent(
+                    "\(stem).pre-migration-v\(prior).sqlite3",
+                    isDirectory: false
+                )
+                _ = try VerifiedMigrationBackup.snapshotSQLite(
+                    database: connection,
+                    to: backupURL,
+                    expectedVersion: prior,
+                    versionQuery: "SELECT version FROM runtime_job_schema_version WHERE singleton=1"
+                )
+            }
             try rawExecute("BEGIN IMMEDIATE", database: connection)
             do {
                 try rawExecute(schema, database: connection)
-                let prior = try rawScalarInt(
-                    "SELECT version FROM runtime_job_schema_version WHERE singleton=1",
-                    database: connection
-                ) ?? 0
-                guard prior <= schemaVersion else {
-                    throw RuntimeJobError.storageFailure(
-                        "unsupported runtime job schema version \(prior)"
-                    )
-                }
                 if !rawTableHasColumn(
                     table: "runtime_job_output_streams",
                     column: "artifact_evicted_at",
@@ -1330,6 +1583,88 @@ public actor RuntimeJobRepository {
             sqlite3_close(connection)
             throw error
         }
+    }
+
+    private static func isExactCoResidentControlPlaneV2(
+        _ candidate: SQLitePreflightDatabase
+    ) throws -> Bool {
+        let versionTableCount = try candidate.integer(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='control_schema_version'"
+        ) ?? 0
+        guard versionTableCount == 1 else { return false }
+        let versionRowCount = try candidate.integer(
+            "SELECT COUNT(*) FROM control_schema_version"
+        ) ?? 0
+        let version = try candidate.integer(
+            "SELECT version FROM control_schema_version WHERE singleton=1"
+        )
+        let userVersion = try candidate.integer("PRAGMA user_version;") ?? 0
+        let requiredTableCount = try candidate.integer(controlPlaneV2RequiredTableCountSQL) ?? 0
+        guard versionRowCount == 1
+            && version == ProjectControlPlaneRepository.schemaVersion
+            && userVersion == ProjectControlPlaneRepository.schemaVersion
+            && requiredTableCount == controlPlaneV2RequiredSurfaces.count else {
+            return false
+        }
+        for surface in controlPlaneV2RequiredSurfaces {
+            let columnList = surface.columns.map { "'\($0)'" }.joined(separator: ",")
+            let totalCount = try candidate.integer(
+                "SELECT COUNT(*) FROM pragma_table_info('\(surface.name)')"
+            ) ?? 0
+            let matchedCount = try candidate.integer(
+                "SELECT COUNT(*) FROM pragma_table_info('\(surface.name)') WHERE name IN (\(columnList))"
+            ) ?? 0
+            guard totalCount == surface.columns.count,
+                  matchedCount == surface.columns.count else {
+                return false
+            }
+        }
+        return true
+    }
+
+    private static func isExactCoResidentControlPlaneV2(
+        _ database: OpaquePointer
+    ) throws -> Bool {
+        let versionTableCount = try rawScalarInt(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='control_schema_version'",
+            database: database
+        ) ?? 0
+        guard versionTableCount == 1 else { return false }
+        let versionRowCount = try rawScalarInt(
+            "SELECT COUNT(*) FROM control_schema_version",
+            database: database
+        ) ?? 0
+        let version = try rawScalarInt(
+            "SELECT version FROM control_schema_version WHERE singleton=1",
+            database: database
+        )
+        let userVersion = try rawScalarInt("PRAGMA user_version", database: database) ?? 0
+        let requiredTableCount = try rawScalarInt(
+            controlPlaneV2RequiredTableCountSQL,
+            database: database
+        ) ?? 0
+        guard versionRowCount == 1
+            && version == ProjectControlPlaneRepository.schemaVersion
+            && userVersion == ProjectControlPlaneRepository.schemaVersion
+            && requiredTableCount == controlPlaneV2RequiredSurfaces.count else {
+            return false
+        }
+        for surface in controlPlaneV2RequiredSurfaces {
+            let columnList = surface.columns.map { "'\($0)'" }.joined(separator: ",")
+            let totalCount = try rawScalarInt(
+                "SELECT COUNT(*) FROM pragma_table_info('\(surface.name)')",
+                database: database
+            ) ?? 0
+            let matchedCount = try rawScalarInt(
+                "SELECT COUNT(*) FROM pragma_table_info('\(surface.name)') WHERE name IN (\(columnList))",
+                database: database
+            ) ?? 0
+            guard totalCount == surface.columns.count,
+                  matchedCount == surface.columns.count else {
+                return false
+            }
+        }
+        return true
     }
 
     @discardableResult

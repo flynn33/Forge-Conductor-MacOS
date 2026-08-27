@@ -1,0 +1,17 @@
+Building for debugging...
+[0/10] Write sources
+[2/10] Write swift-version--58304C5D6DBC2206.txt
+[4/11] Emitting module ForgeConductorCore
+[5/11] Compiling ForgeConductorCore LegacyContinuityMigrator.swift
+[6/11] Compiling ForgeConductorCore ProjectMemoryRepository.swift
+[6/14] Write Objects.LinkFileList
+[8/14] Linking forge-conductor
+[9/14] Applying forge-conductor
+[10/16] Linking forge-conductor-app
+[11/16] Applying forge-conductor-app
+[13/16] Emitting module ForgeConductorTests
+[14/16] Compiling ForgeConductorTests ContinuityV2Tests.swift
+[14/16] Write Objects.LinkFileList
+[15/16] Linking ForgeConductorPackageTests
+Build complete! (3.14s)
+warning: No matching test cases were run

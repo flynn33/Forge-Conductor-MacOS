@@ -1,0 +1,48 @@
+Test Suite 'Selected tests' started at 2026-08-27 06:32:57.938.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-27 06:32:57.939.
+Test Suite 'AppConfigAndDoctorTests' started at 2026-08-27 06:32:57.939.
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testConcurrentLegacyConfigLoadsPerformOneMigration]' started.
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testConcurrentLegacyConfigLoadsPerformOneMigration]' passed (0.009 seconds).
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testLegacyShellMigrationBackupReceiptAndExplicitDisableRemainValid]' started.
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testLegacyShellMigrationBackupReceiptAndExplicitDisableRemainValid]' passed (0.136 seconds).
+Test Suite 'AppConfigAndDoctorTests' passed at 2026-08-27 06:32:58.085.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.146 (0.146) seconds
+Test Suite 'ContinuityTests' started at 2026-08-27 06:32:58.085.
+Test Case '-[ForgeConductorTests.ContinuityTests testConcurrentVersionThreeMigrationIsIdempotent]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testConcurrentVersionThreeMigrationIsIdempotent]' passed (0.009 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testVersionThreeStoreMigratesWithoutLosingHandoff]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testVersionThreeStoreMigratesWithoutLosingHandoff]' passed (0.220 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testVersionTwoStoreMigratesPopulatedDataReopensAndRerunsIdempotently]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testVersionTwoStoreMigratesPopulatedDataReopensAndRerunsIdempotently]' passed (0.010 seconds).
+Test Suite 'ContinuityTests' passed at 2026-08-27 06:32:58.325.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.239 (0.239) seconds
+Test Suite 'ContinuityV2Tests' started at 2026-08-27 06:32:58.325.
+Test Case '-[ForgeConductorTests.ContinuityV2Tests testLegacyLocationV2MigrationPreservesBindingAcrossRestartAndIdempotentReplay]' started.
+Test Case '-[ForgeConductorTests.ContinuityV2Tests testLegacyLocationV2MigrationPreservesBindingAcrossRestartAndIdempotentReplay]' passed (0.029 seconds).
+Test Case '-[ForgeConductorTests.ContinuityV2Tests testLegacyMigrationImportsExactProjectReadOnlyAndQuarantinesAmbiguous]' started.
+Test Case '-[ForgeConductorTests.ContinuityV2Tests testLegacyMigrationImportsExactProjectReadOnlyAndQuarantinesAmbiguous]' passed (0.026 seconds).
+Test Suite 'ContinuityV2Tests' passed at 2026-08-27 06:32:58.380.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.055 (0.055) seconds
+Test Suite 'NativeSessionHostPluginTests' started at 2026-08-27 06:32:58.380.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testV2BlockedCredentialFailureAndLegacySyntheticQuarantinePersist]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testV2BlockedCredentialFailureAndLegacySyntheticQuarantinePersist]' passed (0.009 seconds).
+Test Suite 'NativeSessionHostPluginTests' passed at 2026-08-27 06:32:58.389.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.009 (0.009) seconds
+Test Suite 'ProjectMemoryTests' started at 2026-08-27 06:32:58.389.
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testVersionOneDatabaseMigratesPopulatedDataReopensAndRerunsIdempotently]' started.
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testVersionOneDatabaseMigratesPopulatedDataReopensAndRerunsIdempotently]' passed (0.025 seconds).
+Test Suite 'ProjectMemoryTests' passed at 2026-08-27 06:32:58.414.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.025 (0.025) seconds
+Test Suite 'RuntimeExecutionJobTests' started at 2026-08-27 06:32:58.414.
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testSchemaV2MigratesForwardWithProcessIdentityAndIdempotencyReceiptStorage]' started.
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testSchemaV2MigratesForwardWithProcessIdentityAndIdempotencyReceiptStorage]' passed (0.008 seconds).
+Test Suite 'RuntimeExecutionJobTests' passed at 2026-08-27 06:32:58.421.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.008 (0.008) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-08-27 06:32:58.422.
+	 Executed 10 tests, with 0 failures (0 unexpected) in 0.481 (0.482) seconds
+Test Suite 'Selected tests' passed at 2026-08-27 06:32:58.422.
+	 Executed 10 tests, with 0 failures (0 unexpected) in 0.481 (0.483) seconds
+◇ Test run started.
+↳ Testing Library Version: 1501
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

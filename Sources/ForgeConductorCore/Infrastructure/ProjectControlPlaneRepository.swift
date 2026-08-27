@@ -14,6 +14,7 @@ public actor ProjectControlPlaneRepository {
 
     private let clock: any Clock
     private var connection: ControlPlaneSQLiteConnection?
+    private var openRegistration: SQLiteOpenRegistration?
 
     public init(
         databaseURL: URL,
@@ -25,20 +26,74 @@ public actor ProjectControlPlaneRepository {
         }
         self.databaseURL = databaseURL.standardizedFileURL
         self.clock = clock
-        self.connection = try ControlPlaneSQLiteConnection(
-            databaseURL: databaseURL.standardizedFileURL,
-            busyTimeoutMilliseconds: busyTimeoutMilliseconds,
-            migrationTimestamp: ISO8601.string(from: clock.now())
-        )
+        let standardizedDatabaseURL = databaseURL.standardizedFileURL
+        do {
+            let initialized = try VerifiedMigrationBackup.withMigrationLock(
+                databaseURL: standardizedDatabaseURL,
+                timeoutSeconds: 60
+            ) {
+                try VerifiedMigrationBackup.withNonMutatingSQLitePreflight(
+                    databaseURL: standardizedDatabaseURL
+                ) { candidate in
+                    guard let candidate else { return }
+                    let userVersion = try candidate.integer("PRAGMA user_version;") ?? 0
+                    let hasVersionTable = try candidate.integer(
+                        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='control_schema_version'"
+                    ) == 1
+                    let rowCount = hasVersionTable
+                        ? try candidate.integer("SELECT COUNT(*) FROM control_schema_version") ?? 0
+                        : 0
+                    let storedVersion = hasVersionTable
+                        ? try candidate.integer(
+                            "SELECT version FROM control_schema_version WHERE singleton=1"
+                        ) ?? 0
+                        : 0
+                    let priorVersion = max(userVersion, storedVersion)
+                    if priorVersion == 0, !hasVersionTable {
+                        try candidate.requireEmptySchemaWhenUnversioned(reportedVersion: 0)
+                        return
+                    }
+                    guard userVersion == Self.schemaVersion,
+                          hasVersionTable,
+                          rowCount == 1,
+                          storedVersion == Self.schemaVersion else {
+                        throw ProjectContextError.unsupportedSchemaVersion(priorVersion)
+                    }
+                }
+                let connection = try ControlPlaneSQLiteConnection(
+                    databaseURL: standardizedDatabaseURL,
+                    busyTimeoutMilliseconds: busyTimeoutMilliseconds,
+                    migrationTimestamp: ISO8601.string(from: clock.now())
+                )
+                do {
+                    let registration = try VerifiedMigrationBackup.registerOpenDatabase(
+                        at: standardizedDatabaseURL
+                    )
+                    return (connection, registration)
+                } catch {
+                    connection.close()
+                    throw error
+                }
+            }
+            self.connection = initialized.0
+            self.openRegistration = initialized.1
+        } catch let error as ProjectContextError {
+            throw error
+        } catch {
+            throw ProjectContextError.integrityFailure(error.localizedDescription)
+        }
     }
 
     deinit {
         connection?.close()
+        VerifiedMigrationBackup.unregisterOpenDatabase(openRegistration)
     }
 
     public func close() {
         connection?.close()
         connection = nil
+        VerifiedMigrationBackup.unregisterOpenDatabase(openRegistration)
+        openRegistration = nil
     }
 
     @discardableResult
@@ -4747,8 +4802,9 @@ private final class ControlPlaneSQLiteConnection {
             guard sqlite3_busy_timeout(handle, Int32(busyTimeoutMilliseconds)) == SQLITE_OK else {
                 throw ProjectContextError.databaseFailure("could not configure SQLite busy timeout")
             }
+            let priorVersion = try validatedPriorVersion()
+            try migrate(timestamp: migrationTimestamp, priorVersion: priorVersion)
             try executeStatic("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA synchronous=NORMAL;")
-            try migrate(timestamp: migrationTimestamp)
             try? FileManager.default.setAttributes(
                 [.posixPermissions: 0o600],
                 ofItemAtPath: databaseURL.path
@@ -4843,7 +4899,7 @@ private final class ControlPlaneSQLiteConnection {
         try first(sql, bindings: bindings) { $0.text(0) ?? "" }
     }
 
-    private func migrate(timestamp: String) throws {
+    private func validatedPriorVersion() throws -> Int {
         let userVersion = try scalarInt("PRAGMA user_version;")
         let hasVersionTable = try scalarInt(
             "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='control_schema_version'"
@@ -4852,9 +4908,29 @@ private final class ControlPlaneSQLiteConnection {
             ? try scalarInt("SELECT version FROM control_schema_version WHERE singleton=1")
             : 0
         let priorVersion = max(userVersion, storedVersion)
-        guard priorVersion <= ProjectControlPlaneRepository.schemaVersion else {
+        let schemaObjectCount = try scalarInt(
+            "SELECT COUNT(*) FROM sqlite_master"
+        )
+        if priorVersion == 0 {
+            guard schemaObjectCount == 0, !hasVersionTable else {
+                throw ProjectContextError.integrityFailure(
+                    "nonempty unversioned control-plane database requires explicit recovery"
+                )
+            }
+        } else {
+            guard userVersion == ProjectControlPlaneRepository.schemaVersion,
+                  hasVersionTable,
+                  storedVersion == ProjectControlPlaneRepository.schemaVersion else {
+                throw ProjectContextError.unsupportedSchemaVersion(priorVersion)
+            }
+        }
+        guard priorVersion == 0 || priorVersion == ProjectControlPlaneRepository.schemaVersion else {
             throw ProjectContextError.unsupportedSchemaVersion(priorVersion)
         }
+        return priorVersion
+    }
+
+    private func migrate(timestamp: String, priorVersion: Int) throws {
         try transaction {
             try executeStatic(Self.schemaV2)
             let quickCheck = try scalarText("PRAGMA quick_check;") ?? "missing"

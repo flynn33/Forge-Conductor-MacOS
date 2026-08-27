@@ -1,0 +1,58 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 23774,
+      "path": ".forge-codex/evidence/EVID-20260827T133242Z-ab3bd07aeb.artifact-000-P10-manager-http-compatibility-report.json",
+      "sha256": "fe3692daac3d2e695dc31621ccb629f0352392a7134ba9da55e0b46c092bd035",
+      "source_path": ".forge-codex/evidence/P10-manager-http-compatibility-report.json",
+      "storage": "evidence-id-specific-copy"
+    },
+    {
+      "bytes": 23774,
+      "path": ".forge-codex/evidence/EVID-20260827T133242Z-ab3bd07aeb.stdout.txt",
+      "sha256": "fe3692daac3d2e695dc31621ccb629f0352392a7134ba9da55e0b46c092bd035",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260827T133242Z-ab3bd07aeb.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "command": "python3 .forge-codex/scripts/check_p10_manager_http_compatibility.py --report .forge-codex/evidence/P10-manager-http-compatibility-report.json",
+  "ended_at": "2026-08-27T13:32:44.358833+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 1,
+  "id": "EVID-20260827T133242Z-ab3bd07aeb",
+  "kind": "p10-manager-http-compatibility",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "related_findings": [],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 7834494,
+    "file_count": 234,
+    "schema_version": 1,
+    "sha256": "8e442f4c061909fd0ba9d5d1d59392087f62ae7ec32adfd83ed76924ae8ae7b8"
+  },
+  "source_manifest_after": {
+    "bytes": 7834494,
+    "file_count": 234,
+    "schema_version": 1,
+    "sha256": "8e442f4c061909fd0ba9d5d1d59392087f62ae7ec32adfd83ed76924ae8ae7b8"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-27T13:32:42.773178+00:00",
+  "timed_out": false
+}

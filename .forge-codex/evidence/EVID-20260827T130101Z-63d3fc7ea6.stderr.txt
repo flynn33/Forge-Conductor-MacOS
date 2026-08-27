@@ -1,0 +1,12 @@
+[0/1] Planning build
+Building for production...
+[0/7] Write sources
+[2/7] Write swift-version--58304C5D6DBC2206.txt
+[4/7] Compiling ForgeConductorCore AgentCatalog.swift
+[4/10] Write Objects.LinkFileList
+[6/10] Linking forge-conductor
+[7/11] Linking forge-conductor-app
+[9/11] Compiling ForgeConductorTests AppConfigAndDoctorTests.swift
+[9/11] Write Objects.LinkFileList
+[10/11] Linking ForgeConductorPackageTests
+Build complete! (61.41s)

@@ -1,0 +1,3 @@
+usage: check_p10_cli_compatibility.py [-h] --binary BINARY
+                                      [--baseline BASELINE] [--report REPORT]
+check_p10_cli_compatibility.py: error: the following arguments are required: --binary

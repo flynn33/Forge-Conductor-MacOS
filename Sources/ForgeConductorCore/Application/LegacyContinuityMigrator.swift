@@ -35,21 +35,31 @@ public final class LegacyContinuityMigrator: @unchecked Sendable {
         var quarantined = 0
         var importedHashes: [String] = []
         var quarantineHashes: [String] = []
+        var candidateIdentities: [[String: Any]] = []
 
         for candidate in candidates {
+            var candidateIdentity: [String: Any] = [
+                "path_sha256": JSONSupport.sha256Hex(candidate.path),
+                "content_state": "unreadable_or_invalid",
+            ]
+            defer { candidateIdentities.append(candidateIdentity) }
             do {
                 let values = try candidate.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
                 guard values.isRegularFile == true else {
+                    candidateIdentity["content_state"] = "not_regular"
                     skipped += 1
                     continue
                 }
                 guard let fileSize = values.fileSize,
                       fileSize > 0,
                       fileSize <= ContinuityHandoffV2.maximumEncodedBytes else {
+                    candidateIdentity["content_state"] = "empty_or_oversized"
                     throw ProjectMemoryError.payloadTooLarge("legacy continuity file is empty or oversized")
                 }
                 let data = try Data(contentsOf: candidate, options: [.mappedIfSafe])
                 let sourceSHA256 = JSONSupport.sha256Hex(data)
+                candidateIdentity["content_state"] = "read"
+                candidateIdentity["source_sha256"] = sourceSHA256
                 let object = try JSONSupport.object(from: data)
                 let sanitized: [String: Any]
                 do {
@@ -156,15 +166,28 @@ public final class LegacyContinuityMigrator: @unchecked Sendable {
             }
         }
 
+        let receiptFingerprint = JSONSupport.sha256Hex(
+            try JSONSupport.canonicalJSON([
+                "schema_version": 1,
+                "project_id": repository.projectID,
+                "expected_project_generation": Int64(expectedProjectGeneration),
+                "bound_run_id": boundRunID ?? NSNull(),
+                "submitted_candidate_count": candidateFiles.count,
+                "selected_candidates": candidateIdentities,
+            ])
+        )
+
         return try repository.continuityRecordLegacyMigration(
             importedCount: imported,
             skippedCount: skipped,
             quarantinedCount: quarantined,
             startedAt: startedAt,
+            migrationFingerprintSHA256: receiptFingerprint,
             details: [
                 "candidate_count": candidates.count,
                 "imported_source_sha256": Array(importedHashes.prefix(Self.maximumCandidateCount)),
                 "quarantined_source_sha256": Array(quarantineHashes.prefix(Self.maximumCandidateCount)),
+                "migration_fingerprint_sha256": receiptFingerprint,
                 "global_latest_used_as_authority": false,
             ]
         )
