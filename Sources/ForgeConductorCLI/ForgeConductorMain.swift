@@ -16,6 +16,33 @@ import ForgeNativeSessionHostPlugin
 /// service so the executable remains an adapter rather than a second application layer.
 @main
 enum ForgeConductorMain {
+    private struct ServeShutdownFailure: Error, LocalizedError, CustomStringConvertible {
+        let runError: Error?
+        let unresolvedJobIDs: [UUID]
+        let persistencePendingJobIDs: [UUID]
+
+        var errorDescription: String? {
+            let unresolved = Self.describe(unresolvedJobIDs)
+            let persistencePending = Self.describe(persistencePendingJobIDs)
+            let shutdown = "MCP serve shutdown incomplete; unresolved runtime job IDs: \(unresolved); persistence-pending runtime job IDs: \(persistencePending)"
+            if let runError {
+                return "MCP serve failed: \(runError.localizedDescription); \(shutdown)"
+            }
+            return shutdown
+        }
+
+        var description: String {
+            errorDescription ?? "MCP serve shutdown incomplete"
+        }
+
+        private static func describe(_ jobIDs: [UUID]) -> String {
+            let values = jobIDs
+                .map { $0.uuidString.lowercased() }
+                .sorted()
+            return values.isEmpty ? "none reported" : values.joined(separator: ",")
+        }
+    }
+
     static func main() {
         ForgeNativeSessionHostPlugin.register()
         let args = Array(CommandLine.arguments.dropFirst())
@@ -189,7 +216,27 @@ enum ForgeConductorMain {
     static func cmdServe(_ args: [String]) throws {
         let app = try ForgeApp.bootstrap(home: homeOverride(args))
         let server = MCPServer(app: app)
-        try server.run()
+        do {
+            try server.run()
+        } catch {
+            let shutdownReport = app.shutdown()
+            guard shutdownReport.completed else {
+                throw ServeShutdownFailure(
+                    runError: error,
+                    unresolvedJobIDs: shutdownReport.unresolvedJobIDs,
+                    persistencePendingJobIDs: shutdownReport.persistencePendingJobIDs
+                )
+            }
+            throw error
+        }
+        let shutdownReport = app.shutdown()
+        guard shutdownReport.completed else {
+            throw ServeShutdownFailure(
+                runError: nil,
+                unresolvedJobIDs: shutdownReport.unresolvedJobIDs,
+                persistencePendingJobIDs: shutdownReport.persistencePendingJobIDs
+            )
+        }
     }
 
     static func cmdDashboard(_ args: [String]) throws {

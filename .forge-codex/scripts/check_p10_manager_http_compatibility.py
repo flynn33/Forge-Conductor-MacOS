@@ -133,17 +133,36 @@ EXPECTED_ROUTE_SPECS = [
     },
 ]
 
-SUCCESS_SEMANTICS_UNCOVERED = {
-    ("POST", "/api/manager/runs/start"): (
-        "A 202 success may start a live provider-backed autonomous run and is outside this safe probe."
-    ),
-    ("POST", "/api/manager/runs/status"): (
-        "A 200 success requires a safely seeded autonomous run fixture that this probe does not create."
-    ),
-    ("POST", "/api/manager/runs/control"): (
-        "A 200 success requires a safely seeded controllable run fixture that this probe does not create."
-    ),
+RUN_FIXTURE_ID = "01234567-89ab-4cde-8fab-0123456789ab"
+RUN_FIXTURE_PROVIDER_ID = "p10.fixture.provider"
+RUN_FIXTURE_ADAPTER_ID = "p10.fixture.unregistered-adapter"
+RUN_FIXTURE_MODEL_KEY = "p10-fixture-model"
+RUN_FIXTURE_INITIAL_STATE = "created"
+RUN_FIXTURE_INITIAL_REVISION = 0
+RUN_FIXTURE_CAUSAL_STATE = "waiting_provider"
+RUN_FIXTURE_CAUSAL_REVISION = 6
+RUN_FIXTURE_CAUSAL_ERROR_CODE = "run_step_failed"
+RUN_FIXTURE_CAUSAL_ERROR_SUMMARY = "Host cannot create and bootstrap a successor session"
+RUN_FIXTURE_CAUSAL_EVENT_KIND = "autonomous_run_waiting_provider"
+RUN_FIXTURE_CAUSAL_EVENT_SUMMARY = "Run yielded after a transient execution failure"
+RUN_FIXTURE_PROGRESS_REVISIONS = {
+    "created": {0},
+    "validating": {1},
+    "ready": {2},
+    "starting": {3},
+    "running": {4, 5},
+    "waiting_provider": {6},
 }
+RUN_FIXTURE_EVENT_KINDS_NEWEST_FIRST = [
+    "autonomous_run_waiting_provider",
+    "run_side_effect_intent_persisted",
+    "autonomous_run_running",
+    "autonomous_run_starting",
+    "autonomous_run_ready",
+    "autonomous_run_validation_started",
+    "run_lease_acquired",
+    "autonomous_run_created",
+]
 
 EXPECTED_DIRECT_STATUSES = {
     ("GET", "/api/manager/status"): {200},
@@ -900,6 +919,7 @@ def run_manager_probe(
     observed_routes: set[tuple[str, str]] = set()
     observed_statuses: dict[tuple[str, str], set[int]] = {}
     success_semantics: set[tuple[str, str]] = set()
+    run_fixture: dict[str, Any] | None = None
     exit_code: int | None = None
     graceful = False
 
@@ -970,17 +990,19 @@ def run_manager_probe(
         require(TOKEN_PATTERN.fullmatch(token) is not None, "credential format changed")
         authorization_headers = {**json_headers, "Authorization": f"Bearer {token}"}
 
-        def authenticated_success(
+        def json_success(
             case_id: str,
             method: str,
             path: str,
             payload: dict[str, Any],
+            *,
+            request_headers: dict[str, str] | None = None,
         ) -> tuple[HTTPResult, dict[str, Any]]:
             result = request(
                 port,
                 method,
                 path,
-                headers=authorization_headers,
+                headers=request_headers or authorization_headers,
                 body=json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8"),
                 timeout_seconds=limits["request_timeout_seconds"],
                 maximum_response_bytes=limits["maximum_response_bytes"],
@@ -1285,7 +1307,7 @@ def run_manager_probe(
             require(result.body == expected_body, f"{case_id} body changed")
             responses.append((case_id, result))
 
-        _, start_value = authenticated_success(
+        _, start_value = json_success(
             "authenticated_start",
             "POST",
             "/api/manager/start",
@@ -1304,7 +1326,7 @@ def run_manager_probe(
             ("authenticated_settings_post", "POST"),
             ("authenticated_settings_put", "PUT"),
         ):
-            _, settings_value = authenticated_success(
+            _, settings_value = json_success(
                 case_id,
                 method,
                 "/api/manager/settings",
@@ -1320,7 +1342,7 @@ def run_manager_probe(
 
         project_fixture = probe_dir / "project-fixture"
         project_fixture.mkdir(mode=0o700)
-        _, registered = authenticated_success(
+        _, registered = json_success(
             "authenticated_project_register",
             "POST",
             "/api/manager/projects/register",
@@ -1340,7 +1362,7 @@ def run_manager_probe(
             "project registration escaped the temporary fixture",
         )
 
-        _, project_status = authenticated_success(
+        _, project_status = json_success(
             "authenticated_project_status",
             "POST",
             "/api/manager/projects/status",
@@ -1353,7 +1375,7 @@ def run_manager_probe(
         )
 
         owner_id = "p10-manager-http-probe"
-        _, binding = authenticated_success(
+        _, binding = json_success(
             "authenticated_project_bind",
             "POST",
             "/api/manager/projects/bind",
@@ -1377,7 +1399,7 @@ def run_manager_probe(
             "project binding inline-output bound changed",
         )
 
-        _, reset = authenticated_success(
+        _, reset = json_success(
             "authenticated_project_reset_generation",
             "POST",
             "/api/manager/projects/reset-generation",
@@ -1395,7 +1417,225 @@ def run_manager_probe(
             "project reset did not invalidate the temporary binding",
         )
 
-        _, stop_value = authenticated_success(
+        run_request = {
+            "run_id": RUN_FIXTURE_ID,
+            "project_id": project_id,
+            "project_generation": reset["new_generation"],
+            "mission": "Exercise isolated manager run-route semantics",
+            "provider_id": RUN_FIXTURE_PROVIDER_ID,
+            "adapter_id": RUN_FIXTURE_ADAPTER_ID,
+            "model_key": RUN_FIXTURE_MODEL_KEY,
+            "allowed_tools": ["project_memory.search"],
+            "completion_gates": ["p10_manager_http_route"],
+            "network_allowed": False,
+            "maximum_inline_output_bytes": 1_024,
+        }
+        _, started_run = json_success(
+            "authenticated_run_start",
+            "POST",
+            "/api/manager/runs/start",
+            run_request,
+        )
+        require(started_run.get("run_id") == RUN_FIXTURE_ID, "run start identifier changed")
+        require(started_run.get("project_id") == project_id, "run start project changed")
+        require(
+            started_run.get("project_generation") == reset["new_generation"],
+            "run start generation changed",
+        )
+        require(
+            started_run.get("continuity_mode") == "managedAutonomous",
+            "run start continuity mode changed",
+        )
+        require(
+            started_run.get("provider_id") == RUN_FIXTURE_PROVIDER_ID,
+            "run start provider identity changed",
+        )
+        require(
+            started_run.get("adapter_id") == RUN_FIXTURE_ADAPTER_ID,
+            "run start adapter identity changed",
+        )
+        require(
+            started_run.get("model_key") == RUN_FIXTURE_MODEL_KEY,
+            "run start model identity changed",
+        )
+        require(
+            started_run.get("state") == RUN_FIXTURE_INITIAL_STATE,
+            "run start did not return the newly created durable run",
+        )
+        require(
+            started_run.get("revision") == RUN_FIXTURE_INITIAL_REVISION,
+            "run start did not return the initial durable revision",
+        )
+        require(
+            "last_error_code" not in started_run
+            and "last_error_summary" not in started_run
+            and "retry_at" not in started_run,
+            "run start returned an unrelated failure or retry condition",
+        )
+
+        run_status_result: HTTPResult | None = None
+        run_status: dict[str, Any] | None = None
+        observed_run_progression: list[dict[str, Any]] = [{
+            "state": RUN_FIXTURE_INITIAL_STATE,
+            "revision": RUN_FIXTURE_INITIAL_REVISION,
+        }]
+        prior_revision = RUN_FIXTURE_INITIAL_REVISION
+        run_deadline = time.monotonic() + limits["request_timeout_seconds"]
+        while time.monotonic() < run_deadline:
+            candidate_result = request(
+                port,
+                "POST",
+                "/api/manager/runs/status",
+                headers=json_headers,
+                body=json.dumps(
+                    {"run_id": RUN_FIXTURE_ID}, sort_keys=True, separators=(",", ":")
+                ).encode("utf-8"),
+                timeout_seconds=limits["request_timeout_seconds"],
+                maximum_response_bytes=limits["maximum_response_bytes"],
+            )
+            require(
+                candidate_result.status
+                == EXPECTED_SUCCESS_STATUSES[("POST", "/api/manager/runs/status")],
+                "public_run_status success status changed",
+            )
+            require_common_headers(candidate_result, contract, "public_run_status")
+            candidate = parse_json(candidate_result, "public_run_status")
+            require(candidate.get("ok") is True, "public_run_status success envelope lost ok=true")
+            require(candidate.get("run_id") == RUN_FIXTURE_ID, "run status identifier changed")
+            state = candidate.get("state")
+            revision = candidate.get("revision")
+            require(
+                isinstance(state, str)
+                and type(revision) is int
+                and revision in RUN_FIXTURE_PROGRESS_REVISIONS.get(state, set()),
+                "run status escaped the deterministic unregistered-adapter progression",
+            )
+            require(revision >= prior_revision, "run status revision moved backwards")
+            prior_revision = revision
+            if observed_run_progression[-1] != {"state": state, "revision": revision}:
+                observed_run_progression.append({"state": state, "revision": revision})
+            if state == RUN_FIXTURE_CAUSAL_STATE:
+                run_status_result = candidate_result
+                run_status = candidate
+                break
+            time.sleep(0.02)
+
+        require(
+            run_status_result is not None and run_status is not None,
+            "unregistered-adapter run did not reach its causal waiting state",
+        )
+        require(
+            run_status.get("revision") == RUN_FIXTURE_CAUSAL_REVISION,
+            "unregistered-adapter run reached an unexpected causal revision",
+        )
+        require(
+            run_status.get("last_error_code") == RUN_FIXTURE_CAUSAL_ERROR_CODE,
+            "unregistered-adapter run did not preserve its exact causal error code",
+        )
+        require(
+            run_status.get("last_error_summary") == RUN_FIXTURE_CAUSAL_ERROR_SUMMARY,
+            "unregistered-adapter run did not preserve its exact causal error summary",
+        )
+        require(
+            isinstance(run_status.get("retry_at"), str) and bool(run_status["retry_at"]),
+            "unregistered-adapter run did not persist its bounded retry time",
+        )
+        responses.append(("public_run_status", run_status_result))
+        observe_route("POST", "/api/manager/runs/status", run_status_result)
+        success_semantics.add(("POST", "/api/manager/runs/status"))
+
+        run_event_result = request(
+            port,
+            "GET",
+            "/api/manager/operator/snapshot?limit=100",
+            headers=None,
+            body=None,
+            timeout_seconds=limits["request_timeout_seconds"],
+            maximum_response_bytes=limits["maximum_response_bytes"],
+        )
+        require(run_event_result.status == 200, "run event snapshot status changed")
+        require_common_headers(run_event_result, contract, "run_event_snapshot")
+        run_event_snapshot = parse_json(run_event_result, "run_event_snapshot")
+        run_events = [
+            event for event in run_event_snapshot.get("events", [])
+            if isinstance(event, dict) and event.get("run_id") == RUN_FIXTURE_ID
+        ]
+        require(
+            [event.get("kind") for event in run_events]
+            == RUN_FIXTURE_EVENT_KINDS_NEWEST_FIRST,
+            "unregistered-adapter run event progression changed: "
+            + repr([event.get("kind") for event in run_events]),
+        )
+        causal_event = run_events[0]
+        require(
+            causal_event.get("kind") == RUN_FIXTURE_CAUSAL_EVENT_KIND
+            and causal_event.get("summary") == RUN_FIXTURE_CAUSAL_EVENT_SUMMARY
+            and causal_event.get("severity") == "warning",
+            "unregistered-adapter run causal event changed",
+        )
+        responses.append(("run_event_snapshot", run_event_result))
+
+        _, paused_run = json_success(
+            "authenticated_run_pause",
+            "POST",
+            "/api/manager/runs/control",
+            {"run_id": RUN_FIXTURE_ID, "action": "pause"},
+        )
+        require(paused_run.get("run_id") == RUN_FIXTURE_ID, "run control identifier changed")
+        require(paused_run.get("state") == "paused", "run control did not persist pause")
+        require(
+            paused_run.get("revision") == RUN_FIXTURE_CAUSAL_REVISION + 1,
+            "run control did not advance exactly one durable revision",
+        )
+
+        _, paused_status = json_success(
+            "public_run_status_after_pause",
+            "POST",
+            "/api/manager/runs/status",
+            {"run_id": RUN_FIXTURE_ID},
+            request_headers=json_headers,
+        )
+        require(paused_status.get("run_id") == RUN_FIXTURE_ID, "paused status identifier changed")
+        require(paused_status.get("state") == "paused", "paused status was not durable")
+        require(
+            paused_status.get("revision") == paused_run.get("revision"),
+            "paused status revision changed after control",
+        )
+
+        _, replayed_run = json_success(
+            "authenticated_run_start_replay",
+            "POST",
+            "/api/manager/runs/start",
+            run_request,
+        )
+        require(replayed_run.get("run_id") == RUN_FIXTURE_ID, "run replay identifier changed")
+        require(replayed_run.get("state") == "paused", "run replay did not preserve durable state")
+        require(
+            replayed_run == paused_status,
+            "run replay was not idempotent",
+        )
+        run_fixture = {
+            "mode": "temporary_project_unregistered_adapter",
+            "run_id": RUN_FIXTURE_ID,
+            "project_generation": reset["new_generation"],
+            "start_status": EXPECTED_SUCCESS_STATUSES[("POST", "/api/manager/runs/start")],
+            "status_status": EXPECTED_SUCCESS_STATUSES[("POST", "/api/manager/runs/status")],
+            "control_status": EXPECTED_SUCCESS_STATUSES[("POST", "/api/manager/runs/control")],
+            "causal_state": run_status["state"],
+            "causal_revision": run_status["revision"],
+            "causal_error_code": run_status["last_error_code"],
+            "causal_error_summary": run_status["last_error_summary"],
+            "causal_event_kind": causal_event["kind"],
+            "causal_event_summary": causal_event["summary"],
+            "event_progression_newest_first": [event["kind"] for event in run_events],
+            "observed_progression": observed_run_progression + [
+                {"state": paused_status["state"], "revision": paused_status["revision"]}
+            ],
+            "final_state": paused_status["state"],
+            "idempotent_start_replay": True,
+        }
+
+        _, stop_value = json_success(
             "authenticated_stop",
             "POST",
             "/api/manager/stop",
@@ -1409,7 +1649,7 @@ def run_manager_probe(
             "authenticated stop did not preserve stopped semantics",
         )
 
-        _, resumed = authenticated_success(
+        _, resumed = json_success(
             "authenticated_start_after_stop",
             "POST",
             "/api/manager/start",
@@ -1423,7 +1663,7 @@ def run_manager_probe(
             "authenticated start after stop did not restore running semantics",
         )
 
-        _, restarted = authenticated_success(
+        _, restarted = json_success(
             "authenticated_restart",
             "POST",
             "/api/manager/restart",
@@ -1438,7 +1678,7 @@ def run_manager_probe(
             "authenticated restart did not preserve running semantics",
         )
 
-        shutdown_result, shutdown_value = authenticated_success(
+        shutdown_result, shutdown_value = json_success(
             "authenticated_shutdown",
             "POST",
             "/api/manager/shutdown",
@@ -1455,10 +1695,9 @@ def run_manager_probe(
 
         expected_routes = set(EXPECTED_DIRECT_STATUSES)
         require(observed_routes == expected_routes, "runtime did not observe every current route pair")
-        expected_safe_successes = expected_routes - set(SUCCESS_SEMANTICS_UNCOVERED)
         require(
-            success_semantics == expected_safe_successes,
-            "runtime did not exercise every declared safe success semantic",
+            success_semantics <= expected_routes,
+            "runtime recorded an unknown success semantic",
         )
         baseline_successes = {tuple(pair) for pair in EXPECTED_BASELINE_ROUTES}
         require(
@@ -1487,21 +1726,24 @@ def run_manager_probe(
     require(port_is_closed(port), "manager loopback port remained open after shutdown")
     stdout, _ = process.stdout.snapshot()
     stderr, _ = process.stderr.snapshot()
+    missing_successes = sorted(set(EXPECTED_DIRECT_STATUSES) - success_semantics)
     uncovered_successes = [
         {
             "method": method,
             "path": path,
             "success_status": EXPECTED_SUCCESS_STATUSES[(method, path)],
             "observed_non_success_statuses": sorted(observed_statuses.get((method, path), set())),
-            "reason": reason,
+            "reason": "The bounded runtime probe did not observe the declared success status.",
         }
-        for (method, path), reason in sorted(SUCCESS_SEMANTICS_UNCOVERED.items())
+        for method, path in missing_successes
     ]
     baseline_successes = {tuple(pair) for pair in EXPECTED_BASELINE_ROUTES}
+    require(run_fixture is not None, "manager run fixture result is absent")
     return {
         "available": True,
         "mode": "temporary_home_loopback_process",
         "route_pairs_observed": [list(pair) for pair in sorted(observed_routes)],
+        "run_fixture": run_fixture,
         "success_semantics": {
             "coverage_status": "partial" if uncovered_successes else "complete",
             "full_g10_compatibility_claimed": False if uncovered_successes else True,

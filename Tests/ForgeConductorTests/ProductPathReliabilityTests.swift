@@ -3,6 +3,7 @@
 // In-process protocol calls provide deterministic coverage without automating LM Studio.
 
 import XCTest
+import Darwin
 @testable import ForgeConductorCore
 
 /// G1/G7: product reliability — MCP negotiate + tools surface without LM Studio UI.
@@ -274,6 +275,83 @@ final class ProductPathReliabilityTests: XCTestCase {
         XCTAssertLessThan(Date().timeIntervalSince(started), 2.5)
     }
 
+    func testProcessVerifierRejectsValidHandshakeWithNonzeroNaturalExit() throws {
+        let tmp = try makeVerifierTemp()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        var names = Array(MCPServeVerifier.requiredProductTools)
+        while names.count < MCPServeVerifier.minimumToolCount {
+            names.append("fixture_tool_\(names.count)")
+        }
+        let binary = try makeVerifierExecutable(
+            in: tmp,
+            serverName: "forge-conductor",
+            toolNames: names,
+            postOutputScript: "exit 9"
+        )
+
+        let result = try MCPServeVerifier.verify(
+            binary: binary,
+            home: tmp.appendingPathComponent("home", isDirectory: true),
+            timeoutSec: 0.2
+        )
+        XCTAssertFalse(result.ok)
+        XCTAssertFalse(result.terminationInterventionRequired)
+        XCTAssertEqual(result.terminationReason, "exit")
+        XCTAssertEqual(result.terminationStatus, 9)
+    }
+
+    func testProcessVerifierRejectsValidHandshakeWhenCleanupIntervenes() throws {
+        let tmp = try makeVerifierTemp()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        var names = Array(MCPServeVerifier.requiredProductTools)
+        while names.count < MCPServeVerifier.minimumToolCount {
+            names.append("fixture_tool_\(names.count)")
+        }
+        let binary = try makeVerifierExecutable(
+            in: tmp,
+            serverName: "forge-conductor",
+            toolNames: names,
+            postOutputScript: "exec /bin/sleep 30"
+        )
+
+        let result = try MCPServeVerifier.verify(
+            binary: binary,
+            home: tmp.appendingPathComponent("home", isDirectory: true),
+            timeoutSec: 0.2
+        )
+        XCTAssertFalse(result.ok)
+        XCTAssertTrue(result.terminationInterventionRequired)
+        XCTAssertEqual(result.terminationReason, "uncaught_signal")
+        XCTAssertEqual(result.terminationStatus, SIGTERM)
+        XCTAssertTrue(result.detail.contains("intervention=true"), result.detail)
+    }
+
+    func testProcessVerifierRejectsHandshakeEmittedOnlyAfterEOF() throws {
+        let tmp = try makeVerifierTemp()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        var names = Array(MCPServeVerifier.requiredProductTools)
+        while names.count < MCPServeVerifier.minimumToolCount {
+            names.append("fixture_tool_\(names.count)")
+        }
+        let binary = try makeVerifierExecutable(
+            in: tmp,
+            serverName: "forge-conductor",
+            toolNames: names,
+            deferOutputUntilEOF: true
+        )
+
+        let result = try MCPServeVerifier.verify(
+            binary: binary,
+            home: tmp.appendingPathComponent("home", isDirectory: true),
+            timeoutSec: 0.2
+        )
+        XCTAssertFalse(result.ok)
+        XCTAssertFalse(result.terminationInterventionRequired)
+        XCTAssertEqual(result.terminationReason, "exit")
+        XCTAssertEqual(result.terminationStatus, 0)
+        XCTAssertTrue(result.detail.contains("handshake_before_eof=false"), result.detail)
+    }
+
     private func makeVerifierTemp() throws -> URL {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("forge-verifier-\(UUID().uuidString)", isDirectory: true)
@@ -285,7 +363,9 @@ final class ProductPathReliabilityTests: XCTestCase {
         in directory: URL,
         serverName: String,
         toolNames: [String],
-        prefix: String = ""
+        prefix: String = "",
+        postOutputScript: String = "",
+        deferOutputUntilEOF: Bool = false
     ) throws -> URL {
         let initialize: [String: Any] = [
             "jsonrpc": "2.0",
@@ -311,7 +391,10 @@ final class ProductPathReliabilityTests: XCTestCase {
             + (try JSONSupport.string(from: initialize)) + "\n"
             + (try JSONSupport.string(from: tools)) + "\n"
         let shellQuoted = output.replacingOccurrences(of: "'", with: "'\"'\"'")
-        let script = "#!/bin/sh\ncat >/dev/null\nprintf '%s' '\(shellQuoted)'\n"
+        let responseScript = "printf '%s' '\(shellQuoted)'"
+        let script = deferOutputUntilEOF
+            ? "#!/bin/sh\ncat >/dev/null\n\(responseScript)\n\(postOutputScript)\n"
+            : "#!/bin/sh\n\(responseScript)\ncat >/dev/null\n\(postOutputScript)\n"
         let binary = directory.appendingPathComponent("fixture-server")
         try Data(script.utf8).write(to: binary)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: binary.path)

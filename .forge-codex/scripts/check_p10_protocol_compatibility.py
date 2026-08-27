@@ -11,6 +11,8 @@ import math
 import os
 import pathlib
 import selectors
+import shlex
+import signal
 import subprocess
 import sys
 import tempfile
@@ -47,6 +49,8 @@ EXPECTED_LEGACY_TOOL_COUNT = 34
 EXPECTED_BASELINE_TRANSCRIPT_SHA256 = "332c4bc6124e9792eaf8d9aad109c79948ddff52f0cd56c228ad1abe01f4781b"
 EXPECTED_REQUEST_FIXTURE_SHA256 = "3847873ebea36d3f0bf5f408cd1f72fad9fc45b948a68960b036f42072408d53"
 MAXIMUM_MCP_MESSAGE_BYTES = 4 * 1024 * 1024
+MAXIMUM_BUFFERED_RESPONSES = 16
+MAXIMUM_BUFFERED_RESPONSE_BYTES = MAXIMUM_BUFFERED_RESPONSES * MAXIMUM_MCP_MESSAGE_BYTES
 
 
 class CompatibilityError(RuntimeError):
@@ -452,6 +456,9 @@ class MCPProcess:
         require(self.process.stdout is not None, "MCP stdout is unavailable")
         self._stdout_buffer = bytearray()
         self._stdout_descriptor = self.process.stdout.fileno()
+        self._pending_responses: list[tuple[dict[str, Any], int]] = []
+        self._pending_response_bytes = 0
+        self._response_arrival_ids: list[Any] = []
         os.set_blocking(self._stdout_descriptor, False)
 
     def send(self, request: dict[str, Any]) -> None:
@@ -480,6 +487,14 @@ class MCPProcess:
 
     def receive(self, expected_id: Any, method: str, timeout: float) -> dict[str, Any]:
         require(self.process.stdout is not None, "MCP stdout is unavailable")
+        expected_key = self._response_id_key(expected_id)
+        for index, (response, encoded_bytes) in enumerate(self._pending_responses):
+            require("id" in response, f"buffered response for {method} has no id")
+            if self._response_id_key(response["id"]) == expected_key:
+                self._pending_responses.pop(index)
+                self._pending_response_bytes -= encoded_bytes
+                return response
+
         selector = selectors.DefaultSelector()
         selector.register(self._stdout_descriptor, selectors.EVENT_READ)
         deadline = time.monotonic() + timeout
@@ -493,11 +508,24 @@ class MCPProcess:
                     except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as error:
                         raise CompatibilityError(f"server emitted malformed JSON for {method}: {error}") from error
                     require(isinstance(response, dict), f"server emitted a non-object response for {method}")
+                    require("id" in response, f"server emitted a response without an id for {method}")
+                    response_id = response["id"]
+                    self._response_arrival_ids.append(response_id)
+                    if self._response_id_key(response_id) == expected_key:
+                        return response
                     require(
-                        response.get("id") == expected_id,
-                        f"unexpected response id for {method}: {response.get('id')!r}",
+                        len(self._pending_responses) < MAXIMUM_BUFFERED_RESPONSES,
+                        f"server exceeded {MAXIMUM_BUFFERED_RESPONSES} buffered responses while waiting for {method}",
                     )
-                    return response
+                    encoded_bytes = len(line) + 1
+                    require(
+                        self._pending_response_bytes + encoded_bytes
+                        <= MAXIMUM_BUFFERED_RESPONSE_BYTES,
+                        "server exceeded the buffered response byte limit",
+                    )
+                    self._pending_responses.append((response, encoded_bytes))
+                    self._pending_response_bytes += encoded_bytes
+                    continue
 
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
@@ -536,7 +564,13 @@ class MCPProcess:
                 self.process.wait(timeout=2)
             raise CompatibilityError("MCP server did not stop after stdin closed") from error
         require(self.process.stdout is not None, "MCP stdout is unavailable at shutdown")
-        trailing = bytes(self._stdout_buffer) + (self.process.stdout.read() or b"")
+        buffered_responses = b"".join(
+            canonical_bytes(response) + b"\n"
+            for response, _ in self._pending_responses
+        )
+        trailing = buffered_responses + bytes(self._stdout_buffer) + (self.process.stdout.read() or b"")
+        self._pending_responses.clear()
+        self._pending_response_bytes = 0
         self._stdout_buffer.clear()
         self.process.stdout.close()
         self.stderr_file.seek(0)
@@ -570,6 +604,14 @@ class MCPProcess:
         stderr = self.stderr_file.read().decode("utf-8", errors="replace")[-2000:]
         self.stderr_file.seek(position)
         return f"{message}; stderr={stderr}"
+
+    @property
+    def response_arrival_ids(self) -> list[Any]:
+        return list(self._response_arrival_ids)
+
+    @staticmethod
+    def _response_id_key(value: Any) -> tuple[str, bytes]:
+        return (type(value).__name__, canonical_bytes(value))
 
 
 def validate_endpoint_response(response: dict[str, Any], method: str, expected_id: Any) -> None:
@@ -702,12 +744,6 @@ def validate_tool_call_envelope(
     return structured
 
 
-def validate_legacy_success_response(response: dict[str, Any]) -> None:
-    structured = validate_tool_call_envelope(response, expected_error=False)
-    require(isinstance(structured.get("count"), int), "memory_list success count is missing")
-    require(isinstance(structured.get("notes"), list), "memory_list success notes are missing")
-
-
 def validate_typed_error_response(response: dict[str, Any]) -> None:
     validate_tool_call_envelope(response, expected_error=True, expected_code="invalid_key")
 
@@ -749,6 +785,762 @@ def exercise_initialized_probe(
         "wire_input": ndjson_artifact(requests),
         "requests": requests,
         "responses": responses,
+        "exit_codes": [return_code],
+        "stderr": [stream_artifact(stderr)],
+    })
+
+
+def stop_failed_process(process: MCPProcess, timeout: float) -> None:
+    if process.process.poll() is not None:
+        process.abort()
+        return
+    try:
+        process.finish(max(0.1, timeout))
+    except BaseException:
+        process.abort()
+
+
+def prepare_tool_fixture(
+    home: pathlib.Path,
+    tool_names: list[str],
+) -> tuple[pathlib.Path, pathlib.Path, str]:
+    require(tool_names, "tool fixture requires at least one granted tool")
+    require(len(tool_names) == len(set(tool_names)), "tool fixture grants contain duplicates")
+    require(
+        all(
+            tool
+            and all(character.isalnum() or character in "._-" for character in tool)
+            for tool in tool_names
+        ),
+        "tool fixture grant contains an invalid tool name",
+    )
+
+    agents = home / "agents"
+    workspace = home / "fixture-project"
+    agents.mkdir(parents=True, exist_ok=False)
+    workspace.mkdir(parents=True, exist_ok=False)
+    playbook = agents / "compatibility-fixture.md"
+    playbook.write_text(
+        "\n".join([
+            "---",
+            "id: compatibility-fixture",
+            "display_name: Compatibility Fixture",
+            "description: Isolated protocol fixture.",
+            f"tools: [{', '.join(tool_names)}]",
+            "output_schema: [result]",
+            "---",
+            "",
+            "# Compatibility fixture",
+            "",
+            "Use only for the isolated protocol matrix.",
+            "",
+        ]),
+        encoding="utf-8",
+    )
+
+    tracked = workspace / "tracked.txt"
+    tracked.write_text("tracked before\n", encoding="utf-8")
+    git_commands = (
+        ["git", "init", "--quiet"],
+        ["git", "config", "user.name", "Forge Fixture"],
+        ["git", "config", "user.email", "fixture@forge.invalid"],
+        ["git", "add", "tracked.txt"],
+        ["git", "commit", "--quiet", "-m", "Seed compatibility fixture"],
+    )
+    for command in git_commands:
+        result = subprocess.run(
+            command,
+            cwd=workspace,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        require(
+            result.returncode == 0,
+            f"tool fixture setup failed for {command[:2]}: {result.stderr[-1000:]}",
+        )
+    initial_head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=workspace,
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    ).stdout.strip()
+    require(len(initial_head) == 40, "tool fixture initial Git revision is malformed")
+    return workspace, playbook, initial_head
+
+
+def exercise_legacy_tool_success_matrix(
+    binary: pathlib.Path,
+    root: pathlib.Path,
+    legacy_tools: list[str],
+    response_timeout: float,
+    shutdown_timeout: float,
+) -> dict[str, Any]:
+    name = "legacy_tool_success_matrix"
+    require(
+        len(legacy_tools) == EXPECTED_LEGACY_TOOL_COUNT,
+        "legacy tool matrix does not contain the preserved tool count",
+    )
+    home = root / name
+    home.mkdir(parents=True, exist_ok=False)
+    workspace, playbook, initial_head = prepare_tool_fixture(home, legacy_tools)
+    tracked = workspace / "tracked.txt"
+    source = workspace / "source.md"
+    moved = workspace / "moved.md"
+    delete_target = workspace / "delete-me"
+    converted_pdf = workspace / "from-file.pdf"
+    direct_pdf = workspace / "direct.pdf"
+    process, requests, responses = initialize_process(binary, home, name, response_timeout)
+    called_tools: list[str] = []
+
+    def call_tool(tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        request_id = len(called_tools) + 2
+        request = {
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "method": "tools/call",
+            "params": {"name": tool_name, "arguments": arguments},
+        }
+        requests.append(request)
+        process.send(request)
+        response = process.receive(request_id, tool_name, response_timeout)
+        structured = validate_tool_call_envelope(
+            response,
+            expected_error=False,
+            expected_id=request_id,
+        )
+        responses.append(response)
+        called_tools.append(tool_name)
+        return structured
+
+    try:
+        started = call_tool(
+            "agent_run_start",
+            {
+                "agent_id": "compatibility-fixture",
+                "goal": "Exercise preserved tool behavior",
+                "cwd": str(workspace),
+            },
+        )
+        session_id = started.get("session_id")
+        project_id = started.get("project_id")
+        require(isinstance(session_id, str) and session_id, "agent_run_start returned no session id")
+        require(isinstance(project_id, str), "agent_run_start returned no project id")
+        try:
+            uuid.UUID(project_id)
+        except (ValueError, AttributeError) as error:
+            raise CompatibilityError("agent_run_start returned an invalid project id") from error
+        project_context = started.get("project_context")
+        require(isinstance(project_context, dict), "agent_run_start returned no project context")
+        require(project_context.get("project_id") == project_id, "agent project context id changed")
+        require(
+            project_context.get("project_generation") == started.get("project_generation"),
+            "agent project generation is inconsistent",
+        )
+        roots = project_context.get("authorization_roots")
+        require(
+            isinstance(roots, list)
+            and any(
+                isinstance(root, str)
+                and pathlib.Path(root).exists()
+                and os.path.samefile(root, workspace)
+                for root in roots
+            ),
+            "workspace authorization root is missing",
+        )
+
+        status = call_tool("forge_status", {})
+        status_tools = status.get("tools")
+        require(isinstance(status_tools, list), "forge_status returned no tool inventory")
+        require(set(legacy_tools).issubset(status_tools), "forge_status omitted preserved legacy tools")
+
+        agents = call_tool("agent_list", {}).get("agents")
+        require(isinstance(agents, list), "agent_list returned no agents")
+        require(
+            any(isinstance(agent, dict) and agent.get("id") == "compatibility-fixture" for agent in agents),
+            "agent_list omitted the isolated fixture",
+        )
+        agent = call_tool("agent_get", {"agent_id": "compatibility-fixture"})
+        require(agent.get("id") == "compatibility-fixture", "agent_get returned the wrong agent")
+        context = call_tool("agent_context", {"agent_id": "compatibility-fixture"})
+        require(context.get("id") == "compatibility-fixture", "agent_context returned the wrong agent")
+        require(isinstance(context.get("body"), str) and context["body"], "agent_context returned no playbook body")
+        recommendation = call_tool("agent_recommend", {"task": "implement compatibility fixture"})
+        require(isinstance(recommendation.get("agent_id"), str), "agent_recommend returned no agent id")
+        run_status = call_tool("agent_run_status", {"session_id": session_id})
+        session = run_status.get("session")
+        require(isinstance(session, dict) and session.get("id") == session_id, "agent_run_status lost its session")
+        require(run_status.get("must_complete") is True, "active agent session was not marked incomplete")
+
+        created = call_tool("fs_mkdir", {"path": str(delete_target)})
+        require(created.get("path") == str(delete_target), "fs_mkdir returned the wrong path")
+        require(delete_target.is_dir(), "fs_mkdir did not create its directory")
+        source_text = "# Fixture\nlegacy matrix needle\n"
+        written = call_tool("fs_write", {"path": str(source), "content": source_text})
+        require(written.get("bytes_written") == len(source_text.encode()), "fs_write byte count changed")
+        require(source.read_text(encoding="utf-8") == source_text, "fs_write did not persist exact content")
+        read = call_tool("fs_read", {"path": str(source)})
+        require(read.get("content") == source_text, "fs_read did not return exact content")
+        edited = call_tool(
+            "fs_edit",
+            {"path": str(tracked), "old": "tracked before", "new": "tracked after"},
+        )
+        require(edited.get("replacements") == 1, "fs_edit replacement count changed")
+        require(tracked.read_text(encoding="utf-8") == "tracked after\n", "fs_edit did not persist its edit")
+        listed = call_tool("fs_list", {"path": str(workspace)})
+        entries = listed.get("entries")
+        require(isinstance(entries, list) and "source.md" in entries, "fs_list omitted the fixture file")
+        globbed = call_tool("fs_glob", {"path": str(workspace), "pattern": "*.md"})
+        matches = globbed.get("matches")
+        require(isinstance(matches, list) and str(source) in matches, "fs_glob omitted the fixture file")
+        searched = call_tool("search_text", {"path": str(workspace), "pattern": "legacy matrix needle"})
+        search_matches = searched.get("matches")
+        require(
+            searched.get("count") == 1
+            and isinstance(search_matches, list)
+            and any("source.md:2:legacy matrix needle" in match for match in search_matches),
+            "search_text did not return the exact fixture match",
+        )
+
+        converted = call_tool(
+            "pdf_from_file",
+            {"source_path": str(source), "dest_path": str(converted_pdf), "title": "Fixture"},
+        )
+        require(converted.get("source_path") == str(source), "pdf_from_file source path changed")
+        require(converted.get("path") == str(converted_pdf), "pdf_from_file destination path changed")
+        require(converted.get("bytes_written", 0) > 0 and converted.get("pages", 0) > 0, "pdf_from_file is empty")
+        require(converted_pdf.read_bytes().startswith(b"%PDF-"), "pdf_from_file did not create a PDF")
+        direct = call_tool(
+            "pdf_write",
+            {"path": str(direct_pdf), "content": "# Direct\nFixture body", "title": "Fixture"},
+        )
+        require(direct.get("path") == str(direct_pdf), "pdf_write destination path changed")
+        require(direct.get("bytes_written", 0) > 0 and direct.get("pages", 0) > 0, "pdf_write is empty")
+        require(direct_pdf.read_bytes().startswith(b"%PDF-"), "pdf_write did not create a PDF")
+        move = call_tool("fs_move", {"source": str(source), "destination": str(moved)})
+        require(move.get("src") == str(source) and move.get("dest") == str(moved), "fs_move paths changed")
+        require(not source.exists() and moved.read_text(encoding="utf-8") == source_text, "fs_move lost fixture content")
+        deleted = call_tool("fs_delete", {"path": str(delete_target)})
+        require(deleted.get("deleted") is True and not delete_target.exists(), "fs_delete did not remove its target")
+
+        git_status = call_tool("git_status", {"cwd": str(workspace)})
+        require(git_status.get("exit_code") == 0, "git_status failed")
+        require("tracked.txt" in git_status.get("stdout", ""), "git_status omitted the tracked edit")
+        git_diff = call_tool("git_diff", {"cwd": str(workspace)})
+        require(git_diff.get("exit_code") == 0, "git_diff failed")
+        require(
+            "tracked before" in git_diff.get("stdout", "")
+            and "tracked after" in git_diff.get("stdout", ""),
+            "git_diff omitted the exact tracked change",
+        )
+        git_add = call_tool("git_add", {"cwd": str(workspace), "path": "tracked.txt"})
+        require(git_add.get("exit_code") == 0, "git_add failed")
+        git_commit = call_tool(
+            "git_commit",
+            {"cwd": str(workspace), "message": "Validate compatibility fixture"},
+        )
+        require(git_commit.get("exit_code") == 0, "git_commit failed")
+        final_head = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=workspace,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        ).stdout.strip()
+        require(final_head != initial_head and len(final_head) == 40, "git_commit did not advance HEAD")
+        git_log = call_tool("git_log", {"cwd": str(workspace), "limit": 2})
+        require(git_log.get("exit_code") == 0, "git_log failed")
+        require("Validate compatibility fixture" in git_log.get("stdout", ""), "git_log omitted the tool commit")
+
+        shell = call_tool(
+            "shell_exec",
+            {"cwd": str(workspace), "command": "printf 'runtime-ok\\n'", "timeout_sec": 10},
+        )
+        require(shell.get("exit_code") == 0 and shell.get("timed_out") is False, "shell_exec did not complete")
+        require(shell.get("stdout") == "runtime-ok\n", "shell_exec stdout changed")
+
+        memory_key = "compatibility/legacy"
+        memory_body = "legacy matrix needle"
+        stored = call_tool(
+            "memory_set",
+            {"key": memory_key, "body": memory_body, "tags": ["p10-fixture"]},
+        )
+        stored_note = stored.get("note")
+        require(stored.get("stored") is True, "memory_set did not report persistence")
+        require(isinstance(stored_note, dict) and stored_note.get("body") == memory_body, "memory_set body changed")
+        loaded = call_tool("memory_get", {"key": memory_key})
+        require(loaded.get("found") is True and loaded.get("body") == memory_body, "memory_get lost the note")
+        memory_list = call_tool(
+            "memory_list",
+            {"prefix": "compatibility/", "include_body": True, "limit": 10},
+        )
+        listed_notes = memory_list.get("notes")
+        require(
+            isinstance(listed_notes, list)
+            and any(note.get("key") == memory_key and note.get("body") == memory_body for note in listed_notes),
+            "memory_list omitted the fixture note",
+        )
+        memory_search = call_tool(
+            "memory_search",
+            {"query": memory_body, "include_body": True, "limit": 10},
+        )
+        searched_notes = memory_search.get("notes")
+        require(
+            isinstance(searched_notes, list)
+            and any(note.get("key") == memory_key and note.get("body") == memory_body for note in searched_notes),
+            "memory_search omitted the fixture note",
+        )
+        removed = call_tool("memory_delete", {"key": memory_key})
+        require(removed.get("existed") is True and removed.get("deleted") is True, "memory_delete did not delete the note")
+
+        checkpoint = call_tool(
+            "session_checkpoint",
+            {
+                "goal": "Exercise preserved tool behavior",
+                "status": "checking",
+                "project_slug": "fixture",
+                "cwd": str(workspace),
+                "narrative": "Protocol fixture progress.",
+                "next_actions": ["finish matrix"],
+                "blockers": [],
+                "key_files": [str(tracked)],
+                "decisions": ["Use isolated files."],
+                "chat_label": "P10 fixture",
+            },
+        )
+        handoff_id = checkpoint.get("handoff_id")
+        require(isinstance(handoff_id, str) and handoff_id, "session_checkpoint returned no handoff id")
+        require(checkpoint.get("action") == "checkpoint", "session_checkpoint action changed")
+        require(checkpoint.get("projection_ok") is True, "session_checkpoint projection did not commit")
+        handoff = call_tool(
+            "session_handoff",
+            {
+                "handoff_id": handoff_id,
+                "status": "ready",
+                "narrative": "Protocol fixture completed.",
+                "next_actions": ["verify evidence"],
+            },
+        )
+        require(handoff.get("handoff_id") == handoff_id, "session_handoff changed the handoff id")
+        require(handoff.get("action") == "handoff", "session_handoff action changed")
+        require(handoff.get("resume_ready") is True and handoff.get("handoff_required") is True, "handoff is not resumable")
+        handoff_paths = handoff.get("paths")
+        require(isinstance(handoff_paths, dict), "session_handoff returned no projection paths")
+        handoff_json = pathlib.Path(str(handoff_paths.get("json", "")))
+        require(handoff_json.is_file() and handoff_json.is_relative_to(home), "session_handoff JSON projection is missing")
+        context_get = call_tool("context_get", {"handoff_id": handoff_id, "resume_ready": True})
+        require(context_get.get("found") is True and context_get.get("handoff_id") == handoff_id, "context_get lost the handoff")
+        context_list = call_tool("context_list", {"limit": 5})
+        handoffs = context_list.get("handoffs")
+        require(
+            isinstance(handoffs, list)
+            and any(item.get("id") == handoff_id and item.get("resume_ready") is True for item in handoffs),
+            "context_list omitted the resumable handoff",
+        )
+        completed = call_tool(
+            "agent_run_complete",
+            {"session_id": session_id, "report": {"result": "passed"}},
+        )
+        require(completed.get("schema_complete") is True, "agent_run_complete rejected the fixture report")
+        completed_session = completed.get("session")
+        require(
+            isinstance(completed_session, dict)
+            and completed_session.get("id") == session_id
+            and completed_session.get("status") == "closed",
+            "agent_run_complete did not close the fixture session",
+        )
+
+        require(len(called_tools) == len(set(called_tools)), "legacy matrix called a tool more than once")
+        require(set(called_tools) == set(legacy_tools), "legacy matrix did not call every preserved tool")
+        stderr, return_code = process.close(shutdown_timeout)
+        require(return_code == 0, f"legacy tool matrix server exited {return_code}")
+    except BaseException:
+        stop_failed_process(process, shutdown_timeout)
+        raise
+
+    return seal_probe({
+        "name": name,
+        "status": "passed",
+        "checks": [
+            "legacy_tool_success_all_baseline_methods",
+            "text_and_structured_content_match_all_baseline_methods",
+            "isolated_project_context",
+            "filesystem_side_effects_verified",
+            "git_side_effects_verified",
+            "runtime_side_effects_verified",
+            "memory_side_effects_verified",
+            "continuity_side_effects_verified",
+            "bounded_eof_shutdown",
+        ],
+        "wire_input": ndjson_artifact(requests),
+        "requests": requests,
+        "responses": responses,
+        "called_tools": called_tools,
+        "called_tools_sha256": normalized_hash(called_tools),
+        "fixture": {
+            "playbook_sha256": sha256_file(playbook),
+            "initial_git_revision": initial_head,
+            "final_git_revision": final_head,
+            "converted_pdf_sha256": sha256_file(converted_pdf),
+            "direct_pdf_sha256": sha256_file(direct_pdf),
+            "handoff_projection_sha256": sha256_file(handoff_json),
+        },
+        "exit_codes": [return_code],
+        "stderr": [stream_artifact(stderr)],
+    })
+
+
+def start_fixture_session(
+    process: MCPProcess,
+    requests: list[dict[str, Any]],
+    responses: list[dict[str, Any]],
+    workspace: pathlib.Path,
+    response_timeout: float,
+) -> str:
+    request = {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/call",
+        "params": {
+            "name": "agent_run_start",
+            "arguments": {
+                "agent_id": "compatibility-fixture",
+                "goal": "Exercise concurrent protocol behavior",
+                "cwd": str(workspace),
+            },
+        },
+    }
+    requests.append(request)
+    process.send(request)
+    response = process.receive(2, "agent_run_start", response_timeout)
+    structured = validate_tool_call_envelope(
+        response,
+        expected_error=False,
+        expected_id=2,
+    )
+    responses.append(response)
+    session_id = structured.get("session_id")
+    require(isinstance(session_id, str) and session_id, "fixture session returned no session id")
+    project_context = structured.get("project_context")
+    require(isinstance(project_context, dict), "fixture session returned no project context")
+    roots = project_context.get("authorization_roots")
+    require(
+        isinstance(roots, list)
+        and any(
+            isinstance(root, str)
+            and pathlib.Path(root).exists()
+            and os.path.samefile(root, workspace)
+            for root in roots
+        ),
+        "fixture project root was not bound",
+    )
+    return session_id
+
+
+def exercise_concurrent_mixed_correlation_probe(
+    binary: pathlib.Path,
+    root: pathlib.Path,
+    response_timeout: float,
+    shutdown_timeout: float,
+) -> dict[str, Any]:
+    name = "concurrent_mixed_request_correlation"
+    home = root / name
+    home.mkdir(parents=True, exist_ok=False)
+    workspace, _, _ = prepare_tool_fixture(home, ["shell_exec"])
+    process, requests, responses = initialize_process(binary, home, name, response_timeout)
+    try:
+        start_fixture_session(process, requests, responses, workspace, response_timeout)
+        arrival_start = len(process.response_arrival_ids)
+        slow_request = {
+            "jsonrpc": "2.0",
+            "id": 7,
+            "method": "tools/call",
+            "params": {
+                "name": "shell_exec",
+                "arguments": {
+                    "cwd": str(workspace),
+                    "command": "sleep 1; printf 'slow\\n'",
+                    "timeout_sec": 10,
+                },
+            },
+        }
+        fast_request = {
+            "jsonrpc": "2.0",
+            "id": "7",
+            "method": "ping",
+            "params": {},
+        }
+        requests.extend([slow_request, fast_request])
+        process.send(slow_request)
+        process.send(fast_request)
+
+        fast_response = process.receive("7", "concurrent string-id ping", response_timeout)
+        validate_endpoint_response(fast_response, "ping", "7")
+        responses.append(fast_response)
+        slow_response = process.receive(7, "concurrent numeric-id shell_exec", response_timeout)
+        slow_result = validate_tool_call_envelope(
+            slow_response,
+            expected_error=False,
+            expected_id=7,
+        )
+        responses.append(slow_response)
+        require(
+            slow_result.get("exit_code") == 0
+            and slow_result.get("timed_out") is False
+            and slow_result.get("stdout") == "slow\n",
+            "concurrent slow request did not complete successfully",
+        )
+        arrival_order = process.response_arrival_ids[arrival_start:]
+        require(
+            arrival_order == ["7", 7],
+            f"concurrent responses did not complete out of order: {arrival_order!r}",
+        )
+        stderr, return_code = process.close(shutdown_timeout)
+        require(return_code == 0, f"concurrent correlation server exited {return_code}")
+    except BaseException:
+        stop_failed_process(process, shutdown_timeout)
+        raise
+    return seal_probe({
+        "name": name,
+        "status": "passed",
+        "checks": [
+            "concurrent_mixed_request_correlation",
+            "out_of_order_completion",
+            "typed_numeric_and_string_request_ids",
+            "buffered_response_retrieval",
+            "exactly_one_response_per_request",
+            "bounded_eof_shutdown",
+        ],
+        "wire_input": ndjson_artifact(requests),
+        "requests": requests,
+        "responses": responses,
+        "response_arrival_ids": arrival_order,
+        "exit_codes": [return_code],
+        "stderr": [stream_artifact(stderr)],
+    })
+
+
+def fixture_process_is_running(process_identifier: int) -> bool:
+    try:
+        os.kill(process_identifier, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def wait_for_fixture_process_exit(process_identifier: int, timeout: float) -> bool:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if not fixture_process_is_running(process_identifier):
+            return True
+        time.sleep(0.02)
+    return not fixture_process_is_running(process_identifier)
+
+
+def terminate_fixture_sleep_if_needed(process_identifier: int | None) -> None:
+    if process_identifier is None or not fixture_process_is_running(process_identifier):
+        return
+    inspected = subprocess.run(
+        ["/bin/ps", "-p", str(process_identifier), "-o", "command="],
+        capture_output=True,
+        text=True,
+        timeout=5,
+    )
+    command = inspected.stdout.strip()
+    if inspected.returncode == 0 and command in {"sleep 10", "/bin/sleep 10"}:
+        try:
+            os.kill(process_identifier, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        wait_for_fixture_process_exit(process_identifier, 2.0)
+
+
+def exercise_active_cancellation_probe(
+    binary: pathlib.Path,
+    root: pathlib.Path,
+    response_timeout: float,
+    shutdown_timeout: float,
+) -> dict[str, Any]:
+    name = "active_in_flight_cancellation"
+    home = root / name
+    home.mkdir(parents=True, exist_ok=False)
+    workspace, _, _ = prepare_tool_fixture(home, ["shell_exec"])
+    ready = workspace / "cancel-ready"
+    child_path = workspace / "cancel-child.pid"
+    process, requests, responses = initialize_process(binary, home, name, response_timeout)
+    child_pid: int | None = None
+    try:
+        start_fixture_session(process, requests, responses, workspace, response_timeout)
+        command = (
+            "/bin/sleep 10 & child=$!; "
+            f"printf '%s\\n' \"$child\" > {shlex.quote(str(child_path.resolve()))}; "
+            f": > {shlex.quote(str(ready.resolve()))}; "
+            "wait \"$child\""
+        )
+        target = {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": {
+                "name": "shell_exec",
+                "arguments": {
+                    "cwd": str(workspace),
+                    "command": command,
+                    "timeout_sec": 20,
+                },
+            },
+        }
+        requests.append(target)
+        process.send(target)
+        ready_deadline = time.monotonic() + response_timeout
+        while time.monotonic() < ready_deadline and not (ready.is_file() and child_path.is_file()):
+            require(process.process.poll() is None, process.failure("server exited before cancellation became active"))
+            time.sleep(0.02)
+        require(ready.is_file() and child_path.is_file(), "active cancellation fixture did not reach its ready marker")
+        child_text = child_path.read_text(encoding="utf-8").strip()
+        require(child_text.isascii() and child_text.isdigit(), "active cancellation child pid is malformed")
+        child_pid = int(child_text)
+        require(child_pid > 1 and fixture_process_is_running(child_pid), "active cancellation child is not running")
+
+        cancellation = {
+            "jsonrpc": "2.0",
+            "method": "notifications/cancelled",
+            "params": {"requestId": 3, "reason": "p10-active-cancellation"},
+        }
+        requests.append(cancellation)
+        cancellation_started = time.monotonic()
+        process.send(cancellation)
+        response = process.receive(3, "active cancelled shell_exec", response_timeout)
+        cancellation_milliseconds = int((time.monotonic() - cancellation_started) * 1000)
+        validate_rpc_error(response, 3, -32800)
+        responses.append(response)
+        require(
+            cancellation_milliseconds <= int(response_timeout * 1000),
+            "active cancellation response exceeded its bounded deadline",
+        )
+        require(
+            wait_for_fixture_process_exit(child_pid, min(5.0, response_timeout)),
+            "active cancellation did not terminate the child process",
+        )
+        stderr, return_code = process.close(shutdown_timeout)
+        require(return_code == 0, f"active cancellation server exited {return_code}")
+    except BaseException:
+        stop_failed_process(process, max(15.0, shutdown_timeout))
+        terminate_fixture_sleep_if_needed(child_pid)
+        raise
+    return seal_probe({
+        "name": name,
+        "status": "passed",
+        "checks": [
+            "active_in_flight_cancellation",
+            "cancelled_error_code",
+            "cancelled_work_terminated",
+            "late_success_suppressed",
+            "exactly_one_response_per_request",
+            "bounded_eof_shutdown",
+        ],
+        "wire_input": ndjson_artifact(requests),
+        "requests": requests,
+        "responses": responses,
+        "cancellation_milliseconds": cancellation_milliseconds,
+        "child_process_terminated": True,
+        "exit_codes": [return_code],
+        "stderr": [stream_artifact(stderr)],
+    })
+
+
+def exercise_active_eof_shutdown_probe(
+    binary: pathlib.Path,
+    root: pathlib.Path,
+    response_timeout: float,
+    shutdown_timeout: float,
+) -> dict[str, Any]:
+    name = "active_request_eof_shutdown"
+    home = root / name
+    home.mkdir(parents=True, exist_ok=False)
+    workspace, _, _ = prepare_tool_fixture(home, ["shell_exec"])
+    ready = workspace / "eof-ready"
+    child_path = workspace / "eof-child.pid"
+    process, requests, responses = initialize_process(binary, home, name, response_timeout)
+    child_pid: int | None = None
+    process_finished = False
+    try:
+        start_fixture_session(process, requests, responses, workspace, response_timeout)
+        command = (
+            "/bin/sleep 10 & child=$!; "
+            f"printf '%s\\n' \"$child\" > {shlex.quote(str(child_path.resolve()))}; "
+            f": > {shlex.quote(str(ready.resolve()))}; "
+            "wait \"$child\""
+        )
+        target = {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": {
+                "name": "shell_exec",
+                "arguments": {
+                    "cwd": str(workspace),
+                    "command": command,
+                    "timeout_sec": 20,
+                },
+            },
+        }
+        requests.append(target)
+        process.send(target)
+        ready_deadline = time.monotonic() + response_timeout
+        while time.monotonic() < ready_deadline and not (ready.is_file() and child_path.is_file()):
+            require(process.process.poll() is None, process.failure("server exited before EOF fixture became active"))
+            time.sleep(0.02)
+        require(ready.is_file() and child_path.is_file(), "active EOF fixture did not reach its ready marker")
+        child_text = child_path.read_text(encoding="utf-8").strip()
+        require(child_text.isascii() and child_text.isdigit(), "active EOF child pid is malformed")
+        child_pid = int(child_text)
+        require(child_pid > 1 and fixture_process_is_running(child_pid), "active EOF child is not running")
+
+        eof_started = time.monotonic()
+        trailing, stderr, return_code = process.finish(shutdown_timeout)
+        process_finished = True
+        eof_shutdown_milliseconds = int((time.monotonic() - eof_started) * 1000)
+        require(return_code == 0, f"active EOF server exited {return_code}")
+        require(
+            eof_shutdown_milliseconds <= int(shutdown_timeout * 1000),
+            "active EOF shutdown exceeded its bounded deadline",
+        )
+        require(
+            not trailing.strip(),
+            f"active EOF shutdown emitted an unexpected late response: {trailing[:500]!r}",
+        )
+        require(
+            wait_for_fixture_process_exit(child_pid, min(5.0, response_timeout)),
+            "active EOF shutdown did not terminate the child process",
+        )
+    except BaseException:
+        if not process_finished:
+            stop_failed_process(process, max(15.0, shutdown_timeout))
+        terminate_fixture_sleep_if_needed(child_pid)
+        raise
+    return seal_probe({
+        "name": name,
+        "status": "passed",
+        "checks": [
+            "active_request_eof_shutdown",
+            "cli_serve_disconnect_shutdown",
+            "runtime_child_terminated_on_disconnect",
+            "no_late_response_after_eof",
+            "zero_exit_after_eof",
+            "bounded_eof_shutdown",
+        ],
+        "wire_input": ndjson_artifact(requests),
+        "requests": requests,
+        "responses": responses,
+        "eof_shutdown_milliseconds": eof_shutdown_milliseconds,
+        "child_process_terminated": True,
+        "trailing_stdout": stream_artifact(trailing),
         "exit_codes": [return_code],
         "stderr": [stream_artifact(stderr)],
     })
@@ -1236,18 +2028,10 @@ def main() -> int:
             args.response_timeout,
             args.shutdown_timeout,
         )
-        legacy_success_probe = exercise_initialized_probe(
+        legacy_success_probe = exercise_legacy_tool_success_matrix(
             binary,
             wire_root,
-            "legacy_tool_success",
-            {
-                "jsonrpc": "2.0",
-                "id": 2,
-                "method": "tools/call",
-                "params": {"name": "memory_list", "arguments": {}},
-            },
-            validate_legacy_success_response,
-            ["legacy_tool_call_success", "text_and_structured_content_match", "is_error_false"],
+            sorted(baseline_tools),
             args.response_timeout,
             args.shutdown_timeout,
         )
@@ -1281,6 +2065,24 @@ def main() -> int:
                 "params": {"requestId": 2, "reason": "p10-wire-probe"},
             }],
         )
+        concurrent_probe = exercise_concurrent_mixed_correlation_probe(
+            binary,
+            wire_root,
+            args.response_timeout,
+            args.shutdown_timeout,
+        )
+        active_cancellation_probe = exercise_active_cancellation_probe(
+            binary,
+            wire_root,
+            args.response_timeout,
+            args.shutdown_timeout,
+        )
+        active_eof_shutdown_probe = exercise_active_eof_shutdown_probe(
+            binary,
+            wire_root,
+            args.response_timeout,
+            args.shutdown_timeout,
+        )
         restart_probe = exercise_restart_eof_probe(
             binary,
             wire_root,
@@ -1301,6 +2103,9 @@ def main() -> int:
             legacy_success_probe,
             typed_error_probe,
             cancellation_probe,
+            concurrent_probe,
+            active_cancellation_probe,
+            active_eof_shutdown_probe,
             restart_probe,
             pagination_probe,
         ]
@@ -1393,16 +2198,12 @@ def main() -> int:
 
     current_legacy_descriptors = [reference_tools[name] for name in sorted(baseline_names)]
     additive_descriptors = [reference_tools[name] for name in sorted(additive_names)]
-    uncovered_checks = [
-        "active_in_flight_cancellation",
-        "concurrent_mixed_request_correlation",
-        "legacy_tool_success_all_baseline_methods",
-    ]
+    uncovered_checks: list[str] = []
     report: dict[str, Any] = {
         "schema_version": 1,
-        "status": "partial",
-        "ok": False,
-        "scope": "descriptor compatibility and bounded single-request wire probes",
+        "status": "passed",
+        "ok": True,
+        "scope": "executable descriptor, success, concurrency, cancellation, framing, restart, and pagination compatibility",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "source": source,
         "source_manifest": manifest_before,
@@ -1436,9 +2237,15 @@ def main() -> int:
             "malformed_content_length_rejected",
             "oversized_content_length_rejected",
             "unknown_method_negative_32601",
-            "legacy_tool_call_success_envelope",
+            "legacy_tool_success_all_baseline_methods",
+            "legacy_tool_call_success_envelopes",
             "typed_tool_error_envelope",
             "pre_cancelled_request_negative_32800",
+            "active_in_flight_cancellation",
+            "active_request_eof_shutdown",
+            "cli_serve_disconnect_shutdown",
+            "concurrent_mixed_request_correlation",
+            "typed_numeric_and_string_request_ids",
             "fresh_process_restart_and_eof",
             "project_memory_cursor_pagination",
         ],

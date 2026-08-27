@@ -4078,6 +4078,7 @@ private final class MCPProcessFixture {
     var input: Pipe
     var output: Pipe
     var error: Pipe
+    var capturedOutput = Data()
 
     init(process: Process, input: Pipe, output: Pipe, error: Pipe) {
         self.process = process
@@ -4152,7 +4153,47 @@ private func sendMCPHandoff(_ fixture: MCPProcessFixture, id: Int, goal: String)
     let payload = try JSONSupport.string(from: initialize) + "\n"
         + JSONSupport.string(from: handoff) + "\n"
     fixture.input.fileHandleForWriting.write(Data(payload.utf8))
+    try waitForMCPResponseFrames(fixture, minimumCount: 2, timeout: 10)
     try fixture.input.fileHandleForWriting.close()
+}
+
+private func waitForMCPResponseFrames(
+    _ fixture: MCPProcessFixture,
+    minimumCount: Int,
+    timeout: TimeInterval
+) throws {
+    let deadline = Date().addingTimeInterval(timeout)
+    while fixture.capturedOutput.filter({ $0 == 0x0A }).count < minimumCount {
+        let remaining = deadline.timeIntervalSinceNow
+        guard remaining > 0 else {
+            throw MCPProcessFixtureError.timeout("MCP responses did not arrive before disconnect")
+        }
+        var descriptor = pollfd(
+            fd: fixture.output.fileHandleForReading.fileDescriptor,
+            events: Int16(POLLIN),
+            revents: 0
+        )
+        let milliseconds = Int32(max(1, min(remaining * 1_000, Double(Int32.max))))
+        let pollResult = Darwin.poll(&descriptor, 1, milliseconds)
+        if pollResult < 0, errno == EINTR { continue }
+        guard pollResult > 0 else {
+            if pollResult == 0 { continue }
+            throw MCPProcessFixtureError.failed(
+                "MCP response poll failed: \(String(cString: strerror(errno)))"
+            )
+        }
+        var buffer = [UInt8](repeating: 0, count: 16 * 1_024)
+        let count = Darwin.read(descriptor.fd, &buffer, buffer.count)
+        guard count > 0 else {
+            if count < 0, errno == EINTR { continue }
+            throw MCPProcessFixtureError.failed(
+                count == 0
+                    ? "MCP response stream closed before all responses arrived"
+                    : "MCP response read failed: \(String(cString: strerror(errno)))"
+            )
+        }
+        fixture.capturedOutput.append(contentsOf: buffer.prefix(count))
+    }
 }
 
 private func waitForMCPFixture(
@@ -4167,7 +4208,8 @@ private func waitForMCPFixture(
         fixture.process.terminate()
         throw MCPProcessFixtureError.timeout("MCP process did not exit after stdin closed")
     }
-    let outputData = fixture.output.fileHandleForReading.readDataToEndOfFile()
+    var outputData = fixture.capturedOutput
+    outputData.append(fixture.output.fileHandleForReading.readDataToEndOfFile())
     let errorData = fixture.error.fileHandleForReading.readDataToEndOfFile()
     guard fixture.process.terminationStatus == 0 else {
         let stderr = String(data: errorData, encoding: .utf8) ?? ""

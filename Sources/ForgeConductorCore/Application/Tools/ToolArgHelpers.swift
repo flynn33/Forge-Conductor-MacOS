@@ -6,6 +6,33 @@
 
 import Foundation
 
+/// Cooperative cancellation propagated from a connector request to tool packs.
+/// The lock keeps observation safe across the stdio reader and bounded worker pool.
+public final class ToolCallCancellation: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancelled = false
+
+    public init() {}
+
+    public var isCancelled: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return cancelled
+    }
+
+    public func cancel() {
+        lock.lock()
+        cancelled = true
+        lock.unlock()
+    }
+
+    public func checkCancellation() throws {
+        if isCancelled {
+            throw CancellationError()
+        }
+    }
+}
+
 /// Shared argument parsing for tool packs (wire JSON → Swift).
 public enum ToolArgHelpers {
     public static func string(_ args: [String: Any], _ key: String) -> String? {
@@ -44,6 +71,14 @@ public protocol ToolPackHandling: Sendable {
         clientID: ClientID,
         app: ForgeApp
     ) throws -> ToolResult?
+    func handle(
+        name: String,
+        arguments: [String: Any],
+        context: ToolInvocationContext?,
+        clientID: ClientID,
+        app: ForgeApp,
+        cancellation: ToolCallCancellation?
+    ) throws -> ToolResult?
 }
 
 public extension ToolPackHandling {
@@ -55,5 +90,27 @@ public extension ToolPackHandling {
         app: ForgeApp
     ) throws -> ToolResult? {
         try handle(name: name, arguments: arguments, clientID: clientID, app: app)
+    }
+
+    func handle(
+        name: String,
+        arguments: [String: Any],
+        context: ToolInvocationContext?,
+        clientID: ClientID,
+        app: ForgeApp,
+        cancellation: ToolCallCancellation?
+    ) throws -> ToolResult? {
+        try cancellation?.checkCancellation()
+        // Legacy synchronous packs cannot roll back work after dispatch. Once
+        // their handler returns, preserve its actual outcome even if a cancel
+        // notification raced with the call.
+        let result = try handle(
+            name: name,
+            arguments: arguments,
+            context: context,
+            clientID: clientID,
+            app: app
+        )
+        return result
     }
 }

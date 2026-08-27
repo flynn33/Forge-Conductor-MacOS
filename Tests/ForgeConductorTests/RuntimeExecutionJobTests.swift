@@ -157,6 +157,53 @@ final class RuntimeExecutionJobTests: XCTestCase {
         await fixture.close()
     }
 
+    func testLegacyShellAdapterTaskCancellationTerminatesDescendantProcessGroup() async throws {
+        let fixture = try await Fixture.make()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let pidFile = fixture.projectRoot.appendingPathComponent("legacy-cancel-descendant.pid")
+        let adapter = LegacyShellJobAdapter(service: fixture.service)
+        let task = Task {
+            try await adapter.execute(
+                command: """
+                (
+                  trap '' TERM
+                  while :; do sleep 1; done
+                ) &
+                echo $! > legacy-cancel-descendant.pid
+                wait
+                """,
+                workingDirectory: fixture.projectRoot,
+                timeoutSeconds: 30,
+                context: fixture.context
+            )
+        }
+
+        let pidFileReady = await Self.waitForFile(pidFile)
+        XCTAssertTrue(pidFileReady)
+        let descendant = try Self.readPID(pidFile)
+        task.cancel()
+        do {
+            _ = try await task.value
+            XCTFail("cancelled legacy shell task returned a result")
+        } catch is CancellationError {
+            // Expected: connector cancellation remains cancellation at the compatibility edge.
+        } catch {
+            XCTFail("unexpected cancellation error: \(error)")
+        }
+
+        let jobs = try await fixture.service.list(context: fixture.context)
+        let job = try XCTUnwrap(jobs.first { $0.executionProfile == .legacyBashLogin })
+        let record = try await fixture.service.waitForTerminal(
+            jobID: job.jobID,
+            context: fixture.context,
+            maximumWait: .seconds(8)
+        )
+        XCTAssertEqual(record.state, .cancelled)
+        let descendantGone = await Self.waitUntilProcessIsGone(descendant)
+        XCTAssertTrue(descendantGone)
+        await fixture.close()
+    }
+
     func testForkTreeExceedingPerJobDescendantBudgetIsTerminated() async throws {
         let limits = RuntimeJobLimits(
             maximumConcurrentJobs: 1,

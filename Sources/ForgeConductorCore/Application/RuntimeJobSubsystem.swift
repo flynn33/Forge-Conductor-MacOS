@@ -86,7 +86,26 @@ public struct RuntimeJobSynchronousToolPack: ToolPackHandling, Sendable {
         clientID: ClientID,
         app: ForgeApp
     ) throws -> ToolResult? {
+        try handle(
+            name: name,
+            arguments: arguments,
+            context: context,
+            clientID: clientID,
+            app: app,
+            cancellation: nil
+        )
+    }
+
+    public func handle(
+        name: String,
+        arguments: [String: Any],
+        context: ToolInvocationContext?,
+        clientID: ClientID,
+        app: ForgeApp,
+        cancellation: ToolCallCancellation?
+    ) throws -> ToolResult? {
         guard toolNames.contains(name) else { return nil }
+        try cancellation?.checkCancellation()
         guard let context else {
             return try handle(
                 name: name,
@@ -96,9 +115,17 @@ public struct RuntimeJobSynchronousToolPack: ToolPackHandling, Sendable {
             )
         }
         if name == "shell_exec" {
-            return try handleLegacyShell(arguments: arguments, context: context, app: app)
+            return try handleLegacyShell(
+                arguments: arguments,
+                context: context,
+                app: app,
+                cancellation: cancellation
+            )
         }
-        return try Self.wait(timeoutSeconds: Self.controlTimeoutSeconds) {
+        return try Self.wait(
+            timeoutSeconds: Self.controlTimeoutSeconds,
+            cancellation: cancellation
+        ) {
             await subsystem.toolPack.handle(name: name, arguments: arguments, context: context)
                 ?? .failure(code: "unknown_tool", message: "Unknown tool '\(name)'", retryable: false)
         }
@@ -107,7 +134,8 @@ public struct RuntimeJobSynchronousToolPack: ToolPackHandling, Sendable {
     private func handleLegacyShell(
         arguments: [String: Any],
         context: ToolInvocationContext,
-        app: ForgeApp
+        app: ForgeApp,
+        cancellation: ToolCallCancellation?
     ) throws -> ToolResult {
         guard let command = ToolArgHelpers.string(arguments, "command"), !command.isEmpty else {
             return .failure(code: "missing_command", message: "command required")
@@ -130,7 +158,8 @@ public struct RuntimeJobSynchronousToolPack: ToolPackHandling, Sendable {
             .flatMap(RuntimeReplayClass.init(rawValue:))
             ?? .nonReplayable
         return try Self.wait(
-            timeoutSeconds: timeout + Self.legacyCompletionSlackSeconds
+            timeoutSeconds: timeout + Self.legacyCompletionSlackSeconds,
+            cancellation: cancellation
         ) {
             try await subsystem.legacyShell.execute(
                 command: command,
@@ -145,11 +174,12 @@ public struct RuntimeJobSynchronousToolPack: ToolPackHandling, Sendable {
 
     private static func wait<Value: Sendable>(
         timeoutSeconds: TimeInterval,
+        cancellation: ToolCallCancellation?,
         operation: @escaping @Sendable () async throws -> Value
     ) throws -> Value {
         let semaphore = DispatchSemaphore(value: 0)
         let result = RuntimeBlockingResult<Value>()
-        Task.detached {
+        let task = Task.detached {
             do {
                 result.store(.success(try await operation()))
             } catch {
@@ -157,9 +187,27 @@ public struct RuntimeJobSynchronousToolPack: ToolPackHandling, Sendable {
             }
             semaphore.signal()
         }
-        guard semaphore.wait(timeout: .now() + max(0.1, timeoutSeconds)) == .success else {
-            throw RuntimeJobError.storageFailure("runtime transport wait exceeded its bounded deadline")
+        let clock = ContinuousClock()
+        let deadline = clock.now + .seconds(max(0.1, timeoutSeconds))
+        while semaphore.wait(timeout: .now() + .milliseconds(25)) != .success {
+            if cancellation?.isCancelled == true {
+                task.cancel()
+                let cancellationDeadline = clock.now + .seconds(
+                    min(15, max(0.1, timeoutSeconds))
+                )
+                while semaphore.wait(timeout: .now() + .milliseconds(25)) != .success,
+                      clock.now < cancellationDeadline {}
+                throw CancellationError()
+            }
+            guard clock.now < deadline else {
+                task.cancel()
+                throw RuntimeJobError.storageFailure(
+                    "runtime transport wait exceeded its bounded deadline"
+                )
+            }
         }
+        // A signalled terminal result wins a concurrent cancellation race; the
+        // adapter has already committed the durable job outcome at this point.
         guard let value = result.take() else {
             throw RuntimeJobError.storageFailure("runtime transport completed without a result")
         }
@@ -222,11 +270,34 @@ public struct LegacyShellJobAdapter: Sendable {
             replayClass: replayClass,
             idempotencyKey: idempotencyKey
         )
-        let record = try await service.waitForTerminal(
-            jobID: jobID,
-            context: context,
-            maximumWait: .seconds(boundedTimeout + 5)
-        )
+        let record: RuntimeJobRecord
+        do {
+            record = try await withTaskCancellationHandler {
+                try await service.waitForTerminal(
+                    jobID: jobID,
+                    context: context,
+                    maximumWait: .seconds(boundedTimeout + 5)
+                )
+            } onCancel: {
+                Task {
+                    try? await service.cancel(jobID: jobID, context: context)
+                }
+            }
+        } catch is CancellationError {
+            // Finish cancellation from a fresh task. The current task is already
+            // cancelled, so its polling sleeps would otherwise return immediately
+            // before the runtime actor releases process-group ownership.
+            let cleanup = Task {
+                try? await service.cancel(jobID: jobID, context: context)
+                _ = try? await service.waitForTerminal(
+                    jobID: jobID,
+                    context: context,
+                    maximumWait: .seconds(min(boundedTimeout + 5, 15))
+                )
+            }
+            await cleanup.value
+            throw CancellationError()
+        }
         guard record.state.isTerminal else {
             return .failure(
                 code: "runtime_terminal_commit_pending",
