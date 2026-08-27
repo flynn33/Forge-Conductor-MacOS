@@ -1,0 +1,55 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 5247,
+      "path": ".forge-codex/evidence/EVID-20260827T172622Z-833584f5bf.stdout.txt",
+      "sha256": "5b89cfa1201ed681e463bba8f40f3b14139cb7c4ecd86b87ce933840a98c3898",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 119,
+      "path": ".forge-codex/evidence/EVID-20260827T172622Z-833584f5bf.stderr.txt",
+      "sha256": "7ec01c2d43b35da0d666c4ee6a91bf988dcb39caf382201904779068ae8e3a82",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "command": "env FORGE_SKIP_PS=1 swift test -Xswiftc -warnings-as-errors --filter AppConfigAndDoctorTests/testConfigStoreTypedModel --filter ManagerTests/testManagerSettingsPersist --filter ManagerTests/testDashboardClientAttachesToExistingManager --filter ManagerTests/testManagerRuntimeThrottlesPresenceMaintenance --filter ManagerTests/testOperatorSnapshotRouteIsBoundedRedactedAndPreservesExistingQueryPaths --filter DashboardSecurityTests/testManagerControlCredentialIsStableOwnerOnlyAndComparedExactly --filter DashboardSecurityTests/testEveryManagerMutationExceptReadOnlyStatusRequiresAuthorization --filter DashboardSecurityTests/testManagerControlCredentialFailsClosedWhenStoragePermissionsAreBroadened --filter ManagedAutonomyRuntimeTests/testDurableRunStartIdentityActivatesOnlyOnFirstExactAcceptance --filter ManagedAutonomyRuntimeTests/testHTTPRunControlRoutePersistsExactActionsAndRejectsUnknownActions --filter ResourcePolicyTests/testSubscriberCapsAndBackgroundRefreshQuiesceAfterRemovalAndStop --filter LatestValueMailboxTests/testStaleGenerationAndPostStopValuesNeverReachNewSubscriber --filter LatestValueMailboxTests/testStopClearsBufferedLatestDuringInFlightDelivery",
+  "ended_at": "2026-08-27T17:26:25.571443+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260827T172622Z-833584f5bf",
+  "kind": "p10-host-safe-ui-contracts",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [
+    "FC-MIGRATION-MATRIX-001"
+  ],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 8112698,
+    "file_count": 234,
+    "schema_version": 1,
+    "sha256": "efcfeb6512f07dc42ee4fd33b0893febaae342a3690207739ec091f5292e10fc"
+  },
+  "source_manifest_after": {
+    "bytes": 8112698,
+    "file_count": 234,
+    "schema_version": 1,
+    "sha256": "efcfeb6512f07dc42ee4fd33b0893febaae342a3690207739ec091f5292e10fc"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-27T17:26:22.914094+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

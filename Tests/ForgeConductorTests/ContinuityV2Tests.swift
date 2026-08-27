@@ -649,6 +649,713 @@ final class ContinuityV2Tests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: ambiguousURL), ambiguousSource)
     }
 
+    func testLegacyMigrationReceiptFailureRollsBackSideEffectsAndReplayRepairsProjection() throws {
+        let fixture = try makeMemoryFixture(label: "legacy-receipt-rollback")
+        defer {
+            fixture.memory.closeAll()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let repository = try fixture.memory.repositoryForProject(fixture.projectID)
+        let legacyRoot = fixture.root.appendingPathComponent("legacy-atomic", isDirectory: true)
+        try FileManager.default.createDirectory(at: legacyRoot, withIntermediateDirectories: true)
+
+        let exact = try makeLegacyHandoff(projectID: fixture.projectID)
+        let exactURL = legacyRoot.appendingPathComponent("01-exact.json")
+        try JSONSupport.data(from: exact.asDictionary()).write(to: exactURL)
+        let ambiguous = try makeLegacyHandoff(projectID: UUID().uuidString.lowercased())
+        let ambiguousURL = legacyRoot.appendingPathComponent("02-ambiguous.json")
+        try JSONSupport.data(from: ambiguous.asDictionary()).write(to: ambiguousURL)
+        let exactSource = try Data(contentsOf: exactURL)
+        let ambiguousSource = try Data(contentsOf: ambiguousURL)
+        let baselineReceiptCount = try repository.continuityMigrationReceiptCount()
+        let baselineQuarantineCount = try repository.continuityLegacyQuarantineCount()
+        let quarantineDirectory = repository.directory
+            .appendingPathComponent("continuity/LegacyContinuityQuarantine", isDirectory: true)
+
+        let triggerName = "legacy_receipt_failure_after_staging"
+        try executeLegacyMigrationSQL(
+            at: repository.databaseURL,
+            sql: """
+            CREATE TRIGGER \(triggerName)
+            BEFORE INSERT ON continuity_migration_receipts
+            WHEN NEW.source_version='legacy_global'
+            BEGIN
+              SELECT CASE
+                WHEN (
+                  SELECT COUNT(*) FROM continuity_handoffs
+                  WHERE project_id=NEW.project_id
+                    AND handoff_id='\(exact.handoffID)'
+                    AND migration_source='legacy_global'
+                    AND quarantine_state='legacy_read_only'
+                )=1
+                AND (
+                  SELECT COUNT(*) FROM legacy_continuity_quarantine
+                  WHERE project_id=NEW.project_id
+                )=1
+                THEN RAISE(ABORT, 'injected legacy receipt failure after staged effects')
+                ELSE RAISE(ABORT, 'legacy receipt reached without staged effects')
+              END;
+            END;
+            """
+        )
+        var triggerInstalled = true
+        defer {
+            if triggerInstalled {
+                try? executeLegacyMigrationSQL(
+                    at: repository.databaseURL,
+                    sql: "DROP TRIGGER IF EXISTS \(triggerName);"
+                )
+            }
+        }
+
+        XCTAssertThrowsError(
+            try LegacyContinuityMigrator(repository: repository).migrate(
+                candidateFiles: [ambiguousURL, exactURL],
+                expectedProjectGeneration: 1,
+                boundRunID: nil
+            )
+        ) { error in
+            XCTAssertTrue(
+                error.localizedDescription.contains(
+                    "injected legacy receipt failure after staged effects"
+                ),
+                "\(error)"
+            )
+        }
+        XCTAssertNil(
+            try legacyImportSnapshot(
+                databaseURL: repository.databaseURL,
+                projectID: fixture.projectID,
+                handoffID: exact.handoffID
+            )
+        )
+        XCTAssertEqual(
+            try repository.continuityLegacyQuarantineCount(),
+            baselineQuarantineCount
+        )
+        XCTAssertEqual(
+            try repository.continuityMigrationReceiptCount(),
+            baselineReceiptCount
+        )
+        XCTAssertEqual(
+            try legacyMigrationInt(
+                at: repository.databaseURL,
+                sql: """
+                SELECT COUNT(*) FROM continuity_migration_receipts
+                WHERE project_id=? AND source_version='legacy_global';
+                """,
+                bindings: [fixture.projectID]
+            ),
+            0
+        )
+        XCTAssertEqual(try legacyJSONFiles(in: quarantineDirectory).count, 0)
+
+        try executeLegacyMigrationSQL(
+            at: repository.databaseURL,
+            sql: "DROP TRIGGER \(triggerName);"
+        )
+        triggerInstalled = false
+
+        let receipt = try LegacyContinuityMigrator(repository: repository).migrate(
+            candidateFiles: [ambiguousURL, exactURL],
+            expectedProjectGeneration: 1,
+            boundRunID: nil
+        )
+        XCTAssertEqual(receipt.importedCount, 1)
+        XCTAssertEqual(receipt.skippedCount, 0)
+        XCTAssertEqual(receipt.quarantinedCount, 1)
+        XCTAssertNotNil(
+            try legacyImportSnapshot(
+                databaseURL: repository.databaseURL,
+                projectID: fixture.projectID,
+                handoffID: exact.handoffID
+            )
+        )
+        XCTAssertEqual(
+            try repository.continuityLegacyQuarantineCount(),
+            baselineQuarantineCount + 1
+        )
+        XCTAssertEqual(
+            try repository.continuityMigrationReceiptCount(),
+            baselineReceiptCount + 1
+        )
+        let initialProjectionFiles = try legacyJSONFiles(in: quarantineDirectory)
+        XCTAssertEqual(initialProjectionFiles.count, 1)
+        let initialProjection = try XCTUnwrap(initialProjectionFiles.first)
+        let initialProjectionData = try Data(contentsOf: initialProjection)
+        try FileManager.default.removeItem(at: initialProjection)
+        XCTAssertEqual(try legacyJSONFiles(in: quarantineDirectory).count, 0)
+
+        let replay = try LegacyContinuityMigrator(repository: repository).migrate(
+            candidateFiles: [ambiguousURL, exactURL],
+            expectedProjectGeneration: 1,
+            boundRunID: nil
+        )
+        XCTAssertEqual(replay, receipt)
+        XCTAssertEqual(
+            try repository.continuityLegacyQuarantineCount(),
+            baselineQuarantineCount + 1
+        )
+        XCTAssertEqual(
+            try repository.continuityMigrationReceiptCount(),
+            baselineReceiptCount + 1
+        )
+        let repairedProjectionFiles = try legacyJSONFiles(in: quarantineDirectory)
+        XCTAssertEqual(repairedProjectionFiles.count, 1)
+        let repairedProjection = try XCTUnwrap(repairedProjectionFiles.first)
+        XCTAssertEqual(repairedProjection.lastPathComponent, initialProjection.lastPathComponent)
+        XCTAssertEqual(try Data(contentsOf: repairedProjection), initialProjectionData)
+        XCTAssertEqual(try Data(contentsOf: exactURL), exactSource)
+        XCTAssertEqual(try Data(contentsOf: ambiguousURL), ambiguousSource)
+    }
+
+    func testConcurrentIdenticalLegacyMigrationsCommitOneUnsplittableReceipt() async throws {
+        let fixture = try makeMemoryFixture(label: "legacy-concurrent-receipt")
+        defer {
+            fixture.memory.closeAll()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let seededRepository = try fixture.memory.repositoryForProject(fixture.projectID)
+        let directory = seededRepository.directory
+        let databaseURL = seededRepository.databaseURL
+        let baselineReceiptCount = try seededRepository.continuityMigrationReceiptCount()
+        fixture.memory.closeAll()
+
+        let legacyRoot = fixture.root.appendingPathComponent("legacy-concurrent", isDirectory: true)
+        try FileManager.default.createDirectory(at: legacyRoot, withIntermediateDirectories: true)
+        let exact = try makeLegacyHandoff(projectID: fixture.projectID)
+        let exactURL = legacyRoot.appendingPathComponent("01-exact.json")
+        try JSONSupport.data(from: exact.asDictionary()).write(to: exactURL)
+        let ambiguous = try makeLegacyHandoff(projectID: UUID().uuidString.lowercased())
+        let ambiguousURL = legacyRoot.appendingPathComponent("02-ambiguous.json")
+        try JSONSupport.data(from: ambiguous.asDictionary()).write(to: ambiguousURL)
+        let exactSHA256 = JSONSupport.sha256Hex(try Data(contentsOf: exactURL))
+        let ambiguousSHA256 = JSONSupport.sha256Hex(try Data(contentsOf: ambiguousURL))
+
+        let participantCount = 4
+        let repositories = try (0..<participantCount).map { _ in
+            try ProjectMemoryRepository(
+                projectID: fixture.projectID,
+                directory: directory,
+                enableFTS5: false
+            )
+        }
+        defer { repositories.forEach { $0.close() } }
+        let gate = LegacyMigrationStartGate(participantCount: participantCount)
+        let candidateFiles = [ambiguousURL, exactURL]
+        let receipts = try await withThrowingTaskGroup(
+            of: LegacyContinuityMigrationReceipt.self,
+            returning: [LegacyContinuityMigrationReceipt].self
+        ) { group in
+            for repository in repositories {
+                group.addTask {
+                    await gate.wait()
+                    return try LegacyContinuityMigrator(repository: repository).migrate(
+                        candidateFiles: candidateFiles,
+                        expectedProjectGeneration: 1,
+                        boundRunID: nil
+                    )
+                }
+            }
+            var output: [LegacyContinuityMigrationReceipt] = []
+            output.reserveCapacity(participantCount)
+            for try await receipt in group { output.append(receipt) }
+            return output
+        }
+
+        XCTAssertEqual(receipts.count, participantCount)
+        let receipt = try XCTUnwrap(receipts.first)
+        XCTAssertTrue(receipts.allSatisfy { $0 == receipt })
+        XCTAssertEqual(receipt.importedCount, 1)
+        XCTAssertEqual(receipt.skippedCount, 0)
+        XCTAssertEqual(receipt.quarantinedCount, 1)
+        XCTAssertNotNil(
+            try legacyImportSnapshot(
+                databaseURL: databaseURL,
+                projectID: fixture.projectID,
+                handoffID: exact.handoffID
+            )
+        )
+        XCTAssertEqual(try repositories[0].continuityLegacyQuarantineCount(), 1)
+        XCTAssertEqual(
+            try repositories[0].continuityMigrationReceiptCount(),
+            baselineReceiptCount + 1
+        )
+        XCTAssertEqual(
+            try legacyMigrationInt(
+                at: databaseURL,
+                sql: """
+                SELECT COUNT(*) FROM continuity_migration_receipts
+                WHERE project_id=? AND source_version='legacy_global';
+                """,
+                bindings: [fixture.projectID]
+            ),
+            1
+        )
+        let detailsJSON = try XCTUnwrap(
+            try legacyMigrationText(
+                at: databaseURL,
+                sql: """
+                SELECT details_json FROM continuity_migration_receipts
+                WHERE receipt_id=? AND project_id=? LIMIT 1;
+                """,
+                bindings: [receipt.receiptID, fixture.projectID]
+            )
+        )
+        let details = try JSONSupport.object(from: Data(detailsJSON.utf8))
+        XCTAssertEqual(details["imported_source_sha256"] as? [String], [exactSHA256])
+        XCTAssertEqual(details["quarantined_source_sha256"] as? [String], [ambiguousSHA256])
+        let quarantineDirectory = directory
+            .appendingPathComponent("continuity/LegacyContinuityQuarantine", isDirectory: true)
+        XCTAssertEqual(try legacyJSONFiles(in: quarantineDirectory).count, 1)
+    }
+
+    func testLegacyMigrationAliasesOnePayloadAcrossFilenamesAndReplaysAfterRestart() throws {
+        let fixture = try makeMemoryFixture(label: "legacy-alias-replay")
+        defer {
+            fixture.memory.closeAll()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let repository = try fixture.memory.repositoryForProject(fixture.projectID)
+        let legacyRoot = fixture.root.appendingPathComponent("legacy-aliases", isDirectory: true)
+        try FileManager.default.createDirectory(at: legacyRoot, withIntermediateDirectories: true)
+        let handoff = try makeLegacyHandoff(projectID: fixture.projectID)
+        let source = try JSONSupport.data(from: handoff.asDictionary())
+        let ownerURL = legacyRoot.appendingPathComponent("01-owner.json")
+        let aliasURL = legacyRoot.appendingPathComponent("02-alias.json")
+        try source.write(to: ownerURL)
+        try source.write(to: aliasURL)
+        let baselineReceiptCount = try repository.continuityMigrationReceiptCount()
+
+        let receipt = try LegacyContinuityMigrator(repository: repository).migrate(
+            candidateFiles: [aliasURL, ownerURL],
+            expectedProjectGeneration: 1,
+            boundRunID: nil
+        )
+        XCTAssertEqual(receipt.importedCount, 1)
+        XCTAssertEqual(receipt.skippedCount, 1)
+        XCTAssertEqual(receipt.quarantinedCount, 0)
+        XCTAssertEqual(
+            try XCTUnwrap(
+                legacyImportSnapshot(
+                    databaseURL: repository.databaseURL,
+                    projectID: fixture.projectID,
+                    handoffID: handoff.handoffID
+                )
+            ).legacyRecordID,
+            ownerURL.lastPathComponent
+        )
+
+        fixture.memory.closeAll()
+        let restartedMemory = ProjectMemoryService(paths: AppPaths(home: fixture.home))
+        defer { restartedMemory.closeAll() }
+        let restartedRepository = try restartedMemory.repositoryForProject(fixture.projectID)
+        let replay = try LegacyContinuityMigrator(repository: restartedRepository).migrate(
+            candidateFiles: [ownerURL, aliasURL],
+            expectedProjectGeneration: 1,
+            boundRunID: nil
+        )
+        XCTAssertEqual(replay, receipt)
+        XCTAssertEqual(
+            try restartedRepository.continuityMigrationReceiptCount(),
+            baselineReceiptCount + 1
+        )
+        XCTAssertEqual(try Data(contentsOf: ownerURL), source)
+        XCTAssertEqual(try Data(contentsOf: aliasURL), source)
+    }
+
+    func testLegacyMigrationRejectsMalformedExactRowBeforeRecordingReceipt() throws {
+        let fixture = try makeMemoryFixture(label: "legacy-malformed-exact")
+        defer {
+            fixture.memory.closeAll()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let repository = try fixture.memory.repositoryForProject(fixture.projectID)
+        let legacyRoot = fixture.root.appendingPathComponent("legacy-malformed", isDirectory: true)
+        try FileManager.default.createDirectory(at: legacyRoot, withIntermediateDirectories: true)
+        let handoff = try makeLegacyHandoff(projectID: fixture.projectID)
+        let candidateURL = legacyRoot.appendingPathComponent("candidate.json")
+        try JSONSupport.data(from: handoff.asDictionary()).write(to: candidateURL)
+        XCTAssertTrue(
+            try repository.continuityImportLegacyReadOnly(
+                payload: handoff.asDictionary(),
+                handoffID: handoff.handoffID,
+                operationID: handoff.operationID,
+                schemaVersion: ContinuityHandoff.schemaVersion,
+                contentSHA256: handoff.contentSHA256,
+                createdAt: handoff.createdAt,
+                projectGeneration: nil,
+                runID: nil,
+                predecessorProviderResponseID: nil,
+                bootstrapNonce: nil,
+                sourceRecordID: candidateURL.lastPathComponent
+            )
+        )
+        try executeLegacyMigrationSQL(
+            at: repository.databaseURL,
+            sql: """
+            UPDATE continuity_handoffs
+            SET quarantine_state=NULL,migration_source='compatibility_v1',legacy_record_id=NULL
+            WHERE project_id='\(fixture.projectID)' AND handoff_id='\(handoff.handoffID)';
+            """
+        )
+        let baselineReceiptCount = try repository.continuityMigrationReceiptCount()
+
+        XCTAssertThrowsError(
+            try LegacyContinuityMigrator(repository: repository).migrate(
+                candidateFiles: [candidateURL],
+                expectedProjectGeneration: 1,
+                boundRunID: nil
+            )
+        ) { error in
+            XCTAssertTrue(
+                error.localizedDescription.contains("imported side effect"),
+                "\(error)"
+            )
+        }
+        XCTAssertEqual(
+            try repository.continuityMigrationReceiptCount(),
+            baselineReceiptCount
+        )
+    }
+
+    func testLegacyMigrationRejectsReceiptCountAndHashCategoryTampering() throws {
+        let fixture = try makeMemoryFixture(label: "legacy-receipt-tamper")
+        defer {
+            fixture.memory.closeAll()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let repository = try fixture.memory.repositoryForProject(fixture.projectID)
+        let legacyRoot = fixture.root.appendingPathComponent("legacy-tamper", isDirectory: true)
+        try FileManager.default.createDirectory(at: legacyRoot, withIntermediateDirectories: true)
+        let exact = try makeLegacyHandoff(projectID: fixture.projectID)
+        let exactURL = legacyRoot.appendingPathComponent("01-exact.json")
+        try JSONSupport.data(from: exact.asDictionary()).write(to: exactURL)
+        let ambiguous = try makeLegacyHandoff(projectID: UUID().uuidString.lowercased())
+        let ambiguousURL = legacyRoot.appendingPathComponent("02-ambiguous.json")
+        try JSONSupport.data(from: ambiguous.asDictionary()).write(to: ambiguousURL)
+        let candidates = [exactURL, ambiguousURL]
+        let receipt = try LegacyContinuityMigrator(repository: repository).migrate(
+            candidateFiles: candidates,
+            expectedProjectGeneration: 1,
+            boundRunID: nil
+        )
+        let originalDetailsJSON = try XCTUnwrap(
+            try legacyMigrationText(
+                at: repository.databaseURL,
+                sql: "SELECT details_json FROM continuity_migration_receipts WHERE receipt_id=?;",
+                bindings: [receipt.receiptID]
+            )
+        )
+        let originalDetails = try JSONSupport.object(from: Data(originalDetailsJSON.utf8))
+
+        try updateLegacyMigrationReceipt(
+            at: repository.databaseURL,
+            receiptID: receipt.receiptID,
+            importedCount: 0,
+            skippedCount: 0,
+            quarantinedCount: 2,
+            detailsJSON: originalDetailsJSON
+        )
+        XCTAssertThrowsError(
+            try LegacyContinuityMigrator(repository: repository).migrate(
+                candidateFiles: candidates,
+                expectedProjectGeneration: 1,
+                boundRunID: nil
+            )
+        )
+
+        var swappedDetails = originalDetails
+        let importedHashes = try XCTUnwrap(swappedDetails["imported_source_sha256"] as? [String])
+        let quarantinedHashes = try XCTUnwrap(
+            swappedDetails["quarantined_source_sha256"] as? [String]
+        )
+        swappedDetails["imported_source_sha256"] = quarantinedHashes
+        swappedDetails["quarantined_source_sha256"] = importedHashes
+        try updateLegacyMigrationReceipt(
+            at: repository.databaseURL,
+            receiptID: receipt.receiptID,
+            importedCount: 1,
+            skippedCount: 0,
+            quarantinedCount: 1,
+            detailsJSON: try JSONSupport.string(from: swappedDetails)
+        )
+        XCTAssertThrowsError(
+            try LegacyContinuityMigrator(repository: repository).migrate(
+                candidateFiles: candidates,
+                expectedProjectGeneration: 1,
+                boundRunID: nil
+            )
+        )
+
+        XCTAssertEqual(
+            originalDetails["candidate_outcomes"] as? [String],
+            ["imported", "quarantined"]
+        )
+        var outcomeTamperedDetails = originalDetails
+        outcomeTamperedDetails["candidate_outcomes"] = ["quarantined", "imported"]
+        try updateLegacyMigrationReceipt(
+            at: repository.databaseURL,
+            receiptID: receipt.receiptID,
+            importedCount: 1,
+            skippedCount: 0,
+            quarantinedCount: 1,
+            detailsJSON: try JSONSupport.string(from: outcomeTamperedDetails)
+        )
+        XCTAssertThrowsError(
+            try LegacyContinuityMigrator(repository: repository).migrate(
+                candidateFiles: candidates,
+                expectedProjectGeneration: 1,
+                boundRunID: nil
+            )
+        )
+
+        let originalLedgerSHA256 = try XCTUnwrap(
+            originalDetails["outcome_ledger_sha256"] as? String
+        )
+        var ledgerTamperedDetails = originalDetails
+        let replacementLedgerSHA256 = String(
+            repeating: originalLedgerSHA256 == String(repeating: "0", count: 64) ? "1" : "0",
+            count: 64
+        )
+        ledgerTamperedDetails["outcome_ledger_sha256"] = replacementLedgerSHA256
+        try updateLegacyMigrationReceipt(
+            at: repository.databaseURL,
+            receiptID: receipt.receiptID,
+            importedCount: 1,
+            skippedCount: 0,
+            quarantinedCount: 1,
+            detailsJSON: try JSONSupport.string(from: ledgerTamperedDetails)
+        )
+        XCTAssertThrowsError(
+            try LegacyContinuityMigrator(repository: repository).migrate(
+                candidateFiles: candidates,
+                expectedProjectGeneration: 1,
+                boundRunID: nil
+            )
+        )
+
+        try updateLegacyMigrationReceipt(
+            at: repository.databaseURL,
+            receiptID: receipt.receiptID,
+            importedCount: 1,
+            skippedCount: 0,
+            quarantinedCount: 1,
+            detailsJSON: originalDetailsJSON
+        )
+        XCTAssertEqual(
+            try LegacyContinuityMigrator(repository: repository).migrate(
+                candidateFiles: candidates,
+                expectedProjectGeneration: 1,
+                boundRunID: nil
+            ),
+            receipt
+        )
+    }
+
+    func testLegacyMigrationReconcilesVerifiedVersionOneReceiptDetails() throws {
+        let fixture = try makeMemoryFixture(label: "legacy-receipt-v1-upgrade")
+        defer {
+            fixture.memory.closeAll()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let repository = try fixture.memory.repositoryForProject(fixture.projectID)
+        let legacyRoot = fixture.root.appendingPathComponent("legacy-v1-receipt", isDirectory: true)
+        try FileManager.default.createDirectory(at: legacyRoot, withIntermediateDirectories: true)
+        let aliasOwner = try makeLegacyHandoff(projectID: fixture.projectID)
+        let aliasSource = try JSONSupport.data(from: aliasOwner.asDictionary())
+        let ownerURL = legacyRoot.appendingPathComponent("01-owner.json")
+        let aliasURL = legacyRoot.appendingPathComponent("02-alias.json")
+        try aliasSource.write(to: ownerURL)
+        try aliasSource.write(to: aliasURL)
+
+        let ambiguous = try makeLegacyHandoff(projectID: UUID().uuidString.lowercased())
+        let ambiguousSource = try JSONSupport.data(from: ambiguous.asDictionary())
+        let ambiguousURL = legacyRoot.appendingPathComponent("03-ambiguous.json")
+        try ambiguousSource.write(to: ambiguousURL)
+
+        let collisionHandoffID = UUID().uuidString.lowercased()
+        let collisionOwner = try makeLegacyHandoff(
+            projectID: fixture.projectID,
+            handoffID: collisionHandoffID,
+            mission: "Existing collision owner"
+        )
+        let collisionCandidate = try makeLegacyHandoff(
+            projectID: fixture.projectID,
+            handoffID: collisionHandoffID,
+            mission: "Conflicting migration candidate"
+        )
+        XCTAssertTrue(
+            try repository.continuityImportLegacyReadOnly(
+                payload: collisionOwner.asDictionary(),
+                handoffID: collisionOwner.handoffID,
+                operationID: collisionOwner.operationID,
+                schemaVersion: ContinuityHandoff.schemaVersion,
+                contentSHA256: collisionOwner.contentSHA256,
+                createdAt: collisionOwner.createdAt,
+                projectGeneration: nil,
+                runID: nil,
+                predecessorProviderResponseID: nil,
+                bootstrapNonce: nil,
+                sourceRecordID: "preexisting-collision.json"
+            )
+        )
+        let collisionSource = try JSONSupport.data(from: collisionCandidate.asDictionary())
+        let collisionURL = legacyRoot.appendingPathComponent("04-collision.json")
+        try collisionSource.write(to: collisionURL)
+
+        let candidates = [collisionURL, ambiguousURL, aliasURL, ownerURL]
+        let selectedCandidates = [ownerURL, aliasURL, ambiguousURL, collisionURL]
+        let sourceHashes = [
+            JSONSupport.sha256Hex(aliasSource),
+            JSONSupport.sha256Hex(aliasSource),
+            JSONSupport.sha256Hex(ambiguousSource),
+            JSONSupport.sha256Hex(collisionSource),
+        ]
+        let expectedOutcomes = ["imported", "skipped", "quarantined", "quarantined"]
+        let candidateIdentities: [[String: Any]] = zip(selectedCandidates, sourceHashes).map {
+            candidate, sourceSHA256 in
+            [
+                "path_sha256": JSONSupport.sha256Hex(candidate.standardizedFileURL.path),
+                "content_state": "read",
+                "source_sha256": sourceSHA256,
+            ]
+        }
+        let expectedFingerprintSHA256 = JSONSupport.sha256Hex(
+            try JSONSupport.canonicalJSON([
+                "schema_version": 1,
+                "project_id": fixture.projectID,
+                "expected_project_generation": Int64(1),
+                "bound_run_id": NSNull(),
+                "submitted_candidate_count": candidates.count,
+                "selected_candidates": candidateIdentities,
+            ] as [String: Any])
+        )
+        let ledgerCandidates: [[String: Any]] = zip(
+            candidateIdentities,
+            expectedOutcomes
+        ).map { identity, outcome in
+            var candidate = identity
+            candidate["outcome"] = outcome
+            return candidate
+        }
+        let expectedLedgerSHA256 = JSONSupport.sha256Hex(
+            try JSONSupport.canonicalJSON([
+                "schema_version": 1,
+                "candidates": ledgerCandidates,
+            ] as [String: Any])
+        )
+        let baselineReceiptCount = try repository.continuityMigrationReceiptCount()
+        let baselineQuarantineCount = try repository.continuityLegacyQuarantineCount()
+        let receipt = try LegacyContinuityMigrator(repository: repository).migrate(
+            candidateFiles: candidates,
+            expectedProjectGeneration: 1,
+            boundRunID: nil
+        )
+        XCTAssertEqual(receipt.importedCount, 1)
+        XCTAssertEqual(receipt.skippedCount, 1)
+        XCTAssertEqual(receipt.quarantinedCount, 2)
+        let detailsJSON = try XCTUnwrap(
+            try legacyMigrationText(
+                at: repository.databaseURL,
+                sql: "SELECT details_json FROM continuity_migration_receipts WHERE receipt_id=?;",
+                bindings: [receipt.receiptID]
+            )
+        )
+        var legacyDetails = try JSONSupport.object(from: Data(detailsJSON.utf8))
+        legacyDetails.removeValue(forKey: "receipt_details_schema_version")
+        legacyDetails.removeValue(forKey: "candidate_outcomes")
+        legacyDetails.removeValue(forKey: "outcome_ledger_sha256")
+        legacyDetails["quarantined_source_sha256"] = [sourceHashes[2]]
+        try updateLegacyMigrationReceipt(
+            at: repository.databaseURL,
+            receiptID: receipt.receiptID,
+            importedCount: receipt.importedCount,
+            skippedCount: receipt.skippedCount,
+            quarantinedCount: receipt.quarantinedCount,
+            detailsJSON: try JSONSupport.string(from: legacyDetails)
+        )
+
+        let replay = try LegacyContinuityMigrator(repository: repository).migrate(
+            candidateFiles: candidates,
+            expectedProjectGeneration: 1,
+            boundRunID: nil
+        )
+        XCTAssertEqual(replay, receipt)
+        let upgradedDetailsJSON = try XCTUnwrap(
+            try legacyMigrationText(
+                at: repository.databaseURL,
+                sql: "SELECT details_json FROM continuity_migration_receipts WHERE receipt_id=?;",
+                bindings: [receipt.receiptID]
+            )
+        )
+        let upgradedDetails = try JSONSupport.object(from: Data(upgradedDetailsJSON.utf8))
+        XCTAssertEqual(upgradedDetails["receipt_details_schema_version"] as? Int, 2)
+        XCTAssertEqual(upgradedDetails["candidate_count"] as? Int, 4)
+        XCTAssertEqual(upgradedDetails["candidate_outcomes"] as? [String], expectedOutcomes)
+        XCTAssertEqual(upgradedDetails["imported_source_sha256"] as? [String], [sourceHashes[0]])
+        XCTAssertEqual(
+            upgradedDetails["quarantined_source_sha256"] as? [String],
+            [sourceHashes[2], sourceHashes[3]]
+        )
+        XCTAssertEqual(
+            upgradedDetails["migration_fingerprint_sha256"] as? String,
+            expectedFingerprintSHA256
+        )
+        XCTAssertEqual(
+            upgradedDetails["outcome_ledger_sha256"] as? String,
+            expectedLedgerSHA256
+        )
+        XCTAssertEqual(upgradedDetails["global_latest_used_as_authority"] as? Bool, false)
+        XCTAssertEqual(
+            try XCTUnwrap(
+                legacyImportSnapshot(
+                    databaseURL: repository.databaseURL,
+                    projectID: fixture.projectID,
+                    handoffID: aliasOwner.handoffID
+                )
+            ).legacyRecordID,
+            ownerURL.lastPathComponent
+        )
+        XCTAssertEqual(
+            try repository.continuityMigrationReceiptCount(),
+            baselineReceiptCount + 1
+        )
+        XCTAssertEqual(
+            try repository.continuityLegacyQuarantineCount(),
+            baselineQuarantineCount + 2
+        )
+
+        fixture.memory.closeAll()
+        let restartedMemory = ProjectMemoryService(paths: AppPaths(home: fixture.home))
+        defer { restartedMemory.closeAll() }
+        let restartedRepository = try restartedMemory.repositoryForProject(fixture.projectID)
+        XCTAssertEqual(
+            try LegacyContinuityMigrator(repository: restartedRepository).migrate(
+                candidateFiles: candidates,
+                expectedProjectGeneration: 1,
+                boundRunID: nil
+            ),
+            receipt
+        )
+        XCTAssertEqual(
+            try legacyMigrationText(
+                at: restartedRepository.databaseURL,
+                sql: "SELECT details_json FROM continuity_migration_receipts WHERE receipt_id=?;",
+                bindings: [receipt.receiptID]
+            ),
+            upgradedDetailsJSON
+        )
+        XCTAssertEqual(
+            try restartedRepository.continuityMigrationReceiptCount(),
+            baselineReceiptCount + 1
+        )
+        XCTAssertEqual(
+            try restartedRepository.continuityLegacyQuarantineCount(),
+            baselineQuarantineCount + 2
+        )
+    }
+
     func testLegacyLocationV2MigrationPreservesBindingAcrossRestartAndIdempotentReplay() throws {
         let fixture = try makeMemoryFixture(label: "legacy-v2-location")
         defer {
@@ -962,8 +1669,13 @@ final class ContinuityV2Tests: XCTestCase {
         ).validated()
     }
 
-    private func makeLegacyHandoff(projectID: String) throws -> ContinuityHandoff {
+    private func makeLegacyHandoff(
+        projectID: String,
+        handoffID: String = UUID().uuidString.lowercased(),
+        mission: String = "Preserve legacy diagnostics"
+    ) throws -> ContinuityHandoff {
         try ContinuityHandoff(
+            handoffID: handoffID,
             operationID: UUID().uuidString.lowercased(),
             project: [
                 "project_id": projectID,
@@ -978,7 +1690,7 @@ final class ContinuityV2Tests: XCTestCase {
                 "provider_session_id": NSNull(),
                 "model": NSNull(),
             ],
-            mission: "Preserve legacy diagnostics",
+            mission: mission,
             currentWork: [
                 "phase_id": "legacy",
                 "work_item_id": "legacy",
@@ -1009,6 +1721,29 @@ final class ContinuityV2Tests: XCTestCase {
     }
 }
 
+private actor LegacyMigrationStartGate {
+    private let participantCount: Int
+    private var arrivalCount = 0
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    init(participantCount: Int) {
+        self.participantCount = participantCount
+    }
+
+    func wait() async {
+        arrivalCount += 1
+        if arrivalCount == participantCount {
+            let pending = waiters
+            waiters.removeAll(keepingCapacity: false)
+            for waiter in pending { waiter.resume() }
+            return
+        }
+        await withCheckedContinuation { continuation in
+            waiters.append(continuation)
+        }
+    }
+}
+
 private struct LegacyImportSnapshot {
     let schemaVersion: String
     let projectGeneration: Int?
@@ -1024,6 +1759,129 @@ private struct LegacyImportSnapshot {
 
 private enum LegacyImportSnapshotError: Error {
     case sqlite(String)
+}
+
+private func executeLegacyMigrationSQL(at databaseURL: URL, sql: String) throws {
+    var database: OpaquePointer?
+    let flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
+    guard sqlite3_open_v2(databaseURL.path, &database, flags, nil) == SQLITE_OK,
+          let database else {
+        let message = database.map { String(cString: sqlite3_errmsg($0)) }
+            ?? "unknown SQLite open error"
+        if let database { sqlite3_close(database) }
+        throw LegacyImportSnapshotError.sqlite(message)
+    }
+    defer { sqlite3_close(database) }
+    sqlite3_busy_timeout(database, 3_000)
+    var errorMessage: UnsafeMutablePointer<CChar>?
+    guard sqlite3_exec(database, sql, nil, nil, &errorMessage) == SQLITE_OK else {
+        let message = errorMessage.map { String(cString: $0) }
+            ?? String(cString: sqlite3_errmsg(database))
+        sqlite3_free(errorMessage)
+        throw LegacyImportSnapshotError.sqlite(message)
+    }
+}
+
+private func updateLegacyMigrationReceipt(
+    at databaseURL: URL,
+    receiptID: String,
+    importedCount: Int,
+    skippedCount: Int,
+    quarantinedCount: Int,
+    detailsJSON: String
+) throws {
+    var database: OpaquePointer?
+    let flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
+    guard sqlite3_open_v2(databaseURL.path, &database, flags, nil) == SQLITE_OK,
+          let database else {
+        let message = database.map { String(cString: sqlite3_errmsg($0)) }
+            ?? "unknown SQLite open error"
+        if let database { sqlite3_close(database) }
+        throw LegacyImportSnapshotError.sqlite(message)
+    }
+    defer { sqlite3_close(database) }
+    sqlite3_busy_timeout(database, 3_000)
+    var statement: OpaquePointer?
+    let sql = """
+    UPDATE continuity_migration_receipts
+    SET imported_count=?,skipped_count=?,quarantined_count=?,details_json=?
+    WHERE receipt_id=?;
+    """
+    guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK,
+          let statement else {
+        throw LegacyImportSnapshotError.sqlite(String(cString: sqlite3_errmsg(database)))
+    }
+    defer { sqlite3_finalize(statement) }
+    sqlite3_bind_int64(statement, 1, Int64(importedCount))
+    sqlite3_bind_int64(statement, 2, Int64(skippedCount))
+    sqlite3_bind_int64(statement, 3, Int64(quarantinedCount))
+    bindLegacySnapshot(statement, index: 4, value: detailsJSON)
+    bindLegacySnapshot(statement, index: 5, value: receiptID)
+    guard sqlite3_step(statement) == SQLITE_DONE, sqlite3_changes(database) == 1 else {
+        throw LegacyImportSnapshotError.sqlite(String(cString: sqlite3_errmsg(database)))
+    }
+}
+
+private func legacyMigrationInt(
+    at databaseURL: URL,
+    sql: String,
+    bindings: [String]
+) throws -> Int {
+    var database: OpaquePointer?
+    let flags = SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX
+    guard sqlite3_open_v2(databaseURL.path, &database, flags, nil) == SQLITE_OK,
+          let database else {
+        let message = database.map { String(cString: sqlite3_errmsg($0)) }
+            ?? "unknown SQLite open error"
+        if let database { sqlite3_close(database) }
+        throw LegacyImportSnapshotError.sqlite(message)
+    }
+    defer { sqlite3_close(database) }
+    sqlite3_busy_timeout(database, 3_000)
+    var statement: OpaquePointer?
+    guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK,
+          let statement else {
+        throw LegacyImportSnapshotError.sqlite(String(cString: sqlite3_errmsg(database)))
+    }
+    defer { sqlite3_finalize(statement) }
+    for (offset, value) in bindings.enumerated() {
+        bindLegacySnapshot(statement, index: Int32(offset + 1), value: value)
+    }
+    guard sqlite3_step(statement) == SQLITE_ROW else {
+        throw LegacyImportSnapshotError.sqlite(String(cString: sqlite3_errmsg(database)))
+    }
+    return Int(sqlite3_column_int64(statement, 0))
+}
+
+private func legacyMigrationText(
+    at databaseURL: URL,
+    sql: String,
+    bindings: [String]
+) throws -> String? {
+    var database: OpaquePointer?
+    let flags = SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX
+    guard sqlite3_open_v2(databaseURL.path, &database, flags, nil) == SQLITE_OK,
+          let database else {
+        let message = database.map { String(cString: sqlite3_errmsg($0)) }
+            ?? "unknown SQLite open error"
+        if let database { sqlite3_close(database) }
+        throw LegacyImportSnapshotError.sqlite(message)
+    }
+    defer { sqlite3_close(database) }
+    sqlite3_busy_timeout(database, 3_000)
+    var statement: OpaquePointer?
+    guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK,
+          let statement else {
+        throw LegacyImportSnapshotError.sqlite(String(cString: sqlite3_errmsg(database)))
+    }
+    defer { sqlite3_finalize(statement) }
+    for (offset, value) in bindings.enumerated() {
+        bindLegacySnapshot(statement, index: Int32(offset + 1), value: value)
+    }
+    guard sqlite3_step(statement) == SQLITE_ROW else {
+        throw LegacyImportSnapshotError.sqlite(String(cString: sqlite3_errmsg(database)))
+    }
+    return legacySnapshotText(statement, index: 0)
 }
 
 private func legacyImportSnapshot(
@@ -1086,13 +1944,24 @@ private func legacySnapshotText(_ statement: OpaquePointer, index: Int32) -> Str
     sqlite3_column_text(statement, index).map { String(cString: $0) }
 }
 
-private func jsonFileCount(in directory: URL) throws -> Int {
-    try FileManager.default.contentsOfDirectory(
+private func legacyJSONFiles(in directory: URL) throws -> [URL] {
+    var isDirectory: ObjCBool = false
+    guard FileManager.default.fileExists(atPath: directory.path, isDirectory: &isDirectory) else {
+        return []
+    }
+    guard isDirectory.boolValue else {
+        throw LegacyImportSnapshotError.sqlite("legacy quarantine projection path is not a directory")
+    }
+    return try FileManager.default.contentsOfDirectory(
         at: directory,
         includingPropertiesForKeys: [.isRegularFileKey],
         options: [.skipsHiddenFiles]
     ).filter { url in
         url.pathExtension == "json"
             && (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
-    }.count
+    }.sorted { $0.path < $1.path }
+}
+
+private func jsonFileCount(in directory: URL) throws -> Int {
+    try legacyJSONFiles(in: directory).count
 }

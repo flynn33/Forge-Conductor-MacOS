@@ -2,16 +2,16 @@
   "schema_version": 2,
   "phase": "P10",
   "status": "incomplete",
-  "generated_at": "2026-08-27T16:20:38Z",
+  "generated_at": "2026-08-27T17:27:00Z",
   "tested_tree": {
-    "head": "283b38a7b671dfcc1337104ff14eac9288aa28a3",
+    "head": "3a13dceb034ca36ad6aa56d2fbe8cfa5e8531a7c",
     "working_tree": true
   },
   "source_manifest": {
-    "bytes": 8023721,
+    "bytes": 8112698,
     "file_count": 234,
     "schema_version": 1,
-    "sha256": "6fb4a5445c13a49e1c6c54240eecf4dec110022cfbbcbfd8479f087567a5f11b"
+    "sha256": "efcfeb6512f07dc42ee4fd33b0893febaae342a3690207739ec091f5292e10fc"
   },
   "baseline": {
     "curated_feature_count": 66,
@@ -20,26 +20,26 @@
   },
   "current_automated_results": {
     "swiftpm_debug_strict": {
-      "evidence_id": "EVID-20260827T161138Z-6e4e0134f8",
-      "executed": 477,
+      "evidence_id": "EVID-20260827T171828Z-ee74ab54ac",
+      "executed": 484,
       "skipped": 4,
       "failures": 0
     },
     "swiftpm_release_strict": {
-      "evidence_id": "EVID-20260827T161328Z-2a835789ec",
-      "executed": 477,
+      "evidence_id": "EVID-20260827T172012Z-a901c12095",
+      "executed": 484,
       "skipped": 4,
       "failures": 0
     },
     "cli_compatibility": {
       "status": "passed",
-      "evidence_id": "EVID-20260827T161806Z-0acce7939b",
+      "evidence_id": "EVID-20260827T172553Z-3d3df2b2a4",
       "runtime_cases": 16,
       "preserved_help_arguments": 9
     },
     "mcp_compatibility": {
       "status": "partial",
-      "evidence_id": "EVID-20260827T161816Z-0a2cf31412",
+      "evidence_id": "EVID-20260827T172603Z-de92af96dc",
       "legacy_tools_preserved": 34,
       "current_tools": 63,
       "removed_tools": [],
@@ -53,7 +53,7 @@
     },
     "manager_http_compatibility": {
       "status": "partial",
-      "evidence_id": "EVID-20260827T161831Z-64cf524597",
+      "evidence_id": "EVID-20260827T172612Z-81f3efabf2",
       "report_path": ".forge-codex/evidence/P10-manager-http-compatibility-report.json",
       "baseline_success_semantics": "8 of 8",
       "current_success_semantics": "14 of 17",
@@ -66,7 +66,7 @@
     },
     "host_safe_ui": {
       "status": "passed",
-      "evidence_id": "EVID-20260827T162026Z-657b44b26e",
+      "evidence_id": "EVID-20260827T172622Z-833584f5bf",
       "executed": 13,
       "failures": 0
     }
@@ -109,7 +109,7 @@
   "remaining_requirements": [
     "authorize and pass the native signed UI lane",
     "close all protocol and manager uncovered checks",
-    "close the legacy receipt crash window and remaining migration qualification gaps",
+    "scope and qualify the remaining same-owner pathname replacement migration boundary",
     "regenerate exact-revision evidence after the checkpoint commit"
   ]
 }

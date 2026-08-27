@@ -1628,6 +1628,263 @@ final class ContinuityTests: XCTestCase {
         )
     }
 
+    func testSQLiteCommittedMigrationRecoversAfterSIGKILLBeforeManifestCompletion() throws {
+        let environment = ProcessInfo.processInfo.environment
+        if environment["FORGE_MIGRATION_TEST_ROLE"] == "committed-v3-lock-holder" {
+            guard let databasePath = environment["FORGE_MIGRATION_TEST_DATABASE"],
+                  let readyPath = environment["FORGE_MIGRATION_TEST_READY"] else {
+                throw SQLiteFixtureError.failure("migration child paths are missing")
+            }
+            try runCommittedSQLiteMigrationChild(
+                databaseURL: URL(fileURLWithPath: databasePath),
+                readyURL: URL(fileURLWithPath: readyPath)
+            )
+            return
+        }
+
+        let databaseURL = tempHome.appendingPathComponent("store.sqlite")
+        let backupURL = tempHome.appendingPathComponent("store.pre-migration-v3.sqlite3")
+        let secondBackupURL = tempHome.appendingPathComponent(
+            "store.pre-migration-v3.lineage-2.sqlite3"
+        )
+        let readyURL = tempHome.appendingPathComponent("migration-commit-ready")
+        let archiveURL = VerifiedMigrationBackup.archivedManifestURL(
+            for: backupURL,
+            targetVersion: 5
+        )
+        let activeManifestURL = VerifiedMigrationBackup.activeManifestURL(for: databaseURL)
+        let legacyPacket = HandoffPacket(
+            id: "sigkill-committed-v3-handoff",
+            createdAt: "2026-08-27T00:00:00Z",
+            updatedAt: "2026-08-27T00:00:00Z",
+            source: .model,
+            resumeReady: true,
+            goal: "Recover a committed migration after process death",
+            nextActions: ["Complete the exact migration manifest"]
+        )
+        let legacyJSON = try JSONSupport.string(from: legacyPacket.asDictionary())
+        try withSQLiteFixture(at: databaseURL) { database in
+            try executeSQLiteFixture(
+                database,
+                sql: """
+                CREATE TABLE schema_version (version INTEGER NOT NULL);
+                INSERT INTO schema_version(version) VALUES (3);
+                CREATE TABLE context_handoffs (
+                    id TEXT PRIMARY KEY,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    resume_ready INTEGER NOT NULL DEFAULT 0,
+                    packet_json TEXT NOT NULL
+                );
+                INSERT INTO context_handoffs(
+                    id,created_at,updated_at,source,resume_ready,packet_json
+                ) VALUES(
+                    '\(legacyPacket.id)','\(legacyPacket.createdAt)','\(legacyPacket.updatedAt)',
+                    '\(legacyPacket.source.rawValue)',1,'\(legacyJSON)'
+                );
+                """
+            )
+        }
+
+        let reflectedName = NSStringFromClass(type(of: self))
+        let methodName = String(#function.prefix { $0 != "(" })
+        let child = try launchMigrationXCTestFixture(
+            testIdentifier: "\(reflectedName)/\(methodName)",
+            environment: [
+                "FORGE_MIGRATION_TEST_ROLE": "committed-v3-lock-holder",
+                "FORGE_MIGRATION_TEST_DATABASE": databaseURL.path,
+                "FORGE_MIGRATION_TEST_READY": readyURL.path,
+            ]
+        )
+        defer { child.close() }
+        try waitForMigrationMarker(readyURL, child: child, timeout: 5)
+        XCTAssertTrue(child.process.isRunning)
+
+        let prepared = try JSONDecoder().decode(
+            VerifiedMigrationBackupManifest.self,
+            from: Data(contentsOf: activeManifestURL)
+        )
+        XCTAssertEqual(
+            String(data: try Data(contentsOf: readyURL), encoding: .utf8),
+            prepared.migrationID
+        )
+        XCTAssertEqual(prepared.state, .prepared)
+        XCTAssertEqual(prepared.storageKind, .sqlite)
+        XCTAssertEqual(prepared.sourceVersion, 3)
+        XCTAssertEqual(prepared.targetVersion, 5)
+        XCTAssertEqual(prepared.sourceFilename, databaseURL.lastPathComponent)
+        XCTAssertEqual(prepared.backupFilename, backupURL.lastPathComponent)
+        XCTAssertNil(prepared.targetSHA256)
+        XCTAssertNil(prepared.targetBytes)
+        XCTAssertNil(prepared.completedAt)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: archiveURL.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: secondBackupURL.path))
+
+        let backupData = try Data(contentsOf: backupURL)
+        XCTAssertEqual(prepared.backupSHA256, JSONSupport.sha256Hex(backupData))
+        XCTAssertEqual(prepared.backupBytes, UInt64(backupData.count))
+        XCTAssertEqual(try sqliteFixtureInt(at: backupURL, sql: "SELECT version FROM schema_version;"), 3)
+        XCTAssertEqual(
+            try sqliteFixtureText(
+                at: backupURL,
+                sql: "SELECT packet_json FROM context_handoffs WHERE id='\(legacyPacket.id)';"
+            ),
+            legacyJSON
+        )
+
+        XCTAssertEqual(try sqliteFixtureInt(at: databaseURL, sql: "SELECT version FROM schema_version;"), 5)
+        XCTAssertEqual(try sqliteFixtureText(at: databaseURL, sql: "PRAGMA quick_check;"), "ok")
+        XCTAssertEqual(
+            try sqliteFixtureInt(
+                at: databaseURL,
+                sql: "SELECT COUNT(*) FROM context_handoffs WHERE id='\(legacyPacket.id)';"
+            ),
+            1
+        )
+        XCTAssertEqual(
+            try sqliteFixtureText(
+                at: databaseURL,
+                sql: "SELECT packet_json FROM context_handoffs WHERE id='\(legacyPacket.id)';"
+            ),
+            legacyJSON
+        )
+        XCTAssertEqual(
+            try sqliteFixtureInt(
+                at: databaseURL,
+                sql: """
+                SELECT COUNT(*) FROM forge_migration_receipts
+                WHERE migration_id='\(prepared.migrationID)'
+                  AND receipt_schema_version=1
+                  AND source_filename='\(prepared.sourceFilename)'
+                  AND backup_filename='\(prepared.backupFilename)'
+                  AND source_version=\(prepared.sourceVersion)
+                  AND target_version=\(prepared.targetVersion)
+                  AND source_sha256='\(prepared.sourceSHA256)'
+                  AND source_bytes=\(prepared.sourceBytes);
+                """
+            ),
+            1
+        )
+        XCTAssertEqual(
+            try sqliteFixtureInt(
+                at: databaseURL,
+                sql: "SELECT COUNT(*) FROM forge_migration_receipts;"
+            ),
+            1
+        )
+        XCTAssertThrowsError(
+            try VerifiedMigrationBackup.withMigrationLock(
+                databaseURL: databaseURL,
+                timeoutSeconds: 0.05
+            ) {
+                XCTFail("a second process entered the committed migration boundary")
+            }
+        ) { error in
+            XCTAssertTrue(
+                error.localizedDescription.contains("interprocess migration lock"),
+                "\(error)"
+            )
+        }
+
+        let termination = try forceKillMigrationXCTestFixture(child, timeout: 5)
+        XCTAssertEqual(termination.reason, .uncaughtSignal)
+        XCTAssertEqual(termination.status, SIGKILL)
+        XCTAssertEqual(
+            try VerifiedMigrationBackup.withMigrationLock(
+                databaseURL: databaseURL,
+                timeoutSeconds: 1
+            ) { 42 },
+            42
+        )
+
+        let recovered = try SQLiteStore(path: databaseURL)
+        let recoveredPacket = try XCTUnwrap(recovered.handoffGet(id: legacyPacket.id))
+        XCTAssertEqual(recoveredPacket.id, legacyPacket.id)
+        XCTAssertEqual(recoveredPacket.createdAt, legacyPacket.createdAt)
+        XCTAssertEqual(recoveredPacket.updatedAt, legacyPacket.updatedAt)
+        XCTAssertEqual(recoveredPacket.source, legacyPacket.source)
+        XCTAssertEqual(recoveredPacket.resumeReady, legacyPacket.resumeReady)
+        XCTAssertEqual(recoveredPacket.goal, legacyPacket.goal)
+        XCTAssertEqual(recoveredPacket.nextActions, legacyPacket.nextActions)
+        XCTAssertEqual(try recovered.handoffList(limit: 10).map(\.id), [legacyPacket.id])
+        recovered.close()
+
+        XCTAssertEqual(try sqliteFixtureInt(at: databaseURL, sql: "SELECT version FROM schema_version;"), 5)
+        XCTAssertEqual(try sqliteFixtureInt(at: databaseURL, sql: "SELECT COUNT(*) FROM schema_version;"), 1)
+        XCTAssertEqual(try sqliteFixtureText(at: databaseURL, sql: "PRAGMA quick_check;"), "ok")
+        XCTAssertEqual(
+            try sqliteFixtureInt(
+                at: databaseURL,
+                sql: "SELECT COUNT(*) FROM context_handoffs WHERE id='\(legacyPacket.id)';"
+            ),
+            1
+        )
+        XCTAssertEqual(
+            try sqliteFixtureText(
+                at: databaseURL,
+                sql: "SELECT packet_json FROM context_handoffs WHERE id='\(legacyPacket.id)';"
+            ),
+            legacyJSON
+        )
+        XCTAssertEqual(
+            try sqliteFixtureInt(
+                at: databaseURL,
+                sql: "SELECT COUNT(*) FROM forge_migration_receipts;"
+            ),
+            1
+        )
+        XCTAssertEqual(try Data(contentsOf: backupURL), backupData)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: secondBackupURL.path))
+
+        let completed = try JSONDecoder().decode(
+            VerifiedMigrationBackupManifest.self,
+            from: Data(contentsOf: activeManifestURL)
+        )
+        XCTAssertEqual(completed.state, .completed)
+        XCTAssertEqual(completed.migrationID, prepared.migrationID)
+        XCTAssertEqual(completed.preparedAt, prepared.preparedAt)
+        XCTAssertEqual(completed.sourceSHA256, prepared.sourceSHA256)
+        XCTAssertEqual(completed.sourceBytes, prepared.sourceBytes)
+        XCTAssertEqual(completed.backupSHA256, prepared.backupSHA256)
+        XCTAssertEqual(completed.backupBytes, prepared.backupBytes)
+        XCTAssertNotNil(completed.targetSHA256)
+        XCTAssertNotNil(completed.targetBytes)
+        XCTAssertNotNil(completed.completedAt)
+        XCTAssertEqual(
+            try JSONDecoder().decode(
+                VerifiedMigrationBackupManifest.self,
+                from: Data(contentsOf: archiveURL)
+            ),
+            completed
+        )
+
+        let completedManifestData = try Data(contentsOf: activeManifestURL)
+        let archivedManifestData = try Data(contentsOf: archiveURL)
+        let reopened = try SQLiteStore(path: databaseURL)
+        try reopened.migrate()
+        XCTAssertEqual(try reopened.handoffList(limit: 10).map(\.id), [legacyPacket.id])
+        reopened.close()
+        XCTAssertEqual(try Data(contentsOf: activeManifestURL), completedManifestData)
+        XCTAssertEqual(try Data(contentsOf: archiveURL), archivedManifestData)
+        XCTAssertEqual(try Data(contentsOf: backupURL), backupData)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: secondBackupURL.path))
+        XCTAssertEqual(
+            try sqliteFixtureInt(
+                at: databaseURL,
+                sql: "SELECT COUNT(*) FROM forge_migration_receipts;"
+            ),
+            1
+        )
+        XCTAssertEqual(
+            try sqliteFixtureInt(
+                at: databaseURL,
+                sql: "SELECT COUNT(*) FROM context_handoffs WHERE id='\(legacyPacket.id)';"
+            ),
+            1
+        )
+    }
+
     private func runPreparedSQLiteMigrationChild(
         databaseURL: URL,
         readyURL: URL
@@ -1677,6 +1934,42 @@ final class ContinuityTests: XCTestCase {
                 )
             }
         }
+    }
+
+    private func runCommittedSQLiteMigrationChild(
+        databaseURL: URL,
+        readyURL: URL
+    ) throws {
+        let store = try SQLiteStore(
+            path: databaseURL,
+            postMigrationCommitObserver: { manifest in
+                guard manifest.state == .prepared,
+                      manifest.storageKind == .sqlite,
+                      manifest.sourceVersion == 3,
+                      manifest.targetVersion == 5 else {
+                    throw SQLiteFixtureError.failure(
+                        "migration child reached the commit boundary with an invalid manifest"
+                    )
+                }
+                try Data(manifest.migrationID.utf8).write(to: readyURL, options: .atomic)
+                try FileManager.default.setAttributes(
+                    [.posixPermissions: 0o600],
+                    ofItemAtPath: readyURL.path
+                )
+
+                let deadline = Date().addingTimeInterval(15)
+                while Date() < deadline {
+                    Thread.sleep(forTimeInterval: 0.01)
+                }
+                throw SQLiteFixtureError.failure(
+                    "migration child was not terminated at the commit boundary"
+                )
+            }
+        )
+        store.close()
+        throw SQLiteFixtureError.failure(
+            "migration child completed past the commit boundary"
+        )
     }
 
     func testNonemptyUnversionedStoreFailsClosedWithoutMutatingDatabase() throws {

@@ -34,13 +34,31 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
     private var countedAsOpen = false
     public let path: URL
     private let clock: any Clock
+    private let postMigrationCommitObserver: (
+        @Sendable (VerifiedMigrationBackupManifest) throws -> Void
+    )?
 
     /// SQLite copies the bound text; required so Swift string buffers can free.
     private static let sqliteTransient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
-    public init(path: URL, clock: any Clock = SystemClock()) throws {
+    public convenience init(path: URL, clock: any Clock = SystemClock()) throws {
+        try self.init(
+            path: path,
+            clock: clock,
+            postMigrationCommitObserver: nil
+        )
+    }
+
+    init(
+        path: URL,
+        clock: any Clock = SystemClock(),
+        postMigrationCommitObserver: (
+            @Sendable (VerifiedMigrationBackupManifest) throws -> Void
+        )?
+    ) throws {
         self.path = path
         self.clock = clock
+        self.postMigrationCommitObserver = postMigrationCommitObserver
         try FileManager.default.createDirectory(
             at: path.deletingLastPathComponent(),
             withIntermediateDirectories: true
@@ -232,6 +250,9 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
             throw error
         }
 
+        if isSchemaMigration, let migrationManifest {
+            try postMigrationCommitObserver?(migrationManifest)
+        }
         if let migrationManifest, migrationManifest.state == .prepared {
             try VerifiedMigrationBackup.checkpointSQLiteMigration(
                 database: db,
