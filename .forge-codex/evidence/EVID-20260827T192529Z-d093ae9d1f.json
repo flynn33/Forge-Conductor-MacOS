@@ -1,0 +1,53 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 5247,
+      "path": ".forge-codex/evidence/EVID-20260827T192529Z-d093ae9d1f.stdout.txt",
+      "sha256": "a0945ede5adeecbba1a8d4bcfe4f355bb617122cf7c3975adbd670618ceb6658",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 119,
+      "path": ".forge-codex/evidence/EVID-20260827T192529Z-d093ae9d1f.stderr.txt",
+      "sha256": "46b4268dac542851e87dbc7d8113cc72684a4651e6a62c826a4db67cfb72b428",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "command": "env FORGE_SKIP_PS=1 swift test -Xswiftc -warnings-as-errors --filter AppConfigAndDoctorTests/testConfigStoreTypedModel --filter ManagerTests/testManagerSettingsPersist --filter ManagerTests/testDashboardClientAttachesToExistingManager --filter ManagerTests/testManagerRuntimeThrottlesPresenceMaintenance --filter ManagerTests/testOperatorSnapshotRouteIsBoundedRedactedAndPreservesExistingQueryPaths --filter DashboardSecurityTests/testManagerControlCredentialIsStableOwnerOnlyAndComparedExactly --filter DashboardSecurityTests/testEveryManagerMutationExceptReadOnlyStatusRequiresAuthorization --filter DashboardSecurityTests/testManagerControlCredentialFailsClosedWhenStoragePermissionsAreBroadened --filter ManagedAutonomyRuntimeTests/testDurableRunStartIdentityActivatesOnlyOnFirstExactAcceptance --filter ManagedAutonomyRuntimeTests/testHTTPRunControlRoutePersistsExactActionsAndRejectsUnknownActions --filter ResourcePolicyTests/testSubscriberCapsAndBackgroundRefreshQuiesceAfterRemovalAndStop --filter LatestValueMailboxTests/testStaleGenerationAndPostStopValuesNeverReachNewSubscriber --filter LatestValueMailboxTests/testStopClearsBufferedLatestDuringInFlightDelivery",
+  "ended_at": "2026-08-27T19:25:31.873364+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260827T192529Z-d093ae9d1f",
+  "kind": "p10-host-safe-ui-contracts",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 8239721,
+    "file_count": 234,
+    "schema_version": 1,
+    "sha256": "74ce62d056b3c0a38789bc41dc39f7a6ae6954df904457525508344146b11fd6"
+  },
+  "source_manifest_after": {
+    "bytes": 8239721,
+    "file_count": 234,
+    "schema_version": 1,
+    "sha256": "74ce62d056b3c0a38789bc41dc39f7a6ae6954df904457525508344146b11fd6"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-27T19:25:29.138321+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

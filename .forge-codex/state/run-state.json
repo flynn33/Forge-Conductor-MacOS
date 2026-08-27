@@ -324,6 +324,13 @@
     "EVID-20260827T172622Z-833584f5bf",
     "EVID-20260827T180654Z-3e03d91bdd",
     "EVID-20260827T180842Z-dc6310b299",
+    "EVID-20260827T191720Z-d45ecb441f",
+    "EVID-20260827T191841Z-5f67a75f7f",
+    "EVID-20260827T192048Z-c407e087b1",
+    "EVID-20260827T192339Z-da4a278395",
+    "EVID-20260827T192348Z-20d5fd93cc",
+    "EVID-20260827T192358Z-70c269abf8",
+    "EVID-20260827T192529Z-d093ae9d1f",
     "a5466d4e5b4d7a10f87df64ddfdb58b6b8ca5159a57c20527e98802a822245d7",
     "a5d4276cbf14db3a91baa7f6b79fb8cdb3fb042a2eaf663d3219ff36b5451667",
     "b3dc11a8dc286fa33b6567ff62089692e64787b23a66718cfe1766dc27195724",
@@ -661,25 +668,25 @@
     },
     {
       "created_at": "2026-08-27T12:38:14.940872+00:00",
-      "evidence_class": "E2",
+      "evidence_class": "E0",
       "id": "FC-MCP-RUNTIME-COMPAT-001",
-      "notes": "P10 descriptor and bounded nonblocking wire probes preserve 34 historical tools across four protocol versions with no removed tools, schema narrowing, or description breaks. EVID-20260827T143605Z-cfa4328943 is current and immutable. Active in-flight cancellation, concurrent mixed-request correlation, and successful executable semantics for every historical tool remain unproved, so G10 eligibility is not claimed.",
+      "notes": "Resolved for the compatibility matrix by EVID-20260827T192348Z-20d5fd93cc, which passes all 34 historical tools across four protocol versions and 12 bounded wire probes including typed-ID mixed concurrency, active shell_exec cancellation, EOF shutdown, restart, and pagination. shell_exec is the active-cancellation representative; universal per-tool cancellation and deadline conformance remains separately tracked as FC-MCP-LEGACY-CANCELLATION-001.",
       "path": ".forge-codex/scripts/check_p10_protocol_compatibility.py",
       "severity": "High",
-      "status": "open",
+      "status": "resolved",
       "title": "Executable MCP behavior matrix is incomplete",
-      "updated_at": "2026-08-27T14:37:39.085527+00:00"
+      "updated_at": "2026-08-27T19:26:08.889047+00:00"
     },
     {
       "created_at": "2026-08-27T12:38:15.022381+00:00",
-      "evidence_class": "E2",
+      "evidence_class": "E0",
       "id": "FC-MANAGER-RUN-COMPAT-001",
-      "notes": "All 17 current manager route pairs are observed, all eight historical success semantics pass, and 14 of 17 current success paths pass in an isolated temporary home. POST runs/start, runs/status, and runs/control remain uncovered because the safe probe has no provider-backed seeded run fixture. EVID-20260827T143614Z-159edd265d is current, intentionally partial, and exits nonzero.",
+      "notes": "Resolved by EVID-20260827T192358Z-70c269abf8, which passes all 17 current manager route semantics, including deterministic runs/start, waiting_provider runs/status, exact event replay, and pause control.",
       "path": ".forge-codex/scripts/check_p10_manager_http_compatibility.py",
       "severity": "High",
-      "status": "open",
+      "status": "resolved",
       "title": "Autonomous-run manager route success semantics are unproved",
-      "updated_at": "2026-08-27T14:37:39.248119+00:00"
+      "updated_at": "2026-08-27T19:26:08.969131+00:00"
     },
     {
       "created_at": "2026-08-27T14:25:48.035211+00:00",
@@ -713,9 +720,20 @@
       "status": "resolved",
       "title": "Runtime store accepts partial co-resident control-plane schema",
       "updated_at": "2026-08-27T14:37:38.417019+00:00"
+    },
+    {
+      "created_at": "2026-08-27T19:18:35.253826+00:00",
+      "evidence_class": "E1",
+      "id": "FC-MCP-LEGACY-CANCELLATION-001",
+      "notes": "All tool calls must support cancellation and a deadline. The default ToolPackHandling path checks cancellation only before invoking a synchronous handler and propagates no request deadline. Active git_commit cancellation demonstrably leaves the request occupying capacity until the handler completes, while project_memory deadline_ms is only range-validated and never enforced. Implement cooperative cancellation and per-call deadline propagation across applicable synchronous packs, preserve truthful results after irreversible mutations, and add executable non-shell cancellation and deadline probes.",
+      "path": "Sources/ForgeConductorCore/Application/Tools/ToolArgHelpers.swift",
+      "severity": "High",
+      "status": "open",
+      "title": "Synchronous MCP tool packs lack in-flight cancellation and enforced deadlines",
+      "updated_at": "2026-08-27T19:20:43.658225+00:00"
     }
   ],
-  "last_event_sequence": 409,
+  "last_event_sequence": 420,
   "phases": {
     "P00": {
       "attempts": 1,
@@ -798,12 +816,12 @@
   },
   "repository": {
     "branch": "repair/autonomous-continuity",
-    "commit": "93e7ef2539451af1e6e7b951260b40a431d4b499",
+    "commit": "167c4419d87b63b4f4427e07c620be7ea67cb5a3",
     "dirty": true,
     "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy"
   },
   "run_id": "aba90ab1-be80-4cc5-aa0b-23dd54d4a24d",
   "schema_version": 1,
   "status": "active",
-  "updated_at": "2026-08-27T18:12:59.378640+00:00"
+  "updated_at": "2026-08-27T19:26:08.969291+00:00"
 }

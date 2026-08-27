@@ -1,0 +1,60 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 10130,
+      "path": ".forge-codex/evidence/EVID-20260827T192339Z-da4a278395.artifact-000-P10-cli-compatibility-report.json",
+      "sha256": "77f7f326b9527f100a41327dd332da9fab31903a89145bae11858d85f6c228b7",
+      "source_path": ".forge-codex/evidence/P10-cli-compatibility-report.json",
+      "storage": "evidence-id-specific-copy"
+    },
+    {
+      "bytes": 10130,
+      "path": ".forge-codex/evidence/EVID-20260827T192339Z-da4a278395.stdout.txt",
+      "sha256": "77f7f326b9527f100a41327dd332da9fab31903a89145bae11858d85f6c228b7",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260827T192339Z-da4a278395.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "command": "python3 .forge-codex/scripts/check_p10_cli_compatibility.py --binary .build/release/forge-conductor --baseline .forge-codex/state/baseline/cli-contract.json --report .forge-codex/evidence/P10-cli-compatibility-report.json",
+  "ended_at": "2026-08-27T19:23:39.685419+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260827T192339Z-da4a278395",
+  "kind": "p10-cli-compatibility",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 8239721,
+    "file_count": 234,
+    "schema_version": 1,
+    "sha256": "74ce62d056b3c0a38789bc41dc39f7a6ae6954df904457525508344146b11fd6"
+  },
+  "source_manifest_after": {
+    "bytes": 8239721,
+    "file_count": 234,
+    "schema_version": 1,
+    "sha256": "74ce62d056b3c0a38789bc41dc39f7a6ae6954df904457525508344146b11fd6"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-27T19:23:39.050605+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

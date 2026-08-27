@@ -2,16 +2,16 @@
   "schema_version": 2,
   "phase": "P10",
   "status": "incomplete",
-  "generated_at": "2026-08-27T17:27:00Z",
+  "generated_at": "2026-08-27T19:25:40Z",
   "tested_tree": {
-    "head": "3a13dceb034ca36ad6aa56d2fbe8cfa5e8531a7c",
-    "working_tree": true
+    "head": "167c4419d87b63b4f4427e07c620be7ea67cb5a3",
+    "working_tree": false
   },
   "source_manifest": {
-    "bytes": 8112698,
+    "bytes": 8239721,
     "file_count": 234,
     "schema_version": 1,
-    "sha256": "efcfeb6512f07dc42ee4fd33b0893febaae342a3690207739ec091f5292e10fc"
+    "sha256": "74ce62d056b3c0a38789bc41dc39f7a6ae6954df904457525508344146b11fd6"
   },
   "baseline": {
     "curated_feature_count": 66,
@@ -20,53 +20,45 @@
   },
   "current_automated_results": {
     "swiftpm_debug_strict": {
-      "evidence_id": "EVID-20260827T171828Z-ee74ab54ac",
-      "executed": 484,
+      "evidence_id": "EVID-20260827T191841Z-5f67a75f7f",
+      "executed": 498,
       "skipped": 4,
       "failures": 0
     },
     "swiftpm_release_strict": {
-      "evidence_id": "EVID-20260827T172012Z-a901c12095",
-      "executed": 484,
+      "evidence_id": "EVID-20260827T192048Z-c407e087b1",
+      "executed": 498,
       "skipped": 4,
       "failures": 0
     },
     "cli_compatibility": {
       "status": "passed",
-      "evidence_id": "EVID-20260827T172553Z-3d3df2b2a4",
+      "evidence_id": "EVID-20260827T192339Z-da4a278395",
       "runtime_cases": 16,
       "preserved_help_arguments": 9
     },
     "mcp_compatibility": {
-      "status": "partial",
-      "evidence_id": "EVID-20260827T172603Z-de92af96dc",
+      "status": "passed",
+      "evidence_id": "EVID-20260827T192348Z-20d5fd93cc",
       "legacy_tools_preserved": 34,
       "current_tools": 63,
       "removed_tools": [],
       "schema_breaks": [],
       "description_breaks": [],
-      "uncovered": [
-        "active in-flight cancellation",
-        "concurrent mixed-request correlation",
-        "successful executable semantics for every legacy tool"
-      ]
+      "uncovered": []
     },
     "manager_http_compatibility": {
-      "status": "partial",
-      "evidence_id": "EVID-20260827T172612Z-81f3efabf2",
+      "status": "passed",
+      "evidence_id": "EVID-20260827T192358Z-70c269abf8",
       "report_path": ".forge-codex/evidence/P10-manager-http-compatibility-report.json",
       "baseline_success_semantics": "8 of 8",
-      "current_success_semantics": "14 of 17",
+      "current_success_semantics": "17 of 17",
       "all_current_routes_observed": true,
-      "uncovered": [
-        "POST /api/manager/runs/start success",
-        "POST /api/manager/runs/status success",
-        "POST /api/manager/runs/control success"
-      ]
+      "uncovered": []
     },
     "host_safe_ui": {
       "status": "passed",
-      "evidence_id": "EVID-20260827T172622Z-833584f5bf",
+      "evidence_id": "EVID-20260827T192529Z-d093ae9d1f",
       "executed": 13,
       "failures": 0
     }
@@ -88,9 +80,7 @@
   "unknown": [],
   "untested": [
     "native signed UI command, settings, accessibility, reconnect, and redaction flow",
-    "three autonomous-run manager HTTP success semantics",
-    "active MCP cancellation and concurrent request correlation",
-    "successful executable semantics for every historical MCP tool"
+    "synchronous legacy MCP tool in-flight cancellation and enforced deadlines"
   ],
   "ui": {
     "implementation_present": true,
@@ -103,13 +93,11 @@
     "evidence": ".forge-autonomy-state/evidence/FC-UI-001/test-results.json"
   },
   "migration_report": {
-    "status": "incomplete",
+    "status": "passed",
     "path": ".forge-codex/evidence/P10-migration-report.json"
   },
   "remaining_requirements": [
     "authorize and pass the native signed UI lane",
-    "close all protocol and manager uncovered checks",
-    "scope and qualify the remaining same-owner pathname replacement migration boundary",
-    "regenerate exact-revision evidence after the checkpoint commit"
+    "implement and qualify in-flight cancellation and enforced deadlines for synchronous legacy MCP tool packs"
   ]
 }
