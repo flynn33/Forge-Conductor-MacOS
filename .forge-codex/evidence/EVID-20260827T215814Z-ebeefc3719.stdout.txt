@@ -1,0 +1,506 @@
+{
+  "dependencies" : [
+
+  ],
+  "manifest_display_name" : "ForgeConductor",
+  "name" : "ForgeConductor",
+  "path" : "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+  "platforms" : [
+    {
+      "name" : "macos",
+      "version" : "26.0"
+    }
+  ],
+  "products" : [
+    {
+      "name" : "ForgeConductorCore",
+      "targets" : [
+        "ForgeConductorCore"
+      ],
+      "type" : {
+        "library" : [
+          "automatic"
+        ]
+      }
+    },
+    {
+      "name" : "ForgeNativeSessionHostPlugin",
+      "targets" : [
+        "ForgeNativeSessionHostPlugin"
+      ],
+      "type" : {
+        "library" : [
+          "automatic"
+        ]
+      }
+    },
+    {
+      "name" : "forge-conductor",
+      "targets" : [
+        "ForgeConductorCLI"
+      ],
+      "type" : {
+        "executable" : null
+      }
+    },
+    {
+      "name" : "forge-runtime-launcher",
+      "targets" : [
+        "ForgeRuntimeLauncher"
+      ],
+      "type" : {
+        "executable" : null
+      }
+    },
+    {
+      "name" : "forge-conductor-app",
+      "targets" : [
+        "ForgeConductorApp"
+      ],
+      "type" : {
+        "executable" : null
+      }
+    }
+  ],
+  "swift_languages_versions" : [
+    "5"
+  ],
+  "targets" : [
+    {
+      "c99name" : "ForgeRuntimeLauncher",
+      "module_type" : "SwiftTarget",
+      "name" : "ForgeRuntimeLauncher",
+      "path" : "Sources/ForgeRuntimeLauncher",
+      "product_memberships" : [
+        "forge-conductor",
+        "forge-runtime-launcher",
+        "forge-conductor-app"
+      ],
+      "sources" : [
+        "main.swift"
+      ],
+      "type" : "executable"
+    },
+    {
+      "c99name" : "ForgeNativeSessionHostPlugin",
+      "module_type" : "SwiftTarget",
+      "name" : "ForgeNativeSessionHostPlugin",
+      "path" : "Sources/ForgeNativeSessionHostPlugin",
+      "product_memberships" : [
+        "ForgeNativeSessionHostPlugin",
+        "forge-conductor",
+        "forge-conductor-app"
+      ],
+      "sources" : [
+        "ForgeNativeSessionHostPlugin.swift"
+      ],
+      "target_dependencies" : [
+        "ForgeConductorCore"
+      ],
+      "type" : "library"
+    },
+    {
+      "c99name" : "ForgeConductorTests",
+      "module_type" : "SwiftTarget",
+      "name" : "ForgeConductorTests",
+      "path" : "Tests/ForgeConductorTests",
+      "resources" : [
+        {
+          "path" : "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Tests/ForgeConductorTests/Fixtures/LMStudio/models-loaded.json",
+          "rule" : {
+            "process" : {
+
+            }
+          }
+        },
+        {
+          "path" : "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Tests/ForgeConductorTests/Fixtures/LMStudio/responses-continuation.sse",
+          "rule" : {
+            "process" : {
+
+            }
+          }
+        },
+        {
+          "path" : "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Tests/ForgeConductorTests/Fixtures/LMStudio/responses-root.sse",
+          "rule" : {
+            "process" : {
+
+            }
+          }
+        },
+        {
+          "path" : "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Tests/ForgeConductorTests/Fixtures/telemetry_contract_keys.json",
+          "rule" : {
+            "process" : {
+
+            }
+          }
+        }
+      ],
+      "sources" : [
+        "AppConfigAndDoctorTests.swift",
+        "AutonomousContinuityAcceptanceTests.swift",
+        "AutonomySupervisorTests.swift",
+        "CommittedResultRecoveryTests.swift",
+        "ContextBudgetSupervisorTests.swift",
+        "ContinuityCoordinatorTests.swift",
+        "ContinuityTests.swift",
+        "ContinuityV2Tests.swift",
+        "CoreTests.swift",
+        "DashboardSecurityTests.swift",
+        "DashboardTests.swift",
+        "DiagnosticBoundaryTests.swift",
+        "FilesystemCancellationTests.swift",
+        "ForgeProcessEntryTests.swift",
+        "G1G10AcceptanceTests.swift",
+        "HTTPTestHelpers.swift",
+        "LMStudioConnectorReliabilityTests.swift",
+        "LMStudioContractFixtureServer.swift",
+        "LMStudioContractFixtureTests.swift",
+        "LatestValueMailboxTests.swift",
+        "LegacyContinuityCancellationTests.swift",
+        "LifecycleOwnershipTests.swift",
+        "LiveCollectorEvidenceTests.swift",
+        "MCPProtocolAndDiagnosticsTests.swift",
+        "MachHostMetricsTests.swift",
+        "ManagedAutonomyRuntimeTests.swift",
+        "ManagedContinuityWorkerTests.swift",
+        "ManagedModelProviderBridgeTests.swift",
+        "ManagedProjectRunStepExecutorTests.swift",
+        "ManagerTests.swift",
+        "MemoryToolTests.swift",
+        "NativeAppSmokeTests.swift",
+        "NativeSessionHostPluginTests.swift",
+        "NativeTelemetryTests.swift",
+        "OwnerOnlyAtomicFileTests.swift",
+        "ProcessRunnerTests.swift",
+        "ProductPathReliabilityTests.swift",
+        "ProjectContextIntegrationTests.swift",
+        "ProjectControlPlaneRepositoryTests.swift",
+        "ProjectMemoryTests.swift",
+        "RealtimeStreamTests.swift",
+        "ReleaseStressTests.swift",
+        "ResourcePolicyTests.swift",
+        "RigParityTests.swift",
+        "RuntimeExecutionJobTests.swift",
+        "RuntimeObservabilityTests.swift",
+        "TelemetryContractTests.swift",
+        "ToolDefinitionCatalogTests.swift",
+        "ToolRouterDeadlineTests.swift"
+      ],
+      "target_dependencies" : [
+        "ForgeConductorCore",
+        "ForgeConductorCLI",
+        "ForgeNativeSessionHostPlugin",
+        "ForgeRuntimeLauncher"
+      ],
+      "type" : "test"
+    },
+    {
+      "c99name" : "ForgeConductorCore",
+      "module_type" : "SwiftTarget",
+      "name" : "ForgeConductorCore",
+      "path" : "Sources/ForgeConductorCore",
+      "product_memberships" : [
+        "ForgeConductorCore",
+        "ForgeNativeSessionHostPlugin",
+        "forge-conductor",
+        "forge-conductor-app"
+      ],
+      "resources" : [
+        {
+          "path" : "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Resources/Agents/debug.md",
+          "rule" : {
+            "process" : {
+
+            }
+          }
+        },
+        {
+          "path" : "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Resources/Agents/docs.md",
+          "rule" : {
+            "process" : {
+
+            }
+          }
+        },
+        {
+          "path" : "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Resources/Agents/explore.md",
+          "rule" : {
+            "process" : {
+
+            }
+          }
+        },
+        {
+          "path" : "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Resources/Agents/implement.md",
+          "rule" : {
+            "process" : {
+
+            }
+          }
+        },
+        {
+          "path" : "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Resources/Agents/plan.md",
+          "rule" : {
+            "process" : {
+
+            }
+          }
+        },
+        {
+          "path" : "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Resources/Agents/precommit-audit.md",
+          "rule" : {
+            "process" : {
+
+            }
+          }
+        },
+        {
+          "path" : "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Resources/Agents/research.md",
+          "rule" : {
+            "process" : {
+
+            }
+          }
+        },
+        {
+          "path" : "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Resources/Agents/review.md",
+          "rule" : {
+            "process" : {
+
+            }
+          }
+        },
+        {
+          "path" : "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Resources/Agents/security.md",
+          "rule" : {
+            "process" : {
+
+            }
+          }
+        },
+        {
+          "path" : "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Resources/Agents/test.md",
+          "rule" : {
+            "process" : {
+
+            }
+          }
+        },
+        {
+          "path" : "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Resources/TelemetryStatic/app.js",
+          "rule" : {
+            "process" : {
+
+            }
+          }
+        },
+        {
+          "path" : "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Resources/TelemetryStatic/index.html",
+          "rule" : {
+            "process" : {
+
+            }
+          }
+        },
+        {
+          "path" : "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Resources/TelemetryStatic/style.css",
+          "rule" : {
+            "process" : {
+
+            }
+          }
+        },
+        {
+          "path" : "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Resources/TelemetryStatic/tools-catalog.js",
+          "rule" : {
+            "process" : {
+
+            }
+          }
+        }
+      ],
+      "sources" : [
+        "Application/AgentCatalog.swift",
+        "Application/AgentSessionService.swift",
+        "Application/AutonomySupervisor.swift",
+        "Application/ContextBudgetSupervisor.swift",
+        "Application/ContextContinuityService.swift",
+        "Application/ContinuityAutomation.swift",
+        "Application/ContinuityCoordinator.swift",
+        "Application/ExecutionJobService.swift",
+        "Application/ForgeApp.swift",
+        "Application/ForgeProcessEntry.swift",
+        "Application/LegacyContinuityMigrator.swift",
+        "Application/ManagedAutonomyRuntime.swift",
+        "Application/ManagedContinuityWorker.swift",
+        "Application/ManagedProjectRunStepExecutor.swift",
+        "Application/PersistedManagedRunBudgetEvaluator.swift",
+        "Application/ProjectContextService.swift",
+        "Application/ProjectMemoryService.swift",
+        "Application/ProjectRunCoordinator.swift",
+        "Application/RuntimeJobSubsystem.swift",
+        "Application/ToolAuthorizationService.swift",
+        "Application/ToolDefinitionCatalog.swift",
+        "Application/ToolInvocationBroker.swift",
+        "Application/ToolRouter.swift",
+        "Application/Tools/AgentToolPack.swift",
+        "Application/Tools/ContinuityLifecycleToolPack.swift",
+        "Application/Tools/ContinuityToolPack.swift",
+        "Application/Tools/DocsToolPack.swift",
+        "Application/Tools/FilesystemToolPack.swift",
+        "Application/Tools/GitToolPack.swift",
+        "Application/Tools/MemoryToolPack.swift",
+        "Application/Tools/ProjectMemoryToolPack.swift",
+        "Application/Tools/RuntimeJobToolPack.swift",
+        "Application/Tools/SearchToolPack.swift",
+        "Application/Tools/ShellToolPack.swift",
+        "Application/Tools/ToolArgHelpers.swift",
+        "Dashboard/DashboardHTML.swift",
+        "Dashboard/DashboardHTTPRequest.swift",
+        "Dashboard/DashboardServer.swift",
+        "Dashboard/HTTPResponder.swift",
+        "Dashboard/ManagerRoutes.swift",
+        "Dashboard/OperationalRoutes.swift",
+        "Dashboard/TelemetryRoutes.swift",
+        "Domain/AppConfig.swift",
+        "Domain/AutonomyModels.swift",
+        "Domain/ContextBudgetModels.swift",
+        "Domain/ContinuityModels.swift",
+        "Domain/ContinuityV2Models.swift",
+        "Domain/DoctorModels.swift",
+        "Domain/ForgeSnapshot.swift",
+        "Domain/HandoffPacket.swift",
+        "Domain/HostAdapterRegistry.swift",
+        "Domain/JSONSupport.swift",
+        "Domain/LMStudioConnector.swift",
+        "Domain/ManagedModelProvider.swift",
+        "Domain/ManagerModels.swift",
+        "Domain/Models.swift",
+        "Domain/ProjectContextModels.swift",
+        "Domain/ProjectMemoryModels.swift",
+        "Domain/Protocols.swift",
+        "Domain/RuntimeJobModels.swift",
+        "Infrastructure/AppPaths.swift",
+        "Infrastructure/AuditService.swift",
+        "Infrastructure/ConfigStore.swift",
+        "Infrastructure/DashboardPortGuard.swift",
+        "Infrastructure/DiagnosticLog.swift",
+        "Infrastructure/OwnerOnlyAtomicFile.swift",
+        "Infrastructure/PDFWriter.swift",
+        "Infrastructure/ProcessRunner.swift",
+        "Infrastructure/ProjectControlPlaneRepository.swift",
+        "Infrastructure/ProjectMemoryRepository.swift",
+        "Infrastructure/ResourceBundle.swift",
+        "Infrastructure/ResourcePolicy.swift",
+        "Infrastructure/RuntimeJobRepository.swift",
+        "Infrastructure/RuntimeObservability.swift",
+        "Infrastructure/RuntimeProcessSupervisor.swift",
+        "Infrastructure/SQLiteStore.swift",
+        "Infrastructure/VerifiedMigrationBackup.swift",
+        "MCP/MCPServeVerifier.swift",
+        "MCP/MCPServer.swift",
+        "Manager/ManagerDashboardClient.swift",
+        "Manager/ManagerInstaller.swift",
+        "Manager/ManagerNode.swift",
+        "Manager/ManagerPIDFile.swift",
+        "Manager/ManagerRuntime.swift",
+        "Manager/ManagerSettingsNormalizer.swift",
+        "Telemetry/Collectors/CPUCollector.swift",
+        "Telemetry/Collectors/CPUFrequencyEstimator.swift",
+        "Telemetry/Collectors/DiskIOCollector.swift",
+        "Telemetry/Collectors/DiskVolumeCollector.swift",
+        "Telemetry/Collectors/GPUCollector.swift",
+        "Telemetry/Collectors/IOKitPropertyWalk.swift",
+        "Telemetry/Collectors/PowerSourcesCollector.swift",
+        "Telemetry/Collectors/ProcessMetricsCollector.swift",
+        "Telemetry/Collectors/RAMCollector.swift",
+        "Telemetry/ForgeCollector.swift",
+        "Telemetry/LMStudioDeployService.swift",
+        "Telemetry/LMStudioEnvironment.swift",
+        "Telemetry/LMStudioMCPPluginInstaller.swift",
+        "Telemetry/LatestValueMailbox.swift",
+        "Telemetry/Models/ForgeUIModels.swift",
+        "Telemetry/Models/TelemetryModels.swift",
+        "Telemetry/ProcessDiscovery.swift",
+        "Telemetry/RealtimeMetricsEngine.swift",
+        "Telemetry/SystemCollector.swift",
+        "Telemetry/TelemetryService.swift"
+      ],
+      "type" : "library"
+    },
+    {
+      "c99name" : "ForgeConductorCLI",
+      "module_type" : "SwiftTarget",
+      "name" : "ForgeConductorCLI",
+      "path" : "Sources/ForgeConductorCLI",
+      "product_memberships" : [
+        "forge-conductor"
+      ],
+      "sources" : [
+        "ForgeConductorMain.swift"
+      ],
+      "target_dependencies" : [
+        "ForgeConductorCore",
+        "ForgeNativeSessionHostPlugin",
+        "ForgeRuntimeLauncher"
+      ],
+      "type" : "executable"
+    },
+    {
+      "c99name" : "ForgeConductorApp",
+      "module_type" : "SwiftTarget",
+      "name" : "ForgeConductorApp",
+      "path" : "Sources/ForgeConductorApp",
+      "product_memberships" : [
+        "forge-conductor-app"
+      ],
+      "sources" : [
+        "AppDeployController.swift",
+        "AppModel.swift",
+        "AppTelemetryBinding.swift",
+        "ForgeConductorApp.swift",
+        "Metal/LoadTraceRenderer.swift",
+        "Metal/MetalGaugeKit.swift",
+        "Metal/MetalGaugeResources.swift",
+        "Metal/MetalLoadChart.swift",
+        "Metal/MetalMeterView.swift",
+        "Metal/MultiSeriesLoadRenderer.swift",
+        "OperatorConsole/Models/OperatorConsoleModels.swift",
+        "OperatorConsole/Services/OperatorManagerClient.swift",
+        "OperatorConsole/ViewModels/AutonomyViewModel.swift",
+        "OperatorConsole/ViewModels/ContinuityViewModel.swift",
+        "OperatorConsole/ViewModels/EvidenceViewModel.swift",
+        "OperatorConsole/ViewModels/ProjectsViewModel.swift",
+        "OperatorConsole/ViewModels/ProviderViewModel.swift",
+        "OperatorConsole/ViewModels/RuntimesViewModel.swift",
+        "OperatorConsole/Views/AutonomyOperatorView.swift",
+        "OperatorConsole/Views/ContinuityOperatorView.swift",
+        "OperatorConsole/Views/EvidenceOperatorView.swift",
+        "OperatorConsole/Views/OperatorConsoleComponents.swift",
+        "OperatorConsole/Views/ProjectsOperatorView.swift",
+        "OperatorConsole/Views/ProviderOperatorView.swift",
+        "OperatorConsole/Views/RuntimesOperatorView.swift",
+        "Views/AgentsView.swift",
+        "Views/AppSidebarView.swift",
+        "Views/ContentView.swift",
+        "Views/DiagnosticsView.swift",
+        "Views/LiveFeedView.swift",
+        "Views/MCPServersView.swift",
+        "Views/ManagerSettingsView.swift",
+        "Views/Rig/RigDashboardView.swift",
+        "Views/TelemetryDashboardView.swift",
+        "Views/ToolsView.swift"
+      ],
+      "target_dependencies" : [
+        "ForgeConductorCore",
+        "ForgeNativeSessionHostPlugin",
+        "ForgeRuntimeLauncher"
+      ],
+      "type" : "executable"
+    }
+  ],
+  "tools_version" : "6.2"
+}
