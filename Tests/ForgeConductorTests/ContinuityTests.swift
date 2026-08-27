@@ -1660,16 +1660,18 @@ final class ContinuityTests: XCTestCase {
     }
 
     func testContextGetRequiresExplicitProjectBindingBeforeShell() throws {
+        let projectRoot = tempHome.appendingPathComponent("adopt-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
         _ = try app.config.update(["shell": ["enabled": true]], save: false)
         let original = ClientID("adopt-original")
-        try bindProjectContext(app, clientID: original)
+        try bindProjectContext(app, clientID: original, root: projectRoot)
         _ = try app.tools.call(
             name: "session_checkpoint",
             arguments: [
                 "goal": "Build Jamf Technician",
-                "cwd": tempHome.path,
+                "cwd": projectRoot.path,
                 "project_slug": "jamf-technician",
             ],
             clientID: original
@@ -1682,16 +1684,16 @@ final class ContinuityTests: XCTestCase {
 
         let unboundShell = try app.tools.call(
             name: "shell_exec",
-            arguments: ["command": "pwd", "cwd": tempHome.path],
+            arguments: ["command": "pwd", "cwd": projectRoot.path],
             clientID: resumed
         )
         XCTAssertFalse(unboundShell.ok)
         XCTAssertEqual(unboundShell.payload["code"] as? String, "project_context_required")
 
-        try bindProjectContext(app, clientID: resumed)
+        try bindProjectContext(app, clientID: resumed, root: projectRoot)
         let shell = try app.tools.call(
             name: "shell_exec",
-            arguments: ["command": "pwd", "cwd": tempHome.path],
+            arguments: ["command": "pwd", "cwd": projectRoot.path],
             clientID: resumed
         )
         XCTAssertTrue(shell.ok, "\(shell.payload)")

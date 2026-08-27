@@ -500,6 +500,8 @@ final class CoreTests: XCTestCase {
     }
 
     func testShellExecutesByDefaultInsideAuthorizedProjectWorkspace() throws {
+        let projectRoot = tempHome.appendingPathComponent("shell-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
         let client = ClientID("default-shell")
@@ -507,12 +509,13 @@ final class CoreTests: XCTestCase {
             app: app,
             clientID: client,
             agentID: "implement",
-            goal: "probe"
+            goal: "probe",
+            projectRoot: projectRoot
         )
 
         let result = try app.tools.call(
             name: "shell_exec",
-            arguments: ["command": "printf shell-ready", "cwd": tempHome.path],
+            arguments: ["command": "printf shell-ready", "cwd": projectRoot.path],
             clientID: client
         )
 
@@ -522,8 +525,10 @@ final class CoreTests: XCTestCase {
     }
 
     func testMigratedLegacyConfigExecutesAuthorizedShellByDefault() throws {
+        let projectRoot = tempHome.appendingPathComponent("legacy-shell-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
         let legacy: [String: Any] = [
-            "allowed_roots": [tempHome.path],
+            "allowed_roots": [projectRoot.path],
             "shell": [
                 "enabled": false,
                 "default_timeout_sec": 30,
@@ -541,12 +546,12 @@ final class CoreTests: XCTestCase {
             clientID: client,
             agentID: "implement",
             goal: "migration probe",
-            projectRoot: tempHome
+            projectRoot: projectRoot
         )
 
         let result = try app.tools.call(
             name: "shell_exec",
-            arguments: ["command": "printf migrated-ready", "cwd": tempHome.path],
+            arguments: ["command": "printf migrated-ready", "cwd": projectRoot.path],
             clientID: client
         )
 

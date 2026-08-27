@@ -2730,6 +2730,35 @@ final class RuntimeExecutionJobTests: XCTestCase {
         XCTAssertFalse(profile.contains("system-socket"))
     }
 
+    func testRuntimeSandboxRejectsManagerOutputInsideChildWritableRoot() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("forge-runtime-output-overlap-\(UUID().uuidString)", isDirectory: true)
+        let project = root.appendingPathComponent("project", isDirectory: true)
+        let artifacts = project.appendingPathComponent("runtime-artifacts/job", isDirectory: true)
+        let scratch = root.appendingPathComponent("scratch", isDirectory: true)
+        for directory in [project, artifacts, scratch] {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        XCTAssertThrowsError(
+            try RuntimeProcessSandbox.plan(
+                executable: URL(fileURLWithPath: "/usr/bin/printf"),
+                arguments: ["blocked"],
+                workingDirectory: project,
+                environment: [:],
+                canonicalReadRoots: [project],
+                canonicalWritableRoots: [project],
+                managerReadDirectory: artifacts,
+                scratchDirectory: scratch,
+                networkAllowed: false
+            )
+        ) { error in
+            XCTAssertEqual((error as? RuntimeJobError)?.code, "invalid_request")
+            XCTAssertTrue(error.localizedDescription.contains("durable output"))
+        }
+    }
+
     func testLegacyBashLoginCompatibilityProfileIsExposedWithoutChangingShellToolPack() async throws {
         let fixture = try await Fixture.make()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
