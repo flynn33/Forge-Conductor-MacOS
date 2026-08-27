@@ -1,28 +1,28 @@
 {
   "schema_version": 2,
   "phase": "P10",
-  "status": "incomplete",
-  "generated_at": "2026-08-27T17:23:17Z",
+  "status": "passed",
+  "generated_at": "2026-08-27T18:11:10Z",
   "tested_tree": {
-    "head": "3a13dceb034ca36ad6aa56d2fbe8cfa5e8531a7c",
-    "working_tree": true
+    "head": "93e7ef2539451af1e6e7b951260b40a431d4b499",
+    "working_tree": false
   },
   "source_manifest": {
-    "bytes": 8112698,
+    "bytes": 8151662,
     "file_count": 234,
     "schema_version": 1,
-    "sha256": "efcfeb6512f07dc42ee4fd33b0893febaae342a3690207739ec091f5292e10fc"
+    "sha256": "3adc25065f9e4e9df14dca579c05c3c30934cfe04caca0a8b21b8417091cba1e"
   },
   "strict_suites": {
     "debug": {
-      "evidence_id": "EVID-20260827T171828Z-ee74ab54ac",
-      "executed": 484,
+      "evidence_id": "EVID-20260827T180654Z-3e03d91bdd",
+      "executed": 490,
       "skipped": 4,
       "failures": 0
     },
     "release": {
-      "evidence_id": "EVID-20260827T172012Z-a901c12095",
-      "executed": 484,
+      "evidence_id": "EVID-20260827T180842Z-dc6310b299",
+      "executed": 490,
       "skipped": 4,
       "failures": 0
     }
@@ -41,8 +41,8 @@
         "idempotent concurrent rerun"
       ],
       "evidence_ids": [
-        "EVID-20260827T171828Z-ee74ab54ac",
-        "EVID-20260827T172012Z-a901c12095"
+        "EVID-20260827T180654Z-3e03d91bdd",
+        "EVID-20260827T180842Z-dc6310b299"
       ]
     },
     {
@@ -54,14 +54,16 @@
         "populated semantic fixture",
         "online WAL-aware owner-only backup",
         "quick_check and source-version verification under one bounded deadline",
+        "entry-boundary moved-file rejection before recovery artifacts",
+        "pre-COMMIT stable pathname replacement rolls back schema and receipts while retaining prepared recovery artifacts",
         "changed restored source receives a bounded immutable second lineage",
         "archived completion repairs an interrupted active manifest without discarding later writes",
         "close and reopen",
         "idempotent rerun"
       ],
       "evidence_ids": [
-        "EVID-20260827T171828Z-ee74ab54ac",
-        "EVID-20260827T172012Z-a901c12095"
+        "EVID-20260827T180654Z-3e03d91bdd",
+        "EVID-20260827T180842Z-dc6310b299"
       ]
     },
     {
@@ -82,8 +84,8 @@
         "idempotent rerun"
       ],
       "evidence_ids": [
-        "EVID-20260827T171828Z-ee74ab54ac",
-        "EVID-20260827T172012Z-a901c12095"
+        "EVID-20260827T180654Z-3e03d91bdd",
+        "EVID-20260827T180842Z-dc6310b299"
       ]
     },
     {
@@ -95,13 +97,14 @@
         "populated records, tags, handoff, and rollover fixture",
         "online WAL-aware owner-only backup",
         "eight-way serialized initialization",
+        "pre-COMMIT stable pathname replacement rolls back schema and receipts while retaining the exact original prepared backup",
         "deterministic bounded corrupt-family preservation",
         "close and reopen",
         "idempotent rerun"
       ],
       "evidence_ids": [
-        "EVID-20260827T171828Z-ee74ab54ac",
-        "EVID-20260827T172012Z-a901c12095"
+        "EVID-20260827T180654Z-3e03d91bdd",
+        "EVID-20260827T180842Z-dc6310b299"
       ]
     },
     {
@@ -124,8 +127,8 @@
         "completed replay is idempotent"
       ],
       "evidence_ids": [
-        "EVID-20260827T171828Z-ee74ab54ac",
-        "EVID-20260827T172012Z-a901c12095"
+        "EVID-20260827T180654Z-3e03d91bdd",
+        "EVID-20260827T180842Z-dc6310b299"
       ]
     },
     {
@@ -141,8 +144,8 @@
         "completed replay is idempotent"
       ],
       "evidence_ids": [
-        "EVID-20260827T171828Z-ee74ab54ac",
-        "EVID-20260827T172012Z-a901c12095"
+        "EVID-20260827T180654Z-3e03d91bdd",
+        "EVID-20260827T180842Z-dc6310b299"
       ]
     },
     {
@@ -160,8 +163,8 @@
         "idempotent rerun"
       ],
       "evidence_ids": [
-        "EVID-20260827T171828Z-ee74ab54ac",
-        "EVID-20260827T172012Z-a901c12095"
+        "EVID-20260827T180654Z-3e03d91bdd",
+        "EVID-20260827T180842Z-dc6310b299"
       ]
     },
     {
@@ -173,14 +176,15 @@
         "populated terminal-job fixture",
         "online WAL-aware owner-only backup",
         "eight-way serialized initialization",
+        "pre-COMMIT stable pathname replacement rolls back schema and receipts while retaining the exact original prepared backup",
         "registered runtime v2 migration produces a verified recovery lineage",
         "co-resident control-plane bootstrap produces a version-zero runtime recovery lineage",
         "close and reopen",
         "idempotent rerun"
       ],
       "evidence_ids": [
-        "EVID-20260827T171828Z-ee74ab54ac",
-        "EVID-20260827T172012Z-a901c12095"
+        "EVID-20260827T180654Z-3e03d91bdd",
+        "EVID-20260827T180842Z-dc6310b299"
       ]
     }
   ],
@@ -190,11 +194,28 @@
       "disposition": "not_applicable",
       "reason": "the control-plane repository was introduced at schema v2 and has no shipped v1 fixture",
       "current_behavior": "fresh empty version 0 and exact current version 2 are accepted; fictional v1 and nonempty unversioned databases fail closed without mutation",
-      "evidence_id": "EVID-20260827T171828Z-ee74ab54ac"
+      "evidence_id": "EVID-20260827T180654Z-3e03d91bdd"
     }
   ],
+  "pathname_trust_boundary": {
+    "status": "qualified",
+    "stable_replacement": "fails_closed",
+    "precommit_transaction": "rolls_back_schema_and_receipts_with_prepared_recovery_artifacts_retained",
+    "platform_observations": {
+      "debug": "failed_closed_after_restore",
+      "release": "failed_closed_after_restore"
+    },
+    "excluded_threats": [
+      "hostile_same_user_between_check_namespace_substitution",
+      "hostile_same_user_direct_database_family_mutation"
+    ],
+    "requirements_to_broaden": [
+      "custom_sqlite_vfs_for_database_family_identity",
+      "independent_privilege_boundary_for_direct_mutation"
+    ]
+  },
   "backup_qualification": {
-    "status": "partial",
+    "status": "passed",
     "completed": [
       "bounded online SQLite backup includes WAL state",
       "backup files are owner-only from creation",
@@ -206,14 +227,12 @@
       "a real child-process SIGKILL proves prepared-manifest recovery and kernel lock release",
       "a second real child-process SIGKILL proves committed-schema and receipt recovery before manifest completion",
       "completed archive promotion repairs an interrupted active manifest while preserving later writes",
-      "project-memory, runtime, and native-ledger migrations use bounded process and interprocess initialization locks"
+      "project-memory, runtime, and native-ledger migrations use bounded process and interprocess initialization locks",
+      "stable SQLite pathname replacement fails closed at backup and pre-COMMIT boundaries",
+      "pre-COMMIT rejection rolls back schema and receipts while retaining verified prepared recovery artifacts",
+      "the current macOS VFS restored-path result is recorded without extending the hostile same-user trust boundary"
     ],
-    "remaining": [
-      "close or explicitly exclude the same-owner SQLite pathname replacement race from the production trust boundary"
-    ]
+    "remaining": []
   },
-  "remaining_requirements": [
-    "resolve or explicitly scope the same-owner SQLite pathname replacement qualification gap",
-    "rerun exact-revision evidence after the checkpoint commit"
-  ]
+  "remaining_requirements": []
 }
