@@ -18,12 +18,26 @@ public struct AgentToolPack: ToolPackHandling {
         ]
     }
 
-    public func handle(name: String, arguments: [String: Any], clientID: ClientID, app: ForgeApp) throws -> ToolResult? {
+    public func handle(
+        name: String,
+        arguments: [String: Any],
+        context: ToolInvocationContext?,
+        clientID: ClientID,
+        app: ForgeApp,
+        cancellation: ToolCallCancellation?
+    ) throws -> ToolResult? {
+        guard toolNames.contains(name) else { return nil }
+        try cancellation?.checkCancellation()
         switch name {
         case "forge_status":
-            return try forgeStatus(clientID: clientID, app: app)
+            return try forgeStatus(clientID: clientID, app: app, cancellation: cancellation)
         case "agent_list":
-            return .success(["ok": true, "agents": app.catalog.all().map { $0.asDictionary(includeBody: false) }])
+            let result = ToolResult.success([
+                "ok": true,
+                "agents": app.catalog.all().map { $0.asDictionary(includeBody: false) },
+            ])
+            try cancellation?.checkCancellation()
+            return result
         case "agent_get", "agent_context":
             let id = ToolArgHelpers.string(arguments, "agent_id")
                 ?? ToolArgHelpers.string(arguments, "id")
@@ -31,16 +45,22 @@ public struct AgentToolPack: ToolPackHandling {
             guard let id, let spec = app.catalog.get(id) else {
                 return .failure(code: "agent_not_found", message: "Unknown agent", retryable: true)
             }
-            return .success(spec.asDictionary(includeBody: true).merging(["ok": true]) { _, n in n })
+            let result = ToolResult.success(
+                spec.asDictionary(includeBody: true).merging(["ok": true]) { _, n in n }
+            )
+            try cancellation?.checkCancellation()
+            return result
         case "agent_recommend":
             let task = ToolArgHelpers.string(arguments, "task") ?? ""
             let spec = app.catalog.recommend(task: task)
-            return .success([
+            let result = ToolResult.success([
                 "ok": true,
                 "agent_id": spec.id,
                 "call": "agent_run_start(agent_id: '\(spec.id)', goal: ...)",
                 "card": spec.asDictionary(includeBody: false),
             ])
+            try cancellation?.checkCancellation()
+            return result
         case "agent_run_start":
             let goal = ToolArgHelpers.string(arguments, "goal") ?? ""
             let id = ToolArgHelpers.string(arguments, "agent_id")
@@ -48,32 +68,59 @@ public struct AgentToolPack: ToolPackHandling {
                 ?? ToolArgHelpers.string(arguments, "name")
                 ?? "explore"
             let cwd = ToolArgHelpers.string(arguments, "cwd")
-            let payload = try app.sessions.start(agentID: id, goal: goal, clientID: clientID, cwd: cwd)
+            try cancellation?.checkCancellation()
+            let payload = try app.sessions.start(
+                agentID: id,
+                goal: goal,
+                clientID: clientID,
+                cwd: cwd,
+                cancellation: cancellation
+            )
             return ToolResult(ok: payload["ok"] as? Bool ?? true, payload: payload)
         case "agent_run_status":
             guard let sid = ToolArgHelpers.string(arguments, "session_id") else {
                 return .failure(code: "missing_session_id", message: "session_id required", retryable: true)
             }
-            let payload = try app.sessions.status(sessionID: SessionID(sid), clientID: clientID)
+            try cancellation?.checkCancellation()
+            let payload = try app.sessions.status(
+                sessionID: SessionID(sid),
+                clientID: clientID,
+                cancellation: cancellation
+            )
             return ToolResult(ok: true, payload: payload)
         case "agent_run_complete":
             guard let sid = ToolArgHelpers.string(arguments, "session_id") else {
                 return .failure(code: "missing_session_id", message: "session_id required", retryable: true)
             }
             let report = arguments["report"] as? [String: Any]
-            let payload = try app.sessions.complete(sessionID: SessionID(sid), report: report, clientID: clientID)
+            try cancellation?.checkCancellation()
+            let payload = try app.sessions.complete(
+                sessionID: SessionID(sid),
+                report: report,
+                clientID: clientID,
+                cancellation: cancellation
+            )
             return ToolResult(ok: payload["ok"] as? Bool ?? true, payload: payload)
         default:
             return nil
         }
     }
 
-    private func forgeStatus(clientID: ClientID, app: ForgeApp) throws -> ToolResult {
-        let presence = try app.store.presenceRecords()
-        let openSessions = try app.store.sessionList().filter(\.status.isOpen)
-        let memoryCount = (try? app.store.memoryCount(includeSystem: false)) ?? 0
-        let continuity = (try? app.continuity.statusSummary()) ?? [:]
-        return .success([
+    private func forgeStatus(
+        clientID: ClientID,
+        app: ForgeApp,
+        cancellation: ToolCallCancellation?
+    ) throws -> ToolResult {
+        let presence = try app.store.presenceRecords(cancellation: cancellation)
+        let openSessions = try app.store.sessionList(
+            cancellation: cancellation
+        ).filter(\.status.isOpen)
+        let memoryCount = (try? app.store.memoryCount(
+            includeSystem: false,
+            cancellation: cancellation
+        )) ?? 0
+        let continuity = (try? app.continuity.statusSummary(cancellation: cancellation)) ?? [:]
+        let result = ToolResult.success([
             "ok": true,
             "version": ForgeApp.version,
             "runtime": "swift",
@@ -86,8 +133,13 @@ public struct AgentToolPack: ToolPackHandling {
             "open_sessions": openSessions.count,
             "open_session_ids": openSessions.map(\.id.rawValue),
             "continuity": continuity,
-            "auto_continuity": app.continuityAutomation.snapshot(for: clientID),
+            "auto_continuity": try app.continuityAutomation.snapshot(
+                for: clientID,
+                cancellation: cancellation
+            ),
             "pid": ProcessInfo.processInfo.processIdentifier,
         ])
+        try cancellation?.checkCancellation()
+        return result
     }
 }

@@ -409,6 +409,687 @@ final class ContinuityV2Tests: XCTestCase {
         await controlPlane.close()
     }
 
+    func testPrecommitCancellationAndDeadlineLeaveNoContinuityOperation() throws {
+        let fixture = try makeMemoryFixture(label: "precommit-control")
+        defer {
+            fixture.memory.closeAll()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let engine = ContinuityStateEngine(memory: fixture.memory)
+        let cancelledHandoff = try makeHandoffV2(
+            projectID: fixture.projectID,
+            generation: 1,
+            runID: UUID().uuidString.lowercased(),
+            mode: .managedAutonomous
+        )
+        let cancelled = ToolCallCancellation()
+        cancelled.cancel()
+
+        XCTAssertThrowsError(
+            try engine.prepareV2(
+                handoff: cancelledHandoff,
+                predecessorSessionID: "predecessor",
+                predecessorProviderResponseID: "resp-predecessor",
+                adapterID: "forge.native-session-host",
+                idempotencyKey: "cancel-before-commit",
+                cancellation: cancelled
+            )
+        ) { error in
+            XCTAssertTrue(error is CancellationError, "unexpected error: \(error)")
+        }
+        XCTAssertNil(
+            try fixture.memory.repositoryForProject(fixture.projectID)
+                .continuityOperationV2(id: cancelledHandoff.operationID)
+        )
+
+        let expiredHandoff = try makeHandoffV2(
+            projectID: fixture.projectID,
+            generation: 1,
+            runID: UUID().uuidString.lowercased(),
+            mode: .managedAutonomous
+        )
+        let expired = ToolCallCancellation(timeoutSeconds: 0)
+        XCTAssertThrowsError(
+            try engine.prepareV2(
+                handoff: expiredHandoff,
+                predecessorSessionID: "predecessor",
+                predecessorProviderResponseID: "resp-predecessor",
+                adapterID: "forge.native-session-host",
+                idempotencyKey: "deadline-before-commit",
+                cancellation: expired
+            )
+        ) { error in
+            XCTAssertTrue(error is ToolCallDeadlineExceeded, "unexpected error: \(error)")
+        }
+        XCTAssertNil(
+            try fixture.memory.repositoryForProject(fixture.projectID)
+                .continuityOperationV2(id: expiredHandoff.operationID)
+        )
+    }
+
+    func testLockedContinuityCreateHonorsCancellationAndDeadlineWithoutPartialWrite() throws {
+        let fixture = try makeMemoryFixture(label: "locked-continuity-control")
+        defer {
+            fixture.memory.closeAll()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let repository = try fixture.memory.repositoryForProject(fixture.projectID)
+        let writeLock = try SQLiteWriteLock(databaseURL: repository.databaseURL)
+        defer { writeLock.release() }
+        let engine = ContinuityStateEngine(memory: fixture.memory)
+
+        let cancelledHandoff = try makeHandoffV2(
+            projectID: fixture.projectID,
+            generation: 1,
+            runID: UUID().uuidString.lowercased(),
+            mode: .managedAutonomous
+        )
+        let cancelled = ToolCallCancellation()
+        DispatchQueue.global(qos: .userInitiated).asyncAfter(
+            deadline: .now() + .milliseconds(50)
+        ) {
+            cancelled.cancel()
+        }
+        let cancellationStartedAt = Date()
+        XCTAssertThrowsError(
+            try engine.prepareV2(
+                handoff: cancelledHandoff,
+                predecessorSessionID: "predecessor",
+                predecessorProviderResponseID: "resp-predecessor",
+                adapterID: "forge.native-session-host",
+                idempotencyKey: "cancel-during-busy-lock",
+                cancellation: cancelled
+            )
+        ) { error in
+            XCTAssertTrue(error is CancellationError, "unexpected error: \(error)")
+        }
+        XCTAssertLessThan(
+            Date().timeIntervalSince(cancellationStartedAt),
+            2,
+            "continuity cancellation waited for the three-second SQLite busy fallback"
+        )
+
+        let deadlineHandoff = try makeHandoffV2(
+            projectID: fixture.projectID,
+            generation: 1,
+            runID: UUID().uuidString.lowercased(),
+            mode: .managedAutonomous
+        )
+        let deadline = ToolCallCancellation(timeoutSeconds: 0.05)
+        let deadlineStartedAt = Date()
+        XCTAssertThrowsError(
+            try engine.prepareV2(
+                handoff: deadlineHandoff,
+                predecessorSessionID: "predecessor",
+                predecessorProviderResponseID: "resp-predecessor",
+                adapterID: "forge.native-session-host",
+                idempotencyKey: "deadline-during-busy-lock",
+                cancellation: deadline
+            )
+        ) { error in
+            XCTAssertTrue(error is ToolCallDeadlineExceeded, "unexpected error: \(error)")
+        }
+        XCTAssertLessThan(
+            Date().timeIntervalSince(deadlineStartedAt),
+            2,
+            "continuity deadline waited for the three-second SQLite busy fallback"
+        )
+
+        writeLock.release()
+        XCTAssertNil(try repository.continuityOperationV2(id: cancelledHandoff.operationID))
+        XCTAssertNil(try repository.continuityHandoffV2(id: cancelledHandoff.handoffID))
+        XCTAssertEqual(
+            try repository.continuityTransitionCount(operationID: cancelledHandoff.operationID),
+            0
+        )
+        XCTAssertNil(try repository.continuityOperationV2(id: deadlineHandoff.operationID))
+        XCTAssertNil(try repository.continuityHandoffV2(id: deadlineHandoff.handoffID))
+        XCTAssertEqual(
+            try repository.continuityTransitionCount(operationID: deadlineHandoff.operationID),
+            0
+        )
+    }
+
+    func testContinuityCreateReturnsCommittedResultWhenCancellationRacesAfterCommit() throws {
+        let root = temporaryRoot("continuity-committed-result")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let projectID = UUID().uuidString.lowercased()
+        let cancellation = ToolCallCancellation()
+        let repository = try ProjectMemoryRepository(
+            projectID: projectID,
+            directory: root.appendingPathComponent("memory", isDirectory: true),
+            enableFTS5: false,
+            cancellation: nil,
+            busyRetryObserver: nil,
+            didMutationCommitObserver: {
+                cancellation.cancel()
+            },
+            beforeMigrationCommitObserver: nil
+        )
+        defer { repository.close() }
+        let handoff = try makeHandoffV2(
+            projectID: projectID,
+            generation: 1,
+            runID: UUID().uuidString.lowercased(),
+            mode: .managedAutonomous
+        )
+
+        let operation = try repository.continuityCreateOperationV2(
+            handoff: handoff,
+            predecessorSessionID: "predecessor",
+            predecessorProviderResponseID: "resp-predecessor",
+            adapterID: "forge.native-session-host",
+            idempotencyKey: "cancel-after-continuity-commit",
+            cancellation: cancellation
+        )
+
+        XCTAssertTrue(cancellation.isCancelled)
+        XCTAssertEqual(operation.operationID, handoff.operationID)
+        XCTAssertEqual(operation.state, .active)
+        XCTAssertEqual(
+            try repository.continuityOperationV2(id: handoff.operationID),
+            operation
+        )
+        XCTAssertNotNil(try repository.continuityHandoffV2(id: handoff.handoffID))
+        XCTAssertEqual(
+            try repository.continuityTransitionCount(operationID: handoff.operationID),
+            1
+        )
+    }
+
+    func testProjectionRepairSerializesStaleWriterBehindNewerTransition() async throws {
+        let root = temporaryRoot("continuity-projection-fence")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let projectID = UUID().uuidString.lowercased()
+        let gate = ContinuityProjectionWriteGate()
+        let repository = try ProjectMemoryRepository(
+            projectID: projectID,
+            directory: root.appendingPathComponent("memory", isDirectory: true),
+            enableFTS5: false,
+            cancellation: nil,
+            busyRetryObserver: nil,
+            didMutationCommitObserver: nil,
+            beforeMigrationCommitObserver: nil,
+            beforeContinuityProjectionWriteObserver: { kind, _, _ in
+                gate.observe(kind: kind)
+            }
+        )
+        defer { repository.close() }
+        let handoff = try makeHandoffV2(
+            projectID: projectID,
+            generation: 1,
+            runID: UUID().uuidString.lowercased(),
+            mode: .managedAutonomous
+        )
+        let operation = try repository.continuityCreateOperationV2(
+            handoff: handoff,
+            predecessorSessionID: "predecessor",
+            predecessorProviderResponseID: "resp-predecessor",
+            adapterID: "forge.native-session-host",
+            idempotencyKey: "projection-fence-\(handoff.operationID)"
+        )
+        gate.arm()
+
+        let olderWriter = Task.detached {
+            Result {
+                try repository.continuityTransitionV2(
+                    operationID: operation.operationID,
+                    expected: .active,
+                    to: .checkpointPreparing
+                )
+            }
+        }
+        XCTAssertEqual(gate.waitUntilBlocked(timeout: 2), .success)
+
+        let newerFinished = DispatchSemaphore(value: 0)
+        let newerWriter = Task.detached {
+            defer { newerFinished.signal() }
+            return Result {
+                try repository.continuityTransitionV2(
+                    operationID: operation.operationID,
+                    expected: .checkpointPreparing,
+                    to: .checkpointPersisted
+                )
+            }
+        }
+        XCTAssertEqual(
+            newerFinished.wait(timeout: .now() + .milliseconds(100)),
+            .timedOut,
+            "newer transition escaped while the older projection held its version fence"
+        )
+
+        gate.release()
+        _ = try await olderWriter.value.get()
+        _ = try await newerWriter.value.get()
+        XCTAssertEqual(newerFinished.wait(timeout: .now()), .success)
+
+        let currentURL = repository.directory
+            .appendingPathComponent("continuity", isDirectory: true)
+            .appendingPathComponent("CURRENT.json")
+        let current = try JSONSupport.object(from: Data(contentsOf: currentURL))
+        XCTAssertEqual(current["state"] as? String, ContinuityState.checkpointPersisted.rawValue)
+        XCTAssertFalse(
+            try repository.continuityProjectionRepairPending(operationID: operation.operationID)
+        )
+    }
+
+    func testV2RetryMetadataLeavesRepairIntentUntilProjectionMatchesCanonicalRow() throws {
+        let fixture = try makeMemoryFixture(label: "retry-projection-repair")
+        defer {
+            fixture.memory.closeAll()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let handoff = try makeHandoffV2(
+            projectID: fixture.projectID,
+            generation: 1,
+            runID: UUID().uuidString.lowercased(),
+            mode: .managedAutonomous
+        )
+        let operation = try ContinuityStateEngine(memory: fixture.memory).prepareV2(
+            handoff: handoff,
+            predecessorSessionID: "predecessor",
+            predecessorProviderResponseID: "resp-predecessor",
+            adapterID: "forge.native-session-host",
+            idempotencyKey: "retry-projection-\(handoff.operationID)"
+        )
+        let repository = try fixture.memory.repositoryForProject(fixture.projectID)
+        let operationURL = repository.directory
+            .appendingPathComponent("continuity/operations", isDirectory: true)
+            .appendingPathComponent("\(operation.operationID).json")
+        try FileManager.default.removeItem(at: operationURL)
+        try FileManager.default.createDirectory(at: operationURL, withIntermediateDirectories: false)
+        let retryAt = "2030-01-01T00:00:00Z"
+
+        try repository.continuityRecordRetry(
+            operationID: operation.operationID,
+            error: "retry metadata must be projected",
+            retryAt: retryAt
+        )
+
+        let canonical = try XCTUnwrap(
+            repository.continuityOperationV2(id: operation.operationID)
+        )
+        XCTAssertEqual(canonical.lastError, "retry metadata must be projected")
+        XCTAssertEqual(canonical.retryAt, retryAt)
+        XCTAssertTrue(
+            try repository.continuityProjectionRepairPending(operationID: operation.operationID)
+        )
+
+        try FileManager.default.removeItem(at: operationURL)
+        XCTAssertEqual(try repository.repairContinuityProjections(), 1)
+        let projection = try JSONSupport.object(from: Data(contentsOf: operationURL))
+        XCTAssertEqual(projection["last_error"] as? String, canonical.lastError)
+        XCTAssertEqual(projection["retry_at"] as? String, retryAt)
+        XCTAssertFalse(
+            try repository.continuityProjectionRepairPending(operationID: operation.operationID)
+        )
+    }
+
+    func testContinuationIssuedMutationRefreshesOperationProjection() throws {
+        let fixture = try makeMemoryFixture(label: "continuation-issued-projection")
+        defer {
+            fixture.memory.closeAll()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let handoff = try makeHandoffV2(
+            projectID: fixture.projectID,
+            generation: 1,
+            runID: UUID().uuidString.lowercased(),
+            mode: .managedAutonomous
+        )
+        let engine = ContinuityStateEngine(memory: fixture.memory)
+        var operation = try engine.prepareV2(
+            handoff: handoff,
+            predecessorSessionID: "predecessor",
+            predecessorProviderResponseID: "resp-predecessor",
+            adapterID: "forge.native-session-host",
+            idempotencyKey: "continuation-projection-\(handoff.operationID)"
+        )
+        let repository = try fixture.memory.repositoryForProject(fixture.projectID)
+        operation = try repository.continuityTransitionV2(
+            operationID: operation.operationID,
+            expected: .checkpointPersisted,
+            to: .successorRequested
+        )
+        operation = try repository.continuityTransitionV2(
+            operationID: operation.operationID,
+            expected: .successorRequested,
+            to: .successorCreated,
+            successorSessionID: "continuation-successor",
+            successorProviderResponseID: "continuation-successor-response"
+        )
+        operation = try repository.continuityTransitionV2(
+            operationID: operation.operationID,
+            expected: .successorCreated,
+            to: .successorBootstrapping
+        )
+        let acknowledgement = BootstrapAcknowledgementV2(
+            projectID: ProjectID(try XCTUnwrap(UUID(uuidString: fixture.projectID))),
+            projectGeneration: ProjectGeneration(operation.projectGeneration),
+            runID: RunID(try XCTUnwrap(UUID(uuidString: operation.runID))),
+            operationID: try XCTUnwrap(UUID(uuidString: operation.operationID)),
+            handoffID: try XCTUnwrap(UUID(uuidString: handoff.handoffID)),
+            handoffSHA256: handoff.contentSHA256,
+            nonce: try XCTUnwrap(handoff.bootstrapNonce)
+        )
+        operation = try repository.continuityAcknowledgeV2(
+            operationID: operation.operationID,
+            receipt: BootstrapReceipt(
+                acknowledgement: acknowledgement,
+                internalSessionID: "continuation-successor",
+                providerResponseID: "continuation-successor-response",
+                modelKey: "fixture/model",
+                adapterID: "forge.native-session-host"
+            )
+        )
+        operation = try repository.continuityTransitionV2(
+            operationID: operation.operationID,
+            expected: .successorAcknowledged,
+            to: .predecessorSealed
+        )
+        let operationURL = repository.directory
+            .appendingPathComponent("continuity/operations", isDirectory: true)
+            .appendingPathComponent("\(operation.operationID).json")
+        let before = try JSONSupport.object(from: Data(contentsOf: operationURL))
+        XCTAssertEqual(before["continuation_issued"] as? Bool, false)
+
+        XCTAssertTrue(
+            try repository.continuityMarkContinuationIssuedV2(
+                operationID: operation.operationID
+            )
+        )
+        let after = try JSONSupport.object(from: Data(contentsOf: operationURL))
+        XCTAssertEqual(after["continuation_issued"] as? Bool, true)
+        XCTAssertFalse(
+            try repository.continuityProjectionRepairPending(operationID: operation.operationID)
+        )
+    }
+
+    func testManagedBridgeReturnsDurableCheckpointReceiptWithinBoundedCleanup() async throws {
+        let fixture = try makeMemoryFixture(label: "bridge-committed-result")
+        defer {
+            fixture.memory.closeAll()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let controlPlane = try ProjectControlPlaneRepository(
+            databaseURL: fixture.root.appendingPathComponent("control-plane.sqlite3"),
+            busyTimeoutMilliseconds: 1_000
+        )
+        defer { Task { await controlPlane.close() } }
+        let projectID = ProjectID(try XCTUnwrap(UUID(uuidString: fixture.projectID)))
+        let projectRoot = fixture.root.appendingPathComponent("project", isDirectory: true)
+        _ = try await controlPlane.registerProject(
+            projectID: projectID,
+            displayName: "Managed Bridge Fixture",
+            canonicalRoot: projectRoot
+        )
+        let checkpointPersisted = DispatchSemaphore(value: 0)
+        let continueToEnqueue = DispatchSemaphore(value: 0)
+        let service = ContinuityControlService(
+            memory: fixture.memory,
+            controlPlane: controlPlane,
+            waitTimeout: .milliseconds(25),
+            cancellationCleanupTimeout: .milliseconds(25),
+            didPrepareDurableObserver: {
+                checkpointPersisted.signal()
+                _ = continueToEnqueue.wait(timeout: .now() + 3)
+            },
+            didManagedCommandEnqueueObserver: nil
+        )
+        let operationID = UUID().uuidString.lowercased()
+        let arguments = managedRolloverArguments(
+            fixture: fixture,
+            operationID: operationID
+        )
+        let call = ManagedContinuityCall(
+            service: service,
+            arguments: arguments
+        )
+        let completed = DispatchGroup()
+        completed.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            defer { completed.leave() }
+            call.execute()
+        }
+
+        XCTAssertEqual(checkpointPersisted.wait(timeout: .now() + 2), .success)
+        let repository = try fixture.memory.repositoryForProject(fixture.projectID)
+        let commitDeadline = Date().addingTimeInterval(2)
+        var committed = false
+        while Date() < commitDeadline {
+            if try repository.continuityOperationV2(id: operationID)?.state == .checkpointPersisted {
+                committed = true
+                break
+            }
+            usleep(10_000)
+        }
+        XCTAssertTrue(committed, "project-local checkpoint did not reach its durable boundary")
+        XCTAssertEqual(
+            completed.wait(timeout: .now() + .milliseconds(500)),
+            .success,
+            "the bridge did not return its durable checkpoint receipt within the cleanup bound"
+        )
+        switch try XCTUnwrap(call.result) {
+        case .success(let response):
+            XCTAssertEqual(response["manager_operation_enqueued"] as? Bool, false)
+            XCTAssertEqual(response["enqueue_status"] as? String, "pending")
+            XCTAssertEqual(response["disposition"] as? String, "manager_enqueue_recovery_pending")
+            XCTAssertEqual(response["operation_id"] as? String, operationID)
+        case .failure(let error):
+            XCTFail("committed managed request lost its result: \(error)")
+        }
+        continueToEnqueue.signal()
+        let enqueueDeadline = Date().addingTimeInterval(2)
+        var readyCount = 0
+        while Date() < enqueueDeadline {
+            readyCount = try await controlPlane.readyContinuityCommandCount()
+            if readyCount == 1 { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertEqual(readyCount, 1)
+    }
+
+    func testManagedBridgePublishesCheckpointReceiptBeforeBlockedProjection() async throws {
+        let projectionGate = ContinuityProjectionWriteGate()
+        let fixture = try makeMemoryFixture(
+            label: "bridge-checkpoint-commit-receipt",
+            beforeContinuityProjectionWriteObserver: { kind, _, _ in
+                projectionGate.observe(kind: kind)
+            }
+        )
+        defer {
+            projectionGate.release()
+            fixture.memory.closeAll()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let controlPlane = try ProjectControlPlaneRepository(
+            databaseURL: fixture.root.appendingPathComponent("control-plane.sqlite3"),
+            busyTimeoutMilliseconds: 1_000
+        )
+        defer { Task { await controlPlane.close() } }
+        let projectID = ProjectID(try XCTUnwrap(UUID(uuidString: fixture.projectID)))
+        _ = try await controlPlane.registerProject(
+            projectID: projectID,
+            displayName: "Managed Projection Receipt Fixture",
+            canonicalRoot: fixture.root.appendingPathComponent("project", isDirectory: true)
+        )
+        let service = ContinuityControlService(
+            memory: fixture.memory,
+            controlPlane: controlPlane,
+            waitTimeout: .milliseconds(25),
+            cancellationCleanupTimeout: .milliseconds(25)
+        )
+        let operationID = UUID().uuidString.lowercased()
+        let call = ManagedContinuityCall(
+            service: service,
+            arguments: managedRolloverArguments(fixture: fixture, operationID: operationID)
+        )
+        projectionGate.arm()
+        let completed = DispatchGroup()
+        completed.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            defer { completed.leave() }
+            call.execute()
+        }
+
+        XCTAssertEqual(projectionGate.waitUntilBlocked(timeout: 2), .success)
+        let repository = try fixture.memory.repositoryForProject(fixture.projectID)
+        XCTAssertEqual(
+            try repository.continuityOperationV2(id: operationID)?.state,
+            .checkpointPersisted,
+            "projection began before the canonical checkpoint commit"
+        )
+        XCTAssertEqual(
+            completed.wait(timeout: .now() + .milliseconds(500)),
+            .success,
+            "the bridge did not return its commit-boundary receipt while projection was blocked"
+        )
+        switch try XCTUnwrap(call.result) {
+        case .success(let response):
+            XCTAssertEqual(response["manager_operation_enqueued"] as? Bool, false)
+            XCTAssertEqual(response["enqueue_status"] as? String, "pending")
+            XCTAssertEqual(response["projection_repair_pending"] as? Bool, true)
+            XCTAssertEqual(response["operation_id"] as? String, operationID)
+        case .failure(let error):
+            XCTFail("canonical checkpoint lost its pre-projection receipt: \(error)")
+        }
+
+        projectionGate.release()
+        let enqueueDeadline = Date().addingTimeInterval(2)
+        var readyCount = 0
+        while Date() < enqueueDeadline {
+            readyCount = try await controlPlane.readyContinuityCommandCount()
+            if readyCount == 1 { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertEqual(readyCount, 1)
+    }
+
+    func testManagedBridgePublishesCheckpointReceiptBeforeBlockedPostCommitObserver() async throws {
+        // A fresh managed preparation commits, in order: operation creation,
+        // handoff replay, checkpoint intent, handoff replay, and the canonical
+        // checkpoint. Blocking the fifth generic observer deterministically
+        // places this test after checkpoint COMMIT but before that observer can
+        // return to its caller.
+        let postCommitGate = ContinuityPostCommitGate(targetCommit: 5)
+        let fixture = try makeMemoryFixture(
+            label: "bridge-checkpoint-post-commit-receipt",
+            didMutationCommitObserver: {
+                postCommitGate.observe()
+            }
+        )
+        defer {
+            postCommitGate.release()
+            fixture.memory.closeAll()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let controlPlane = try ProjectControlPlaneRepository(
+            databaseURL: fixture.root.appendingPathComponent("control-plane.sqlite3"),
+            busyTimeoutMilliseconds: 1_000
+        )
+        defer { Task { await controlPlane.close() } }
+        let projectID = ProjectID(try XCTUnwrap(UUID(uuidString: fixture.projectID)))
+        _ = try await controlPlane.registerProject(
+            projectID: projectID,
+            displayName: "Managed Post-Commit Receipt Fixture",
+            canonicalRoot: fixture.root.appendingPathComponent("project", isDirectory: true)
+        )
+        let service = ContinuityControlService(
+            memory: fixture.memory,
+            controlPlane: controlPlane,
+            waitTimeout: .milliseconds(25),
+            cancellationCleanupTimeout: .milliseconds(25)
+        )
+        let operationID = UUID().uuidString.lowercased()
+        let call = ManagedContinuityCall(
+            service: service,
+            arguments: managedRolloverArguments(fixture: fixture, operationID: operationID)
+        )
+        postCommitGate.arm()
+        let completed = DispatchGroup()
+        completed.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            defer { completed.leave() }
+            call.execute()
+        }
+
+        XCTAssertEqual(postCommitGate.waitUntilBlocked(timeout: 2), .success)
+        XCTAssertEqual(postCommitGate.observedCommitCount, 5)
+        XCTAssertEqual(
+            completed.wait(timeout: .now() + .milliseconds(500)),
+            .success,
+            "the bridge did not return its receipt while the generic post-commit observer was blocked"
+        )
+        switch try XCTUnwrap(call.result) {
+        case .success(let response):
+            XCTAssertEqual(response["manager_operation_enqueued"] as? Bool, false)
+            XCTAssertEqual(response["enqueue_status"] as? String, "pending")
+            XCTAssertEqual(response["operation_id"] as? String, operationID)
+            XCTAssertEqual(
+                (response["operation"] as? [String: Any])?["state"] as? String,
+                ContinuityState.checkpointPersisted.rawValue
+            )
+        case .failure(let error):
+            XCTFail("canonical checkpoint was hidden behind a generic post-commit observer: \(error)")
+        }
+
+        postCommitGate.release()
+        let enqueueDeadline = Date().addingTimeInterval(2)
+        var readyCount = 0
+        while Date() < enqueueDeadline {
+            readyCount = try await controlPlane.readyContinuityCommandCount()
+            if readyCount == 1 { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertEqual(readyCount, 1)
+    }
+
+    func testManagedRunIdentityConflictDoesNotCreateProjectCheckpoint() async throws {
+        let fixture = try makeMemoryFixture(label: "managed-preflight-conflict")
+        defer {
+            fixture.memory.closeAll()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let controlPlane = try ProjectControlPlaneRepository(
+            databaseURL: fixture.root.appendingPathComponent("control-plane.sqlite3")
+        )
+        defer { Task { await controlPlane.close() } }
+        let projectID = ProjectID(try XCTUnwrap(UUID(uuidString: fixture.projectID)))
+        _ = try await controlPlane.registerProject(
+            projectID: projectID,
+            displayName: "Managed Preflight Fixture",
+            canonicalRoot: fixture.root.appendingPathComponent("project", isDirectory: true)
+        )
+        let operationID = UUID().uuidString.lowercased()
+        let arguments = managedRolloverArguments(
+            fixture: fixture,
+            operationID: operationID
+        )
+        let runID = RunID(try XCTUnwrap(UUID(uuidString: arguments["run_id"] as? String ?? "")))
+        try await controlPlane.reserveContinuityRun(
+            runID: runID,
+            projectID: projectID,
+            projectGeneration: .initial,
+            assignmentID: arguments["assignment_id"] as? String,
+            mission: "Conflicting reserved mission",
+            mode: .managedAutonomous
+        )
+        let service = ContinuityControlService(
+            memory: fixture.memory,
+            controlPlane: controlPlane
+        )
+
+        XCTAssertThrowsError(try service.requestRollover(arguments: arguments))
+        let repository = try fixture.memory.repositoryForProject(fixture.projectID)
+        XCTAssertNil(try repository.continuityOperationV2(id: operationID))
+        XCTAssertNil(
+            try repository.continuityHandoffV2(
+                id: arguments["handoff_id"] as? String ?? ""
+            )
+        )
+        XCTAssertEqual(try repository.continuityTransitionCount(operationID: operationID), 0)
+    }
+
     func testForgeAppManagedToolQueuesExactlyOneCommandAndExternalStaysHandoffOnly() async throws {
         let root = temporaryRoot("production-route")
         let home = root.appendingPathComponent("home", isDirectory: true)
@@ -1490,7 +2171,11 @@ final class ContinuityV2Tests: XCTestCase {
         }
     }
 
-    private func makeMemoryFixture(label: String) throws -> (
+    private func makeMemoryFixture(
+        label: String,
+        beforeContinuityProjectionWriteObserver: (@Sendable (String, String, String) -> Void)? = nil,
+        didMutationCommitObserver: (@Sendable () -> Void)? = nil
+    ) throws -> (
         root: URL,
         home: URL,
         projectID: String,
@@ -1502,7 +2187,15 @@ final class ContinuityV2Tests: XCTestCase {
         try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
         let paths = AppPaths(home: home)
         try paths.ensureLayout()
-        let memory = ProjectMemoryService(paths: paths)
+        let memory = ProjectMemoryService(
+            paths: paths,
+            clock: SystemClock(),
+            limits: .current,
+            afterIdentityMetadataWriteObserver: nil,
+            didIdentityRegistryCommitObserver: nil,
+            beforeContinuityProjectionWriteObserver: beforeContinuityProjectionWriteObserver,
+            didMutationCommitObserver: didMutationCommitObserver
+        )
         let initialized = try memory.initialize(path: project.path)
         return (
             root,
@@ -1510,6 +2203,44 @@ final class ContinuityV2Tests: XCTestCase {
             try XCTUnwrap(initialized["project_id"] as? String),
             memory
         )
+    }
+
+    private func managedRolloverArguments(
+        fixture: (root: URL, home: URL, projectID: String, memory: ProjectMemoryService),
+        operationID: String
+    ) -> [String: Any] {
+        [
+            "project_id": fixture.projectID,
+            "project_generation": 1,
+            "run_id": UUID().uuidString.lowercased(),
+            "operation_id": operationID,
+            "handoff_id": UUID().uuidString.lowercased(),
+            "continuity_mode": ContinuityMode.managedAutonomous.rawValue,
+            "predecessor_session_id": "managed-predecessor",
+            "provider_id": "lmstudio-local",
+            "provider_response_id": "response-predecessor",
+            "adapter_id": "forge.native-session-host",
+            "model": "fixture/tool-model",
+            "mission": "Preserve the committed managed request outcome",
+            "assignment_id": "FC-CONT-001",
+            "phase_id": "FC-CONT-001",
+            "work_item_id": "managed-bridge",
+            "summary": "Persist handoff before the delayed enqueue",
+            "repository_root": fixture.root.appendingPathComponent("project").path,
+            "next_actions": ["Claim the queued rollover"],
+            "context_capacity": 32_768,
+            "context_used": 27_000,
+            "context_reserved": 4_096,
+            "context_remaining": 1_672,
+            "context_confidence": 1.0,
+            "context_action": "rollover",
+            "context_trigger": "rollover threshold crossed",
+            "context_budget_source": "provider_exact",
+            "bootstrap_nonce": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            "idempotency_key": "managed-bridge-\(operationID)",
+            "requested_by": "continuity.request_rollover",
+            "reason": "bounded bridge timeout qualification",
+        ]
     }
 
     private func assertV2PreparationRecovery(
@@ -1721,6 +2452,78 @@ final class ContinuityV2Tests: XCTestCase {
     }
 }
 
+private final class ManagedContinuityCall: @unchecked Sendable {
+    private let lock = NSLock()
+    private let service: ContinuityControlService
+    private let arguments: [String: Any]
+    private var storedResult: Result<[String: Any], Error>?
+
+    init(service: ContinuityControlService, arguments: [String: Any]) {
+        self.service = service
+        self.arguments = arguments
+    }
+
+    var result: Result<[String: Any], Error>? {
+        lock.lock()
+        defer { lock.unlock() }
+        return storedResult
+    }
+
+    func execute() {
+        let result = Result {
+            try service.requestRollover(arguments: arguments)
+        }
+        lock.lock()
+        storedResult = result
+        lock.unlock()
+    }
+}
+
+private final class SQLiteWriteLock {
+    private var database: OpaquePointer?
+    private var isReleased = false
+
+    init(databaseURL: URL) throws {
+        let flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
+        guard sqlite3_open_v2(databaseURL.path, &database, flags, nil) == SQLITE_OK,
+              let database else {
+            let message = database.map { String(cString: sqlite3_errmsg($0)) }
+                ?? "unknown SQLite open error"
+            if let database { sqlite3_close(database) }
+            throw LegacyImportSnapshotError.sqlite(message)
+        }
+        do {
+            try Self.execute(database, sql: "BEGIN IMMEDIATE;")
+        } catch {
+            sqlite3_close(database)
+            self.database = nil
+            throw error
+        }
+    }
+
+    deinit {
+        release()
+    }
+
+    func release() {
+        guard !isReleased, let database else { return }
+        _ = sqlite3_exec(database, "COMMIT;", nil, nil, nil)
+        sqlite3_close(database)
+        self.database = nil
+        isReleased = true
+    }
+
+    private static func execute(_ database: OpaquePointer, sql: String) throws {
+        var errorMessage: UnsafeMutablePointer<CChar>?
+        guard sqlite3_exec(database, sql, nil, nil, &errorMessage) == SQLITE_OK else {
+            let message = errorMessage.map { String(cString: $0) }
+                ?? String(cString: sqlite3_errmsg(database))
+            sqlite3_free(errorMessage)
+            throw LegacyImportSnapshotError.sqlite(message)
+        }
+    }
+}
+
 private actor LegacyMigrationStartGate {
     private let participantCount: Int
     private var arrivalCount = 0
@@ -1741,6 +2544,92 @@ private actor LegacyMigrationStartGate {
         await withCheckedContinuation { continuation in
             waiters.append(continuation)
         }
+    }
+}
+
+private final class ContinuityProjectionWriteGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private let blocked = DispatchSemaphore(value: 0)
+    private let releaseSemaphore = DispatchSemaphore(value: 0)
+    private var armed = false
+    private var didBlock = false
+
+    func arm() {
+        lock.lock()
+        armed = true
+        lock.unlock()
+    }
+
+    func observe(kind: String) {
+        lock.lock()
+        guard armed, kind == "operation", !didBlock else {
+            lock.unlock()
+            return
+        }
+        didBlock = true
+        lock.unlock()
+        blocked.signal()
+        _ = releaseSemaphore.wait(timeout: .now() + 3)
+    }
+
+    func waitUntilBlocked(timeout: TimeInterval) -> DispatchTimeoutResult {
+        blocked.wait(timeout: .now() + timeout)
+    }
+
+    func release() {
+        releaseSemaphore.signal()
+    }
+}
+
+private final class ContinuityPostCommitGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private let blocked = DispatchSemaphore(value: 0)
+    private let releaseSemaphore = DispatchSemaphore(value: 0)
+    private let targetCommit: Int
+    private var armed = false
+    private var commitCount = 0
+    private var didBlock = false
+
+    init(targetCommit: Int) {
+        self.targetCommit = targetCommit
+    }
+
+    var observedCommitCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return commitCount
+    }
+
+    func arm() {
+        lock.lock()
+        armed = true
+        commitCount = 0
+        lock.unlock()
+    }
+
+    func observe() {
+        lock.lock()
+        guard armed, !didBlock else {
+            lock.unlock()
+            return
+        }
+        commitCount += 1
+        guard commitCount == targetCommit else {
+            lock.unlock()
+            return
+        }
+        didBlock = true
+        lock.unlock()
+        blocked.signal()
+        _ = releaseSemaphore.wait(timeout: .now() + 3)
+    }
+
+    func waitUntilBlocked(timeout: TimeInterval) -> DispatchTimeoutResult {
+        blocked.wait(timeout: .now() + timeout)
+    }
+
+    func release() {
+        releaseSemaphore.signal()
     }
 }
 

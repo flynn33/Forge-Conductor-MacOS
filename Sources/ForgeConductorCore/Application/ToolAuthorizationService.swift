@@ -4,6 +4,7 @@
 // policy, blocks symlink escapes, and sanitizes arguments before audit persistence.
 // Why: Authorization must be centralized so no connector can bypass safety rules.
 
+import Darwin
 import Foundation
 
 /// Captures the complete result of evaluating one tool invocation against policy.
@@ -30,6 +31,14 @@ public protocol ToolAuthorizing: Sendable {
         clientID: ClientID,
         binding: ActiveBinding?
     ) -> ToolAuthorizationDecision
+    func authorize(
+        tool: String,
+        arguments: [String: Any],
+        context: ToolInvocationContext?,
+        clientID: ClientID,
+        binding: ActiveBinding?,
+        cancellation: ToolCallCancellation?
+    ) throws -> ToolAuthorizationDecision
 }
 
 public extension ToolAuthorizing {
@@ -41,6 +50,26 @@ public extension ToolAuthorizing {
         binding: ActiveBinding?
     ) -> ToolAuthorizationDecision {
         authorize(tool: tool, arguments: arguments, clientID: clientID, binding: binding)
+    }
+
+    func authorize(
+        tool: String,
+        arguments: [String: Any],
+        context: ToolInvocationContext?,
+        clientID: ClientID,
+        binding: ActiveBinding?,
+        cancellation: ToolCallCancellation?
+    ) throws -> ToolAuthorizationDecision {
+        try cancellation?.checkCancellation()
+        let decision = authorize(
+            tool: tool,
+            arguments: arguments,
+            context: context,
+            clientID: clientID,
+            binding: binding
+        )
+        try cancellation?.checkCancellation()
+        return decision
     }
 }
 
@@ -88,6 +117,28 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
         clientID: ClientID,
         binding: ActiveBinding?
     ) -> ToolAuthorizationDecision {
+        (try? authorize(
+            tool: tool,
+            arguments: arguments,
+            context: context,
+            clientID: clientID,
+            binding: binding,
+            cancellation: nil
+        )) ?? .denied(
+            code: "authorization_unavailable",
+            message: "Tool authorization state is unavailable"
+        )
+    }
+
+    public func authorize(
+        tool: String,
+        arguments: [String: Any],
+        context: ToolInvocationContext?,
+        clientID: ClientID,
+        binding: ActiveBinding?,
+        cancellation: ToolCallCancellation?
+    ) throws -> ToolAuthorizationDecision {
+        try cancellation?.checkCancellation()
         if let context {
             guard context.clientID == clientID else {
                 return .denied(
@@ -119,9 +170,15 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
                 )
             }
         } else if Self.requiresActiveSession.contains(tool) {
-            let extras = context?.authorizationScope.canonicalRoots
-                ?? workspace?.additionalRoots(for: clientID)
-                ?? []
+            let extras: [URL]
+            if let contextualRoots = context?.authorizationScope.canonicalRoots {
+                extras = contextualRoots
+            } else {
+                extras = try workspace?.additionalRoots(
+                    for: clientID,
+                    cancellation: cancellation
+                ) ?? []
+            }
             if extras.isEmpty {
                 return .denied(
                     code: "active_session_required",
@@ -141,13 +198,25 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
             )
         }
 
-        let roots = authorizedRoots(binding: binding, context: context, clientID: clientID)
+        let roots = try authorizedRoots(
+            binding: binding,
+            context: context,
+            clientID: clientID,
+            cancellation: cancellation
+        )
         let base = binding.flatMap(\.cwd).map(ToolArgHelpers.resolvePath) ?? roots.first ?? paths.home
         var normalized = arguments
 
         let readOnly = Self.readOnlyPathTools.contains(tool)
         for access in pathAccesses(tool: tool, arguments: arguments, base: base) {
-            let candidate = canonicalURL(access.url)
+            try cancellation?.checkCancellation()
+            guard access.url.path.utf8.count <= Int(PATH_MAX) else {
+                return .denied(
+                    code: "invalid_path",
+                    message: "Path exceeds the supported filesystem limit"
+                )
+            }
+            let candidate = try canonicalURL(access.url, cancellation: cancellation)
             var containingRoot = roots.first(where: { contains(candidate, root: $0) })
             if containingRoot == nil, readOnly, isPermittedHomeRead(candidate) {
                 containingRoot = homeReadRoot(for: candidate)
@@ -174,6 +243,7 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
            normalized["path"] == nil {
             normalized["path"] = base.path
         }
+        try cancellation?.checkCancellation()
         return .allowed(arguments: normalized)
     }
 
@@ -240,24 +310,30 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
     private func authorizedRoots(
         binding: ActiveBinding?,
         context: ToolInvocationContext?,
-        clientID: ClientID
-    ) -> [URL] {
+        clientID: ClientID,
+        cancellation: ToolCallCancellation?
+    ) throws -> [URL] {
+        try cancellation?.checkCancellation()
         if let context {
-            return context.authorizationScope.canonicalRoots
-                .map(canonicalURL)
-                .reduce(into: [URL]()) { roots, root in
-                    if !roots.contains(root) { roots.append(root) }
-                }
+            return try canonicalizedUnique(
+                context.authorizationScope.canonicalRoots,
+                cancellation: cancellation
+            )
         }
-        let trusted = ([paths.home] + config.model.allowedRoots.map(ToolArgHelpers.resolvePath))
-            .map(canonicalURL)
-            .reduce(into: [URL]()) { roots, root in
-                if !roots.contains(root) { roots.append(root) }
-            }
+        let trusted = try canonicalizedUnique(
+            [paths.home] + config.model.allowedRoots.map(ToolArgHelpers.resolvePath),
+            cancellation: cancellation
+        )
         let claimed = [binding.flatMap(\.cwd).map(ToolArgHelpers.resolvePath)].compactMap { $0 }
-            + (workspace?.additionalRoots(for: clientID) ?? [])
+            + (try workspace?.additionalRoots(for: clientID, cancellation: cancellation) ?? [])
         guard !claimed.isEmpty else { return trusted }
-        return claimed.map(canonicalURL).filter { candidate in
+        var canonicalClaims: [URL] = []
+        canonicalClaims.reserveCapacity(claimed.count)
+        for claim in claimed {
+            try cancellation?.checkCancellation()
+            canonicalClaims.append(try canonicalURL(claim, cancellation: cancellation))
+        }
+        return canonicalClaims.filter { candidate in
             trusted.contains { contains(candidate, root: $0) }
         }.reduce(into: [URL]()) { roots, root in
             if !roots.contains(root) { roots.append(root) }
@@ -293,17 +369,38 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
     /// Resolve symlinks in the deepest existing ancestor, then append any
     /// not-yet-created path suffix. This prevents writes through a symlink that
     /// points outside an allowed root.
-    private func canonicalURL(_ url: URL) -> URL {
+    private func canonicalizedUnique(
+        _ urls: [URL],
+        cancellation: ToolCallCancellation?
+    ) throws -> [URL] {
+        var roots: [URL] = []
+        roots.reserveCapacity(urls.count)
+        for url in urls {
+            try cancellation?.checkCancellation()
+            let root = try canonicalURL(url, cancellation: cancellation)
+            if !roots.contains(root) { roots.append(root) }
+        }
+        return roots
+    }
+
+    private func canonicalURL(
+        _ url: URL,
+        cancellation: ToolCallCancellation?
+    ) throws -> URL {
         var existing = url.standardizedFileURL
         var suffix: [String] = []
         while !fileManager.fileExists(atPath: existing.path), existing.path != "/" {
-            suffix.insert(existing.lastPathComponent, at: 0)
+            try cancellation?.checkCancellation()
+            suffix.append(existing.lastPathComponent)
             existing.deleteLastPathComponent()
         }
+        try cancellation?.checkCancellation()
         var resolved = existing.resolvingSymlinksInPath().standardizedFileURL
-        for component in suffix {
+        for component in suffix.reversed() {
+            try cancellation?.checkCancellation()
             resolved.appendPathComponent(component)
         }
+        try cancellation?.checkCancellation()
         return resolved.standardizedFileURL
     }
 
@@ -353,6 +450,9 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
 }
 
 public enum ToolAuditSanitizer {
+    private static let maximumDepth = 8
+    private static let maximumCollectionItems = 128
+    private static let maximumStringBytes = 4 * 1_024
     private static let sensitiveKeys: Set<String> = [
         "command", "content", "old", "new", "report", "goal", "body", "value",
         "narrative", "summary", "resume_seed", "blockers", "next_actions",
@@ -360,16 +460,49 @@ public enum ToolAuditSanitizer {
     ]
 
     public static func sanitize(_ arguments: [String: Any]) -> [String: Any] {
-        arguments.reduce(into: [String: Any]()) { sanitized, pair in
-            guard sensitiveKeys.contains(pair.key) else {
-                sanitized[pair.key] = pair.value
-                return
-            }
-            if let string = pair.value as? String {
-                sanitized[pair.key] = "<redacted:\(string.utf8.count) bytes>"
+        sanitizeDictionary(arguments, depth: 0)
+    }
+
+    private static func sanitizeDictionary(
+        _ dictionary: [String: Any],
+        depth: Int
+    ) -> [String: Any] {
+        var sanitized: [String: Any] = [:]
+        for key in dictionary.keys.sorted().prefix(maximumCollectionItems) {
+            guard let value = dictionary[key] else { continue }
+            if sensitiveKeys.contains(key.lowercased()) {
+                if let string = value as? String {
+                    sanitized[key] = "<redacted:\(string.utf8.count) bytes>"
+                } else {
+                    sanitized[key] = "<redacted>"
+                }
             } else {
-                sanitized[pair.key] = "<redacted>"
+                sanitized[key] = sanitizeValue(value, depth: depth + 1)
             }
         }
+        if dictionary.count > maximumCollectionItems {
+            sanitized["_truncated_fields"] = dictionary.count - maximumCollectionItems
+        }
+        return sanitized
+    }
+
+    private static func sanitizeValue(_ value: Any, depth: Int) -> Any {
+        guard depth <= maximumDepth else { return "<truncated:maximum-depth>" }
+        if let dictionary = value as? [String: Any] {
+            return sanitizeDictionary(dictionary, depth: depth)
+        }
+        if let values = value as? [Any] {
+            var sanitized = values.prefix(maximumCollectionItems).map {
+                sanitizeValue($0, depth: depth + 1)
+            }
+            if values.count > maximumCollectionItems {
+                sanitized.append("<truncated:\(values.count - maximumCollectionItems) items>")
+            }
+            return sanitized
+        }
+        if let string = value as? String, string.utf8.count > maximumStringBytes {
+            return "<truncated:\(string.utf8.count) bytes>"
+        }
+        return value
     }
 }

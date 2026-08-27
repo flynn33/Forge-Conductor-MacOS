@@ -5,9 +5,15 @@
 // Why: Connectors depend on one stable execution port while tool packs remain pluggable.
 
 import Foundation
+import CoreFoundation
 
 /// Thin dispatcher: audits tool calls and routes to modular tool packs.
 public final class ToolRouter: ToolExecuting, @unchecked Sendable {
+    /// Total bound applied when a connector or managed provider does not request
+    /// a shorter deadline. Runtime tools may impose an additional shorter bound.
+    public static let defaultCallTimeoutSeconds: TimeInterval = 300
+    public static let maximumRequestedDeadlineMilliseconds = 60_000
+
     // ForgeApp owns its router. An unowned back-reference keeps the composition
     // root acyclic while still giving modular tool packs access to app services.
     private unowned let app: ForgeApp
@@ -61,24 +67,86 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         clientID: ClientID,
         cancellation: ToolCallCancellation?
     ) throws -> ToolResult {
-        try cancellation?.checkCancellation()
+        let start = Date()
+        let requestControl = cancellation
+            ?? ToolCallCancellation(timeoutSeconds: Self.defaultCallTimeoutSeconds)
+        do {
+            try configureRequestCancellation(
+                arguments: arguments,
+                cancellation: requestControl
+            )
+        } catch is CancellationError {
+            recordCancellation(
+                tool: name,
+                arguments: arguments,
+                clientID: clientID,
+                start: start,
+                cancellation: requestControl
+            )
+            throw CancellationError()
+        } catch is ToolCallDeadlineExceeded {
+            return deadlineFailure(
+                tool: name,
+                arguments: arguments,
+                clientID: clientID,
+                start: start,
+                cancellation: requestControl
+            )
+        } catch {
+            return invalidDeadlineFailure(
+                error,
+                tool: name,
+                arguments: arguments,
+                clientID: clientID,
+                start: start,
+                cancellation: requestControl
+            )
+        }
         let context: ToolInvocationContext?
         do {
             if Self.contextRequiredTools.contains(name) {
-                context = try app.projectContexts.invocationContext(for: clientID)
+                context = try app.projectContexts.invocationContext(
+                    for: clientID,
+                    cancellation: requestControl
+                )
             } else {
-                context = try? app.projectContexts.invocationContext(for: clientID)
+                context = try? app.projectContexts.invocationContext(
+                    for: clientID,
+                    cancellation: requestControl
+                )
             }
             if let context {
-                try app.projectContexts.validate(context)
+                try app.projectContexts.validate(
+                    context,
+                    cancellation: requestControl
+                )
             }
+            try requestControl.checkCancellation()
+        } catch is CancellationError {
+            recordCancellation(
+                tool: name,
+                arguments: arguments,
+                clientID: clientID,
+                start: start,
+                cancellation: requestControl
+            )
+            throw CancellationError()
+        } catch is ToolCallDeadlineExceeded {
+            return deadlineFailure(
+                tool: name,
+                arguments: arguments,
+                clientID: clientID,
+                start: start,
+                cancellation: requestControl
+            )
         } catch {
             return projectContextFailure(
                 error,
                 tool: name,
                 arguments: arguments,
                 clientID: clientID,
-                start: Date()
+                start: start,
+                cancellation: requestControl
             )
         }
         return try callInternal(
@@ -86,7 +154,8 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
             arguments: arguments,
             context: context,
             clientID: clientID,
-            cancellation: cancellation
+            cancellation: requestControl,
+            start: start
         )
     }
 
@@ -109,16 +178,72 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         context: ToolInvocationContext,
         cancellation: ToolCallCancellation?
     ) throws -> ToolResult {
-        try cancellation?.checkCancellation()
+        let start = Date()
+        let requestControl = cancellation
+            ?? ToolCallCancellation(timeoutSeconds: Self.defaultCallTimeoutSeconds)
         do {
-            try app.projectContexts.validate(context)
+            try configureRequestCancellation(
+                arguments: arguments,
+                cancellation: requestControl
+            )
+        } catch is CancellationError {
+            recordCancellation(
+                tool: name,
+                arguments: arguments,
+                clientID: context.clientID,
+                start: start,
+                cancellation: requestControl
+            )
+            throw CancellationError()
+        } catch is ToolCallDeadlineExceeded {
+            return deadlineFailure(
+                tool: name,
+                arguments: arguments,
+                clientID: context.clientID,
+                start: start,
+                cancellation: requestControl
+            )
+        } catch {
+            return invalidDeadlineFailure(
+                error,
+                tool: name,
+                arguments: arguments,
+                clientID: context.clientID,
+                start: start,
+                cancellation: requestControl
+            )
+        }
+        do {
+            try app.projectContexts.validate(
+                context,
+                cancellation: requestControl
+            )
+            try requestControl.checkCancellation()
+        } catch is CancellationError {
+            recordCancellation(
+                tool: name,
+                arguments: arguments,
+                clientID: context.clientID,
+                start: start,
+                cancellation: requestControl
+            )
+            throw CancellationError()
+        } catch is ToolCallDeadlineExceeded {
+            return deadlineFailure(
+                tool: name,
+                arguments: arguments,
+                clientID: context.clientID,
+                start: start,
+                cancellation: requestControl
+            )
         } catch {
             return projectContextFailure(
                 error,
                 tool: name,
                 arguments: arguments,
                 clientID: context.clientID,
-                start: Date()
+                start: start,
+                cancellation: requestControl
             )
         }
         return try callInternal(
@@ -126,7 +251,8 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
             arguments: arguments,
             context: context,
             clientID: context.clientID,
-            cancellation: cancellation
+            cancellation: requestControl,
+            start: start
         )
     }
 
@@ -135,18 +261,75 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         arguments: [String: Any],
         context: ToolInvocationContext?,
         clientID: ClientID,
-        cancellation: ToolCallCancellation?
+        cancellation: ToolCallCancellation,
+        start: Date
     ) throws -> ToolResult {
-        try cancellation?.checkCancellation()
-        let start = Date()
-        app.sessions.touchIfActive(clientID: clientID)
-        let binding = try? app.sessions.rehydrate(clientID: clientID)
+        let binding: ActiveBinding?
+        do {
+            try app.sessions.touchIfActive(
+                clientID: clientID,
+                cancellation: cancellation
+            )
+            binding = try app.sessions.rehydrate(
+                clientID: clientID,
+                cancellation: cancellation
+            )
+        } catch is CancellationError {
+            recordCancellation(
+                tool: name,
+                arguments: arguments,
+                clientID: clientID,
+                start: start,
+                cancellation: cancellation
+            )
+            throw CancellationError()
+        } catch is ToolCallDeadlineExceeded {
+            return deadlineFailure(
+                tool: name,
+                arguments: arguments,
+                clientID: clientID,
+                start: start,
+                cancellation: cancellation
+            )
+        } catch {
+            // Legacy session rehydration is ancillary for tools that do not require
+            // an active binding. Preserve the prior fail-open behavior while making
+            // cancellation and deadlines authoritative.
+            app.diagnostics.warn("session_rehydrate_failed", [
+                "tool": name,
+                "client_id": clientID.rawValue,
+                "error": "\(error)",
+            ], category: .tools)
+            binding = nil
+        }
 
-        if let mismatch = projectScopeMismatch(
-            tool: name,
-            arguments: arguments,
-            context: context
-        ) {
+        let scopeMismatch: ToolResult?
+        do {
+            scopeMismatch = try projectScopeMismatch(
+                tool: name,
+                arguments: arguments,
+                context: context,
+                cancellation: cancellation
+            )
+        } catch is CancellationError {
+            recordCancellation(
+                tool: name,
+                arguments: arguments,
+                clientID: clientID,
+                start: start,
+                cancellation: cancellation
+            )
+            throw CancellationError()
+        } catch is ToolCallDeadlineExceeded {
+            return deadlineFailure(
+                tool: name,
+                arguments: arguments,
+                clientID: clientID,
+                start: start,
+                cancellation: cancellation
+            )
+        }
+        if let mismatch = scopeMismatch {
             return recordAndReturn(
                 mismatch,
                 tool: name,
@@ -155,19 +338,42 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
                 start: start,
                 status: "denied",
                 auditError: mismatch.payload["message"] as? String,
-                mutating: Self.mutatingTools.contains(name)
+                mutating: Self.mutatingTools.contains(name),
+                cancellation: cancellation
             )
         }
 
         let routedArguments: [String: Any]
         let authorizationDenial: (code: String, message: String)?
-        switch authorization.authorize(
-            tool: name,
-            arguments: arguments,
-            context: context,
-            clientID: clientID,
-            binding: binding
-        ) {
+        let authorizationDecision: ToolAuthorizationDecision
+        do {
+            authorizationDecision = try authorization.authorize(
+                tool: name,
+                arguments: arguments,
+                context: context,
+                clientID: clientID,
+                binding: binding,
+                cancellation: cancellation
+            )
+        } catch is CancellationError {
+            recordCancellation(
+                tool: name,
+                arguments: arguments,
+                clientID: clientID,
+                start: start,
+                cancellation: cancellation
+            )
+            throw CancellationError()
+        } catch is ToolCallDeadlineExceeded {
+            return deadlineFailure(
+                tool: name,
+                arguments: arguments,
+                clientID: clientID,
+                start: start,
+                cancellation: cancellation
+            )
+        }
+        switch authorizationDecision {
         case .allowed(let normalized):
             routedArguments = normalized
             authorizationDenial = nil
@@ -183,10 +389,59 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         // evade the context-budget circuit breaker indefinitely.
         let isContinuity = ContinuityToolPack().toolNames.contains(name)
             || ContinuityLifecycleToolPack().toolNames.contains(name)
-        if !isContinuity,
-           !ContinuityAutomation.resumeTools.contains(name),
-           app.continuityAutomation.isBlocked(clientID) {
-            let blocked = contextBudgetBlockResult(clientID: clientID)
+        let bypassesContinuityBlock = isContinuity
+            || ContinuityAutomation.resumeTools.contains(name)
+        var continuityBlocked = false
+        if !bypassesContinuityBlock {
+            do {
+                continuityBlocked = try app.continuityAutomation.isBlocked(
+                    clientID,
+                    cancellation: cancellation
+                )
+            } catch is CancellationError {
+                recordCancellation(
+                    tool: name,
+                    arguments: routedArguments,
+                    clientID: clientID,
+                    start: start,
+                    cancellation: cancellation
+                )
+                throw CancellationError()
+            } catch is ToolCallDeadlineExceeded {
+                return deadlineFailure(
+                    tool: name,
+                    arguments: routedArguments,
+                    clientID: clientID,
+                    start: start,
+                    cancellation: cancellation
+                )
+            }
+        }
+        if continuityBlocked {
+            let blocked: ToolResult
+            do {
+                blocked = try contextBudgetBlockResult(
+                    clientID: clientID,
+                    cancellation: cancellation
+                )
+            } catch is CancellationError {
+                recordCancellation(
+                    tool: name,
+                    arguments: routedArguments,
+                    clientID: clientID,
+                    start: start,
+                    cancellation: cancellation
+                )
+                throw CancellationError()
+            } catch is ToolCallDeadlineExceeded {
+                return deadlineFailure(
+                    tool: name,
+                    arguments: routedArguments,
+                    clientID: clientID,
+                    start: start,
+                    cancellation: cancellation
+                )
+            }
             return recordAndReturn(
                 blocked,
                 tool: name,
@@ -195,7 +450,8 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
                 start: start,
                 status: "error",
                 auditError: blocked.payload["code"] as? String,
-                mutating: false
+                mutating: false,
+                cancellation: cancellation
             )
         }
         let loopCount = isContinuity
@@ -206,12 +462,33 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
             // Hard stop runs before either denial return or dispatch. The repeated
             // tool therefore cannot execute, and continuation is never advertised
             // unless its resume-ready handoff was durably stored.
-            let result = hardLoopResult(
-                tool: name,
-                loopCount: loopCount,
-                clientID: clientID,
-                authorizationDenialCode: authorizationDenial?.code
-            )
+            let result: ToolResult
+            do {
+                result = try hardLoopResult(
+                    tool: name,
+                    loopCount: loopCount,
+                    clientID: clientID,
+                    authorizationDenialCode: authorizationDenial?.code,
+                    cancellation: cancellation
+                )
+            } catch is CancellationError {
+                recordCancellation(
+                    tool: name,
+                    arguments: routedArguments,
+                    clientID: clientID,
+                    start: start,
+                    cancellation: cancellation
+                )
+                throw CancellationError()
+            } catch is ToolCallDeadlineExceeded {
+                return deadlineFailure(
+                    tool: name,
+                    arguments: routedArguments,
+                    clientID: clientID,
+                    start: start,
+                    cancellation: cancellation
+                )
+            }
             return recordAndReturn(
                 result,
                 tool: name,
@@ -220,20 +497,41 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
                 start: start,
                 status: "error",
                 auditError: result.payload["code"] as? String,
-                mutating: false
+                mutating: false,
+                cancellation: cancellation
             )
         }
 
         if let denial = authorizationDenial {
             var result = ToolResult.failure(code: denial.code, message: denial.message, retryable: false)
             if loopCount == Self.maxIdenticalConsecutiveCalls + 1 {
-                result = softBudgetResult(
-                    result,
-                    tool: name,
-                    loopCount: loopCount,
-                    clientID: clientID,
-                    authorizationDenialCode: denial.code
-                )
+                do {
+                    result = try softBudgetResult(
+                        result,
+                        tool: name,
+                        loopCount: loopCount,
+                        clientID: clientID,
+                        authorizationDenialCode: denial.code,
+                        cancellation: cancellation
+                    )
+                } catch is CancellationError {
+                    recordCancellation(
+                        tool: name,
+                        arguments: routedArguments,
+                        clientID: clientID,
+                        start: start,
+                        cancellation: cancellation
+                    )
+                    throw CancellationError()
+                } catch is ToolCallDeadlineExceeded {
+                    return deadlineFailure(
+                        tool: name,
+                        arguments: routedArguments,
+                        clientID: clientID,
+                        start: start,
+                        cancellation: cancellation
+                    )
+                }
             }
             return recordAndReturn(
                 result,
@@ -243,24 +541,30 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
                 start: start,
                 status: "denied",
                 auditError: denial.message,
-                mutating: Self.mutatingTools.contains(name)
+                mutating: Self.mutatingTools.contains(name),
+                cancellation: cancellation
             )
         }
 
         let result: ToolResult
         do {
+            // This is the final shared-layer check before handing ownership to the
+            // selected pack. Once a handler returns, its result stays authoritative:
+            // a late deadline must not conceal an irreversible committed mutation.
+            try cancellation.checkCancellation()
             let dispatched: ToolResult
             if let context, Self.projectMemoryMutatingTools.contains(name) {
                 dispatched = try app.projectContexts.commitIfCurrent(
                     context: context,
-                    resultKind: name
-                ) {
+                    resultKind: name,
+                    cancellation: cancellation
+                ) { mutationControl in
                     try self.dispatch(
                         name: name,
                         arguments: routedArguments,
                         context: context,
                         clientID: clientID,
-                        cancellation: cancellation
+                        cancellation: mutationControl
                     )
                 }
             } else {
@@ -272,39 +576,85 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
                     cancellation: cancellation
                 )
             }
-            result = try attachBootstrapProjectContextIfNeeded(
-                dispatched,
-                tool: name,
-                arguments: routedArguments,
-                clientID: clientID
-            )
+            do {
+                result = try attachBootstrapProjectContextIfNeeded(
+                    dispatched,
+                    tool: name,
+                    arguments: routedArguments,
+                    clientID: clientID,
+                    cancellation: cancellation
+                )
+            } catch is CancellationError {
+                result = committedBootstrapResult(
+                    dispatched,
+                    tool: name,
+                    code: "request_cancelled"
+                )
+            } catch is ToolCallDeadlineExceeded {
+                result = committedBootstrapResult(
+                    dispatched,
+                    tool: name,
+                    code: "deadline_exceeded"
+                )
+            } catch {
+                app.diagnostics.warn("project_context_attachment_pending", [
+                    "tool": name,
+                    "client_id": clientID.rawValue,
+                    "error": "\(error)",
+                ], category: .tools)
+                result = committedBootstrapResult(
+                    dispatched,
+                    tool: name,
+                    code: "project_context_attachment_failed"
+                )
+            }
         } catch is CancellationError {
-            let cancelled = ToolResult.failure(
-                code: "request_cancelled",
-                message: "Tool call cancelled",
-                retryable: false
-            )
-            _ = recordAndReturn(
-                cancelled,
+            recordCancellation(
                 tool: name,
                 arguments: routedArguments,
                 clientID: clientID,
                 start: start,
-                status: "cancelled",
-                auditError: "request_cancelled",
-                mutating: Self.mutatingTools.contains(name)
+                cancellation: cancellation
             )
             throw CancellationError()
+        } catch is ToolCallDeadlineExceeded {
+            return deadlineFailure(
+                tool: name,
+                arguments: routedArguments,
+                clientID: clientID,
+                start: start,
+                cancellation: cancellation
+            )
         } catch {
             var fail = ToolResult.failure(code: "tool_exception", message: "\(error)", retryable: true)
             if !isContinuity, loopCount == Self.maxIdenticalConsecutiveCalls + 1 {
-                fail = softBudgetResult(
-                    fail,
-                    tool: name,
-                    loopCount: loopCount,
-                    clientID: clientID,
-                    authorizationDenialCode: nil
-                )
+                do {
+                    fail = try softBudgetResult(
+                        fail,
+                        tool: name,
+                        loopCount: loopCount,
+                        clientID: clientID,
+                        authorizationDenialCode: nil,
+                        cancellation: cancellation
+                    )
+                } catch is CancellationError {
+                    recordCancellation(
+                        tool: name,
+                        arguments: routedArguments,
+                        clientID: clientID,
+                        start: start,
+                        cancellation: cancellation
+                    )
+                    throw CancellationError()
+                } catch is ToolCallDeadlineExceeded {
+                    return deadlineFailure(
+                        tool: name,
+                        arguments: routedArguments,
+                        clientID: clientID,
+                        start: start,
+                        cancellation: cancellation
+                    )
+                }
             }
             app.diagnostics.error("tool_exception", [
                 "tool": name,
@@ -319,7 +669,8 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
                 start: start,
                 status: "error",
                 auditError: "\(error)",
-                mutating: false
+                mutating: false,
+                cancellation: cancellation
             )
         }
 
@@ -327,21 +678,25 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         // The soft budget is based on repeated attempts, not execution success.
         // Keep the original outcome while attaching its durable resume handoff.
         if !isContinuity, loopCount == Self.maxIdenticalConsecutiveCalls + 1 {
-            finalResult = softBudgetResult(
+            finalResult = (try? softBudgetResult(
                 result,
                 tool: name,
                 loopCount: loopCount,
                 clientID: clientID,
-                authorizationDenialCode: nil
-            )
+                authorizationDenialCode: nil,
+                cancellation: cancellation
+            )) ?? result
         }
-        if !isContinuity {
+        if !isContinuity,
+           !cancellation.isCancelled,
+           !cancellation.isDeadlineExceeded {
             finalResult = applyRuntimeContinuity(
                 finalResult,
                 tool: name,
                 arguments: routedArguments,
                 clientID: clientID,
-                succeeded: result.ok
+                succeeded: result.ok,
+                cancellation: cancellation
             )
         }
 
@@ -354,7 +709,8 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
             start: start,
             status: status,
             auditError: finalResult.ok ? nil : Self.errorSummary(finalResult),
-            mutating: Self.mutatingTools.contains(name)
+            mutating: Self.mutatingTools.contains(name),
+            cancellation: cancellation
         )
     }
 
@@ -363,13 +719,22 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         tool: String,
         loopCount: Int,
         clientID: ClientID,
-        authorizationDenialCode: String?
-    ) -> ToolResult {
+        authorizationDenialCode: String?,
+        cancellation: ToolCallCancellation?
+    ) throws -> ToolResult {
         let denialReason = authorizationDenialCode.map { " authorization_denial=\($0)" } ?? ""
-        guard let packet = try? app.continuity.budgetAutoCheckpoint(
-            clientID: clientID,
-            reason: "soft_budget identical \(tool) count=\(loopCount)\(denialReason)"
-        ) else {
+        let packet: HandoffPacket
+        do {
+            packet = try app.continuity.budgetAutoCheckpoint(
+                clientID: clientID,
+                reason: "soft_budget identical \(tool) count=\(loopCount)\(denialReason)",
+                cancellation: cancellation
+            )
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as ToolCallDeadlineExceeded {
+            throw error
+        } catch {
             return result
         }
         var payload = result.payload
@@ -386,13 +751,15 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         tool: String,
         loopCount: Int,
         clientID: ClientID,
-        authorizationDenialCode: String?
-    ) -> ToolResult {
+        authorizationDenialCode: String?,
+        cancellation: ToolCallCancellation?
+    ) throws -> ToolResult {
         let denialReason = authorizationDenialCode.map { " authorization_denial=\($0)" } ?? ""
         do {
             let packet = try app.continuity.budgetAutoCheckpoint(
                 clientID: clientID,
-                reason: "identical_call_loop tool=\(tool) count=\(loopCount)\(denialReason)"
+                reason: "identical_call_loop tool=\(tool) count=\(loopCount)\(denialReason)",
+                cancellation: cancellation
             )
             app.continuityAutomation.markBlocked(clientID: clientID, packet: packet)
             var payload: [String: Any] = [
@@ -410,6 +777,10 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
                 payload["blocked_call_code"] = authorizationDenialCode
             }
             return ToolResult(ok: false, payload: payload, isError: true)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as ToolCallDeadlineExceeded {
+            throw error
         } catch {
             let message =
                 "Blocked repeated identical \(tool) (\(loopCount)×), but the required continuity " +
@@ -437,6 +808,31 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         }
     }
 
+    private func recordCancellation(
+        tool: String,
+        arguments: [String: Any],
+        clientID: ClientID,
+        start: Date,
+        cancellation: ToolCallCancellation
+    ) {
+        let cancelled = ToolResult.failure(
+            code: "request_cancelled",
+            message: "Tool call cancelled",
+            retryable: false
+        )
+        _ = recordAndReturn(
+            cancelled,
+            tool: tool,
+            arguments: arguments,
+            clientID: clientID,
+            start: start,
+            status: "cancelled",
+            auditError: "request_cancelled",
+            mutating: Self.mutatingTools.contains(tool),
+            cancellation: cancellation
+        )
+    }
+
     private func recordAndReturn(
         _ result: ToolResult,
         tool: String,
@@ -445,18 +841,35 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         start: Date,
         status: String,
         auditError: String?,
-        mutating: Bool
+        mutating: Bool,
+        cancellation: ToolCallCancellation? = nil
     ) -> ToolResult {
         let durationMs = Int(Date().timeIntervalSince(start) * 1000)
-        try? app.audit.append(
-            tool: tool,
-            status: status,
-            clientID: clientID.rawValue,
-            args: ToolAuditSanitizer.sanitize(arguments),
-            durationMs: durationMs,
-            error: auditError,
-            mutating: mutating
-        )
+        let auditArguments = ToolAuditSanitizer.sanitize(arguments)
+        if status == "cancelled" || status == "deadline_exceeded" {
+            // The request token is already terminal. Submit evidence with its own
+            // short control so audit contention cannot delay the wire response.
+            _ = app.audit.attemptAppend(
+                tool: tool,
+                status: status,
+                clientID: clientID.rawValue,
+                args: auditArguments,
+                durationMs: durationMs,
+                error: auditError,
+                mutating: mutating
+            )
+        } else {
+            try? app.audit.append(
+                tool: tool,
+                status: status,
+                clientID: clientID.rawValue,
+                args: auditArguments,
+                durationMs: durationMs,
+                error: auditError,
+                mutating: mutating,
+                cancellation: cancellation
+            )
+        }
         if status == "denied" {
             app.diagnostics.warn("tool_denied", [
                 "tool": tool,
@@ -523,13 +936,15 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         tool: String,
         arguments: [String: Any],
         clientID: ClientID,
-        succeeded: Bool
+        succeeded: Bool,
+        cancellation: ToolCallCancellation?
     ) -> ToolResult {
         guard let observation = app.continuityAutomation.observe(
             tool: tool,
             arguments: arguments,
             clientID: clientID,
-            succeeded: succeeded
+            succeeded: succeeded,
+            cancellation: cancellation
         ) else {
             return result
         }
@@ -549,8 +964,14 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         return ToolResult(ok: result.ok, payload: payload, isError: result.isError)
     }
 
-    private func contextBudgetBlockResult(clientID: ClientID) -> ToolResult {
-        let prior = app.continuityAutomation.blockState(clientID)
+    private func contextBudgetBlockResult(
+        clientID: ClientID,
+        cancellation: ToolCallCancellation?
+    ) throws -> ToolResult {
+        let prior = try app.continuityAutomation.blockState(
+            clientID,
+            cancellation: cancellation
+        )
         let payload: [String: Any] = [
             "ok": false,
             "code": "context_budget_exceeded",
@@ -591,8 +1012,10 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
     private func projectScopeMismatch(
         tool: String,
         arguments: [String: Any],
-        context: ToolInvocationContext?
-    ) -> ToolResult? {
+        context: ToolInvocationContext?,
+        cancellation: ToolCallCancellation?
+    ) throws -> ToolResult? {
+        try cancellation?.checkCancellation()
         guard let context else { return nil }
         if let rawProjectID = ToolArgHelpers.string(arguments, "project_id"),
            let supplied = UUID(uuidString: rawProjectID),
@@ -606,10 +1029,12 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         if tool == "project_memory.initialize",
            let rawPath = ToolArgHelpers.string(arguments, "project_path")
                 ?? ToolArgHelpers.string(arguments, "path") {
+            try cancellation?.checkCancellation()
             let candidate = ToolArgHelpers.resolvePath(rawPath)
                 .resolvingSymlinksInPath().standardizedFileURL
+            try cancellation?.checkCancellation()
             guard context.authorizationScope.canonicalRoots.contains(where: {
-                $0.resolvingSymlinksInPath().standardizedFileURL == candidate
+                $0.standardizedFileURL == candidate
             }) else {
                 return .failure(
                     code: ProjectContextError.projectScopeMismatch.code,
@@ -618,6 +1043,7 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
                 )
             }
         }
+        try cancellation?.checkCancellation()
         return nil
     }
 
@@ -625,7 +1051,8 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         _ result: ToolResult,
         tool: String,
         arguments: [String: Any],
-        clientID: ClientID
+        clientID: ClientID,
+        cancellation: ToolCallCancellation?
     ) throws -> ToolResult {
         guard result.ok else { return result }
         let descriptor: ProjectMemoryDescriptor
@@ -637,18 +1064,27 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
                     ?? ToolArgHelpers.string(arguments, "path") else {
                 throw ProjectContextError.invalidIdentifier("initialized project context")
             }
-            descriptor = try app.projectMemory.identities.descriptor(projectID: projectID)
+            descriptor = try app.projectMemory.identities.descriptor(
+                projectID: projectID,
+                cancellation: cancellation
+            )
             root = ToolArgHelpers.resolvePath(rawPath)
         case "agent_run_start":
             guard let rawPath = ToolArgHelpers.string(arguments, "cwd") else {
                 return result
             }
             root = ToolArgHelpers.resolvePath(rawPath)
-            let initialized = try app.projectMemory.initialize(path: root.path)
+            let initialized = try app.projectMemory.initialize(
+                path: root.path,
+                cancellation: cancellation
+            )
             guard let projectID = initialized["project_id"] as? String else {
                 throw ProjectContextError.invalidIdentifier("agent project context")
             }
-            descriptor = try app.projectMemory.identities.descriptor(projectID: projectID)
+            descriptor = try app.projectMemory.identities.descriptor(
+                projectID: projectID,
+                cancellation: cancellation
+            )
         default:
             return result
         }
@@ -656,9 +1092,11 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         let context = try app.projectContexts.registerAndBindMCPClient(
             descriptor: descriptor,
             canonicalRoot: root,
-            clientID: clientID
+            clientID: clientID,
+            cancellation: cancellation
         )
         var payload = result.payload
+        payload["project_context_attached"] = true
         payload["project_id"] = context.projectID.description
         payload["project_generation"] = context.projectGeneration.rawValue
         payload["project_context"] = [
@@ -671,12 +1109,33 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         return ToolResult(ok: result.ok, payload: payload, isError: result.isError)
     }
 
+    private func committedBootstrapResult(
+        _ result: ToolResult,
+        tool: String,
+        code: String
+    ) -> ToolResult {
+        guard result.ok,
+              tool == "project_memory.initialize" || tool == "agent_run_start" else {
+            return result
+        }
+        var payload = result.payload
+        payload["project_context_attached"] = false
+        payload["project_context_attachment"] = "pending"
+        payload["project_context_error"] = code
+        payload["project_context_note"] =
+            "The primary operation committed before project-context attachment stopped. " +
+            "Retry project_memory.initialize for the same workspace to complete attachment."
+        payload["reconciled"] = true
+        return ToolResult(ok: true, payload: payload, isError: false)
+    }
+
     private func projectContextFailure(
         _ error: Error,
         tool: String,
         arguments: [String: Any],
         clientID: ClientID,
-        start: Date
+        start: Date,
+        cancellation: ToolCallCancellation? = nil
     ) -> ToolResult {
         let code: String
         let retryable: Bool
@@ -700,7 +1159,88 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
             start: start,
             status: "denied",
             auditError: error.localizedDescription,
-            mutating: Self.mutatingTools.contains(tool)
+            mutating: Self.mutatingTools.contains(tool),
+            cancellation: cancellation
+        )
+    }
+
+    private func configureRequestCancellation(
+        arguments: [String: Any],
+        cancellation: ToolCallCancellation
+    ) throws {
+        if cancellation.remainingTimeInterval == nil {
+            try cancellation.tightenDeadline(
+                milliseconds: Int(Self.defaultCallTimeoutSeconds * 1_000)
+            )
+        }
+        if let milliseconds = try Self.requestedDeadlineMilliseconds(in: arguments) {
+            try cancellation.tightenDeadline(milliseconds: milliseconds)
+        }
+        try cancellation.checkCancellation()
+    }
+
+    static func requestedDeadlineMilliseconds(
+        in arguments: [String: Any]
+    ) throws -> Int? {
+        guard let rawValue = arguments["deadline_ms"] else { return nil }
+        guard let number = rawValue as? NSNumber,
+              CFGetTypeID(number) != CFBooleanGetTypeID(),
+              number.doubleValue.isFinite,
+              let milliseconds = Int(exactly: number.doubleValue),
+              (1...Self.maximumRequestedDeadlineMilliseconds).contains(milliseconds) else {
+            throw ToolCallDeadlineArgumentError()
+        }
+        return milliseconds
+    }
+
+    private func invalidDeadlineFailure(
+        _ error: Error,
+        tool: String,
+        arguments: [String: Any],
+        clientID: ClientID,
+        start: Date,
+        cancellation: ToolCallCancellation? = nil
+    ) -> ToolResult {
+        let result = ToolResult.failure(
+            code: "invalid_deadline",
+            message: error.localizedDescription,
+            retryable: false
+        )
+        return recordAndReturn(
+            result,
+            tool: tool,
+            arguments: arguments,
+            clientID: clientID,
+            start: start,
+            status: "denied",
+            auditError: "invalid_deadline",
+            mutating: Self.mutatingTools.contains(tool),
+            cancellation: cancellation
+        )
+    }
+
+    private func deadlineFailure(
+        tool: String,
+        arguments: [String: Any],
+        clientID: ClientID,
+        start: Date,
+        cancellation: ToolCallCancellation? = nil
+    ) -> ToolResult {
+        let result = ToolResult.failure(
+            code: "deadline_exceeded",
+            message: "Tool call deadline exceeded",
+            retryable: true
+        )
+        return recordAndReturn(
+            result,
+            tool: tool,
+            arguments: arguments,
+            clientID: clientID,
+            start: start,
+            status: "deadline_exceeded",
+            auditError: "deadline_exceeded",
+            mutating: Self.mutatingTools.contains(tool),
+            cancellation: cancellation
         )
     }
 
@@ -709,7 +1249,7 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         arguments: [String: Any],
         context: ToolInvocationContext?,
         clientID: ClientID,
-        cancellation: ToolCallCancellation?
+        cancellation: ToolCallCancellation
     ) throws -> ToolResult {
         for pack in packs {
             if let result = try pack.handle(
@@ -759,5 +1299,11 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
     private func canonicalArgumentFingerprint(_ arguments: [String: Any]) -> String {
         (try? JSONSupport.canonicalJSON(arguments))
             ?? String(describing: arguments)
+    }
+}
+
+private struct ToolCallDeadlineArgumentError: Error, LocalizedError, Sendable {
+    var errorDescription: String? {
+        "deadline_ms must be an integer within 1...\(ToolRouter.maximumRequestedDeadlineMilliseconds)"
     }
 }

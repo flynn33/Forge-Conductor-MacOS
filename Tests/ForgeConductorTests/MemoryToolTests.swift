@@ -3,6 +3,7 @@
 // Does not touch the operator's live ~/.forge-conductor install.
 
 import XCTest
+import SQLite3
 @testable import ForgeConductorCore
 
 final class MemoryToolTests: XCTestCase {
@@ -305,5 +306,154 @@ final class MemoryToolTests: XCTestCase {
         XCTAssertEqual(byTag.payload["count"] as? Int, 1)
         let notes = byTag.payload["notes"] as? [[String: Any]] ?? []
         XCTAssertEqual(notes.first?["body"] as? String, "alias body works")
+    }
+
+    func testMemoryReadPathsHonorExpiredDeadline() throws {
+        let store = try SQLiteStore(path: tempHome.appendingPathComponent("memory-read-deadline.sqlite3"))
+        defer { store.close() }
+        try store.memorySet(key: "deadline/read", body: "seed", tags: ["deadline"])
+
+        let operations: [(ToolCallCancellation) throws -> Void] = [
+            { control in _ = try store.memoryGet(key: "deadline/read", cancellation: control) },
+            { control in _ = try store.memoryGetNote(key: "deadline/read", cancellation: control) },
+            { control in _ = try store.memoryList(cancellation: control) },
+            { control in _ = try store.memorySearch(query: "seed", cancellation: control) },
+            { control in _ = try store.memoryCount(cancellation: control) },
+        ]
+
+        for operation in operations {
+            let expired = ToolCallCancellation(timeoutSeconds: 0)
+            XCTAssertThrowsError(try operation(expired)) { error in
+                XCTAssertTrue(error is ToolCallDeadlineExceeded, "unexpected error: \(error)")
+            }
+        }
+    }
+
+    func testMemoryToolPackDeadlinePreemptsDatabaseLockWithoutPartialWrite() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let databaseURL = app.store.path
+        var locker: OpaquePointer?
+        XCTAssertEqual(sqlite3_open(databaseURL.path, &locker), SQLITE_OK)
+        let opened = try XCTUnwrap(locker)
+        defer {
+            sqlite3_exec(opened, "ROLLBACK;", nil, nil, nil)
+            sqlite3_close(opened)
+        }
+        XCTAssertEqual(sqlite3_exec(opened, "BEGIN IMMEDIATE;", nil, nil, nil), SQLITE_OK)
+
+        let control = ToolCallCancellation(timeoutSeconds: 0.1)
+        let startedAt = Date()
+        XCTAssertThrowsError(
+            try MemoryToolPack().handle(
+                name: "memory_set",
+                arguments: [
+                    "key": "deadline/locked",
+                    "body": "must not commit",
+                ],
+                context: nil,
+                clientID: ClientID("memory-deadline-lock"),
+                app: app,
+                cancellation: control
+            )
+        ) { error in
+            XCTAssertTrue(error is ToolCallDeadlineExceeded, "unexpected error: \(error)")
+        }
+        XCTAssertLessThan(Date().timeIntervalSince(startedAt), 1)
+
+        sqlite3_exec(opened, "ROLLBACK;", nil, nil, nil)
+        XCTAssertNil(try app.store.memoryGet(key: "deadline/locked"))
+    }
+
+    func testMemoryCancellationPreemptsActiveDatabaseLockWithoutPartialWrite() async throws {
+        let databaseURL = tempHome.appendingPathComponent("memory-cancel-lock.sqlite3")
+        let busyReached = DispatchSemaphore(value: 0)
+        let store = try SQLiteStore(
+            path: databaseURL,
+            postMigrationCommitObserver: nil,
+            sqliteBusyRetryObserver: {
+                busyReached.signal()
+            }
+        )
+        defer { store.close() }
+        var locker: OpaquePointer?
+        XCTAssertEqual(sqlite3_open(databaseURL.path, &locker), SQLITE_OK)
+        let opened = try XCTUnwrap(locker)
+        defer {
+            sqlite3_exec(opened, "ROLLBACK;", nil, nil, nil)
+            sqlite3_close(opened)
+        }
+        XCTAssertEqual(sqlite3_exec(opened, "BEGIN IMMEDIATE;", nil, nil, nil), SQLITE_OK)
+
+        let control = ToolCallCancellation(timeoutSeconds: 5)
+        let operation = Task.detached {
+            try store.memorySet(
+                key: "cancel/locked",
+                body: "must not commit",
+                cancellation: control
+            )
+        }
+        XCTAssertEqual(busyReached.wait(timeout: .now() + 1), .success)
+        let cancelledAt = Date()
+        control.cancel()
+        do {
+            try await operation.value
+            XCTFail("cancelled memory write returned success")
+        } catch is CancellationError {
+            // Expected: the active SQLite busy handler observed cancellation.
+        } catch {
+            XCTFail("unexpected cancellation error: \(error)")
+        }
+        XCTAssertLessThan(Date().timeIntervalSince(cancelledAt), 1)
+
+        sqlite3_exec(opened, "ROLLBACK;", nil, nil, nil)
+        XCTAssertNil(try store.memoryGet(key: "cancel/locked"))
+    }
+
+    func testMemoryCancellationAtPreCommitRollsBackWrite() throws {
+        let control = ToolCallCancellation(timeoutSeconds: 5)
+        let store = try SQLiteStore(
+            path: tempHome.appendingPathComponent("memory-precommit.sqlite3"),
+            postMigrationCommitObserver: nil,
+            beforeMutationCommitObserver: { kind in
+                if kind == .memory { control.cancel() }
+            }
+        )
+        defer { store.close() }
+
+        XCTAssertThrowsError(
+            try store.memorySet(
+                key: "cancel/precommit",
+                body: "must roll back",
+                cancellation: control
+            )
+        ) { error in
+            XCTAssertTrue(error is CancellationError, "unexpected error: \(error)")
+        }
+        XCTAssertNil(try store.memoryGet(key: "cancel/precommit"))
+    }
+
+    func testMemoryCancellationAfterCommitReturnsCommittedResult() throws {
+        let control = ToolCallCancellation(timeoutSeconds: 5)
+        let store = try SQLiteStore(
+            path: tempHome.appendingPathComponent("memory-postcommit.sqlite3"),
+            postMigrationCommitObserver: nil,
+            didMutationCommitObserver: { kind in
+                if kind == .memory { control.cancel() }
+            }
+        )
+        defer { store.close() }
+
+        try store.memorySet(
+            key: "cancel/postcommit",
+            body: "committed result is authoritative",
+            cancellation: control
+        )
+
+        XCTAssertTrue(control.isCancelled)
+        XCTAssertEqual(
+            try store.memoryGet(key: "cancel/postcommit"),
+            "committed result is authoritative"
+        )
     }
 }

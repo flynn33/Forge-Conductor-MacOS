@@ -750,11 +750,13 @@ public actor ExecutionJobService: ExecutionJobServicing {
     }
 
     public func submit(_ request: RuntimeJobRequest) async throws -> UUID {
+        try Task.checkCancellation()
         try await ensureStarted()
         guard !shuttingDown else {
             throw RuntimeJobError.invalidRequest("runtime job service is shutting down")
         }
         try await contextValidator.validateCaller(request.context)
+        try Task.checkCancellation()
         let validated = try validate(request)
         if let key = request.idempotencyKey,
            let existing = try await repository.existingJob(
@@ -767,6 +769,7 @@ public actor ExecutionJobService: ExecutionJobServicing {
         guard pending.count + active.count < limits.maximumQueuedJobs + limits.maximumConcurrentJobs else {
             throw RuntimeJobError.queueFull
         }
+        try Task.checkCancellation()
 
         let jobID = UUID()
         let outputArtifactBudget = try await reserveArtifactCapacity(
@@ -795,24 +798,30 @@ public actor ExecutionJobService: ExecutionJobServicing {
                 canonicalWorkingDirectory: validated.workingDirectory,
                 spool: spool
             )
+            // This is the last cancellation boundary before the durable queued
+            // job record commits. After createJob succeeds, recovery must finish
+            // wiring or terminalizing that exact job even if the caller leaves.
+            try Task.checkCancellation()
+            let persistedRequest = RuntimeJobRequest(
+                kind: request.kind,
+                profile: request.profile,
+                context: request.context,
+                executable: request.executable,
+                arguments: request.arguments,
+                script: request.script,
+                canonicalWorkingDirectory: validated.workingDirectory,
+                timeout: request.timeout,
+                maximumInlineOutputBytes: validated.inlineBytes,
+                replayClass: request.replayClass,
+                idempotencyKey: request.idempotencyKey
+            )
             let persisted = try await repository.createJob(
                 jobID: jobID,
-                request: RuntimeJobRequest(
-                    kind: request.kind,
-                    profile: request.profile,
-                    context: request.context,
-                    executable: request.executable,
-                    arguments: request.arguments,
-                    script: request.script,
-                    canonicalWorkingDirectory: validated.workingDirectory,
-                    timeout: request.timeout,
-                    maximumInlineOutputBytes: validated.inlineBytes,
-                    replayClass: request.replayClass,
-                    idempotencyKey: request.idempotencyKey
-                ),
+                request: persistedRequest,
                 commandSummary: planned.summary,
                 timeoutSeconds: validated.timeoutSeconds,
-                requestArtifactRelativePath: planned.requestArtifactRelativePath
+                requestArtifactRelativePath: planned.requestArtifactRelativePath,
+                commitObserver: request.didPersist
             )
             guard persisted.jobID == jobID else {
                 spool.discard()
@@ -841,7 +850,7 @@ public actor ExecutionJobService: ExecutionJobServicing {
                 throw error
             }
             pending[jobID] = PendingExecution(
-                request: request,
+                request: persistedRequest,
                 jobContext: jobContext,
                 plan: planned.plan,
                 spool: spool,
@@ -868,8 +877,45 @@ public actor ExecutionJobService: ExecutionJobServicing {
         replayClass: RuntimeReplayClass,
         idempotencyKey: String? = nil
     ) async throws -> UUID {
-        try await submit(
-            RuntimeJobRequest(
+        try await submitLegacyBashLoginObservingPersistence(
+            command: command,
+            workingDirectory: workingDirectory,
+            timeoutSeconds: timeoutSeconds,
+            context: context,
+            replayClass: replayClass,
+            idempotencyKey: idempotencyKey,
+            didPersist: nil
+        )
+    }
+
+    func submitLegacyBashLoginObservingPersistence(
+        command: String,
+        workingDirectory: URL,
+        timeoutSeconds: Int,
+        context: ToolInvocationContext,
+        replayClass: RuntimeReplayClass,
+        idempotencyKey: String? = nil,
+        didPersist: (@Sendable (RuntimeJobRecord) -> Void)?
+    ) async throws -> UUID {
+        let request: RuntimeJobRequest
+        if let didPersist {
+            request = RuntimeJobRequest(
+                kind: .bash,
+                profile: .legacyBashLogin,
+                context: context,
+                script: command,
+                canonicalWorkingDirectory: workingDirectory,
+                timeout: .seconds(min(min(timeoutSeconds, 120), limits.maximumTimeoutSeconds)),
+                maximumInlineOutputBytes: min(
+                    context.authorizationScope.maximumInlineOutputBytes,
+                    limits.maximumInlineOutputBytes
+                ),
+                replayClass: replayClass,
+                idempotencyKey: idempotencyKey,
+                persistenceObserver: didPersist
+            )
+        } else {
+            request = RuntimeJobRequest(
                 kind: .bash,
                 profile: .legacyBashLogin,
                 context: context,
@@ -883,13 +929,17 @@ public actor ExecutionJobService: ExecutionJobServicing {
                 replayClass: replayClass,
                 idempotencyKey: idempotencyKey
             )
-        )
+        }
+        return try await submit(request)
     }
 
     public func status(jobID: UUID, context: ToolInvocationContext) async throws -> RuntimeJobRecord {
+        try Task.checkCancellation()
         try await ensureStarted()
         try await contextValidator.validateCaller(context)
-        return try await repository.job(jobID, context: context)
+        let record = try await repository.job(jobID, context: context)
+        try Task.checkCancellation()
+        return record
     }
 
     public func list(
@@ -898,14 +948,17 @@ public actor ExecutionJobService: ExecutionJobServicing {
         limit: Int = 20,
         beforeCreatedAt: String? = nil
     ) async throws -> [RuntimeJobRecord] {
+        try Task.checkCancellation()
         try await ensureStarted()
         try await contextValidator.validateCaller(context)
-        return try await repository.list(
+        let records = try await repository.list(
             context: context,
             states: states,
             limit: limit,
             beforeCreatedAt: beforeCreatedAt
         )
+        try Task.checkCancellation()
+        return records
     }
 
     public func readOutput(
@@ -915,6 +968,7 @@ public actor ExecutionJobService: ExecutionJobServicing {
         limit: Int,
         context: ToolInvocationContext
     ) async throws -> RuntimeOutputSlice {
+        try Task.checkCancellation()
         try await ensureStarted()
         try await contextValidator.validateCaller(context)
         guard (1...(64 * 1_024)).contains(limit) else {
@@ -940,6 +994,7 @@ public actor ExecutionJobService: ExecutionJobServicing {
             let start = min(Int(min(offset, UInt64(Int.max))), bytes.count)
             source = Data(bytes[start..<min(bytes.count, start + limit)])
         }
+        try Task.checkCancellation()
         let next = min(
             metadata.retainedByteCount,
             offset.addingReportingOverflow(UInt64(source.count)).overflow
@@ -961,9 +1016,23 @@ public actor ExecutionJobService: ExecutionJobServicing {
     }
 
     public func cancel(jobID: UUID, context: ToolInvocationContext) async throws {
+        _ = try await cancelAndReturnRecord(jobID: jobID, context: context)
+    }
+
+    func cancelAndReturnRecord(
+        jobID: UUID,
+        context: ToolInvocationContext,
+        commitObserver: (@Sendable (RuntimeJobRecord) -> Void)? = nil
+    ) async throws -> RuntimeJobRecord {
+        try Task.checkCancellation()
         try await ensureStarted()
         try await contextValidator.validateCaller(context)
-        _ = try await cancelOwnedJob(jobID: jobID, context: context)
+        try Task.checkCancellation()
+        return try await cancelOwnedJob(
+            jobID: jobID,
+            context: context,
+            commitObserver: commitObserver
+        ).record
     }
 
     /// Trusted manager seam for releasing the bounded set of queued and active jobs owned by a run.
@@ -992,7 +1061,10 @@ public actor ExecutionJobService: ExecutionJobServicing {
         var activeCandidates: Set<UUID> = []
         for candidate in candidates {
             if active[candidate.jobID] != nil { activeCandidates.insert(candidate.jobID) }
-            if try await cancelOwnedJob(jobID: candidate.jobID, context: candidate.context) {
+            if try await cancelOwnedJob(
+                jobID: candidate.jobID,
+                context: candidate.context
+            ).changed {
                 cancellationCount += 1
             }
         }
@@ -1022,23 +1094,28 @@ public actor ExecutionJobService: ExecutionJobServicing {
 
     private func cancelOwnedJob(
         jobID: UUID,
-        context: ToolInvocationContext
-    ) async throws -> Bool {
-        let record = try await repository.requestCancellation(jobID: jobID, context: context)
+        context: ToolInvocationContext,
+        commitObserver: (@Sendable (RuntimeJobRecord) -> Void)? = nil
+    ) async throws -> (changed: Bool, record: RuntimeJobRecord) {
+        let record = try await repository.requestCancellation(
+            jobID: jobID,
+            context: context,
+            commitObserver: commitObserver
+        )
         if record.state == .cancelled, let pendingExecution = pending.removeValue(forKey: jobID) {
             pendingOrder.removeAll { $0 == jobID }
             pendingExecution.spool.discard()
             deleteRequestArtifact(pendingExecution.requestArtifactRelativePath)
             releaseArtifactReservation(jobID: jobID)
             pumpQueue()
-            return true
+            return (true, record)
         }
         if var execution = active[jobID] {
             execution.cancellationRequested = true
             active[jobID] = execution
-            return true
+            return (true, record)
         }
-        return false
+        return (false, record)
     }
 
     public func waitForTerminal(

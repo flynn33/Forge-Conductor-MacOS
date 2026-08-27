@@ -23,6 +23,15 @@ final class ToolDefinitionCatalogTests: XCTestCase {
                 let schema = try definition.inputSchemaObject()
                 XCTAssertEqual(schema["type"] as? String, "object", definition.name)
                 XCTAssertFalse(definition.description.isEmpty, definition.name)
+                let properties = try XCTUnwrap(
+                    schema["properties"] as? [String: Any],
+                    definition.name
+                )
+                let deadline = try XCTUnwrap(
+                    properties["deadline_ms"] as? [String: Any],
+                    definition.name
+                )
+                XCTAssertEqual(deadline["type"] as? String, "integer", definition.name)
             }
 
             let allowed = try catalog.definitions(

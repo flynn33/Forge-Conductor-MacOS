@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import errno
 import hashlib
 import json
 import math
@@ -51,6 +52,9 @@ EXPECTED_REQUEST_FIXTURE_SHA256 = "3847873ebea36d3f0bf5f408cd1f72fad9fc45b948a68
 MAXIMUM_MCP_MESSAGE_BYTES = 4 * 1024 * 1024
 MAXIMUM_BUFFERED_RESPONSES = 16
 MAXIMUM_BUFFERED_RESPONSE_BYTES = MAXIMUM_BUFFERED_RESPONSES * MAXIMUM_MCP_MESSAGE_BYTES
+NON_SHELL_CANCELLATION_MAXIMUM_MILLISECONDS = 2_000
+NON_SHELL_DEADLINE_MILLISECONDS = 2_000
+NON_SHELL_DEADLINE_RESPONSE_SLACK_MILLISECONDS = 1_000
 
 
 class CompatibilityError(RuntimeError):
@@ -790,6 +794,66 @@ def exercise_initialized_probe(
     })
 
 
+def exercise_unknown_cancellation_probe(
+    binary: pathlib.Path,
+    root: pathlib.Path,
+    response_timeout: float,
+    shutdown_timeout: float,
+) -> dict[str, Any]:
+    name = "unknown_cancellation"
+    home = root / name
+    home.mkdir(parents=True, exist_ok=False)
+    process, requests, responses = initialize_process(binary, home, name, response_timeout)
+    try:
+        arrival_start = len(process.response_arrival_ids)
+        notification = {
+            "jsonrpc": "2.0",
+            "method": "notifications/cancelled",
+            "params": {"requestId": 2, "reason": "p10-unknown-cancellation"},
+        }
+        first_ping = {"jsonrpc": "2.0", "id": 2, "method": "ping", "params": {}}
+        requests.extend([notification, first_ping])
+        process.send(notification)
+        process.send(first_ping)
+        first_response = process.receive(2, "ping after unknown cancellation", response_timeout)
+        validate_endpoint_response(first_response, "ping", 2)
+        responses.append(first_response)
+
+        second_ping = {"jsonrpc": "2.0", "id": 2, "method": "ping", "params": {}}
+        requests.append(second_ping)
+        process.send(second_ping)
+        second_response = process.receive(2, "reused request id", response_timeout)
+        validate_endpoint_response(second_response, "ping", 2)
+        responses.append(second_response)
+
+        arrival_order = process.response_arrival_ids[arrival_start:]
+        require(
+            arrival_order == [2, 2],
+            f"unknown cancellation or request-id reuse changed response delivery: {arrival_order!r}",
+        )
+        stderr, return_code = process.close(shutdown_timeout)
+        require(return_code == 0, f"unknown cancellation server exited {return_code}")
+    except BaseException:
+        process.abort()
+        raise
+    return seal_probe({
+        "name": name,
+        "status": "passed",
+        "checks": [
+            "unknown_cancellation_ignored",
+            "completed_request_id_reusable",
+            "exactly_one_response_per_request",
+            "bounded_eof_shutdown",
+        ],
+        "wire_input": ndjson_artifact(requests),
+        "requests": requests,
+        "responses": responses,
+        "response_arrival_ids": arrival_order,
+        "exit_codes": [return_code],
+        "stderr": [stream_artifact(stderr)],
+    })
+
+
 def stop_failed_process(process: MCPProcess, timeout: float) -> None:
     if process.process.poll() is not None:
         process.abort()
@@ -1342,6 +1406,46 @@ def wait_for_fixture_process_exit(process_identifier: int, timeout: float) -> bo
     return not fixture_process_is_running(process_identifier)
 
 
+def open_fifo_when_reader_is_ready(
+    path: pathlib.Path,
+    process: MCPProcess,
+    timeout: float,
+    label: str,
+) -> int:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        require(process.process.poll() is None, process.failure(f"server exited before {label} became active"))
+        try:
+            return os.open(path, os.O_WRONLY | os.O_NONBLOCK)
+        except OSError as error:
+            if error.errno != errno.ENXIO:
+                raise
+        time.sleep(0.01)
+    raise CompatibilityError(f"{label} did not begin reading its FIFO")
+
+
+def wait_for_fifo_reader_exit(path: pathlib.Path, timeout: float) -> bool:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            descriptor = os.open(path, os.O_WRONLY | os.O_NONBLOCK)
+        except OSError as error:
+            if error.errno == errno.ENXIO:
+                return True
+            raise
+        else:
+            os.close(descriptor)
+        time.sleep(0.01)
+    try:
+        descriptor = os.open(path, os.O_WRONLY | os.O_NONBLOCK)
+    except OSError as error:
+        if error.errno == errno.ENXIO:
+            return True
+        raise
+    os.close(descriptor)
+    return False
+
+
 def terminate_fixture_sleep_if_needed(process_identifier: int | None) -> None:
     if process_identifier is None or not fixture_process_is_running(process_identifier):
         return
@@ -1449,6 +1553,361 @@ def exercise_active_cancellation_probe(
         "responses": responses,
         "cancellation_milliseconds": cancellation_milliseconds,
         "child_process_terminated": True,
+        "exit_codes": [return_code],
+        "stderr": [stream_artifact(stderr)],
+    })
+
+
+def exercise_non_shell_search_control_probe(
+    binary: pathlib.Path,
+    root: pathlib.Path,
+    response_timeout: float,
+    shutdown_timeout: float,
+) -> dict[str, Any]:
+    name = "non_shell_search_control"
+    home = root / name
+    home.mkdir(parents=True, exist_ok=False)
+    workspace, _, _ = prepare_tool_fixture(home, ["search_text"])
+    cancellation_root = workspace / "blocking-cancel-search"
+    deadline_root = workspace / "blocking-deadline-search"
+    cancellation_root.mkdir()
+    deadline_root.mkdir()
+    cancellation_fifo = cancellation_root / "input.pipe"
+    deadline_fifo = deadline_root / "input.pipe"
+    os.mkfifo(cancellation_fifo, mode=0o600)
+    os.mkfifo(deadline_fifo, mode=0o600)
+    process, requests, responses = initialize_process(binary, home, name, response_timeout)
+    writer_descriptors: set[int] = set()
+    try:
+        start_fixture_session(process, requests, responses, workspace, response_timeout)
+        arrival_start = len(process.response_arrival_ids)
+
+        cancellation_target = {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": {
+                "name": "search_text",
+                "arguments": {
+                    "path": str(cancellation_root),
+                    "pattern": "never-written-needle",
+                },
+            },
+        }
+        requests.append(cancellation_target)
+        process.send(cancellation_target)
+        cancellation_writer = open_fifo_when_reader_is_ready(
+            cancellation_fifo,
+            process,
+            min(3.0, response_timeout),
+            "non-shell cancellation",
+        )
+        writer_descriptors.add(cancellation_writer)
+        cancellation = {
+            "jsonrpc": "2.0",
+            "method": "notifications/cancelled",
+            "params": {"requestId": 3, "reason": "p10-non-shell-cancellation"},
+        }
+        requests.append(cancellation)
+        cancellation_started = time.monotonic()
+        process.send(cancellation)
+        cancellation_response = process.receive(
+            3,
+            "active cancelled search_text",
+            response_timeout,
+        )
+        cancellation_milliseconds = int((time.monotonic() - cancellation_started) * 1000)
+        validate_rpc_error(cancellation_response, 3, -32800)
+        require(
+            cancellation_milliseconds <= NON_SHELL_CANCELLATION_MAXIMUM_MILLISECONDS,
+            "non-shell cancellation exceeded "
+            f"{NON_SHELL_CANCELLATION_MAXIMUM_MILLISECONDS} ms: "
+            f"{cancellation_milliseconds} ms",
+        )
+        responses.append(cancellation_response)
+        require(
+            wait_for_fifo_reader_exit(cancellation_fifo, min(3.0, response_timeout)),
+            "cancelled search_text retained its FIFO reader",
+        )
+        os.close(cancellation_writer)
+        writer_descriptors.remove(cancellation_writer)
+
+        cancellation_ping = {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "method": "ping",
+            "params": {},
+        }
+        requests.append(cancellation_ping)
+        process.send(cancellation_ping)
+        cancellation_ping_response = process.receive(
+            4,
+            "post-cancellation ping",
+            response_timeout,
+        )
+        validate_endpoint_response(cancellation_ping_response, "ping", 4)
+        responses.append(cancellation_ping_response)
+
+        deadline_target = {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "method": "tools/call",
+            "params": {
+                "name": "search_text",
+                "arguments": {
+                    "path": str(deadline_root),
+                    "pattern": "never-written-needle",
+                    "deadline_ms": NON_SHELL_DEADLINE_MILLISECONDS,
+                },
+            },
+        }
+        requests.append(deadline_target)
+        deadline_started = time.monotonic()
+        process.send(deadline_target)
+        deadline_writer = open_fifo_when_reader_is_ready(
+            deadline_fifo,
+            process,
+            min(1.0, response_timeout),
+            "non-shell deadline",
+        )
+        writer_descriptors.add(deadline_writer)
+        deadline_response = process.receive(
+            5,
+            "deadline-bounded search_text",
+            response_timeout,
+        )
+        deadline_milliseconds = int((time.monotonic() - deadline_started) * 1000)
+        validate_tool_call_envelope(
+            deadline_response,
+            expected_error=True,
+            expected_code="deadline_exceeded",
+            expected_id=5,
+        )
+        maximum_deadline_response_milliseconds = (
+            NON_SHELL_DEADLINE_MILLISECONDS
+            + NON_SHELL_DEADLINE_RESPONSE_SLACK_MILLISECONDS
+        )
+        require(
+            deadline_milliseconds <= maximum_deadline_response_milliseconds,
+            "non-shell deadline response exceeded its requested deadline plus bounded cleanup "
+            f"slack ({maximum_deadline_response_milliseconds} ms): "
+            f"{deadline_milliseconds} ms",
+        )
+        responses.append(deadline_response)
+        require(
+            wait_for_fifo_reader_exit(deadline_fifo, min(3.0, response_timeout)),
+            "deadline-bounded search_text retained its FIFO reader",
+        )
+        os.close(deadline_writer)
+        writer_descriptors.remove(deadline_writer)
+
+        deadline_ping = {
+            "jsonrpc": "2.0",
+            "id": 6,
+            "method": "ping",
+            "params": {},
+        }
+        requests.append(deadline_ping)
+        process.send(deadline_ping)
+        deadline_ping_response = process.receive(
+            6,
+            "post-deadline ping",
+            response_timeout,
+        )
+        validate_endpoint_response(deadline_ping_response, "ping", 6)
+        responses.append(deadline_ping_response)
+
+        arrival_order = process.response_arrival_ids[arrival_start:]
+        require(
+            arrival_order == [3, 4, 5, 6],
+            f"non-shell control responses were duplicated or reordered: {arrival_order!r}",
+        )
+        stderr, return_code = process.close(shutdown_timeout)
+        require(return_code == 0, f"non-shell control server exited {return_code}")
+    except BaseException:
+        for descriptor in writer_descriptors:
+            os.close(descriptor)
+        stop_failed_process(process, max(15.0, shutdown_timeout))
+        raise
+    return seal_probe({
+        "name": name,
+        "status": "passed",
+        "checks": [
+            "non_shell_active_cancellation",
+            "non_shell_request_deadline",
+            "fifo_reader_terminated_after_cancellation",
+            "fifo_reader_terminated_after_deadline",
+            "cancelled_error_code",
+            "deadline_exceeded_tool_error",
+            "strict_cancellation_latency",
+            "strict_deadline_latency",
+            "no_late_response_after_control_completion",
+            "exactly_one_response_per_request",
+            "bounded_eof_shutdown",
+        ],
+        "wire_input": ndjson_artifact(requests),
+        "requests": requests,
+        "responses": responses,
+        "response_arrival_ids": arrival_order,
+        "cancellation_milliseconds": cancellation_milliseconds,
+        "maximum_cancellation_milliseconds": NON_SHELL_CANCELLATION_MAXIMUM_MILLISECONDS,
+        "deadline_milliseconds": deadline_milliseconds,
+        "requested_deadline_milliseconds": NON_SHELL_DEADLINE_MILLISECONDS,
+        "maximum_deadline_response_milliseconds": maximum_deadline_response_milliseconds,
+        "exit_codes": [return_code],
+        "stderr": [stream_artifact(stderr)],
+    })
+
+
+def exercise_git_post_commit_reconciliation_probe(
+    binary: pathlib.Path,
+    root: pathlib.Path,
+    response_timeout: float,
+    shutdown_timeout: float,
+) -> dict[str, Any]:
+    name = "git_post_commit_reconciliation"
+    home = root / name
+    home.mkdir(parents=True, exist_ok=False)
+    workspace, _, initial_head = prepare_tool_fixture(home, ["git_commit"])
+    tracked = workspace / "tracked.txt"
+    tracked.write_text("tracked after\n", encoding="utf-8")
+    for command in (
+        ["git", "config", "commit.gpgsign", "false"],
+        ["git", "add", "tracked.txt"],
+    ):
+        result = subprocess.run(
+            command,
+            cwd=workspace,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        require(result.returncode == 0, f"post-commit fixture setup failed: {result.stderr[-1000:]}")
+
+    ready = workspace / "post-commit-hook-ready"
+    release = workspace / "post-commit-hook-release"
+    hook = workspace / ".git/hooks/post-commit"
+    hook.write_text(
+        "\n".join([
+            "#!/bin/sh",
+            f": > {shlex.quote(str(ready.resolve()))}",
+            "attempt=0",
+            f"while [ ! -f {shlex.quote(str(release.resolve()))} ]; do",
+            "  attempt=$((attempt + 1))",
+            "  [ \"$attempt\" -lt 400 ] || exit 75",
+            "  sleep 0.05",
+            "done",
+            "",
+        ]),
+        encoding="utf-8",
+    )
+    hook.chmod(0o755)
+
+    process, requests, responses = initialize_process(binary, home, name, response_timeout)
+    try:
+        start_fixture_session(process, requests, responses, workspace, response_timeout)
+        arrival_start = len(process.response_arrival_ids)
+        target = {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": {
+                "name": "git_commit",
+                "arguments": {
+                    "cwd": str(workspace),
+                    "message": "Validate post-commit reconciliation",
+                },
+            },
+        }
+        requests.append(target)
+        process.send(target)
+        ready_deadline = time.monotonic() + response_timeout
+        while time.monotonic() < ready_deadline and not ready.is_file():
+            require(process.process.poll() is None, process.failure("server exited before post-commit hook became active"))
+            time.sleep(0.02)
+        require(ready.is_file(), "post-commit hook did not reach its ready marker")
+        committed_head = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=workspace,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        ).stdout.strip()
+        require(
+            committed_head != initial_head and len(committed_head) == 40,
+            "HEAD did not advance before post-commit cancellation",
+        )
+
+        cancellation = {
+            "jsonrpc": "2.0",
+            "method": "notifications/cancelled",
+            "params": {"requestId": 3, "reason": "p10-post-commit-cancellation"},
+        }
+        requests.append(cancellation)
+        process.send(cancellation)
+        response = process.receive(3, "cancelled post-commit git_commit", response_timeout)
+        structured = validate_tool_call_envelope(
+            response,
+            expected_error=False,
+            expected_id=3,
+        )
+        responses.append(response)
+        require(structured.get("exit_code") == 0, "reconciled git_commit did not report success")
+        require(structured.get("reconciled") is True, "git_commit did not report reconciliation")
+        require(structured.get("commit") == committed_head, "git_commit returned the wrong committed revision")
+        committed_content = subprocess.run(
+            ["git", "show", "HEAD:tracked.txt"],
+            cwd=workspace,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        ).stdout
+        require(committed_content == "tracked after\n", "reconciled commit lost the staged content")
+
+        ping = {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "method": "ping",
+            "params": {},
+        }
+        requests.append(ping)
+        process.send(ping)
+        ping_response = process.receive(4, "post-reconciliation ping", response_timeout)
+        validate_endpoint_response(ping_response, "ping", 4)
+        responses.append(ping_response)
+        arrival_order = process.response_arrival_ids[arrival_start:]
+        require(
+            arrival_order == [3, 4],
+            f"post-commit reconciliation emitted duplicate responses: {arrival_order!r}",
+        )
+        stderr, return_code = process.close(shutdown_timeout)
+        require(return_code == 0, f"post-commit reconciliation server exited {return_code}")
+    except BaseException:
+        release.touch(exist_ok=True)
+        stop_failed_process(process, max(15.0, shutdown_timeout))
+        raise
+    finally:
+        release.touch(exist_ok=True)
+    return seal_probe({
+        "name": name,
+        "status": "passed",
+        "checks": [
+            "head_advanced_before_post_commit_cancellation",
+            "truthful_post_commit_cancellation_reconciliation",
+            "committed_content_preserved",
+            "success_response_after_committed_mutation",
+            "no_late_response_after_control_completion",
+            "exactly_one_response_per_request",
+            "bounded_eof_shutdown",
+        ],
+        "wire_input": ndjson_artifact(requests),
+        "requests": requests,
+        "responses": responses,
+        "response_arrival_ids": arrival_order,
+        "initial_head": initial_head,
+        "committed_head": committed_head,
         "exit_codes": [return_code],
         "stderr": [stream_artifact(stderr)],
     })
@@ -2050,20 +2509,11 @@ def main() -> int:
             args.response_timeout,
             args.shutdown_timeout,
         )
-        cancellation_probe = exercise_initialized_probe(
+        cancellation_probe = exercise_unknown_cancellation_probe(
             binary,
             wire_root,
-            "cancellation",
-            {"jsonrpc": "2.0", "id": 2, "method": "ping", "params": {}},
-            lambda response: validate_rpc_error(response, 2, -32800),
-            ["cancellation_notification", "cancelled_error_code", "bounded_eof_shutdown"],
             args.response_timeout,
             args.shutdown_timeout,
-            before_target=[{
-                "jsonrpc": "2.0",
-                "method": "notifications/cancelled",
-                "params": {"requestId": 2, "reason": "p10-wire-probe"},
-            }],
         )
         concurrent_probe = exercise_concurrent_mixed_correlation_probe(
             binary,
@@ -2072,6 +2522,18 @@ def main() -> int:
             args.shutdown_timeout,
         )
         active_cancellation_probe = exercise_active_cancellation_probe(
+            binary,
+            wire_root,
+            args.response_timeout,
+            args.shutdown_timeout,
+        )
+        non_shell_search_control_probe = exercise_non_shell_search_control_probe(
+            binary,
+            wire_root,
+            args.response_timeout,
+            args.shutdown_timeout,
+        )
+        git_post_commit_reconciliation_probe = exercise_git_post_commit_reconciliation_probe(
             binary,
             wire_root,
             args.response_timeout,
@@ -2105,6 +2567,8 @@ def main() -> int:
             cancellation_probe,
             concurrent_probe,
             active_cancellation_probe,
+            non_shell_search_control_probe,
+            git_post_commit_reconciliation_probe,
             active_eof_shutdown_probe,
             restart_probe,
             pagination_probe,
@@ -2203,7 +2667,7 @@ def main() -> int:
         "schema_version": 1,
         "status": "passed",
         "ok": True,
-        "scope": "executable descriptor, success, concurrency, cancellation, framing, restart, and pagination compatibility",
+        "scope": "executable descriptor, success, concurrency, cancellation, deadline, committed-result truthfulness, framing, restart, and pagination compatibility",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "source": source,
         "source_manifest": manifest_before,
@@ -2240,8 +2704,14 @@ def main() -> int:
             "legacy_tool_success_all_baseline_methods",
             "legacy_tool_call_success_envelopes",
             "typed_tool_error_envelope",
-            "pre_cancelled_request_negative_32800",
+            "unknown_cancellation_ignored",
+            "completed_request_id_reusable",
             "active_in_flight_cancellation",
+            "non_shell_active_cancellation",
+            "non_shell_request_deadline",
+            "strict_non_shell_cancellation_latency",
+            "strict_non_shell_deadline_latency",
+            "truthful_post_commit_cancellation_reconciliation",
             "active_request_eof_shutdown",
             "cli_serve_disconnect_shutdown",
             "concurrent_mixed_request_correlation",

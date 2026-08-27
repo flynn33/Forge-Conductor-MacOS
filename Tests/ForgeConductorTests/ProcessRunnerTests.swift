@@ -47,6 +47,21 @@ final class ProcessRunnerTests: XCTestCase {
         XCTAssertLessThan(started.duration(to: .now), .seconds(1))
     }
 
+    func testNonfiniteTimeoutCannotCreateAnIndefiniteWait() throws {
+        for timeout in [TimeInterval.infinity, TimeInterval.nan, -TimeInterval.infinity] {
+            let started = ContinuousClock.now
+            let result = try fastRunner().run(
+                executable: "/bin/sleep",
+                arguments: ["5"],
+                timeoutSec: timeout
+            )
+
+            XCTAssertTrue(result.timedOut)
+            XCTAssertNotEqual(result.exitCode, 0)
+            XCTAssertLessThan(started.duration(to: .now), .seconds(1))
+        }
+    }
+
     func testTermIgnoringChildRequiresSIGKILL() throws {
         let result = try fastRunner().run(
             executable: "/bin/sh",
@@ -103,16 +118,178 @@ final class ProcessRunnerTests: XCTestCase {
             timeoutSec: 1
         )
         let elapsed = started.duration(to: .now)
-
-        if elapsed < .seconds(2),
-           let descendantPID = Int32(result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)) {
-            _ = kill(descendantPID, SIGKILL)
-        }
+        let descendantPID = try XCTUnwrap(
+            Int32(result.stdout.trimmingCharacters(in: .whitespacesAndNewlines))
+        )
 
         XCTAssertEqual(result.exitCode, 0)
         XCTAssertFalse(result.timedOut)
         XCTAssertLessThan(elapsed, .seconds(1))
-        XCTAssertNotNil(Int32(result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)))
+        XCTAssertFalse(processExists(descendantPID))
+    }
+
+    func testCancellationTerminatesAndReapsEntireProcessGroup() throws {
+        let directory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let leaderFile = directory.appendingPathComponent("leader.pid")
+        let descendantFile = directory.appendingPathComponent("descendant.pid")
+        let cancellation = ToolCallCancellation()
+        let runner = fastRunner()
+        let result = LockedProcessResult()
+        let completed = DispatchGroup()
+        completed.enter()
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            defer { completed.leave() }
+            result.store(Result {
+                try runner.run(
+                    executable: "/bin/sh",
+                    arguments: [
+                        "-c",
+                        """
+                        trap '' TERM
+                        printf '%d' "$$" > "$LEADER_FILE"
+                        (
+                          trap '' TERM
+                          while :; do /bin/sleep 1; done
+                        ) &
+                        printf '%d' "$!" > "$DESCENDANT_FILE"
+                        while :; do /bin/sleep 1; done
+                        """,
+                    ],
+                    environment: [
+                        "LEADER_FILE": leaderFile.path,
+                        "DESCENDANT_FILE": descendantFile.path,
+                    ],
+                    timeoutSec: 5,
+                    cancellation: cancellation
+                )
+            })
+        }
+
+        let leaderPID = try XCTUnwrap(waitForPID(at: leaderFile))
+        let descendantPID = try XCTUnwrap(waitForPID(at: descendantFile))
+        cancellation.cancel()
+
+        XCTAssertEqual(completed.wait(timeout: .now() + 2), .success)
+        switch try XCTUnwrap(result.value) {
+        case .failure(let error):
+            XCTAssertTrue(error is CancellationError, "unexpected error: \(error)")
+        case .success(let processResult):
+            XCTFail("cancelled process returned status \(processResult.exitCode)")
+        }
+        XCTAssertFalse(processExists(leaderPID))
+        XCTAssertFalse(processExists(descendantPID))
+    }
+
+    func testDeadlineTerminatesProcessAndThrowsDeadlineError() throws {
+        let cancellation = ToolCallCancellation(timeoutSeconds: 0.05)
+        let started = ContinuousClock.now
+
+        XCTAssertThrowsError(
+            try fastRunner().run(
+                executable: "/bin/sleep",
+                arguments: ["5"],
+                timeoutSec: 5,
+                cancellation: cancellation
+            )
+        ) { error in
+            XCTAssertTrue(error is ToolCallDeadlineExceeded, "unexpected error: \(error)")
+        }
+        XCTAssertLessThan(started.duration(to: .now), .seconds(1))
+    }
+
+    func testTimeoutTerminatesAndReapsEntireDescendantGroup() throws {
+        let directory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let leaderFile = directory.appendingPathComponent("leader.pid")
+        let descendantFile = directory.appendingPathComponent("descendant.pid")
+
+        let result = try fastRunner().run(
+            executable: "/bin/sh",
+            arguments: [
+                "-c",
+                """
+                trap '' TERM
+                printf '%d' "$$" > "$LEADER_FILE"
+                (
+                  trap '' TERM
+                  while :; do /bin/sleep 1; done
+                ) &
+                printf '%d' "$!" > "$DESCENDANT_FILE"
+                while :; do /bin/sleep 1; done
+                """,
+            ],
+            environment: [
+                "LEADER_FILE": leaderFile.path,
+                "DESCENDANT_FILE": descendantFile.path,
+            ],
+            timeoutSec: 0.2
+        )
+        let leaderPID = try XCTUnwrap(readPID(at: leaderFile))
+        let descendantPID = try XCTUnwrap(readPID(at: descendantFile))
+
+        XCTAssertTrue(result.timedOut)
+        XCTAssertEqual(result.exitCode, SIGKILL)
+        XCTAssertFalse(processExists(leaderPID))
+        XCTAssertFalse(processExists(descendantPID))
+    }
+
+    func testObservedTerminalResultWinsConcurrentCancellation() throws {
+        let directory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let leaderFile = directory.appendingPathComponent("leader.pid")
+        let descendantFile = directory.appendingPathComponent("descendant.pid")
+        let cancellation = ToolCallCancellation()
+        let result = LockedProcessResult()
+        let completed = DispatchGroup()
+        let runner = ProcessRunner(
+            terminationGraceSec: 0.3,
+            forcedTerminationGraceSec: 0.5
+        )
+        completed.enter()
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            defer { completed.leave() }
+            result.store(Result {
+                try runner.run(
+                    executable: "/bin/sh",
+                    arguments: [
+                        "-c",
+                        """
+                        printf '%d' "$$" > "$LEADER_FILE"
+                        (
+                          trap '' TERM
+                          while :; do /bin/sleep 1; done
+                        ) &
+                        printf '%d' "$!" > "$DESCENDANT_FILE"
+                        exit 0
+                        """,
+                    ],
+                    environment: [
+                        "LEADER_FILE": leaderFile.path,
+                        "DESCENDANT_FILE": descendantFile.path,
+                    ],
+                    timeoutSec: 5,
+                    cancellation: cancellation
+                )
+            })
+        }
+
+        let leaderPID = try XCTUnwrap(waitForPID(at: leaderFile))
+        let descendantPID = try XCTUnwrap(waitForPID(at: descendantFile))
+        XCTAssertTrue(waitForProcessExit(leaderPID, timeout: 1))
+        cancellation.cancel()
+
+        XCTAssertEqual(completed.wait(timeout: .now() + 2), .success)
+        switch try XCTUnwrap(result.value) {
+        case .success(let processResult):
+            XCTAssertEqual(processResult.exitCode, 0)
+            XCTAssertFalse(processResult.timedOut)
+        case .failure(let error):
+            XCTFail("terminal command lost to cancellation: \(error)")
+        }
+        XCTAssertFalse(processExists(descendantPID))
     }
 
     func testMalformedAndCapSplitUTF8PreserveReadableOutput() throws {
@@ -184,6 +361,42 @@ final class ProcessRunnerTests: XCTestCase {
         XCTAssertEqual(failures.values, [])
         XCTAssertLessThan(started.duration(to: .now), .seconds(5))
     }
+
+    private func makeTemporaryDirectory() throws -> URL {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "forge-process-runner-\(UUID().uuidString.lowercased())",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }
+
+    private func waitForPID(at url: URL, timeout: TimeInterval = 1) -> Int32? {
+        let deadline = ProcessInfo.processInfo.systemUptime + timeout
+        repeat {
+            if let pid = readPID(at: url) { return pid }
+            Thread.sleep(forTimeInterval: 0.005)
+        } while ProcessInfo.processInfo.systemUptime < deadline
+        return readPID(at: url)
+    }
+
+    private func readPID(at url: URL) -> Int32? {
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return nil }
+        return Int32(text.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    private func waitForProcessExit(_ processIdentifier: Int32, timeout: TimeInterval) -> Bool {
+        let deadline = ProcessInfo.processInfo.systemUptime + timeout
+        while processExists(processIdentifier), ProcessInfo.processInfo.systemUptime < deadline {
+            Thread.sleep(forTimeInterval: 0.005)
+        }
+        return !processExists(processIdentifier)
+    }
+
+    private func processExists(_ processIdentifier: Int32) -> Bool {
+        let result = kill(processIdentifier, 0)
+        return result == 0 || errno == EPERM
+    }
 }
 
 private final class FailureBox: @unchecked Sendable {
@@ -199,6 +412,23 @@ private final class FailureBox: @unchecked Sendable {
     func append(_ value: String) {
         lock.lock()
         storage.append(value)
+        lock.unlock()
+    }
+}
+
+private final class LockedProcessResult: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: Result<ProcessResult, Error>?
+
+    var value: Result<ProcessResult, Error>? {
+        lock.lock()
+        defer { lock.unlock() }
+        return storage
+    }
+
+    func store(_ value: Result<ProcessResult, Error>) {
+        lock.lock()
+        storage = value
         lock.unlock()
     }
 }

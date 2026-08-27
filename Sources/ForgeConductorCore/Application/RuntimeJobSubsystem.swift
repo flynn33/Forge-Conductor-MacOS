@@ -122,11 +122,24 @@ public struct RuntimeJobSynchronousToolPack: ToolPackHandling, Sendable {
                 cancellation: cancellation
             )
         }
+        let committedReceipt = Self.mutatingControlTools.contains(name)
+            ? RuntimeBlockingResult<ToolResult>()
+            : nil
+        let toolPack = committedReceipt.map { receipt in
+            RuntimeJobToolPack(
+                service: subsystem.service,
+                durableResultObserver: { value in
+                    receipt.store(.success(value))
+                }
+            )
+        } ?? subsystem.toolPack
         return try Self.wait(
             timeoutSeconds: Self.controlTimeoutSeconds,
-            cancellation: cancellation
+            cancellation: cancellation,
+            committedResultWins: Self.mutatingControlTools.contains(name),
+            committedReceipt: committedReceipt
         ) {
-            await subsystem.toolPack.handle(name: name, arguments: arguments, context: context)
+            try await toolPack.handle(name: name, arguments: arguments, context: context)
                 ?? .failure(code: "unknown_tool", message: "Unknown tool '\(name)'", retryable: false)
         }
     }
@@ -157,9 +170,15 @@ public struct RuntimeJobSynchronousToolPack: ToolPackHandling, Sendable {
         let replayClass = ToolArgHelpers.string(arguments, "replay_class")
             .flatMap(RuntimeReplayClass.init(rawValue:))
             ?? .nonReplayable
+        // `shell_exec` is the legacy synchronous compatibility surface. Its
+        // cancellation and deadline responses are part of the existing MCP
+        // contract, even though the durable runtime records the submitted job
+        // before the process finishes. New asynchronous runtime mutation tools
+        // return their exact committed receipts through the path above.
         return try Self.wait(
             timeoutSeconds: timeout + Self.legacyCompletionSlackSeconds,
-            cancellation: cancellation
+            cancellation: cancellation,
+            committedResultWins: false
         ) {
             try await subsystem.legacyShell.execute(
                 command: command,
@@ -172,9 +191,11 @@ public struct RuntimeJobSynchronousToolPack: ToolPackHandling, Sendable {
         }
     }
 
-    private static func wait<Value: Sendable>(
+    static func wait<Value: Sendable>(
         timeoutSeconds: TimeInterval,
         cancellation: ToolCallCancellation?,
+        committedResultWins: Bool,
+        committedReceipt: RuntimeBlockingResult<Value>? = nil,
         operation: @escaping @Sendable () async throws -> Value
     ) throws -> Value {
         let semaphore = DispatchSemaphore(value: 0)
@@ -189,20 +210,75 @@ public struct RuntimeJobSynchronousToolPack: ToolPackHandling, Sendable {
         }
         let clock = ContinuousClock()
         let deadline = clock.now + .seconds(max(0.1, timeoutSeconds))
+        func committedValueIfAvailable() -> Value? {
+            guard committedResultWins,
+                  let receipt = committedReceipt?.take(),
+                  case .success(let committedValue) = receipt else {
+                return nil
+            }
+            return committedValue
+        }
         while semaphore.wait(timeout: .now() + .milliseconds(25)) != .success {
-            if cancellation?.isCancelled == true {
+            do {
+                try cancellation?.checkCancellation()
+            } catch {
                 task.cancel()
                 let cancellationDeadline = clock.now + .seconds(
                     min(15, max(0.1, timeoutSeconds))
                 )
                 while semaphore.wait(timeout: .now() + .milliseconds(25)) != .success,
                       clock.now < cancellationDeadline {}
-                throw CancellationError()
+                let terminalResult = result.take()
+                if let terminalResult {
+                    switch terminalResult {
+                    case .success(let committedValue) where committedResultWins:
+                        return committedValue
+                    case .failure(let terminalError)
+                        where !(terminalError is CancellationError)
+                            && !(terminalError is ToolCallDeadlineExceeded):
+                        throw terminalError
+                    default:
+                        if let committedValue = committedValueIfAvailable() {
+                            return committedValue
+                        }
+                        throw error
+                    }
+                }
+                if let committedValue = committedValueIfAvailable() {
+                    return committedValue
+                }
+                throw RuntimeJobError.storageFailure(
+                    "runtime transport cancellation did not stop its operation"
+                )
             }
             guard clock.now < deadline else {
                 task.cancel()
+                let cleanupDeadline = clock.now + .seconds(15)
+                while semaphore.wait(timeout: .now() + .milliseconds(25)) != .success,
+                      clock.now < cleanupDeadline {}
+                let terminalResult = result.take()
+                if let terminalResult {
+                    switch terminalResult {
+                    case .success(let committedValue) where committedResultWins:
+                        return committedValue
+                    case .failure(let terminalError)
+                        where !(terminalError is CancellationError)
+                            && !(terminalError is ToolCallDeadlineExceeded):
+                        throw terminalError
+                    default:
+                        if let committedValue = committedValueIfAvailable() {
+                            return committedValue
+                        }
+                        throw RuntimeJobError.storageFailure(
+                            "runtime transport wait exceeded its bounded deadline"
+                        )
+                    }
+                }
+                if let committedValue = committedValueIfAvailable() {
+                    return committedValue
+                }
                 throw RuntimeJobError.storageFailure(
-                    "runtime transport wait exceeded its bounded deadline"
+                    "runtime transport timeout did not stop its operation"
                 )
             }
         }
@@ -213,9 +289,14 @@ public struct RuntimeJobSynchronousToolPack: ToolPackHandling, Sendable {
         }
         return try value.get()
     }
+
+    private static let mutatingControlTools: Set<String> = [
+        "process.run", "shell.run", "bash.run", "python.run", "powershell.run",
+        "job.cancel",
+    ]
 }
 
-private final class RuntimeBlockingResult<Value: Sendable>: @unchecked Sendable {
+final class RuntimeBlockingResult<Value: Sendable>: @unchecked Sendable {
     private let lock = NSLock()
     private var result: Result<Value, Error>?
 
@@ -251,6 +332,26 @@ public struct LegacyShellJobAdapter: Sendable {
         replayClass: RuntimeReplayClass = .nonReplayable,
         idempotencyKey: String? = nil
     ) async throws -> ToolResult {
+        try await executeObservingPersistence(
+            command: command,
+            workingDirectory: workingDirectory,
+            timeoutSeconds: timeoutSeconds,
+            context: context,
+            replayClass: replayClass,
+            idempotencyKey: idempotencyKey,
+            didPersist: nil
+        )
+    }
+
+    func executeObservingPersistence(
+        command: String,
+        workingDirectory: URL,
+        timeoutSeconds: Int,
+        context: ToolInvocationContext,
+        replayClass: RuntimeReplayClass = .nonReplayable,
+        idempotencyKey: String? = nil,
+        didPersist: (@Sendable (RuntimeJobRecord) -> Void)?
+    ) async throws -> ToolResult {
         guard !command.isEmpty else {
             return .failure(code: "missing_command", message: "command required")
         }
@@ -262,13 +363,14 @@ public struct LegacyShellJobAdapter: Sendable {
             )
         }
         let boundedTimeout = min(timeoutSeconds, Self.maximumTimeoutSeconds)
-        let jobID = try await service.submitLegacyBashLogin(
+        let jobID = try await service.submitLegacyBashLoginObservingPersistence(
             command: command,
             workingDirectory: workingDirectory,
             timeoutSeconds: boundedTimeout,
             context: context,
             replayClass: replayClass,
-            idempotencyKey: idempotencyKey
+            idempotencyKey: idempotencyKey,
+            didPersist: didPersist
         )
         let record: RuntimeJobRecord
         do {

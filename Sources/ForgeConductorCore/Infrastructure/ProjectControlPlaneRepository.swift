@@ -15,6 +15,9 @@ public actor ProjectControlPlaneRepository {
     private let clock: any Clock
     private var connection: ControlPlaneSQLiteConnection?
     private var openRegistration: SQLiteOpenRegistration?
+    private var busyRetryObserver: (@Sendable () -> Void)?
+    private var beforeCommitObserver: (@Sendable () throws -> Void)?
+    private var didCommitObserver: (@Sendable () -> Void)?
 
     public init(
         databaseURL: URL,
@@ -89,6 +92,16 @@ public actor ProjectControlPlaneRepository {
         VerifiedMigrationBackup.unregisterOpenDatabase(openRegistration)
     }
 
+    func configureOperationObservers(
+        busyRetry: (@Sendable () -> Void)? = nil,
+        beforeCommit: (@Sendable () throws -> Void)? = nil,
+        didCommit: (@Sendable () -> Void)? = nil
+    ) {
+        busyRetryObserver = busyRetry
+        beforeCommitObserver = beforeCommit
+        didCommitObserver = didCommit
+    }
+
     public func close() {
         connection?.close()
         connection = nil
@@ -102,9 +115,10 @@ public actor ProjectControlPlaneRepository {
         displayName: String,
         canonicalRoot: URL,
         repositoryFingerprint: String? = nil,
-        bookmarkReference: String? = nil
+        bookmarkReference: String? = nil,
+        cancellation: ToolCallCancellation? = nil
     ) throws -> ProjectControlRecord {
-        let connection = try requiredConnection()
+        try cancellation?.checkCancellation()
         let name = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty, name.utf8.count <= 512 else {
             throw ProjectContextError.invalidIdentifier("project display name")
@@ -113,8 +127,9 @@ public actor ProjectControlPlaneRepository {
         let fingerprint = try Self.boundedOptional(repositoryFingerprint, maximumBytes: 2_048, field: "repository fingerprint")
         let bookmark = try Self.boundedOptional(bookmarkReference, maximumBytes: 16 * 1_024, field: "bookmark reference")
         let timestamp = ISO8601.string(from: clock.now())
+        try cancellation?.checkCancellation()
 
-        return try connection.transaction {
+        return try controlledTransaction(cancellation: cancellation) { connection in
             if let current = try projectUnlocked(projectID, connection: connection) {
                 guard current.canonicalRoot.path == root.path else {
                     throw ProjectContextError.projectRelinkRequired(projectID)
@@ -162,8 +177,13 @@ public actor ProjectControlPlaneRepository {
         }
     }
 
-    public func project(_ projectID: ProjectID) throws -> ProjectControlRecord? {
-        try projectUnlocked(projectID, connection: requiredConnection())
+    public func project(
+        _ projectID: ProjectID,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ProjectControlRecord? {
+        try controlledOperation(cancellation: cancellation) { connection in
+            try projectUnlocked(projectID, connection: connection)
+        }
     }
 
     /// Newest-first project rows for the read-only native operator surface.
@@ -262,18 +282,20 @@ public actor ProjectControlPlaneRepository {
         runID: RunID? = nil,
         authorizationScope: ToolAuthorizationScope,
         leaseOwner: String? = nil,
-        leaseExpiresAt: String? = nil
+        leaseExpiresAt: String? = nil,
+        cancellation: ToolCallCancellation? = nil
     ) throws -> ProjectContextBinding {
+        try cancellation?.checkCancellation()
         try Self.validate(owner)
         try Self.validate(generation)
         try Self.validate(authorizationScope)
-        let connection = try requiredConnection()
         let scopeJSON = try Self.scopeJSON(authorizationScope)
         let boundedLeaseOwner = try Self.boundedOptional(leaseOwner, maximumBytes: 512, field: "lease owner")
         let boundedLeaseExpiry = try Self.boundedOptional(leaseExpiresAt, maximumBytes: 128, field: "lease expiry")
         let timestamp = ISO8601.string(from: clock.now())
+        try cancellation?.checkCancellation()
 
-        return try connection.transaction {
+        return try controlledTransaction(cancellation: cancellation) { connection in
             let project = try requiredActiveProjectUnlocked(
                 projectID,
                 generation: generation,
@@ -331,66 +353,83 @@ public actor ProjectControlPlaneRepository {
 
     public func binding(
         for owner: ProjectBindingOwner,
-        includeInactive: Bool = false
+        includeInactive: Bool = false,
+        cancellation: ToolCallCancellation? = nil
     ) throws -> ProjectContextBinding? {
         try Self.validate(owner)
-        return try bindingUnlocked(
-            owner: owner,
-            includeInactive: includeInactive,
-            connection: requiredConnection()
-        )
+        return try controlledOperation(cancellation: cancellation) { connection in
+            try bindingUnlocked(
+                owner: owner,
+                includeInactive: includeInactive,
+                connection: connection
+            )
+        }
     }
 
     public func invocationContext(
         for owner: ProjectBindingOwner,
-        clientID: ClientID? = nil
+        clientID: ClientID? = nil,
+        cancellation: ToolCallCancellation? = nil
     ) throws -> ToolInvocationContext {
+        try cancellation?.checkCancellation()
         try Self.validate(owner)
-        let connection = try requiredConnection()
-        guard let binding = try bindingUnlocked(owner: owner, includeInactive: false, connection: connection) else {
-            throw ProjectContextError.projectContextRequired(owner)
+        return try controlledOperation(cancellation: cancellation) { connection in
+            guard let binding = try bindingUnlocked(
+                owner: owner,
+                includeInactive: false,
+                connection: connection
+            ) else {
+                throw ProjectContextError.projectContextRequired(owner)
+            }
+            _ = try requiredActiveProjectUnlocked(
+                binding.projectID,
+                generation: binding.projectGeneration,
+                connection: connection
+            )
+            try requireActiveProviderSessionUnlocked(
+                owner: owner,
+                binding: binding,
+                connection: connection
+            )
+            return binding.invocationContext(clientID: clientID ?? ClientID(owner.id))
         }
-        _ = try requiredActiveProjectUnlocked(
-            binding.projectID,
-            generation: binding.projectGeneration,
-            connection: connection
-        )
-        try requireActiveProviderSessionUnlocked(
-            owner: owner,
-            binding: binding,
-            connection: connection
-        )
-        return binding.invocationContext(clientID: clientID ?? ClientID(owner.id))
     }
 
     public func validate(
         _ context: ToolInvocationContext,
-        for owner: ProjectBindingOwner
+        for owner: ProjectBindingOwner,
+        cancellation: ToolCallCancellation? = nil
     ) throws {
+        try cancellation?.checkCancellation()
         try Self.validate(owner)
         try Self.validate(context.projectGeneration)
         try Self.validate(context.authorizationScope)
-        let connection = try requiredConnection()
-        _ = try requiredActiveProjectUnlocked(
-            context.projectID,
-            generation: context.projectGeneration,
-            connection: connection
-        )
-        guard let binding = try bindingUnlocked(owner: owner, includeInactive: false, connection: connection) else {
-            throw ProjectContextError.projectContextRequired(owner)
+        try controlledOperation(cancellation: cancellation) { connection in
+            _ = try requiredActiveProjectUnlocked(
+                context.projectID,
+                generation: context.projectGeneration,
+                connection: connection
+            )
+            guard let binding = try bindingUnlocked(
+                owner: owner,
+                includeInactive: false,
+                connection: connection
+            ) else {
+                throw ProjectContextError.projectContextRequired(owner)
+            }
+            guard binding.projectID == context.projectID,
+                  binding.projectGeneration == context.projectGeneration,
+                  binding.runID == context.runID,
+                  binding.authorizationScope == context.authorizationScope,
+                  Self.owner(owner, matches: context) else {
+                throw ProjectContextError.projectScopeMismatch
+            }
+            try requireActiveProviderSessionUnlocked(
+                owner: owner,
+                binding: binding,
+                connection: connection
+            )
         }
-        guard binding.projectID == context.projectID,
-              binding.projectGeneration == context.projectGeneration,
-              binding.runID == context.runID,
-              binding.authorizationScope == context.authorizationScope,
-              Self.owner(owner, matches: context) else {
-            throw ProjectContextError.projectScopeMismatch
-        }
-        try requireActiveProviderSessionUnlocked(
-            owner: owner,
-            binding: binding,
-            connection: connection
-        )
     }
 
     /// Runs a short synchronous result mutation only while the durable project generation
@@ -401,14 +440,18 @@ public actor ProjectControlPlaneRepository {
         owner: ProjectBindingOwner,
         resultKind: String,
         resultSHA256: String? = nil,
+        cancellation: ToolCallCancellation? = nil,
         mutation: @Sendable () throws -> Value
     ) throws -> Value {
+        try cancellation?.checkCancellation()
         try Self.validate(owner)
         try Self.validate(context.projectGeneration)
         try Self.validate(context.authorizationScope)
-        let connection = try requiredConnection()
         do {
-            return try connection.transaction {
+            return try controlledTransaction(
+                cancellation: cancellation,
+                checkCancellationBeforeCommit: false
+            ) { connection in
                 guard let project = try projectUnlocked(context.projectID, connection: connection) else {
                     throw ProjectContextError.projectNotFound(context.projectID)
                 }
@@ -433,13 +476,29 @@ public actor ProjectControlPlaneRepository {
                     binding: binding,
                     connection: connection
                 )
-                return try mutation()
+                // The external repository shares this request's commit authority. It
+                // may ignore polling while doing bounded preparation, but it must claim
+                // the authority only around its irreversible commit so cancellation can
+                // revoke a mutator that has not reached that boundary.
+                try cancellation?.checkCancellation()
+                let value = try mutation()
+                // Database/file repositories publish a lower-layer receipt at their
+                // actual commit boundary. Promote it immediately to this bridge's
+                // exact result before any later control-plane completion observer can
+                // delay result delivery.
+                cancellation?.promoteCommittedResultIfPresent(value)
+                // The external mutation has returned its authoritative outcome. Do not
+                // let a later cancellation conceal it while this read-only guard
+                // transaction is closed.
+                connection.finishRequestCancellationWindow()
+                return value
             }
         } catch DelayedResultFenceError.staleGeneration(let actualGeneration) {
             _ = try quarantineStaleResult(
                 context: context,
                 resultKind: resultKind,
-                resultSHA256: resultSHA256
+                resultSHA256: resultSHA256,
+                cancellation: cancellation
             )
             throw ProjectContextError.staleProjectGeneration(
                 expected: context.projectGeneration,
@@ -451,12 +510,13 @@ public actor ProjectControlPlaneRepository {
     @discardableResult
     public func beginReset(
         projectID: ProjectID,
-        expectedGeneration: ProjectGeneration
+        expectedGeneration: ProjectGeneration,
+        cancellation: ToolCallCancellation? = nil
     ) throws -> ProjectControlRecord {
+        try cancellation?.checkCancellation()
         try Self.validate(expectedGeneration)
-        let connection = try requiredConnection()
         let timestamp = ISO8601.string(from: clock.now())
-        return try connection.transaction {
+        return try controlledTransaction(cancellation: cancellation) { connection in
             _ = try requiredActiveProjectUnlocked(
                 projectID,
                 generation: expectedGeneration,
@@ -483,15 +543,16 @@ public actor ProjectControlPlaneRepository {
     @discardableResult
     public func completeReset(
         projectID: ProjectID,
-        expectedGeneration: ProjectGeneration
+        expectedGeneration: ProjectGeneration,
+        cancellation: ToolCallCancellation? = nil
     ) throws -> ProjectGenerationResetReceipt {
+        try cancellation?.checkCancellation()
         try Self.validate(expectedGeneration)
         guard expectedGeneration.rawValue < UInt64(Int64.max) else {
             throw ProjectContextError.invalidGeneration(expectedGeneration.rawValue)
         }
-        let connection = try requiredConnection()
         let timestamp = ISO8601.string(from: clock.now())
-        return try connection.transaction {
+        return try controlledTransaction(cancellation: cancellation) { connection in
             guard let current = try projectUnlocked(projectID, connection: connection) else {
                 throw ProjectContextError.projectNotFound(projectID)
             }
@@ -552,31 +613,34 @@ public actor ProjectControlPlaneRepository {
 
     public func cancelReset(
         projectID: ProjectID,
-        expectedGeneration: ProjectGeneration
+        expectedGeneration: ProjectGeneration,
+        cancellation: ToolCallCancellation? = nil
     ) throws {
+        try cancellation?.checkCancellation()
         try Self.validate(expectedGeneration)
-        let connection = try requiredConnection()
-        let changed = try connection.execute(
-            """
-            UPDATE control_projects SET lifecycle_state='active',updated_at=?
-            WHERE project_id=? AND generation=? AND lifecycle_state='resetting'
-            """,
-            bindings: [
-                .text(ISO8601.string(from: clock.now())), .text(projectID.description),
-                .int64(try Self.sqliteGeneration(expectedGeneration)),
-            ]
-        )
-        guard changed == 1 else {
-            guard let project = try projectUnlocked(projectID, connection: connection) else {
-                throw ProjectContextError.projectNotFound(projectID)
+        try controlledTransaction(cancellation: cancellation) { connection in
+            let changed = try connection.execute(
+                """
+                UPDATE control_projects SET lifecycle_state='active',updated_at=?
+                WHERE project_id=? AND generation=? AND lifecycle_state='resetting'
+                """,
+                bindings: [
+                    .text(ISO8601.string(from: clock.now())), .text(projectID.description),
+                    .int64(try Self.sqliteGeneration(expectedGeneration)),
+                ]
+            )
+            guard changed == 1 else {
+                guard let project = try projectUnlocked(projectID, connection: connection) else {
+                    throw ProjectContextError.projectNotFound(projectID)
+                }
+                guard project.generation == expectedGeneration else {
+                    throw ProjectContextError.staleProjectGeneration(
+                        expected: expectedGeneration,
+                        actual: project.generation
+                    )
+                }
+                throw ProjectContextError.resetNotPrepared(projectID)
             }
-            guard project.generation == expectedGeneration else {
-                throw ProjectContextError.staleProjectGeneration(
-                    expected: expectedGeneration,
-                    actual: project.generation
-                )
-            }
-            throw ProjectContextError.resetNotPrepared(projectID)
         }
     }
 
@@ -1000,8 +1064,10 @@ public actor ProjectControlPlaneRepository {
         projectGeneration: ProjectGeneration,
         assignmentID: String? = nil,
         mission: String,
-        mode: ContinuityMode
+        mode: ContinuityMode,
+        cancellation: ToolCallCancellation? = nil
     ) throws {
+        try cancellation?.checkCancellation()
         try Self.validate(projectGeneration)
         let normalizedMission = mission.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalizedMission.isEmpty, normalizedMission.utf8.count <= 16 * 1_024 else {
@@ -1012,9 +1078,9 @@ public actor ProjectControlPlaneRepository {
             maximumBytes: 1_024,
             field: "assignment identifier"
         )
-        let connection = try requiredConnection()
         let timestamp = ISO8601.string(from: clock.now())
-        try connection.transaction {
+        try cancellation?.checkCancellation()
+        try controlledTransaction(cancellation: cancellation) { connection in
             _ = try requiredActiveProjectUnlocked(
                 projectID,
                 generation: projectGeneration,
@@ -1053,12 +1119,14 @@ public actor ProjectControlPlaneRepository {
     /// and idempotency key both reconcile to one immutable command identity.
     @discardableResult
     public func enqueueContinuityCommand(
-        _ request: ContinuityCommandRequest
+        _ request: ContinuityCommandRequest,
+        cancellation: ToolCallCancellation? = nil
     ) throws -> ContinuityCommand {
+        try cancellation?.checkCancellation()
         try validateContinuityCommandRequest(request)
-        let connection = try requiredConnection()
         let timestamp = ISO8601.string(from: clock.now())
-        return try connection.transaction {
+        try cancellation?.checkCancellation()
+        return try controlledTransaction(cancellation: cancellation) { connection in
             try enqueueContinuityCommandUnlocked(
                 request,
                 timestamp: timestamp,
@@ -2733,8 +2801,10 @@ public actor ProjectControlPlaneRepository {
     public func quarantineStaleResult(
         context: ToolInvocationContext,
         resultKind: String,
-        resultSHA256: String? = nil
+        resultSHA256: String? = nil,
+        cancellation: ToolCallCancellation? = nil
     ) throws -> String {
+        try cancellation?.checkCancellation()
         try Self.validate(context.projectGeneration)
         let kind = resultKind.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !kind.isEmpty, kind.utf8.count <= 128 else {
@@ -2746,8 +2816,8 @@ public actor ProjectControlPlaneRepository {
                 throw ProjectContextError.invalidIdentifier("result SHA-256")
             }
         }
-        let connection = try requiredConnection()
-        return try connection.transaction {
+        try cancellation?.checkCancellation()
+        return try controlledTransaction(cancellation: cancellation) { connection in
             guard let project = try projectUnlocked(context.projectID, connection: connection) else {
                 throw ProjectContextError.projectNotFound(context.projectID)
             }
@@ -2804,24 +2874,61 @@ public actor ProjectControlPlaneRepository {
         )
     }
 
-    public func health() throws -> ControlPlaneDatabaseHealth {
-        let connection = try requiredConnection()
-        let integrity = try connection.scalarText("PRAGMA integrity_check;") ?? "missing"
-        guard integrity == "ok" else {
-            throw ProjectContextError.integrityFailure(integrity)
+    public func health(
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ControlPlaneDatabaseHealth {
+        try controlledOperation(cancellation: cancellation) { connection in
+            let integrity = try connection.scalarText("PRAGMA integrity_check;") ?? "missing"
+            guard integrity == "ok" else {
+                throw ProjectContextError.integrityFailure(integrity)
+            }
+            return ControlPlaneDatabaseHealth(
+                schemaVersion: try connection.scalarInt(
+                    "SELECT version FROM control_schema_version WHERE singleton=1"
+                ),
+                journalMode: (try connection.scalarText("PRAGMA journal_mode;")) ?? "unknown",
+                foreignKeysEnabled: try connection.scalarInt("PRAGMA foreign_keys;") == 1,
+                busyTimeoutMilliseconds: try connection.scalarInt("PRAGMA busy_timeout;"),
+                integrityResult: integrity
+            )
         }
-        return ControlPlaneDatabaseHealth(
-            schemaVersion: try connection.scalarInt("SELECT version FROM control_schema_version WHERE singleton=1"),
-            journalMode: (try connection.scalarText("PRAGMA journal_mode;")) ?? "unknown",
-            foreignKeysEnabled: try connection.scalarInt("PRAGMA foreign_keys;") == 1,
-            busyTimeoutMilliseconds: try connection.scalarInt("PRAGMA busy_timeout;"),
-            integrityResult: integrity
-        )
     }
 
     private func requiredConnection() throws -> ControlPlaneSQLiteConnection {
         guard let connection else { throw ProjectContextError.repositoryClosed }
         return connection
+    }
+
+    private func controlledOperation<T>(
+        cancellation: ToolCallCancellation?,
+        _ body: (ControlPlaneSQLiteConnection) throws -> T
+    ) throws -> T {
+        let connection = try requiredConnection()
+        return try connection.withRequestControl(
+            cancellation: cancellation,
+            busyRetryObserver: busyRetryObserver,
+            beforeCommitObserver: beforeCommitObserver,
+            didCommitObserver: didCommitObserver
+        ) {
+            try body(connection)
+        }
+    }
+
+    private func controlledTransaction<T>(
+        cancellation: ToolCallCancellation?,
+        checkCancellationBeforeCommit: Bool = true,
+        _ body: (ControlPlaneSQLiteConnection) throws -> T
+    ) throws -> T {
+        let connection = try requiredConnection()
+        return try connection.transaction(
+            cancellation: cancellation,
+            busyRetryObserver: busyRetryObserver,
+            beforeCommitObserver: beforeCommitObserver,
+            didCommitObserver: didCommitObserver,
+            checkCancellationBeforeCommit: checkCancellationBeforeCommit
+        ) {
+            try body(connection)
+        }
     }
 
     private func requiredActiveProjectUnlocked(
@@ -4770,10 +4877,132 @@ private struct ControlPlaneSQLiteRow {
     }
 }
 
+private final class ControlPlaneSQLiteOperationControl {
+    private static let busyPollSeconds: TimeInterval = 0.01
+
+    let cancellation: ToolCallCancellation?
+    private let busyRetryObserver: (@Sendable () -> Void)?
+    private let beforeCommitObserver: (@Sendable () throws -> Void)?
+    private let didCommitObserver: (@Sendable () -> Void)?
+    private let busyDeadlineUptimeNanoseconds: UInt64
+    private var reportedBusy = false
+    private var acceptsCancellation = true
+    private(set) var committed = false
+
+    init(
+        cancellation: ToolCallCancellation?,
+        busyTimeoutMilliseconds: Int,
+        busyRetryObserver: (@Sendable () -> Void)?,
+        beforeCommitObserver: (@Sendable () throws -> Void)?,
+        didCommitObserver: (@Sendable () -> Void)?
+    ) {
+        self.cancellation = cancellation
+        self.busyRetryObserver = busyRetryObserver
+        self.beforeCommitObserver = beforeCommitObserver
+        self.didCommitObserver = didCommitObserver
+        let milliseconds = UInt64(max(1, busyTimeoutMilliseconds))
+        let delta = milliseconds.multipliedReportingOverflow(by: 1_000_000)
+        let boundedDelta = delta.overflow ? UInt64.max : delta.partialValue
+        let deadline = DispatchTime.now().uptimeNanoseconds
+            .addingReportingOverflow(boundedDelta)
+        busyDeadlineUptimeNanoseconds = deadline.overflow ? UInt64.max : deadline.partialValue
+    }
+
+    func checkCancellation() throws {
+        guard acceptsCancellation else { return }
+        try cancellation?.checkCancellation()
+    }
+
+    func prepareToCommit() throws {
+        try beforeCommitObserver?()
+        try checkCancellation()
+    }
+
+    func performCommit(_ commit: () throws -> Void) throws {
+        try beforeCommitObserver?()
+        if let cancellation {
+            try cancellation.withCommitAuthorization(commit)
+        } else {
+            try commit()
+        }
+        recordCommit()
+    }
+
+    func performCommit<Value>(
+        committedResult: Value,
+        _ commit: () throws -> Void
+    ) throws {
+        try beforeCommitObserver?()
+        if let cancellation {
+            try cancellation.withCommitAuthorization(
+                committedResult: committedResult,
+                commit
+            )
+        } else {
+            try commit()
+        }
+        recordCommit()
+    }
+
+    func recordCommit() {
+        committed = true
+        didCommitObserver?()
+    }
+
+    func shouldInterrupt() -> Bool {
+        acceptsCancellation
+            && (cancellation?.isCancelled == true || cancellation?.isDeadlineExceeded == true)
+    }
+
+    func finishCancellationWindow() {
+        acceptsCancellation = false
+    }
+
+    func waitForBusyRetry() -> Int32 {
+        if !reportedBusy {
+            reportedBusy = true
+            busyRetryObserver?()
+        }
+        guard !shouldInterrupt() else { return 0 }
+        let now = DispatchTime.now().uptimeNanoseconds
+        guard now < busyDeadlineUptimeNanoseconds else { return 0 }
+        let fallbackRemaining = TimeInterval(busyDeadlineUptimeNanoseconds - now) / 1_000_000_000
+        let requestRemaining = acceptsCancellation
+            ? cancellation?.remainingTimeInterval ?? fallbackRemaining
+            : fallbackRemaining
+        let delay = min(Self.busyPollSeconds, fallbackRemaining, requestRemaining)
+        guard delay > 0 else { return 0 }
+        Thread.sleep(forTimeInterval: delay)
+        return shouldInterrupt() || DispatchTime.now().uptimeNanoseconds >= busyDeadlineUptimeNanoseconds
+            ? 0
+            : 1
+    }
+}
+
+private func controlPlaneSQLiteBusyHandler(
+    _ context: UnsafeMutableRawPointer?,
+    _ priorAttempts: Int32
+) -> Int32 {
+    guard let context else { return 0 }
+    return Unmanaged<ControlPlaneSQLiteOperationControl>.fromOpaque(context)
+        .takeUnretainedValue()
+        .waitForBusyRetry()
+}
+
+private func controlPlaneSQLiteProgressHandler(_ context: UnsafeMutableRawPointer?) -> Int32 {
+    guard let context else { return 0 }
+    return Unmanaged<ControlPlaneSQLiteOperationControl>.fromOpaque(context)
+        .takeUnretainedValue()
+        .shouldInterrupt() ? 1 : 0
+}
+
 private final class ControlPlaneSQLiteConnection {
     private static let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
     private var database: OpaquePointer?
+    private let busyTimeoutMilliseconds: Int
+    private var activeControl: ControlPlaneSQLiteOperationControl?
+    private var transactionDepth = 0
 
     init(
         databaseURL: URL,
@@ -4798,6 +5027,7 @@ private final class ControlPlaneSQLiteConnection {
             throw ProjectContextError.databaseFailure(message)
         }
         database = handle
+        self.busyTimeoutMilliseconds = busyTimeoutMilliseconds
         do {
             guard sqlite3_busy_timeout(handle, Int32(busyTimeoutMilliseconds)) == SQLITE_OK else {
                 throw ProjectContextError.databaseFailure("could not configure SQLite busy timeout")
@@ -4832,15 +5062,89 @@ private final class ControlPlaneSQLiteConnection {
         }
     }
 
-    func transaction<T>(_ body: () throws -> T) throws -> T {
-        try executeStatic("BEGIN IMMEDIATE;")
+    func withRequestControl<T>(
+        cancellation: ToolCallCancellation?,
+        busyRetryObserver: (@Sendable () -> Void)? = nil,
+        beforeCommitObserver: (@Sendable () throws -> Void)? = nil,
+        didCommitObserver: (@Sendable () -> Void)? = nil,
+        _ body: () throws -> T
+    ) throws -> T {
+        if activeControl != nil {
+            try cancellation?.checkCancellation()
+            return try body()
+        }
+        let database = try requiredDatabase()
+        let control = ControlPlaneSQLiteOperationControl(
+            cancellation: cancellation,
+            busyTimeoutMilliseconds: busyTimeoutMilliseconds,
+            busyRetryObserver: busyRetryObserver,
+            beforeCommitObserver: beforeCommitObserver,
+            didCommitObserver: didCommitObserver
+        )
+        try control.checkCancellation()
+        activeControl = control
+        let context = Unmanaged.passUnretained(control).toOpaque()
+        sqlite3_busy_handler(database, controlPlaneSQLiteBusyHandler, context)
+        sqlite3_progress_handler(database, 1_000, controlPlaneSQLiteProgressHandler, context)
+        defer {
+            sqlite3_progress_handler(database, 0, nil, nil)
+            sqlite3_busy_timeout(database, Int32(busyTimeoutMilliseconds))
+            activeControl = nil
+        }
         do {
             let value = try body()
-            try executeStatic("COMMIT;")
+            if !control.committed {
+                try control.checkCancellation()
+            }
             return value
         } catch {
-            try? executeStatic("ROLLBACK;")
+            if !control.committed {
+                try control.checkCancellation()
+            }
             throw error
+        }
+    }
+
+    func finishRequestCancellationWindow() {
+        activeControl?.finishCancellationWindow()
+    }
+
+    func transaction<T>(
+        cancellation: ToolCallCancellation? = nil,
+        busyRetryObserver: (@Sendable () -> Void)? = nil,
+        beforeCommitObserver: (@Sendable () throws -> Void)? = nil,
+        didCommitObserver: (@Sendable () -> Void)? = nil,
+        checkCancellationBeforeCommit: Bool = true,
+        _ body: () throws -> T
+    ) throws -> T {
+        try withRequestControl(
+            cancellation: cancellation,
+            busyRetryObserver: busyRetryObserver,
+            beforeCommitObserver: beforeCommitObserver,
+            didCommitObserver: didCommitObserver
+        ) {
+            try executeStatic("BEGIN IMMEDIATE;")
+            transactionDepth += 1
+            defer { transactionDepth -= 1 }
+            do {
+                let value = try body()
+                if checkCancellationBeforeCommit {
+                    if let activeControl {
+                        try activeControl.performCommit(committedResult: value) {
+                            try executeStatic("COMMIT;")
+                        }
+                    } else {
+                        try executeStatic("COMMIT;")
+                    }
+                } else {
+                    try executeStatic("COMMIT;")
+                    activeControl?.recordCommit()
+                }
+                return value
+            } catch {
+                try? executeStatic("ROLLBACK;")
+                throw error
+            }
         }
     }
 
@@ -4850,8 +5154,15 @@ private final class ControlPlaneSQLiteConnection {
         bindings: [ControlPlaneSQLiteBinding] = []
     ) throws -> Int {
         try withStatement(sql, bindings: bindings) { statement in
-            let result = sqlite3_step(statement)
-            guard result == SQLITE_DONE else { throw mappedError(result) }
+            let executeStep = {
+                let result = sqlite3_step(statement)
+                guard result == SQLITE_DONE else { throw self.mappedError(result) }
+            }
+            if transactionDepth == 0, let activeControl {
+                try activeControl.performCommit(executeStep)
+            } else {
+                try executeStep()
+            }
             return Int(sqlite3_changes(try requiredDatabase()))
         }
     }

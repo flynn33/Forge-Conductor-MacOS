@@ -30,6 +30,61 @@ final class RuntimeExecutionJobTests: XCTestCase {
         }
     }
 
+    private actor PostCancellationCommitGate {
+        private var paused = false
+        private var released = false
+        private var pauseWaiters: [CheckedContinuation<Void, Never>] = []
+        private var releaseWaiter: CheckedContinuation<Void, Never>?
+
+        func pause() async {
+            paused = true
+            let waiters = pauseWaiters
+            pauseWaiters.removeAll(keepingCapacity: false)
+            for waiter in waiters { waiter.resume() }
+            if released { return }
+            await withCheckedContinuation { continuation in
+                releaseWaiter = continuation
+            }
+        }
+
+        func waitUntilPaused() async {
+            if paused { return }
+            await withCheckedContinuation { continuation in
+                pauseWaiters.append(continuation)
+            }
+        }
+
+        func release() {
+            released = true
+            releaseWaiter?.resume()
+            releaseWaiter = nil
+        }
+    }
+
+    private final class RepositoryCommitGate: @unchecked Sendable {
+        private let expectedKind: RuntimeJobCommitKind
+        private let committed = DispatchSemaphore(value: 0)
+        private let releaseCommit = DispatchSemaphore(value: 0)
+
+        init(expectedKind: RuntimeJobCommitKind) {
+            self.expectedKind = expectedKind
+        }
+
+        func observe(_ kind: RuntimeJobCommitKind) {
+            guard kind == expectedKind else { return }
+            committed.signal()
+            _ = releaseCommit.wait(timeout: .now() + 2)
+        }
+
+        func waitUntilCommitted(timeout: TimeInterval = 1) -> DispatchTimeoutResult {
+            committed.wait(timeout: .now() + timeout)
+        }
+
+        func release() {
+            releaseCommit.signal()
+        }
+    }
+
     func testConcurrentStdoutAndStderrDrainWithoutDeadlockAndSpillWithinBudget() async throws {
         let fixture = try await Fixture.make()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
@@ -105,12 +160,17 @@ final class RuntimeExecutionJobTests: XCTestCase {
         wait
         """
         let jobID = try await fixture.service.submit(
-            fixture.request(kind: .bash, profile: .bashNoProfile, script: script, timeout: 1)
+            fixture.request(kind: .bash, profile: .bashNoProfile, script: script, timeout: 5)
         )
+        guard await Self.waitForFile(pidFile) else {
+            XCTFail("timed runtime fixture did not start its descendant")
+            await fixture.close()
+            return
+        }
         let record = try await fixture.service.waitForTerminal(
             jobID: jobID,
             context: fixture.context,
-            maximumWait: .seconds(8)
+            maximumWait: .seconds(12)
         )
         XCTAssertEqual(record.state, .timedOut)
         let descendant = try Self.readPID(pidFile)
@@ -962,6 +1022,31 @@ final class RuntimeExecutionJobTests: XCTestCase {
             ),
             migrationManifest
         )
+    }
+
+    func testRuntimeColumnProbePropagatesStepFailures() throws {
+        for stepCode in [SQLITE_BUSY, SQLITE_IOERR] {
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+                "forge-runtime-column-probe-\(stepCode)-\(UUID().uuidString)",
+                isDirectory: true
+            )
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let databaseURL = root.appendingPathComponent("runtime.sqlite")
+
+            XCTAssertThrowsError(
+                try RuntimeJobRepository(
+                    databaseURL: databaseURL,
+                    beforeMigrationCommitObserver: nil,
+                    tableInfoStepObserver: { stepCode }
+                )
+            ) { error in
+                XCTAssertTrue(
+                    error.localizedDescription.contains("table-info step failed with code \(stepCode)"),
+                    "unexpected error: \(error)"
+                )
+            }
+        }
     }
 
     func testRuntimeVersionTwoMigrationRejectsStablePathReplacementBeforeCommit() throws {
@@ -3514,7 +3599,7 @@ final class RuntimeExecutionJobTests: XCTestCase {
         let fixture = try await Fixture.make()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
         let toolPack = RuntimeJobToolPack(service: fixture.service)
-        let submission = await toolPack.handle(
+        let submission = try await toolPack.handle(
             name: "bash.run",
             arguments: [
                 "script": "printf 'tool-path'",
@@ -3537,12 +3622,358 @@ final class RuntimeExecutionJobTests: XCTestCase {
             maximumWait: .seconds(8)
         )
         XCTAssertEqual(terminal.state, .completed)
-        let status = await toolPack.handle(
+        let status = try await toolPack.handle(
             name: "job.status",
             arguments: ["job_id": jobText],
             context: fixture.context
         )
         XCTAssertEqual(status?.payload["state"] as? String, RuntimeJobState.completed.rawValue)
+        await fixture.close()
+    }
+
+    func testSynchronousRuntimeBridgePreservesDeadlineWhenCancelledTaskStops() throws {
+        let cancellation = ToolCallCancellation(timeoutSeconds: 0.05)
+        do {
+            let _: String = try RuntimeJobSynchronousToolPack.wait(
+                timeoutSeconds: 1,
+                cancellation: cancellation,
+                committedResultWins: true
+            ) {
+                while !Task.isCancelled {
+                    await Task.yield()
+                }
+                throw CancellationError()
+            }
+            XCTFail("expired runtime deadline unexpectedly returned a value")
+        } catch {
+            XCTAssertTrue(
+                error is ToolCallDeadlineExceeded,
+                "task cancellation replaced the deadline error: \(error)"
+            )
+        }
+    }
+
+    func testSynchronousRuntimeBridgeCommittedReceiptWinsCancelledChildTerminal() throws {
+        let cancellation = ToolCallCancellation()
+        let receipt = RuntimeBlockingResult<String>()
+        let value: String = try RuntimeJobSynchronousToolPack.wait(
+            timeoutSeconds: 1,
+            cancellation: cancellation,
+            committedResultWins: true,
+            committedReceipt: receipt
+        ) {
+            receipt.store(.success("committed-after-cancellation"))
+            cancellation.cancel()
+            while !Task.isCancelled {
+                await Task.yield()
+            }
+            throw CancellationError()
+        }
+        XCTAssertEqual(value, "committed-after-cancellation")
+    }
+
+    func testSynchronousRuntimeBridgeCommittedReceiptWinsDeadlineChildTerminal() throws {
+        let receipt = RuntimeBlockingResult<String>()
+        let value: String = try RuntimeJobSynchronousToolPack.wait(
+            timeoutSeconds: 0.1,
+            cancellation: nil,
+            committedResultWins: true,
+            committedReceipt: receipt
+        ) {
+            receipt.store(.success("committed-before-deadline"))
+            while !Task.isCancelled {
+                await Task.yield()
+            }
+            throw ToolCallDeadlineExceeded()
+        }
+        XCTAssertEqual(value, "committed-before-deadline")
+    }
+
+    func testSynchronousRuntimeBridgeWithoutReceiptPreservesCancellation() throws {
+        let cancellation = ToolCallCancellation()
+        do {
+            let _: String = try RuntimeJobSynchronousToolPack.wait(
+                timeoutSeconds: 1,
+                cancellation: cancellation,
+                committedResultWins: true
+            ) {
+                cancellation.cancel()
+                while !Task.isCancelled {
+                    await Task.yield()
+                }
+                throw CancellationError()
+            }
+            XCTFail("cancelled runtime bridge unexpectedly returned a value")
+        } catch {
+            XCTAssertTrue(error is CancellationError, "unexpected error: \(error)")
+        }
+    }
+
+    func testRuntimeSubmissionReceiptIsPublishedAtCommitBeforeRepositoryReturns() async throws {
+        let gate = RepositoryCommitGate(expectedKind: .submission)
+        let fixture = try await Fixture.make(afterMutationCommitObserver: gate.observe)
+        defer {
+            gate.release()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let receipt = RuntimeBlockingResult<ToolResult>()
+        let toolPack = RuntimeJobToolPack(
+            service: fixture.service,
+            durableResultObserver: { value in
+                receipt.store(.success(value))
+            }
+        )
+        let cancellation = ToolCallCancellation()
+        let bridgeResult = RuntimeBlockingResult<ToolResult>()
+        let bridgeFinished = DispatchSemaphore(value: 0)
+        let context = fixture.context
+        let cwd = fixture.projectRoot.path
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let value: ToolResult = try RuntimeJobSynchronousToolPack.wait(
+                    timeoutSeconds: 0.1,
+                    cancellation: cancellation,
+                    committedResultWins: true,
+                    committedReceipt: receipt
+                ) {
+                    try await toolPack.handle(
+                        name: "bash.run",
+                        arguments: [
+                            "script": "printf 'submission-receipt'",
+                            "cwd": cwd,
+                            "timeout_sec": 5,
+                            "replay_class": RuntimeReplayClass.readOnly.rawValue,
+                        ],
+                        context: context
+                    ) ?? .failure(code: "missing_result", message: "runtime tool returned no result")
+                }
+                bridgeResult.store(.success(value))
+            } catch {
+                bridgeResult.store(.failure(error))
+            }
+            bridgeFinished.signal()
+        }
+
+        XCTAssertEqual(gate.waitUntilCommitted(), .success)
+        cancellation.cancel()
+        XCTAssertEqual(
+            bridgeFinished.wait(timeout: .now() + 1),
+            .success,
+            "submission bridge did not reconcile its COMMIT receipt while the actor was gated"
+        )
+        let result = try XCTUnwrap(bridgeResult.take()).get()
+        XCTAssertTrue(result.ok)
+        let jobID = try XCTUnwrap(
+            (result.payload["job_id"] as? String).flatMap(UUID.init(uuidString:))
+        )
+        XCTAssertEqual(result.payload["state"] as? String, RuntimeJobState.queued.rawValue)
+
+        gate.release()
+        let terminal = try await fixture.service.waitForTerminal(
+            jobID: jobID,
+            context: fixture.context,
+            maximumWait: .seconds(8)
+        )
+        XCTAssertEqual(terminal.state, .completed)
+        await fixture.close()
+    }
+
+    func testRuntimeCancellationReceiptIsPublishedAtCommitBeforeRepositoryReturns() async throws {
+        let gate = RepositoryCommitGate(expectedKind: .cancellation)
+        let fixture = try await Fixture.make(afterMutationCommitObserver: gate.observe)
+        defer {
+            gate.release()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let ready = fixture.projectRoot.appendingPathComponent("cancel-receipt-ready")
+        let jobID = try await fixture.service.submit(
+            fixture.request(
+                kind: .bash,
+                profile: .bashNoProfile,
+                script: ": > cancel-receipt-ready; while :; do sleep 1; done",
+                timeout: 30
+            )
+        )
+        guard await Self.waitForFile(ready) else {
+            await fixture.close()
+            XCTFail("runtime cancellation receipt fixture did not start")
+            return
+        }
+
+        let receipt = RuntimeBlockingResult<ToolResult>()
+        let toolPack = RuntimeJobToolPack(
+            service: fixture.service,
+            durableResultObserver: { value in
+                receipt.store(.success(value))
+            }
+        )
+        let cancellation = ToolCallCancellation()
+        let bridgeResult = RuntimeBlockingResult<ToolResult>()
+        let bridgeFinished = DispatchSemaphore(value: 0)
+        let context = fixture.context
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let value: ToolResult = try RuntimeJobSynchronousToolPack.wait(
+                    timeoutSeconds: 0.1,
+                    cancellation: cancellation,
+                    committedResultWins: true,
+                    committedReceipt: receipt
+                ) {
+                    try await toolPack.handle(
+                        name: "job.cancel",
+                        arguments: ["job_id": jobID.uuidString.lowercased()],
+                        context: context
+                    ) ?? .failure(code: "missing_result", message: "runtime tool returned no result")
+                }
+                bridgeResult.store(.success(value))
+            } catch {
+                bridgeResult.store(.failure(error))
+            }
+            bridgeFinished.signal()
+        }
+
+        XCTAssertEqual(gate.waitUntilCommitted(), .success)
+        cancellation.cancel()
+        XCTAssertEqual(
+            bridgeFinished.wait(timeout: .now() + 1),
+            .success,
+            "cancellation bridge did not reconcile its COMMIT receipt while the actor was gated"
+        )
+        let result = try XCTUnwrap(bridgeResult.take()).get()
+        XCTAssertTrue(result.ok)
+        XCTAssertEqual(result.payload["job_id"] as? String, jobID.uuidString.lowercased())
+        XCTAssertTrue(
+            result.payload["state"] as? String == RuntimeJobState.cancelling.rawValue
+                || result.payload["state"] as? String == RuntimeJobState.cancelled.rawValue
+        )
+
+        gate.release()
+        let terminal = try await fixture.service.waitForTerminal(
+            jobID: jobID,
+            context: fixture.context,
+            maximumWait: .seconds(8)
+        )
+        XCTAssertEqual(terminal.state, .cancelled)
+        await fixture.close()
+    }
+
+    func testCancelledRuntimeCreateRollsBackAfterDatabaseAdmission() async throws {
+        let fixture = try await Fixture.make()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let runtimeDatabaseURL = await fixture.runtimeRepository.databaseURL
+        var locker: OpaquePointer?
+        XCTAssertEqual(
+            sqlite3_open_v2(
+                runtimeDatabaseURL.path,
+                &locker,
+                SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX,
+                nil
+            ),
+            SQLITE_OK
+        )
+        let opened = try XCTUnwrap(locker)
+        defer {
+            sqlite3_exec(opened, "ROLLBACK;", nil, nil, nil)
+            sqlite3_close(opened)
+        }
+        XCTAssertEqual(sqlite3_exec(opened, "BEGIN IMMEDIATE;", nil, nil, nil), SQLITE_OK)
+
+        let jobID = UUID()
+        let idempotencyKey = "cancelled-runtime-create-\(jobID.uuidString.lowercased())"
+        let request = fixture.request(
+            kind: .bash,
+            profile: .bashNoProfile,
+            script: "printf never-created",
+            timeout: 5,
+            idempotencyKey: idempotencyKey
+        )
+        let create = Task {
+            try await fixture.runtimeRepository.createJob(
+                jobID: jobID,
+                request: request,
+                commandSummary: "cancelled runtime create",
+                timeoutSeconds: 5,
+                requestArtifactRelativePath: nil
+            )
+        }
+        try await Task.sleep(for: .milliseconds(50))
+        create.cancel()
+        sqlite3_exec(opened, "COMMIT;", nil, nil, nil)
+
+        do {
+            _ = try await create.value
+            XCTFail("cancelled runtime create unexpectedly committed")
+        } catch is CancellationError {
+            // Expected: cancellation is checked after actor/database admission.
+        } catch {
+            XCTFail("unexpected error: \(error)")
+        }
+        let stored = try await fixture.runtimeRepository.existingJob(
+            projectID: fixture.projectID,
+            generation: fixture.context.projectGeneration,
+            idempotencyKey: idempotencyKey
+        )
+        XCTAssertNil(stored)
+        await fixture.close()
+    }
+
+    func testRuntimeJobCancelReturnsCommittedStatusAfterCallerCancellation() async throws {
+        let fixture = try await Fixture.make()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let ready = fixture.projectRoot.appendingPathComponent("job-cancel-commit-ready")
+        let jobID = try await fixture.service.submit(
+            fixture.request(
+                kind: .bash,
+                profile: .bashNoProfile,
+                script: ": > job-cancel-commit-ready; while :; do sleep 1; done",
+                timeout: 30
+            )
+        )
+        let didStart = await Self.waitForFile(ready)
+        guard didStart else {
+            await fixture.close()
+            XCTFail("runtime cancellation fixture did not start")
+            return
+        }
+
+        let gate = PostCancellationCommitGate()
+        let toolPack = RuntimeJobToolPack(
+            service: fixture.service,
+            postCancellationCommit: {
+                await gate.pause()
+            }
+        )
+        let invocation = Task {
+            try await toolPack.handle(
+                name: "job.cancel",
+                arguments: ["job_id": jobID.uuidString.lowercased()],
+                context: fixture.context
+            )
+        }
+        await gate.waitUntilPaused()
+        let committed = try await fixture.runtimeRepository.job(jobID)
+        XCTAssertTrue(
+            committed?.state == .cancelling || committed?.state == .cancelled,
+            "job cancellation was not durable before the caller was cancelled"
+        )
+
+        invocation.cancel()
+        await gate.release()
+        let result = try await invocation.value
+        XCTAssertEqual(result?.ok, true)
+        XCTAssertTrue(
+            result?.payload["state"] as? String == RuntimeJobState.cancelling.rawValue
+                || result?.payload["state"] as? String == RuntimeJobState.cancelled.rawValue
+        )
+
+        let terminal = try await fixture.service.waitForTerminal(
+            jobID: jobID,
+            context: fixture.context,
+            maximumWait: .seconds(8)
+        )
+        XCTAssertEqual(terminal.state, .cancelled)
         await fixture.close()
     }
 
@@ -4155,7 +4586,8 @@ final class RuntimeExecutionJobTests: XCTestCase {
             launchObserver: any RuntimeJobLaunchObserving = NoopRuntimeJobLaunchObserver(),
             terminalPersistenceHook: any RuntimeJobTerminalPersistenceHook =
                 NoopRuntimeJobTerminalPersistenceHook(),
-            recoveredProcessController: (any RuntimeRecoveredProcessControlling)? = nil
+            recoveredProcessController: (any RuntimeRecoveredProcessControlling)? = nil,
+            afterMutationCommitObserver: (@Sendable (RuntimeJobCommitKind) -> Void)? = nil
         ) async throws -> Fixture {
             let root = FileManager.default.temporaryDirectory
                 .appendingPathComponent("forge-runtime-tests-\(UUID().uuidString)", isDirectory: true)
@@ -4185,7 +4617,11 @@ final class RuntimeExecutionJobTests: XCTestCase {
                 authorizationScope: scope
             )
             let context = try await control.invocationContext(for: owner)
-            let runtime = try RuntimeJobRepository(databaseURL: database)
+            let runtime = try RuntimeJobRepository(
+                databaseURL: database,
+                beforeMigrationCommitObserver: nil,
+                afterMutationCommitObserver: afterMutationCommitObserver
+            )
             let service = try ExecutionJobService(
                 repository: runtime,
                 contextValidator: ProjectControlPlaneRuntimeJobContextValidator(repository: control),

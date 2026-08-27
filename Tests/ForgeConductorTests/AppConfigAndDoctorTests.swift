@@ -138,6 +138,7 @@ final class AppConfigAndDoctorTests: XCTestCase {
         XCTAssertEqual(modifiedReceipt["current_config_state"] as? String, "schema_v2_modified")
 
         let app = try ForgeApp.bootstrap(home: home)
+        XCTAssertTrue(app.diagnostics.flush(timeout: 2))
         app.shutdown()
         let emittedReceipt = try JSONSupport.object(
             from: Data(contentsOf: paths.shellPolicyMigrationReceipt)

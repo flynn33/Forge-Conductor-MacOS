@@ -104,9 +104,13 @@ for marker in (
     "atomicCreateAndBootstrap: true", "freshRoot: true",
     "maximumLedgerBytes = 4 * 1024 * 1024", "maximumRecords = 1024",
     "maximumReconciliationRecords = 4096", "maximumLiveTerminalRecords = 128",
-    "maximumProviderAttempts = 3", "completeFileProtectionUnlessOpen",
+    "maximumProviderAttempts = 3", "OwnerOnlyAtomicFile.write",
 ):
     require(marker in plugin, f"missing production plugin marker: {marker}")
+require(
+    "completeFileProtectionUnlessOpen" not in plugin,
+    "production plugin still uses a host-dependent file-protection write option",
+)
 require(
     "LocalLogicalSessionTransport" not in production_registration,
     "production registration still selects the logical fixture transport",
