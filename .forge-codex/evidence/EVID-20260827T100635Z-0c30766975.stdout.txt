@@ -1,5 +1,5 @@
 {
-  "binary": "/private/tmp/forge-g09-52f8aca.IuXsao/arm64-apple-macosx/release/forge-conductor",
+  "binary": "/private/tmp/forge-g09-c7df57a.VPjKBn/arm64-apple-macosx/release/forge-conductor",
   "checks": [
     "tool_inventory",
     "tool_schemas",
@@ -12,7 +12,7 @@
     "active_session_swap"
   ],
   "ok": true,
-  "project_id": "d3aa5e77-6061-4704-9d1c-f36603f2cf81",
+  "project_id": "44e65128-9f28-4c83-8869-e94ec5fe7fe8",
   "transcript": [
     {
       "id": 1,
@@ -60,7 +60,7 @@
         "handoff": {
           "completed_work": [],
           "constraints": [],
-          "created_at": "2026-08-27T10:33:15Z",
+          "created_at": "2026-08-27T10:06:35Z",
           "current_work": {
             "active_files": [],
             "phase_id": "P08",
@@ -69,7 +69,7 @@
           },
           "decisions": [],
           "evidence_references": [],
-          "handoff_id": "ec8a60b0-6026-4cdc-9b9c-a5b56026c7f0",
+          "handoff_id": "783492fd-3777-4ab8-900d-080097f06a6c",
           "host_state": {
             "adapter_id": "external-mcp",
             "context_budget_source": "caller_reported",
@@ -78,7 +78,7 @@
             "retry": {}
           },
           "integrity": {
-            "content_sha256": "3120b2c80127eb9acb41a45028d6fa2330b7d2d13acb42f6620b9f6a4f400b7e",
+            "content_sha256": "afb9f92d31aeeab781a73e99b07bc5d842938e9fbde4772964d80ef797058163",
             "redaction_complete": true
           },
           "memory_references": [],
@@ -98,7 +98,7 @@
             }
           ],
           "open_work": [],
-          "operation_id": "8e9cec74-da21-4e5c-bd78-39b00102864a",
+          "operation_id": "1bff443f-79ea-4388-a982-0e51df0b7272",
           "predecessor_session": {
             "model": null,
             "provider_session_id": null,
@@ -109,8 +109,8 @@
             "commit": "0000000",
             "dirty_summary": [],
             "display_name": "project",
-            "project_id": "d3aa5e77-6061-4704-9d1c-f36603f2cf81",
-            "repository_root": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p08-conformance-wpv0qxgj/project"
+            "project_id": "44e65128-9f28-4c83-8869-e94ec5fe7fe8",
+            "repository_root": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p08-conformance-xc6szyvz/project"
           },
           "schema_version": "1.0",
           "successor_session": null,
@@ -128,18 +128,18 @@
           "acknowledged_session_id": null,
           "adapter_id": "external-mcp",
           "attempt": 2,
-          "created_at": "2026-08-27T10:33:15Z",
-          "handoff_id": "ec8a60b0-6026-4cdc-9b9c-a5b56026c7f0",
-          "idempotency_key": "8e9cec74-da21-4e5c-bd78-39b00102864a",
+          "created_at": "2026-08-27T10:06:35Z",
+          "handoff_id": "783492fd-3777-4ab8-900d-080097f06a6c",
+          "idempotency_key": "1bff443f-79ea-4388-a982-0e51df0b7272",
           "last_error": null,
-          "operation_id": "8e9cec74-da21-4e5c-bd78-39b00102864a",
+          "operation_id": "1bff443f-79ea-4388-a982-0e51df0b7272",
           "predecessor_session_id": "process-predecessor",
-          "project_id": "d3aa5e77-6061-4704-9d1c-f36603f2cf81",
+          "project_id": "44e65128-9f28-4c83-8869-e94ec5fe7fe8",
           "retry_at": null,
           "state": "checkpointPersisted",
-          "state_checksum": "7901a5bb4ff6cb57c05dd66a602f28d748313b1c837f51e2bd9c526a8105c17a",
+          "state_checksum": "dd14b9ccba6d496c21304b208c1d468621ec54d8c8c1af39a5a54b204f307d05",
           "successor_session_id": null,
-          "updated_at": "2026-08-27T10:33:15Z"
+          "updated_at": "2026-08-27T10:06:35Z"
         },
         "request_route": "external_handoff_only",
         "session_creation_confirmed": false
@@ -150,22 +150,22 @@
         "acknowledged": true,
         "ok": true,
         "operation": {
-          "acknowledged_handoff_id": "ec8a60b0-6026-4cdc-9b9c-a5b56026c7f0",
+          "acknowledged_handoff_id": "783492fd-3777-4ab8-900d-080097f06a6c",
           "acknowledged_session_id": "process-successor",
           "adapter_id": "external-mcp",
           "attempt": 6,
-          "created_at": "2026-08-27T10:33:15Z",
-          "handoff_id": "ec8a60b0-6026-4cdc-9b9c-a5b56026c7f0",
-          "idempotency_key": "8e9cec74-da21-4e5c-bd78-39b00102864a",
+          "created_at": "2026-08-27T10:06:35Z",
+          "handoff_id": "783492fd-3777-4ab8-900d-080097f06a6c",
+          "idempotency_key": "1bff443f-79ea-4388-a982-0e51df0b7272",
           "last_error": null,
-          "operation_id": "8e9cec74-da21-4e5c-bd78-39b00102864a",
+          "operation_id": "1bff443f-79ea-4388-a982-0e51df0b7272",
           "predecessor_session_id": "process-predecessor",
-          "project_id": "d3aa5e77-6061-4704-9d1c-f36603f2cf81",
+          "project_id": "44e65128-9f28-4c83-8869-e94ec5fe7fe8",
           "retry_at": null,
           "state": "successorAcknowledged",
-          "state_checksum": "661b46f94d393bf1cad01bacb4e406a78081b7c2fafc2b64ba96714e09430359",
+          "state_checksum": "1b8be0ecbd9bcf46b79e8966b3ade369fdff3d926d42492cd4a27fa947d36691",
           "successor_session_id": "process-successor",
-          "updated_at": "2026-08-27T10:33:15Z"
+          "updated_at": "2026-08-27T10:06:35Z"
         }
       },
       "rejected_acknowledgement": {
@@ -187,22 +187,22 @@
         "acknowledged": true,
         "ok": true,
         "operation": {
-          "acknowledged_handoff_id": "ec8a60b0-6026-4cdc-9b9c-a5b56026c7f0",
+          "acknowledged_handoff_id": "783492fd-3777-4ab8-900d-080097f06a6c",
           "acknowledged_session_id": "process-successor",
           "adapter_id": "external-mcp",
           "attempt": 6,
-          "created_at": "2026-08-27T10:33:15Z",
-          "handoff_id": "ec8a60b0-6026-4cdc-9b9c-a5b56026c7f0",
-          "idempotency_key": "8e9cec74-da21-4e5c-bd78-39b00102864a",
+          "created_at": "2026-08-27T10:06:35Z",
+          "handoff_id": "783492fd-3777-4ab8-900d-080097f06a6c",
+          "idempotency_key": "1bff443f-79ea-4388-a982-0e51df0b7272",
           "last_error": null,
-          "operation_id": "8e9cec74-da21-4e5c-bd78-39b00102864a",
+          "operation_id": "1bff443f-79ea-4388-a982-0e51df0b7272",
           "predecessor_session_id": "process-predecessor",
-          "project_id": "d3aa5e77-6061-4704-9d1c-f36603f2cf81",
+          "project_id": "44e65128-9f28-4c83-8869-e94ec5fe7fe8",
           "retry_at": null,
           "state": "successorAcknowledged",
-          "state_checksum": "661b46f94d393bf1cad01bacb4e406a78081b7c2fafc2b64ba96714e09430359",
+          "state_checksum": "1b8be0ecbd9bcf46b79e8966b3ade369fdff3d926d42492cd4a27fa947d36691",
           "successor_session_id": "process-successor",
-          "updated_at": "2026-08-27T10:33:15Z"
+          "updated_at": "2026-08-27T10:06:35Z"
         }
       },
       "restart_pending": {
@@ -210,7 +210,7 @@
         "handoff": {
           "completed_work": [],
           "constraints": [],
-          "created_at": "2026-08-27T10:33:15Z",
+          "created_at": "2026-08-27T10:06:35Z",
           "current_work": {
             "active_files": [],
             "phase_id": "P08",
@@ -219,7 +219,7 @@
           },
           "decisions": [],
           "evidence_references": [],
-          "handoff_id": "ec8a60b0-6026-4cdc-9b9c-a5b56026c7f0",
+          "handoff_id": "783492fd-3777-4ab8-900d-080097f06a6c",
           "host_state": {
             "adapter_id": "external-mcp",
             "context_budget_source": "caller_reported",
@@ -228,7 +228,7 @@
             "retry": {}
           },
           "integrity": {
-            "content_sha256": "3120b2c80127eb9acb41a45028d6fa2330b7d2d13acb42f6620b9f6a4f400b7e",
+            "content_sha256": "afb9f92d31aeeab781a73e99b07bc5d842938e9fbde4772964d80ef797058163",
             "redaction_complete": true
           },
           "memory_references": [],
@@ -248,7 +248,7 @@
             }
           ],
           "open_work": [],
-          "operation_id": "8e9cec74-da21-4e5c-bd78-39b00102864a",
+          "operation_id": "1bff443f-79ea-4388-a982-0e51df0b7272",
           "predecessor_session": {
             "model": null,
             "provider_session_id": null,
@@ -259,8 +259,8 @@
             "commit": "0000000",
             "dirty_summary": [],
             "display_name": "project",
-            "project_id": "d3aa5e77-6061-4704-9d1c-f36603f2cf81",
-            "repository_root": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p08-conformance-wpv0qxgj/project"
+            "project_id": "44e65128-9f28-4c83-8869-e94ec5fe7fe8",
+            "repository_root": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p08-conformance-xc6szyvz/project"
           },
           "schema_version": "1.0",
           "successor_session": null,
@@ -276,39 +276,39 @@
           "acknowledged_session_id": null,
           "adapter_id": "external-mcp",
           "attempt": 2,
-          "created_at": "2026-08-27T10:33:15Z",
-          "handoff_id": "ec8a60b0-6026-4cdc-9b9c-a5b56026c7f0",
-          "idempotency_key": "8e9cec74-da21-4e5c-bd78-39b00102864a",
+          "created_at": "2026-08-27T10:06:35Z",
+          "handoff_id": "783492fd-3777-4ab8-900d-080097f06a6c",
+          "idempotency_key": "1bff443f-79ea-4388-a982-0e51df0b7272",
           "last_error": null,
-          "operation_id": "8e9cec74-da21-4e5c-bd78-39b00102864a",
+          "operation_id": "1bff443f-79ea-4388-a982-0e51df0b7272",
           "predecessor_session_id": "process-predecessor",
-          "project_id": "d3aa5e77-6061-4704-9d1c-f36603f2cf81",
+          "project_id": "44e65128-9f28-4c83-8869-e94ec5fe7fe8",
           "retry_at": null,
           "state": "checkpointPersisted",
-          "state_checksum": "7901a5bb4ff6cb57c05dd66a602f28d748313b1c837f51e2bd9c526a8105c17a",
+          "state_checksum": "dd14b9ccba6d496c21304b208c1d468621ec54d8c8c1af39a5a54b204f307d05",
           "successor_session_id": null,
-          "updated_at": "2026-08-27T10:33:15Z"
+          "updated_at": "2026-08-27T10:06:35Z"
         }
       },
       "sealed": {
         "ok": true,
         "operation": {
-          "acknowledged_handoff_id": "ec8a60b0-6026-4cdc-9b9c-a5b56026c7f0",
+          "acknowledged_handoff_id": "783492fd-3777-4ab8-900d-080097f06a6c",
           "acknowledged_session_id": "process-successor",
           "adapter_id": "external-mcp",
           "attempt": 7,
-          "created_at": "2026-08-27T10:33:15Z",
-          "handoff_id": "ec8a60b0-6026-4cdc-9b9c-a5b56026c7f0",
-          "idempotency_key": "8e9cec74-da21-4e5c-bd78-39b00102864a",
+          "created_at": "2026-08-27T10:06:35Z",
+          "handoff_id": "783492fd-3777-4ab8-900d-080097f06a6c",
+          "idempotency_key": "1bff443f-79ea-4388-a982-0e51df0b7272",
           "last_error": null,
-          "operation_id": "8e9cec74-da21-4e5c-bd78-39b00102864a",
+          "operation_id": "1bff443f-79ea-4388-a982-0e51df0b7272",
           "predecessor_session_id": "process-predecessor",
-          "project_id": "d3aa5e77-6061-4704-9d1c-f36603f2cf81",
+          "project_id": "44e65128-9f28-4c83-8869-e94ec5fe7fe8",
           "retry_at": null,
           "state": "predecessorSealed",
-          "state_checksum": "0e781e26848fe59acb3496cf83903f6eb256f4fa7969483908b59e842071ee10",
+          "state_checksum": "4ebe2fca5eac45b10090b174cc246d82b10fcf3a52bb5076221230ccf7de326d",
           "successor_session_id": "process-successor",
-          "updated_at": "2026-08-27T10:33:15Z"
+          "updated_at": "2026-08-27T10:06:35Z"
         },
         "resumed": true
       },
@@ -318,7 +318,7 @@
         "ok": true,
         "operation": null,
         "pending_handoff_id": null,
-        "project_id": "d3aa5e77-6061-4704-9d1c-f36603f2cf81",
+        "project_id": "44e65128-9f28-4c83-8869-e94ec5fe7fe8",
         "retry": {
           "error": null,
           "retry_at": null

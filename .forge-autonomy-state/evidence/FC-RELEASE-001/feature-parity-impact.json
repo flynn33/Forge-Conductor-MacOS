@@ -17,20 +17,35 @@
       "path": "ForgeConductor.xcodeproj/project.pbxproj",
       "change": "embed the runtime helper Info.plist identity in its Mach-O product",
       "compatibility_effect": "the declared helper identifier is now enforceable in Xcode-built products"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/ManagedContinuityWorker.swift",
+      "change": "make the automatic continuation turn explicitly distinct from the completed bootstrap acknowledgement",
+      "compatibility_effect": "the durable acknowledgement and first-open-action contracts are preserved while duplicate acknowledgement is prohibited"
+    },
+    {
+      "path": "Sources/ForgeNativeSessionHostPlugin/ForgeNativeSessionHostPlugin.swift",
+      "change": "bound provider output to a validated maximum of 4096 tokens and clarify bootstrap-only acknowledgement instructions",
+      "compatibility_effect": "the new configuration key is additive with a bounded default; existing stored configurations decode compatibly"
     }
   ],
   "verified_preserved_in_current_source_proofs": {
-    "focused_strict_swiftpm_runtime": true,
-    "focused_xcode_runtime": true,
-    "xcode_helper_exact_identifier": true,
-    "project_local_build_run_and_nested_signature_verification": true
+    "full_strict_debug_swiftpm": true,
+    "full_strict_release_swiftpm": true,
+    "all_non_skipped_swiftpm_tests": true,
+    "runtime_and_sandbox_unit_contracts": true,
+    "bounded_managed_continuation_unit_contracts": true
   },
-  "current_source_not_passed": [
-    "full strict Debug suite: blocked by locked-session protected-file reopen failures",
-    "full strict Release suite: blocked by the identical locked-session failure set"
+  "current_source_skipped_coverage": [
+    "read-only LM Studio Projects home-path behavior: the folder is absent on this Mac",
+    "real LM Studio fresh-root acknowledgement and automatic continuation: live-provider variables were explicitly unset",
+    "PowerShell runtime profile: PowerShell is not installed on this host",
+    "Release-only valid team-signed app preservation: no valid local team-signed fixture is available"
   ],
   "historical_proof_requiring_current_source_refresh": [
     "full Xcode unit target",
+    "Xcode runtime helper identity and focused runtime tests",
+    "project-local app build, nested-signature verification, and launch",
     "real LM Studio fresh-root acknowledgement and automatic continuation scenario"
   ],
   "behavioral_parity_not_yet_verified": [
@@ -42,7 +57,7 @@
     "complete MCP, CLI, manager HTTP, settings, project format, migration, import/export, and UI snapshot comparison"
   ],
   "release_validation_gaps": [
-    "current-source full suites from an unlocked console session",
+    "current-source Xcode and project-local app packaging qualification",
     "Address Sanitizer pass",
     "Thread Sanitizer pass",
     "valid Instruments and memgraph evidence",

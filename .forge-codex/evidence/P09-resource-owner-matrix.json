@@ -1,6 +1,18 @@
 {
   "schema_version": 2,
   "phase": "P09",
+  "captured_at": "2026-08-27T10:41:04.799117+00:00",
+  "source_revision": "52f8aca47463f88fa94276115fb5c2070ca683ef",
+  "status": "passed",
+  "qualification": {
+    "plugin_release_build_record": ".forge-codex/evidence/EVID-20260827T103142Z-31aeee7a3f.json",
+    "plugin_contract_tests_record": ".forge-codex/evidence/EVID-20260827T103242Z-f2a67a3569.json",
+    "debug_strict_suite_command_id": "CMD-20260827T103327Z-5d0a028f3d",
+    "release_strict_suite_command_id": "CMD-20260827T103455Z-4b3944647c",
+    "live_rollover_command_id": "CMD-20260827T103812Z-17ac760a12",
+    "live_artifact": ".forge-autonomy-state/evidence/FC-E2E-001/live-lmstudio-managed-continuity.json",
+    "live_artifact_sha256": "7861db2e43dff59892b85b6bb914540b891a630c07f7ae882c69954f5e01702b"
+  },
   "owners": [
     {
       "owner": "HostAdapterRegistry",
@@ -16,14 +28,14 @@
     },
     {
       "owner": "LMStudioManagedSessionTransport",
-      "resources": ["URLSession requests", "bounded SSE decoder", "idempotency receipts", "operation permits"],
-      "bound": "validated response, text, tool-argument, event, timeout, and concurrency limits from provider configuration",
+      "resources": ["URLSession requests", "bounded SSE decoder", "idempotency receipts", "operation permits", "bounded output-token budget"],
+      "bound": "validated response, text, tool-argument, event, timeout, concurrency, and 1-through-4096 output-token limits from provider configuration",
       "release": "each request is awaited under a total deadline; cancellation invalidates the owned request"
     },
     {
       "owner": "LMStudioManagedModelProvider",
       "resources": ["provider capability snapshot", "root and continuation requests"],
-      "bound": "one provider turn per managed execution step with provider-exact usage accounting",
+      "bound": "one provider turn per managed execution step; every request carries a validated maximum-output-token budget no greater than 4096 with provider-exact usage accounting",
       "release": "turn-local request and response values release after durable commit"
     },
     {

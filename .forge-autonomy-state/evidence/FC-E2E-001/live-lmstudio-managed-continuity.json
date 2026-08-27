@@ -1,34 +1,36 @@
 {
   "acknowledgement_validated" : true,
-  "automatic_continuation_previous_response_id" : "resp_5a89b283c53c4b10d0a4d9cde6be8c795e559d24ec7bc62e",
-  "automatic_continuation_response_id" : "resp_c7b19a4cb545da34e467d3b7ebb0570f0a81e09a4711270d",
+  "automatic_continuation_marker_validated" : true,
+  "automatic_continuation_previous_response_id" : "resp_e3cdc3ca3ada982b611151440e5fa49d5e3e402fabcc20bc",
+  "automatic_continuation_response_id" : "resp_a298c38e128737df155e4def290e2d2fc74d20e409bca75d",
   "automatic_continuation_usage" : {
     "capacity" : 119552,
-    "input_tokens" : 1454,
-    "output_tokens" : 3478,
+    "input_tokens" : 2321,
+    "output_tokens" : 82,
     "source" : "provider_exact",
-    "total_tokens" : 4932
+    "total_tokens" : 2403
   },
   "automatic_continuation_validated" : true,
-  "bootstrap_response_id" : "resp_5a89b283c53c4b10d0a4d9cde6be8c795e559d24ec7bc62e",
+  "bootstrap_response_id" : "resp_e3cdc3ca3ada982b611151440e5fa49d5e3e402fabcc20bc",
   "bootstrap_usage" : {
     "action" : "normal",
     "capacity" : 119552,
     "confidence" : 1,
-    "remaining" : 117882,
+    "remaining" : 117035,
     "reserved" : 0,
     "source" : "provider_exact",
-    "used" : 1670
+    "used" : 2517
   },
   "capability_fingerprint_sha256" : "6708d05f2dc20097274f9c473a8813c8445bb262b2455e487ec557d835ed54de",
   "context_length" : 119552,
-  "contract_probe_response_id" : "resp_dc05b5bf8398f0285df41f5d196aa3281007c87fdc6b32bd",
+  "contract_probe_response_id" : "resp_99880ffa0da902333d98af64e96f0849619d2dfe6c5d370a",
   "fresh_root_validated" : true,
-  "handoff_id" : "1eeb6733-f4dd-49fc-bf9c-1c9c5623bdff",
-  "handoff_sha256" : "657528148d02c073264c337ee043c134a243943e0226393ffb9020ee6c43f071",
+  "handoff_id" : "8093f2dd-b906-4979-b618-77ed405aa179",
+  "handoff_sha256" : "7c8f9080c01e3837665026c534eedaab89dc3864813b929d3ff7bee0657a458e",
   "loaded_instance_id" : "qwen/qwen3.8-27b",
+  "maximum_output_tokens" : 4096,
   "model_key" : "qwen/qwen3.8-27b",
-  "operation_id" : "e4bc898b-03fa-44ef-b621-12b8405f52eb",
+  "operation_id" : "17e3424e-4b4b-4f2b-b993-29b10a1b2dea",
   "provider" : "lmstudio",
   "provider_version" : "unreported",
   "schema_version" : 1

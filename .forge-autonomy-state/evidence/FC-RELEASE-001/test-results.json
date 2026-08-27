@@ -1,96 +1,57 @@
 {
   "schema_version": 1,
   "work_package": "FC-RELEASE-001",
-  "captured_at": "2026-08-27T03:01:00.743220+00:00",
+  "captured_at": "2026-08-27T10:37:20.439841+00:00",
   "overall_status": "not_passed",
   "evidence_complete": false,
   "command_log_scope": {
     "source": ".forge-autonomy-state/command-logs/FC-RELEASE-001/commands.jsonl",
-    "entries": 35,
+    "entries": 41,
     "first_command_id": "CMD-20260826T231108Z-1f8c4815f5",
-    "last_command_id": "CMD-20260827T030013Z-bf6e30761e",
+    "last_command_id": "CMD-20260827T103455Z-4b3944647c",
     "compact_log_matches_source": true,
     "related_commands_from_other_work_packages_are_referenced_but_not_copied": true
   },
   "current_source_results": [
     {
       "id": "FC-RELEASE-DEBUG-STRICT-SWIFTPM",
-      "command_id": "CMD-20260827T025715Z-b42c01b23b",
+      "command_id": "CMD-20260827T103327Z-5d0a028f3d",
       "configuration": "debug_strict",
       "compiled_with_warnings_as_errors": true,
-      "executed": 444,
+      "executed": 447,
       "skipped": 3,
-      "assertion_failures": 137,
-      "unexpected_failures": 42,
-      "exit_code": 1,
-      "status": "blocked_by_locked_session_file_protection"
+      "assertion_failures": 0,
+      "unexpected_failures": 0,
+      "exit_code": 0,
+      "status": "passed",
+      "live_provider_environment_explicitly_unset": true,
+      "skip_reasons": [
+        "LM Studio Projects folder not present on this Mac",
+        "real-provider system test requires FORGE_LIVE_LMSTUDIO_MODEL",
+        "PowerShell is not installed on this host"
+      ]
     },
     {
       "id": "FC-RELEASE-RELEASE-STRICT-SWIFTPM",
-      "command_id": "CMD-20260827T025822Z-dc523f8bbf",
+      "command_id": "CMD-20260827T103455Z-4b3944647c",
       "configuration": "release_strict",
       "compiled_with_warnings_as_errors": true,
-      "executed": 444,
-      "skipped": 3,
-      "assertion_failures": 137,
-      "unexpected_failures": 42,
-      "exit_code": 1,
-      "status": "blocked_by_locked_session_file_protection",
-      "failed_test_set_matches_debug": true
-    },
-    {
-      "id": "FC-RELEASE-PROJECT-LOCAL-BUILD-RUN-VERIFY",
-      "command_id": "CMD-20260827T025942Z-8af334d72e",
-      "configuration": "debug_project_local_app",
+      "executed": 447,
+      "skipped": 4,
+      "assertion_failures": 0,
+      "unexpected_failures": 0,
       "exit_code": 0,
       "status": "passed",
-      "source_scope": "exact frozen tree",
-      "observed": {
-        "product_build": "passed",
-        "app_bundle": "dist/Forge Conductor.app",
-        "nested_code_signature_validation": "passed",
-        "launch": "passed",
-        "launched_app_stopped_after_verification": true
-      }
-    },
-    {
-      "id": "FC-RELEASE-XCODE-BUILD-FOR-TESTING",
-      "command_id": "CMD-20260827T030013Z-bf6e30761e",
-      "configuration": "xcode_debug_adhoc",
-      "exit_code": 0,
-      "status": "passed",
-      "helper_identifier": "com.forge-conductor.runtime-launcher"
-    },
-    {
-      "id": "FC-RELEASE-XCODE-RUNTIME-TESTS",
-      "command_id": "CMD-20260827T030030Z-e106bb4ef2",
-      "recorded_under": "FC-RUNTIME-001",
-      "configuration": "xcode_debug_adhoc",
-      "executed": 64,
-      "skipped": 1,
-      "failures": 0,
-      "exit_code": 0,
-      "status": "passed"
-    },
-    {
-      "id": "FC-RELEASE-REAL-LMSTUDIO-MANAGED-CONTINUITY",
-      "command_id": "CMD-20260826T224938Z-9660289413",
-      "recorded_under": "FC-E2E-001",
-      "executed": 1,
-      "failures": 0,
-      "exit_code": 0,
-      "status": "historical_pass_before_final_source_freeze"
+      "live_provider_environment_explicitly_unset": true,
+      "skip_reasons": [
+        "LM Studio Projects folder not present on this Mac",
+        "no valid local team-signed Forge app fixture is available",
+        "real-provider system test requires FORGE_LIVE_LMSTUDIO_MODEL",
+        "PowerShell is not installed on this host"
+      ]
     }
   ],
   "environment_blockers": [
-    {
-      "id": "FC-RELEASE-LOCKED-PROTECTED-FILES",
-      "diagnostic_command_id": "CMD-20260827T024229Z-92a78059b3",
-      "observed": "CGSSessionScreenIsLocked=Yes",
-      "error": "NSCocoaErrorDomain 257 with underlying EPERM when tests reopen complete-file-protected registry.json",
-      "scope": "the exact frozen-tree Debug and Release runs fail with the same test set and counts; focused runtime tests that exclude the two protected bootstrap fixtures pass under SwiftPM and Xcode",
-      "resolution": "rerun both full strict suites while the console session is unlocked; do not weaken file protection"
-    },
     {
       "id": "FC-RELEASE-UI-AUTOMATION",
       "recorded_under": "FC-UI-001",
@@ -116,7 +77,7 @@
       "command_id": "CMD-20260827T021458Z-18f5a46f96",
       "classification": "a load-sensitive unreaped-child interval produced a transient identity-unavailable recovery probe",
       "remediation": "the persisted reaper retries only identity-unavailable samples within absolute TERM and KILL deadlines; mismatch and deadline exhaustion still fail closed",
-      "final_release_command_id": "CMD-20260827T025822Z-dc523f8bbf"
+      "final_release_command_id": "CMD-20260827T103455Z-4b3944647c"
     },
     {
       "command_ids": [
@@ -127,6 +88,42 @@
       "remediation": "the Xcode helper embeds its generated Info.plist so code signing binds the exact declared identifier",
       "final_build_command_id": "CMD-20260827T030013Z-bf6e30761e",
       "final_test_command_id": "CMD-20260827T030030Z-e106bb4ef2"
+    },
+    {
+      "command_ids": [
+        "CMD-20260827T025715Z-b42c01b23b",
+        "CMD-20260827T025822Z-dc523f8bbf"
+      ],
+      "diagnostic_command_id": "CMD-20260827T024229Z-92a78059b3",
+      "classification": "the locked console session denied reopening complete-file-protected registry fixtures and produced matching Debug and Release cascades",
+      "remediation": "file protection remained unchanged; the full suites passed after the console session was unlocked",
+      "passing_command_ids": [
+        "CMD-20260827T100050Z-5dbe9ae0e1",
+        "CMD-20260827T100219Z-ff6e44637c"
+      ]
+    },
+    {
+      "command_ids": [
+        "CMD-20260827T095414Z-6db765976b",
+        "CMD-20260827T095414Z-2e2cafd283"
+      ],
+      "configuration_counts": {
+        "executed_each": 444,
+        "skipped_each": 3,
+        "assertion_failures_each": 7,
+        "failed_test_cases_each": 3,
+        "unexpected_failures_each": 0
+      },
+      "classification": "three shell fixtures placed the authorized project root inside the manager-owned runtime output root and were correctly rejected by the durable-output isolation invariant",
+      "remediation": "the fixtures now use distinct project workspaces and an adversarial regression test preserves the non-overlap boundary",
+      "passing_command_ids": [
+        "CMD-20260827T100050Z-5dbe9ae0e1",
+        "CMD-20260827T100219Z-ff6e44637c"
+      ],
+      "final_source_passing_command_ids": [
+        "CMD-20260827T103327Z-5d0a028f3d",
+        "CMD-20260827T103455Z-4b3944647c"
+      ]
     }
   ],
   "sanitizer_results": [
@@ -189,20 +186,72 @@
       "skipped": 1,
       "failures": 0,
       "reason": "passed before the dedicated helper product and final source changes"
+    },
+    {
+      "command_ids": [
+        "CMD-20260827T100050Z-5dbe9ae0e1",
+        "CMD-20260827T100219Z-ff6e44637c"
+      ],
+      "configurations": [
+        "debug_strict",
+        "release_strict"
+      ],
+      "executed_each": 445,
+      "skipped_each": 3,
+      "failures_each": 0,
+      "reason": "passed after shell-fixture isolation but before the final managed-continuation source and test changes"
+    }
+  ],
+  "historical_qualification_results_requiring_current_source_refresh": [
+    {
+      "id": "FC-RELEASE-PROJECT-LOCAL-BUILD-RUN-VERIFY",
+      "command_id": "CMD-20260827T025942Z-8af334d72e",
+      "exit_code": 0,
+      "observed": "the project-local app and nested helper built, passed deep strict signature verification, launched, and were stopped after verification",
+      "status": "historical_pass_before_final_source_changes"
+    },
+    {
+      "id": "FC-RELEASE-XCODE-BUILD-FOR-TESTING",
+      "command_id": "CMD-20260827T030013Z-bf6e30761e",
+      "exit_code": 0,
+      "helper_identifier": "com.forge-conductor.runtime-launcher",
+      "status": "historical_pass_before_final_source_changes"
+    },
+    {
+      "id": "FC-RELEASE-XCODE-RUNTIME-TESTS",
+      "command_id": "CMD-20260827T030030Z-e106bb4ef2",
+      "recorded_under": "FC-RUNTIME-001",
+      "executed": 64,
+      "skipped": 1,
+      "failures": 0,
+      "exit_code": 0,
+      "status": "historical_pass_before_final_source_changes"
+    },
+    {
+      "id": "FC-RELEASE-REAL-LMSTUDIO-MANAGED-CONTINUITY",
+      "command_id": "CMD-20260826T224938Z-9660289413",
+      "recorded_under": "FC-E2E-001",
+      "executed": 1,
+      "failures": 0,
+      "exit_code": 0,
+      "status": "historical_pass_before_final_source_changes"
     }
   ],
   "integrity_results": {
-    "command_record": ".forge-codex/evidence/EVID-20260827T030641Z-831d98c838.json",
-    "package_validation": "passed_395_checks",
-    "prohibited_attribution_scan": "passed",
-    "secret_scan": "passed",
-    "completion_verifier": "nonzero_only_for_G09_through_G11_and_dependency_statuses"
+    "historical_command_record": ".forge-codex/evidence/EVID-20260827T030641Z-831d98c838.json",
+    "historical_package_validation": "passed_395_checks_before_final_source_changes",
+    "historical_prohibited_attribution_scan": "passed_before_final_source_changes",
+    "historical_secret_scan": "passed_before_final_source_changes",
+    "current_source_package_validation": "not_recorded",
+    "current_source_prohibited_attribution_scan": "not_recorded",
+    "current_source_secret_scan": "not_recorded",
+    "completion_verifier": "not_passed"
   },
   "acceptance": {
-    "strict_debug_swiftpm_suite": "blocked_environment_not_passed",
-    "strict_release_swiftpm_suite": "blocked_environment_not_passed",
-    "xcode_runtime_suite": "passed",
-    "project_local_build_and_run_verification": "passed",
+    "strict_debug_swiftpm_suite": "passed",
+    "strict_release_swiftpm_suite": "passed",
+    "xcode_runtime_suite": "historical_pass_current_source_refresh_required",
+    "project_local_build_and_run_verification": "historical_pass_current_source_refresh_required",
     "address_sanitizer": "blocked_not_passed",
     "thread_sanitizer": "blocked_not_passed",
     "ui_and_accessibility": "blocked_not_passed",
@@ -210,16 +259,16 @@
     "long_duration_resource_validation": "not_executed",
     "signed_launchagent_and_app": "not_executed",
     "notarization": "not_executed",
-    "package_validation": "passed",
-    "prohibited_attribution_scan": "passed",
-    "secret_scan": "passed",
+    "package_validation": "current_source_refresh_required",
+    "prohibited_attribution_scan": "current_source_refresh_required",
+    "secret_scan": "current_source_refresh_required",
     "final_release_content_and_transport_scan": "not_executed",
     "full_feature_parity": "incomplete",
     "completion_verifier": "not_passed",
     "every_hard_gate": "not_passed"
   },
   "remaining_required_evidence": [
-    "passing current-source Debug and Release strict suites from an unlocked console session",
+    "current-source Xcode, project-local app build/run, nested-signature, and packaging qualification",
     "successful separate Address Sanitizer and Thread Sanitizer runs that execute the intended tests",
     "successful accessibility and UI behavior tests after host developer authorization and signing are available",
     "valid Instruments and memgraph captures, including hidden SwiftUI and Metal quiescence",
