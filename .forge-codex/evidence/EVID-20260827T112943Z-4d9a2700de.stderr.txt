@@ -1,0 +1,30 @@
+Building for debugging...
+[0/10] Write sources
+[2/10] Write swift-version--58304C5D6DBC2206.txt
+[4/11] Emitting module ForgeConductorCore
+[5/11] Compiling ForgeConductorCore LegacyContinuityMigrator.swift
+[6/11] Compiling ForgeConductorCore ProjectMemoryRepository.swift
+[7/18] Compiling ForgeConductorCore ProjectMemoryToolPack.swift
+[8/18] Compiling ForgeConductorCore ForgeApp.swift
+[9/18] Compiling ForgeConductorCore ContinuityCoordinator.swift
+[10/18] Compiling ForgeConductorCore ProjectMemoryService.swift
+[11/18] Compiling ForgeConductorCore MCPServer.swift
+[12/18] Compiling ForgeConductorCore ManagerNode.swift
+[13/18] Compiling ForgeConductorCore ToolInvocationBroker.swift
+[14/22] Emitting module ForgeNativeSessionHostPlugin
+[14/22] Write Objects.LinkFileList
+[16/23] Emitting module ForgeConductorApp
+[16/23] Write Objects.LinkFileList
+[17/23] Linking forge-conductor
+[18/23] Applying forge-conductor
+[19/29] Linking forge-conductor-app
+[20/29] Applying forge-conductor-app
+[22/29] Compiling ForgeConductorTests ProjectMemoryTests.swift
+[23/29] Compiling ForgeConductorTests ManagedContinuityWorkerTests.swift
+[24/29] Compiling ForgeConductorTests ContinuityCoordinatorTests.swift
+[25/29] Emitting module ForgeConductorTests
+[26/29] Compiling ForgeConductorTests ContinuityV2Tests.swift
+[27/29] Compiling ForgeConductorTests AutonomousContinuityAcceptanceTests.swift
+[27/29] Write Objects.LinkFileList
+[28/29] Linking ForgeConductorPackageTests
+Build complete! (4.06s)

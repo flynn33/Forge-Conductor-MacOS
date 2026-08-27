@@ -12,6 +12,11 @@ struct RuntimeArtifactRetentionCandidate: Sendable, Equatable {
     let retainedBytes: UInt64
 }
 
+enum RuntimeJobCommitKind: Sendable, Equatable {
+    case submission
+    case cancellation
+}
+
 public actor RuntimeJobRepository {
     public static let schemaVersion = 5
     public static let maximumListLimit = 100
@@ -20,41 +25,231 @@ public actor RuntimeJobRepository {
     public static let maximumIdempotencyReceiptsPerProject = 512
     public static let maximumIdempotencyReceiptsGlobal = 4_096
 
+    private struct ControlPlaneV2TableSurface: Sendable {
+        let name: String
+        let columns: [String]
+    }
+
+    private static let controlPlaneV2RequiredSurfaces = [
+        ControlPlaneV2TableSurface(
+            name: "control_schema_version",
+            columns: ["singleton", "version", "applied_at"]
+        ),
+        ControlPlaneV2TableSurface(
+            name: "control_projects",
+            columns: [
+                "project_id", "display_name", "canonical_root", "generation",
+                "lifecycle_state", "repository_fingerprint", "bookmark_reference",
+                "created_at", "updated_at",
+            ]
+        ),
+        ControlPlaneV2TableSurface(
+            name: "project_bindings",
+            columns: [
+                "binding_id", "owner_kind", "owner_id", "project_id",
+                "project_generation", "run_id", "authorization_scope_json",
+                "lease_owner", "lease_expires_at", "active", "created_at", "updated_at",
+            ]
+        ),
+        ControlPlaneV2TableSurface(
+            name: "autonomous_runs",
+            columns: [
+                "run_id", "project_id", "project_generation", "assignment_id", "mission",
+                "state", "continuity_mode", "provider_id", "model_key", "active_session_id",
+                "active_operation_id", "current_work_json", "completion_request_json",
+                "last_error_code", "last_error_summary", "retry_at", "continuation_pending",
+                "revision", "created_at", "updated_at",
+            ]
+        ),
+        ControlPlaneV2TableSurface(
+            name: "run_leases",
+            columns: [
+                "run_id", "lease_owner", "lease_epoch", "acquired_at", "renewed_at", "expires_at",
+            ]
+        ),
+        ControlPlaneV2TableSurface(
+            name: "provider_sessions",
+            columns: [
+                "session_id", "run_id", "project_id", "project_generation", "provider_id",
+                "adapter_id", "model_key", "provider_response_id", "predecessor_session_id",
+                "handoff_id", "operation_id", "idempotency_key", "bootstrap_nonce_hash",
+                "handoff_sha256", "status", "accepted", "context_capacity", "created_at",
+                "updated_at",
+            ]
+        ),
+        ControlPlaneV2TableSurface(
+            name: "provider_turns",
+            columns: [
+                "turn_id", "run_id", "session_id", "operation_id", "project_id",
+                "project_generation", "request_kind", "idempotency_key", "previous_response_id",
+                "input_sha256", "tool_schema_sha256", "state", "provider_request_id",
+                "provider_response_id", "request_artifact_id", "result_artifact_id", "usage_json",
+                "attempt", "retry_at", "last_error_code", "last_error_summary", "created_at",
+                "updated_at",
+            ]
+        ),
+        ControlPlaneV2TableSurface(
+            name: "tool_invocations",
+            columns: [
+                "invocation_id", "turn_id", "run_id", "session_id", "project_id",
+                "project_generation", "provider_call_id", "tool_name", "replay_class",
+                "idempotency_key", "arguments_sha256", "arguments_artifact_id", "state",
+                "result_sha256", "result_artifact_id", "result_summary", "last_error_code",
+                "last_error_summary", "created_at", "updated_at",
+            ]
+        ),
+        ControlPlaneV2TableSurface(
+            name: "context_budget_observations",
+            columns: [
+                "observation_id", "run_id", "session_id", "provider_response_id", "capacity",
+                "used", "output_reserve", "schema_reserve", "handoff_reserve", "recovery_reserve",
+                "remaining", "projected_next_turn", "source", "confidence", "estimator_version",
+                "action", "created_at",
+            ]
+        ),
+        ControlPlaneV2TableSurface(
+            name: "context_budget_observation_details",
+            columns: [
+                "observation_id", "project_id", "project_generation", "trigger_point",
+                "checkpoint_threshold", "rollover_threshold", "emergency_floor", "hysteresis",
+                "action_epoch", "created_at",
+            ]
+        ),
+        ControlPlaneV2TableSurface(
+            name: "context_budget_supervisor_state",
+            columns: [
+                "run_id", "session_id", "project_id", "project_generation", "state_json",
+                "latest_observation_id", "revision", "updated_at",
+            ]
+        ),
+        ControlPlaneV2TableSurface(
+            name: "context_budget_action_requests",
+            columns: [
+                "request_id", "continuity_operation_id", "run_id", "session_id", "project_id",
+                "project_generation", "observation_id", "requested_action", "fulfilled_action",
+                "action_epoch", "reason", "revision", "created_at", "updated_at",
+            ]
+        ),
+        ControlPlaneV2TableSurface(
+            name: "continuity_commands",
+            columns: [
+                "command_id", "operation_id", "run_id", "project_id", "project_generation",
+                "command_type", "requested_by", "reason", "state", "idempotency_key",
+                "payload_sha256", "attempt", "retry_at", "last_error_code", "last_error_summary",
+                "created_at", "updated_at",
+            ]
+        ),
+        ControlPlaneV2TableSurface(
+            name: "execution_jobs",
+            columns: [
+                "job_id", "run_id", "project_id", "project_generation", "runtime_kind",
+                "execution_profile", "replay_class", "idempotency_key", "state", "canonical_cwd",
+                "command_summary", "timeout_seconds", "exit_code", "stdout_inline", "stderr_inline",
+                "output_artifact_id", "output_bytes", "process_identifier",
+                "process_group_identifier", "created_at", "started_at", "completed_at", "updated_at",
+            ]
+        ),
+        ControlPlaneV2TableSurface(
+            name: "autonomy_events",
+            columns: [
+                "sequence", "event_id", "run_id", "project_id", "operation_id", "session_id",
+                "job_id", "event_type", "severity", "summary", "metadata_json",
+                "previous_event_sha256", "event_sha256", "created_at",
+            ]
+        ),
+        ControlPlaneV2TableSurface(
+            name: "stale_result_quarantine_events",
+            columns: [
+                "sequence", "event_id", "project_id", "stale_generation", "current_generation",
+                "run_id", "result_kind", "result_sha256", "created_at",
+            ]
+        ),
+        ControlPlaneV2TableSurface(
+            name: "migration_receipts",
+            columns: [
+                "receipt_id", "migration_name", "source_version", "target_version", "source_sha256",
+                "backup_path", "backup_sha256", "imported_count", "skipped_count",
+                "quarantined_count", "integrity_result", "details_json", "started_at", "completed_at",
+            ]
+        ),
+    ]
+
+    private static let controlPlaneV2RequiredTableCountSQL =
+        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ("
+        + controlPlaneV2RequiredSurfaces.map { "'\($0.name)'" }.joined(separator: ",")
+        + ")"
+
     public let databaseURL: URL
 
     private let clock: any Clock
+    private let afterMutationCommitObserver: (@Sendable (RuntimeJobCommitKind) -> Void)?
     private var database: OpaquePointer?
+    private var openRegistration: SQLiteOpenRegistration?
 
     public init(
         databaseURL: URL,
         clock: any Clock = SystemClock(),
         busyTimeoutMilliseconds: Int = 5_000
     ) throws {
+        try self.init(
+            databaseURL: databaseURL,
+            clock: clock,
+            busyTimeoutMilliseconds: busyTimeoutMilliseconds,
+            beforeMigrationCommitObserver: nil,
+            tableInfoStepObserver: nil,
+            afterMutationCommitObserver: nil
+        )
+    }
+
+    init(
+        databaseURL: URL,
+        clock: any Clock = SystemClock(),
+        busyTimeoutMilliseconds: Int = 5_000,
+        beforeMigrationCommitObserver: (@Sendable () throws -> Void)?,
+        tableInfoStepObserver: (@Sendable () -> Int32?)? = nil,
+        afterMutationCommitObserver: (@Sendable (RuntimeJobCommitKind) -> Void)? = nil
+    ) throws {
         guard (1...30_000).contains(busyTimeoutMilliseconds) else {
             throw RuntimeJobError.storageFailure("busy timeout must be between 1 and 30000 milliseconds")
         }
-        self.databaseURL = databaseURL.standardizedFileURL
+        let standardizedDatabaseURL = databaseURL.standardizedFileURL
+        self.databaseURL = standardizedDatabaseURL
         self.clock = clock
+        self.afterMutationCommitObserver = afterMutationCommitObserver
         try FileManager.default.createDirectory(
-            at: databaseURL.deletingLastPathComponent(),
+            at: standardizedDatabaseURL.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
 
-        database = try Self.openAndMigrate(
-            databaseURL: databaseURL,
+        let opened = try Self.openAndMigrate(
+            databaseURL: standardizedDatabaseURL,
             busyTimeoutMilliseconds: busyTimeoutMilliseconds,
-            timestamp: ISO8601.string(from: clock.now())
+            timestamp: ISO8601.string(from: clock.now()),
+            beforeMigrationCommitObserver: beforeMigrationCommitObserver,
+            tableInfoStepObserver: tableInfoStepObserver
         )
+        do {
+            openRegistration = try VerifiedMigrationBackup.registerOpenDatabase(
+                at: standardizedDatabaseURL
+            )
+            database = opened
+        } catch {
+            sqlite3_close(opened)
+            throw RuntimeJobError.storageFailure(error.localizedDescription)
+        }
     }
 
     deinit {
         if let database { sqlite3_close(database) }
+        VerifiedMigrationBackup.unregisterOpenDatabase(openRegistration)
     }
 
     public func close() {
         guard let database else { return }
         sqlite3_close(database)
         self.database = nil
+        VerifiedMigrationBackup.unregisterOpenDatabase(openRegistration)
+        openRegistration = nil
     }
 
     public func health() throws -> (schemaVersion: Int, integrity: String, journalMode: String) {
@@ -69,6 +264,7 @@ public actor RuntimeJobRepository {
         generation: ProjectGeneration,
         idempotencyKey: String
     ) throws -> RuntimeJobRecord? {
+        try Task.checkCancellation()
         let key = try Self.boundedIdempotencyKey(idempotencyKey)
         if let record = try queryOne(
             Self.selectRecord +
@@ -95,8 +291,10 @@ public actor RuntimeJobRepository {
         request: RuntimeJobRequest,
         commandSummary: String,
         timeoutSeconds: Int,
-        requestArtifactRelativePath: String?
+        requestArtifactRelativePath: String?,
+        commitObserver: (@Sendable (RuntimeJobRecord) -> Void)? = nil
     ) throws -> RuntimeJobRecord {
+        try Task.checkCancellation()
         let summary = try Self.bounded(commandSummary, maximumBytes: 2_048, field: "command summary")
         let idempotency = try request.idempotencyKey.map(Self.boundedIdempotencyKey)
         let requestPath = try requestArtifactRelativePath.map {
@@ -107,7 +305,11 @@ public actor RuntimeJobRepository {
         }
         let now = ISO8601.string(from: clock.now())
 
-        return try transaction {
+        return try transaction(
+            checkTaskCancellation: true,
+            commitKind: .submission,
+            commitObserver: commitObserver
+        ) {
             try validateCurrentProject(request.context)
             if let idempotency,
                let existing = try existingJobUnlocked(
@@ -371,31 +573,52 @@ public actor RuntimeJobRepository {
     }
 
     @discardableResult
-    public func requestCancellation(jobID: UUID, context: ToolInvocationContext) throws -> RuntimeJobRecord {
-        let current = try job(jobID, context: context)
-        if current.state.isTerminal { return current }
-        let now = ISO8601.string(from: clock.now())
-        switch current.state {
-        case .queued:
-            _ = try execute(
-                """
-                UPDATE execution_jobs SET state='cancelled',completed_at=?,updated_at=?
-                WHERE job_id=? AND state='queued'
-                """,
-                bindings: [.text(now), .text(now), .text(Self.uuid(jobID))]
-            )
-        case .running:
-            _ = try execute(
-                "UPDATE execution_jobs SET state='cancelling',updated_at=? WHERE job_id=? AND state='running'",
-                bindings: [.text(now), .text(Self.uuid(jobID))]
-            )
-        case .cancelling:
-            break
-        case .completed, .failed, .timedOut, .cancelled, .quarantinedStale:
-            break
+    public func requestCancellation(
+        jobID: UUID,
+        context: ToolInvocationContext,
+        commitObserver: (@Sendable (RuntimeJobRecord) -> Void)? = nil
+    ) throws -> RuntimeJobRecord {
+        try Task.checkCancellation()
+        return try transaction(
+            checkTaskCancellation: true,
+            commitKind: .cancellation,
+            commitObserver: commitObserver
+        ) {
+            try validateCurrentProject(context)
+            guard let current = try jobUnlocked(jobID) else {
+                throw RuntimeJobError.jobNotFound(jobID)
+            }
+            guard current.projectID == context.projectID,
+                  current.projectGeneration == context.projectGeneration,
+                  current.runID == context.runID || context.runID == nil else {
+                throw RuntimeJobError.jobScopeMismatch(jobID)
+            }
+            if current.state.isTerminal { return current }
+            let now = ISO8601.string(from: clock.now())
+            switch current.state {
+            case .queued:
+                _ = try execute(
+                    """
+                    UPDATE execution_jobs SET state='cancelled',completed_at=?,updated_at=?
+                    WHERE job_id=? AND state='queued'
+                    """,
+                    bindings: [.text(now), .text(now), .text(Self.uuid(jobID))]
+                )
+            case .running:
+                _ = try execute(
+                    "UPDATE execution_jobs SET state='cancelling',updated_at=? WHERE job_id=? AND state='running'",
+                    bindings: [.text(now), .text(Self.uuid(jobID))]
+                )
+            case .cancelling:
+                break
+            case .completed, .failed, .timedOut, .cancelled, .quarantinedStale:
+                break
+            }
+            guard let refreshed = try jobUnlocked(jobID) else {
+                throw RuntimeJobError.jobNotFound(jobID)
+            }
+            return refreshed
         }
-        guard let refreshed = try jobUnlocked(jobID) else { throw RuntimeJobError.jobNotFound(jobID) }
-        return refreshed
     }
 
     @discardableResult
@@ -1118,11 +1341,22 @@ public actor RuntimeJobRepository {
         return try body(statement)
     }
 
-    private func transaction<Value>(_ body: () throws -> Value) throws -> Value {
+    private func transaction<Value>(
+        checkTaskCancellation: Bool = false,
+        commitKind: RuntimeJobCommitKind? = nil,
+        commitObserver: ((Value) -> Void)? = nil,
+        _ body: () throws -> Value
+    ) throws -> Value {
+        if checkTaskCancellation { try Task.checkCancellation() }
         try execute("BEGIN IMMEDIATE")
         do {
             let value = try body()
+            if checkTaskCancellation { try Task.checkCancellation() }
             try execute("COMMIT")
+            commitObserver?(value)
+            if let commitKind {
+                afterMutationCommitObserver?(commitKind)
+            }
             return value
         } catch {
             _ = try? execute("ROLLBACK")
@@ -1182,7 +1416,85 @@ public actor RuntimeJobRepository {
     private static func openAndMigrate(
         databaseURL: URL,
         busyTimeoutMilliseconds: Int,
-        timestamp: String
+        timestamp: String,
+        beforeMigrationCommitObserver: (@Sendable () throws -> Void)?,
+        tableInfoStepObserver: (@Sendable () -> Int32?)?
+    ) throws -> OpaquePointer {
+        var migrationManifest: VerifiedMigrationBackupManifest?
+        return try VerifiedMigrationBackup.withMigrationLock(
+            databaseURL: databaseURL,
+            timeoutSeconds: 60
+        ) {
+            do {
+                try VerifiedMigrationBackup.withNonMutatingSQLitePreflight(
+                    databaseURL: databaseURL
+                ) { candidate in
+                    guard let candidate else {
+                        _ = try VerifiedMigrationBackup.reconcileMigrationManifest(
+                            sourceURL: databaseURL,
+                            observedVersion: 0
+                        )
+                        return
+                    }
+                    let hasRuntimeVersion = try candidate.integer(
+                        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='runtime_job_schema_version'"
+                    ) == 1
+                    if hasRuntimeVersion {
+                        let rowCount = try candidate.integer(
+                            "SELECT COUNT(*) FROM runtime_job_schema_version"
+                        ) ?? 0
+                        let version = try candidate.integer(
+                            "SELECT version FROM runtime_job_schema_version WHERE singleton=1"
+                        ) ?? 0
+                        guard rowCount == 1, (1...schemaVersion).contains(version) else {
+                            throw RuntimeJobError.storageFailure(
+                                "unsupported runtime job schema version \(version)"
+                            )
+                        }
+                        migrationManifest = try VerifiedMigrationBackup
+                            .reconcileMigrationManifest(
+                                sourceURL: databaseURL,
+                                observedVersion: version
+                            )
+                        return
+                    }
+                    if try isExactCoResidentControlPlaneV2(candidate) {
+                        migrationManifest = try VerifiedMigrationBackup
+                            .reconcileMigrationManifest(
+                                sourceURL: databaseURL,
+                                observedVersion: 0
+                            )
+                        return
+                    }
+                    try candidate.requireEmptySchemaWhenUnversioned(reportedVersion: 0)
+                    _ = try VerifiedMigrationBackup.reconcileMigrationManifest(
+                        sourceURL: databaseURL,
+                        observedVersion: 0
+                    )
+                }
+            } catch let error as RuntimeJobError {
+                throw error
+            } catch {
+                throw RuntimeJobError.storageFailure(error.localizedDescription)
+            }
+            return try openAndMigrateLocked(
+                databaseURL: databaseURL,
+                busyTimeoutMilliseconds: busyTimeoutMilliseconds,
+                timestamp: timestamp,
+                migrationManifest: migrationManifest,
+                beforeMigrationCommitObserver: beforeMigrationCommitObserver,
+                tableInfoStepObserver: tableInfoStepObserver
+            )
+        }
+    }
+
+    private static func openAndMigrateLocked(
+        databaseURL: URL,
+        busyTimeoutMilliseconds: Int,
+        timestamp: String,
+        migrationManifest initialManifest: VerifiedMigrationBackupManifest?,
+        beforeMigrationCommitObserver: (@Sendable () throws -> Void)?,
+        tableInfoStepObserver: (@Sendable () -> Int32?)?
     ) throws -> OpaquePointer {
         var connection: OpaquePointer?
         let flags = SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
@@ -1193,46 +1505,121 @@ public actor RuntimeJobRepository {
             throw RuntimeJobError.storageFailure(message)
         }
         do {
+            sqlite3_busy_timeout(connection, Int32(busyTimeoutMilliseconds))
+            let hasVersionTable = try rawScalarInt(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='runtime_job_schema_version'",
+                database: connection
+            ) == 1
+            let prior = hasVersionTable
+                ? try rawScalarInt(
+                    "SELECT version FROM runtime_job_schema_version WHERE singleton=1",
+                    database: connection
+                ) ?? 0
+                : 0
+            let isCurrentCoResidentControlPlane: Bool
+            if hasVersionTable {
+                isCurrentCoResidentControlPlane = false
+            } else {
+                isCurrentCoResidentControlPlane = try isExactCoResidentControlPlaneV2(connection)
+            }
+            if !isCurrentCoResidentControlPlane {
+                do {
+                    try VerifiedMigrationBackup.requireEmptySQLiteSchemaWhenUnversioned(
+                        database: connection,
+                        reportedVersion: prior
+                    )
+                } catch {
+                    throw RuntimeJobError.storageFailure(error.localizedDescription)
+                }
+            }
+            guard prior <= schemaVersion else {
+                throw RuntimeJobError.storageFailure(
+                    "unsupported runtime job schema version \(prior)"
+                )
+            }
+            var migrationManifest = try initialManifest
+                ?? VerifiedMigrationBackup.reconcileMigrationManifest(
+                    sourceURL: databaseURL,
+                    observedVersion: prior
+                )
+            if prior == schemaVersion,
+               let currentManifest = migrationManifest {
+                migrationManifest = try VerifiedMigrationBackup.requireSQLiteMigrationReceipt(
+                    database: connection,
+                    sourceURL: databaseURL,
+                    manifest: currentManifest
+                )
+            }
             try rawExecute("PRAGMA foreign_keys=ON", database: connection)
             try rawExecute("PRAGMA journal_mode=WAL", database: connection)
             try rawExecute("PRAGMA synchronous=NORMAL", database: connection)
             try rawExecute("PRAGMA busy_timeout=\(busyTimeoutMilliseconds)", database: connection)
+            let isSchemaMigration = (prior > 0 && prior < schemaVersion)
+                || (prior == 0 && isCurrentCoResidentControlPlane)
+            let needsDurableCompletion = isSchemaMigration
+                || migrationManifest?.state == .prepared
+            if needsDurableCompletion {
+                try rawExecute("PRAGMA synchronous=FULL", database: connection)
+            }
+            defer {
+                if needsDurableCompletion {
+                    _ = try? rawExecute("PRAGMA synchronous=NORMAL", database: connection)
+                }
+            }
+            var completingManifest = migrationManifest
             try rawExecute("BEGIN IMMEDIATE", database: connection)
             do {
-                try rawExecute(schema, database: connection)
-                let prior = try rawScalarInt(
-                    "SELECT version FROM runtime_job_schema_version WHERE singleton=1",
-                    database: connection
-                ) ?? 0
-                guard prior <= schemaVersion else {
-                    throw RuntimeJobError.storageFailure(
-                        "unsupported runtime job schema version \(prior)"
+                if isSchemaMigration {
+                    completingManifest = try VerifiedMigrationBackup
+                        .prepareSQLiteMigrationAtWriteBoundary(
+                            database: connection,
+                            sourceURL: databaseURL,
+                            backupURL: migrationBackupURL(
+                                databaseURL: databaseURL,
+                                sourceVersion: prior
+                            ),
+                            sourceVersion: prior,
+                            targetVersion: schemaVersion,
+                            versionQuery: prior == 0
+                                ? "SELECT 0;"
+                                : "SELECT version FROM runtime_job_schema_version WHERE singleton=1"
+                        )
+                } else if prior == schemaVersion,
+                          let currentManifest = completingManifest {
+                    completingManifest = try VerifiedMigrationBackup.requireSQLiteMigrationReceipt(
+                        database: connection,
+                        sourceURL: databaseURL,
+                        manifest: currentManifest
                     )
                 }
-                if !rawTableHasColumn(
+                try rawExecute(schema, database: connection)
+                if try !rawTableHasColumn(
                     table: "runtime_job_output_streams",
                     column: "artifact_evicted_at",
-                    database: connection
+                    database: connection,
+                    stepObserver: tableInfoStepObserver
                 ) {
                     try rawExecute(
                         "ALTER TABLE runtime_job_output_streams ADD COLUMN artifact_evicted_at TEXT",
                         database: connection
                     )
                 }
-                if !rawTableHasColumn(
+                if try !rawTableHasColumn(
                     table: "execution_jobs",
                     column: "process_start_seconds",
-                    database: connection
+                    database: connection,
+                    stepObserver: tableInfoStepObserver
                 ) {
                     try rawExecute(
                         "ALTER TABLE execution_jobs ADD COLUMN process_start_seconds INTEGER CHECK(process_start_seconds>0)",
                         database: connection
                     )
                 }
-                if !rawTableHasColumn(
+                if try !rawTableHasColumn(
                     table: "execution_jobs",
                     column: "process_start_microseconds",
-                    database: connection
+                    database: connection,
+                    stepObserver: tableInfoStepObserver
                 ) {
                     try rawExecute(
                         """
@@ -1242,10 +1629,11 @@ public actor RuntimeJobRepository {
                         database: connection
                     )
                 }
-                if !rawTableHasColumn(
+                if try !rawTableHasColumn(
                     table: "runtime_job_output_streams",
                     column: "artifact_device_identifier",
-                    database: connection
+                    database: connection,
+                    stepObserver: tableInfoStepObserver
                 ) {
                     try rawExecute(
                         """
@@ -1256,10 +1644,11 @@ public actor RuntimeJobRepository {
                         database: connection
                     )
                 }
-                if !rawTableHasColumn(
+                if try !rawTableHasColumn(
                     table: "runtime_job_output_streams",
                     column: "artifact_file_identifier",
-                    database: connection
+                    database: connection,
+                    stepObserver: tableInfoStepObserver
                 ) {
                     try rawExecute(
                         """
@@ -1270,10 +1659,11 @@ public actor RuntimeJobRepository {
                         database: connection
                     )
                 }
-                if !rawTableHasColumn(
+                if try !rawTableHasColumn(
                     table: "runtime_job_details",
                     column: "termination_phase",
-                    database: connection
+                    database: connection,
+                    stepObserver: tableInfoStepObserver
                 ) {
                     try rawExecute(
                         """
@@ -1286,20 +1676,22 @@ public actor RuntimeJobRepository {
                         database: connection
                     )
                 }
-                if !rawTableHasColumn(
+                if try !rawTableHasColumn(
                     table: "runtime_job_details",
                     column: "termination_probe_deadline",
-                    database: connection
+                    database: connection,
+                    stepObserver: tableInfoStepObserver
                 ) {
                     try rawExecute(
                         "ALTER TABLE runtime_job_details ADD COLUMN termination_probe_deadline TEXT",
                         database: connection
                     )
                 }
-                if !rawTableHasColumn(
+                if try !rawTableHasColumn(
                     table: "runtime_job_details",
                     column: "termination_error_summary",
-                    database: connection
+                    database: connection,
+                    stepObserver: tableInfoStepObserver
                 ) {
                     try rawExecute(
                         "ALTER TABLE runtime_job_details ADD COLUMN termination_error_summary TEXT",
@@ -1314,22 +1706,152 @@ public actor RuntimeJobRepository {
                     ON CONFLICT(singleton) DO UPDATE SET version=excluded.version,applied_at=excluded.applied_at
                     """,
                     database: connection,
-                    bindings: [.text(timestamp)]
+                    bindings: [.text(completingManifest?.preparedAt ?? timestamp)]
                 )
+                if isSchemaMigration, let completingManifest {
+                    try VerifiedMigrationBackup.recordSQLiteMigrationReceipt(
+                        database: connection,
+                        sourceURL: databaseURL,
+                        manifest: completingManifest
+                    )
+                }
                 let integrity = try rawScalarText("PRAGMA quick_check", database: connection) ?? "missing"
                 guard integrity.lowercased() == "ok" else {
                     throw RuntimeJobError.storageFailure("SQLite quick check failed: \(integrity)")
+                }
+                if needsDurableCompletion {
+                    try beforeMigrationCommitObserver?()
+                    try VerifiedMigrationBackup.requireSQLiteMainFileUnmoved(
+                        database: connection,
+                        sourceURL: databaseURL,
+                        purpose: "runtime job migration commit"
+                    )
                 }
                 try rawExecute("COMMIT", database: connection)
             } catch {
                 _ = try? rawExecute("ROLLBACK", database: connection)
                 throw error
             }
+            if let completingManifest, completingManifest.state == .prepared {
+                let observedVersion = try rawScalarInt(
+                    "SELECT version FROM runtime_job_schema_version WHERE singleton=1",
+                    database: connection
+                ) ?? 0
+                try VerifiedMigrationBackup.checkpointSQLiteMigration(
+                    database: connection,
+                    sourceURL: databaseURL
+                )
+                let target = try VerifiedMigrationBackup.logicalSQLiteMetadata(
+                    database: connection,
+                    sourceURL: databaseURL,
+                    expectedVersion: schemaVersion,
+                    versionQuery: "SELECT version FROM runtime_job_schema_version WHERE singleton=1"
+                )
+                _ = try VerifiedMigrationBackup.completeMigrationManifest(
+                    sourceURL: databaseURL,
+                    preparedManifest: completingManifest,
+                    observedVersion: observedVersion,
+                    targetMetadata: target
+                )
+            }
             return connection
         } catch {
             sqlite3_close(connection)
             throw error
         }
+    }
+
+    private static func migrationBackupURL(
+        databaseURL: URL,
+        sourceVersion: Int
+    ) -> URL {
+        let stem = databaseURL.deletingPathExtension().lastPathComponent
+        return databaseURL.deletingLastPathComponent().appendingPathComponent(
+            "\(stem).pre-migration-v\(sourceVersion).sqlite3",
+            isDirectory: false
+        )
+    }
+
+    private static func isExactCoResidentControlPlaneV2(
+        _ candidate: SQLitePreflightDatabase
+    ) throws -> Bool {
+        let versionTableCount = try candidate.integer(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='control_schema_version'"
+        ) ?? 0
+        guard versionTableCount == 1 else { return false }
+        let versionRowCount = try candidate.integer(
+            "SELECT COUNT(*) FROM control_schema_version"
+        ) ?? 0
+        let version = try candidate.integer(
+            "SELECT version FROM control_schema_version WHERE singleton=1"
+        )
+        let userVersion = try candidate.integer("PRAGMA user_version;") ?? 0
+        let requiredTableCount = try candidate.integer(controlPlaneV2RequiredTableCountSQL) ?? 0
+        guard versionRowCount == 1
+            && version == ProjectControlPlaneRepository.schemaVersion
+            && userVersion == ProjectControlPlaneRepository.schemaVersion
+            && requiredTableCount == controlPlaneV2RequiredSurfaces.count else {
+            return false
+        }
+        for surface in controlPlaneV2RequiredSurfaces {
+            let columnList = surface.columns.map { "'\($0)'" }.joined(separator: ",")
+            let totalCount = try candidate.integer(
+                "SELECT COUNT(*) FROM pragma_table_info('\(surface.name)')"
+            ) ?? 0
+            let matchedCount = try candidate.integer(
+                "SELECT COUNT(*) FROM pragma_table_info('\(surface.name)') WHERE name IN (\(columnList))"
+            ) ?? 0
+            guard totalCount == surface.columns.count,
+                  matchedCount == surface.columns.count else {
+                return false
+            }
+        }
+        return true
+    }
+
+    private static func isExactCoResidentControlPlaneV2(
+        _ database: OpaquePointer
+    ) throws -> Bool {
+        let versionTableCount = try rawScalarInt(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='control_schema_version'",
+            database: database
+        ) ?? 0
+        guard versionTableCount == 1 else { return false }
+        let versionRowCount = try rawScalarInt(
+            "SELECT COUNT(*) FROM control_schema_version",
+            database: database
+        ) ?? 0
+        let version = try rawScalarInt(
+            "SELECT version FROM control_schema_version WHERE singleton=1",
+            database: database
+        )
+        let userVersion = try rawScalarInt("PRAGMA user_version", database: database) ?? 0
+        let requiredTableCount = try rawScalarInt(
+            controlPlaneV2RequiredTableCountSQL,
+            database: database
+        ) ?? 0
+        guard versionRowCount == 1
+            && version == ProjectControlPlaneRepository.schemaVersion
+            && userVersion == ProjectControlPlaneRepository.schemaVersion
+            && requiredTableCount == controlPlaneV2RequiredSurfaces.count else {
+            return false
+        }
+        for surface in controlPlaneV2RequiredSurfaces {
+            let columnList = surface.columns.map { "'\($0)'" }.joined(separator: ",")
+            let totalCount = try rawScalarInt(
+                "SELECT COUNT(*) FROM pragma_table_info('\(surface.name)')",
+                database: database
+            ) ?? 0
+            let matchedCount = try rawScalarInt(
+                "SELECT COUNT(*) FROM pragma_table_info('\(surface.name)') WHERE name IN (\(columnList))",
+                database: database
+            ) ?? 0
+            guard totalCount == surface.columns.count,
+                  matchedCount == surface.columns.count else {
+                return false
+            }
+        }
+        return true
     }
 
     @discardableResult
@@ -1397,16 +1919,30 @@ public actor RuntimeJobRepository {
     private static func rawTableHasColumn(
         table: String,
         column: String,
-        database: OpaquePointer
-    ) -> Bool {
+        database: OpaquePointer,
+        stepObserver: (@Sendable () -> Int32?)?
+    ) throws -> Bool {
         var statement: OpaquePointer?
-        guard sqlite3_prepare_v2(database, "PRAGMA table_info(\(table))", -1, &statement, nil) == SQLITE_OK,
-              let statement else { return false }
-        defer { sqlite3_finalize(statement) }
-        while sqlite3_step(statement) == SQLITE_ROW {
-            if optionalText(statement, column: 1) == column { return true }
+        let prepare = sqlite3_prepare_v2(database, "PRAGMA table_info(\(table))", -1, &statement, nil)
+        guard prepare == SQLITE_OK, let statement else {
+            throw RuntimeJobError.storageFailure(
+                "SQLite table-info prepare failed with code \(prepare): \(String(cString: sqlite3_errmsg(database)))"
+            )
         }
-        return false
+        defer { sqlite3_finalize(statement) }
+        while true {
+            let step = stepObserver?() ?? sqlite3_step(statement)
+            switch step {
+            case SQLITE_ROW:
+                if optionalText(statement, column: 1) == column { return true }
+            case SQLITE_DONE:
+                return false
+            default:
+                throw RuntimeJobError.storageFailure(
+                    "SQLite table-info step failed with code \(step): \(String(cString: sqlite3_errmsg(database)))"
+                )
+            }
+        }
     }
 
     private static func decodeRecord(_ statement: OpaquePointer) throws -> RuntimeJobRecord {

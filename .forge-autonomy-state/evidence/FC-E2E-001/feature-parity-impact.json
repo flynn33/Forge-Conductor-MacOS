@@ -1,21 +1,54 @@
 {
   "schema_version": 1,
   "work_package": "FC-E2E-001",
+  "source_commit": "52f8aca47463f88fa94276115fb5c2070ca683ef",
   "verified_preserved_paths": {
     "project_scoped_successor_bootstrap": true,
     "exact_handoff_acknowledgement": true,
     "automatic_successor_continuation": true,
+    "automatic_successor_continuation_marker": true,
     "real_provider_response_identifiers": true,
     "provider_exact_usage_accounting": true,
+    "bounded_provider_output_tokens": true,
     "transient_provider_failure_is_fail_closed": true,
-    "deterministic_multi_project_generation_fencing": true
+    "deterministic_multi_project_generation_fencing": true,
+    "strict_debug_and_release_regression_suites": true
   },
   "additive": [
     "real LM Studio fresh-root acknowledgment and automatic-continuation acceptance test",
     "machine-readable live continuity transcript",
+    "explicit bounded max_output_tokens on every managed LM Studio Responses request",
+    "continuation marker proof that the successor advances beyond bootstrap acknowledgment",
     "deterministic multi-project and crash-boundary acceptance scenarios"
   ],
   "removed": [],
+  "current_validation": {
+    "focused_provider_contract_debug": {
+      "command_id": "CMD-20260827T103019Z-caacf56201",
+      "executed": 27,
+      "skipped": 1,
+      "failures": 0
+    },
+    "full_debug_strict": {
+      "command_id": "CMD-20260827T103327Z-5d0a028f3d",
+      "executed": 447,
+      "skipped": 3,
+      "failures": 0
+    },
+    "full_release_strict": {
+      "command_id": "CMD-20260827T103455Z-4b3944647c",
+      "executed": 447,
+      "skipped": 4,
+      "failures": 0
+    },
+    "exact_commit_live_lmstudio": {
+      "command_id": "CMD-20260827T103812Z-17ac760a12",
+      "executed": 1,
+      "failures": 0,
+      "maximum_output_tokens": 4096,
+      "continuation_marker_validated": true
+    }
+  },
   "feature_parity_not_yet_verified": [
     "complete MCP tool-name and schema comparison",
     "CLI and manager HTTP compatibility comparison",

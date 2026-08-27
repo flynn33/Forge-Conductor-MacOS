@@ -201,6 +201,7 @@
 		P10B00000000000000000007 /* Metal/MetalGaugeResources.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000007 /* Metal/MetalGaugeResources.swift */; };
 		P10B00000000000000000008 /* Domain/ProjectMemoryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000008 /* Domain/ProjectMemoryModels.swift */; };
 		P10B00000000000000000009 /* Infrastructure/ProjectMemoryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000009 /* Infrastructure/ProjectMemoryRepository.swift */; };
+		C482E7FA103B4D6F95A18C20 /* Infrastructure/VerifiedMigrationBackup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71D3A9C84F6E42B1A5D809CE /* Infrastructure/VerifiedMigrationBackup.swift */; };
 		P10B00000000000000000010 /* Application/ProjectMemoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000010 /* Application/ProjectMemoryService.swift */; };
 		P10B00000000000000000011 /* Application/Tools/ProjectMemoryToolPack.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000011 /* Application/Tools/ProjectMemoryToolPack.swift */; };
 		P10B00000000000000000012 /* Infrastructure/ResourcePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000012 /* Infrastructure/ResourcePolicy.swift */; };
@@ -213,6 +214,13 @@
 		P10B00000000000000000019 /* ResourcePolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000019 /* ResourcePolicyTests.swift */; };
 		P10B00000000000000000020 /* RuntimeObservabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000020 /* RuntimeObservabilityTests.swift */; };
 		P11B00000000000000000001 /* ReleaseStressTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = P11F00000000000000000001 /* ReleaseStressTests.swift */; };
+		B27B00000000000000000001 /* Infrastructure/OwnerOnlyAtomicFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27F00000000000000000001 /* Infrastructure/OwnerOnlyAtomicFile.swift */; };
+		B27B00000000000000000002 /* CommittedResultRecoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27F00000000000000000002 /* CommittedResultRecoveryTests.swift */; };
+		B27B00000000000000000003 /* DiagnosticBoundaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27F00000000000000000003 /* DiagnosticBoundaryTests.swift */; };
+		B27B00000000000000000004 /* FilesystemCancellationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27F00000000000000000004 /* FilesystemCancellationTests.swift */; };
+		B27B00000000000000000005 /* LegacyContinuityCancellationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27F00000000000000000005 /* LegacyContinuityCancellationTests.swift */; };
+		B27B00000000000000000006 /* OwnerOnlyAtomicFileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27F00000000000000000006 /* OwnerOnlyAtomicFileTests.swift */; };
+		B27B00000000000000000007 /* ToolRouterDeadlineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27F00000000000000000007 /* ToolRouterDeadlineTests.swift */; };
 		F0A700000000000000000001 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0A70000000000000000000A /* main.swift */; };
 		F0A700000000000000000002 /* forge-runtime-launcher in Embed Runtime Helper */ = {isa = PBXBuildFile; fileRef = F0A70000000000000000000B /* forge-runtime-launcher */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 /* End PBXBuildFile section */
@@ -509,6 +517,7 @@
 		P10F00000000000000000007 /* Metal/MetalGaugeResources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Metal/MetalGaugeResources.swift; sourceTree = "<group>"; };
 		P10F00000000000000000008 /* Domain/ProjectMemoryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/ProjectMemoryModels.swift; sourceTree = "<group>"; };
 		P10F00000000000000000009 /* Infrastructure/ProjectMemoryRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Infrastructure/ProjectMemoryRepository.swift; sourceTree = "<group>"; };
+		71D3A9C84F6E42B1A5D809CE /* Infrastructure/VerifiedMigrationBackup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Infrastructure/VerifiedMigrationBackup.swift; sourceTree = "<group>"; };
 		P10F00000000000000000010 /* Application/ProjectMemoryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/ProjectMemoryService.swift; sourceTree = "<group>"; };
 		P10F00000000000000000011 /* Application/Tools/ProjectMemoryToolPack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/Tools/ProjectMemoryToolPack.swift; sourceTree = "<group>"; };
 		P10F00000000000000000012 /* Infrastructure/ResourcePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Infrastructure/ResourcePolicy.swift; sourceTree = "<group>"; };
@@ -521,6 +530,13 @@
 		P10F00000000000000000019 /* ResourcePolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResourcePolicyTests.swift; sourceTree = "<group>"; };
 		P10F00000000000000000020 /* RuntimeObservabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeObservabilityTests.swift; sourceTree = "<group>"; };
 		P11F00000000000000000001 /* ReleaseStressTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseStressTests.swift; sourceTree = "<group>"; };
+		B27F00000000000000000001 /* Infrastructure/OwnerOnlyAtomicFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Infrastructure/OwnerOnlyAtomicFile.swift; sourceTree = "<group>"; };
+		B27F00000000000000000002 /* CommittedResultRecoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommittedResultRecoveryTests.swift; sourceTree = "<group>"; };
+		B27F00000000000000000003 /* DiagnosticBoundaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticBoundaryTests.swift; sourceTree = "<group>"; };
+		B27F00000000000000000004 /* FilesystemCancellationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilesystemCancellationTests.swift; sourceTree = "<group>"; };
+		B27F00000000000000000005 /* LegacyContinuityCancellationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyContinuityCancellationTests.swift; sourceTree = "<group>"; };
+		B27F00000000000000000006 /* OwnerOnlyAtomicFileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OwnerOnlyAtomicFileTests.swift; sourceTree = "<group>"; };
+		B27F00000000000000000007 /* ToolRouterDeadlineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolRouterDeadlineTests.swift; sourceTree = "<group>"; };
 		F0A70000000000000000000A /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		F0A70000000000000000000B /* forge-runtime-launcher */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "forge-runtime-launcher"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -610,6 +626,12 @@
 				P10F00000000000000000018 /* ProjectMemoryTests.swift */,
 				P10F00000000000000000019 /* ResourcePolicyTests.swift */,
 				P10F00000000000000000020 /* RuntimeObservabilityTests.swift */,
+				B27F00000000000000000002 /* CommittedResultRecoveryTests.swift */,
+				B27F00000000000000000003 /* DiagnosticBoundaryTests.swift */,
+				B27F00000000000000000004 /* FilesystemCancellationTests.swift */,
+				B27F00000000000000000005 /* LegacyContinuityCancellationTests.swift */,
+				B27F00000000000000000006 /* OwnerOnlyAtomicFileTests.swift */,
+				B27F00000000000000000007 /* ToolRouterDeadlineTests.swift */,
 				C07A00000000000000000004 /* ContinuityTests.swift */,
 				A0FC00000000000000000007 /* LMStudioConnectorReliabilityTests.swift */,
 				A0FC00000000000000000009 /* DashboardSecurityTests.swift */,
@@ -773,6 +795,8 @@
 				P10F00000000000000000006 /* Telemetry/LatestValueMailbox.swift */,
 				P10F00000000000000000008 /* Domain/ProjectMemoryModels.swift */,
 				P10F00000000000000000009 /* Infrastructure/ProjectMemoryRepository.swift */,
+				71D3A9C84F6E42B1A5D809CE /* Infrastructure/VerifiedMigrationBackup.swift */,
+				B27F00000000000000000001 /* Infrastructure/OwnerOnlyAtomicFile.swift */,
 				P10F00000000000000000010 /* Application/ProjectMemoryService.swift */,
 				P10F00000000000000000011 /* Application/Tools/ProjectMemoryToolPack.swift */,
 				P10F00000000000000000012 /* Infrastructure/ResourcePolicy.swift */,
@@ -1084,6 +1108,12 @@
 				P10B00000000000000000018 /* ProjectMemoryTests.swift in Sources */,
 				P10B00000000000000000019 /* ResourcePolicyTests.swift in Sources */,
 				P10B00000000000000000020 /* RuntimeObservabilityTests.swift in Sources */,
+				B27B00000000000000000002 /* CommittedResultRecoveryTests.swift in Sources */,
+				B27B00000000000000000003 /* DiagnosticBoundaryTests.swift in Sources */,
+				B27B00000000000000000004 /* FilesystemCancellationTests.swift in Sources */,
+				B27B00000000000000000005 /* LegacyContinuityCancellationTests.swift in Sources */,
+				B27B00000000000000000006 /* OwnerOnlyAtomicFileTests.swift in Sources */,
+				B27B00000000000000000007 /* ToolRouterDeadlineTests.swift in Sources */,
 				C07A00000000000000000008 /* ContinuityTests.swift in Sources */,
 				A0FC00000000000000000008 /* LMStudioConnectorReliabilityTests.swift in Sources */,
 				A0FC0000000000000000000A /* DashboardSecurityTests.swift in Sources */,
@@ -1201,6 +1231,8 @@
 				P10B00000000000000000006 /* Telemetry/LatestValueMailbox.swift in Sources */,
 				P10B00000000000000000008 /* Domain/ProjectMemoryModels.swift in Sources */,
 				P10B00000000000000000009 /* Infrastructure/ProjectMemoryRepository.swift in Sources */,
+				C482E7FA103B4D6F95A18C20 /* Infrastructure/VerifiedMigrationBackup.swift in Sources */,
+				B27B00000000000000000001 /* Infrastructure/OwnerOnlyAtomicFile.swift in Sources */,
 				P10B00000000000000000010 /* Application/ProjectMemoryService.swift in Sources */,
 				P10B00000000000000000011 /* Application/Tools/ProjectMemoryToolPack.swift in Sources */,
 				P10B00000000000000000012 /* Infrastructure/ResourcePolicy.swift in Sources */,

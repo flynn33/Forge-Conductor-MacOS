@@ -1,6 +1,50 @@
 {
   "schema_version": 2,
   "phase": "P09",
+  "captured_at": "2026-08-27T10:41:04.799117+00:00",
+  "source_revision": "52f8aca47463f88fa94276115fb5c2070ca683ef",
+  "status": "passed",
+  "qualification": {
+    "plugin_release_build_record": ".forge-codex/evidence/EVID-20260827T103142Z-31aeee7a3f.json",
+    "plugin_contract_tests": {
+      "record": ".forge-codex/evidence/EVID-20260827T103242Z-f2a67a3569.json",
+      "executed": 16,
+      "skipped": 1,
+      "failures": 0
+    },
+    "debug_strict_suite": {
+      "command_id": "CMD-20260827T103327Z-5d0a028f3d",
+      "executed": 447,
+      "skipped": 3,
+      "failures": 0
+    },
+    "release_strict_suite": {
+      "command_id": "CMD-20260827T103455Z-4b3944647c",
+      "executed": 447,
+      "skipped": 4,
+      "failures": 0
+    },
+    "external_mcp": {
+      "release_build_record": ".forge-codex/evidence/EVID-20260827T103306Z-a585799235.json",
+      "record": ".forge-codex/evidence/EVID-20260827T103315Z-ea299d27a2.json",
+      "artifact": ".forge-codex/evidence/P09-external-mcp-compatibility.json",
+      "checks": 9
+    },
+    "private_ui_scan": {
+      "record": ".forge-codex/evidence/EVID-20260827T103321Z-9af37ac353.json",
+      "violations": 0
+    },
+    "live_lmstudio": {
+      "command_id": "CMD-20260827T103812Z-17ac760a12",
+      "artifact": ".forge-autonomy-state/evidence/FC-E2E-001/live-lmstudio-managed-continuity.json",
+      "artifact_sha256": "7861db2e43dff59892b85b6bb914540b891a630c07f7ae882c69954f5e01702b",
+      "fresh_root_validated": true,
+      "acknowledgement_validated": true,
+      "automatic_continuation_validated": true,
+      "automatic_continuation_marker_validated": true,
+      "maximum_output_tokens": 4096
+    }
+  },
   "preserved": [
     "MCP-SERVER-STDIO",
     "DATA-CONTEXT-HANDOFFS",

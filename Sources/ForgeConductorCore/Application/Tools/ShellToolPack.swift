@@ -15,8 +15,16 @@ public struct ShellToolPack: ToolPackHandling {
 
     public var toolNames: [String] { ["shell_exec"] }
 
-    public func handle(name: String, arguments: [String: Any], clientID: ClientID, app: ForgeApp) throws -> ToolResult? {
+    public func handle(
+        name: String,
+        arguments: [String: Any],
+        context: ToolInvocationContext?,
+        clientID: ClientID,
+        app: ForgeApp,
+        cancellation: ToolCallCancellation?
+    ) throws -> ToolResult? {
         guard name == "shell_exec" else { return nil }
+        try cancellation?.checkCancellation()
         guard let command = ToolArgHelpers.string(arguments, "command"), !command.isEmpty else {
             return .failure(code: "missing_command", message: "command required")
         }
@@ -36,7 +44,8 @@ public struct ShellToolPack: ToolPackHandling {
             arguments: ["-lc", command],
             currentDirectory: cwd,
             timeoutSec: timeout,
-            maximumOutputBytes: 100_000
+            maximumOutputBytes: 100_000,
+            cancellation: cancellation
         )
         let ok = result.exitCode == 0 && !result.timedOut
         return ToolResult(

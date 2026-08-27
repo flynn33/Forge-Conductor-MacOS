@@ -1,0 +1,36 @@
+Test Suite 'Selected tests' started at 2026-08-27 06:55:44.979.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-27 06:55:44.980.
+Test Suite 'ContinuityTests' started at 2026-08-27 06:55:44.980.
+Test Case '-[ForgeConductorTests.ContinuityTests testConcurrentVersionThreeMigrationIsIdempotent]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testConcurrentVersionThreeMigrationIsIdempotent]' passed (0.038 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testVerifiedMigrationBackupCapturesWALAndRejectsTamperedReuse]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testVerifiedMigrationBackupCapturesWALAndRejectsTamperedReuse]' passed (0.011 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testVersionThreeStoreMigratesWithoutLosingHandoff]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testVersionThreeStoreMigratesWithoutLosingHandoff]' passed (0.273 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testVersionTwoStoreMigratesPopulatedDataReopensAndRerunsIdempotently]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testVersionTwoStoreMigratesPopulatedDataReopensAndRerunsIdempotently]' passed (0.012 seconds).
+Test Suite 'ContinuityTests' passed at 2026-08-27 06:55:45.315.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.335 (0.335) seconds
+Test Suite 'NativeSessionHostPluginTests' started at 2026-08-27 06:55:45.315.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testV2BlockedCredentialFailureAndLegacySyntheticQuarantinePersist]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testV2BlockedCredentialFailureAndLegacySyntheticQuarantinePersist]' passed (0.018 seconds).
+Test Suite 'NativeSessionHostPluginTests' passed at 2026-08-27 06:55:45.333.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.018 (0.019) seconds
+Test Suite 'ProjectMemoryTests' started at 2026-08-27 06:55:45.333.
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testVersionOneDatabaseMigratesPopulatedDataReopensAndRerunsIdempotently]' started.
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testVersionOneDatabaseMigratesPopulatedDataReopensAndRerunsIdempotently]' passed (0.027 seconds).
+Test Suite 'ProjectMemoryTests' passed at 2026-08-27 06:55:45.360.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.027 (0.027) seconds
+Test Suite 'RuntimeExecutionJobTests' started at 2026-08-27 06:55:45.360.
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testSchemaV2MigratesForwardWithProcessIdentityAndIdempotencyReceiptStorage]' started.
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testSchemaV2MigratesForwardWithProcessIdentityAndIdempotencyReceiptStorage]' passed (0.012 seconds).
+Test Suite 'RuntimeExecutionJobTests' passed at 2026-08-27 06:55:45.372.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.012 (0.012) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-08-27 06:55:45.372.
+	 Executed 7 tests, with 0 failures (0 unexpected) in 0.391 (0.392) seconds
+Test Suite 'Selected tests' passed at 2026-08-27 06:55:45.372.
+	 Executed 7 tests, with 0 failures (0 unexpected) in 0.391 (0.393) seconds
+◇ Test run started.
+↳ Testing Library Version: 1501
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

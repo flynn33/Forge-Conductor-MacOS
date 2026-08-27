@@ -46,10 +46,17 @@ public final class ContextContinuityService: @unchecked Sendable {
     public func checkpoint(
         arguments: [String: Any],
         clientID: ClientID,
-        source: HandoffSource = .model
+        source: HandoffSource = .model,
+        cancellation: ToolCallCancellation? = nil
     ) throws -> [String: Any] {
-        let persisted = try mutateAndPersist {
-            try buildPacket(arguments: arguments, clientID: clientID, source: source, finalize: false)
+        let persisted = try mutateAndPersist(cancellation: cancellation) {
+            try buildPacket(
+                arguments: arguments,
+                clientID: clientID,
+                source: source,
+                finalize: false,
+                cancellation: cancellation
+            )
         }
         let packet = persisted.packet
         diagnostics.info("session_checkpoint", [
@@ -65,10 +72,17 @@ public final class ContextContinuityService: @unchecked Sendable {
     public func handoff(
         arguments: [String: Any],
         clientID: ClientID,
-        source: HandoffSource = .model
+        source: HandoffSource = .model,
+        cancellation: ToolCallCancellation? = nil
     ) throws -> [String: Any] {
-        let persisted = try mutateAndPersist {
-            var packet = try buildPacket(arguments: arguments, clientID: clientID, source: source, finalize: true)
+        let persisted = try mutateAndPersist(cancellation: cancellation) {
+            var packet = try buildPacket(
+                arguments: arguments,
+                clientID: clientID,
+                source: source,
+                finalize: true,
+                cancellation: cancellation
+            )
             packet.resumeReady = true
             if packet.resumeSeed.isEmpty {
                 packet.resumeSeed = packet.defaultResumeSeed()
@@ -91,13 +105,22 @@ public final class ContextContinuityService: @unchecked Sendable {
         return payload
     }
 
-    public func get(id: String? = nil, preferResumeReady: Bool = false) throws -> [String: Any] {
+    public func get(
+        id: String? = nil,
+        preferResumeReady: Bool = false,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> [String: Any] {
         let packet: HandoffPacket?
         if let id, !id.isEmpty {
-            packet = try store.handoffGet(id: id)
+            packet = try store.handoffGet(id: id, cancellation: cancellation)
         } else {
-            packet = try store.handoffLatest(resumeReadyOnly: preferResumeReady)
-                ?? store.handoffLatest(resumeReadyOnly: false)
+            packet = try store.handoffLatest(
+                resumeReadyOnly: preferResumeReady,
+                cancellation: cancellation
+            ) ?? store.handoffLatest(
+                resumeReadyOnly: false,
+                cancellation: cancellation
+            )
         }
         guard let packet else {
             let message: String
@@ -121,8 +144,11 @@ public final class ContextContinuityService: @unchecked Sendable {
         return payload
     }
 
-    public func list(limit: Int = 10) throws -> [String: Any] {
-        let packets = try store.handoffList(limit: limit)
+    public func list(
+        limit: Int = 10,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> [String: Any] {
+        let packets = try store.handoffList(limit: limit, cancellation: cancellation)
         return [
             "ok": true,
             "count": packets.count,
@@ -141,10 +167,18 @@ public final class ContextContinuityService: @unchecked Sendable {
     }
 
     /// Compact status for forge_status.
-    public func statusSummary() throws -> [String: Any] {
-        let latest = try store.handoffLatest(resumeReadyOnly: false)
-        let resume = try store.handoffLatest(resumeReadyOnly: true)
-        let open = try store.sessionList().filter(\.status.isOpen)
+    public func statusSummary(
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> [String: Any] {
+        let latest = try store.handoffLatest(
+            resumeReadyOnly: false,
+            cancellation: cancellation
+        )
+        let resume = try store.handoffLatest(
+            resumeReadyOnly: true,
+            cancellation: cancellation
+        )
+        let open = try store.sessionList(cancellation: cancellation).filter(\.status.isOpen)
         return [
             "latest_id": latest?.id as Any,
             "latest_updated_at": latest?.updatedAt as Any,
@@ -171,12 +205,18 @@ public final class ContextContinuityService: @unchecked Sendable {
         clientID: ClientID,
         reason: String,
         finalize: Bool,
-        inferred: [String: Any]
+        inferred: [String: Any],
+        cancellation: ToolCallCancellation? = nil
     ) throws -> HandoffPacket {
-        let persisted = try mutateAndPersist {
+        let persisted = try mutateAndPersist(cancellation: cancellation) {
             var args = inferred
-            if let latest = try store.handoffLatest(clientID: clientID.rawValue)
-                ?? store.handoffLatest(resumeReadyOnly: false) {
+            if let latest = try store.handoffLatest(
+                clientID: clientID.rawValue,
+                cancellation: cancellation
+            ) ?? store.handoffLatest(
+                resumeReadyOnly: false,
+                cancellation: cancellation
+            ) {
                 args["handoff_id"] = latest.id
                 // Runtime inference fills blanks only. A model/budget packet already
                 // has the structured task; overwriting it would drop operator state.
@@ -199,7 +239,8 @@ public final class ContextContinuityService: @unchecked Sendable {
                 clientID: clientID,
                 source: .auto,
                 finalize: finalize,
-                preserveAuthorIdentity: true
+                preserveAuthorIdentity: true,
+                cancellation: cancellation
             )
             if packet.goal.isEmpty {
                 packet.goal = finalize ? "Auto-handoff: \(reason)" : "Auto-checkpoint: \(reason)"
@@ -234,17 +275,25 @@ public final class ContextContinuityService: @unchecked Sendable {
     }
 
     /// Auto-checkpoint used by budget policy (identical tool-loop / pressure).
-    public func budgetAutoCheckpoint(clientID: ClientID, reason: String) throws -> HandoffPacket {
-        let persisted = try mutateAndPersist {
+    public func budgetAutoCheckpoint(
+        clientID: ClientID,
+        reason: String,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> HandoffPacket {
+        let persisted = try mutateAndPersist(cancellation: cancellation) {
             var args: [String: Any] = ["status": "budget_pressure"]
-            if let latest = try store.handoffLatest(clientID: clientID.rawValue) {
+            if let latest = try store.handoffLatest(
+                clientID: clientID.rawValue,
+                cancellation: cancellation
+            ) {
                 args["handoff_id"] = latest.id
             }
             var packet = try buildPacket(
                 arguments: args,
                 clientID: clientID,
                 source: .budget,
-                finalize: true
+                finalize: true,
+                cancellation: cancellation
             )
             if packet.goal.isEmpty { packet.goal = "Auto-checkpoint: \(reason)" }
             if packet.nextActions.isEmpty {
@@ -303,8 +352,10 @@ public final class ContextContinuityService: @unchecked Sendable {
         clientID: ClientID,
         source: HandoffSource,
         finalize: Bool,
-        preserveAuthorIdentity: Bool = false
+        preserveAuthorIdentity: Bool = false,
+        cancellation: ToolCallCancellation? = nil
     ) throws -> HandoffPacket {
+        try cancellation?.checkCancellation()
         let now = ISO8601.string(from: clock.now())
         let existingID = ToolArgHelpers.string(arguments, "handoff_id")
             ?? ToolArgHelpers.string(arguments, "id")
@@ -315,7 +366,10 @@ public final class ContextContinuityService: @unchecked Sendable {
             clientID: clientID.rawValue
         )
         if let existingID {
-            guard let prior = try store.handoffGet(id: existingID) else {
+            guard let prior = try store.handoffGet(
+                id: existingID,
+                cancellation: cancellation
+            ) else {
                 throw StoreError.notFound("Unknown handoff packet: \(existingID)")
             }
             base = prior
@@ -323,7 +377,10 @@ public final class ContextContinuityService: @unchecked Sendable {
             if !(preserveAuthorIdentity && !finalize) {
                 base.source = source
             }
-        } else if let latest = try store.handoffLatest(clientID: clientID.rawValue), !latest.resumeReady {
+        } else if let latest = try store.handoffLatest(
+            clientID: clientID.rawValue,
+            cancellation: cancellation
+        ), !latest.resumeReady {
             // Continue the calling MCP client's open packet when no id is supplied.
             base = latest
             base.updatedAt = now
@@ -383,21 +440,25 @@ public final class ContextContinuityService: @unchecked Sendable {
             base.decisions = decisions
         }
 
-        let currentAgents = try snapshotAgents(clientID: clientID)
+        let currentAgents = try snapshotAgents(
+            clientID: clientID,
+            cancellation: cancellation
+        )
         if existingID != nil {
             // A resumed chat may checkpoint the recovered packet before it has
             // reattached every listed agent. Keep prior snapshots whose durable
             // sessions are still open, replacing them as the new client reattaches.
             base.agents = try mergeOpenAgentSnapshots(
                 prior: base.agents,
-                current: currentAgents
+                current: currentAgents,
+                cancellation: cancellation
             )
         } else {
             base.agents = currentAgents
         }
 
         // Fill goal/cwd from active binding if still empty.
-        if let binding = sessions.binding(for: clientID) {
+        if let binding = try sessions.binding(for: clientID, cancellation: cancellation) {
             if base.goal.isEmpty { base.goal = binding.goal }
             if base.cwd == nil || base.cwd?.isEmpty == true { base.cwd = binding.cwd }
         }
@@ -411,26 +472,35 @@ public final class ContextContinuityService: @unchecked Sendable {
         return base
     }
 
-    private func snapshotAgents(clientID: ClientID) throws -> [AgentContinuitySnapshot] {
-        let open = try store.sessionList().filter(\.status.isOpen)
+    private func snapshotAgents(
+        clientID: ClientID,
+        cancellation: ToolCallCancellation?
+    ) throws -> [AgentContinuitySnapshot] {
+        let open = try store.sessionList(cancellation: cancellation).filter(\.status.isOpen)
 
         // Deduplicate by session id
         var seen = Set<String>()
         var snaps: [AgentContinuitySnapshot] = []
         for s in open where s.clientID == clientID {
+            try cancellation?.checkCancellation()
             if snaps.count >= Self.maximumAgentSnapshots { break }
             if seen.contains(s.id.rawValue) { continue }
             seen.insert(s.id.rawValue)
 
             var goal = ""
             var cwd: String?
-            if let body = try? store.memoryGet(key: "agent_run/\(s.id.rawValue)"),
+            if let body = try optionalMemoryGet(
+                key: "agent_run/\(s.id.rawValue)",
+                cancellation: cancellation
+            ),
                let data = body.data(using: .utf8),
                let obj = try? JSONSupport.object(from: data) {
                 goal = obj["goal"] as? String ?? ""
                 cwd = obj["cwd"] as? String
             }
-            if goal.isEmpty, let binding = sessions.binding(for: clientID), binding.sessionID == s.id {
+            if goal.isEmpty,
+               let binding = try sessions.binding(for: clientID, cancellation: cancellation),
+               binding.sessionID == s.id {
                 goal = binding.goal
                 cwd = binding.cwd
             }
@@ -454,7 +524,8 @@ public final class ContextContinuityService: @unchecked Sendable {
 
     private func mergeOpenAgentSnapshots(
         prior: [AgentContinuitySnapshot],
-        current: [AgentContinuitySnapshot]
+        current: [AgentContinuitySnapshot],
+        cancellation: ToolCallCancellation?
     ) throws -> [AgentContinuitySnapshot] {
         var currentBySession: [String: AgentContinuitySnapshot] = [:]
         for snapshot in current {
@@ -464,18 +535,38 @@ public final class ContextContinuityService: @unchecked Sendable {
         var merged: [AgentContinuitySnapshot] = []
         var seen = Set<String>()
         for snapshot in prior where seen.insert(snapshot.sessionID).inserted {
+            try cancellation?.checkCancellation()
             if merged.count >= Self.maximumAgentSnapshots { break }
-            guard let session = try store.sessionGet(id: SessionID(snapshot.sessionID)),
+            guard let session = try store.sessionGet(
+                id: SessionID(snapshot.sessionID),
+                cancellation: cancellation
+            ),
                   session.status.isOpen else {
                 continue
             }
             merged.append(currentBySession.removeValue(forKey: snapshot.sessionID) ?? snapshot)
         }
         for snapshot in current where seen.insert(snapshot.sessionID).inserted {
+            try cancellation?.checkCancellation()
             if merged.count >= Self.maximumAgentSnapshots { break }
             merged.append(snapshot)
         }
         return merged
+    }
+
+    private func optionalMemoryGet(
+        key: String,
+        cancellation: ToolCallCancellation?
+    ) throws -> String? {
+        do {
+            return try store.memoryGet(key: key, cancellation: cancellation)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch is ToolCallDeadlineExceeded {
+            throw ToolCallDeadlineExceeded()
+        } catch {
+            return nil
+        }
     }
 
     private struct PersistenceOutcome {
@@ -483,15 +574,24 @@ public final class ContextContinuityService: @unchecked Sendable {
         var projectionWarning: String?
     }
 
-    private func mutateAndPersist(_ mutation: () throws -> HandoffPacket) throws -> PersistenceOutcome {
-        guard lock.lock(before: Date().addingTimeInterval(Self.persistenceLockTimeout)) else {
-            throw posixPersistenceError(operation: "lock continuity service", code: EBUSY)
-        }
+    private func mutateAndPersist(
+        cancellation: ToolCallCancellation?,
+        _ mutation: () throws -> HandoffPacket
+    ) throws -> PersistenceOutcome {
+        try lockContinuityMutex(
+            lock,
+            operation: "lock continuity service",
+            cancellation: cancellation
+        )
         defer { lock.unlock() }
+        try cancellation?.checkCancellation()
         try paths.ensureLayout()
-        return try withPersistenceFileLock {
+        return try withPersistenceFileLock(cancellation: cancellation) {
+            try cancellation?.checkCancellation()
             let packet = try mutation()
-            try store.handoffUpsert(packet)
+            try store.handoffUpsert(packet, cancellation: cancellation)
+            // SQLite is authoritative. A cancellation observed after this point
+            // cannot turn the durable handoff into a reported failure.
             do {
                 try writeProjections(packet)
                 return PersistenceOutcome(packet: packet, projectionWarning: nil)
@@ -508,12 +608,14 @@ public final class ContextContinuityService: @unchecked Sendable {
     /// SQLite is authoritative. Rebuild the readable projections at process start
     /// so an interrupted write cannot leave LATEST/current-task.json out of sync.
     private func reconcileProjections() throws {
-        guard lock.lock(before: Date().addingTimeInterval(Self.persistenceLockTimeout)) else {
-            throw posixPersistenceError(operation: "lock continuity service", code: EBUSY)
-        }
+        try lockContinuityMutex(
+            lock,
+            operation: "lock continuity service",
+            cancellation: nil
+        )
         defer { lock.unlock() }
         try paths.ensureLayout()
-        try withPersistenceFileLock {
+        try withPersistenceFileLock(cancellation: nil) {
             try store.handoffRepairPointers()
             try ensureMemoryIndex()
             for packet in try store.handoffListAll() {
@@ -567,12 +669,19 @@ public final class ContextContinuityService: @unchecked Sendable {
 
     /// Primary and fallback MCP processes share one home. An advisory file lock
     /// makes the SQLite write and its JSON/Markdown projections one serialized unit.
-    private func withPersistenceFileLock<T>(_ body: () throws -> T) throws -> T {
-        let deadline = Date().addingTimeInterval(Self.persistenceLockTimeout)
-        guard Self.processPersistenceLock.lock(before: deadline) else {
-            throw posixPersistenceError(operation: "lock process continuity service", code: EBUSY)
-        }
+    private func withPersistenceFileLock<T>(
+        cancellation: ToolCallCancellation?,
+        _ body: () throws -> T
+    ) throws -> T {
+        let deadline = DispatchTime.now().uptimeNanoseconds
+            + UInt64(Self.persistenceLockTimeout * 1_000_000_000)
+        try lockContinuityMutex(
+            Self.processPersistenceLock,
+            operation: "lock process continuity service",
+            cancellation: cancellation
+        )
         defer { Self.processPersistenceLock.unlock() }
+        try cancellation?.checkCancellation()
 
         let mode = mode_t(S_IRUSR | S_IWUSR)
         let descriptor = paths.memoryContinuityLock.path.withCString {
@@ -588,13 +697,36 @@ public final class ContextContinuityService: @unchecked Sendable {
             guard code == EACCES || code == EAGAIN else {
                 throw posixPersistenceError(operation: "lock continuity projections", code: code)
             }
-            guard Date() < deadline else {
+            try cancellation?.checkCancellation()
+            guard DispatchTime.now().uptimeNanoseconds < deadline else {
                 throw posixPersistenceError(operation: "lock continuity projections", code: EBUSY)
             }
             Thread.sleep(forTimeInterval: 0.01)
         }
         defer { _ = Darwin.lockf(descriptor, F_ULOCK, 0) }
+        try cancellation?.checkCancellation()
         return try body()
+    }
+
+    private func lockContinuityMutex(
+        _ mutex: NSLock,
+        operation: String,
+        cancellation: ToolCallCancellation?
+    ) throws {
+        let deadline = DispatchTime.now().uptimeNanoseconds
+            + UInt64(Self.persistenceLockTimeout * 1_000_000_000)
+        while !mutex.lock(before: Date().addingTimeInterval(0.01)) {
+            try cancellation?.checkCancellation()
+            guard DispatchTime.now().uptimeNanoseconds < deadline else {
+                throw posixPersistenceError(operation: operation, code: EBUSY)
+            }
+        }
+        do {
+            try cancellation?.checkCancellation()
+        } catch {
+            mutex.unlock()
+            throw error
+        }
     }
 
     private func posixPersistenceError(operation: String, code: Int32 = errno) -> NSError {

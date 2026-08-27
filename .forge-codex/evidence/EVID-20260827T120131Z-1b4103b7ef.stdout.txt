@@ -1,0 +1,17 @@
+Test Suite 'Selected tests' started at 2026-08-27 07:01:35.993.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-27 07:01:35.993.
+Test Suite 'ProjectControlPlaneRepositoryTests' started at 2026-08-27 07:01:35.993.
+Test Case '-[ForgeConductorTests.ProjectControlPlaneRepositoryTests testSchemaIntegrityPragmasAndMigrationReceiptAreIdempotent]' started.
+Test Case '-[ForgeConductorTests.ProjectControlPlaneRepositoryTests testSchemaIntegrityPragmasAndMigrationReceiptAreIdempotent]' passed (0.029 seconds).
+Test Case '-[ForgeConductorTests.ProjectControlPlaneRepositoryTests testUnshippedAndUnversionedControlPlaneSchemasFailClosedWithoutMutation]' started.
+Test Case '-[ForgeConductorTests.ProjectControlPlaneRepositoryTests testUnshippedAndUnversionedControlPlaneSchemasFailClosedWithoutMutation]' passed (0.005 seconds).
+Test Suite 'ProjectControlPlaneRepositoryTests' passed at 2026-08-27 07:01:36.028.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.034 (0.034) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-08-27 07:01:36.028.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.034 (0.034) seconds
+Test Suite 'Selected tests' passed at 2026-08-27 07:01:36.028.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.034 (0.035) seconds
+◇ Test run started.
+↳ Testing Library Version: 1501
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

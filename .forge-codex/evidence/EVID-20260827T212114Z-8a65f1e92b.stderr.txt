@@ -1,0 +1,12 @@
+--- xcodebuild: WARNING: Using the first of multiple matching destinations:
+{ platform:macOS, arch:arm64, id:00006040-0016283C11F8801C, name:My Mac }
+{ platform:macOS, arch:x86_64, id:00006040-0016283C11F8801C, name:My Mac }
+{ platform:macOS, name:Any Mac }
+** BUILD FAILED **
+
+
+The following build commands failed:
+	SwiftCompile normal arm64 Compiling\ ProjectMemoryService.swift,\ ProjectMemoryToolPack.swift,\ ResourcePolicy.swift,\ RuntimeObservability.swift,\ HandoffPacket.swift,\ ContextContinuityService.swift,\ ContinuityAutomation.swift,\ ContinuityToolPack.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ProjectMemoryService.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/Tools/ProjectMemoryToolPack.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ResourcePolicy.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeObservability.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Domain/HandoffPacket.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ContextContinuityService.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ContinuityAutomation.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/Tools/ContinuityToolPack.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+	SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ProjectMemoryService.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+	Building workspace ForgeConductor with scheme ForgeConductor and configuration Debug
+(3 failures)

@@ -5,6 +5,83 @@
 // Why: Failures need durable, correlatable evidence across short-lived process roles.
 
 import Foundation
+import Synchronization
+
+/// Capacity-limited serial work owner used by persistence mirrors that must not
+/// retain their caller while filesystem or database I/O is slow.
+final class BoundedAsyncWorkQueue: @unchecked Sendable {
+    let capacity: Int
+
+    private let queue: DispatchQueue
+    private let slots: DispatchSemaphore
+    private let pending = DispatchGroup()
+    private let admissionLock = NSLock()
+    private let dropped = Atomic<Int>(0)
+    private var accepting = true
+
+    init(label: String, capacity: Int) {
+        self.capacity = max(1, min(capacity, 4_096))
+        self.queue = DispatchQueue(label: label, qos: .utility)
+        self.slots = DispatchSemaphore(value: self.capacity)
+    }
+
+    @discardableResult
+    func submit(_ work: @escaping @Sendable () -> Void) -> Bool {
+        // The response path never waits for admission or queue capacity.
+        guard admissionLock.try() else {
+            dropped.wrappingAdd(1, ordering: .relaxed)
+            return false
+        }
+        defer { admissionLock.unlock() }
+        guard accepting,
+              slots.wait(timeout: .now()) == .success else {
+            dropped.wrappingAdd(1, ordering: .relaxed)
+            return false
+        }
+
+        pending.enter()
+        let pending = self.pending
+        let slots = self.slots
+        queue.async {
+            defer {
+                slots.signal()
+                pending.leave()
+            }
+            work()
+        }
+        return true
+    }
+
+    @discardableResult
+    func flush(timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(Self.bounded(timeout))
+        guard admissionLock.lock(before: deadline) else { return false }
+        defer { admissionLock.unlock() }
+        return pending.wait(
+            timeout: .now() + max(0, deadline.timeIntervalSinceNow)
+        ) == .success
+    }
+
+    @discardableResult
+    func shutdown(timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(Self.bounded(timeout))
+        guard admissionLock.lock(before: deadline) else { return false }
+        defer { admissionLock.unlock() }
+        accepting = false
+        return pending.wait(
+            timeout: .now() + max(0, deadline.timeIntervalSinceNow)
+        ) == .success
+    }
+
+    var droppedSubmissions: Int {
+        dropped.load(ordering: .relaxed)
+    }
+
+    private static func bounded(_ timeout: TimeInterval) -> TimeInterval {
+        guard timeout.isFinite else { return 30 }
+        return min(30, max(0, timeout))
+    }
+}
 
 public enum DiagnosticRedaction {
     private static let privateKeys: Set<String> = [
@@ -45,6 +122,7 @@ public enum DiagnosticRedaction {
 public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
     public static let masterLogName = "forge-diagnostics.jsonl"
     public static let ringCapacity = 4_000
+    public static let persistenceQueueCapacity = 256
     /// Rotate master JSONL when larger than this (bytes).
     public static let maxMasterLogBytes: UInt64 = 8 * 1024 * 1024
 
@@ -53,8 +131,9 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
     private let ringLimit: Int
     private let maximumLogBytes: UInt64
     private let retainedArchives: Int
-    private let lock = NSLock()
-    private var ring: [DiagnosticEnvelope] = []
+    private let ringState: DiagnosticRingState
+    private let persistenceWriter: DiagnosticPersistenceWriter
+    private let persistenceQueue: BoundedAsyncWorkQueue
 
     public init(paths: AppPaths, role: String = "primary") {
         self.paths = paths
@@ -63,6 +142,17 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
         self.ringLimit = min(Self.ringCapacity, limits.diagnosticRingRecords)
         self.maximumLogBytes = min(Self.maxMasterLogBytes, limits.logFileBytes)
         self.retainedArchives = limits.retainedLogArchives
+        self.ringState = DiagnosticRingState(limit: self.ringLimit)
+        self.persistenceWriter = DiagnosticPersistenceWriter(
+            paths: paths,
+            maximumLogBytes: self.maximumLogBytes,
+            retainedArchives: self.retainedArchives,
+            beforePersistence: nil
+        )
+        self.persistenceQueue = BoundedAsyncWorkQueue(
+            label: "forge.diagnostics.persistence",
+            capacity: Self.persistenceQueueCapacity
+        )
     }
 
     init(
@@ -70,53 +160,76 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
         role: String = "primary",
         ringLimit: Int,
         maximumLogBytes: UInt64,
-        retainedArchives: Int
+        retainedArchives: Int,
+        persistenceQueueCapacity: Int = DiagnosticLog.persistenceQueueCapacity,
+        beforePersistence: (@Sendable () -> Void)? = nil
     ) {
         self.paths = paths
         self.role = role
         self.ringLimit = max(1, ringLimit)
         self.maximumLogBytes = max(1, maximumLogBytes)
         self.retainedArchives = max(0, retainedArchives)
+        self.ringState = DiagnosticRingState(limit: self.ringLimit)
+        self.persistenceWriter = DiagnosticPersistenceWriter(
+            paths: paths,
+            maximumLogBytes: self.maximumLogBytes,
+            retainedArchives: self.retainedArchives,
+            beforePersistence: beforePersistence
+        )
+        self.persistenceQueue = BoundedAsyncWorkQueue(
+            label: "forge.diagnostics.persistence.\(UUID().uuidString)",
+            capacity: persistenceQueueCapacity
+        )
+    }
+
+    deinit {
+        _ = persistenceQueue.shutdown(timeout: 0.25)
     }
 
     // MARK: - Write
 
     public func log(_ record: DiagnosticRecord) {
-        lock.lock()
-        defer { lock.unlock() }
-        do {
-            try paths.ensureLayout()
-            let envelope = DiagnosticEnvelope(
-                ts: record.ts,
-                event: record.event,
-                severity: record.severity,
-                role: record.role.isEmpty ? role : record.role,
-                pid: ProcessInfo.processInfo.processIdentifier,
-                category: record.category,
-                fields: DiagnosticRedaction.fields(record.fields)
-            )
-            ring.append(envelope)
-            if ring.count > ringLimit {
-                ring.removeFirst(ring.count - ringLimit)
-            }
+        let envelope = DiagnosticEnvelope(
+            ts: record.ts,
+            event: record.event,
+            severity: record.severity,
+            role: record.role.isEmpty ? role : record.role,
+            pid: ProcessInfo.processInfo.processIdentifier,
+            category: record.category,
+            fields: DiagnosticRedaction.fields(record.fields)
+        )
 
-            let data = try envelope.jsonLine()
-            try append(data, to: paths.masterDiagnostics)
-            try append(data, to: paths.toolDiagnostics)
-
-            if record.event.hasPrefix("agent_") || record.event == "agent_health" {
-                try append(data, to: paths.agentDiagnostics)
+        // Preserve the ring immediately when uncontended. If a concurrent reader
+        // owns its short memory-only lock, the persistence worker completes the
+        // append instead of making this caller wait.
+        let ringWasUpdated = ringState.tryAppend(envelope)
+        let ringState = self.ringState
+        let writer = persistenceWriter
+        _ = persistenceQueue.submit {
+            if !ringWasUpdated {
+                ringState.append(envelope)
             }
-            if record.severity == .warn || record.severity == .error || record.severity == .critical
-                || record.event.hasPrefix("agent_")
-                || record.category == .mcp
-                || record.category == .lmstudio {
-                try append(data, to: paths.failoverDiagnostics)
+            do {
+                try writer.persist(envelope)
+            } catch {
+                fputs("diagnostic log error: \(error)\n", stderr)
             }
-        } catch {
-            fputs("diagnostic log error: \(error)\n", stderr)
         }
     }
+
+    /// Bounded drain for exports, deterministic tests, and explicit owner shutdown.
+    @discardableResult
+    public func flush(timeout: TimeInterval = 2) -> Bool {
+        persistenceQueue.flush(timeout: timeout)
+    }
+
+    /// Stops accepting persistence work and waits only through the supplied bound.
+    @discardableResult
+    public func shutdown(timeout: TimeInterval = 2) -> Bool {
+        persistenceQueue.shutdown(timeout: timeout)
+    }
+
+    var droppedPersistenceCount: Int { persistenceQueue.droppedSubmissions }
 
     public func info(_ event: String, _ fields: [String: String] = [:], category: DiagnosticCategory = .general) {
         log(DiagnosticRecord(event: event, severity: .info, role: role, category: category, fields: fields))
@@ -138,13 +251,14 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
 
     /// Recent records from the in-memory ring (newest last).
     public func recent(limit: Int = 200) -> [DiagnosticEnvelope] {
-        lock.lock()
-        defer { lock.unlock() }
-        return Array(ring.suffix(max(0, min(limit, ringLimit))))
+        ringState.snapshot(limit: limit)
     }
 
     /// Load all on-disk master JSONL records (best-effort; large files may be capped).
     public func loadPersisted(maxLines: Int = 50_000) throws -> [DiagnosticEnvelope] {
+        guard flush(timeout: 2) else {
+            throw DiagnosticExportError.persistenceBusy
+        }
         let url = paths.masterDiagnostics
         guard FileManager.default.fileExists(atPath: url.path) else { return [] }
         let text = try String(contentsOf: url, encoding: .utf8)
@@ -180,9 +294,7 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
 
         var merged = try loadPersisted()
-        lock.lock()
-        let live = ring
-        lock.unlock()
+        let live = ringState.snapshot(limit: .max)
         // Prefer disk order; append any ring entries not already present by (ts,event,pid)
         let seen = Set(merged.map(\.identityKey))
         for e in live where !seen.contains(e.identityKey) {
@@ -230,39 +342,6 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
     }
 
     // MARK: - Private
-
-    private func append(_ data: Data, to url: URL) throws {
-        try rotateIfNeeded(url)
-        if !FileManager.default.fileExists(atPath: url.path) {
-            FileManager.default.createFile(atPath: url.path, contents: nil)
-        }
-        let h = try FileHandle(forWritingTo: url)
-        defer { try? h.close() }
-        try h.seekToEnd()
-        try h.write(contentsOf: data)
-    }
-
-    private func rotateIfNeeded(_ url: URL) throws {
-        let fm = FileManager.default
-        guard fm.fileExists(atPath: url.path) else { return }
-        let attrs = try fm.attributesOfItem(atPath: url.path)
-        let size = (attrs[.size] as? NSNumber)?.uint64Value ?? 0
-        guard size >= maximumLogBytes else { return }
-        if retainedArchives > 0 {
-            for generation in stride(from: retainedArchives, through: 2, by: -1) {
-                let older = URL(fileURLWithPath: "\(url.path).\(generation - 1)")
-                let newer = URL(fileURLWithPath: "\(url.path).\(generation)")
-                if fm.fileExists(atPath: newer.path) { try fm.removeItem(at: newer) }
-                if fm.fileExists(atPath: older.path) { try fm.moveItem(at: older, to: newer) }
-            }
-            let first = URL(fileURLWithPath: "\(url.path).1")
-            if fm.fileExists(atPath: first.path) { try fm.removeItem(at: first) }
-            try fm.moveItem(at: url, to: first)
-        } else {
-            try fm.removeItem(at: url)
-        }
-        fm.createFile(atPath: url.path, contents: nil)
-    }
 
     private static func fileStamp() -> String {
         let f = DateFormatter()
@@ -325,6 +404,118 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
     }
 }
 
+private final class DiagnosticRingState: @unchecked Sendable {
+    private let limit: Int
+    private let lock = NSLock()
+    private var records: [DiagnosticEnvelope] = []
+
+    init(limit: Int) {
+        self.limit = max(1, limit)
+    }
+
+    func tryAppend(_ envelope: DiagnosticEnvelope) -> Bool {
+        guard lock.try() else { return false }
+        appendLocked(envelope)
+        lock.unlock()
+        return true
+    }
+
+    func append(_ envelope: DiagnosticEnvelope) {
+        lock.lock()
+        appendLocked(envelope)
+        lock.unlock()
+    }
+
+    func snapshot(limit requestedLimit: Int) -> [DiagnosticEnvelope] {
+        lock.lock()
+        defer { lock.unlock() }
+        return Array(records.suffix(max(0, min(requestedLimit, limit))))
+    }
+
+    private func appendLocked(_ envelope: DiagnosticEnvelope) {
+        records.append(envelope)
+        if records.count > limit {
+            records.removeFirst(records.count - limit)
+        }
+    }
+}
+
+private final class DiagnosticPersistenceWriter: @unchecked Sendable {
+    private let paths: AppPaths
+    private let maximumLogBytes: UInt64
+    private let retainedArchives: Int
+    private let beforePersistence: (@Sendable () -> Void)?
+
+    init(
+        paths: AppPaths,
+        maximumLogBytes: UInt64,
+        retainedArchives: Int,
+        beforePersistence: (@Sendable () -> Void)?
+    ) {
+        self.paths = paths
+        self.maximumLogBytes = maximumLogBytes
+        self.retainedArchives = retainedArchives
+        self.beforePersistence = beforePersistence
+    }
+
+    func persist(_ envelope: DiagnosticEnvelope) throws {
+        beforePersistence?()
+        try paths.ensureLayout()
+        let data = try envelope.jsonLine()
+        try append(data, to: paths.masterDiagnostics)
+        try append(data, to: paths.toolDiagnostics)
+
+        if envelope.event.hasPrefix("agent_") || envelope.event == "agent_health" {
+            try append(data, to: paths.agentDiagnostics)
+        }
+        if envelope.severity == .warn || envelope.severity == .error || envelope.severity == .critical
+            || envelope.event.hasPrefix("agent_")
+            || envelope.category == .mcp
+            || envelope.category == .lmstudio {
+            try append(data, to: paths.failoverDiagnostics)
+        }
+    }
+
+    private func append(_ data: Data, to url: URL) throws {
+        try rotateIfNeeded(url)
+        if !FileManager.default.fileExists(atPath: url.path) {
+            FileManager.default.createFile(atPath: url.path, contents: nil)
+        }
+        let handle = try FileHandle(forWritingTo: url)
+        defer { try? handle.close() }
+        try handle.seekToEnd()
+        try handle.write(contentsOf: data)
+    }
+
+    private func rotateIfNeeded(_ url: URL) throws {
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: url.path) else { return }
+        let attributes = try fileManager.attributesOfItem(atPath: url.path)
+        let size = (attributes[.size] as? NSNumber)?.uint64Value ?? 0
+        guard size >= maximumLogBytes else { return }
+        if retainedArchives > 0 {
+            for generation in stride(from: retainedArchives, through: 2, by: -1) {
+                let older = URL(fileURLWithPath: "\(url.path).\(generation - 1)")
+                let newer = URL(fileURLWithPath: "\(url.path).\(generation)")
+                if fileManager.fileExists(atPath: newer.path) {
+                    try fileManager.removeItem(at: newer)
+                }
+                if fileManager.fileExists(atPath: older.path) {
+                    try fileManager.moveItem(at: older, to: newer)
+                }
+            }
+            let first = URL(fileURLWithPath: "\(url.path).1")
+            if fileManager.fileExists(atPath: first.path) {
+                try fileManager.removeItem(at: first)
+            }
+            try fileManager.moveItem(at: url, to: first)
+        } else {
+            try fileManager.removeItem(at: url)
+        }
+        fileManager.createFile(atPath: url.path, contents: nil)
+    }
+}
+
 // MARK: - Models
 
 public enum DiagnosticCategory: String, Sendable, Codable, CaseIterable {
@@ -340,11 +531,14 @@ public enum DiagnosticCategory: String, Sendable, Codable, CaseIterable {
     case ui
 }
 
-public enum DiagnosticExportError: Error, LocalizedError {
+public enum DiagnosticExportError: Error, LocalizedError, Equatable {
     case cancelled
+    case persistenceBusy
+
     public var errorDescription: String? {
         switch self {
         case .cancelled: "Export cancelled"
+        case .persistenceBusy: "Diagnostic persistence did not drain before the read deadline"
         }
     }
 }

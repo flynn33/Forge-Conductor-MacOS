@@ -1,0 +1,16 @@
+[0/1] Planning build
+Building for production...
+[0/7] Write sources
+[2/7] Write swift-version--58304C5D6DBC2206.txt
+[4/7] Compiling ForgeConductorCore AgentCatalog.swift
+[5/8] Compiling ForgeNativeSessionHostPlugin ForgeNativeSessionHostPlugin.swift
+[6/10] Compiling ForgeConductorCLI ForgeConductorMain.swift
+[6/12] Write Objects.LinkFileList
+[7/12] Linking forge-conductor
+[9/13] Compiling ForgeConductorApp AppDeployController.swift
+[9/14] Write Objects.LinkFileList
+[10/14] Linking forge-conductor-app
+[12/14] Compiling ForgeConductorTests AppConfigAndDoctorTests.swift
+[12/14] Write Objects.LinkFileList
+[13/14] Linking ForgeConductorPackageTests
+Build complete! (65.37s)

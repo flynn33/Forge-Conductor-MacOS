@@ -23,6 +23,15 @@ final class ToolDefinitionCatalogTests: XCTestCase {
                 let schema = try definition.inputSchemaObject()
                 XCTAssertEqual(schema["type"] as? String, "object", definition.name)
                 XCTAssertFalse(definition.description.isEmpty, definition.name)
+                let properties = try XCTUnwrap(
+                    schema["properties"] as? [String: Any],
+                    definition.name
+                )
+                let deadline = try XCTUnwrap(
+                    properties["deadline_ms"] as? [String: Any],
+                    definition.name
+                )
+                XCTAssertEqual(deadline["type"] as? String, "integer", definition.name)
             }
 
             let allowed = try catalog.definitions(
@@ -124,6 +133,21 @@ final class ToolDefinitionCatalogTests: XCTestCase {
                 )
                 XCTAssertEqual(wireSchema, definition.inputSchemaJSON, definition.name)
             }
+        }
+    }
+
+    func testLegacyShellTimeoutSchemaRemainsCompatibleWithRuntimeClamping() throws {
+        try withProductionApp("legacy-shell-schema") { app in
+            let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
+            let definition = try XCTUnwrap(
+                catalog.definitions.first(where: { $0.name == "shell_exec" })
+            )
+            let schema = try definition.inputSchemaObject()
+            let properties = try XCTUnwrap(schema["properties"] as? [String: Any])
+            let timeout = try XCTUnwrap(properties["timeout_sec"] as? [String: Any])
+
+            XCTAssertEqual(timeout["type"] as? String, "number")
+            XCTAssertEqual(Set(timeout.keys), ["type"])
         }
     }
 

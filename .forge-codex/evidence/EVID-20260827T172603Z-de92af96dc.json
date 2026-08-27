@@ -1,0 +1,90 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 19680,
+      "path": ".forge-codex/evidence/EVID-20260827T172603Z-de92af96dc.artifact-000-P10-protocol-compatibility-report.json",
+      "sha256": "5b8e023e91419bf8661804d279da1e31d3ed31b211ad675dc0a9b0a0cad7f9f8",
+      "source_path": ".forge-codex/evidence/P10-protocol-compatibility-report.json",
+      "storage": "evidence-id-specific-copy"
+    },
+    {
+      "bytes": 333764,
+      "path": ".forge-codex/evidence/EVID-20260827T172603Z-de92af96dc.artifact-001-P10-mcp-runtime-transcript.json",
+      "sha256": "2e932598e740a125c2110d1d6c15e32275ba2bea4920fd6f5e769beb42f20fe3",
+      "source_path": ".forge-codex/evidence/P10-mcp-runtime-transcript.json",
+      "storage": "evidence-id-specific-copy"
+    },
+    {
+      "bytes": 11930720,
+      "path": ".forge-codex/evidence/EVID-20260827T172603Z-de92af96dc.artifact-002-forge-conductor",
+      "sha256": "c50b38ed91aa85b4564c2866823a8523084f2eae05dcc9072592aebe5b3114bd",
+      "source_path": ".build/arm64-apple-macosx/release/forge-conductor",
+      "storage": "evidence-id-specific-copy"
+    },
+    {
+      "bytes": 8568,
+      "path": ".forge-codex/evidence/EVID-20260827T172603Z-de92af96dc.artifact-003-EVID-20260823T184311Z-0dccfacc9f.stdout.txt",
+      "sha256": "332c4bc6124e9792eaf8d9aad109c79948ddff52f0cd56c228ad1abe01f4781b",
+      "source_path": ".forge-codex/evidence/EVID-20260823T184311Z-0dccfacc9f.stdout.txt",
+      "storage": "evidence-id-specific-copy"
+    },
+    {
+      "bytes": 470,
+      "path": ".forge-codex/evidence/EVID-20260827T172603Z-de92af96dc.artifact-004-mcp-baseline-requests.ndjson",
+      "sha256": "3847873ebea36d3f0bf5f408cd1f72fad9fc45b948a68960b036f42072408d53",
+      "source_path": ".forge-codex/state/baseline/mcp-baseline-requests.ndjson",
+      "storage": "evidence-id-specific-copy"
+    },
+    {
+      "bytes": 19680,
+      "path": ".forge-codex/evidence/EVID-20260827T172603Z-de92af96dc.stdout.txt",
+      "sha256": "5b8e023e91419bf8661804d279da1e31d3ed31b211ad675dc0a9b0a0cad7f9f8",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260827T172603Z-de92af96dc.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "command": "python3 .forge-codex/scripts/check_p10_protocol_compatibility.py --binary .build/release/forge-conductor --baseline-transcript .forge-codex/evidence/EVID-20260823T184311Z-0dccfacc9f.stdout.txt --requests .forge-codex/state/baseline/mcp-baseline-requests.ndjson --output .forge-codex/evidence/P10-protocol-compatibility-report.json --transcript-output .forge-codex/evidence/P10-mcp-runtime-transcript.json",
+  "ended_at": "2026-08-27T17:26:05.161418+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260827T172603Z-de92af96dc",
+  "kind": "p10-protocol-compatibility",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [
+    "FC-MIGRATION-MATRIX-001"
+  ],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 8112698,
+    "file_count": 234,
+    "schema_version": 1,
+    "sha256": "efcfeb6512f07dc42ee4fd33b0893febaae342a3690207739ec091f5292e10fc"
+  },
+  "source_manifest_after": {
+    "bytes": 8112698,
+    "file_count": 234,
+    "schema_version": 1,
+    "sha256": "efcfeb6512f07dc42ee4fd33b0893febaae342a3690207739ec091f5292e10fc"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-27T17:26:03.244885+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

@@ -15,29 +15,62 @@ public struct ContinuityLifecycleToolPack: ToolPackHandling {
     public init() {}
     public var toolNames: [String] { Self.names }
 
-    public func handle(name: String, arguments: [String: Any], clientID: ClientID, app: ForgeApp) throws -> ToolResult? {
+    public func handle(
+        name: String,
+        arguments: [String: Any],
+        context: ToolInvocationContext?,
+        clientID: ClientID,
+        app: ForgeApp,
+        cancellation: ToolCallCancellation?
+    ) throws -> ToolResult? {
         guard Self.names.contains(name) else { return nil }
         do {
+            try cancellation?.checkCancellation()
             let payload: [String: Any]
             switch name {
             case "continuity.checkpoint":
-                payload = try app.continuityControl.checkpoint(arguments: arguments)
+                payload = try app.continuityControl.checkpoint(
+                    arguments: arguments,
+                    cancellation: cancellation
+                )
             case "continuity.prepare_handoff":
-                payload = try app.continuityControl.prepareHandoff(arguments: arguments)
+                payload = try app.continuityControl.prepareHandoff(
+                    arguments: arguments,
+                    cancellation: cancellation
+                )
             case "continuity.request_rollover":
-                payload = try app.continuityControl.requestRollover(arguments: arguments)
+                payload = try app.continuityControl.requestRollover(
+                    arguments: arguments,
+                    cancellation: cancellation
+                )
             case "continuity.get_pending_handoff":
-                payload = try app.continuityControl.pending(arguments: arguments)
+                payload = try app.continuityControl.pending(
+                    arguments: arguments,
+                    cancellation: cancellation
+                )
             case "continuity.acknowledge_handoff":
-                payload = try app.continuityControl.acknowledge(arguments: arguments)
+                payload = try app.continuityControl.acknowledge(
+                    arguments: arguments,
+                    cancellation: cancellation
+                )
             case "continuity.resume":
-                payload = try app.continuityControl.resume(arguments: arguments)
+                payload = try app.continuityControl.resume(
+                    arguments: arguments,
+                    cancellation: cancellation
+                )
             case "continuity.status":
-                payload = try app.continuityControl.status(arguments: arguments)
+                payload = try app.continuityControl.status(
+                    arguments: arguments,
+                    cancellation: cancellation
+                )
             default:
                 throw ProjectMemoryError.invalidRequest("unknown continuity tool")
             }
             return .success(payload)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as ToolCallDeadlineExceeded {
+            throw error
         } catch let error as ProjectMemoryError {
             return .failure(code: error.code, message: error.localizedDescription, retryable: error == .databaseBusy)
         } catch {

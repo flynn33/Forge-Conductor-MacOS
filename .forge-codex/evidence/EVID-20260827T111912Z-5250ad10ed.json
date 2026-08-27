@@ -1,0 +1,33 @@
+{
+  "artifacts": [
+    {
+      "bytes": 1582,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T111912Z-5250ad10ed.stdout.txt",
+      "sha256": "eb4ba90e06845471e1864ac1e0aabf8ea65e218055808a3bfc1244e92c88922d"
+    },
+    {
+      "bytes": 10842,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T111912Z-5250ad10ed.stderr.txt",
+      "sha256": "3a333c54e65d081e3fba2eaebbacba941c0a892b4a0aa93b00ece35e46f1ab9c"
+    }
+  ],
+  "command": "swift test -Xswiftc -warnings-as-errors --filter 'ContinuityTests.testVersionTwoStoreMigratesPopulatedDataReopensAndRerunsIdempotently|ProjectMemoryTests.testVersionOneDatabaseMigratesPopulatedDataReopensAndRerunsIdempotently'",
+  "ended_at": "2026-08-27T11:19:23.510810+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260827T111912Z-5250ad10ed",
+  "kind": "p10-old-format-migration-regressions",
+  "related_findings": [
+    "FC-MIGRATION-MATRIX-001"
+  ],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-27T11:19:12.146838+00:00",
+  "timed_out": false
+}

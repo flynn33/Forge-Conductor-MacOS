@@ -1,0 +1,33 @@
+{
+  "artifacts": [
+    {
+      "bytes": 5749,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T103242Z-f2a67a3569.stdout.txt",
+      "sha256": "8361b046a06f165fee0c40f3492f605f406495cfb6956f4838a743133c240f12"
+    },
+    {
+      "bytes": 11558,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T103242Z-f2a67a3569.stderr.txt",
+      "sha256": "64cbd61f8887f92f1dd6110c006488d4e52e59364d7aa3aa4a51c57b9c624f3f"
+    }
+  ],
+  "command": "env -u FORGE_LIVE_LMSTUDIO_MODEL -u FORGE_LIVE_LMSTUDIO_BASE_URL -u FORGE_LIVE_LMSTUDIO_EVIDENCE swift test --scratch-path /tmp/forge-g09-52f8aca.IuXsao -Xswiftc -warnings-as-errors --filter NativeSessionHostPluginTests",
+  "ended_at": "2026-08-27T10:33:01.881862+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260827T103242Z-f2a67a3569",
+  "kind": "g09-plugin-contract-tests",
+  "related_findings": [
+    "FC-LIVE-ROLLOVER-001"
+  ],
+  "related_gates": [
+    "G09"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-27T10:32:42.448386+00:00",
+  "timed_out": false
+}

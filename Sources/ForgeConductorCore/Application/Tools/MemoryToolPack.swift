@@ -17,20 +17,24 @@ public struct MemoryToolPack: ToolPackHandling {
     public func handle(
         name: String,
         arguments: [String: Any],
+        context: ToolInvocationContext?,
         clientID: ClientID,
-        app: ForgeApp
+        app: ForgeApp,
+        cancellation: ToolCallCancellation?
     ) throws -> ToolResult? {
+        guard toolNames.contains(name) else { return nil }
+        try cancellation?.checkCancellation()
         switch name {
         case "memory_set":
-            return try memorySet(arguments: arguments, app: app)
+            return try memorySet(arguments: arguments, app: app, cancellation: cancellation)
         case "memory_get":
-            return try memoryGet(arguments: arguments, app: app)
+            return try memoryGet(arguments: arguments, app: app, cancellation: cancellation)
         case "memory_list":
-            return try memoryList(arguments: arguments, app: app)
+            return try memoryList(arguments: arguments, app: app, cancellation: cancellation)
         case "memory_delete":
-            return try memoryDelete(arguments: arguments, app: app)
+            return try memoryDelete(arguments: arguments, app: app, cancellation: cancellation)
         case "memory_search":
-            return try memorySearch(arguments: arguments, app: app)
+            return try memorySearch(arguments: arguments, app: app, cancellation: cancellation)
         default:
             return nil
         }
@@ -38,7 +42,11 @@ public struct MemoryToolPack: ToolPackHandling {
 
     // MARK: - Handlers
 
-    private func memorySet(arguments: [String: Any], app: ForgeApp) throws -> ToolResult {
+    private func memorySet(
+        arguments: [String: Any],
+        app: ForgeApp,
+        cancellation: ToolCallCancellation?
+    ) throws -> ToolResult {
         guard let key = validatedKey(arguments) else {
             return .failure(code: "invalid_key", message: Self.keyHelp, retryable: true)
         }
@@ -55,10 +63,13 @@ public struct MemoryToolPack: ToolPackHandling {
             )
         }
         let tags = parseTags(arguments["tags"])
-        try app.store.memorySet(key: key, body: body, tags: tags)
-        guard let note = try app.store.memoryGetNote(key: key) else {
-            return .failure(code: "store_error", message: "memory write did not persist", retryable: true)
-        }
+        try cancellation?.checkCancellation()
+        let note = try app.store.memorySetAndGetNote(
+            key: key,
+            body: body,
+            tags: tags,
+            cancellation: cancellation
+        )
         return .success([
             "ok": true,
             "stored": true,
@@ -67,11 +78,18 @@ public struct MemoryToolPack: ToolPackHandling {
         ])
     }
 
-    private func memoryGet(arguments: [String: Any], app: ForgeApp) throws -> ToolResult {
+    private func memoryGet(
+        arguments: [String: Any],
+        app: ForgeApp,
+        cancellation: ToolCallCancellation?
+    ) throws -> ToolResult {
         guard let key = validatedKey(arguments) else {
             return .failure(code: "invalid_key", message: Self.keyHelp, retryable: true)
         }
-        guard let note = try app.store.memoryGetNote(key: key) else {
+        guard let note = try app.store.memoryGetNote(
+            key: key,
+            cancellation: cancellation
+        ) else {
             return .success([
                 "ok": true,
                 "found": false,
@@ -91,7 +109,11 @@ public struct MemoryToolPack: ToolPackHandling {
         ])
     }
 
-    private func memoryList(arguments: [String: Any], app: ForgeApp) throws -> ToolResult {
+    private func memoryList(
+        arguments: [String: Any],
+        app: ForgeApp,
+        cancellation: ToolCallCancellation?
+    ) throws -> ToolResult {
         let prefix = ToolArgHelpers.string(arguments, "prefix")
         let tag = ToolArgHelpers.string(arguments, "tag")
         let includeSystem = ToolArgHelpers.bool(arguments, "include_system") ?? false
@@ -102,9 +124,13 @@ public struct MemoryToolPack: ToolPackHandling {
             prefix: prefix,
             tag: tag,
             includeSystem: includeSystem,
-            limit: limit
+            limit: limit,
+            cancellation: cancellation
         )
-        let total = try app.store.memoryCount(includeSystem: includeSystem)
+        let total = try app.store.memoryCount(
+            includeSystem: includeSystem,
+            cancellation: cancellation
+        )
         return .success([
             "ok": true,
             "count": notes.count,
@@ -116,12 +142,20 @@ public struct MemoryToolPack: ToolPackHandling {
         ])
     }
 
-    private func memoryDelete(arguments: [String: Any], app: ForgeApp) throws -> ToolResult {
+    private func memoryDelete(
+        arguments: [String: Any],
+        app: ForgeApp,
+        cancellation: ToolCallCancellation?
+    ) throws -> ToolResult {
         guard let key = validatedKey(arguments) else {
             return .failure(code: "invalid_key", message: Self.keyHelp, retryable: true)
         }
-        let existed = try app.store.memoryGetNote(key: key) != nil
-        let deleted = try app.store.memoryDelete(key: key)
+        let existed = try app.store.memoryGetNote(
+            key: key,
+            cancellation: cancellation
+        ) != nil
+        try cancellation?.checkCancellation()
+        let deleted = try app.store.memoryDelete(key: key, cancellation: cancellation)
         return .success([
             "ok": true,
             "key": key,
@@ -131,7 +165,11 @@ public struct MemoryToolPack: ToolPackHandling {
         ])
     }
 
-    private func memorySearch(arguments: [String: Any], app: ForgeApp) throws -> ToolResult {
+    private func memorySearch(
+        arguments: [String: Any],
+        app: ForgeApp,
+        cancellation: ToolCallCancellation?
+    ) throws -> ToolResult {
         guard let query = ToolArgHelpers.string(arguments, "query")
             ?? ToolArgHelpers.string(arguments, "q")
             ?? ToolArgHelpers.string(arguments, "pattern") else {
@@ -148,7 +186,8 @@ public struct MemoryToolPack: ToolPackHandling {
         let notes = try app.store.memorySearch(
             query: trimmed,
             includeSystem: includeSystem,
-            limit: limit
+            limit: limit,
+            cancellation: cancellation
         )
         return .success([
             "ok": true,

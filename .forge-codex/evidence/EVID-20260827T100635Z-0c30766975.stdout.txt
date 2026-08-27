@@ -1,0 +1,331 @@
+{
+  "binary": "/private/tmp/forge-g09-c7df57a.VPjKBn/arm64-apple-macosx/release/forge-conductor",
+  "checks": [
+    "tool_inventory",
+    "tool_schemas",
+    "memory_only_capability_fallback",
+    "durable_handoff_restart",
+    "exact_acknowledgement_rejection",
+    "rejected_acknowledgement_no_mutation",
+    "idempotent_acknowledgement",
+    "predecessor_seal",
+    "active_session_swap"
+  ],
+  "ok": true,
+  "project_id": "44e65128-9f28-4c83-8869-e94ec5fe7fe8",
+  "transcript": [
+    {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "capabilities": {
+          "projectContext": {
+            "durableBindings": true,
+            "generationFencing": true,
+            "missingContextCode": "project_context_required",
+            "schemaVersion": 2
+          },
+          "projectMemory": {
+            "capabilityVersion": 1,
+            "limits": {
+              "batch_bytes": 1048576,
+              "batch_count": 50,
+              "body_bytes": 262144,
+              "open_projects": 8,
+              "page_count": 100,
+              "response_bytes": 262144,
+              "source_reference_bytes": 2048,
+              "summary_bytes": 4096,
+              "tag_bytes": 128,
+              "tag_count": 32,
+              "title_bytes": 512
+            },
+            "schemaVersion": 2
+          },
+          "tools": {
+            "listChanged": false
+          }
+        },
+        "protocolVersion": "2025-11-25",
+        "serverInfo": {
+          "name": "forge-conductor",
+          "version": "0.9.0"
+        }
+      }
+    },
+    {
+      "prepared": {
+        "disposition": "memory_only_handoff_ready",
+        "external_capability": "handoff_only",
+        "handoff": {
+          "completed_work": [],
+          "constraints": [],
+          "created_at": "2026-08-27T10:06:35Z",
+          "current_work": {
+            "active_files": [],
+            "phase_id": "P08",
+            "summary": "Continue process-level repair",
+            "work_item_id": "P08-07"
+          },
+          "decisions": [],
+          "evidence_references": [],
+          "handoff_id": "783492fd-3777-4ab8-900d-080097f06a6c",
+          "host_state": {
+            "adapter_id": "external-mcp",
+            "context_budget_source": "caller_reported",
+            "continuity_state": "checkpointPreparing",
+            "remaining_budget_estimate": null,
+            "retry": {}
+          },
+          "integrity": {
+            "content_sha256": "afb9f92d31aeeab781a73e99b07bc5d842938e9fbde4772964d80ef797058163",
+            "redaction_complete": true
+          },
+          "memory_references": [],
+          "mission": "Continue process-level repair",
+          "next_actions": [
+            {
+              "action": "Recover the pending handoff",
+              "command": "",
+              "order": 1,
+              "success_condition": "Action completed and checkpointed"
+            },
+            {
+              "action": "Acknowledge the successor",
+              "command": "",
+              "order": 2,
+              "success_condition": "Action completed and checkpointed"
+            }
+          ],
+          "open_work": [],
+          "operation_id": "1bff443f-79ea-4388-a982-0e51df0b7272",
+          "predecessor_session": {
+            "model": null,
+            "provider_session_id": null,
+            "session_id": "process-predecessor"
+          },
+          "project": {
+            "branch": "unknown",
+            "commit": "0000000",
+            "dirty_summary": [],
+            "display_name": "project",
+            "project_id": "44e65128-9f28-4c83-8869-e94ec5fe7fe8",
+            "repository_root": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p08-conformance-xc6szyvz/project"
+          },
+          "schema_version": "1.0",
+          "successor_session": null,
+          "validation": {
+            "commands": [],
+            "open_gates": [],
+            "passed_gates": []
+          }
+        },
+        "host_capability": "external_session_creation_unconfirmed",
+        "manager_operation_enqueued": false,
+        "ok": true,
+        "operation": {
+          "acknowledged_handoff_id": null,
+          "acknowledged_session_id": null,
+          "adapter_id": "external-mcp",
+          "attempt": 2,
+          "created_at": "2026-08-27T10:06:35Z",
+          "handoff_id": "783492fd-3777-4ab8-900d-080097f06a6c",
+          "idempotency_key": "1bff443f-79ea-4388-a982-0e51df0b7272",
+          "last_error": null,
+          "operation_id": "1bff443f-79ea-4388-a982-0e51df0b7272",
+          "predecessor_session_id": "process-predecessor",
+          "project_id": "44e65128-9f28-4c83-8869-e94ec5fe7fe8",
+          "retry_at": null,
+          "state": "checkpointPersisted",
+          "state_checksum": "dd14b9ccba6d496c21304b208c1d468621ec54d8c8c1af39a5a54b204f307d05",
+          "successor_session_id": null,
+          "updated_at": "2026-08-27T10:06:35Z"
+        },
+        "request_route": "external_handoff_only",
+        "session_creation_confirmed": false
+      }
+    },
+    {
+      "acknowledged": {
+        "acknowledged": true,
+        "ok": true,
+        "operation": {
+          "acknowledged_handoff_id": "783492fd-3777-4ab8-900d-080097f06a6c",
+          "acknowledged_session_id": "process-successor",
+          "adapter_id": "external-mcp",
+          "attempt": 6,
+          "created_at": "2026-08-27T10:06:35Z",
+          "handoff_id": "783492fd-3777-4ab8-900d-080097f06a6c",
+          "idempotency_key": "1bff443f-79ea-4388-a982-0e51df0b7272",
+          "last_error": null,
+          "operation_id": "1bff443f-79ea-4388-a982-0e51df0b7272",
+          "predecessor_session_id": "process-predecessor",
+          "project_id": "44e65128-9f28-4c83-8869-e94ec5fe7fe8",
+          "retry_at": null,
+          "state": "successorAcknowledged",
+          "state_checksum": "1b8be0ecbd9bcf46b79e8966b3ade369fdff3d926d42492cd4a27fa947d36691",
+          "successor_session_id": "process-successor",
+          "updated_at": "2026-08-27T10:06:35Z"
+        }
+      },
+      "rejected_acknowledgement": {
+        "content": [
+          {
+            "text": "{\"code\":\"conflict\",\"message\":\"acknowledgment does not match exact handoff, successor, and adapter\",\"ok\":false,\"retryable\":false}",
+            "type": "text"
+          }
+        ],
+        "isError": true,
+        "structuredContent": {
+          "code": "conflict",
+          "message": "acknowledgment does not match exact handoff, successor, and adapter",
+          "ok": false,
+          "retryable": false
+        }
+      },
+      "replayed_acknowledgement": {
+        "acknowledged": true,
+        "ok": true,
+        "operation": {
+          "acknowledged_handoff_id": "783492fd-3777-4ab8-900d-080097f06a6c",
+          "acknowledged_session_id": "process-successor",
+          "adapter_id": "external-mcp",
+          "attempt": 6,
+          "created_at": "2026-08-27T10:06:35Z",
+          "handoff_id": "783492fd-3777-4ab8-900d-080097f06a6c",
+          "idempotency_key": "1bff443f-79ea-4388-a982-0e51df0b7272",
+          "last_error": null,
+          "operation_id": "1bff443f-79ea-4388-a982-0e51df0b7272",
+          "predecessor_session_id": "process-predecessor",
+          "project_id": "44e65128-9f28-4c83-8869-e94ec5fe7fe8",
+          "retry_at": null,
+          "state": "successorAcknowledged",
+          "state_checksum": "1b8be0ecbd9bcf46b79e8966b3ade369fdff3d926d42492cd4a27fa947d36691",
+          "successor_session_id": "process-successor",
+          "updated_at": "2026-08-27T10:06:35Z"
+        }
+      },
+      "restart_pending": {
+        "found": true,
+        "handoff": {
+          "completed_work": [],
+          "constraints": [],
+          "created_at": "2026-08-27T10:06:35Z",
+          "current_work": {
+            "active_files": [],
+            "phase_id": "P08",
+            "summary": "Continue process-level repair",
+            "work_item_id": "P08-07"
+          },
+          "decisions": [],
+          "evidence_references": [],
+          "handoff_id": "783492fd-3777-4ab8-900d-080097f06a6c",
+          "host_state": {
+            "adapter_id": "external-mcp",
+            "context_budget_source": "caller_reported",
+            "continuity_state": "checkpointPreparing",
+            "remaining_budget_estimate": null,
+            "retry": {}
+          },
+          "integrity": {
+            "content_sha256": "afb9f92d31aeeab781a73e99b07bc5d842938e9fbde4772964d80ef797058163",
+            "redaction_complete": true
+          },
+          "memory_references": [],
+          "mission": "Continue process-level repair",
+          "next_actions": [
+            {
+              "action": "Recover the pending handoff",
+              "command": "",
+              "order": 1,
+              "success_condition": "Action completed and checkpointed"
+            },
+            {
+              "action": "Acknowledge the successor",
+              "command": "",
+              "order": 2,
+              "success_condition": "Action completed and checkpointed"
+            }
+          ],
+          "open_work": [],
+          "operation_id": "1bff443f-79ea-4388-a982-0e51df0b7272",
+          "predecessor_session": {
+            "model": null,
+            "provider_session_id": null,
+            "session_id": "process-predecessor"
+          },
+          "project": {
+            "branch": "unknown",
+            "commit": "0000000",
+            "dirty_summary": [],
+            "display_name": "project",
+            "project_id": "44e65128-9f28-4c83-8869-e94ec5fe7fe8",
+            "repository_root": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p08-conformance-xc6szyvz/project"
+          },
+          "schema_version": "1.0",
+          "successor_session": null,
+          "validation": {
+            "commands": [],
+            "open_gates": [],
+            "passed_gates": []
+          }
+        },
+        "ok": true,
+        "operation": {
+          "acknowledged_handoff_id": null,
+          "acknowledged_session_id": null,
+          "adapter_id": "external-mcp",
+          "attempt": 2,
+          "created_at": "2026-08-27T10:06:35Z",
+          "handoff_id": "783492fd-3777-4ab8-900d-080097f06a6c",
+          "idempotency_key": "1bff443f-79ea-4388-a982-0e51df0b7272",
+          "last_error": null,
+          "operation_id": "1bff443f-79ea-4388-a982-0e51df0b7272",
+          "predecessor_session_id": "process-predecessor",
+          "project_id": "44e65128-9f28-4c83-8869-e94ec5fe7fe8",
+          "retry_at": null,
+          "state": "checkpointPersisted",
+          "state_checksum": "dd14b9ccba6d496c21304b208c1d468621ec54d8c8c1af39a5a54b204f307d05",
+          "successor_session_id": null,
+          "updated_at": "2026-08-27T10:06:35Z"
+        }
+      },
+      "sealed": {
+        "ok": true,
+        "operation": {
+          "acknowledged_handoff_id": "783492fd-3777-4ab8-900d-080097f06a6c",
+          "acknowledged_session_id": "process-successor",
+          "adapter_id": "external-mcp",
+          "attempt": 7,
+          "created_at": "2026-08-27T10:06:35Z",
+          "handoff_id": "783492fd-3777-4ab8-900d-080097f06a6c",
+          "idempotency_key": "1bff443f-79ea-4388-a982-0e51df0b7272",
+          "last_error": null,
+          "operation_id": "1bff443f-79ea-4388-a982-0e51df0b7272",
+          "predecessor_session_id": "process-predecessor",
+          "project_id": "44e65128-9f28-4c83-8869-e94ec5fe7fe8",
+          "retry_at": null,
+          "state": "predecessorSealed",
+          "state_checksum": "4ebe2fca5eac45b10090b174cc246d82b10fcf3a52bb5076221230ccf7de326d",
+          "successor_session_id": "process-successor",
+          "updated_at": "2026-08-27T10:06:35Z"
+        },
+        "resumed": true
+      },
+      "status": {
+        "active_session_id": "process-successor",
+        "health": "ok",
+        "ok": true,
+        "operation": null,
+        "pending_handoff_id": null,
+        "project_id": "44e65128-9f28-4c83-8869-e94ec5fe7fe8",
+        "retry": {
+          "error": null,
+          "retry_at": null
+        },
+        "schema_version": 1,
+        "state": "active"
+      }
+    }
+  ]
+}

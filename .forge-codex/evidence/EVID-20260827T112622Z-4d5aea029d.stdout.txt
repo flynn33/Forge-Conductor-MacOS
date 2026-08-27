@@ -1,0 +1,19 @@
+Test Suite 'Selected tests' started at 2026-08-27 06:26:34.277.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-27 06:26:34.278.
+Test Suite 'ContinuityV2Tests' started at 2026-08-27 06:26:34.278.
+Test Case '-[ForgeConductorTests.ContinuityV2Tests testLegacyLocationV2MigrationPreservesBindingAcrossRestartAndIdempotentReplay]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Tests/ForgeConductorTests/ContinuityV2Tests.swift:711: error: -[ForgeConductorTests.ContinuityV2Tests testLegacyLocationV2MigrationPreservesBindingAcrossRestartAndIdempotentReplay] : XCTAssertEqual failed: ("3") is not equal to ("2") - Replaying the same bound V2 source must not append a duplicate receipt
+Test Case '-[ForgeConductorTests.ContinuityV2Tests testLegacyLocationV2MigrationPreservesBindingAcrossRestartAndIdempotentReplay]' failed (0.178 seconds).
+Test Case '-[ForgeConductorTests.ContinuityV2Tests testLegacyMigrationImportsExactProjectReadOnlyAndQuarantinesAmbiguous]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Tests/ForgeConductorTests/ContinuityV2Tests.swift:612: error: -[ForgeConductorTests.ContinuityV2Tests testLegacyMigrationImportsExactProjectReadOnlyAndQuarantinesAmbiguous] : XCTAssertEqual failed: ("3") is not equal to ("2") - Replaying the same legacy source set must not append a duplicate receipt
+Test Case '-[ForgeConductorTests.ContinuityV2Tests testLegacyMigrationImportsExactProjectReadOnlyAndQuarantinesAmbiguous]' failed (0.033 seconds).
+Test Suite 'ContinuityV2Tests' failed at 2026-08-27 06:26:34.489.
+	 Executed 2 tests, with 2 failures (0 unexpected) in 0.211 (0.212) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' failed at 2026-08-27 06:26:34.489.
+	 Executed 2 tests, with 2 failures (0 unexpected) in 0.211 (0.212) seconds
+Test Suite 'Selected tests' failed at 2026-08-27 06:26:34.489.
+	 Executed 2 tests, with 2 failures (0 unexpected) in 0.211 (0.213) seconds
+◇ Test run started.
+↳ Testing Library Version: 1501
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

@@ -1,0 +1,25 @@
+Test Suite 'Selected tests' started at 2026-08-27 07:55:17.351.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-27 07:55:17.352.
+Test Suite 'ContinuityTests' started at 2026-08-27 07:55:17.352.
+Test Case '-[ForgeConductorTests.ContinuityTests testNonemptyUnversionedStoreFailsClosedWithoutMutatingDatabase]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testNonemptyUnversionedStoreFailsClosedWithoutMutatingDatabase]' passed (0.029 seconds).
+Test Suite 'ContinuityTests' passed at 2026-08-27 07:55:17.381.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.029 (0.029) seconds
+Test Suite 'ProjectMemoryTests' started at 2026-08-27 07:55:17.381.
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testNonemptyUnversionedDatabaseFailsClosedWithoutMutatingDatabase]' started.
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testNonemptyUnversionedDatabaseFailsClosedWithoutMutatingDatabase]' passed (0.007 seconds).
+Test Suite 'ProjectMemoryTests' passed at 2026-08-27 07:55:17.388.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.007 (0.007) seconds
+Test Suite 'RuntimeExecutionJobTests' started at 2026-08-27 07:55:17.388.
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testNonemptyUnversionedRuntimeDatabaseFailsClosedWithoutMutation]' started.
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testNonemptyUnversionedRuntimeDatabaseFailsClosedWithoutMutation]' passed (0.006 seconds).
+Test Suite 'RuntimeExecutionJobTests' passed at 2026-08-27 07:55:17.394.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.006 (0.006) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-08-27 07:55:17.394.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.042 (0.043) seconds
+Test Suite 'Selected tests' passed at 2026-08-27 07:55:17.394.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.042 (0.043) seconds
+◇ Test run started.
+↳ Testing Library Version: 1501
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

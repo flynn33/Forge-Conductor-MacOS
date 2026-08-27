@@ -1,0 +1,34 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 3909,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T125820Z-22fc7d7bd5.stdout.txt",
+      "sha256": "20115240ee2fd6dca232a3b616ec5e5ce9a802a0d998e8eab9e70b6340a6def3"
+    },
+    {
+      "bytes": 511,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T125820Z-22fc7d7bd5.stderr.txt",
+      "sha256": "6a3b72eaeb29e909ef91ea6a44b98112a0ed16cb8cb8405fac63b27f225791d0"
+    }
+  ],
+  "command": "env FORGE_SKIP_PS=1 swift test --no-parallel -Xswiftc -warnings-as-errors --filter 'ContinuityTests.testVersionTwoStoreMigratesPopulatedDataReopensAndRerunsIdempotently|ContinuityTests.testVersionThreeStoreMigratesWithoutLosingHandoff|ContinuityTests.testConcurrentVersionThreeMigrationIsIdempotent|ContinuityTests.testNonemptyUnversionedStoreFailsClosedWithoutMutatingDatabase|ProjectMemoryTests.testVersionOneDatabaseMigratesPopulatedDataReopensAndRerunsIdempotently|ProjectMemoryTests.testConcurrentInitializersSerializeVersionOneMigration|ProjectMemoryTests.testNonemptyUnversionedDatabaseFailsClosedWithoutMutatingDatabase|RuntimeExecutionJobTests.testSchemaV2MigratesForwardWithProcessIdentityAndIdempotencyReceiptStorage|RuntimeExecutionJobTests.testConcurrentInitializersSerializeVersionTwoMigration|RuntimeExecutionJobTests.testNonemptyUnversionedRuntimeDatabaseFailsClosedWithoutMutation'",
+  "ended_at": "2026-08-27T12:58:23.975460+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260827T125820Z-22fc7d7bd5",
+  "kind": "p10-sqlite-migration-regression-debug",
+  "related_findings": [
+    "FC-MIGRATION-MATRIX-001"
+  ],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-27T12:58:20.371837+00:00",
+  "timed_out": false
+}

@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 23519,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T122926Z-e45900e86c.stdout.txt",
+      "sha256": "05296a468b44663fdb8331da437e77bc505aa9c96f6f9da968ae7f95b864bdd4"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T122926Z-e45900e86c.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "command": "python3 .forge-codex/scripts/check_p10_manager_http_compatibility.py",
+  "ended_at": "2026-08-27T12:29:28.068951+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 1,
+  "id": "EVID-20260827T122926Z-e45900e86c",
+  "kind": "compatibility",
+  "related_findings": [],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-27T12:29:26.831179+00:00",
+  "timed_out": false
+}

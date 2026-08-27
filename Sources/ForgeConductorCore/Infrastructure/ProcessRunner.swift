@@ -1,7 +1,7 @@
 // ProcessRunner.swift
 // What: Provides the bounded native subprocess adapter used by connector modules.
-// How: Foundation.Process is wrapped with explicit environment, working directory,
-// timeout, termination, and capped stdout/stderr collection behavior.
+// How: posix_spawn creates an owned process group with explicit environment, working
+// directory, timeout, cancellation, and capped stdout/stderr collection behavior.
 // Why: Every module must share the same resource and failure semantics for child processes.
 
 import Foundation
@@ -69,9 +69,10 @@ public final class ProcessRunner: @unchecked Sendable {
         currentDirectory: String? = nil,
         environment: [String: String]? = nil,
         timeoutSec: TimeInterval = 30,
-        maximumOutputBytes: Int = 1_048_576
+        maximumOutputBytes: Int = 1_048_576,
+        cancellation: ToolCallCancellation? = nil
     ) throws -> ProcessResult {
-        let process = Process()
+        try cancellation?.checkCancellation()
         let exeURL: URL
         if executable.hasPrefix("/") {
             exeURL = URL(fileURLWithPath: executable)
@@ -84,22 +85,9 @@ public final class ProcessRunner: @unchecked Sendable {
                 userInfo: [NSLocalizedDescriptionKey: "executable not found: \(executable)"]
             )
         }
-        process.executableURL = exeURL
-        process.arguments = arguments
-        if let currentDirectory {
-            process.currentDirectoryURL = URL(fileURLWithPath: currentDirectory)
-        }
-        if let environment {
-            var env = ProcessInfo.processInfo.environment
-            for (k, v) in environment { env[k] = v }
-            process.environment = env
-        }
 
         let outPipe = Pipe()
         let errPipe = Pipe()
-        process.standardOutput = outPipe
-        process.standardError = errPipe
-        process.standardInput = FileHandle.nullDevice
 
         final class BufferBox: @unchecked Sendable {
             let condition = NSCondition()
@@ -236,33 +224,13 @@ public final class ProcessRunner: @unchecked Sendable {
             }
         }
 
-        final class TerminationBox: @unchecked Sendable {
-            private let lock = NSLock()
-            private var completed = false
-            private var status: Int32?
-
-            /// Records the first terminal outcome. The return value identifies the
-            /// caller responsible for balancing the termination dispatch group.
-            func complete(status: Int32?) -> Bool {
-                lock.lock()
-                defer { lock.unlock() }
-                guard !completed else { return false }
-                completed = true
-                self.status = status
-                return true
-            }
-
-            func load() -> Int32? {
-                lock.lock()
-                defer { lock.unlock() }
-                return status
-            }
-        }
         let boundedOutputBytes = min(max(0, maximumOutputBytes), maximumRetainedOutputBytes)
         let outBox = BufferBox(limit: boundedOutputBytes)
         let errBox = BufferBox(limit: boundedOutputBytes)
         let outHandle = outPipe.fileHandleForReading
         let errHandle = errPipe.fileHandleForReading
+        let outWriteHandle = outPipe.fileHandleForWriting
+        let errWriteHandle = errPipe.fileHandleForWriting
 
         outHandle.readabilityHandler = { handle in
             outBox.consumeAvailableData(from: handle)
@@ -270,30 +238,48 @@ public final class ProcessRunner: @unchecked Sendable {
         errHandle.readabilityHandler = { handle in
             errBox.consumeAvailableData(from: handle)
         }
-        defer {
+        var outputFinalized = false
+        func finalizeOutput(drain: Bool) -> (
+            stdout: (data: Data, truncated: Bool),
+            stderr: (data: Data, truncated: Bool)
+        ) {
             outBox.stopCallbacks(on: outHandle)
             errBox.stopCallbacks(on: errHandle)
+            if drain {
+                outBox.drainCurrentlyAvailableData(from: outHandle)
+                errBox.drainCurrentlyAvailableData(from: errHandle)
+            }
+            try? outHandle.close()
+            try? errHandle.close()
+            outputFinalized = true
+            return (outBox.take(), errBox.take())
+        }
+        defer {
+            try? outWriteHandle.close()
+            try? errWriteHandle.close()
+            if !outputFinalized {
+                _ = finalizeOutput(drain: false)
+            }
         }
 
-        let terminationGroup = DispatchGroup()
-        let terminationBox = TerminationBox()
-        var timedOut = false
-        terminationGroup.enter()
-        process.terminationHandler = { terminatedProcess in
-            if terminationBox.complete(status: terminatedProcess.terminationStatus) {
-                terminationGroup.leave()
-            }
-        }
+        let processIdentifier: Int32
         do {
-            try process.run()
+            processIdentifier = try Self.spawn(
+                executable: exeURL,
+                arguments: arguments,
+                currentDirectory: currentDirectory,
+                environment: environment,
+                stdoutDescriptors: [outHandle.fileDescriptor, outWriteHandle.fileDescriptor],
+                stderrDescriptors: [errHandle.fileDescriptor, errWriteHandle.fileDescriptor]
+            )
         } catch {
-            process.terminationHandler = nil
-            if terminationBox.complete(status: nil) {
-                terminationGroup.leave()
-            }
             throw error
         }
-        let processIdentifier = process.processIdentifier
+        // The parent must not retain write ends; otherwise EOF can never be observed
+        // after the owned process group has exited.
+        try? outWriteHandle.close()
+        try? errWriteHandle.close()
+
         let runtimeDiagnostics = RuntimeDiagnostics.shared
         let operation = UInt64(UInt32(bitPattern: processIdentifier))
         runtimeDiagnostics.increment(.processLaunches)
@@ -307,65 +293,281 @@ public final class ProcessRunner: @unchecked Sendable {
             RuntimeSignposts.processExit(processSignpost, operation: operation)
         }
 
-        func confirmedStatus(waiting seconds: TimeInterval) -> Int32? {
-            if seconds == .infinity {
-                terminationGroup.wait()
-                return terminationBox.load()
+        func pollTerminalStatus() throws -> Int32? {
+            var rawStatus: Int32 = 0
+            var waited: pid_t
+            repeat {
+                waited = Darwin.waitpid(processIdentifier, &rawStatus, WNOHANG)
+            } while waited < 0 && errno == EINTR
+            if waited == 0 { return nil }
+            guard waited == processIdentifier else {
+                throw NSError(
+                    domain: NSPOSIXErrorDomain,
+                    code: Int(errno),
+                    userInfo: [
+                        NSLocalizedDescriptionKey:
+                            "waitpid failed for process \(processIdentifier): \(String(cString: strerror(errno)))",
+                    ]
+                )
             }
-            let boundedSeconds = seconds.isFinite ? max(0, seconds) : 0
-            guard terminationGroup.wait(timeout: .now() + boundedSeconds) == .success else {
-                return nil
-            }
-            return terminationBox.load()
+            let signal = rawStatus & 0x7f
+            return signal == 0 ? (rawStatus >> 8) & 0xff : signal
         }
 
-        let exitCode: Int32
-        if let status = confirmedStatus(waiting: timeoutSec) {
-            exitCode = status
-        } else {
-            timedOut = true
-            process.terminate()
-            if let status = confirmedStatus(waiting: terminationGraceSec) {
-                exitCode = status
-            } else {
-                // Some system tools ignore SIGTERM (e.g. systemextensionsctl).
-                let killResult = kill(processIdentifier, SIGKILL)
-                let signalError: Int32? = killResult == 0 || errno == ESRCH ? nil : errno
-                guard let status = confirmedStatus(waiting: forcedTerminationGraceSec) else {
-                    // Do not synchronously drain pipes while the child may still own their
-                    // write ends. Closing our readers keeps the failure path bounded.
-                    outBox.stopCallbacks(on: outHandle)
-                    errBox.stopCallbacks(on: errHandle)
-                    try? outHandle.close()
-                    try? errHandle.close()
-                    throw ProcessRunnerError.terminationUnconfirmed(
-                        processIdentifier: processIdentifier,
-                        signalError: signalError
-                    )
+        func processGroupExists() -> Bool {
+            let result = Darwin.kill(-processIdentifier, 0)
+            return result == 0 || errno == EPERM
+        }
+
+        @discardableResult
+        func signalOwnedProcess(_ signal: Int32, includeDirectChild: Bool) -> Int32? {
+            var signalError: Int32?
+            if Darwin.kill(-processIdentifier, signal) != 0, errno != ESRCH {
+                signalError = errno
+            }
+            // POSIX_SPAWN_SETPGROUP makes the child the process-group leader. The
+            // direct signal is a bounded fallback if the executable changed groups.
+            if includeDirectChild,
+               Darwin.kill(processIdentifier, signal) != 0,
+               errno != ESRCH,
+               signalError == nil {
+                signalError = errno
+            }
+            return signalError
+        }
+
+        func waitForOwnedExit(
+            status: inout Int32?,
+            maximumSeconds: TimeInterval
+        ) throws -> Bool {
+            let deadline = ProcessInfo.processInfo.systemUptime + max(0, maximumSeconds)
+            while true {
+                if status == nil {
+                    status = try pollTerminalStatus()
                 }
-                exitCode = status
+                if status != nil, !processGroupExists() { return true }
+                let remaining = deadline - ProcessInfo.processInfo.systemUptime
+                if remaining <= 0 { return status != nil && !processGroupExists() }
+                Thread.sleep(forTimeInterval: min(0.025, remaining))
             }
         }
 
-        // Termination is confirmed. Stop callbacks before draining bytes that are
-        // immediately available so no two readers race on the same file descriptor.
-        // Do not wait for EOF: a descendant can retain an inherited write end.
-        outBox.stopCallbacks(on: outHandle)
-        errBox.stopCallbacks(on: errHandle)
-        outBox.drainCurrentlyAvailableData(from: outHandle)
-        errBox.drainCurrentlyAvailableData(from: errHandle)
-        try? outHandle.close()
-        try? errHandle.close()
+        func terminateAndConfirm(initialStatus: Int32?) throws -> Int32 {
+            var status = initialStatus
+            _ = signalOwnedProcess(SIGTERM, includeDirectChild: status == nil)
+            if try waitForOwnedExit(status: &status, maximumSeconds: terminationGraceSec),
+               let status {
+                return status
+            }
+            // Some commands and their descendants ignore SIGTERM. SIGKILL is sent to
+            // the owned group, then both direct-child reaping and group disappearance
+            // are confirmed before returning control to the caller.
+            let signalError = signalOwnedProcess(SIGKILL, includeDirectChild: status == nil)
+            guard try waitForOwnedExit(status: &status, maximumSeconds: forcedTerminationGraceSec),
+                  let status else {
+                throw ProcessRunnerError.terminationUnconfirmed(
+                    processIdentifier: processIdentifier,
+                    signalError: signalError
+                )
+            }
+            return status
+        }
 
-        let capturedOut = outBox.take()
-        let capturedError = errBox.take()
+        func closeDescendantsAfterTerminal(_ status: Int32) throws {
+            guard processGroupExists() else { return }
+            var terminalStatus: Int32? = status
+            _ = signalOwnedProcess(SIGTERM, includeDirectChild: false)
+            if try waitForOwnedExit(
+                status: &terminalStatus,
+                maximumSeconds: terminationGraceSec
+            ) {
+                return
+            }
+            let signalError = signalOwnedProcess(SIGKILL, includeDirectChild: false)
+            guard try waitForOwnedExit(
+                status: &terminalStatus,
+                maximumSeconds: forcedTerminationGraceSec
+            ) else {
+                throw ProcessRunnerError.terminationUnconfirmed(
+                    processIdentifier: processIdentifier,
+                    signalError: signalError
+                )
+            }
+        }
+
+        let startedAt = ProcessInfo.processInfo.systemUptime
+        let boundedTimeout: TimeInterval
+        // Preserve the prior bounded adapter contract: every non-finite or negative
+        // timeout is an immediate timeout. No caller can turn the shared process
+        // boundary into an indefinite wait by supplying positive infinity.
+        boundedTimeout = timeoutSec.isFinite ? max(0, timeoutSec) : 0
+        let timeoutDeadline = startedAt + boundedTimeout
+        var exitCode: Int32?
+        var controlError: Error?
+        var timedOut = false
+
+        while exitCode == nil {
+            // A directly observed terminal result is authoritative. Checking it both
+            // before and immediately after control state closes the cancellation race
+            // without ever reporting a rollback for an already-completed command.
+            exitCode = try pollTerminalStatus()
+            if exitCode != nil { break }
+
+            do {
+                try cancellation?.checkCancellation()
+            } catch {
+                exitCode = try pollTerminalStatus()
+                if exitCode == nil { controlError = error }
+            }
+            if exitCode != nil || controlError != nil { break }
+
+            let now = ProcessInfo.processInfo.systemUptime
+            if now >= timeoutDeadline {
+                exitCode = try pollTerminalStatus()
+                if exitCode == nil { timedOut = true }
+                break
+            }
+
+            var remaining = timeoutDeadline - now
+            if let controlRemaining = cancellation?.remainingTimeInterval {
+                remaining = min(remaining, controlRemaining)
+            }
+            if remaining > 0 {
+                Thread.sleep(forTimeInterval: min(0.025, remaining))
+            }
+        }
+
+        if let observed = exitCode {
+            try closeDescendantsAfterTerminal(observed)
+            exitCode = observed
+        } else {
+            exitCode = try terminateAndConfirm(initialStatus: nil)
+        }
+
+        let captured = finalizeOutput(drain: true)
+        if let controlError { throw controlError }
+
         return ProcessResult(
-            exitCode: exitCode,
-            stdout: String(decoding: capturedOut.data, as: UTF8.self),
-            stderr: String(decoding: capturedError.data, as: UTF8.self),
+            exitCode: exitCode ?? 255,
+            stdout: String(decoding: captured.stdout.data, as: UTF8.self),
+            stderr: String(decoding: captured.stderr.data, as: UTF8.self),
             timedOut: timedOut,
-            stdoutTruncated: capturedOut.truncated,
-            stderrTruncated: capturedError.truncated
+            stdoutTruncated: captured.stdout.truncated,
+            stderrTruncated: captured.stderr.truncated
+        )
+    }
+
+    private static func spawn(
+        executable: URL,
+        arguments: [String],
+        currentDirectory: String?,
+        environment suppliedEnvironment: [String: String]?,
+        stdoutDescriptors: [Int32],
+        stderrDescriptors: [Int32]
+    ) throws -> Int32 {
+        var actions: posix_spawn_file_actions_t?
+        var attributes: posix_spawnattr_t?
+        var result = posix_spawn_file_actions_init(&actions)
+        guard result == 0 else { throw posixError(result, operation: "initialize spawn actions") }
+        result = posix_spawnattr_init(&attributes)
+        guard result == 0 else {
+            posix_spawn_file_actions_destroy(&actions)
+            throw posixError(result, operation: "initialize spawn attributes")
+        }
+        defer {
+            posix_spawn_file_actions_destroy(&actions)
+            posix_spawnattr_destroy(&attributes)
+        }
+
+        result = posix_spawn_file_actions_adddup2(&actions, stdoutDescriptors[1], STDOUT_FILENO)
+        guard result == 0 else { throw posixError(result, operation: "configure stdout") }
+        result = posix_spawn_file_actions_adddup2(&actions, stderrDescriptors[1], STDERR_FILENO)
+        guard result == 0 else { throw posixError(result, operation: "configure stderr") }
+        for descriptor in Set(stdoutDescriptors + stderrDescriptors).sorted()
+        where descriptor != STDIN_FILENO && descriptor != STDOUT_FILENO && descriptor != STDERR_FILENO {
+            result = posix_spawn_file_actions_addclose(&actions, descriptor)
+            guard result == 0 else { throw posixError(result, operation: "close inherited pipe") }
+        }
+        result = posix_spawn_file_actions_addopen(
+            &actions,
+            STDIN_FILENO,
+            "/dev/null",
+            O_RDONLY,
+            0
+        )
+        guard result == 0 else { throw posixError(result, operation: "configure stdin") }
+        if let currentDirectory {
+            result = currentDirectory.withCString {
+                posix_spawn_file_actions_addchdir(&actions, $0)
+            }
+            guard result == 0 else { throw posixError(result, operation: "configure working directory") }
+        }
+
+        var emptySignalMask = sigset_t()
+        guard Darwin.sigemptyset(&emptySignalMask) == 0 else {
+            throw posixError(errno, operation: "initialize signal mask")
+        }
+        result = posix_spawnattr_setsigmask(&attributes, &emptySignalMask)
+        guard result == 0 else { throw posixError(result, operation: "configure signal mask") }
+        var defaultSignals = sigset_t()
+        guard Darwin.sigfillset(&defaultSignals) == 0 else {
+            throw posixError(errno, operation: "initialize default signals")
+        }
+        result = posix_spawnattr_setsigdefault(&attributes, &defaultSignals)
+        guard result == 0 else { throw posixError(result, operation: "configure default signals") }
+        let flags = Int16(
+            POSIX_SPAWN_SETPGROUP
+                | POSIX_SPAWN_CLOEXEC_DEFAULT
+                | POSIX_SPAWN_SETSIGMASK
+                | POSIX_SPAWN_SETSIGDEF
+        )
+        result = posix_spawnattr_setflags(&attributes, flags)
+        guard result == 0 else { throw posixError(result, operation: "configure spawn flags") }
+        result = posix_spawnattr_setpgroup(&attributes, 0)
+        guard result == 0 else { throw posixError(result, operation: "configure process group") }
+
+        var mergedEnvironment = ProcessInfo.processInfo.environment
+        if let suppliedEnvironment {
+            for (key, value) in suppliedEnvironment { mergedEnvironment[key] = value }
+        }
+        let argumentPointers = ([executable.path] + arguments).map { strdup($0) } + [nil]
+        let environmentPointers = mergedEnvironment
+            .sorted { $0.key < $1.key }
+            .map { strdup("\($0.key)=\($0.value)") } + [nil]
+        defer {
+            for pointer in argumentPointers where pointer != nil {
+                Darwin.free(UnsafeMutableRawPointer(pointer!))
+            }
+            for pointer in environmentPointers where pointer != nil {
+                Darwin.free(UnsafeMutableRawPointer(pointer!))
+            }
+        }
+
+        var processIdentifier: pid_t = 0
+        result = argumentPointers.withUnsafeBufferPointer { argumentBuffer in
+            environmentPointers.withUnsafeBufferPointer { environmentBuffer in
+                posix_spawn(
+                    &processIdentifier,
+                    executable.path,
+                    &actions,
+                    &attributes,
+                    UnsafeMutablePointer(mutating: argumentBuffer.baseAddress),
+                    UnsafeMutablePointer(mutating: environmentBuffer.baseAddress)
+                )
+            }
+        }
+        guard result == 0 else { throw posixError(result, operation: "spawn process") }
+        return processIdentifier
+    }
+
+    private static func posixError(_ code: Int32, operation: String) -> NSError {
+        NSError(
+            domain: NSPOSIXErrorDomain,
+            code: Int(code),
+            userInfo: [
+                NSLocalizedDescriptionKey:
+                    "Failed to \(operation): \(String(cString: strerror(code)))",
+            ]
         )
     }
 

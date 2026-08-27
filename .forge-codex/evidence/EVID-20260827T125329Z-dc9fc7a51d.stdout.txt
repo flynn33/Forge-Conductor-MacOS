@@ -1,0 +1,26 @@
+Test Suite 'Selected tests' started at 2026-08-27 07:54:37.889.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-27 07:54:37.890.
+Test Suite 'ContinuityTests' started at 2026-08-27 07:54:37.890.
+Test Case '-[ForgeConductorTests.ContinuityTests testNonemptyUnversionedStoreFailsClosedWithoutMutatingDatabase]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testNonemptyUnversionedStoreFailsClosedWithoutMutatingDatabase]' passed (0.025 seconds).
+Test Suite 'ContinuityTests' passed at 2026-08-27 07:54:37.915.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.025 (0.026) seconds
+Test Suite 'ProjectMemoryTests' started at 2026-08-27 07:54:37.915.
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testNonemptyUnversionedDatabaseFailsClosedWithoutMutatingDatabase]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Tests/ForgeConductorTests/ProjectMemoryTests.swift:281: error: -[ForgeConductorTests.ProjectMemoryTests testNonemptyUnversionedDatabaseFailsClosedWithoutMutatingDatabase] : XCTAssertTrue failed - unexpected error: integrityFailure("database preserved for recovery at memory.corrupt-c57408a1-3f43-4397-a4e4-d92d3efad0bd.sqlite3")
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testNonemptyUnversionedDatabaseFailsClosedWithoutMutatingDatabase]' failed (0.137 seconds).
+Test Suite 'ProjectMemoryTests' failed at 2026-08-27 07:54:38.053.
+	 Executed 1 test, with 1 failure (0 unexpected) in 0.137 (0.137) seconds
+Test Suite 'RuntimeExecutionJobTests' started at 2026-08-27 07:54:38.053.
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testNonemptyUnversionedRuntimeDatabaseFailsClosedWithoutMutation]' started.
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testNonemptyUnversionedRuntimeDatabaseFailsClosedWithoutMutation]' passed (0.006 seconds).
+Test Suite 'RuntimeExecutionJobTests' passed at 2026-08-27 07:54:38.059.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.006 (0.006) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' failed at 2026-08-27 07:54:38.059.
+	 Executed 3 tests, with 1 failure (0 unexpected) in 0.169 (0.169) seconds
+Test Suite 'Selected tests' failed at 2026-08-27 07:54:38.059.
+	 Executed 3 tests, with 1 failure (0 unexpected) in 0.169 (0.170) seconds
+◇ Test run started.
+↳ Testing Library Version: 1501
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

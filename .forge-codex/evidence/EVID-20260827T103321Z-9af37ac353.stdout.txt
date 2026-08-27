@@ -1,0 +1,10 @@
+{
+  "allowed_existing_lifecycle_integration": "LMStudioDeployService may use public app activation and termination without UI element control.",
+  "ok": true,
+  "scope": [
+    "Sources/**/*.swift",
+    "all private UI APIs",
+    "all plugin UI automation"
+  ],
+  "violations": []
+}

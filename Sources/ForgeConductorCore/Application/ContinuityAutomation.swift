@@ -9,6 +9,22 @@ import Foundation
 /// Extra filesystem roots granted without a live agent binding.
 public protocol WorkspaceRootProviding: AnyObject {
     func additionalRoots(for clientID: ClientID) -> [URL]
+    func additionalRoots(
+        for clientID: ClientID,
+        cancellation: ToolCallCancellation?
+    ) throws -> [URL]
+}
+
+public extension WorkspaceRootProviding {
+    func additionalRoots(
+        for clientID: ClientID,
+        cancellation: ToolCallCancellation?
+    ) throws -> [URL] {
+        try cancellation?.checkCancellation()
+        let roots = additionalRoots(for: clientID)
+        try cancellation?.checkCancellation()
+        return roots
+    }
 }
 
 /// Observed result of a progress tool that may annotate the MCP payload.
@@ -65,21 +81,38 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
     }
 
     public func additionalRoots(for clientID: ClientID) -> [URL] {
-        lock.lock()
-        let implicit = state[clientID.rawValue]?.implicitRoots ?? []
-        lock.unlock()
+        (try? additionalRoots(for: clientID, cancellation: nil)) ?? []
+    }
+
+    public func additionalRoots(
+        for clientID: ClientID,
+        cancellation: ToolCallCancellation?
+    ) throws -> [URL] {
+        let implicit = try withStateLock(cancellation: cancellation) {
+            state[clientID.rawValue]?.implicitRoots ?? []
+        }
 
         var roots = implicit
-        if let binding = sessions.binding(for: clientID), let cwd = binding.cwd, !cwd.isEmpty {
+        if let binding = try sessions.binding(for: clientID, cancellation: cancellation),
+           let cwd = binding.cwd,
+           !cwd.isEmpty {
             roots.append(ToolArgHelpers.resolvePath(cwd))
         }
-        if let packet = try? store.handoffLatest(clientID: clientID.rawValue)
-            ?? store.handoffLatest(resumeReadyOnly: false),
+        let clientPacket = try bestEffortHandoff(
+            clientID: clientID.rawValue,
+            cancellation: cancellation
+        )
+        let globalPacket = try bestEffortHandoff(
+            clientID: nil,
+            cancellation: cancellation
+        )
+        if let packet = clientPacket ?? globalPacket,
            let cwd = packet.cwd, !cwd.isEmpty {
             roots.append(ToolArgHelpers.resolvePath(cwd))
         }
-        if let packet = try? store.handoffLatest(resumeReadyOnly: false) {
+        if let packet = globalPacket {
             for file in packet.keyFiles {
+                try cancellation?.checkCancellation()
                 let url = ToolArgHelpers.resolvePath(file)
                 var isDir: ObjCBool = false
                 if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) {
@@ -87,31 +120,74 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
                 }
             }
         }
+        try cancellation?.checkCancellation()
         return uniqued(roots)
+    }
+
+    private func bestEffortHandoff(
+        clientID: String?,
+        cancellation: ToolCallCancellation?
+    ) throws -> HandoffPacket? {
+        do {
+            return try store.handoffLatest(
+                resumeReadyOnly: false,
+                clientID: clientID,
+                cancellation: cancellation
+            )
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as ToolCallDeadlineExceeded {
+            throw error
+        } catch {
+            return nil
+        }
     }
 
     /// Remember a workspace from a loaded handoff packet or an adopted path.
     public func adopt(clientID: ClientID, paths: [String]) {
-        let urls = paths.compactMap { raw -> URL? in
+        try? adopt(clientID: clientID, paths: paths, cancellation: nil)
+    }
+
+    public func adopt(
+        clientID: ClientID,
+        paths: [String],
+        cancellation: ToolCallCancellation?
+    ) throws {
+        var urls: [URL] = []
+        for raw in paths {
+            try cancellation?.checkCancellation()
             let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else { return nil }
-            return directoryURL(for: ToolArgHelpers.resolvePath(trimmed))
+            guard !trimmed.isEmpty else { continue }
+            urls.append(
+                try directoryURL(
+                    for: ToolArgHelpers.resolvePath(trimmed),
+                    cancellation: cancellation
+                )
+            )
         }
         guard !urls.isEmpty else { return }
-        lock.lock()
-        defer { lock.unlock() }
-        var current = state[clientID.rawValue] ?? ClientState()
-        current.implicitRoots = Array(
-            uniqued(current.implicitRoots + urls).suffix(Self.maxImplicitRootsPerClient)
-        )
-        makeRoomForClientIfNeeded(clientID.rawValue)
-        state[clientID.rawValue] = current
+        try withStateLock(cancellation: cancellation) {
+            var current = state[clientID.rawValue] ?? ClientState()
+            current.implicitRoots = Array(
+                uniqued(current.implicitRoots + urls).suffix(Self.maxImplicitRootsPerClient)
+            )
+            makeRoomForClientIfNeeded(clientID.rawValue)
+            state[clientID.rawValue] = current
+        }
     }
 
     public func adopt(clientID: ClientID, packet: HandoffPacket) {
+        try? adopt(clientID: clientID, packet: packet, cancellation: nil)
+    }
+
+    public func adopt(
+        clientID: ClientID,
+        packet: HandoffPacket,
+        cancellation: ToolCallCancellation?
+    ) throws {
         var paths: [String] = packet.keyFiles
         if let cwd = packet.cwd { paths.insert(cwd, at: 0) }
-        adopt(clientID: clientID, paths: paths)
+        try adopt(clientID: clientID, paths: paths, cancellation: cancellation)
     }
 
     /// Record a dispatched tool. Returns a packet when the runtime persisted continuity.
@@ -119,82 +195,109 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
         tool: String,
         arguments: [String: Any],
         clientID: ClientID,
-        succeeded: Bool
+        succeeded: Bool,
+        cancellation: ToolCallCancellation? = nil
     ) -> ContinuityObservation? {
-        if let path = ToolArgHelpers.string(arguments, "path") ?? ToolArgHelpers.string(arguments, "cwd") {
-            adopt(clientID: clientID, paths: [path])
-        }
-
-        guard succeeded, Self.progressTools.contains(tool) else { return nil }
-
-        let now = clock.now()
-        lock.lock()
-        var current = state[clientID.rawValue] ?? ClientState()
-        current.progressCount += 1
-        current.lastTools.append(tool)
-        if current.lastTools.count > 12 {
-            current.lastTools.removeFirst(current.lastTools.count - 12)
-        }
-        if let path = ToolArgHelpers.string(arguments, "path") ?? ToolArgHelpers.string(arguments, "cwd") {
-            current.lastPaths.append(path)
-            if current.lastPaths.count > 16 {
-                current.lastPaths.removeFirst(current.lastPaths.count - 16)
-            }
-        }
-        let progress = current.progressCount
-        let sinceCheckpoint = progress - current.lastCheckpointCount
-        let sinceHandoff = progress - current.lastHandoffCount
-        let forcePersist = Self.forcePersistTools.contains(tool)
-        let checkpointDue = forcePersist
-            || sinceCheckpoint >= Self.checkpointEveryTools
-            || current.lastCheckpointAt.map({ now.timeIntervalSince($0) >= Self.checkpointIntervalSec }) == true
-        let handoffDue = sinceHandoff >= Self.handoffEveryTools
-            || current.lastHandoffAt.map({ now.timeIntervalSince($0) >= Self.handoffIntervalSec }) == true
-        makeRoomForClientIfNeeded(clientID.rawValue)
-        state[clientID.rawValue] = current
-        lock.unlock()
-
-        guard checkpointDue || handoffDue else { return nil }
-
-        let inferred = inferredArguments(clientID: clientID, lastTools: current.lastTools, lastPaths: current.lastPaths)
-        let finalize = handoffDue
-        let reason = finalize
-            ? "auto_handoff progress=\(progress)"
-            : "auto_checkpoint progress=\(progress)"
         do {
+            try cancellation?.checkCancellation()
+            let observedPath = ToolArgHelpers.string(arguments, "path")
+                ?? ToolArgHelpers.string(arguments, "cwd")
+            if let observedPath {
+                try adopt(
+                    clientID: clientID,
+                    paths: [observedPath],
+                    cancellation: cancellation
+                )
+            }
+            guard succeeded, Self.progressTools.contains(tool) else { return nil }
+
+            let now = clock.now()
+            let update = try withStateLock(cancellation: cancellation) { () -> (
+                current: ClientState,
+                progress: Int,
+                checkpointDue: Bool,
+                handoffDue: Bool
+            ) in
+                var current = state[clientID.rawValue] ?? ClientState()
+                current.progressCount += 1
+                current.lastTools.append(tool)
+                if current.lastTools.count > 12 {
+                    current.lastTools.removeFirst(current.lastTools.count - 12)
+                }
+                if let observedPath {
+                    current.lastPaths.append(observedPath)
+                    if current.lastPaths.count > 16 {
+                        current.lastPaths.removeFirst(current.lastPaths.count - 16)
+                    }
+                }
+                let progress = current.progressCount
+                let sinceCheckpoint = progress - current.lastCheckpointCount
+                let sinceHandoff = progress - current.lastHandoffCount
+                let forcePersist = Self.forcePersistTools.contains(tool)
+                let checkpointDue = forcePersist
+                    || sinceCheckpoint >= Self.checkpointEveryTools
+                    || current.lastCheckpointAt.map({
+                        now.timeIntervalSince($0) >= Self.checkpointIntervalSec
+                    }) == true
+                let handoffDue = sinceHandoff >= Self.handoffEveryTools
+                    || current.lastHandoffAt.map({
+                        now.timeIntervalSince($0) >= Self.handoffIntervalSec
+                    }) == true
+                makeRoomForClientIfNeeded(clientID.rawValue)
+                state[clientID.rawValue] = current
+                return (current, progress, checkpointDue, handoffDue)
+            }
+
+            guard update.checkpointDue || update.handoffDue else { return nil }
+            let inferred = try inferredArguments(
+                clientID: clientID,
+                lastTools: update.current.lastTools,
+                lastPaths: update.current.lastPaths,
+                cancellation: cancellation
+            )
+            let finalize = update.handoffDue
+            let reason = finalize
+                ? "auto_handoff progress=\(update.progress)"
+                : "auto_checkpoint progress=\(update.progress)"
             let packet = try continuity.autoPersist(
                 clientID: clientID,
                 reason: reason,
                 finalize: finalize,
-                inferred: inferred
+                inferred: inferred,
+                cancellation: cancellation
             )
-            lock.lock()
-            if var next = state[clientID.rawValue] {
-                next.lastCheckpointCount = progress
-                next.lastCheckpointAt = now
-                if finalize {
-                    next.lastHandoffCount = progress
-                    next.lastHandoffAt = now
-                    next.blocked = true
-                    next.lastHandoffID = packet.id
-                    next.lastResumeSeed = packet.resumeSeed.isEmpty
-                        ? packet.defaultResumeSeed()
-                        : packet.resumeSeed
+            // The packet is durable at this point. Updating the in-memory mirror is
+            // best effort and must not let a late cancellation hide that commit.
+            try? withStateLock(cancellation: nil) {
+                if var next = state[clientID.rawValue] {
+                    next.lastCheckpointCount = update.progress
+                    next.lastCheckpointAt = now
+                    if finalize {
+                        next.lastHandoffCount = update.progress
+                        next.lastHandoffAt = now
+                        next.blocked = true
+                        next.lastHandoffID = packet.id
+                        next.lastResumeSeed = packet.resumeSeed.isEmpty
+                            ? packet.defaultResumeSeed()
+                            : packet.resumeSeed
+                    }
+                    state[clientID.rawValue] = next
                 }
-                state[clientID.rawValue] = next
             }
-            lock.unlock()
             diagnostics.info(finalize ? "auto_handoff" : "auto_checkpoint", [
                 "handoff_id": packet.id,
                 "client_id": clientID.rawValue,
-                "progress": "\(progress)",
+                "progress": "\(update.progress)",
                 "reason": reason,
             ], category: .general)
             return ContinuityObservation(packet: packet, finalize: finalize, reason: reason)
+        } catch is CancellationError {
+            return nil
+        } catch is ToolCallDeadlineExceeded {
+            return nil
         } catch {
             diagnostics.warn("auto_continuity_failed", [
                 "client_id": clientID.rawValue,
-                "reason": reason,
                 "error": "\(error)",
             ], category: .general)
             return nil
@@ -202,45 +305,75 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
     }
 
     public func isBlocked(_ clientID: ClientID) -> Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return state[clientID.rawValue]?.blocked == true
+        (try? isBlocked(clientID, cancellation: nil)) ?? false
+    }
+
+    public func isBlocked(
+        _ clientID: ClientID,
+        cancellation: ToolCallCancellation?
+    ) throws -> Bool {
+        try withStateLock(cancellation: cancellation) {
+            state[clientID.rawValue]?.blocked == true
+        }
     }
 
     public func blockState(_ clientID: ClientID) -> (handoffID: String?, resumeSeed: String?) {
-        lock.lock()
-        defer { lock.unlock() }
-        let current = state[clientID.rawValue]
-        return (current?.lastHandoffID, current?.lastResumeSeed)
+        (try? blockState(clientID, cancellation: nil)) ?? (nil, nil)
+    }
+
+    public func blockState(
+        _ clientID: ClientID,
+        cancellation: ToolCallCancellation?
+    ) throws -> (handoffID: String?, resumeSeed: String?) {
+        try withStateLock(cancellation: cancellation) {
+            let current = state[clientID.rawValue]
+            return (current?.lastHandoffID, current?.lastResumeSeed)
+        }
     }
 
     public func markBlocked(clientID: ClientID, packet: HandoffPacket) {
-        lock.lock()
-        defer { lock.unlock() }
-        var current = state[clientID.rawValue] ?? ClientState()
-        current.blocked = true
-        current.lastHandoffID = packet.id
-        current.lastResumeSeed = packet.resumeSeed.isEmpty ? packet.defaultResumeSeed() : packet.resumeSeed
-        makeRoomForClientIfNeeded(clientID.rawValue)
-        state[clientID.rawValue] = current
-    }
-
-    public func clearBlock(clientID: ClientID) {
-        lock.lock()
-        defer { lock.unlock() }
-        if var current = state[clientID.rawValue] {
-            current.blocked = false
-            current.progressCount = 0
-            current.lastCheckpointCount = 0
-            current.lastHandoffCount = 0
+        try? withStateLock(cancellation: nil) {
+            var current = state[clientID.rawValue] ?? ClientState()
+            current.blocked = true
+            current.lastHandoffID = packet.id
+            current.lastResumeSeed = packet.resumeSeed.isEmpty
+                ? packet.defaultResumeSeed()
+                : packet.resumeSeed
+            makeRoomForClientIfNeeded(clientID.rawValue)
             state[clientID.rawValue] = current
         }
     }
 
+    public func clearBlock(clientID: ClientID) {
+        try? clearBlock(clientID: clientID, cancellation: nil)
+    }
+
+    public func clearBlock(
+        clientID: ClientID,
+        cancellation: ToolCallCancellation?
+    ) throws {
+        try withStateLock(cancellation: cancellation) {
+            if var current = state[clientID.rawValue] {
+                current.blocked = false
+                current.progressCount = 0
+                current.lastCheckpointCount = 0
+                current.lastHandoffCount = 0
+                state[clientID.rawValue] = current
+            }
+        }
+    }
+
     public func snapshot(for clientID: ClientID) -> [String: Any] {
-        lock.lock()
-        let current = state[clientID.rawValue]
-        lock.unlock()
+        (try? snapshot(for: clientID, cancellation: nil)) ?? ["enabled": true]
+    }
+
+    public func snapshot(
+        for clientID: ClientID,
+        cancellation: ToolCallCancellation?
+    ) throws -> [String: Any] {
+        let current = try withStateLock(cancellation: cancellation) {
+            state[clientID.rawValue]
+        }
         return [
             "enabled": true,
             "checkpoint_every_tools": Self.checkpointEveryTools,
@@ -257,6 +390,22 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
         return state.count
     }
 
+    private func withStateLock<Value>(
+        cancellation: ToolCallCancellation?,
+        _ body: () throws -> Value
+    ) throws -> Value {
+        let lockDeadline = DispatchTime.now().uptimeNanoseconds + 3_000_000_000
+        while !lock.lock(before: Date().addingTimeInterval(0.01)) {
+            try cancellation?.checkCancellation()
+            guard DispatchTime.now().uptimeNanoseconds < lockDeadline else {
+                throw StoreError.execFailed("continuity state is busy")
+            }
+        }
+        defer { lock.unlock() }
+        try cancellation?.checkCancellation()
+        return try body()
+    }
+
     private func makeRoomForClientIfNeeded(_ key: String) {
         guard state[key] == nil, state.count >= Self.maxTrackedClients else { return }
         if let victim = state.keys.filter({ $0 != key }).sorted().first {
@@ -267,16 +416,22 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
     private func inferredArguments(
         clientID: ClientID,
         lastTools: [String],
-        lastPaths: [String]
-    ) -> [String: Any] {
+        lastPaths: [String],
+        cancellation: ToolCallCancellation?
+    ) throws -> [String: Any] {
         var args: [String: Any] = [:]
-        if let binding = sessions.binding(for: clientID) {
+        if let binding = try sessions.binding(for: clientID, cancellation: cancellation) {
             if !binding.goal.isEmpty { args["goal"] = binding.goal }
             if let cwd = binding.cwd, !cwd.isEmpty { args["cwd"] = cwd }
         }
-        if args["cwd"] == nil, let first = additionalRoots(for: clientID).first {
+        if args["cwd"] == nil,
+           let first = try additionalRoots(
+                for: clientID,
+                cancellation: cancellation
+           ).first {
             args["cwd"] = first.path
         }
+        try cancellation?.checkCancellation()
         if !lastPaths.isEmpty {
             args["key_files"] = Array(Set(lastPaths)).sorted().suffix(12).map { $0 }
         }
@@ -289,11 +444,17 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
         return args
     }
 
-    private func directoryURL(for url: URL) -> URL {
+    private func directoryURL(
+        for url: URL,
+        cancellation: ToolCallCancellation?
+    ) throws -> URL {
+        try cancellation?.checkCancellation()
         var isDir: ObjCBool = false
         if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue {
+            try cancellation?.checkCancellation()
             return url.standardizedFileURL
         }
+        try cancellation?.checkCancellation()
         return url.deletingLastPathComponent().standardizedFileURL
     }
 

@@ -41,6 +41,14 @@ Session bindings and continuity packets may narrow access to a configured root, 
 
 Use least-privilege file permissions. Prevent another project from opening a memory store by path substitution. Export is explicit, checksummed, and redacted according to policy.
 
+Migration pathname checks cover stable moved-file substitutions and
+cooperating processes. The current macOS VFS also fails closed in the tested
+A-to-B-to-A restoration cycle, but sequential observations are not an atomic
+security boundary. Hostile same-user namespace substitution and direct
+mutation of owner-controlled database files remain excluded unless a custom
+SQLite VFS pins the database family and/or an independent privilege boundary
+prevents same-owner mutation.
+
 ## Managed runtime execution
 
 Managed shell and interpreter jobs execute only through the native runtime launcher. Production app and CLI builds require an exact, signed product identity, enclosing application seal where applicable, and a matching staged-helper code-directory hash. Exact-path, ad-hoc SwiftPM pairings are accepted only for local development products with allowlisted identifiers; they are not distribution authority.

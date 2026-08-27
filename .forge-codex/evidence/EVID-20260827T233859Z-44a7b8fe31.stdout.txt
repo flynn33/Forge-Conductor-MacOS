@@ -1,0 +1,963 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -workspace /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/ForgeConductor.xcodeproj/project.xcworkspace -scheme ForgeConductor -configuration Debug -derivedDataPath /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData CODE_SIGNING_ALLOWED=NO build
+
+Build settings from command line:
+    CODE_SIGNING_ALLOWED = NO
+
+ComputePackagePrebuildTargetDependencyGraph
+
+Prepare packages
+
+CreateBuildRequest
+
+SendProjectDescription
+
+CreateBuildOperation
+
+ComputeTargetDependencyGraph
+note: Building targets in dependency order
+note: Target dependency graph (3 targets)
+    Target 'ForgeConductor' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeConductorCore' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeRuntimeLauncher' in project 'ForgeConductor'
+    Target 'ForgeRuntimeLauncher' in project 'ForgeConductor' (no dependencies)
+    Target 'ForgeConductorCore' in project 'ForgeConductor' (no dependencies)
+
+GatherProvisioningInputs
+
+CreateBuildDescription
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -v -E -dM -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk -x c -c /dev/null
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc --version
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/usr/bin/actool --version --output-format xml1
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld -version_details
+
+Build description signature: cfd5fa9620666c00bc2f6791f88fb875
+Build description path: /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/XCBuildData/cfd5fa9620666c00bc2f6791f88fb875.xcbuilddata
+ClangStatCache /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/SDKStatCaches.noindex/macosx26.2-25C57-dc75598d0054f22ec865fa860f139d7200fa09913b459cbbc988d1f6730289ae.sdkstatcache
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/ForgeConductor.xcodeproj
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk -o /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/SDKStatCaches.noindex/macosx26.2-25C57-dc75598d0054f22ec865fa860f139d7200fa09913b459cbbc988d1f6730289ae.sdkstatcache
+
+SwiftDriver ForgeConductorCore normal arm64 com.apple.xcode.tools.swift.compiler (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    builtin-SwiftDriver -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name ForgeConductorCore -Onone -enforce-exclusivity\=checked @/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore.SwiftFileList -DDEBUG -enable-upcoming-feature StrictConcurrency -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk -target arm64-apple-macos26.0 -g -module-cache-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -index-store-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Index.noindex/DataStore -swift-version 5 -I /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug -F /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug -c -j14 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/SDKStatCaches.noindex/macosx26.2-25C57-dc75598d0054f22ec865fa860f139d7200fa09913b459cbbc988d1f6730289ae.sdkstatcache -output-file-map /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/ModuleCache.noindex -sdk-module-cache-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore_const_extract_protocols.json -Xcc -iquote -Xcc /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/ForgeConductorCore-generated-files.hmap -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/ForgeConductorCore-own-target-headers.hmap -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/ForgeConductorCore-all-target-headers.hmap -Xcc -iquote -Xcc /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/ForgeConductorCore-project-headers.hmap -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/include -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/DerivedSources-normal/arm64 -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/DerivedSources/arm64 -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore-Swift.h -working-directory /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy -experimental-emit-module-separately -disable-cmo
+
+ProcessInfoPlistFile /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeRuntimeLauncher.build/Objects-normal/arm64/Processed-Info.plist /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeRuntimeLauncher.build/empty-forge-runtime-launcher.plist (in target 'ForgeRuntimeLauncher' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    builtin-infoPlistUtility /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeRuntimeLauncher.build/empty-forge-runtime-launcher.plist -producttype com.apple.product-type.tool -expandbuildsettings -platform macosx -o /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeRuntimeLauncher.build/Objects-normal/arm64/Processed-Info.plist
+
+SwiftCompile normal arm64 Compiling\ RuntimeJobModels.swift,\ ProjectControlPlaneRepository.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Domain/RuntimeJobModels.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Domain/RuntimeJobModels.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:91:19: warning: cannot access property 'connection' with a non-Sendable type 'ControlPlaneSQLiteConnection?' from nonisolated deinit; this is an error in the Swift 6 language mode
+        connection?.close()
+                  ^
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:4999:21: note: class 'ControlPlaneSQLiteConnection' does not conform to the 'Sendable' protocol
+private final class ControlPlaneSQLiteConnection {
+                    ^
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:804:37: warning: sending 'connection' risks causing data races; this is an error in the Swift 6 language mode
+            guard let current = try contextBudgetActionRequestUnlocked(
+                                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:804:37: note: 'self'-isolated 'connection' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later actor-isolated uses
+            guard let current = try contextBudgetActionRequestUnlocked(
+                                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:803:31: note: access can happen concurrently
+        return try connection.transaction {
+                   ~~~~~~~~~~~^~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:871:21: warning: sending 'connection' risks causing data races; this is an error in the Swift 6 language mode
+            _ = try requiredActiveProjectUnlocked(
+                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:871:21: note: 'self'-isolated 'connection' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later actor-isolated uses
+            _ = try requiredActiveProjectUnlocked(
+                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:869:31: note: access can happen concurrently
+        return try connection.transaction {
+                   ~~~~~~~~~~~^~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:1229:50: warning: sending 'connection' risks causing data races; this is an error in the Swift 6 language mode
+            guard let candidate = try connection.first(
+                                      ~~~~~~~~~~~^~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:1229:50: note: 'self'-isolated 'connection' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later actor-isolated uses
+            guard let candidate = try connection.first(
+                                      ~~~~~~~~~~~^~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:1228:31: note: access can happen concurrently
+        return try connection.transaction { () -> ContinuityCommand? in
+                   ~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:1271:17: warning: sending 'connection' risks causing data races; this is an error in the Swift 6 language mode
+            try verifyRunLeaseUnlocked(lease, timestamp: timestamp, connection: connection)
+                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:1271:17: note: 'self'-isolated 'connection' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later actor-isolated uses
+            try verifyRunLeaseUnlocked(lease, timestamp: timestamp, connection: connection)
+                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:1270:31: note: access can happen concurrently
+        return try connection.transaction { () -> ContinuityCommand? in
+                   ~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:1339:23: warning: sending 'connection' risks causing data races; this is an error in the Swift 6 language mode
+            guard try continuityCommandUnlocked(commandID: commandID, connection: connection) != nil else {
+                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:1339:23: note: 'self'-isolated 'connection' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later actor-isolated uses
+            guard try continuityCommandUnlocked(commandID: commandID, connection: connection) != nil else {
+                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:1338:31: note: access can happen concurrently
+        return try connection.transaction {
+                   ~~~~~~~~~~~^~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:1420:21: warning: sending 'connection' risks causing data races; this is an error in the Swift 6 language mode
+            _ = try requiredActiveProjectUnlocked(
+                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:1420:21: note: 'self'-isolated 'connection' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later actor-isolated uses
+            _ = try requiredActiveProjectUnlocked(
+                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:1419:31: note: access can happen concurrently
+        return try connection.transaction {
+                   ~~~~~~~~~~~^~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:1617:33: warning: sending 'connection' risks causing data races; this is an error in the Swift 6 language mode
+            guard let run = try autonomousRunUnlocked(runID, connection: connection) else {
+                                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:1617:33: note: 'self'-isolated 'connection' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later actor-isolated uses
+            guard let run = try autonomousRunUnlocked(runID, connection: connection) else {
+                                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:1616:31: note: access can happen concurrently
+        return try connection.transaction {
+                   ~~~~~~~~~~~^~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:1691:31: warning: sending 'connection' risks causing data races; this is an error in the Swift 6 language mode
+            let current = try requiredRunLeaseUnlocked(lease.runID, connection: connection)
+                              ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:1691:31: note: 'self'-isolated 'connection' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later actor-isolated uses
+            let current = try requiredRunLeaseUnlocked(lease.runID, connection: connection)
+                              ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:1690:31: note: access can happen concurrently
+        return try connection.transaction {
+                   ~~~~~~~~~~~^~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:1766:17: warning: sending 'connection' risks causing data races; this is an error in the Swift 6 language mode
+            try verifyRunLeaseUnlocked(lease, timestamp: timestamp, connection: connection)
+                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:1766:17: note: 'self'-isolated 'connection' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later actor-isolated uses
+            try verifyRunLeaseUnlocked(lease, timestamp: timestamp, connection: connection)
+                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:1765:31: note: access can happen concurrently
+        return try connection.transaction {
+                   ~~~~~~~~~~~^~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:1836:17: warning: sending 'connection' risks causing data races; this is an error in the Swift 6 language mode
+            try verifyRunLeaseUnlocked(lease, timestamp: timestamp, connection: connection)
+                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:1836:17: note: 'self'-isolated 'connection' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later actor-isolated uses
+            try verifyRunLeaseUnlocked(lease, timestamp: timestamp, connection: connection)
+                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:1835:31: note: access can happen concurrently
+        return try connection.transaction {
+                   ~~~~~~~~~~~^~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:1889:17: warning: sending 'connection' risks causing data races; this is an error in the Swift 6 language mode
+            try verifyRunLeaseUnlocked(lease, timestamp: timestamp, connection: connection)
+                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:1889:17: note: 'self'-isolated 'connection' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later actor-isolated uses
+            try verifyRunLeaseUnlocked(lease, timestamp: timestamp, connection: connection)
+                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:1888:31: note: access can happen concurrently
+        return try connection.transaction {
+                   ~~~~~~~~~~~^~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:1985:17: warning: sending 'connection' risks causing data races; this is an error in the Swift 6 language mode
+            try verifyRunLeaseUnlocked(lease, timestamp: timestamp, connection: connection)
+                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:1985:17: note: 'self'-isolated 'connection' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later actor-isolated uses
+            try verifyRunLeaseUnlocked(lease, timestamp: timestamp, connection: connection)
+                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:1984:24: note: access can happen concurrently
+        try connection.transaction {
+            ~~~~~~~~~~~^~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:2146:17: warning: sending 'connection' risks causing data races; this is an error in the Swift 6 language mode
+            try verifyRunLeaseUnlocked(lease, timestamp: timestamp, connection: connection)
+                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:2146:17: note: 'self'-isolated 'connection' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later actor-isolated uses
+            try verifyRunLeaseUnlocked(lease, timestamp: timestamp, connection: connection)
+                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:2145:31: note: access can happen concurrently
+        return try connection.transaction {
+                   ~~~~~~~~~~~^~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:2227:17: warning: sending 'connection' risks causing data races; this is an error in the Swift 6 language mode
+            try verifyRunLeaseUnlocked(lease, timestamp: timestamp, connection: connection)
+                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:2227:17: note: 'self'-isolated 'connection' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later actor-isolated uses
+            try verifyRunLeaseUnlocked(lease, timestamp: timestamp, connection: connection)
+                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:2226:31: note: access can happen concurrently
+        return try connection.transaction {
+                   ~~~~~~~~~~~^~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:2395:17: warning: sending 'connection' risks causing data races; this is an error in the Swift 6 language mode
+            try verifyRunLeaseUnlocked(lease, timestamp: timestamp, connection: connection)
+                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:2395:17: note: 'self'-isolated 'connection' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later actor-isolated uses
+            try verifyRunLeaseUnlocked(lease, timestamp: timestamp, connection: connection)
+                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:2394:31: note: access can happen concurrently
+        return try connection.transaction {
+                   ~~~~~~~~~~~^~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:2496:17: warning: sending 'connection' risks causing data races; this is an error in the Swift 6 language mode
+            try verifyRunLeaseUnlocked(lease, timestamp: timestamp, connection: connection)
+                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:2496:17: note: 'self'-isolated 'connection' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later actor-isolated uses
+            try verifyRunLeaseUnlocked(lease, timestamp: timestamp, connection: connection)
+                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:2495:31: note: access can happen concurrently
+        return try connection.transaction {
+                   ~~~~~~~~~~~^~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:2588:17: warning: sending 'connection' risks causing data races; this is an error in the Swift 6 language mode
+            try verifyRunLeaseUnlocked(lease, timestamp: timestamp, connection: connection)
+                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:2588:17: note: 'self'-isolated 'connection' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later actor-isolated uses
+            try verifyRunLeaseUnlocked(lease, timestamp: timestamp, connection: connection)
+                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:2587:31: note: access can happen concurrently
+        return try connection.transaction {
+                   ~~~~~~~~~~~^~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:2650:17: warning: sending 'connection' risks causing data races; this is an error in the Swift 6 language mode
+            try verifyRunLeaseUnlocked(lease, timestamp: timestamp, connection: connection)
+                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:2650:17: note: 'self'-isolated 'connection' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later actor-isolated uses
+            try verifyRunLeaseUnlocked(lease, timestamp: timestamp, connection: connection)
+                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:2649:31: note: access can happen concurrently
+        return try connection.transaction {
+                   ~~~~~~~~~~~^~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:2744:17: warning: sending 'connection' risks causing data races; this is an error in the Swift 6 language mode
+            try verifyRunLeaseUnlocked(lease, timestamp: timestamp, connection: connection)
+                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:2744:17: note: 'self'-isolated 'connection' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later actor-isolated uses
+            try verifyRunLeaseUnlocked(lease, timestamp: timestamp, connection: connection)
+                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift:2743:31: note: access can happen concurrently
+        return try connection.transaction {
+                   ~~~~~~~~~~~^~~~~~~~~~~~~
+
+SwiftCompile normal arm64 Compiling\ ExecutionJobService.swift,\ ProjectContextService.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ExecutionJobService.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ProjectContextService.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ExecutionJobService.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ProjectContextService.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 Compiling\ ProjectMemoryRepository.swift,\ OwnerOnlyAtomicFile.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectMemoryRepository.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/OwnerOnlyAtomicFile.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProjectMemoryRepository.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/OwnerOnlyAtomicFile.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 Compiling\ RuntimeJobRepository.swift,\ ContinuityCoordinator.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeJobRepository.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ContinuityCoordinator.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeJobRepository.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeJobRepository.swift:243:9: warning: cannot access property 'database' with a non-Sendable type 'OpaquePointer?' from nonisolated deinit; this is an error in the Swift 6 language mode
+        if let database { sqlite3_close(database) }
+        ^
+Swift.Optional:1:21: note: generic enum 'Optional' does not conform to the 'Sendable' protocol
+@frozen public enum Optional<Wrapped> : ~Copyable, ~Escapable where Wrapped : ~Copyable, Wrapped : ~Escapable {
+                    ^
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeJobRepository.swift:1308:9: warning: sending 'decode' risks causing data races; this is an error in the Swift 6 language mode
+        }
+~~~~~~~~^
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeJobRepository.swift:1308:9: note: 'self'-isolated 'decode' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later actor-isolated uses
+        }
+~~~~~~~~^
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/RuntimeJobRepository.swift:1302:13: note: access can happen concurrently
+        try withStatement(sql) { statement in
+            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ContinuityCoordinator.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 Compiling\ RuntimeJobSubsystem.swift,\ RuntimeJobToolPack.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/RuntimeJobSubsystem.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/Tools/RuntimeJobToolPack.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/RuntimeJobSubsystem.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/RuntimeJobSubsystem.swift:142:62: warning: capture of 'arguments' with non-Sendable type '[String : Any]' in a '@Sendable' closure; this is an error in the Swift 6 language mode
+            try await toolPack.handle(name: name, arguments: arguments, context: context)
+                                                             ^
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/RuntimeJobSubsystem.swift:189:55: warning: capture of 'arguments' with non-Sendable type '[String : Any]' in a '@Sendable' closure; this is an error in the Swift 6 language mode
+                idempotencyKey: ToolArgHelpers.string(arguments, "idempotency_key")
+                                                      ^
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/Tools/RuntimeJobToolPack.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 Compiling\ ProjectMemoryService.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ProjectMemoryService.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ProjectMemoryService.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 Compiling\ AgentSessionService.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/AgentSessionService.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/AgentSessionService.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 Compiling\ ToolArgHelpers.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/Tools/ToolArgHelpers.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/Tools/ToolArgHelpers.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 Compiling\ GitToolPack.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/Tools/GitToolPack.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/Tools/GitToolPack.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 Compiling\ ToolRouter.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ToolRouter.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ToolRouter.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ToolRouter.swift:564:36: warning: capture of 'routedArguments' with non-Sendable type '[String : Any]' in a '@Sendable' closure; this is an error in the Swift 6 language mode
+                        arguments: routedArguments,
+                                   ^
+
+SwiftCompile normal arm64 Compiling\ AuditService.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/AuditService.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/AuditService.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftEmitModule normal arm64 Emitting\ module\ for\ ForgeConductorCore (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+EmitSwiftModule normal arm64 (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/VerifiedMigrationBackup.swift:156:24: warning: static property 'openRegistrationCounts' is not concurrency-safe because it is nonisolated global shared mutable state; this is an error in the Swift 6 language mode
+    private static var openRegistrationCounts: [SQLiteFileIdentity: Int] = [:]
+                       ^
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/VerifiedMigrationBackup.swift:156:24: note: convert 'openRegistrationCounts' to a 'let' constant to make 'Sendable' shared state immutable
+    private static var openRegistrationCounts: [SQLiteFileIdentity: Int] = [:]
+                   ~~~ ^
+                   let
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/VerifiedMigrationBackup.swift:156:24: note: add '@MainActor' to make static property 'openRegistrationCounts' part of global actor 'MainActor'
+    private static var openRegistrationCounts: [SQLiteFileIdentity: Int] = [:]
+                       ^
+    @MainActor 
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/VerifiedMigrationBackup.swift:156:24: note: disable concurrency-safety checks if accesses are protected by an external synchronization mechanism
+    private static var openRegistrationCounts: [SQLiteFileIdentity: Int] = [:]
+                       ^
+    nonisolated(unsafe) 
+
+SwiftCompile normal arm64 Compiling\ MCPServer.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/MCP/MCPServer.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/MCP/MCPServer.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 Compiling\ SQLiteStore.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/SQLiteStore.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/SQLiteStore.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 Compiling\ FilesystemToolPack.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/Tools/FilesystemToolPack.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/Tools/FilesystemToolPack.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling AuditService.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftDriverJobDiscovery normal arm64 Compiling ToolArgHelpers.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ LMStudioDeployService.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Telemetry/LMStudioDeployService.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Telemetry/LMStudioDeployService.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 Compiling\ ManagedContinuityWorker.swift,\ ManagedProjectRunStepExecutor.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ManagedContinuityWorker.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ManagedProjectRunStepExecutor.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ManagedContinuityWorker.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ManagedProjectRunStepExecutor.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling AgentSessionService.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ ManagedAutonomyRuntime.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ManagedAutonomyRuntime.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ManagedAutonomyRuntime.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling GitToolPack.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ ForgeCollector.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Telemetry/ForgeCollector.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Telemetry/ForgeCollector.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling ToolRouter.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ ContextContinuityService.swift,\ ContinuityAutomation.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ContextContinuityService.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ContinuityAutomation.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ContextContinuityService.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ContinuityAutomation.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling MCPServer.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ ManagerRoutes.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Dashboard/ManagerRoutes.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Dashboard/ManagerRoutes.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling LMStudioDeployService.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ ContinuityToolPack.swift,\ ToolAuthorizationService.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/Tools/ContinuityToolPack.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ToolAuthorizationService.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/Tools/ContinuityToolPack.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ToolAuthorizationService.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling RuntimeJobSubsystem.swift, RuntimeJobToolPack.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ ToolDefinitionCatalog.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ToolDefinitionCatalog.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ToolDefinitionCatalog.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling ManagedAutonomyRuntime.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ ProjectRunCoordinator.swift,\ ToolInvocationBroker.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ProjectRunCoordinator.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ToolInvocationBroker.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ProjectRunCoordinator.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ToolInvocationBroker.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling ProjectMemoryService.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ ForgeNativeSessionHostPlugin.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeNativeSessionHostPlugin/ForgeNativeSessionHostPlugin.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeNativeSessionHostPlugin/ForgeNativeSessionHostPlugin.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling SQLiteStore.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ TelemetryRoutes.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Dashboard/TelemetryRoutes.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Dashboard/TelemetryRoutes.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling ForgeCollector.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ SearchToolPack.swift,\ MemoryToolPack.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/Tools/SearchToolPack.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/Tools/MemoryToolPack.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/Tools/SearchToolPack.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/Tools/MemoryToolPack.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling ContinuityToolPack.swift, ToolAuthorizationService.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ VerifiedMigrationBackup.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/VerifiedMigrationBackup.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/VerifiedMigrationBackup.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/VerifiedMigrationBackup.swift:156:24: warning: static property 'openRegistrationCounts' is not concurrency-safe because it is nonisolated global shared mutable state; this is an error in the Swift 6 language mode
+    private static var openRegistrationCounts: [SQLiteFileIdentity: Int] = [:]
+                       ^
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/VerifiedMigrationBackup.swift:156:24: note: convert 'openRegistrationCounts' to a 'let' constant to make 'Sendable' shared state immutable
+    private static var openRegistrationCounts: [SQLiteFileIdentity: Int] = [:]
+                   ~~~ ^
+                   let
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/VerifiedMigrationBackup.swift:156:24: note: add '@MainActor' to make static property 'openRegistrationCounts' part of global actor 'MainActor'
+    private static var openRegistrationCounts: [SQLiteFileIdentity: Int] = [:]
+                       ^
+    @MainActor 
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/VerifiedMigrationBackup.swift:156:24: note: disable concurrency-safety checks if accesses are protected by an external synchronization mechanism
+    private static var openRegistrationCounts: [SQLiteFileIdentity: Int] = [:]
+                       ^
+    nonisolated(unsafe) 
+
+SwiftDriverJobDiscovery normal arm64 Compiling ToolDefinitionCatalog.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ MCPServeVerifier.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/MCP/MCPServeVerifier.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/MCP/MCPServeVerifier.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling ManagerRoutes.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ ShellToolPack.swift,\ OperationalRoutes.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/Tools/ShellToolPack.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Dashboard/OperationalRoutes.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/Tools/ShellToolPack.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Dashboard/OperationalRoutes.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling ManagedContinuityWorker.swift, ManagedProjectRunStepExecutor.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ ManagerModels.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Domain/ManagerModels.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Domain/ManagerModels.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling ContextContinuityService.swift, ContinuityAutomation.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ ManagerNode.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Manager/ManagerNode.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Manager/ManagerNode.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling TelemetryRoutes.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ ContinuityLifecycleToolPack.swift,\ ProjectMemoryToolPack.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/Tools/ContinuityLifecycleToolPack.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/Tools/ProjectMemoryToolPack.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/Tools/ContinuityLifecycleToolPack.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/Tools/ProjectMemoryToolPack.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling SearchToolPack.swift, MemoryToolPack.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ LegacyContinuityMigrator.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/LegacyContinuityMigrator.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/LegacyContinuityMigrator.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling FilesystemToolPack.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ TelemetryService.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Telemetry/TelemetryService.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Telemetry/TelemetryService.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling ShellToolPack.swift, OperationalRoutes.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ DashboardServer.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Dashboard/DashboardServer.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Dashboard/DashboardServer.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling MCPServeVerifier.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ AutonomyModels.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Domain/AutonomyModels.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Domain/AutonomyModels.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling LegacyContinuityMigrator.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ DocsToolPack.swift,\ AgentToolPack.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/Tools/DocsToolPack.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/Tools/AgentToolPack.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/Tools/DocsToolPack.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/Tools/AgentToolPack.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftDriverJobDiscovery normal arm64 Emitting module for ForgeConductorCore (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftDriver\ Compilation\ Requirements ForgeConductorCore normal arm64 com.apple.xcode.tools.swift.compiler (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    builtin-Swift-Compilation-Requirements -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name ForgeConductorCore -Onone -enforce-exclusivity\=checked @/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore.SwiftFileList -DDEBUG -enable-upcoming-feature StrictConcurrency -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk -target arm64-apple-macos26.0 -g -module-cache-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -index-store-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Index.noindex/DataStore -swift-version 5 -I /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug -F /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug -c -j14 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/SDKStatCaches.noindex/macosx26.2-25C57-dc75598d0054f22ec865fa860f139d7200fa09913b459cbbc988d1f6730289ae.sdkstatcache -output-file-map /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/ModuleCache.noindex -sdk-module-cache-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore_const_extract_protocols.json -Xcc -iquote -Xcc /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/ForgeConductorCore-generated-files.hmap -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/ForgeConductorCore-own-target-headers.hmap -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/ForgeConductorCore-all-target-headers.hmap -Xcc -iquote -Xcc /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/ForgeConductorCore-project-headers.hmap -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/include -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/DerivedSources-normal/arm64 -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/DerivedSources/arm64 -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore-Swift.h -working-directory /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy -experimental-emit-module-separately -disable-cmo
+
+SwiftDriverJobDiscovery normal arm64 Compiling ContinuityLifecycleToolPack.swift, ProjectMemoryToolPack.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ ProcessRunner.swift,\ ManagerInstaller.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProcessRunner.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Manager/ManagerInstaller.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Infrastructure/ProcessRunner.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Manager/ManagerInstaller.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+Copy /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/ForgeConductorCore.framework/Versions/A/Modules/ForgeConductorCore.swiftmodule/Project/arm64-apple-macos.swiftsourceinfo /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore.swiftsourceinfo (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore.swiftsourceinfo /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/ForgeConductorCore.framework/Versions/A/Modules/ForgeConductorCore.swiftmodule/Project/arm64-apple-macos.swiftsourceinfo
+
+SwiftDriverJobDiscovery normal arm64 Compiling TelemetryService.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ ProcessDiscovery.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Telemetry/ProcessDiscovery.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Telemetry/ProcessDiscovery.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+Copy /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/ForgeConductorCore.framework/Versions/A/Modules/ForgeConductorCore.swiftmodule/arm64-apple-macos.swiftmodule /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore.swiftmodule (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore.swiftmodule /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/ForgeConductorCore.framework/Versions/A/Modules/ForgeConductorCore.swiftmodule/arm64-apple-macos.swiftmodule
+
+SwiftDriverJobDiscovery normal arm64 Compiling RuntimeJobRepository.swift, ContinuityCoordinator.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+Copy /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/ForgeConductorCore.framework/Versions/A/Modules/ForgeConductorCore.swiftmodule/arm64-apple-macos.swiftdoc /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore.swiftdoc (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore.swiftdoc /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/ForgeConductorCore.framework/Versions/A/Modules/ForgeConductorCore.swiftmodule/arm64-apple-macos.swiftdoc
+
+Copy /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/ForgeConductorCore.framework/Versions/A/Modules/ForgeConductorCore.swiftmodule/arm64-apple-macos.abi.json /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore.abi.json (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore.abi.json /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/ForgeConductorCore.framework/Versions/A/Modules/ForgeConductorCore.swiftmodule/arm64-apple-macos.abi.json
+
+SwiftCompile normal arm64 Compiling\ HostAdapterRegistry.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Domain/HostAdapterRegistry.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Domain/HostAdapterRegistry.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling DashboardServer.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ ForgeApp.swift,\ ForgeProcessEntry.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ForgeApp.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ForgeProcessEntry.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ForgeApp.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorCore/Application/ForgeProcessEntry.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftDriver ForgeConductor normal arm64 com.apple.xcode.tools.swift.compiler (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    builtin-SwiftDriver -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name Forge_Conductor -Onone -enforce-exclusivity\=checked @/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge\ Conductor.SwiftFileList -DDEBUG -enable-upcoming-feature StrictConcurrency -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk -target arm64-apple-macos26.0 -g -module-cache-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -index-store-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Index.noindex/DataStore -swift-version 5 -I /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug -F /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug -c -j14 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/SDKStatCaches.noindex/macosx26.2-25C57-dc75598d0054f22ec865fa860f139d7200fa09913b459cbbc988d1f6730289ae.sdkstatcache -output-file-map /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/ForgeConductor-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/ModuleCache.noindex -sdk-module-cache-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge_Conductor.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/ForgeConductor_const_extract_protocols.json -Xcc -iquote -Xcc /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Forge\ Conductor-generated-files.hmap -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Forge\ Conductor-own-target-headers.hmap -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Forge\ Conductor-all-target-headers.hmap -Xcc -iquote -Xcc /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Forge\ Conductor-project-headers.hmap -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/include -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/DerivedSources-normal/arm64 -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/DerivedSources/arm64 -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge_Conductor-Swift.h -working-directory /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy -experimental-emit-module-separately -disable-cmo
+
+SwiftDriverJobDiscovery normal arm64 Compiling DocsToolPack.swift, AgentToolPack.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftDriverJobDiscovery normal arm64 Compiling ManagerNode.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftDriverJobDiscovery normal arm64 Compiling HostAdapterRegistry.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftDriverJobDiscovery normal arm64 Compiling ManagerModels.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftDriverJobDiscovery normal arm64 Compiling ProjectMemoryRepository.swift, OwnerOnlyAtomicFile.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftDriverJobDiscovery normal arm64 Compiling ProcessDiscovery.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftDriverJobDiscovery normal arm64 Compiling ProjectRunCoordinator.swift, ToolInvocationBroker.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ RuntimesViewModel.swift,\ AutonomyOperatorView.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/OperatorConsole/ViewModels/RuntimesViewModel.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/OperatorConsole/Views/AutonomyOperatorView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/OperatorConsole/ViewModels/RuntimesViewModel.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/OperatorConsole/Views/AutonomyOperatorView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 Compiling\ ContinuityOperatorView.swift,\ EvidenceOperatorView.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/OperatorConsole/Views/ContinuityOperatorView.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/OperatorConsole/Views/EvidenceOperatorView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/OperatorConsole/Views/ContinuityOperatorView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/OperatorConsole/Views/EvidenceOperatorView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 Compiling\ OperatorManagerClient.swift,\ AutonomyViewModel.swift,\ EvidenceViewModel.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/OperatorConsole/Services/OperatorManagerClient.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/OperatorConsole/ViewModels/AutonomyViewModel.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/OperatorConsole/ViewModels/EvidenceViewModel.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/OperatorConsole/Services/OperatorManagerClient.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/OperatorConsole/ViewModels/AutonomyViewModel.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/OperatorConsole/ViewModels/EvidenceViewModel.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 Compiling\ OperatorConsoleComponents.swift,\ ProjectsOperatorView.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/OperatorConsole/Views/OperatorConsoleComponents.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/OperatorConsole/Views/ProjectsOperatorView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/OperatorConsole/Views/OperatorConsoleComponents.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/OperatorConsole/Views/ProjectsOperatorView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 Compiling\ ProviderOperatorView.swift,\ RuntimesOperatorView.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/OperatorConsole/Views/ProviderOperatorView.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/OperatorConsole/Views/RuntimesOperatorView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/OperatorConsole/Views/ProviderOperatorView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/OperatorConsole/Views/RuntimesOperatorView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/OperatorConsole/Views/RuntimesOperatorView.swift:82:40: warning: converting non-Sendable function value to '@isolated(any) @Sendable (Bool) -> Void' may introduce data races
+                        set: viewModel.setShellEnabled
+                                       ^
+
+SwiftCompile normal arm64 Compiling\ LoadTraceRenderer.swift,\ AgentsView.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/Metal/LoadTraceRenderer.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/Views/AgentsView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/Metal/LoadTraceRenderer.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/Views/AgentsView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 Compiling\ MetalGaugeResources.swift,\ MetalGaugeKit.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/Metal/MetalGaugeResources.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/Metal/MetalGaugeKit.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/Metal/MetalGaugeResources.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/Metal/MetalGaugeKit.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftEmitModule normal arm64 Emitting\ module\ for\ Forge_Conductor (in target 'ForgeConductor' from project 'ForgeConductor')
+
+EmitSwiftModule normal arm64 (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling ForgeApp.swift, ForgeProcessEntry.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ DiagnosticsView.swift,\ ManagerSettingsView.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/Views/DiagnosticsView.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/Views/ManagerSettingsView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/Views/DiagnosticsView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/Views/ManagerSettingsView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling ExecutionJobService.swift, ProjectContextService.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ AppSidebarView.swift,\ ContentView.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/Views/AppSidebarView.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/Views/ContentView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/Views/AppSidebarView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/Views/ContentView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling AutonomyModels.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ LiveFeedView.swift,\ MCPServersView.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/Views/LiveFeedView.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/Views/MCPServersView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/Views/LiveFeedView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/Views/MCPServersView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling ProcessRunner.swift, ManagerInstaller.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ TelemetryDashboardView.swift,\ ToolsView.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/Views/TelemetryDashboardView.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/Views/ToolsView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/Views/TelemetryDashboardView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/Views/ToolsView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling VerifiedMigrationBackup.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ AppDeployController.swift,\ ForgeConductorApp.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/AppDeployController.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/ForgeConductorApp.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/AppDeployController.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/ForgeConductorApp.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling LoadTraceRenderer.swift, AgentsView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ AppModel.swift,\ AppTelemetryBinding.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/AppModel.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/AppTelemetryBinding.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/AppModel.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/AppTelemetryBinding.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftDriverJobDiscovery normal arm64 Emitting module for Forge_Conductor (in target 'ForgeConductor' from project 'ForgeConductor')
+
+SwiftDriver\ Compilation\ Requirements ForgeConductor normal arm64 com.apple.xcode.tools.swift.compiler (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    builtin-Swift-Compilation-Requirements -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name Forge_Conductor -Onone -enforce-exclusivity\=checked @/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge\ Conductor.SwiftFileList -DDEBUG -enable-upcoming-feature StrictConcurrency -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk -target arm64-apple-macos26.0 -g -module-cache-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -index-store-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Index.noindex/DataStore -swift-version 5 -I /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug -F /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug -c -j14 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/SDKStatCaches.noindex/macosx26.2-25C57-dc75598d0054f22ec865fa860f139d7200fa09913b459cbbc988d1f6730289ae.sdkstatcache -output-file-map /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/ForgeConductor-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/ModuleCache.noindex -sdk-module-cache-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge_Conductor.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/ForgeConductor_const_extract_protocols.json -Xcc -iquote -Xcc /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Forge\ Conductor-generated-files.hmap -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Forge\ Conductor-own-target-headers.hmap -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Forge\ Conductor-all-target-headers.hmap -Xcc -iquote -Xcc /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Forge\ Conductor-project-headers.hmap -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/include -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/DerivedSources-normal/arm64 -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/DerivedSources/arm64 -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge_Conductor-Swift.h -working-directory /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy -experimental-emit-module-separately -disable-cmo
+
+SwiftDriverJobDiscovery normal arm64 Compiling ProviderOperatorView.swift, RuntimesOperatorView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 Compiling\ RigDashboardView.swift,\ MultiSeriesLoadRenderer.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/Views/Rig/RigDashboardView.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/Metal/MultiSeriesLoadRenderer.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/Views/Rig/RigDashboardView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/Metal/MultiSeriesLoadRenderer.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    
+
+Copy /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/Forge_Conductor.swiftmodule/Project/arm64-apple-macos.swiftsourceinfo /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge_Conductor.swiftsourceinfo (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge_Conductor.swiftsourceinfo /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/Forge_Conductor.swiftmodule/Project/arm64-apple-macos.swiftsourceinfo
+
+SwiftDriverJobDiscovery normal arm64 Compiling OperatorManagerClient.swift, AutonomyViewModel.swift, EvidenceViewModel.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+
+Copy /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/Forge_Conductor.swiftmodule/arm64-apple-macos.swiftmodule /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge_Conductor.swiftmodule (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge_Conductor.swiftmodule /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/Forge_Conductor.swiftmodule/arm64-apple-macos.swiftmodule
+
+Copy /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/Forge_Conductor.swiftmodule/arm64-apple-macos.swiftdoc /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge_Conductor.swiftdoc (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge_Conductor.swiftdoc /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/Forge_Conductor.swiftmodule/arm64-apple-macos.swiftdoc
+
+Copy /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/Forge_Conductor.swiftmodule/arm64-apple-macos.abi.json /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge_Conductor.abi.json (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge_Conductor.abi.json /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/Forge_Conductor.swiftmodule/arm64-apple-macos.abi.json
+
+SwiftDriverJobDiscovery normal arm64 Compiling ContinuityOperatorView.swift, EvidenceOperatorView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+
+SwiftDriverJobDiscovery normal arm64 Compiling MetalGaugeResources.swift, MetalGaugeKit.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+
+SwiftDriverJobDiscovery normal arm64 Compiling RuntimesViewModel.swift, AutonomyOperatorView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+
+SwiftDriverJobDiscovery normal arm64 Compiling OperatorConsoleComponents.swift, ProjectsOperatorView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+
+SwiftDriverJobDiscovery normal arm64 Compiling DiagnosticsView.swift, ManagerSettingsView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+
+SwiftDriverJobDiscovery normal arm64 Compiling AppDeployController.swift, ForgeConductorApp.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+
+SwiftDriverJobDiscovery normal arm64 Compiling AppSidebarView.swift, ContentView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+
+SwiftDriverJobDiscovery normal arm64 Compiling ForgeNativeSessionHostPlugin.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftDriverJobDiscovery normal arm64 Compiling RuntimeJobModels.swift, ProjectControlPlaneRepository.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftDriver\ Compilation ForgeConductorCore normal arm64 com.apple.xcode.tools.swift.compiler (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    builtin-Swift-Compilation -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name ForgeConductorCore -Onone -enforce-exclusivity\=checked @/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore.SwiftFileList -DDEBUG -enable-upcoming-feature StrictConcurrency -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk -target arm64-apple-macos26.0 -g -module-cache-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -index-store-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Index.noindex/DataStore -swift-version 5 -I /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug -F /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug -c -j14 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/SDKStatCaches.noindex/macosx26.2-25C57-dc75598d0054f22ec865fa860f139d7200fa09913b459cbbc988d1f6730289ae.sdkstatcache -output-file-map /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/ModuleCache.noindex -sdk-module-cache-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore_const_extract_protocols.json -Xcc -iquote -Xcc /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/ForgeConductorCore-generated-files.hmap -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/ForgeConductorCore-own-target-headers.hmap -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/ForgeConductorCore-all-target-headers.hmap -Xcc -iquote -Xcc /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/ForgeConductorCore-project-headers.hmap -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/include -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/DerivedSources-normal/arm64 -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/DerivedSources/arm64 -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore-Swift.h -working-directory /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy -experimental-emit-module-separately -disable-cmo
+
+SwiftDriverJobDiscovery normal arm64 Compiling TelemetryDashboardView.swift, ToolsView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+
+Ld /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/ForgeConductorCore.framework/Versions/A/ForgeConductorCore normal (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -Xlinker -reproducible -target arm64-apple-macos26.0 -dynamiclib -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk -Os -L/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/EagerLinkingTBDs/Debug -L/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug -F/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/EagerLinkingTBDs/Debug -F/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug -filelist /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore.LinkFileList -install_name @rpath/ForgeConductorCore.framework/Versions/A/ForgeConductorCore -dead_strip -Xlinker -object_path_lto -Xlinker /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore_lto.o -rdynamic -Xlinker -dependency_info -Xlinker /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore_dependency_info.dat -fobjc-link-runtime -L/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx -L/usr/lib/swift -Xlinker -add_ast_path -Xlinker /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore.swiftmodule @/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore-linker-args.resp -o /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/ForgeConductorCore.framework/Versions/A/ForgeConductorCore
+
+SwiftDriverJobDiscovery normal arm64 Compiling AppModel.swift, AppTelemetryBinding.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+
+ExtractAppIntentsMetadata (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsmetadataprocessor --toolchain-dir /var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.3.7003.10.hxAlQ2/Metal.xctoolchain --module-name ForgeConductorCore --sdk-root /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk --xcode-version 17C52 --platform-family macOS --deployment-target 26.0 --bundle-identifier com.forge-conductor.core --output /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/ForgeConductorCore.framework/Versions/A/Resources --target-triple arm64-apple-macos26.0 --binary-file /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/ForgeConductorCore.framework/Versions/A/ForgeConductorCore --dependency-file /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore_dependency_info.dat --stringsdata-file /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ExtractedAppShortcutsMetadata.stringsdata --source-file-list /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore.SwiftFileList --metadata-file-list /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/ForgeConductorCore.DependencyMetadataFileList --static-metadata-file-list /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/ForgeConductorCore.DependencyStaticMetadataFileList --swift-const-vals-list /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore.SwiftConstValuesFileList --compile-time-extraction --deployment-aware-processing --validate-assistant-intents --no-app-shortcuts-localization
+2026-08-27 18:39:05.112 appintentsmetadataprocessor[38868:15578995] Starting appintentsmetadataprocessor export
+2026-08-27 18:39:05.113 appintentsmetadataprocessor[38868:15578995] warning: Metadata extraction skipped. No AppIntents.framework dependency found.
+
+ProcessInfoPlistFile /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/ForgeConductorCore.framework/Versions/A/Resources/Info.plist /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/empty-ForgeConductorCore.plist (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    builtin-infoPlistUtility /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/empty-ForgeConductorCore.plist -producttype com.apple.product-type.framework -expandbuildsettings -platform macosx -o /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/ForgeConductorCore.framework/Versions/A/Resources/Info.plist
+
+GenerateTAPI /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/EagerLinkingTBDs/Debug/ForgeConductorCore.framework/Versions/A/ForgeConductorCore.tbd (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/tapi stubify -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk -F/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug -L/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/ForgeConductorCore.framework/Versions/A/ForgeConductorCore -o /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/EagerLinkingTBDs/Debug/ForgeConductorCore.framework/Versions/A/ForgeConductorCore.tbd
+
+SwiftDriverJobDiscovery normal arm64 Compiling LiveFeedView.swift, MCPServersView.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+
+SwiftDriverJobDiscovery normal arm64 Compiling RigDashboardView.swift, MultiSeriesLoadRenderer.swift (in target 'ForgeConductor' from project 'ForgeConductor')
+
+SwiftDriver\ Compilation ForgeConductor normal arm64 com.apple.xcode.tools.swift.compiler (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    builtin-Swift-Compilation -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name Forge_Conductor -Onone -enforce-exclusivity\=checked @/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge\ Conductor.SwiftFileList -DDEBUG -enable-upcoming-feature StrictConcurrency -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk -target arm64-apple-macos26.0 -g -module-cache-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -index-store-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Index.noindex/DataStore -swift-version 5 -I /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug -F /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug -c -j14 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/SDKStatCaches.noindex/macosx26.2-25C57-dc75598d0054f22ec865fa860f139d7200fa09913b459cbbc988d1f6730289ae.sdkstatcache -output-file-map /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/ForgeConductor-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/ModuleCache.noindex -sdk-module-cache-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge_Conductor.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/ForgeConductor_const_extract_protocols.json -Xcc -iquote -Xcc /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Forge\ Conductor-generated-files.hmap -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Forge\ Conductor-own-target-headers.hmap -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Forge\ Conductor-all-target-headers.hmap -Xcc -iquote -Xcc /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Forge\ Conductor-project-headers.hmap -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/include -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/DerivedSources-normal/arm64 -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/DerivedSources/arm64 -Xcc -I/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge_Conductor-Swift.h -working-directory /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy -experimental-emit-module-separately -disable-cmo
+
+Ld /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/Forge\ Conductor.app/Contents/MacOS/Forge\ Conductor.debug.dylib normal (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -Xlinker -reproducible -target arm64-apple-macos26.0 -dynamiclib -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk -Os -L/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/EagerLinkingTBDs/Debug -L/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug -F/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/EagerLinkingTBDs/Debug -F/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug -filelist /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge\ Conductor.LinkFileList -install_name @rpath/Forge\ Conductor.debug.dylib -Xlinker -rpath -Xlinker @executable_path/../Frameworks -Xlinker -rpath -Xlinker @executable_path -dead_strip -Xlinker -object_path_lto -Xlinker /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge\ Conductor_lto.o -rdynamic -Xlinker -dependency_info -Xlinker /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge\ Conductor_dependency_info.dat -fobjc-link-runtime -L/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx -L/usr/lib/swift -Xlinker -add_ast_path -Xlinker /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge_Conductor.swiftmodule @/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge_Conductor-linker-args.resp -Xlinker -alias -Xlinker _main -Xlinker ___debug_main_executable_dylib_entry_point -framework ForgeConductorCore -framework MetalKit -framework SwiftUI -o /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/Forge\ Conductor.app/Contents/MacOS/Forge\ Conductor.debug.dylib
+
+ConstructStubExecutorLinkFileList /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Forge\ Conductor-ExecutorLinkFileList-normal-arm64.txt (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    construct-stub-executor-link-file-list /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/Forge\ Conductor.app/Contents/MacOS/Forge\ Conductor.debug.dylib /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib/libPreviewsJITStubExecutor_no_swift_entry_point.a /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib/libPreviewsJITStubExecutor.a --output /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Forge\ Conductor-ExecutorLinkFileList-normal-arm64.txt
+note: Using stub executor library with Swift entry point. (in target 'ForgeConductor' from project 'ForgeConductor')
+
+Ld /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/Forge\ Conductor.app/Contents/MacOS/Forge\ Conductor normal (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -Xlinker -reproducible -target arm64-apple-macos26.0 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk -Os -L/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug -F/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug -Xlinker -rpath -Xlinker @executable_path -Xlinker -rpath -Xlinker @executable_path/../Frameworks -rdynamic -e ___debug_blank_executor_main -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __debug_dylib -Xlinker /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Forge\ Conductor-DebugDylibPath-normal-arm64.txt -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __debug_instlnm -Xlinker /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Forge\ Conductor-DebugDylibInstallName-normal-arm64.txt -Xlinker -filelist -Xlinker /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Forge\ Conductor-ExecutorLinkFileList-normal-arm64.txt /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/Forge\ Conductor.app/Contents/MacOS/Forge\ Conductor.debug.dylib -o /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/Forge\ Conductor.app/Contents/MacOS/Forge\ Conductor
+
+Copy /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/ForgeConductorCore.framework /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/ForgeConductorCore.framework (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -exclude Headers -exclude PrivateHeaders -exclude Modules -exclude \*.tbd -resolve-src-symlinks -remove-static-executable /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/ForgeConductorCore.framework /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks
+
+CopySwiftLibs /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/Forge\ Conductor.app (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    builtin-swiftStdLibTool --copy --verbose --scan-executable /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/Forge\ Conductor.app/Contents/MacOS/Forge\ Conductor.debug.dylib --scan-folder /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks --scan-folder /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/Forge\ Conductor.app/Contents/PlugIns --scan-folder /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/Forge\ Conductor.app/Contents/Library/SystemExtensions --scan-folder /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/Forge\ Conductor.app/Contents/Extensions --scan-folder /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/ForgeConductorCore.framework --scan-folder /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/MetalKit.framework --scan-folder /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/SwiftUI.framework --platform macosx --toolchain /var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.3.7003.10.hxAlQ2/Metal.xctoolchain --toolchain /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --destination /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks --strip-bitcode --strip-bitcode-tool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/bitcode_strip --emit-dependency-info /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/SwiftStdLibToolInputDependencies.dep --filter-for-swift-os
+Ignoring --strip-bitcode because --sign was not passed
+
+ExtractAppIntentsMetadata (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsmetadataprocessor --toolchain-dir /var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.3.7003.10.hxAlQ2/Metal.xctoolchain --module-name Forge_Conductor --sdk-root /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk --xcode-version 17C52 --platform-family macOS --deployment-target 26.0 --bundle-identifier com.forge-conductor.app --output /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/Forge\ Conductor.app/Contents/Resources --target-triple arm64-apple-macos26.0 --binary-file /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/Forge\ Conductor.app/Contents/MacOS/Forge\ Conductor --dependency-file /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge\ Conductor_dependency_info.dat --stringsdata-file /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/ExtractedAppShortcutsMetadata.stringsdata --source-file-list /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge\ Conductor.SwiftFileList --metadata-file-list /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Forge\ Conductor.DependencyMetadataFileList --static-metadata-file-list /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Forge\ Conductor.DependencyStaticMetadataFileList --swift-const-vals-list /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge\ Conductor.SwiftConstValuesFileList --compile-time-extraction --deployment-aware-processing --validate-assistant-intents --no-app-shortcuts-localization
+2026-08-27 18:39:06.226 appintentsmetadataprocessor[38874:15579043] Starting appintentsmetadataprocessor export
+2026-08-27 18:39:06.227 appintentsmetadataprocessor[38874:15579043] warning: Metadata extraction skipped. No AppIntents.framework dependency found.
+
+ProcessInfoPlistFile /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/Forge\ Conductor.app/Contents/Info.plist /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/Resources/Info.plist (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy
+    builtin-infoPlistUtility /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Sources/ForgeConductorApp/Resources/Info.plist -producttype com.apple.product-type.application -genpkginfo /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/Forge\ Conductor.app/Contents/PkgInfo -expandbuildsettings -platform macosx -additionalcontentfile /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/assetcatalog_generated_info.plist -scanforprivacyfile /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/ForgeConductorCore.framework -o /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.build/DerivedData/Build/Products/Debug/Forge\ Conductor.app/Contents/Info.plist
+
+** BUILD SUCCEEDED **
+

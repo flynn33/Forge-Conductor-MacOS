@@ -1,0 +1,33 @@
+{
+  "artifacts": [
+    {
+      "bytes": 2839,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T110620Z-8e7143e237.stdout.txt",
+      "sha256": "64d14e615692712740aa7340729e38971ad9ffdea2349c4ba0c38f4a28149e8a"
+    },
+    {
+      "bytes": 609,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T110620Z-8e7143e237.stderr.txt",
+      "sha256": "2a6c48c71a8782477c02aa4f9052f8f171838fa35b1a2c5aa1b7920997e808ea"
+    }
+  ],
+  "command": "swift test -Xswiftc -warnings-as-errors --filter 'ToolDefinitionCatalogTests|CoreTests.testShellExecPreservesLoginBashAndResponseContract|CoreTests.testShellRejectsNonFiniteTimeoutWhenEnabled'",
+  "ended_at": "2026-08-27T11:06:24.549912+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260827T110620Z-8e7143e237",
+  "kind": "p10-legacy-mcp-schema-regression",
+  "related_findings": [
+    "FC-MCP-SCHEMA-001"
+  ],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-27T11:06:20.144331+00:00",
+  "timed_out": false
+}

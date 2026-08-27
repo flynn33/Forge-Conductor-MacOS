@@ -1,0 +1,54 @@
+Test Suite 'Selected tests' started at 2026-08-27 12:26:23.390.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-27 12:26:23.391.
+Test Suite 'AppConfigAndDoctorTests' started at 2026-08-27 12:26:23.391.
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testConfigStoreTypedModel]' started.
+Test Case '-[ForgeConductorTests.AppConfigAndDoctorTests testConfigStoreTypedModel]' passed (0.004 seconds).
+Test Suite 'AppConfigAndDoctorTests' passed at 2026-08-27 12:26:23.395.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.004 (0.004) seconds
+Test Suite 'DashboardSecurityTests' started at 2026-08-27 12:26:23.395.
+Test Case '-[ForgeConductorTests.DashboardSecurityTests testEveryManagerMutationExceptReadOnlyStatusRequiresAuthorization]' started.
+Test Case '-[ForgeConductorTests.DashboardSecurityTests testEveryManagerMutationExceptReadOnlyStatusRequiresAuthorization]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.DashboardSecurityTests testManagerControlCredentialFailsClosedWhenStoragePermissionsAreBroadened]' started.
+Test Case '-[ForgeConductorTests.DashboardSecurityTests testManagerControlCredentialFailsClosedWhenStoragePermissionsAreBroadened]' passed (0.002 seconds).
+Test Case '-[ForgeConductorTests.DashboardSecurityTests testManagerControlCredentialIsStableOwnerOnlyAndComparedExactly]' started.
+Test Case '-[ForgeConductorTests.DashboardSecurityTests testManagerControlCredentialIsStableOwnerOnlyAndComparedExactly]' passed (0.002 seconds).
+Test Suite 'DashboardSecurityTests' passed at 2026-08-27 12:26:23.400.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.004 (0.005) seconds
+Test Suite 'LatestValueMailboxTests' started at 2026-08-27 12:26:23.400.
+Test Case '-[ForgeConductorTests.LatestValueMailboxTests testStaleGenerationAndPostStopValuesNeverReachNewSubscriber]' started.
+Test Case '-[ForgeConductorTests.LatestValueMailboxTests testStaleGenerationAndPostStopValuesNeverReachNewSubscriber]' passed (0.032 seconds).
+Test Case '-[ForgeConductorTests.LatestValueMailboxTests testStopClearsBufferedLatestDuringInFlightDelivery]' started.
+Test Case '-[ForgeConductorTests.LatestValueMailboxTests testStopClearsBufferedLatestDuringInFlightDelivery]' passed (0.036 seconds).
+Test Suite 'LatestValueMailboxTests' passed at 2026-08-27 12:26:23.467.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.068 (0.068) seconds
+Test Suite 'ManagedAutonomyRuntimeTests' started at 2026-08-27 12:26:23.467.
+Test Case '-[ForgeConductorTests.ManagedAutonomyRuntimeTests testDurableRunStartIdentityActivatesOnlyOnFirstExactAcceptance]' started.
+Test Case '-[ForgeConductorTests.ManagedAutonomyRuntimeTests testDurableRunStartIdentityActivatesOnlyOnFirstExactAcceptance]' passed (0.158 seconds).
+Test Case '-[ForgeConductorTests.ManagedAutonomyRuntimeTests testHTTPRunControlRoutePersistsExactActionsAndRejectsUnknownActions]' started.
+Test Case '-[ForgeConductorTests.ManagedAutonomyRuntimeTests testHTTPRunControlRoutePersistsExactActionsAndRejectsUnknownActions]' passed (0.446 seconds).
+Test Suite 'ManagedAutonomyRuntimeTests' passed at 2026-08-27 12:26:24.072.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.604 (0.604) seconds
+Test Suite 'ManagerTests' started at 2026-08-27 12:26:24.072.
+Test Case '-[ForgeConductorTests.ManagerTests testDashboardClientAttachesToExistingManager]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testDashboardClientAttachesToExistingManager]' passed (0.369 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testManagerRuntimeThrottlesPresenceMaintenance]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testManagerRuntimeThrottlesPresenceMaintenance]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testManagerSettingsPersist]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testManagerSettingsPersist]' passed (0.231 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testOperatorSnapshotRouteIsBoundedRedactedAndPreservesExistingQueryPaths]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testOperatorSnapshotRouteIsBoundedRedactedAndPreservesExistingQueryPaths]' passed (0.380 seconds).
+Test Suite 'ManagerTests' passed at 2026-08-27 12:26:25.052.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.980 (0.981) seconds
+Test Suite 'ResourcePolicyTests' started at 2026-08-27 12:26:25.052.
+Test Case '-[ForgeConductorTests.ResourcePolicyTests testSubscriberCapsAndBackgroundRefreshQuiesceAfterRemovalAndStop]' started.
+Test Case '-[ForgeConductorTests.ResourcePolicyTests testSubscriberCapsAndBackgroundRefreshQuiesceAfterRemovalAndStop]' passed (0.484 seconds).
+Test Suite 'ResourcePolicyTests' passed at 2026-08-27 12:26:25.537.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.484 (0.485) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-08-27 12:26:25.537.
+	 Executed 13 tests, with 0 failures (0 unexpected) in 2.145 (2.146) seconds
+Test Suite 'Selected tests' passed at 2026-08-27 12:26:25.537.
+	 Executed 13 tests, with 0 failures (0 unexpected) in 2.145 (2.147) seconds
+◇ Test run started.
+↳ Testing Library Version: 1501
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

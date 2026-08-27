@@ -1,0 +1,19 @@
+[0/1] Planning build
+Building for debugging...
+[0/10] Write sources
+[2/10] Write swift-version--58304C5D6DBC2206.txt
+[4/11] Compiling ForgeConductorCore RuntimeJobRepository.swift
+[5/11] Emitting module ForgeConductorCore
+[6/11] Compiling ForgeConductorCore VerifiedMigrationBackup.swift
+[6/14] Write Objects.LinkFileList
+[8/14] Linking forge-conductor
+[9/14] Applying forge-conductor
+[10/18] Linking forge-conductor-app
+[11/18] Applying forge-conductor-app
+[13/18] Emitting module ForgeConductorTests
+[14/18] Compiling ForgeConductorTests ContinuityTests.swift
+[15/18] Compiling ForgeConductorTests ProjectMemoryTests.swift
+[16/18] Compiling ForgeConductorTests RuntimeExecutionJobTests.swift
+[16/18] Write Objects.LinkFileList
+[17/18] Linking ForgeConductorPackageTests
+Build complete! (4.29s)

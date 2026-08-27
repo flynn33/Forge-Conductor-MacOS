@@ -98,6 +98,7 @@ public struct RuntimeJobRequest: Sendable {
     public let maximumInlineOutputBytes: Int
     public let replayClass: RuntimeReplayClass
     public let idempotencyKey: String?
+    let didPersist: (@Sendable (RuntimeJobRecord) -> Void)?
 
     public init(
         kind: RuntimeKind,
@@ -123,6 +124,35 @@ public struct RuntimeJobRequest: Sendable {
         self.maximumInlineOutputBytes = maximumInlineOutputBytes
         self.replayClass = replayClass
         self.idempotencyKey = idempotencyKey
+        didPersist = nil
+    }
+
+    init(
+        kind: RuntimeKind,
+        profile: RuntimeExecutionProfile,
+        context: ToolInvocationContext,
+        executable: URL? = nil,
+        arguments: [String] = [],
+        script: String? = nil,
+        canonicalWorkingDirectory: URL,
+        timeout: Duration,
+        maximumInlineOutputBytes: Int = 64 * 1_024,
+        replayClass: RuntimeReplayClass,
+        idempotencyKey: String? = nil,
+        persistenceObserver: @escaping @Sendable (RuntimeJobRecord) -> Void
+    ) {
+        self.kind = kind
+        self.profile = profile
+        self.context = context
+        self.executable = executable
+        self.arguments = arguments
+        self.script = script
+        self.canonicalWorkingDirectory = canonicalWorkingDirectory
+        self.timeout = timeout
+        self.maximumInlineOutputBytes = maximumInlineOutputBytes
+        self.replayClass = replayClass
+        self.idempotencyKey = idempotencyKey
+        didPersist = persistenceObserver
     }
 }
 

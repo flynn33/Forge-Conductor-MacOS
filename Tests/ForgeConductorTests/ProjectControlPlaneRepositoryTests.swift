@@ -2,9 +2,482 @@
 // Verifies durable project isolation, exact owner binding, and generation fencing.
 
 import XCTest
+import SQLite3
 @testable import ForgeConductorCore
 
 final class ProjectControlPlaneRepositoryTests: XCTestCase {
+    func testLockedRegistrationHonorsCancellationAndDeadlineWithoutPartialWrite() async throws {
+        try await withRepository(busyTimeoutMilliseconds: 3_000) { repository, root in
+            let writeLock = try ControlPlaneWriteLock(
+                databaseURL: root.appendingPathComponent("control-plane.sqlite3")
+            )
+            let cancelledProjectID = ProjectID()
+            let cancelled = ToolCallCancellation()
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(
+                deadline: .now() + .milliseconds(50)
+            ) {
+                cancelled.cancel()
+            }
+
+            let cancellationStartedAt = Date()
+            do {
+                _ = try await repository.registerProject(
+                    projectID: cancelledProjectID,
+                    displayName: "Cancelled Project",
+                    canonicalRoot: root.appendingPathComponent("cancelled-project", isDirectory: true),
+                    cancellation: cancelled
+                )
+                XCTFail("Expected registration cancellation")
+            } catch {
+                XCTAssertTrue(error is CancellationError, "unexpected error: \(error)")
+            }
+            XCTAssertLessThan(
+                Date().timeIntervalSince(cancellationStartedAt),
+                2,
+                "registration cancellation waited for the SQLite busy fallback"
+            )
+
+            let deadlineProjectID = ProjectID()
+            let deadline = ToolCallCancellation(timeoutSeconds: 0.05)
+            let deadlineStartedAt = Date()
+            do {
+                _ = try await repository.registerProject(
+                    projectID: deadlineProjectID,
+                    displayName: "Deadline Project",
+                    canonicalRoot: root.appendingPathComponent("deadline-project", isDirectory: true),
+                    cancellation: deadline
+                )
+                XCTFail("Expected registration deadline")
+            } catch {
+                XCTAssertTrue(error is ToolCallDeadlineExceeded, "unexpected error: \(error)")
+            }
+            XCTAssertLessThan(
+                Date().timeIntervalSince(deadlineStartedAt),
+                2,
+                "registration deadline waited for the SQLite busy fallback"
+            )
+
+            writeLock.release()
+            let cancelledProject = try await repository.project(cancelledProjectID)
+            let deadlineProject = try await repository.project(deadlineProjectID)
+            XCTAssertNil(cancelledProject)
+            XCTAssertNil(deadlineProject)
+        }
+    }
+
+    func testRegistrationChecksCancellationBeforeCommitAndReturnsCommittedResult() async throws {
+        try await withRepository { repository, root in
+            let precommitProjectID = ProjectID()
+            let precommitCancellation = ToolCallCancellation()
+            await repository.configureOperationObservers(beforeCommit: {
+                precommitCancellation.cancel()
+            })
+            do {
+                _ = try await repository.registerProject(
+                    projectID: precommitProjectID,
+                    displayName: "Precommit Project",
+                    canonicalRoot: root.appendingPathComponent("precommit-project", isDirectory: true),
+                    cancellation: precommitCancellation
+                )
+                XCTFail("Expected precommit cancellation")
+            } catch {
+                XCTAssertTrue(error is CancellationError, "unexpected error: \(error)")
+            }
+            await repository.configureOperationObservers()
+            let precommitProject = try await repository.project(precommitProjectID)
+            XCTAssertNil(precommitProject)
+
+            let committedProjectID = ProjectID()
+            let postcommitCancellation = ToolCallCancellation()
+            await repository.configureOperationObservers(didCommit: {
+                postcommitCancellation.cancel()
+            })
+            let committed = try await repository.registerProject(
+                projectID: committedProjectID,
+                displayName: "Committed Project",
+                canonicalRoot: root.appendingPathComponent("committed-project", isDirectory: true),
+                cancellation: postcommitCancellation
+            )
+            await repository.configureOperationObservers()
+
+            XCTAssertTrue(postcommitCancellation.isCancelled)
+            XCTAssertEqual(committed.projectID, committedProjectID)
+            let storedProject = try await repository.project(committedProjectID)
+            XCTAssertEqual(storedProject, committed)
+        }
+    }
+
+    func testProjectContextServicePropagatesDeadlineIntoLockedRepository() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("forge-project-context-service-\(UUID().uuidString)", isDirectory: true)
+        let databaseURL = root.appendingPathComponent("control-plane.sqlite3")
+        let service = try ProjectContextService(
+            databaseURL: databaseURL,
+            waitTimeout: .milliseconds(100),
+            cancellationCleanupTimeout: .seconds(2)
+        )
+        defer {
+            service.close()
+            try? FileManager.default.removeItem(at: root)
+        }
+        let writeLock = try ControlPlaneWriteLock(databaseURL: databaseURL)
+        let projectID = UUID().uuidString.lowercased()
+        let cancellation = ToolCallCancellation(timeoutSeconds: 0.05)
+        let startedAt = Date()
+
+        XCTAssertThrowsError(
+            try service.registerProject(
+                descriptor: ProjectMemoryDescriptor(
+                    id: projectID,
+                    displayName: "Service Deadline Project",
+                    repositoryIdentity: nil,
+                    aliases: []
+                ),
+                canonicalRoot: root.appendingPathComponent("service-project", isDirectory: true),
+                cancellation: cancellation
+            )
+        ) { error in
+            XCTAssertTrue(error is ToolCallDeadlineExceeded, "unexpected error: \(error)")
+        }
+        XCTAssertLessThan(
+            Date().timeIntervalSince(startedAt),
+            2,
+            "service bridge did not stop the locked repository at the request deadline"
+        )
+
+        let compatibilityProjectID = UUID().uuidString.lowercased()
+        XCTAssertThrowsError(
+            try service.registerProject(
+                descriptor: ProjectMemoryDescriptor(
+                    id: compatibilityProjectID,
+                    displayName: "Compatibility Timeout Project",
+                    repositoryIdentity: nil,
+                    aliases: []
+                ),
+                canonicalRoot: root.appendingPathComponent("compatibility-project", isDirectory: true)
+            )
+        ) { error in
+            XCTAssertEqual((error as? ProjectContextError)?.code, "database_busy")
+        }
+
+        writeLock.release()
+        XCTAssertNil(try service.project(ProjectID(UUID(uuidString: projectID)!)))
+        XCTAssertNil(try service.project(ProjectID(UUID(uuidString: compatibilityProjectID)!)))
+    }
+
+    func testProjectContextBridgeCancelsMutationWithinBoundedCleanup() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("forge-project-context-truthful-\(UUID().uuidString)", isDirectory: true)
+        let databaseURL = root.appendingPathComponent("control-plane.sqlite3")
+        let projectRoot = root.appendingPathComponent("project", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+        let service = try ProjectContextService(
+            databaseURL: databaseURL,
+            waitTimeout: .milliseconds(50),
+            cancellationCleanupTimeout: .milliseconds(25)
+        )
+        defer {
+            service.close()
+            try? FileManager.default.removeItem(at: root)
+        }
+        let projectID = ProjectID()
+        _ = try service.registerProject(
+            descriptor: ProjectMemoryDescriptor(
+                id: projectID.description,
+                displayName: "Truthful Mutation Project",
+                repositoryIdentity: nil,
+                aliases: [projectRoot.path]
+            ),
+            canonicalRoot: projectRoot
+        )
+        let owner = ProjectBindingOwner(kind: .mcpClient, id: "truthful-mutation-client")
+        _ = try service.bind(
+            owner: owner,
+            projectID: projectID,
+            generation: .initial,
+            authorizationScope: scope(root: projectRoot)
+        )
+        let context = try service.invocationContext(
+            for: owner,
+            clientID: ClientID(owner.id)
+        )
+        let cancellation = ToolCallCancellation(timeoutSeconds: 0.05)
+        let startedAt = Date()
+
+        XCTAssertThrowsError(
+            try service.commitIfCurrent(
+                context: context,
+                resultKind: "bounded-fixture-mutation",
+                cancellation: cancellation
+            ) { control in
+                while true {
+                    try control.checkCancellation()
+                    Thread.sleep(forTimeInterval: 0.005)
+                }
+            } as String
+        ) { error in
+            XCTAssertTrue(error is ToolCallDeadlineExceeded, "unexpected error: \(error)")
+        }
+        XCTAssertLessThan(Date().timeIntervalSince(startedAt), 0.5)
+        XCTAssertTrue(cancellation.isDeadlineExceeded)
+    }
+
+    func testProjectContextBridgeRevokesLateCommitFromUncooperativeMutation() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "forge-project-context-commit-fence-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        let databaseURL = root.appendingPathComponent("control-plane.sqlite3")
+        let projectRoot = root.appendingPathComponent("project", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+        let service = try ProjectContextService(
+            databaseURL: databaseURL,
+            waitTimeout: .milliseconds(50),
+            cancellationCleanupTimeout: .milliseconds(25)
+        )
+        defer {
+            service.close()
+            try? FileManager.default.removeItem(at: root)
+        }
+        let projectID = ProjectID()
+        _ = try service.registerProject(
+            descriptor: ProjectMemoryDescriptor(
+                id: projectID.description,
+                displayName: "Commit Fence Project",
+                repositoryIdentity: nil,
+                aliases: [projectRoot.path]
+            ),
+            canonicalRoot: projectRoot
+        )
+        let owner = ProjectBindingOwner(kind: .mcpClient, id: "commit-fence-client")
+        _ = try service.bind(
+            owner: owner,
+            projectID: projectID,
+            generation: .initial,
+            authorizationScope: scope(root: projectRoot)
+        )
+        let context = try service.invocationContext(for: owner, clientID: ClientID(owner.id))
+        let mutationStarted = DispatchSemaphore(value: 0)
+        let releaseMutation = DispatchSemaphore(value: 0)
+        let mutationFinished = DispatchSemaphore(value: 0)
+        let probe = MutationProbe()
+
+        XCTAssertThrowsError(
+            try service.commitIfCurrent(
+                context: context,
+                resultKind: "uncooperative-bounded-mutation"
+            ) { control in
+                mutationStarted.signal()
+                _ = releaseMutation.wait(timeout: .now() + 1)
+                defer { mutationFinished.signal() }
+                return try control.withCommitAuthorization {
+                    probe.increment()
+                    return "late-commit"
+                }
+            } as String
+        )
+        XCTAssertEqual(mutationStarted.wait(timeout: .now()), .success)
+        XCTAssertEqual(probe.value, 0)
+
+        releaseMutation.signal()
+        XCTAssertEqual(mutationFinished.wait(timeout: .now() + 1), .success)
+        XCTAssertEqual(
+            probe.value,
+            0,
+            "a mutation released after the bridge returned crossed its revoked commit fence"
+        )
+    }
+
+    func testProjectContextBridgeReturnsCommittedReceiptWhileRepositoryResultIsBlocked() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "forge-project-context-post-commit-receipt-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        let databaseURL = root.appendingPathComponent("control-plane.sqlite3")
+        let projectRoot = root.appendingPathComponent("project", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+        let service = try ProjectContextService(
+            databaseURL: databaseURL,
+            waitTimeout: .milliseconds(50),
+            cancellationCleanupTimeout: .milliseconds(25)
+        )
+        defer {
+            service.close()
+            try? FileManager.default.removeItem(at: root)
+        }
+        let projectID = ProjectID()
+        _ = try service.registerProject(
+            descriptor: ProjectMemoryDescriptor(
+                id: projectID.description,
+                displayName: "Post-Commit Receipt Project",
+                repositoryIdentity: nil,
+                aliases: [projectRoot.path]
+            ),
+            canonicalRoot: projectRoot
+        )
+        let owner = ProjectBindingOwner(kind: .mcpClient, id: "post-commit-receipt-client")
+        _ = try service.bind(
+            owner: owner,
+            projectID: projectID,
+            generation: .initial,
+            authorizationScope: scope(root: projectRoot)
+        )
+        let context = try service.invocationContext(for: owner, clientID: ClientID(owner.id))
+        let repositoryCommitted = DispatchSemaphore(value: 0)
+        let releaseRepositoryResult = DispatchSemaphore(value: 0)
+        await service.repository.configureOperationObservers(didCommit: {
+            repositoryCommitted.signal()
+            _ = releaseRepositoryResult.wait(timeout: .now() + 1)
+        })
+        let probe = MutationProbe()
+        let cancellation = ToolCallCancellation(timeoutSeconds: 0.05)
+        let startedAt = Date()
+
+        let result: String = try service.commitIfCurrent(
+            context: context,
+            resultKind: "post-commit-result-gate",
+            cancellation: cancellation
+        ) { control in
+            try control.withCommitAuthorization {
+                probe.increment()
+                return "committed-result"
+            }
+        }
+
+        XCTAssertEqual(repositoryCommitted.wait(timeout: .now()), .success)
+        XCTAssertEqual(result, "committed-result")
+        XCTAssertEqual(probe.value, 1)
+        XCTAssertTrue(cancellation.isDeadlineExceeded)
+        XCTAssertLessThan(Date().timeIntervalSince(startedAt), 0.5)
+        releaseRepositoryResult.signal()
+        XCTAssertNotNil(try service.project(projectID))
+    }
+
+    func testProjectMemoryMutationReconcilesOuterToolResultWhilePostCommitIsBlocked() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "forge-project-memory-tool-result-receipt-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        let home = root.appendingPathComponent("home", isDirectory: true)
+        let projectRoot = root.appendingPathComponent("project", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+        let paths = AppPaths(home: home)
+        try paths.ensureLayout()
+        let mutationCommitted = DispatchSemaphore(value: 0)
+        let releasePostCommit = DispatchSemaphore(value: 0)
+        let memory = ProjectMemoryService(
+            paths: paths,
+            clock: SystemClock(),
+            limits: .current,
+            afterIdentityMetadataWriteObserver: nil,
+            didIdentityRegistryCommitObserver: nil,
+            beforeContinuityProjectionWriteObserver: nil,
+            beforeExportCommitObserver: nil,
+            didMutationCommitObserver: {
+                mutationCommitted.signal()
+                _ = releasePostCommit.wait(timeout: .now() + 1)
+            }
+        )
+        let service = try ProjectContextService(
+            databaseURL: root.appendingPathComponent("control-plane.sqlite3"),
+            waitTimeout: .milliseconds(50),
+            cancellationCleanupTimeout: .milliseconds(25)
+        )
+        defer {
+            releasePostCommit.signal()
+            memory.closeAll()
+            service.close()
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        let initialized = try memory.initialize(path: projectRoot.path)
+        let rawProjectID = try XCTUnwrap(initialized["project_id"] as? String)
+        let projectID = ProjectID(try XCTUnwrap(UUID(uuidString: rawProjectID)))
+        _ = try service.registerProject(
+            descriptor: ProjectMemoryDescriptor(
+                id: rawProjectID,
+                displayName: "Committed Memory Result",
+                repositoryIdentity: nil,
+                aliases: [projectRoot.path]
+            ),
+            canonicalRoot: projectRoot
+        )
+        let owner = ProjectBindingOwner(kind: .mcpClient, id: "memory-receipt-client")
+        _ = try service.bind(
+            owner: owner,
+            projectID: projectID,
+            generation: .initial,
+            authorizationScope: scope(root: projectRoot, tools: ["project_memory.remember"])
+        )
+        let context = try service.invocationContext(for: owner, clientID: ClientID(owner.id))
+        let cancellation = ToolCallCancellation(timeoutSeconds: 0.05)
+        let startedAt = Date()
+
+        let result: ToolResult = try service.commitIfCurrent(
+            context: context,
+            resultKind: "project_memory.remember",
+            cancellation: cancellation
+        ) { control in
+            ToolResult.success(try memory.remember(
+                projectID: rawProjectID,
+                write: ProjectMemoryWrite(
+                    kind: "fact",
+                    title: "Durable tool result",
+                    summary: "the outer response survives a post-COMMIT stall"
+                ),
+                cancellation: control
+            ))
+        }
+
+        XCTAssertEqual(mutationCommitted.wait(timeout: .now()), .success)
+        XCTAssertTrue(result.ok)
+        XCTAssertNotNil(result.payload["record_id"] as? String)
+        XCTAssertTrue(cancellation.isDeadlineExceeded)
+        XCTAssertLessThan(Date().timeIntervalSince(startedAt), 0.5)
+        releasePostCommit.signal()
+        let recordID = try XCTUnwrap(result.payload["record_id"] as? String)
+        let stored = try memory.get(
+            projectID: rawProjectID,
+            ids: [recordID],
+            includeBody: false
+        )
+        XCTAssertEqual((stored["records"] as? [[String: Any]])?.count, 1)
+    }
+
+    func testCommitIfCurrentKeepsMutationOutcomeAfterItsIrreversibleBoundary() async throws {
+        try await withRepository { repository, root in
+            let projectID = ProjectID()
+            let projectRoot = root.appendingPathComponent("irreversible-project", isDirectory: true)
+            _ = try await repository.registerProject(
+                projectID: projectID,
+                displayName: "Irreversible Project",
+                canonicalRoot: projectRoot
+            )
+            let owner = ProjectBindingOwner(kind: .mcpClient, id: "irreversible-client")
+            _ = try await repository.bind(
+                owner: owner,
+                projectID: projectID,
+                generation: .initial,
+                authorizationScope: scope(root: projectRoot)
+            )
+            let context = try await repository.invocationContext(for: owner)
+            let cancellation = ToolCallCancellation()
+
+            let result = try await repository.commitIfCurrent(
+                context: context,
+                owner: owner,
+                resultKind: "external-write",
+                cancellation: cancellation
+            ) {
+                cancellation.cancel()
+                return "durable-result"
+            }
+
+            XCTAssertTrue(cancellation.isCancelled)
+            XCTAssertEqual(result, "durable-result")
+        }
+    }
+
     func testRegistrationRefreshesExactMetadataButRequiresRelinkForMovedRoot() async throws {
         try await withRepository { repository, root in
             let projectID = ProjectID()
@@ -284,6 +757,77 @@ final class ProjectControlPlaneRepositoryTests: XCTestCase {
         try? FileManager.default.removeItem(at: root)
     }
 
+    func testUnshippedAndUnversionedControlPlaneSchemasFailClosedWithoutMutation() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("forge-control-plane-legacy-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let versionOneURL = root.appendingPathComponent("version-one.sqlite3")
+        try createLegacyControlPlaneFixture(at: versionOneURL, userVersion: 1)
+        let versionOneBefore = try controlPlaneFixtureSnapshot(at: versionOneURL)
+        XCTAssertThrowsError(try ProjectControlPlaneRepository(databaseURL: versionOneURL)) { error in
+            XCTAssertEqual((error as? ProjectContextError)?.code, "unsupported_schema_version")
+        }
+        let versionOneAfter = try controlPlaneFixtureSnapshot(at: versionOneURL)
+        XCTAssertEqual(versionOneAfter.databaseBytes, versionOneBefore.databaseBytes)
+        XCTAssertEqual(versionOneAfter.journalMode, versionOneBefore.journalMode)
+        XCTAssertEqual(versionOneAfter.sidecars, versionOneBefore.sidecars)
+        XCTAssertEqual(try controlPlaneFixtureInt(at: versionOneURL, sql: "PRAGMA user_version;"), 1)
+        XCTAssertEqual(
+            try controlPlaneFixtureInt(at: versionOneURL, sql: "SELECT value FROM legacy_marker WHERE id=1;"),
+            41
+        )
+
+        let unversionedURL = root.appendingPathComponent("unversioned.sqlite3")
+        try createLegacyControlPlaneFixture(at: unversionedURL, userVersion: 0)
+        let unversionedBefore = try controlPlaneFixtureSnapshot(at: unversionedURL)
+        XCTAssertThrowsError(try ProjectControlPlaneRepository(databaseURL: unversionedURL)) { error in
+            XCTAssertEqual((error as? ProjectContextError)?.code, "integrity_failure")
+        }
+        let unversionedAfter = try controlPlaneFixtureSnapshot(at: unversionedURL)
+        XCTAssertEqual(unversionedAfter.databaseBytes, unversionedBefore.databaseBytes)
+        XCTAssertEqual(unversionedAfter.journalMode, unversionedBefore.journalMode)
+        XCTAssertEqual(unversionedAfter.sidecars, unversionedBefore.sidecars)
+        XCTAssertEqual(try controlPlaneFixtureInt(at: unversionedURL, sql: "PRAGMA user_version;"), 0)
+        XCTAssertEqual(
+            try controlPlaneFixtureInt(at: unversionedURL, sql: "SELECT value FROM legacy_marker WHERE id=1;"),
+            41
+        )
+
+        let viewOnlyURL = root.appendingPathComponent("view-only.sqlite3")
+        try createViewOnlyControlPlaneFixture(at: viewOnlyURL)
+        let viewOnlyBytes = try Data(contentsOf: viewOnlyURL)
+        XCTAssertThrowsError(try ProjectControlPlaneRepository(databaseURL: viewOnlyURL)) { error in
+            XCTAssertEqual((error as? ProjectContextError)?.code, "integrity_failure")
+        }
+        XCTAssertEqual(try Data(contentsOf: viewOnlyURL), viewOnlyBytes)
+        XCTAssertEqual(
+            try controlPlaneFixtureInt(
+                at: viewOnlyURL,
+                sql: "SELECT COUNT(*) FROM sqlite_master WHERE type='view' AND name='foreign_view';"
+            ),
+            1
+        )
+        XCTAssertEqual(try controlPlaneFixtureInt(at: viewOnlyURL, sql: "PRAGMA user_version;"), 0)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: viewOnlyURL.path + "-wal"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: viewOnlyURL.path + "-shm"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: viewOnlyURL.path + "-journal"))
+
+        let freshURL = root.appendingPathComponent("fresh.sqlite3")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: freshURL.path))
+        let fresh = try ProjectControlPlaneRepository(databaseURL: freshURL)
+        let freshHealth = try await fresh.health()
+        XCTAssertEqual(freshHealth.schemaVersion, ProjectControlPlaneRepository.schemaVersion)
+        XCTAssertEqual(freshHealth.journalMode.lowercased(), "wal")
+        XCTAssertEqual(freshHealth.integrityResult, "ok")
+        await fresh.close()
+        XCTAssertEqual(
+            try controlPlaneFixtureInt(at: freshURL, sql: "PRAGMA user_version;"),
+            ProjectControlPlaneRepository.schemaVersion
+        )
+    }
+
     func testInvalidGenerationAndAuthorizationScopeAreRejectedBeforePersistence() async throws {
         try await withRepository { repository, root in
             let projectID = ProjectID()
@@ -334,13 +878,15 @@ final class ProjectControlPlaneRepositoryTests: XCTestCase {
     }
 
     private func withRepository(
+        busyTimeoutMilliseconds: Int = 5_000,
         _ body: (ProjectControlPlaneRepository, URL) async throws -> Void
     ) async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("forge-control-plane-\(UUID().uuidString)", isDirectory: true)
         let repository = try ProjectControlPlaneRepository(
             databaseURL: root.appendingPathComponent("control-plane.sqlite3"),
-            clock: FixedClock(Date(timeIntervalSince1970: 1_000))
+            clock: FixedClock(Date(timeIntervalSince1970: 1_000)),
+            busyTimeoutMilliseconds: busyTimeoutMilliseconds
         )
         do {
             try await body(repository, root)
@@ -368,6 +914,192 @@ final class ProjectControlPlaneRepositoryTests: XCTestCase {
             XCTFail("Unexpected error: \(error)", file: file, line: line)
         }
     }
+}
+
+private enum ControlPlaneFixtureError: Error {
+    case sqlite(String)
+}
+
+private struct ControlPlaneFixtureSnapshot: Equatable {
+    let databaseBytes: Data
+    let journalMode: String
+    let sidecars: [ControlPlaneSidecarSnapshot]
+}
+
+private struct ControlPlaneSidecarSnapshot: Equatable {
+    let suffix: String
+    let exists: Bool
+    let bytes: Data?
+}
+
+private final class ControlPlaneWriteLock {
+    private var database: OpaquePointer?
+    private var isReleased = false
+
+    init(databaseURL: URL) throws {
+        let flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
+        guard sqlite3_open_v2(databaseURL.path, &database, flags, nil) == SQLITE_OK,
+              let database else {
+            let message = database.map { String(cString: sqlite3_errmsg($0)) }
+                ?? "unknown SQLite open error"
+            if let database { sqlite3_close(database) }
+            throw ControlPlaneFixtureError.sqlite(message)
+        }
+        do {
+            try Self.execute(database, sql: "BEGIN IMMEDIATE;")
+        } catch {
+            sqlite3_close(database)
+            self.database = nil
+            throw error
+        }
+    }
+
+    deinit {
+        release()
+    }
+
+    func release() {
+        guard !isReleased, let database else { return }
+        _ = sqlite3_exec(database, "COMMIT;", nil, nil, nil)
+        sqlite3_close(database)
+        self.database = nil
+        isReleased = true
+    }
+
+    private static func execute(_ database: OpaquePointer, sql: String) throws {
+        var errorMessage: UnsafeMutablePointer<CChar>?
+        guard sqlite3_exec(database, sql, nil, nil, &errorMessage) == SQLITE_OK else {
+            let message = errorMessage.map { String(cString: $0) }
+                ?? String(cString: sqlite3_errmsg(database))
+            sqlite3_free(errorMessage)
+            throw ControlPlaneFixtureError.sqlite(message)
+        }
+    }
+}
+
+private func controlPlaneFixtureSnapshot(at url: URL) throws -> ControlPlaneFixtureSnapshot {
+    let fileManager = FileManager.default
+    let sidecars = try ["-wal", "-shm", "-journal"].map { suffix in
+        let sidecarURL = URL(fileURLWithPath: url.path + suffix)
+        let exists = fileManager.fileExists(atPath: sidecarURL.path)
+        return ControlPlaneSidecarSnapshot(
+            suffix: suffix,
+            exists: exists,
+            bytes: exists ? try Data(contentsOf: sidecarURL) : nil
+        )
+    }
+    return ControlPlaneFixtureSnapshot(
+        databaseBytes: try Data(contentsOf: url),
+        journalMode: try controlPlaneFixtureText(at: url, sql: "PRAGMA journal_mode;"),
+        sidecars: sidecars
+    )
+}
+
+private func createLegacyControlPlaneFixture(at url: URL, userVersion: Int) throws {
+    var database: OpaquePointer?
+    guard sqlite3_open_v2(
+        url.path,
+        &database,
+        SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX,
+        nil
+    ) == SQLITE_OK, let database else {
+        if let database { sqlite3_close(database) }
+        throw ControlPlaneFixtureError.sqlite("could not open legacy fixture")
+    }
+    defer { sqlite3_close(database) }
+    var message: UnsafeMutablePointer<CChar>?
+    let result = sqlite3_exec(
+        database,
+        "CREATE TABLE legacy_marker(id INTEGER PRIMARY KEY,value INTEGER NOT NULL);"
+            + "INSERT INTO legacy_marker(id,value) VALUES(1,41);"
+            + "PRAGMA user_version=\(userVersion);",
+        nil,
+        nil,
+        &message
+    )
+    guard result == SQLITE_OK else {
+        let detail = message.map { String(cString: $0) }
+            ?? String(cString: sqlite3_errmsg(database))
+        sqlite3_free(message)
+        throw ControlPlaneFixtureError.sqlite(detail)
+    }
+}
+
+private func createViewOnlyControlPlaneFixture(at url: URL) throws {
+    var database: OpaquePointer?
+    guard sqlite3_open_v2(
+        url.path,
+        &database,
+        SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX,
+        nil
+    ) == SQLITE_OK, let database else {
+        if let database { sqlite3_close(database) }
+        throw ControlPlaneFixtureError.sqlite("could not open view-only fixture")
+    }
+    defer { sqlite3_close(database) }
+    var message: UnsafeMutablePointer<CChar>?
+    let result = sqlite3_exec(
+        database,
+        "CREATE VIEW foreign_view AS SELECT 1 AS value; PRAGMA user_version=0;",
+        nil,
+        nil,
+        &message
+    )
+    guard result == SQLITE_OK else {
+        let detail = message.map { String(cString: $0) }
+            ?? String(cString: sqlite3_errmsg(database))
+        sqlite3_free(message)
+        throw ControlPlaneFixtureError.sqlite(detail)
+    }
+}
+
+private func controlPlaneFixtureInt(at url: URL, sql: String) throws -> Int {
+    var database: OpaquePointer?
+    guard sqlite3_open_v2(
+        url.path,
+        &database,
+        SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX,
+        nil
+    ) == SQLITE_OK, let database else {
+        if let database { sqlite3_close(database) }
+        throw ControlPlaneFixtureError.sqlite("could not reopen legacy fixture")
+    }
+    defer { sqlite3_close(database) }
+    var statement: OpaquePointer?
+    guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK,
+          let statement else {
+        throw ControlPlaneFixtureError.sqlite(String(cString: sqlite3_errmsg(database)))
+    }
+    defer { sqlite3_finalize(statement) }
+    guard sqlite3_step(statement) == SQLITE_ROW else {
+        throw ControlPlaneFixtureError.sqlite(String(cString: sqlite3_errmsg(database)))
+    }
+    return Int(sqlite3_column_int64(statement, 0))
+}
+
+private func controlPlaneFixtureText(at url: URL, sql: String) throws -> String {
+    var database: OpaquePointer?
+    guard sqlite3_open_v2(
+        url.path,
+        &database,
+        SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX,
+        nil
+    ) == SQLITE_OK, let database else {
+        if let database { sqlite3_close(database) }
+        throw ControlPlaneFixtureError.sqlite("could not reopen legacy fixture")
+    }
+    defer { sqlite3_close(database) }
+    var statement: OpaquePointer?
+    guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK,
+          let statement else {
+        throw ControlPlaneFixtureError.sqlite(String(cString: sqlite3_errmsg(database)))
+    }
+    defer { sqlite3_finalize(statement) }
+    guard sqlite3_step(statement) == SQLITE_ROW,
+          let value = sqlite3_column_text(statement, 0) else {
+        throw ControlPlaneFixtureError.sqlite(String(cString: sqlite3_errmsg(database)))
+    }
+    return String(cString: value)
 }
 
 private final class MutationProbe: @unchecked Sendable {

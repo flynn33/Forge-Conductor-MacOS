@@ -129,7 +129,7 @@ public struct ToolDefinitionCatalog: Sendable, Equatable {
             return try CanonicalToolDefinition(
                 name: name,
                 description: description,
-                inputSchema: schema
+                inputSchema: schemaWithSharedInvocationControls(schema)
             )
         }
         return try ToolDefinitionCatalog(toolNames: toolNames, definitions: definitions)
@@ -169,6 +169,23 @@ public struct ToolDefinitionCatalog: Sendable, Equatable {
 
     public func mcpDescriptors() throws -> [[String: Any]] {
         try definitions.map { try $0.mcpDescriptor() }
+    }
+
+    private static func schemaWithSharedInvocationControls(
+        _ suppliedSchema: [String: Any]
+    ) -> [String: Any] {
+        var schema = suppliedSchema
+        var properties = schema["properties"] as? [String: Any] ?? [:]
+        // The shared transport owns this field. Replace pack-local placeholder
+        // schemas so every advertised tool has the same accepted range.
+        properties["deadline_ms"] = [
+            "type": "integer",
+            "minimum": 1,
+            "maximum": ToolRouter.maximumRequestedDeadlineMilliseconds,
+            "description": "Optional total tool-call deadline in milliseconds.",
+        ] as [String: Any]
+        schema["properties"] = properties
+        return schema
     }
 
     private static func encode(_ definitions: [CanonicalToolDefinition]) throws -> Data {
@@ -373,11 +390,7 @@ private enum ProductionToolDefinitionSource {
                 "properties": [
                     "command": ["type": "string"] as [String: Any],
                     "cwd": ["type": "string"] as [String: Any],
-                    "timeout_sec": [
-                        "type": "number",
-                        "exclusiveMinimum": 0,
-                        "maximum": ShellToolPack.maximumTimeoutSec,
-                    ] as [String: Any],
+                    "timeout_sec": ["type": "number"] as [String: Any],
                 ] as [String: Any],
                 "required": ["command"],
             ]

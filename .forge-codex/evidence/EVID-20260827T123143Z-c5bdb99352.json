@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "bytes": 126897,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T123143Z-c5bdb99352.stdout.txt",
+      "sha256": "a11d6f18a3d04b042e6f500bc86e02c355244c46294aefbe0109dbd2c0032f25"
+    },
+    {
+      "bytes": 778,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T123143Z-c5bdb99352.stderr.txt",
+      "sha256": "019b13ce790babbb002bf7c7595a692abfd8796d1881ea9d65376949ee7597ab"
+    }
+  ],
+  "command": "env FORGE_SKIP_PS=1 swift test -c release --no-parallel -Xswiftc -warnings-as-errors",
+  "ended_at": "2026-08-27T12:34:01.866358+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260827T123143Z-c5bdb99352",
+  "kind": "test",
+  "related_findings": [],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-27T12:31:43.620360+00:00",
+  "timed_out": false
+}

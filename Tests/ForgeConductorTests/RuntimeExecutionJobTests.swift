@@ -7,6 +7,84 @@ import XCTest
 @testable import ForgeConductorCore
 
 final class RuntimeExecutionJobTests: XCTestCase {
+    private actor InitializationGate {
+        private let participantCount: Int
+        private var arrivalCount = 0
+        private var waiters: [CheckedContinuation<Void, Never>] = []
+
+        init(participantCount: Int) {
+            self.participantCount = participantCount
+        }
+
+        func wait() async {
+            arrivalCount += 1
+            if arrivalCount == participantCount {
+                let pending = waiters
+                waiters.removeAll(keepingCapacity: false)
+                for waiter in pending { waiter.resume() }
+                return
+            }
+            await withCheckedContinuation { continuation in
+                waiters.append(continuation)
+            }
+        }
+    }
+
+    private actor PostCancellationCommitGate {
+        private var paused = false
+        private var released = false
+        private var pauseWaiters: [CheckedContinuation<Void, Never>] = []
+        private var releaseWaiter: CheckedContinuation<Void, Never>?
+
+        func pause() async {
+            paused = true
+            let waiters = pauseWaiters
+            pauseWaiters.removeAll(keepingCapacity: false)
+            for waiter in waiters { waiter.resume() }
+            if released { return }
+            await withCheckedContinuation { continuation in
+                releaseWaiter = continuation
+            }
+        }
+
+        func waitUntilPaused() async {
+            if paused { return }
+            await withCheckedContinuation { continuation in
+                pauseWaiters.append(continuation)
+            }
+        }
+
+        func release() {
+            released = true
+            releaseWaiter?.resume()
+            releaseWaiter = nil
+        }
+    }
+
+    private final class RepositoryCommitGate: @unchecked Sendable {
+        private let expectedKind: RuntimeJobCommitKind
+        private let committed = DispatchSemaphore(value: 0)
+        private let releaseCommit = DispatchSemaphore(value: 0)
+
+        init(expectedKind: RuntimeJobCommitKind) {
+            self.expectedKind = expectedKind
+        }
+
+        func observe(_ kind: RuntimeJobCommitKind) {
+            guard kind == expectedKind else { return }
+            committed.signal()
+            _ = releaseCommit.wait(timeout: .now() + 2)
+        }
+
+        func waitUntilCommitted(timeout: TimeInterval = 1) -> DispatchTimeoutResult {
+            committed.wait(timeout: .now() + timeout)
+        }
+
+        func release() {
+            releaseCommit.signal()
+        }
+    }
+
     func testConcurrentStdoutAndStderrDrainWithoutDeadlockAndSpillWithinBudget() async throws {
         let fixture = try await Fixture.make()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
@@ -82,12 +160,17 @@ final class RuntimeExecutionJobTests: XCTestCase {
         wait
         """
         let jobID = try await fixture.service.submit(
-            fixture.request(kind: .bash, profile: .bashNoProfile, script: script, timeout: 1)
+            fixture.request(kind: .bash, profile: .bashNoProfile, script: script, timeout: 5)
         )
+        guard await Self.waitForFile(pidFile) else {
+            XCTFail("timed runtime fixture did not start its descendant")
+            await fixture.close()
+            return
+        }
         let record = try await fixture.service.waitForTerminal(
             jobID: jobID,
             context: fixture.context,
-            maximumWait: .seconds(8)
+            maximumWait: .seconds(12)
         )
         XCTAssertEqual(record.state, .timedOut)
         let descendant = try Self.readPID(pidFile)
@@ -129,6 +212,53 @@ final class RuntimeExecutionJobTests: XCTestCase {
         )
         XCTAssertEqual(record.state, .cancelled)
         let descendant = try Self.readPID(pidFile)
+        let descendantGone = await Self.waitUntilProcessIsGone(descendant)
+        XCTAssertTrue(descendantGone)
+        await fixture.close()
+    }
+
+    func testLegacyShellAdapterTaskCancellationTerminatesDescendantProcessGroup() async throws {
+        let fixture = try await Fixture.make()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let pidFile = fixture.projectRoot.appendingPathComponent("legacy-cancel-descendant.pid")
+        let adapter = LegacyShellJobAdapter(service: fixture.service)
+        let task = Task {
+            try await adapter.execute(
+                command: """
+                (
+                  trap '' TERM
+                  while :; do sleep 1; done
+                ) &
+                echo $! > legacy-cancel-descendant.pid
+                wait
+                """,
+                workingDirectory: fixture.projectRoot,
+                timeoutSeconds: 30,
+                context: fixture.context
+            )
+        }
+
+        let pidFileReady = await Self.waitForFile(pidFile)
+        XCTAssertTrue(pidFileReady)
+        let descendant = try Self.readPID(pidFile)
+        task.cancel()
+        do {
+            _ = try await task.value
+            XCTFail("cancelled legacy shell task returned a result")
+        } catch is CancellationError {
+            // Expected: connector cancellation remains cancellation at the compatibility edge.
+        } catch {
+            XCTFail("unexpected cancellation error: \(error)")
+        }
+
+        let jobs = try await fixture.service.list(context: fixture.context)
+        let job = try XCTUnwrap(jobs.first { $0.executionProfile == .legacyBashLogin })
+        let record = try await fixture.service.waitForTerminal(
+            jobID: job.jobID,
+            context: fixture.context,
+            maximumWait: .seconds(8)
+        )
+        XCTAssertEqual(record.state, .cancelled)
         let descendantGone = await Self.waitUntilProcessIsGone(descendant)
         XCTAssertTrue(descendantGone)
         await fixture.close()
@@ -751,13 +881,93 @@ final class RuntimeExecutionJobTests: XCTestCase {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
         let databaseURL = root.appendingPathComponent("runtime-v2.sqlite")
-        try Self.createRuntimeSchemaV2(at: databaseURL)
+        let legacyJobID = UUID()
+        let legacyProjectID = ProjectID()
+        try Self.createRuntimeSchemaV2(
+            at: databaseURL,
+            jobID: legacyJobID,
+            projectID: legacyProjectID
+        )
+
+        func assertLegacyJob(in repository: RuntimeJobRepository) async throws {
+            let storedJob = try await repository.job(legacyJobID)
+            let job = try XCTUnwrap(storedJob)
+            XCTAssertEqual(job.projectID, legacyProjectID)
+            XCTAssertEqual(job.projectGeneration, .initial)
+            XCTAssertEqual(job.runtimeKind, .bash)
+            XCTAssertEqual(job.executionProfile, .bashNoProfile)
+            XCTAssertEqual(job.replayClass, .readOnly)
+            XCTAssertEqual(job.state, .completed)
+            XCTAssertEqual(job.canonicalWorkingDirectory.path, "/legacy/runtime-project")
+            XCTAssertEqual(job.commandSummary, "legacy v2 completed job")
+            XCTAssertEqual(job.timeoutSeconds, 30)
+            XCTAssertEqual(job.exitCode, 0)
+            XCTAssertEqual(job.outputBytes, 14)
+            XCTAssertEqual(job.createdAt, "2026-08-26T00:00:00.000Z")
+            XCTAssertEqual(job.completedAt, "2026-08-26T00:00:01.000Z")
+        }
 
         let repository = try RuntimeJobRepository(databaseURL: databaseURL)
         let health = try await repository.health()
         XCTAssertEqual(health.schemaVersion, RuntimeJobRepository.schemaVersion)
         XCTAssertEqual(health.integrity.lowercased(), "ok")
+        try await assertLegacyJob(in: repository)
         await repository.close()
+
+        let backupURL = root.appendingPathComponent("runtime-v2.pre-migration-v2.sqlite3")
+        XCTAssertEqual(
+            try Self.sqliteCount(
+                databaseURL: backupURL,
+                sql: "SELECT version FROM runtime_job_schema_version WHERE singleton=1"
+            ),
+            2
+        )
+        XCTAssertEqual(try Self.sqliteText(databaseURL: backupURL, sql: "PRAGMA quick_check"), "ok")
+        XCTAssertEqual(
+            try Self.sqliteCount(
+                databaseURL: backupURL,
+                sql: "SELECT COUNT(*) FROM execution_jobs WHERE job_id=?",
+                textBinding: legacyJobID.uuidString.lowercased()
+            ),
+            1
+        )
+        XCTAssertEqual(
+            (try FileManager.default.attributesOfItem(atPath: backupURL.path)[.posixPermissions]
+                as? NSNumber)?.intValue,
+            0o600
+        )
+        let migrationManifest = try JSONDecoder().decode(
+            VerifiedMigrationBackupManifest.self,
+            from: Data(
+                contentsOf: VerifiedMigrationBackup.activeManifestURL(for: databaseURL)
+            )
+        )
+        XCTAssertEqual(migrationManifest.state, .completed)
+        XCTAssertEqual(migrationManifest.storageKind, .sqlite)
+        XCTAssertEqual(migrationManifest.sourceVersion, 2)
+        XCTAssertEqual(migrationManifest.targetVersion, RuntimeJobRepository.schemaVersion)
+        XCTAssertEqual(
+            migrationManifest.backupSHA256,
+            JSONSupport.sha256Hex(try Data(contentsOf: backupURL))
+        )
+        XCTAssertNotNil(migrationManifest.targetSHA256)
+        XCTAssertEqual(
+            try Self.sqliteCount(
+                databaseURL: databaseURL,
+                sql: "SELECT COUNT(*) FROM forge_migration_receipts WHERE migration_id=?",
+                textBinding: migrationManifest.migrationID
+            ),
+            1
+        )
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: VerifiedMigrationBackup.archivedManifestURL(
+                    for: backupURL,
+                    targetVersion: RuntimeJobRepository.schemaVersion
+                ).path
+            )
+        )
+        let firstBackupData = try Data(contentsOf: backupURL)
 
         let columns = try Self.sqliteColumnNames(
             databaseURL: databaseURL,
@@ -772,6 +982,574 @@ final class RuntimeExecutionJobTests: XCTestCase {
             ),
             1
         )
+
+        let reopened = try RuntimeJobRepository(databaseURL: databaseURL)
+        try await assertLegacyJob(in: reopened)
+        let reopenedHealth = try await reopened.health()
+        XCTAssertEqual(reopenedHealth.schemaVersion, RuntimeJobRepository.schemaVersion)
+        await reopened.close()
+
+        let rerun = try RuntimeJobRepository(databaseURL: databaseURL)
+        try await assertLegacyJob(in: rerun)
+        let rerunHealth = try await rerun.health()
+        XCTAssertEqual(rerunHealth.integrity.lowercased(), "ok")
+        XCTAssertEqual(
+            try Self.sqliteCount(
+                databaseURL: databaseURL,
+                sql: "SELECT COUNT(*) FROM runtime_job_schema_version WHERE singleton=1 AND version=\(RuntimeJobRepository.schemaVersion)"
+            ),
+            1
+        )
+        await rerun.close()
+        XCTAssertEqual(try Data(contentsOf: backupURL), firstBackupData)
+
+        try firstBackupData.write(to: databaseURL, options: .atomic)
+        for suffix in ["-wal", "-shm", "-journal"] {
+            let sidecar = URL(fileURLWithPath: databaseURL.path + suffix)
+            if FileManager.default.fileExists(atPath: sidecar.path) {
+                try FileManager.default.removeItem(at: sidecar)
+            }
+        }
+        let restored = try RuntimeJobRepository(databaseURL: databaseURL)
+        try await assertLegacyJob(in: restored)
+        await restored.close()
+        XCTAssertEqual(
+            try JSONDecoder().decode(
+                VerifiedMigrationBackupManifest.self,
+                from: Data(
+                    contentsOf: VerifiedMigrationBackup.activeManifestURL(for: databaseURL)
+                )
+            ),
+            migrationManifest
+        )
+    }
+
+    func testRuntimeColumnProbePropagatesStepFailures() throws {
+        for stepCode in [SQLITE_BUSY, SQLITE_IOERR] {
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+                "forge-runtime-column-probe-\(stepCode)-\(UUID().uuidString)",
+                isDirectory: true
+            )
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let databaseURL = root.appendingPathComponent("runtime.sqlite")
+
+            XCTAssertThrowsError(
+                try RuntimeJobRepository(
+                    databaseURL: databaseURL,
+                    beforeMigrationCommitObserver: nil,
+                    tableInfoStepObserver: { stepCode }
+                )
+            ) { error in
+                XCTAssertTrue(
+                    error.localizedDescription.contains("table-info step failed with code \(stepCode)"),
+                    "unexpected error: \(error)"
+                )
+            }
+        }
+    }
+
+    func testRuntimeVersionTwoMigrationRejectsStablePathReplacementBeforeCommit() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "forge-runtime-v2-path-replacement-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let databaseURL = root.appendingPathComponent("runtime-v2.sqlite")
+        let replacementURL = root.appendingPathComponent("replacement.sqlite")
+        let displacedURL = root.appendingPathComponent("displaced.sqlite")
+        let backupURL = root.appendingPathComponent("runtime-v2.pre-migration-v2.sqlite3")
+        let originalJobID = UUID()
+        let replacementJobID = UUID()
+        let originalProjectID = ProjectID()
+        let replacementProjectID = ProjectID()
+        try Self.createRuntimeSchemaV2(
+            at: databaseURL,
+            jobID: originalJobID,
+            projectID: originalProjectID
+        )
+        try Self.createRuntimeSchemaV2(
+            at: replacementURL,
+            jobID: replacementJobID,
+            projectID: replacementProjectID
+        )
+
+        XCTAssertThrowsError(
+            try RuntimeJobRepository(
+                databaseURL: databaseURL,
+                beforeMigrationCommitObserver: {
+                    try FileManager.default.moveItem(at: databaseURL, to: displacedURL)
+                    try FileManager.default.moveItem(at: replacementURL, to: databaseURL)
+                }
+            )
+        ) { error in
+            XCTAssertTrue(
+                error.localizedDescription.contains("moved")
+                    || error.localizedDescription.contains("replaced")
+                    || error.localizedDescription.contains("movement check"),
+                "unexpected error: \(error)"
+            )
+        }
+
+        try FileManager.default.moveItem(at: databaseURL, to: replacementURL)
+        try FileManager.default.moveItem(at: displacedURL, to: databaseURL)
+
+        for fixture in [
+            (databaseURL, originalJobID, originalProjectID, replacementJobID),
+            (replacementURL, replacementJobID, replacementProjectID, originalJobID),
+        ] {
+            XCTAssertEqual(
+                try Self.sqliteCount(
+                    databaseURL: fixture.0,
+                    sql: "SELECT version FROM runtime_job_schema_version WHERE singleton=1"
+                ),
+                2
+            )
+            XCTAssertEqual(
+                try Self.sqliteCount(databaseURL: fixture.0, sql: "SELECT COUNT(*) FROM execution_jobs"),
+                1
+            )
+            XCTAssertEqual(
+                try Self.sqliteCount(
+                    databaseURL: fixture.0,
+                    sql: "SELECT COUNT(*) FROM execution_jobs WHERE job_id=? AND project_id=?",
+                    textBindings: [
+                        fixture.1.uuidString.lowercased(),
+                        fixture.2.description,
+                    ]
+                ),
+                1
+            )
+            XCTAssertEqual(
+                try Self.sqliteText(
+                    databaseURL: fixture.0,
+                    sql: "SELECT job_id FROM execution_jobs LIMIT 1"
+                ),
+                fixture.1.uuidString.lowercased()
+            )
+            XCTAssertEqual(
+                try Self.sqliteText(
+                    databaseURL: fixture.0,
+                    sql: "SELECT project_id FROM execution_jobs LIMIT 1"
+                ),
+                fixture.2.description
+            )
+            XCTAssertEqual(
+                try Self.sqliteText(
+                    databaseURL: fixture.0,
+                    sql: "SELECT command_summary FROM execution_jobs LIMIT 1"
+                ),
+                "legacy v2 completed job"
+            )
+            XCTAssertEqual(
+                try Self.sqliteText(
+                    databaseURL: fixture.0,
+                    sql: "SELECT stdout_inline FROM execution_jobs LIMIT 1"
+                ),
+                "legacy output"
+            )
+            XCTAssertEqual(
+                try Self.sqliteCount(
+                    databaseURL: fixture.0,
+                    sql: "SELECT COUNT(*) FROM execution_jobs WHERE job_id=?",
+                    textBinding: fixture.3.uuidString.lowercased()
+                ),
+                0
+            )
+            XCTAssertFalse(
+                try Self.sqliteColumnNames(
+                    databaseURL: fixture.0,
+                    table: "execution_jobs"
+                ).contains("process_start_seconds")
+            )
+            XCTAssertEqual(
+                try Self.sqliteCount(
+                    databaseURL: fixture.0,
+                    sql: "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='forge_migration_receipts'"
+                ),
+                0
+            )
+        }
+
+        XCTAssertEqual(
+            try Self.sqliteCount(
+                databaseURL: backupURL,
+                sql: "SELECT version FROM runtime_job_schema_version WHERE singleton=1"
+            ),
+            2
+        )
+        XCTAssertEqual(
+            try Self.sqliteCount(
+                databaseURL: backupURL,
+                sql: "SELECT COUNT(*) FROM execution_jobs WHERE job_id=? AND project_id=?",
+                textBindings: [
+                    originalJobID.uuidString.lowercased(),
+                    originalProjectID.description,
+                ]
+            ),
+            1
+        )
+        let activeManifest = try JSONDecoder().decode(
+            VerifiedMigrationBackupManifest.self,
+            from: Data(
+                contentsOf: VerifiedMigrationBackup.activeManifestURL(for: databaseURL)
+            )
+        )
+        XCTAssertEqual(activeManifest.state, .prepared)
+        XCTAssertEqual(activeManifest.sourceVersion, 2)
+        XCTAssertEqual(activeManifest.targetVersion, RuntimeJobRepository.schemaVersion)
+        XCTAssertEqual(activeManifest.backupFilename, backupURL.lastPathComponent)
+        XCTAssertEqual(
+            activeManifest.backupSHA256,
+            JSONSupport.sha256Hex(try Data(contentsOf: backupURL))
+        )
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: VerifiedMigrationBackup.archivedManifestURL(
+                    for: backupURL,
+                    targetVersion: RuntimeJobRepository.schemaVersion
+                ).path
+            )
+        )
+    }
+
+    func testNonemptyUnversionedRuntimeDatabaseFailsClosedWithoutMutation() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("forge-runtime-unversioned-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let databaseURL = root.appendingPathComponent("runtime.sqlite")
+        try Self.createUnversionedRuntimeFixture(at: databaseURL)
+        let originalBytes = try Data(contentsOf: databaseURL)
+
+        XCTAssertThrowsError(try RuntimeJobRepository(databaseURL: databaseURL)) { error in
+            XCTAssertTrue(
+                error.localizedDescription.contains("unversioned SQLite database is not empty"),
+                "unexpected error: \(error)"
+            )
+        }
+        XCTAssertEqual(try Data(contentsOf: databaseURL), originalBytes)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: databaseURL.path + "-wal"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: databaseURL.path + "-shm"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: databaseURL.path + "-journal"))
+
+        let freshURL = root.appendingPathComponent("fresh-runtime.sqlite")
+        let fresh = try RuntimeJobRepository(databaseURL: freshURL)
+        let health = try await fresh.health()
+        XCTAssertEqual(health.schemaVersion, RuntimeJobRepository.schemaVersion)
+        await fresh.close()
+    }
+
+    func testMalformedCoResidentControlPlaneVersionFailsClosedWithoutMutatingWALFamily() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("forge-runtime-malformed-control-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let databaseURL = root.appendingPathComponent("control-plane.sqlite3")
+        let controlPlane = try ProjectControlPlaneRepository(databaseURL: databaseURL)
+        await controlPlane.close()
+
+        let database = try Self.openSQLiteFixture(at: databaseURL)
+        defer { sqlite3_close(database) }
+        try Self.executeSQLiteFixture(
+            """
+            PRAGMA journal_mode=WAL;
+            PRAGMA wal_autocheckpoint=0;
+            BEGIN IMMEDIATE;
+            ALTER TABLE control_schema_version RENAME TO valid_control_schema_version;
+            CREATE TABLE control_schema_version(
+                singleton INTEGER NOT NULL,
+                version INTEGER NOT NULL,
+                applied_at TEXT NOT NULL
+            );
+            INSERT INTO control_schema_version(singleton,version,applied_at)
+            VALUES(1,2,'2026-08-27T00:00:00.000Z'),(2,2,'2026-08-27T00:00:00.000Z');
+            DROP TABLE valid_control_schema_version;
+            COMMIT;
+            """,
+            database: database
+        )
+        let before = try Self.sqliteFamilySnapshot(at: databaseURL)
+        XCTAssertNotNil(before.writeAheadLog)
+        XCTAssertNotNil(before.sharedMemory)
+
+        XCTAssertThrowsError(try RuntimeJobRepository(databaseURL: databaseURL)) { error in
+            XCTAssertTrue(
+                error.localizedDescription.contains("unversioned SQLite database is not empty"),
+                "unexpected error: \(error)"
+            )
+        }
+        XCTAssertEqual(try Self.sqliteFamilySnapshot(at: databaseURL), before)
+    }
+
+    func testColumnTruncatedCoResidentControlPlaneFailsClosedWithoutMutatingWALFamily() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("forge-runtime-truncated-control-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let databaseURL = root.appendingPathComponent("control-plane.sqlite3")
+        let controlPlane = try ProjectControlPlaneRepository(databaseURL: databaseURL)
+        await controlPlane.close()
+
+        let database = try Self.openSQLiteFixture(at: databaseURL)
+        defer { sqlite3_close(database) }
+        try Self.executeSQLiteFixture(
+            """
+            PRAGMA journal_mode=WAL;
+            PRAGMA wal_autocheckpoint=0;
+            ALTER TABLE migration_receipts RENAME TO complete_migration_receipts;
+            CREATE TABLE migration_receipts(
+                receipt_id TEXT PRIMARY KEY,
+                migration_name TEXT NOT NULL,
+                source_version TEXT NOT NULL,
+                target_version TEXT NOT NULL,
+                source_sha256 TEXT,
+                backup_path TEXT,
+                backup_sha256 TEXT,
+                imported_count INTEGER NOT NULL DEFAULT 0,
+                skipped_count INTEGER NOT NULL DEFAULT 0,
+                quarantined_count INTEGER NOT NULL DEFAULT 0,
+                integrity_result TEXT NOT NULL,
+                details_json TEXT NOT NULL DEFAULT '{}',
+                started_at TEXT NOT NULL
+            );
+            DROP TABLE complete_migration_receipts;
+            """,
+            database: database
+        )
+        let before = try Self.sqliteFamilySnapshot(at: databaseURL)
+        XCTAssertNotNil(before.writeAheadLog)
+        XCTAssertNotNil(before.sharedMemory)
+
+        XCTAssertThrowsError(try RuntimeJobRepository(databaseURL: databaseURL)) { error in
+            XCTAssertTrue(
+                error.localizedDescription.contains("unversioned SQLite database is not empty"),
+                "unexpected error: \(error)"
+            )
+        }
+        XCTAssertEqual(try Self.sqliteFamilySnapshot(at: databaseURL), before)
+    }
+
+    func testPostOpenValidationRejectsRegisteredTruncatedControlPlaneWithoutMutation() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("forge-runtime-post-open-control-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let databaseURL = root.appendingPathComponent("control-plane.sqlite3")
+        let controlPlane = try ProjectControlPlaneRepository(databaseURL: databaseURL)
+        await controlPlane.close()
+
+        let database = try Self.openSQLiteFixture(at: databaseURL)
+        try Self.executeSQLiteFixture(
+            """
+            PRAGMA journal_mode=DELETE;
+            DROP TABLE provider_turns;
+            """,
+            database: database
+        )
+        XCTAssertEqual(sqlite3_close(database), SQLITE_OK)
+        let registration = try VerifiedMigrationBackup.registerOpenDatabase(at: databaseURL)
+        defer { VerifiedMigrationBackup.unregisterOpenDatabase(registration) }
+        let before = try Self.sqliteFamilySnapshot(at: databaseURL)
+
+        XCTAssertThrowsError(try RuntimeJobRepository(databaseURL: databaseURL)) { error in
+            XCTAssertTrue(
+                error.localizedDescription.contains("unversioned SQLite database is not empty"),
+                "unexpected error: \(error)"
+            )
+        }
+        XCTAssertEqual(try Self.sqliteFamilySnapshot(at: databaseURL), before)
+    }
+
+    func testConcurrentInitializersSerializeVersionTwoMigration() async throws {
+        let participantCount = 8
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(
+                "forge-runtime-v2-concurrent-migration-\(UUID().uuidString)",
+                isDirectory: true
+            )
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let databaseURL = root.appendingPathComponent("runtime-v2.sqlite")
+        let legacyJobID = UUID()
+        let legacyProjectID = ProjectID()
+        try Self.createRuntimeSchemaV2(
+            at: databaseURL,
+            jobID: legacyJobID,
+            projectID: legacyProjectID
+        )
+
+        let gate = InitializationGate(participantCount: participantCount)
+        let repositories = try await withThrowingTaskGroup(
+            of: RuntimeJobRepository.self,
+            returning: [RuntimeJobRepository].self
+        ) { group in
+            for _ in 0..<participantCount {
+                group.addTask {
+                    await gate.wait()
+                    return try RuntimeJobRepository(databaseURL: databaseURL)
+                }
+            }
+            var opened: [RuntimeJobRepository] = []
+            opened.reserveCapacity(participantCount)
+            for try await repository in group { opened.append(repository) }
+            return opened
+        }
+
+        XCTAssertEqual(repositories.count, participantCount)
+        for repository in repositories {
+            let health = try await repository.health()
+            XCTAssertEqual(health.schemaVersion, RuntimeJobRepository.schemaVersion)
+            XCTAssertEqual(health.integrity.lowercased(), "ok")
+            let storedJob = try await repository.job(legacyJobID)
+            let job = try XCTUnwrap(storedJob)
+            XCTAssertEqual(job.projectID, legacyProjectID)
+            XCTAssertEqual(job.commandSummary, "legacy v2 completed job")
+        }
+        for repository in repositories { await repository.close() }
+
+        XCTAssertEqual(
+            try Self.sqliteCount(
+                databaseURL: databaseURL,
+                sql: "SELECT version FROM runtime_job_schema_version WHERE singleton=1"
+            ),
+            RuntimeJobRepository.schemaVersion
+        )
+        let backupURL = root.appendingPathComponent("runtime-v2.pre-migration-v2.sqlite3")
+        XCTAssertEqual(
+            try Self.sqliteCount(
+                databaseURL: backupURL,
+                sql: "SELECT version FROM runtime_job_schema_version WHERE singleton=1"
+            ),
+            2
+        )
+        XCTAssertEqual(
+            try Self.sqliteCount(
+                databaseURL: backupURL,
+                sql: "SELECT COUNT(*) FROM execution_jobs WHERE job_id=?",
+                textBinding: legacyJobID.uuidString.lowercased()
+            ),
+            1
+        )
+        XCTAssertEqual(try Self.sqliteText(databaseURL: backupURL, sql: "PRAGMA quick_check"), "ok")
+    }
+
+    func testRegisteredRuntimeVersionTwoMigrationStillCreatesRecoveryManifest() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "forge-runtime-v2-registered-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let databaseURL = root.appendingPathComponent("control-plane.sqlite3")
+        let legacyJobID = UUID()
+        try Self.createRuntimeSchemaV2(
+            at: databaseURL,
+            jobID: legacyJobID,
+            projectID: ProjectID()
+        )
+        let registration = try VerifiedMigrationBackup.registerOpenDatabase(at: databaseURL)
+        defer { VerifiedMigrationBackup.unregisterOpenDatabase(registration) }
+
+        let repository = try RuntimeJobRepository(databaseURL: databaseURL)
+        let health = try await repository.health()
+        XCTAssertEqual(
+            health.schemaVersion,
+            RuntimeJobRepository.schemaVersion
+        )
+        let migratedJob = try await repository.job(legacyJobID)
+        XCTAssertNotNil(migratedJob)
+        await repository.close()
+
+        let backupURL = root.appendingPathComponent(
+            "control-plane.pre-migration-v2.sqlite3"
+        )
+        XCTAssertEqual(
+            try Self.sqliteCount(
+                databaseURL: backupURL,
+                sql: "SELECT version FROM runtime_job_schema_version WHERE singleton=1"
+            ),
+            2
+        )
+        let manifest = try JSONDecoder().decode(
+            VerifiedMigrationBackupManifest.self,
+            from: Data(
+                contentsOf: VerifiedMigrationBackup.activeManifestURL(for: databaseURL)
+            )
+        )
+        XCTAssertEqual(manifest.state, .completed)
+        XCTAssertEqual(manifest.sourceVersion, 2)
+        XCTAssertEqual(manifest.targetVersion, RuntimeJobRepository.schemaVersion)
+        XCTAssertEqual(
+            try Self.sqliteCount(
+                databaseURL: databaseURL,
+                sql: "SELECT COUNT(*) FROM forge_migration_receipts WHERE migration_id=?",
+                textBinding: manifest.migrationID
+            ),
+            1
+        )
+    }
+
+    func testCoResidentControlPlaneRuntimeBootstrapCreatesVersionZeroRecoveryManifest() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "forge-runtime-control-plane-bootstrap-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let databaseURL = root.appendingPathComponent("control-plane.sqlite3")
+        let controlPlane = try ProjectControlPlaneRepository(databaseURL: databaseURL)
+
+        let runtime = try RuntimeJobRepository(databaseURL: databaseURL)
+        let health = try await runtime.health()
+        XCTAssertEqual(health.schemaVersion, RuntimeJobRepository.schemaVersion)
+        await runtime.close()
+
+        let backupURL = root.appendingPathComponent(
+            "control-plane.pre-migration-v0.sqlite3"
+        )
+        XCTAssertEqual(
+            try Self.sqliteCount(
+                databaseURL: backupURL,
+                sql: "SELECT version FROM control_schema_version WHERE singleton=1"
+            ),
+            ProjectControlPlaneRepository.schemaVersion
+        )
+        XCTAssertEqual(
+            try Self.sqliteCount(
+                databaseURL: backupURL,
+                sql: "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='runtime_job_schema_version'"
+            ),
+            0
+        )
+        let manifest = try JSONDecoder().decode(
+            VerifiedMigrationBackupManifest.self,
+            from: Data(
+                contentsOf: VerifiedMigrationBackup.activeManifestURL(for: databaseURL)
+            )
+        )
+        XCTAssertEqual(manifest.state, .completed)
+        XCTAssertEqual(manifest.sourceVersion, 0)
+        XCTAssertEqual(manifest.targetVersion, RuntimeJobRepository.schemaVersion)
+        XCTAssertEqual(manifest.backupFilename, backupURL.lastPathComponent)
+        XCTAssertEqual(
+            try Self.sqliteCount(
+                databaseURL: databaseURL,
+                sql: "SELECT COUNT(*) FROM forge_migration_receipts WHERE migration_id=?",
+                textBinding: manifest.migrationID
+            ),
+            1
+        )
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: VerifiedMigrationBackup.archivedManifestURL(
+                    for: backupURL,
+                    targetVersion: RuntimeJobRepository.schemaVersion
+                ).path
+            )
+        )
+        await controlPlane.close()
     }
 
     func testTerminalLedgerCompactionRetainsBoundedIdempotencyReceiptAndPreventsReplay() async throws {
@@ -2821,7 +3599,7 @@ final class RuntimeExecutionJobTests: XCTestCase {
         let fixture = try await Fixture.make()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
         let toolPack = RuntimeJobToolPack(service: fixture.service)
-        let submission = await toolPack.handle(
+        let submission = try await toolPack.handle(
             name: "bash.run",
             arguments: [
                 "script": "printf 'tool-path'",
@@ -2844,12 +3622,358 @@ final class RuntimeExecutionJobTests: XCTestCase {
             maximumWait: .seconds(8)
         )
         XCTAssertEqual(terminal.state, .completed)
-        let status = await toolPack.handle(
+        let status = try await toolPack.handle(
             name: "job.status",
             arguments: ["job_id": jobText],
             context: fixture.context
         )
         XCTAssertEqual(status?.payload["state"] as? String, RuntimeJobState.completed.rawValue)
+        await fixture.close()
+    }
+
+    func testSynchronousRuntimeBridgePreservesDeadlineWhenCancelledTaskStops() throws {
+        let cancellation = ToolCallCancellation(timeoutSeconds: 0.05)
+        do {
+            let _: String = try RuntimeJobSynchronousToolPack.wait(
+                timeoutSeconds: 1,
+                cancellation: cancellation,
+                committedResultWins: true
+            ) {
+                while !Task.isCancelled {
+                    await Task.yield()
+                }
+                throw CancellationError()
+            }
+            XCTFail("expired runtime deadline unexpectedly returned a value")
+        } catch {
+            XCTAssertTrue(
+                error is ToolCallDeadlineExceeded,
+                "task cancellation replaced the deadline error: \(error)"
+            )
+        }
+    }
+
+    func testSynchronousRuntimeBridgeCommittedReceiptWinsCancelledChildTerminal() throws {
+        let cancellation = ToolCallCancellation()
+        let receipt = RuntimeBlockingResult<String>()
+        let value: String = try RuntimeJobSynchronousToolPack.wait(
+            timeoutSeconds: 1,
+            cancellation: cancellation,
+            committedResultWins: true,
+            committedReceipt: receipt
+        ) {
+            receipt.store(.success("committed-after-cancellation"))
+            cancellation.cancel()
+            while !Task.isCancelled {
+                await Task.yield()
+            }
+            throw CancellationError()
+        }
+        XCTAssertEqual(value, "committed-after-cancellation")
+    }
+
+    func testSynchronousRuntimeBridgeCommittedReceiptWinsDeadlineChildTerminal() throws {
+        let receipt = RuntimeBlockingResult<String>()
+        let value: String = try RuntimeJobSynchronousToolPack.wait(
+            timeoutSeconds: 0.1,
+            cancellation: nil,
+            committedResultWins: true,
+            committedReceipt: receipt
+        ) {
+            receipt.store(.success("committed-before-deadline"))
+            while !Task.isCancelled {
+                await Task.yield()
+            }
+            throw ToolCallDeadlineExceeded()
+        }
+        XCTAssertEqual(value, "committed-before-deadline")
+    }
+
+    func testSynchronousRuntimeBridgeWithoutReceiptPreservesCancellation() throws {
+        let cancellation = ToolCallCancellation()
+        do {
+            let _: String = try RuntimeJobSynchronousToolPack.wait(
+                timeoutSeconds: 1,
+                cancellation: cancellation,
+                committedResultWins: true
+            ) {
+                cancellation.cancel()
+                while !Task.isCancelled {
+                    await Task.yield()
+                }
+                throw CancellationError()
+            }
+            XCTFail("cancelled runtime bridge unexpectedly returned a value")
+        } catch {
+            XCTAssertTrue(error is CancellationError, "unexpected error: \(error)")
+        }
+    }
+
+    func testRuntimeSubmissionReceiptIsPublishedAtCommitBeforeRepositoryReturns() async throws {
+        let gate = RepositoryCommitGate(expectedKind: .submission)
+        let fixture = try await Fixture.make(afterMutationCommitObserver: gate.observe)
+        defer {
+            gate.release()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let receipt = RuntimeBlockingResult<ToolResult>()
+        let toolPack = RuntimeJobToolPack(
+            service: fixture.service,
+            durableResultObserver: { value in
+                receipt.store(.success(value))
+            }
+        )
+        let cancellation = ToolCallCancellation()
+        let bridgeResult = RuntimeBlockingResult<ToolResult>()
+        let bridgeFinished = DispatchSemaphore(value: 0)
+        let context = fixture.context
+        let cwd = fixture.projectRoot.path
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let value: ToolResult = try RuntimeJobSynchronousToolPack.wait(
+                    timeoutSeconds: 0.1,
+                    cancellation: cancellation,
+                    committedResultWins: true,
+                    committedReceipt: receipt
+                ) {
+                    try await toolPack.handle(
+                        name: "bash.run",
+                        arguments: [
+                            "script": "printf 'submission-receipt'",
+                            "cwd": cwd,
+                            "timeout_sec": 5,
+                            "replay_class": RuntimeReplayClass.readOnly.rawValue,
+                        ],
+                        context: context
+                    ) ?? .failure(code: "missing_result", message: "runtime tool returned no result")
+                }
+                bridgeResult.store(.success(value))
+            } catch {
+                bridgeResult.store(.failure(error))
+            }
+            bridgeFinished.signal()
+        }
+
+        XCTAssertEqual(gate.waitUntilCommitted(), .success)
+        cancellation.cancel()
+        XCTAssertEqual(
+            bridgeFinished.wait(timeout: .now() + 1),
+            .success,
+            "submission bridge did not reconcile its COMMIT receipt while the actor was gated"
+        )
+        let result = try XCTUnwrap(bridgeResult.take()).get()
+        XCTAssertTrue(result.ok)
+        let jobID = try XCTUnwrap(
+            (result.payload["job_id"] as? String).flatMap(UUID.init(uuidString:))
+        )
+        XCTAssertEqual(result.payload["state"] as? String, RuntimeJobState.queued.rawValue)
+
+        gate.release()
+        let terminal = try await fixture.service.waitForTerminal(
+            jobID: jobID,
+            context: fixture.context,
+            maximumWait: .seconds(8)
+        )
+        XCTAssertEqual(terminal.state, .completed)
+        await fixture.close()
+    }
+
+    func testRuntimeCancellationReceiptIsPublishedAtCommitBeforeRepositoryReturns() async throws {
+        let gate = RepositoryCommitGate(expectedKind: .cancellation)
+        let fixture = try await Fixture.make(afterMutationCommitObserver: gate.observe)
+        defer {
+            gate.release()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let ready = fixture.projectRoot.appendingPathComponent("cancel-receipt-ready")
+        let jobID = try await fixture.service.submit(
+            fixture.request(
+                kind: .bash,
+                profile: .bashNoProfile,
+                script: ": > cancel-receipt-ready; while :; do sleep 1; done",
+                timeout: 30
+            )
+        )
+        guard await Self.waitForFile(ready) else {
+            await fixture.close()
+            XCTFail("runtime cancellation receipt fixture did not start")
+            return
+        }
+
+        let receipt = RuntimeBlockingResult<ToolResult>()
+        let toolPack = RuntimeJobToolPack(
+            service: fixture.service,
+            durableResultObserver: { value in
+                receipt.store(.success(value))
+            }
+        )
+        let cancellation = ToolCallCancellation()
+        let bridgeResult = RuntimeBlockingResult<ToolResult>()
+        let bridgeFinished = DispatchSemaphore(value: 0)
+        let context = fixture.context
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let value: ToolResult = try RuntimeJobSynchronousToolPack.wait(
+                    timeoutSeconds: 0.1,
+                    cancellation: cancellation,
+                    committedResultWins: true,
+                    committedReceipt: receipt
+                ) {
+                    try await toolPack.handle(
+                        name: "job.cancel",
+                        arguments: ["job_id": jobID.uuidString.lowercased()],
+                        context: context
+                    ) ?? .failure(code: "missing_result", message: "runtime tool returned no result")
+                }
+                bridgeResult.store(.success(value))
+            } catch {
+                bridgeResult.store(.failure(error))
+            }
+            bridgeFinished.signal()
+        }
+
+        XCTAssertEqual(gate.waitUntilCommitted(), .success)
+        cancellation.cancel()
+        XCTAssertEqual(
+            bridgeFinished.wait(timeout: .now() + 1),
+            .success,
+            "cancellation bridge did not reconcile its COMMIT receipt while the actor was gated"
+        )
+        let result = try XCTUnwrap(bridgeResult.take()).get()
+        XCTAssertTrue(result.ok)
+        XCTAssertEqual(result.payload["job_id"] as? String, jobID.uuidString.lowercased())
+        XCTAssertTrue(
+            result.payload["state"] as? String == RuntimeJobState.cancelling.rawValue
+                || result.payload["state"] as? String == RuntimeJobState.cancelled.rawValue
+        )
+
+        gate.release()
+        let terminal = try await fixture.service.waitForTerminal(
+            jobID: jobID,
+            context: fixture.context,
+            maximumWait: .seconds(8)
+        )
+        XCTAssertEqual(terminal.state, .cancelled)
+        await fixture.close()
+    }
+
+    func testCancelledRuntimeCreateRollsBackAfterDatabaseAdmission() async throws {
+        let fixture = try await Fixture.make()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let runtimeDatabaseURL = await fixture.runtimeRepository.databaseURL
+        var locker: OpaquePointer?
+        XCTAssertEqual(
+            sqlite3_open_v2(
+                runtimeDatabaseURL.path,
+                &locker,
+                SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX,
+                nil
+            ),
+            SQLITE_OK
+        )
+        let opened = try XCTUnwrap(locker)
+        defer {
+            sqlite3_exec(opened, "ROLLBACK;", nil, nil, nil)
+            sqlite3_close(opened)
+        }
+        XCTAssertEqual(sqlite3_exec(opened, "BEGIN IMMEDIATE;", nil, nil, nil), SQLITE_OK)
+
+        let jobID = UUID()
+        let idempotencyKey = "cancelled-runtime-create-\(jobID.uuidString.lowercased())"
+        let request = fixture.request(
+            kind: .bash,
+            profile: .bashNoProfile,
+            script: "printf never-created",
+            timeout: 5,
+            idempotencyKey: idempotencyKey
+        )
+        let create = Task {
+            try await fixture.runtimeRepository.createJob(
+                jobID: jobID,
+                request: request,
+                commandSummary: "cancelled runtime create",
+                timeoutSeconds: 5,
+                requestArtifactRelativePath: nil
+            )
+        }
+        try await Task.sleep(for: .milliseconds(50))
+        create.cancel()
+        sqlite3_exec(opened, "COMMIT;", nil, nil, nil)
+
+        do {
+            _ = try await create.value
+            XCTFail("cancelled runtime create unexpectedly committed")
+        } catch is CancellationError {
+            // Expected: cancellation is checked after actor/database admission.
+        } catch {
+            XCTFail("unexpected error: \(error)")
+        }
+        let stored = try await fixture.runtimeRepository.existingJob(
+            projectID: fixture.projectID,
+            generation: fixture.context.projectGeneration,
+            idempotencyKey: idempotencyKey
+        )
+        XCTAssertNil(stored)
+        await fixture.close()
+    }
+
+    func testRuntimeJobCancelReturnsCommittedStatusAfterCallerCancellation() async throws {
+        let fixture = try await Fixture.make()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let ready = fixture.projectRoot.appendingPathComponent("job-cancel-commit-ready")
+        let jobID = try await fixture.service.submit(
+            fixture.request(
+                kind: .bash,
+                profile: .bashNoProfile,
+                script: ": > job-cancel-commit-ready; while :; do sleep 1; done",
+                timeout: 30
+            )
+        )
+        let didStart = await Self.waitForFile(ready)
+        guard didStart else {
+            await fixture.close()
+            XCTFail("runtime cancellation fixture did not start")
+            return
+        }
+
+        let gate = PostCancellationCommitGate()
+        let toolPack = RuntimeJobToolPack(
+            service: fixture.service,
+            postCancellationCommit: {
+                await gate.pause()
+            }
+        )
+        let invocation = Task {
+            try await toolPack.handle(
+                name: "job.cancel",
+                arguments: ["job_id": jobID.uuidString.lowercased()],
+                context: fixture.context
+            )
+        }
+        await gate.waitUntilPaused()
+        let committed = try await fixture.runtimeRepository.job(jobID)
+        XCTAssertTrue(
+            committed?.state == .cancelling || committed?.state == .cancelled,
+            "job cancellation was not durable before the caller was cancelled"
+        )
+
+        invocation.cancel()
+        await gate.release()
+        let result = try await invocation.value
+        XCTAssertEqual(result?.ok, true)
+        XCTAssertTrue(
+            result?.payload["state"] as? String == RuntimeJobState.cancelling.rawValue
+                || result?.payload["state"] as? String == RuntimeJobState.cancelled.rawValue
+        )
+
+        let terminal = try await fixture.service.waitForTerminal(
+            jobID: jobID,
+            context: fixture.context,
+            maximumWait: .seconds(8)
+        )
+        XCTAssertEqual(terminal.state, .cancelled)
         await fixture.close()
     }
 
@@ -2894,7 +4018,8 @@ final class RuntimeExecutionJobTests: XCTestCase {
         let shellSchema = try XCTUnwrap(shell["inputSchema"] as? [String: Any])
         let shellProperties = try XCTUnwrap(shellSchema["properties"] as? [String: Any])
         let timeout = try XCTUnwrap(shellProperties["timeout_sec"] as? [String: Any])
-        XCTAssertEqual((timeout["maximum"] as? NSNumber)?.doubleValue, 120)
+        XCTAssertEqual(timeout["type"] as? String, "number")
+        XCTAssertEqual(Set(timeout.keys), ["type"])
         XCTAssertEqual(shellSchema["required"] as? [String], ["command"])
     }
 
@@ -3023,7 +4148,11 @@ final class RuntimeExecutionJobTests: XCTestCase {
         )
     }
 
-    private static func createRuntimeSchemaV2(at databaseURL: URL) throws {
+    private static func createRuntimeSchemaV2(
+        at databaseURL: URL,
+        jobID: UUID,
+        projectID: ProjectID
+    ) throws {
         var database: OpaquePointer?
         let opened = sqlite3_open_v2(
             databaseURL.path,
@@ -3069,9 +4198,100 @@ final class RuntimeExecutionJobTests: XCTestCase {
             completed_at TEXT,
             updated_at TEXT NOT NULL
         );
+        INSERT INTO execution_jobs(
+            job_id,run_id,project_id,project_generation,runtime_kind,execution_profile,
+            replay_class,idempotency_key,state,canonical_cwd,command_summary,timeout_seconds,
+            exit_code,stdout_inline,stderr_inline,output_artifact_id,output_bytes,
+            process_identifier,process_group_identifier,created_at,started_at,completed_at,updated_at
+        ) VALUES(
+            '\(jobID.uuidString.lowercased())',NULL,'\(projectID.description)',1,'bash','bash_no_profile',
+            'read_only',NULL,'completed','/legacy/runtime-project','legacy v2 completed job',30,
+            0,'legacy output','',NULL,14,NULL,NULL,'2026-08-26T00:00:00.000Z',
+            '2026-08-26T00:00:00.100Z','2026-08-26T00:00:01.000Z','2026-08-26T00:00:01.000Z'
+        );
         """
         var message: UnsafeMutablePointer<CChar>?
         let executed = sqlite3_exec(database, sql, nil, nil, &message)
+        guard executed == SQLITE_OK else {
+            let detail = message.map { String(cString: $0) } ?? "SQLite error \(executed)"
+            sqlite3_free(message)
+            throw RuntimeJobError.storageFailure(detail)
+        }
+    }
+
+    private struct SQLiteFamilySnapshot: Equatable {
+        let database: Data?
+        let writeAheadLog: Data?
+        let sharedMemory: Data?
+        let rollbackJournal: Data?
+    }
+
+    private static func sqliteFamilySnapshot(at databaseURL: URL) throws -> SQLiteFamilySnapshot {
+        func dataIfPresent(_ url: URL) throws -> Data? {
+            guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+            return try Data(contentsOf: url)
+        }
+        return try SQLiteFamilySnapshot(
+            database: dataIfPresent(databaseURL),
+            writeAheadLog: dataIfPresent(URL(fileURLWithPath: databaseURL.path + "-wal")),
+            sharedMemory: dataIfPresent(URL(fileURLWithPath: databaseURL.path + "-shm")),
+            rollbackJournal: dataIfPresent(URL(fileURLWithPath: databaseURL.path + "-journal"))
+        )
+    }
+
+    private static func openSQLiteFixture(at databaseURL: URL) throws -> OpaquePointer {
+        var database: OpaquePointer?
+        let opened = sqlite3_open_v2(
+            databaseURL.path,
+            &database,
+            SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX,
+            nil
+        )
+        guard opened == SQLITE_OK, let database else {
+            if let database { sqlite3_close(database) }
+            throw RuntimeJobError.storageFailure("could not open control-plane fixture")
+        }
+        return database
+    }
+
+    private static func executeSQLiteFixture(
+        _ sql: String,
+        database: OpaquePointer
+    ) throws {
+        var message: UnsafeMutablePointer<CChar>?
+        let executed = sqlite3_exec(database, sql, nil, nil, &message)
+        guard executed == SQLITE_OK else {
+            let detail = message.map { String(cString: $0) } ?? "SQLite error \(executed)"
+            sqlite3_free(message)
+            throw RuntimeJobError.storageFailure(detail)
+        }
+    }
+
+    private static func createUnversionedRuntimeFixture(at databaseURL: URL) throws {
+        var database: OpaquePointer?
+        let opened = sqlite3_open_v2(
+            databaseURL.path,
+            &database,
+            SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX,
+            nil
+        )
+        guard opened == SQLITE_OK, let database else {
+            if let database { sqlite3_close(database) }
+            throw RuntimeJobError.storageFailure("could not create unversioned runtime fixture")
+        }
+        defer { sqlite3_close(database) }
+        var message: UnsafeMutablePointer<CChar>?
+        let executed = sqlite3_exec(
+            database,
+            """
+            PRAGMA journal_mode=DELETE;
+            CREATE TABLE foreign_records(id INTEGER PRIMARY KEY, payload TEXT NOT NULL);
+            INSERT INTO foreign_records(id,payload) VALUES(1,'must remain byte-for-byte intact');
+            """,
+            nil,
+            nil,
+            &message
+        )
         guard executed == SQLITE_OK else {
             let detail = message.map { String(cString: $0) } ?? "SQLite error \(executed)"
             sqlite3_free(message)
@@ -3109,7 +4329,8 @@ final class RuntimeExecutionJobTests: XCTestCase {
     private static func sqliteCount(
         databaseURL: URL,
         sql: String,
-        textBinding: String? = nil
+        textBinding: String? = nil,
+        textBindings: [String] = []
     ) throws -> Int {
         var database: OpaquePointer?
         let opened = sqlite3_open_v2(
@@ -3129,16 +4350,50 @@ final class RuntimeExecutionJobTests: XCTestCase {
             throw RuntimeJobError.storageFailure("could not prepare SQLite count")
         }
         defer { sqlite3_finalize(statement) }
-        if let textBinding {
+        let bindings = textBindings.isEmpty ? textBinding.map { [$0] } ?? [] : textBindings
+        if !bindings.isEmpty {
             let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
-            guard sqlite3_bind_text(statement, 1, textBinding, -1, transient) == SQLITE_OK else {
-                throw RuntimeJobError.storageFailure("could not bind SQLite count")
+            for (offset, binding) in bindings.enumerated() {
+                guard sqlite3_bind_text(
+                    statement,
+                    Int32(offset + 1),
+                    binding,
+                    -1,
+                    transient
+                ) == SQLITE_OK else {
+                    throw RuntimeJobError.storageFailure("could not bind SQLite count")
+                }
             }
         }
         guard sqlite3_step(statement) == SQLITE_ROW else {
             throw RuntimeJobError.storageFailure("could not read SQLite count")
         }
         return Int(sqlite3_column_int64(statement, 0))
+    }
+
+    private static func sqliteText(databaseURL: URL, sql: String) throws -> String? {
+        var database: OpaquePointer?
+        let opened = sqlite3_open_v2(
+            databaseURL.path,
+            &database,
+            SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX,
+            nil
+        )
+        guard opened == SQLITE_OK, let database else {
+            if let database { sqlite3_close(database) }
+            throw RuntimeJobError.storageFailure("could not open SQLite fixture")
+        }
+        defer { sqlite3_close(database) }
+        var statement: OpaquePointer?
+        let prepared = sqlite3_prepare_v2(database, sql, -1, &statement, nil)
+        guard prepared == SQLITE_OK, let statement else {
+            throw RuntimeJobError.storageFailure("could not prepare SQLite text query")
+        }
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_step(statement) == SQLITE_ROW else {
+            throw RuntimeJobError.storageFailure("could not read SQLite text")
+        }
+        return sqlite3_column_text(statement, 0).map { String(cString: $0) }
     }
 
     private static let testLimits = RuntimeJobLimits(
@@ -3331,7 +4586,8 @@ final class RuntimeExecutionJobTests: XCTestCase {
             launchObserver: any RuntimeJobLaunchObserving = NoopRuntimeJobLaunchObserver(),
             terminalPersistenceHook: any RuntimeJobTerminalPersistenceHook =
                 NoopRuntimeJobTerminalPersistenceHook(),
-            recoveredProcessController: (any RuntimeRecoveredProcessControlling)? = nil
+            recoveredProcessController: (any RuntimeRecoveredProcessControlling)? = nil,
+            afterMutationCommitObserver: (@Sendable (RuntimeJobCommitKind) -> Void)? = nil
         ) async throws -> Fixture {
             let root = FileManager.default.temporaryDirectory
                 .appendingPathComponent("forge-runtime-tests-\(UUID().uuidString)", isDirectory: true)
@@ -3361,7 +4617,11 @@ final class RuntimeExecutionJobTests: XCTestCase {
                 authorizationScope: scope
             )
             let context = try await control.invocationContext(for: owner)
-            let runtime = try RuntimeJobRepository(databaseURL: database)
+            let runtime = try RuntimeJobRepository(
+                databaseURL: database,
+                beforeMigrationCommitObserver: nil,
+                afterMutationCommitObserver: afterMutationCommitObserver
+            )
             let service = try ExecutionJobService(
                 repository: runtime,
                 contextValidator: ProjectControlPlaneRuntimeJobContextValidator(repository: control),

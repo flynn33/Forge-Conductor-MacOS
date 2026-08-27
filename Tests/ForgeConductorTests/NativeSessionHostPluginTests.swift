@@ -514,8 +514,12 @@ final class NativeSessionHostPluginTests: XCTestCase {
         )
         XCTAssertEqual(
             directoryItems.filter { $0.lastPathComponent.hasPrefix("native-session-ledger") }
-                .map(\.lastPathComponent),
-            ["native-session-ledger.json"]
+                .map(\.lastPathComponent)
+                .sorted(),
+            [
+                "native-session-ledger.json",
+                "native-session-ledger.json.migration.lock",
+            ]
         )
     }
 
@@ -783,13 +787,248 @@ final class NativeSessionHostPluginTests: XCTestCase {
             storageDirectory: legacyRoot,
             transport: legacyTransport
         )
+        let backupURL = legacyRoot.appendingPathComponent(
+            "native-session-ledger.pre-migration-v1.json"
+        )
+        XCTAssertEqual(try Data(contentsOf: backupURL), legacyData)
+        XCTAssertEqual(
+            (try FileManager.default.attributesOfItem(atPath: backupURL.path)[.posixPermissions]
+                as? NSNumber)?.intValue,
+            0o600
+        )
+        let targetArtifactURL = legacyRoot.appendingPathComponent(
+            "native-session-ledger.schema-v2.target.json"
+        )
+        let migrationManifest = try JSONDecoder().decode(
+            VerifiedMigrationBackupManifest.self,
+            from: Data(
+                contentsOf: VerifiedMigrationBackup.activeManifestURL(for: legacyLedgerURL)
+            )
+        )
+        XCTAssertEqual(migrationManifest.state, .completed)
+        XCTAssertEqual(migrationManifest.storageKind, .file)
+        XCTAssertEqual(migrationManifest.sourceVersion, 1)
+        XCTAssertEqual(migrationManifest.targetVersion, 2)
+        XCTAssertEqual(migrationManifest.sourceSHA256, JSONSupport.sha256Hex(legacyData))
+        XCTAssertEqual(
+            migrationManifest.targetSHA256,
+            JSONSupport.sha256Hex(try Data(contentsOf: targetArtifactURL))
+        )
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: VerifiedMigrationBackup.archivedManifestURL(
+                    for: backupURL,
+                    targetVersion: 2
+                ).path
+            )
+        )
+        let firstBackupData = try Data(contentsOf: backupURL)
         let legacyCount = await migrated.legacyQuarantineCount()
         XCTAssertEqual(legacyCount, 1)
-        let migratedText = try String(contentsOf: legacyLedgerURL, encoding: .utf8)
+        let firstMigrationData = try Data(contentsOf: legacyLedgerURL)
+        let migratedText = try XCTUnwrap(String(data: firstMigrationData, encoding: .utf8))
         XCTAssertTrue(migratedText.contains("legacy_v1_untrusted_provider_identity"))
         XCTAssertFalse(migratedText.contains("forge-logical-session-private"))
         XCTAssertFalse(migratedText.contains("native-fabricated-private"))
         XCTAssertFalse(migratedText.contains("legacy-private-key"))
+        let migratedObject = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: firstMigrationData) as? [String: Any]
+        )
+        XCTAssertEqual(migratedObject["schema_version"] as? Int, 2)
+        XCTAssertEqual((migratedObject["records"] as? [[String: Any]])?.count, 0)
+        XCTAssertEqual((migratedObject["legacy_quarantine"] as? [[String: Any]])?.count, 1)
+
+        try legacyData.write(to: legacyLedgerURL, options: .atomic)
+        let preparedBackup = try VerifiedMigrationBackup.copyFile(
+            from: legacyLedgerURL,
+            to: backupURL,
+            maximumBytes: 2 * 1_024 * 1_024
+        )
+        let preparedTarget = try VerifiedMigrationBackup.writeFile(
+            firstMigrationData,
+            to: targetArtifactURL,
+            maximumBytes: 2 * 1_024 * 1_024
+        )
+        let preparedRestart = try VerifiedMigrationBackup.prepareMigrationManifest(
+            sourceURL: legacyLedgerURL,
+            backup: preparedBackup,
+            sourceVersion: 1,
+            targetVersion: 2,
+            storageKind: .file,
+            targetArtifact: preparedTarget
+        )
+        XCTAssertEqual(preparedRestart.state, .prepared)
+        let resumedAfterPrepared = try LMStudioManagedSessionHostAdapterV2(
+            storageDirectory: legacyRoot,
+            transport: legacyTransport
+        )
+        let resumedLegacyCount = await resumedAfterPrepared.legacyQuarantineCount()
+        XCTAssertEqual(resumedLegacyCount, 1)
+        XCTAssertEqual(try Data(contentsOf: legacyLedgerURL), firstMigrationData)
+        XCTAssertEqual(
+            try JSONDecoder().decode(
+                VerifiedMigrationBackupManifest.self,
+                from: Data(
+                    contentsOf: VerifiedMigrationBackup.activeManifestURL(for: legacyLedgerURL)
+                )
+            ).state,
+            .completed
+        )
+
+        let reopenedTransport = ScriptedManagedTransport(
+            mode: .normal,
+            ledgerURL: legacyLedgerURL
+        )
+        let reopened = try LMStudioManagedSessionHostAdapterV2(
+            storageDirectory: legacyRoot,
+            transport: reopenedTransport
+        )
+        let reopenedLegacyCount = await reopened.legacyQuarantineCount()
+        XCTAssertEqual(reopenedLegacyCount, 1)
+        XCTAssertEqual(try Data(contentsOf: legacyLedgerURL), firstMigrationData)
+        XCTAssertEqual(try Data(contentsOf: backupURL), firstBackupData)
+
+        let rerun = try LMStudioManagedSessionHostAdapterV2(
+            storageDirectory: legacyRoot,
+            transport: reopenedTransport
+        )
+        let rerunLegacyCount = await rerun.legacyQuarantineCount()
+        XCTAssertEqual(rerunLegacyCount, 1)
+        XCTAssertEqual(try Data(contentsOf: legacyLedgerURL), firstMigrationData)
+        XCTAssertEqual(try Data(contentsOf: backupURL), firstBackupData)
+    }
+
+    func testNativeLedgerChangedRestoreUsesBoundedImmutableLineages() async throws {
+        let root = temporaryRoot("v2-ledger-lineages")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let ledgerURL = root.appendingPathComponent("native-session-ledger.json")
+        let transport = ScriptedManagedTransport(mode: .normal, ledgerURL: ledgerURL)
+
+        func legacyData(_ lineage: Int) throws -> Data {
+            try JSONSerialization.data(withJSONObject: [
+                "schemaVersion": 1,
+                "records": [[
+                    "sessionID": "legacy-logical-\(lineage)",
+                    "providerSessionID": "legacy-provider-\(lineage)",
+                    "idempotencyKey": "legacy-idempotency-\(lineage)",
+                ]],
+            ], options: [.sortedKeys])
+        }
+
+        let firstSource = try legacyData(1)
+        try firstSource.write(to: ledgerURL, options: .atomic)
+        let first = try LMStudioManagedSessionHostAdapterV2(
+            storageDirectory: root,
+            transport: transport
+        )
+        let firstQuarantineCount = await first.legacyQuarantineCount()
+        XCTAssertEqual(firstQuarantineCount, 1)
+        let firstBackupURL = root.appendingPathComponent(
+            "native-session-ledger.pre-migration-v1.json"
+        )
+        let firstTargetURL = root.appendingPathComponent(
+            "native-session-ledger.schema-v2.target.json"
+        )
+        let firstBackup = try Data(contentsOf: firstBackupURL)
+        let firstTarget = try Data(contentsOf: firstTargetURL)
+        let firstArchiveURL = VerifiedMigrationBackup.archivedManifestURL(
+            for: firstBackupURL,
+            targetVersion: 2
+        )
+        let firstArchive = try Data(contentsOf: firstArchiveURL)
+
+        let secondSource = try legacyData(2)
+        try secondSource.write(to: ledgerURL, options: .atomic)
+        let second = try LMStudioManagedSessionHostAdapterV2(
+            storageDirectory: root,
+            transport: transport
+        )
+        let secondQuarantineCount = await second.legacyQuarantineCount()
+        XCTAssertEqual(secondQuarantineCount, 1)
+        let secondBackupURL = root.appendingPathComponent(
+            "native-session-ledger.pre-migration-v1.lineage-2.json"
+        )
+        let secondTargetURL = root.appendingPathComponent(
+            "native-session-ledger.schema-v2.target.lineage-2.json"
+        )
+        XCTAssertEqual(try Data(contentsOf: secondBackupURL), secondSource)
+        XCTAssertEqual(try Data(contentsOf: firstBackupURL), firstBackup)
+        XCTAssertEqual(try Data(contentsOf: firstTargetURL), firstTarget)
+        XCTAssertEqual(try Data(contentsOf: firstArchiveURL), firstArchive)
+
+        let secondManifest = try JSONDecoder().decode(
+            VerifiedMigrationBackupManifest.self,
+            from: Data(contentsOf: VerifiedMigrationBackup.activeManifestURL(for: ledgerURL))
+        )
+        XCTAssertEqual(secondManifest.state, .completed)
+        XCTAssertEqual(secondManifest.backupFilename, secondBackupURL.lastPathComponent)
+        XCTAssertEqual(secondManifest.targetArtifactFilename, secondTargetURL.lastPathComponent)
+        XCTAssertEqual(secondManifest.sourceSHA256, JSONSupport.sha256Hex(secondSource))
+        XCTAssertEqual(
+            secondManifest.targetSHA256,
+            JSONSupport.sha256Hex(try Data(contentsOf: secondTargetURL))
+        )
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: VerifiedMigrationBackup.archivedManifestURL(
+                    for: secondBackupURL,
+                    targetVersion: 2
+                ).path
+            )
+        )
+        let secondInstalled = try Data(contentsOf: ledgerURL)
+        _ = try LMStudioManagedSessionHostAdapterV2(
+            storageDirectory: root,
+            transport: transport
+        )
+        XCTAssertEqual(try Data(contentsOf: ledgerURL), secondInstalled)
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: root.appendingPathComponent(
+                    "native-session-ledger.pre-migration-v1.lineage-3.json"
+                ).path
+            )
+        )
+
+        for lineage in 3...LMStudioManagedSessionHostAdapterV2.maximumMigrationLineages {
+            try legacyData(lineage).write(to: ledgerURL, options: .atomic)
+            _ = try LMStudioManagedSessionHostAdapterV2(
+                storageDirectory: root,
+                transport: transport
+            )
+        }
+        let completedFourthManifest = try Data(
+            contentsOf: VerifiedMigrationBackup.activeManifestURL(for: ledgerURL)
+        )
+        let fifthSource = try legacyData(
+            LMStudioManagedSessionHostAdapterV2.maximumMigrationLineages + 1
+        )
+        try fifthSource.write(to: ledgerURL, options: .atomic)
+        XCTAssertThrowsError(
+            try LMStudioManagedSessionHostAdapterV2(
+                storageDirectory: root,
+                transport: transport
+            )
+        ) { error in
+            XCTAssertTrue(
+                error.localizedDescription.contains(
+                    "all bounded file migration lineages are occupied"
+                )
+            )
+        }
+        XCTAssertEqual(try Data(contentsOf: ledgerURL), fifthSource)
+        XCTAssertEqual(
+            try Data(contentsOf: VerifiedMigrationBackup.activeManifestURL(for: ledgerURL)),
+            completedFourthManifest
+        )
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: root.appendingPathComponent(
+                    "native-session-ledger.pre-migration-v1.lineage-5.json"
+                ).path
+            )
+        )
     }
 
     func testLiveLMStudioFreshRootAcknowledgementAndAutomaticContinuation() async throws {

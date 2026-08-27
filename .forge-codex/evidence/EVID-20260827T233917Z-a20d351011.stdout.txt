@@ -1,0 +1,825 @@
+{
+  "additive_tool_count": 29,
+  "additive_tools": [
+    "bash.run",
+    "continuity.acknowledge_handoff",
+    "continuity.checkpoint",
+    "continuity.get_pending_handoff",
+    "continuity.prepare_handoff",
+    "continuity.request_rollover",
+    "continuity.resume",
+    "continuity.status",
+    "job.cancel",
+    "job.list",
+    "job.read_output",
+    "job.status",
+    "powershell.run",
+    "process.run",
+    "project_memory.export",
+    "project_memory.forget",
+    "project_memory.get",
+    "project_memory.import",
+    "project_memory.initialize",
+    "project_memory.link",
+    "project_memory.list_recent",
+    "project_memory.remember",
+    "project_memory.remember_batch",
+    "project_memory.search",
+    "project_memory.status",
+    "project_memory.update",
+    "python.run",
+    "runtime.capabilities",
+    "shell.run"
+  ],
+  "artifacts": {
+    "baseline_transcript": {
+      "bytes": 8568,
+      "path": ".forge-codex/evidence/EVID-20260823T184311Z-0dccfacc9f.stdout.txt",
+      "sha256": "332c4bc6124e9792eaf8d9aad109c79948ddff52f0cd56c228ad1abe01f4781b"
+    },
+    "binary": {
+      "bytes": 13148880,
+      "path": ".build/arm64-apple-macosx/release/forge-conductor",
+      "sha256": "f4f70d3609acbdb8a09f89750ec1dc87673bb70a96bf38590a60bc01b85dd5a3"
+    },
+    "request_fixture": {
+      "bytes": 470,
+      "path": ".forge-codex/state/baseline/mcp-baseline-requests.ndjson",
+      "sha256": "3847873ebea36d3f0bf5f408cd1f72fad9fc45b948a68960b036f42072408d53"
+    },
+    "runtime_transcript": {
+      "bytes": 599096,
+      "path": ".forge-codex/evidence/P10-mcp-runtime-transcript.json",
+      "sha256": "10b6f819012847a9545e98ce815ada47d8b503cc7ebfa6e496395acb809fcc50"
+    }
+  },
+  "compatibility_checks": [
+    "p01_baseline_artifacts_valid",
+    "initialize_all_supported_versions",
+    "tools_list_all_supported_versions",
+    "resources_list_all_supported_versions",
+    "prompts_list_all_supported_versions",
+    "ping_all_supported_versions",
+    "legacy_tool_inventory_preserved",
+    "legacy_descriptions_preserved",
+    "legacy_schemas_recursively_non_narrowing",
+    "protocol_tool_descriptors_identical",
+    "additive_tools_inventoried",
+    "bounded_process_shutdown",
+    "valid_content_length_input",
+    "malformed_content_length_rejected",
+    "oversized_content_length_rejected",
+    "unknown_method_negative_32601",
+    "legacy_tool_success_all_baseline_methods",
+    "legacy_tool_call_success_envelopes",
+    "typed_tool_error_envelope",
+    "unknown_cancellation_ignored",
+    "completed_request_id_reusable",
+    "active_in_flight_cancellation",
+    "non_shell_active_cancellation",
+    "non_shell_request_deadline",
+    "strict_non_shell_cancellation_latency",
+    "strict_non_shell_deadline_latency",
+    "truthful_post_commit_cancellation_reconciliation",
+    "active_request_eof_shutdown",
+    "cli_serve_disconnect_shutdown",
+    "concurrent_mixed_request_correlation",
+    "typed_numeric_and_string_request_ids",
+    "fresh_process_restart_and_eof",
+    "project_memory_cursor_pagination"
+  ],
+  "current_tool_count": 63,
+  "description_breaks": [],
+  "generated_at": "2026-08-27T23:39:26.121145+00:00",
+  "legacy_tool_count": 34,
+  "legacy_tools": [
+    "agent_context",
+    "agent_get",
+    "agent_list",
+    "agent_recommend",
+    "agent_run_complete",
+    "agent_run_start",
+    "agent_run_status",
+    "context_get",
+    "context_list",
+    "forge_status",
+    "fs_delete",
+    "fs_edit",
+    "fs_glob",
+    "fs_list",
+    "fs_mkdir",
+    "fs_move",
+    "fs_read",
+    "fs_write",
+    "git_add",
+    "git_commit",
+    "git_diff",
+    "git_log",
+    "git_status",
+    "memory_delete",
+    "memory_get",
+    "memory_list",
+    "memory_search",
+    "memory_set",
+    "pdf_from_file",
+    "pdf_write",
+    "search_text",
+    "session_checkpoint",
+    "session_handoff",
+    "shell_exec"
+  ],
+  "normalized_hashes": {
+    "additive_descriptors": "63d26776a5fa33d6c0e40818407da7dab0e25879fd9c19e3e5cb6493aca12f19",
+    "additive_inventory": "382b1714f4897f1756f25455b40d7808e3a3f46bc91e8ec4e3db5e64015ec9b0",
+    "baseline_legacy_descriptors": "7a8536746326a55dd68d5614d41936144b1a39b5c74742637c7703613d5ca997",
+    "baseline_transcript": "62d64fa6b7ee95b59ee605e9e05b324f0c9f29690e9bb38abc144d3a6bd8a829",
+    "current_legacy_descriptors": "cdb0fa496e9c87d4d4c4f49c35eb4e18ba1db94c07611788e8498b6beb3b2fe7",
+    "report_payload_without_self_hash": "e4b7a20198be7d1e7b7308bb880022b3cd2935ae836c9abd8594cde9722a2f12",
+    "request_fixture": "01557938fbacb4cbad69ac843867445c83dd9fe72a218bbbdbf1f68ba3e3c945",
+    "runtime_transcript": "52839ac795d566af7342b2f74c07619655ff47501340fd3ad676cb3a25212690",
+    "tool_descriptors_by_protocol": {
+      "2024-11-05": "dd9398ea9963969157fffc0f2a02d13e8431bb69d023544388593229ab15d70b",
+      "2025-03-26": "dd9398ea9963969157fffc0f2a02d13e8431bb69d023544388593229ab15d70b",
+      "2025-06-18": "dd9398ea9963969157fffc0f2a02d13e8431bb69d023544388593229ab15d70b",
+      "2025-11-25": "dd9398ea9963969157fffc0f2a02d13e8431bb69d023544388593229ab15d70b"
+    },
+    "tool_inventories_by_protocol": {
+      "2024-11-05": "032199f74fca9992e133098374ff5b104525d2351513d2220fdb0d64b12c922b",
+      "2025-03-26": "032199f74fca9992e133098374ff5b104525d2351513d2220fdb0d64b12c922b",
+      "2025-06-18": "032199f74fca9992e133098374ff5b104525d2351513d2220fdb0d64b12c922b",
+      "2025-11-25": "032199f74fca9992e133098374ff5b104525d2351513d2220fdb0d64b12c922b"
+    },
+    "wire_probes": "d155df346e511a2d122223cb38d33aa7576297bf7757644465cdb589ad48a66e",
+    "wire_probes_by_name": {
+      "active_in_flight_cancellation": "4032401efe012458f9a5bbbf7d611a6b54c15ed3f0f23547c3155bc8b2720da2",
+      "active_request_eof_shutdown": "9ade546a9e73e82f327555de9f3ee966d170737c8e3a8bf498925fa6cc982a27",
+      "concurrent_mixed_request_correlation": "fce4a1cefa9410ad1b1d76d549cfea8f0bd05df02f05bbd2a23fc60e89f2d072",
+      "content_length_input": "1b988f5ad1b5b2771bd7f5484530b1f37275b8bbe01a8c8137964a904e6f081a",
+      "git_post_commit_reconciliation": "854308ddaa77938b636ceae1701f3a44df8e5c7f62d07594ddd1c5c5269c837b",
+      "legacy_tool_success_matrix": "41aeff89acbca670f6eb5b646fc907ca47ddc95c77c8e96a76f5772258f484fc",
+      "malformed_content_length": "474beed5ebc1e7c7f326ed44b52eb977262ffcb00205b1aeff53122d4dd4ecde",
+      "non_shell_search_control": "c5d3a7913d5c828652bb51cd9a479dbf2497474a13c4fd6c93526f5bca1733c3",
+      "oversized_content_length": "b26669c67ec7aeb08a22070a12644ccafd11670c05541ea137f1b5ff2f240119",
+      "pagination": "7b3bb1d49fbb14437264cd06bbd9ee57b7a500c71524182390d2eaed9d055f28",
+      "restart_and_eof": "e2dd94320cda0de6703482a89cd72cb76218c75deb9184e5af64d4def107775a",
+      "typed_tool_error": "38e0ac9dcef0378561dbb288a55e0230193e82355e2460d782468abf5f753f4e",
+      "unknown_cancellation": "98ae1408e39dcd28dcf882fee80b076b9b7b18e7549c20c7c3f44a251c1badfd",
+      "unknown_method": "4cd00362b0a6fad976e5ef5e6734819098f908137b1f7c1e055b49a73a9aec17"
+    }
+  },
+  "ok": true,
+  "protocol_runs": [
+    {
+      "exit_code": 0,
+      "normalized_transcript_sha256": "aac3984ed66535b98ecef784638a64fccb8364981bbe6602db9123db91529d15",
+      "prompts_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "protocol_version": "2025-11-25",
+      "resources_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "tool_count": 63,
+      "tool_descriptors_sha256": "dd9398ea9963969157fffc0f2a02d13e8431bb69d023544388593229ab15d70b"
+    },
+    {
+      "exit_code": 0,
+      "normalized_transcript_sha256": "b0282c5537fcecb2683c652553e67da47427d8cddfcddbec80ad5fae2fefa520",
+      "prompts_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "protocol_version": "2025-06-18",
+      "resources_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "tool_count": 63,
+      "tool_descriptors_sha256": "dd9398ea9963969157fffc0f2a02d13e8431bb69d023544388593229ab15d70b"
+    },
+    {
+      "exit_code": 0,
+      "normalized_transcript_sha256": "dc9f52b117177df63455a76f8adf37b0e018a656a7c31d1b3acb7f121aaaf9ad",
+      "prompts_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "protocol_version": "2025-03-26",
+      "resources_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "tool_count": 63,
+      "tool_descriptors_sha256": "dd9398ea9963969157fffc0f2a02d13e8431bb69d023544388593229ab15d70b"
+    },
+    {
+      "exit_code": 0,
+      "normalized_transcript_sha256": "04dc9bd3d6d8cc393a5041c0eac3d493bf68e1347ef7ee6c713f4cd42ff058f2",
+      "prompts_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "protocol_version": "2024-11-05",
+      "resources_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "tool_count": 63,
+      "tool_descriptors_sha256": "dd9398ea9963969157fffc0f2a02d13e8431bb69d023544388593229ab15d70b"
+    }
+  ],
+  "protocol_versions": [
+    "2025-11-25",
+    "2025-06-18",
+    "2025-03-26",
+    "2024-11-05"
+  ],
+  "removed_tools": [],
+  "schema_breaks": [],
+  "schema_version": 1,
+  "scope": "executable descriptor, success, concurrency, cancellation, deadline, committed-result truthfulness, framing, restart, and pagination compatibility",
+  "source": {
+    "dirty": true,
+    "repository_root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "revision": "973a45f857f2c5f6fbc3e22b939df2429df720d9",
+    "status": [
+      " M .forge-codex/evidence/P10-mcp-runtime-transcript.json",
+      " M .forge-codex/evidence/P10-protocol-compatibility-report.json",
+      " M .forge-codex/scripts/check_p09_completion.py",
+      " M .forge-codex/scripts/check_p10_protocol_compatibility.py",
+      " M .forge-codex/state/environment.json",
+      " M .forge-codex/state/events.jsonl",
+      " M .forge-codex/state/run-state.json",
+      " M ForgeConductor.xcodeproj/project.pbxproj",
+      " M Sources/ForgeConductorCore/Application/AgentSessionService.swift",
+      " M Sources/ForgeConductorCore/Application/ContextContinuityService.swift",
+      " M Sources/ForgeConductorCore/Application/ContinuityAutomation.swift",
+      " M Sources/ForgeConductorCore/Application/ContinuityCoordinator.swift",
+      " M Sources/ForgeConductorCore/Application/ExecutionJobService.swift",
+      " M Sources/ForgeConductorCore/Application/ForgeApp.swift",
+      " M Sources/ForgeConductorCore/Application/ProjectContextService.swift",
+      " M Sources/ForgeConductorCore/Application/ProjectMemoryService.swift",
+      " M Sources/ForgeConductorCore/Application/RuntimeJobSubsystem.swift",
+      " M Sources/ForgeConductorCore/Application/ToolAuthorizationService.swift",
+      " M Sources/ForgeConductorCore/Application/ToolDefinitionCatalog.swift",
+      " M Sources/ForgeConductorCore/Application/ToolRouter.swift",
+      " M Sources/ForgeConductorCore/Application/Tools/AgentToolPack.swift",
+      " M Sources/ForgeConductorCore/Application/Tools/ContinuityLifecycleToolPack.swift",
+      " M Sources/ForgeConductorCore/Application/Tools/ContinuityToolPack.swift",
+      " M Sources/ForgeConductorCore/Application/Tools/DocsToolPack.swift",
+      " M Sources/ForgeConductorCore/Application/Tools/FilesystemToolPack.swift",
+      " M Sources/ForgeConductorCore/Application/Tools/GitToolPack.swift",
+      " M Sources/ForgeConductorCore/Application/Tools/MemoryToolPack.swift",
+      " M Sources/ForgeConductorCore/Application/Tools/ProjectMemoryToolPack.swift",
+      " M Sources/ForgeConductorCore/Application/Tools/RuntimeJobToolPack.swift",
+      " M Sources/ForgeConductorCore/Application/Tools/SearchToolPack.swift",
+      " M Sources/ForgeConductorCore/Application/Tools/ShellToolPack.swift",
+      " M Sources/ForgeConductorCore/Application/Tools/ToolArgHelpers.swift",
+      " M Sources/ForgeConductorCore/Domain/RuntimeJobModels.swift",
+      " M Sources/ForgeConductorCore/Infrastructure/AuditService.swift",
+      " M Sources/ForgeConductorCore/Infrastructure/DiagnosticLog.swift",
+      " M Sources/ForgeConductorCore/Infrastructure/PDFWriter.swift",
+      " M Sources/ForgeConductorCore/Infrastructure/ProcessRunner.swift",
+      " M Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift",
+      " M Sources/ForgeConductorCore/Infrastructure/ProjectMemoryRepository.swift",
+      " M Sources/ForgeConductorCore/Infrastructure/RuntimeJobRepository.swift",
+      " M Sources/ForgeConductorCore/Infrastructure/SQLiteStore.swift",
+      " M Sources/ForgeConductorCore/MCP/MCPServer.swift",
+      " M Sources/ForgeNativeSessionHostPlugin/ForgeNativeSessionHostPlugin.swift",
+      " M Tests/ForgeConductorTests/AppConfigAndDoctorTests.swift",
+      " M Tests/ForgeConductorTests/ContinuityCoordinatorTests.swift",
+      " M Tests/ForgeConductorTests/ContinuityTests.swift",
+      " M Tests/ForgeConductorTests/ContinuityV2Tests.swift",
+      " M Tests/ForgeConductorTests/CoreTests.swift",
+      " M Tests/ForgeConductorTests/MCPProtocolAndDiagnosticsTests.swift",
+      " M Tests/ForgeConductorTests/MemoryToolTests.swift",
+      " M Tests/ForgeConductorTests/ProcessRunnerTests.swift",
+      " M Tests/ForgeConductorTests/ProjectControlPlaneRepositoryTests.swift",
+      " M Tests/ForgeConductorTests/ProjectMemoryTests.swift",
+      " M Tests/ForgeConductorTests/ResourcePolicyTests.swift",
+      " M Tests/ForgeConductorTests/RuntimeExecutionJobTests.swift",
+      " M Tests/ForgeConductorTests/ToolDefinitionCatalogTests.swift",
+      "?? .forge-codex/evidence/EVID-20260827T211934Z-a744b1e1d1.json",
+      "?? .forge-codex/evidence/EVID-20260827T211934Z-a744b1e1d1.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T211934Z-a744b1e1d1.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T211935Z-0edebe128b.json",
+      "?? .forge-codex/evidence/EVID-20260827T211935Z-0edebe128b.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T211935Z-0edebe128b.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T211945Z-695f17ed45.json",
+      "?? .forge-codex/evidence/EVID-20260827T211945Z-695f17ed45.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T211945Z-695f17ed45.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T212011Z-dcbc2f4541.json",
+      "?? .forge-codex/evidence/EVID-20260827T212011Z-dcbc2f4541.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T212011Z-dcbc2f4541.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T212114Z-8a65f1e92b.json",
+      "?? .forge-codex/evidence/EVID-20260827T212114Z-8a65f1e92b.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T212114Z-8a65f1e92b.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T212325Z-24175c9913.json",
+      "?? .forge-codex/evidence/EVID-20260827T212325Z-24175c9913.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T212325Z-24175c9913.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T212325Z-bf0c4e2418.json",
+      "?? .forge-codex/evidence/EVID-20260827T212325Z-bf0c4e2418.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T212325Z-bf0c4e2418.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T212325Z-d7c34d9501.json",
+      "?? .forge-codex/evidence/EVID-20260827T212325Z-d7c34d9501.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T212325Z-d7c34d9501.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T212528Z-518ab7b892.json",
+      "?? .forge-codex/evidence/EVID-20260827T212528Z-518ab7b892.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T212528Z-518ab7b892.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T212528Z-674475b1bd.json",
+      "?? .forge-codex/evidence/EVID-20260827T212528Z-674475b1bd.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T212528Z-674475b1bd.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T212538Z-c17d5d9b6c.json",
+      "?? .forge-codex/evidence/EVID-20260827T212538Z-c17d5d9b6c.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T212538Z-c17d5d9b6c.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T212604Z-2853075aa5.json",
+      "?? .forge-codex/evidence/EVID-20260827T212604Z-2853075aa5.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T212604Z-2853075aa5.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T212606Z-ce5c409c24.json",
+      "?? .forge-codex/evidence/EVID-20260827T212606Z-ce5c409c24.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T212606Z-ce5c409c24.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T212608Z-5b1f4f27b0.json",
+      "?? .forge-codex/evidence/EVID-20260827T212608Z-5b1f4f27b0.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T212608Z-5b1f4f27b0.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T215814Z-89ce0c1520.json",
+      "?? .forge-codex/evidence/EVID-20260827T215814Z-89ce0c1520.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T215814Z-89ce0c1520.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T215814Z-ebeefc3719.json",
+      "?? .forge-codex/evidence/EVID-20260827T215814Z-ebeefc3719.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T215814Z-ebeefc3719.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T233859Z-44a7b8fe31.json",
+      "?? .forge-codex/evidence/EVID-20260827T233859Z-44a7b8fe31.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T233859Z-44a7b8fe31.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260827T233917Z-a20d351011.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260827T233917Z-a20d351011.stdout.txt",
+      "?? Sources/ForgeConductorCore/Infrastructure/OwnerOnlyAtomicFile.swift",
+      "?? Tests/ForgeConductorTests/CommittedResultRecoveryTests.swift",
+      "?? Tests/ForgeConductorTests/DiagnosticBoundaryTests.swift",
+      "?? Tests/ForgeConductorTests/FilesystemCancellationTests.swift",
+      "?? Tests/ForgeConductorTests/LegacyContinuityCancellationTests.swift",
+      "?? Tests/ForgeConductorTests/OwnerOnlyAtomicFileTests.swift",
+      "?? Tests/ForgeConductorTests/ToolRouterDeadlineTests.swift"
+    ],
+    "status_sha256": "b0c3627b3fddef81d844f3fcd4f25ebacee597b2d97d19205dcbaab0a0bd2c52"
+  },
+  "source_manifest": {
+    "bytes": 8884030,
+    "file_count": 241,
+    "schema_version": 1,
+    "sha256": "51eef96aa7b01c71ddba8d0446923a1e4ced268711f4810ebda1e1cc95bc9b28"
+  },
+  "status": "passed",
+  "uncovered_checks": [],
+  "wire_coverage": {
+    "active_in_flight_cancellation": {
+      "probe": "active_in_flight_cancellation",
+      "status": "passed"
+    },
+    "active_request_eof_shutdown": {
+      "probe": "active_request_eof_shutdown",
+      "status": "passed"
+    },
+    "concurrent_mixed_request_correlation": {
+      "probe": "concurrent_mixed_request_correlation",
+      "status": "passed"
+    },
+    "content_length_input": {
+      "probe": "content_length_input",
+      "status": "passed"
+    },
+    "git_post_commit_reconciliation": {
+      "probe": "git_post_commit_reconciliation",
+      "status": "passed"
+    },
+    "legacy_tool_success_matrix": {
+      "probe": "legacy_tool_success_matrix",
+      "status": "passed"
+    },
+    "malformed_content_length": {
+      "probe": "malformed_content_length",
+      "status": "passed"
+    },
+    "non_shell_search_control": {
+      "probe": "non_shell_search_control",
+      "status": "passed"
+    },
+    "oversized_content_length": {
+      "probe": "oversized_content_length",
+      "status": "passed"
+    },
+    "pagination": {
+      "probe": "pagination",
+      "status": "passed"
+    },
+    "restart_and_eof": {
+      "probe": "restart_and_eof",
+      "status": "passed"
+    },
+    "typed_tool_error": {
+      "probe": "typed_tool_error",
+      "status": "passed"
+    },
+    "unknown_cancellation": {
+      "probe": "unknown_cancellation",
+      "status": "passed"
+    },
+    "unknown_method": {
+      "probe": "unknown_method",
+      "status": "passed"
+    }
+  },
+  "wire_probe_results": [
+    {
+      "checks": [
+        "valid_content_length_input",
+        "ndjson_response",
+        "bounded_eof_shutdown"
+      ],
+      "cycle_wire_inputs": [],
+      "exit_codes": [
+        0
+      ],
+      "name": "content_length_input",
+      "normalized_probe_payload_sha256": "1b988f5ad1b5b2771bd7f5484530b1f37275b8bbe01a8c8137964a904e6f081a",
+      "status": "passed",
+      "stderr": [
+        {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "wire_input": {
+        "bytes": 129,
+        "declared_content_length": 106,
+        "framing": "content_length",
+        "sha256": "a7de7253e8ba0a4680c3438403b0393a40e72db743250b9af136c5b1b8c34ba3"
+      }
+    },
+    {
+      "checks": [
+        "malformed_content_length_rejected",
+        "no_response_before_rejection",
+        "bounded_failure_exit"
+      ],
+      "cycle_wire_inputs": [],
+      "exit_codes": [
+        1
+      ],
+      "name": "malformed_content_length",
+      "normalized_probe_payload_sha256": "474beed5ebc1e7c7f326ed44b52eb977262ffcb00205b1aeff53122d4dd4ecde",
+      "status": "passed",
+      "stderr": [
+        {
+          "bytes": 332,
+          "sha256": "e7c0daea774a3b068caaa51f9347e819943979e007049259885860dad3dc3d33",
+          "utf8_tail": "error: Error Domain=NSCocoaErrorDomain Code=3840 \"JSON text did not start with array or object and option to allow fragments not set. around line 1, column 0.\" UserInfo={NSDebugDescription=JSON text did not start with array or object and option to allow fragments not set. around line 1, column 0., NSJSONSerializationErrorIndex=0}\n"
+        }
+      ],
+      "wire_input": {
+        "bytes": 34,
+        "framing": "content_length",
+        "sha256": "d26a2850f1fe200db1fd1cb9526e989bea531a53aedaea778a04bedcefb1bdc8"
+      }
+    },
+    {
+      "checks": [
+        "oversized_content_length_rejected",
+        "no_body_read",
+        "bounded_failure_exit"
+      ],
+      "cycle_wire_inputs": [],
+      "exit_codes": [
+        1
+      ],
+      "name": "oversized_content_length",
+      "normalized_probe_payload_sha256": "b26669c67ec7aeb08a22070a12644ccafd11670c05541ea137f1b5ff2f240119",
+      "status": "passed",
+      "stderr": [
+        {
+          "bytes": 32,
+          "sha256": "ade9dd011c36d2eecfbd960b4fa8f5f90f1ec87454441d5419fb6d41cb1515c3",
+          "utf8_tail": "error: messageTooLarge(4194304)\n"
+        }
+      ],
+      "wire_input": {
+        "bytes": 27,
+        "framing": "content_length",
+        "sha256": "247e6cdbf8dc6bb06e53f95584b0bd2c3c7d24ce7242b4b0fb0119b18544f740"
+      }
+    },
+    {
+      "checks": [
+        "unknown_method_error_code",
+        "unknown_method_error_envelope",
+        "bounded_eof_shutdown"
+      ],
+      "cycle_wire_inputs": [],
+      "exit_codes": [
+        0
+      ],
+      "name": "unknown_method",
+      "normalized_probe_payload_sha256": "4cd00362b0a6fad976e5ef5e6734819098f908137b1f7c1e055b49a73a9aec17",
+      "status": "passed",
+      "stderr": [
+        {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "wire_input": {
+        "bytes": 314,
+        "framing": "ndjson",
+        "sha256": "35e34b40ca37ef34c823bb79364637b5c81fc8a52f52d2b992d3637d477f6f32"
+      }
+    },
+    {
+      "checks": [
+        "legacy_tool_success_all_baseline_methods",
+        "text_and_structured_content_match_all_baseline_methods",
+        "isolated_project_context",
+        "filesystem_side_effects_verified",
+        "git_side_effects_verified",
+        "runtime_side_effects_verified",
+        "memory_side_effects_verified",
+        "continuity_side_effects_verified",
+        "bounded_eof_shutdown"
+      ],
+      "cycle_wire_inputs": [],
+      "exit_codes": [
+        0
+      ],
+      "name": "legacy_tool_success_matrix",
+      "normalized_probe_payload_sha256": "41aeff89acbca670f6eb5b646fc907ca47ddc95c77c8e96a76f5772258f484fc",
+      "status": "passed",
+      "stderr": [
+        {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "wire_input": {
+        "bytes": 8039,
+        "framing": "ndjson",
+        "sha256": "3f157229a39dbdf473c97f515343d62f349a5b10808c87d43289543d535f0ba7"
+      }
+    },
+    {
+      "checks": [
+        "typed_tool_error",
+        "invalid_key_code",
+        "text_and_structured_content_match",
+        "is_error_true"
+      ],
+      "cycle_wire_inputs": [],
+      "exit_codes": [
+        0
+      ],
+      "name": "typed_tool_error",
+      "normalized_probe_payload_sha256": "38e0ac9dcef0378561dbb288a55e0230193e82355e2460d782468abf5f753f4e",
+      "status": "passed",
+      "stderr": [
+        {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "wire_input": {
+        "bytes": 326,
+        "framing": "ndjson",
+        "sha256": "b554348815c5e5e3fc4cada798f4bf037f2fcc5dc941a4dcdcafa37b563c5b20"
+      }
+    },
+    {
+      "checks": [
+        "unknown_cancellation_ignored",
+        "completed_request_id_reusable",
+        "exactly_one_response_per_request",
+        "bounded_eof_shutdown"
+      ],
+      "cycle_wire_inputs": [],
+      "exit_codes": [
+        0
+      ],
+      "name": "unknown_cancellation",
+      "normalized_probe_payload_sha256": "98ae1408e39dcd28dcf882fee80b076b9b7b18e7549c20c7c3f44a251c1badfd",
+      "status": "passed",
+      "stderr": [
+        {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "wire_input": {
+        "bytes": 453,
+        "framing": "ndjson",
+        "sha256": "3a32c4459c1fa5532861a4466f45bd5f71dee4d588343376f713557a033a473a"
+      }
+    },
+    {
+      "checks": [
+        "concurrent_mixed_request_correlation",
+        "out_of_order_completion",
+        "typed_numeric_and_string_request_ids",
+        "buffered_response_retrieval",
+        "exactly_one_response_per_request",
+        "bounded_eof_shutdown"
+      ],
+      "cycle_wire_inputs": [],
+      "exit_codes": [
+        0
+      ],
+      "name": "concurrent_mixed_request_correlation",
+      "normalized_probe_payload_sha256": "fce4a1cefa9410ad1b1d76d549cfea8f0bd05df02f05bbd2a23fc60e89f2d072",
+      "status": "passed",
+      "stderr": [
+        {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "wire_input": {
+        "bytes": 914,
+        "framing": "ndjson",
+        "sha256": "e58c5ed75ca4c4df5d64ccef7427bf7a4a61ef516df6a019d28500cdb3edb690"
+      }
+    },
+    {
+      "checks": [
+        "active_in_flight_cancellation",
+        "cancelled_error_code",
+        "cancelled_work_terminated",
+        "late_success_suppressed",
+        "exactly_one_response_per_request",
+        "bounded_eof_shutdown"
+      ],
+      "cycle_wire_inputs": [],
+      "exit_codes": [
+        0
+      ],
+      "name": "active_in_flight_cancellation",
+      "normalized_probe_payload_sha256": "4032401efe012458f9a5bbbf7d611a6b54c15ed3f0f23547c3155bc8b2720da2",
+      "status": "passed",
+      "stderr": [
+        {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "wire_input": {
+        "bytes": 1324,
+        "framing": "ndjson",
+        "sha256": "f3cbb3b24aaa25b9a67517b7a4dbf47c1cbf1ac2f7aee239a34ef1caac95a620"
+      }
+    },
+    {
+      "checks": [
+        "non_shell_active_cancellation",
+        "non_shell_request_deadline",
+        "fifo_reader_terminated_after_cancellation",
+        "fifo_reader_terminated_after_deadline",
+        "cancelled_error_code",
+        "deadline_exceeded_tool_error",
+        "strict_cancellation_latency",
+        "strict_deadline_latency",
+        "no_late_response_after_control_completion",
+        "exactly_one_response_per_request",
+        "bounded_eof_shutdown"
+      ],
+      "cycle_wire_inputs": [],
+      "exit_codes": [
+        0
+      ],
+      "name": "non_shell_search_control",
+      "normalized_probe_payload_sha256": "c5d3a7913d5c828652bb51cd9a479dbf2497474a13c4fd6c93526f5bca1733c3",
+      "status": "passed",
+      "stderr": [
+        {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "wire_input": {
+        "bytes": 1369,
+        "framing": "ndjson",
+        "sha256": "78f4f5c8eca6357895167addaa3cc6db6445290cd3becfb30178a9382ed55981"
+      }
+    },
+    {
+      "checks": [
+        "head_advanced_before_post_commit_cancellation",
+        "truthful_post_commit_cancellation_reconciliation",
+        "committed_content_preserved",
+        "success_response_after_committed_mutation",
+        "no_late_response_after_control_completion",
+        "exactly_one_response_per_request",
+        "bounded_eof_shutdown"
+      ],
+      "cycle_wire_inputs": [],
+      "exit_codes": [
+        0
+      ],
+      "name": "git_post_commit_reconciliation",
+      "normalized_probe_payload_sha256": "854308ddaa77938b636ceae1701f3a44df8e5c7f62d07594ddd1c5c5269c837b",
+      "status": "passed",
+      "stderr": [
+        {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "wire_input": {
+        "bytes": 1011,
+        "framing": "ndjson",
+        "sha256": "ddabff092f8200bffb083aaef3808502c226d78b9335b7baa49a4d27c30b2dbc"
+      }
+    },
+    {
+      "checks": [
+        "active_request_eof_shutdown",
+        "cli_serve_disconnect_shutdown",
+        "runtime_child_terminated_on_disconnect",
+        "no_late_response_after_eof",
+        "zero_exit_after_eof",
+        "bounded_eof_shutdown"
+      ],
+      "cycle_wire_inputs": [],
+      "exit_codes": [
+        0
+      ],
+      "name": "active_request_eof_shutdown",
+      "normalized_probe_payload_sha256": "9ade546a9e73e82f327555de9f3ee966d170737c8e3a8bf498925fa6cc982a27",
+      "status": "passed",
+      "stderr": [
+        {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "wire_input": {
+        "bytes": 1197,
+        "framing": "ndjson",
+        "sha256": "0ad9e1df23d8d750e3d3eef7ac1b24cc981144f1666f2f2a8c54be3fce6c824c"
+      }
+    },
+    {
+      "checks": [
+        "bounded_eof_shutdown",
+        "durable_home_reopen",
+        "fresh_process_restart",
+        "post_restart_ping"
+      ],
+      "cycle_wire_inputs": [
+        {
+          "bytes": 286,
+          "framing": "ndjson",
+          "sha256": "35133a7782401dc85d6014128bc4289d25469ae341c51bd9e50f8f69669844bc"
+        },
+        {
+          "bytes": 286,
+          "framing": "ndjson",
+          "sha256": "35133a7782401dc85d6014128bc4289d25469ae341c51bd9e50f8f69669844bc"
+        }
+      ],
+      "exit_codes": [
+        0,
+        0
+      ],
+      "name": "restart_and_eof",
+      "normalized_probe_payload_sha256": "e2dd94320cda0de6703482a89cd72cb76218c75deb9184e5af64d4def107775a",
+      "status": "passed",
+      "stderr": [
+        {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "wire_input": null
+    },
+    {
+      "checks": [
+        "project_memory_fixture_seeded",
+        "opaque_cursor_returned",
+        "cursor_page_has_no_duplicates",
+        "cursor_page_has_no_omissions",
+        "terminal_page_has_no_cursor",
+        "bounded_eof_shutdown"
+      ],
+      "cycle_wire_inputs": [],
+      "exit_codes": [
+        0
+      ],
+      "name": "pagination",
+      "normalized_probe_payload_sha256": "7b3bb1d49fbb14437264cd06bbd9ee57b7a500c71524182390d2eaed9d055f28",
+      "status": "passed",
+      "stderr": [
+        {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "wire_input": {
+        "bytes": 1730,
+        "framing": "ndjson",
+        "sha256": "c0edc64683377580774e066e7c225677c675447f65093f8ef7fc8df94dee9d6b"
+      }
+    }
+  ]
+}

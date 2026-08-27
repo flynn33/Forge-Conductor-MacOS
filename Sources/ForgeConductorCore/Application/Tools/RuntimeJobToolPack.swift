@@ -9,7 +9,7 @@ public protocol AsyncContextualToolPackHandling: Sendable {
         name: String,
         arguments: [String: Any],
         context: ToolInvocationContext
-    ) async -> ToolResult?
+    ) async throws -> ToolResult?
 }
 
 public struct RuntimeJobToolPack: AsyncContextualToolPackHandling, Sendable {
@@ -27,9 +27,31 @@ public struct RuntimeJobToolPack: AsyncContextualToolPackHandling, Sendable {
     ]
 
     private let service: ExecutionJobService
+    private let postCancellationCommit: (@Sendable () async -> Void)?
+    private let durableResultObserver: (@Sendable (ToolResult) -> Void)?
 
     public init(service: ExecutionJobService) {
         self.service = service
+        postCancellationCommit = nil
+        durableResultObserver = nil
+    }
+
+    init(
+        service: ExecutionJobService,
+        postCancellationCommit: @escaping @Sendable () async -> Void
+    ) {
+        self.service = service
+        self.postCancellationCommit = postCancellationCommit
+        durableResultObserver = nil
+    }
+
+    init(
+        service: ExecutionJobService,
+        durableResultObserver: @escaping @Sendable (ToolResult) -> Void
+    ) {
+        self.service = service
+        postCancellationCommit = nil
+        self.durableResultObserver = durableResultObserver
     }
 
     public var toolNames: [String] { Self.names }
@@ -111,25 +133,37 @@ public struct RuntimeJobToolPack: AsyncContextualToolPackHandling, Sendable {
         name: String,
         arguments: [String: Any],
         context: ToolInvocationContext
-    ) async -> ToolResult? {
+    ) async throws -> ToolResult? {
         guard Self.names.contains(name) else { return nil }
         do {
+            try Task.checkCancellation()
             try Self.requireAuthorization(name, context: context)
             switch name {
             case "runtime.capabilities":
-                return .success(Self.capabilitiesPayload(await service.capabilities()))
+                let payload = Self.capabilitiesPayload(await service.capabilities())
+                try Task.checkCancellation()
+                return .success(payload)
             case "process.run", "shell.run", "bash.run", "python.run", "powershell.run":
-                let request = try Self.request(name: name, arguments: arguments, context: context)
+                let request = try Self.request(
+                    name: name,
+                    arguments: arguments,
+                    context: context,
+                    didPersist: { record in
+                        durableResultObserver?(.success(Self.submissionPayload(record)))
+                    }
+                )
+                try Task.checkCancellation()
                 let jobID = try await service.submit(request)
-                return .success([
-                    "job_id": jobID.uuidString.lowercased(),
-                    "state": RuntimeJobState.queued.rawValue,
-                    "project_id": context.projectID.description,
-                    "project_generation": context.projectGeneration.rawValue,
-                ])
+                return .success(Self.submissionPayload(
+                    jobID: jobID,
+                    state: .queued,
+                    context: context
+                ))
             case "job.status":
                 let jobID = try Self.jobID(arguments)
-                return .success(Self.recordPayload(try await service.status(jobID: jobID, context: context)))
+                let record = try await service.status(jobID: jobID, context: context)
+                try Task.checkCancellation()
+                return .success(Self.recordPayload(record))
             case "job.read_output":
                 let jobID = try Self.jobID(arguments)
                 let stream = try Self.outputStream(arguments)
@@ -142,6 +176,7 @@ public struct RuntimeJobToolPack: AsyncContextualToolPackHandling, Sendable {
                     limit: limit,
                     context: context
                 )
+                try Task.checkCancellation()
                 return .success([
                     "job_id": jobID.uuidString.lowercased(),
                     "stream": stream.rawValue,
@@ -156,8 +191,17 @@ public struct RuntimeJobToolPack: AsyncContextualToolPackHandling, Sendable {
                 ])
             case "job.cancel":
                 let jobID = try Self.jobID(arguments)
-                try await service.cancel(jobID: jobID, context: context)
-                let record = try await service.status(jobID: jobID, context: context)
+                let record = try await service.cancelAndReturnRecord(
+                    jobID: jobID,
+                    context: context,
+                    commitObserver: { record in
+                        durableResultObserver?(.success(Self.recordPayload(record)))
+                    }
+                )
+                await postCancellationCommit?()
+                // requestCancellation returns the row captured at its durable commit
+                // boundary, so a late caller cancellation cannot conceal the result or
+                // require an unowned follow-up read task.
                 return .success(Self.recordPayload(record))
             case "job.list":
                 let states = try Self.states(arguments)
@@ -168,6 +212,7 @@ public struct RuntimeJobToolPack: AsyncContextualToolPackHandling, Sendable {
                     limit: limit,
                     beforeCreatedAt: ToolArgHelpers.string(arguments, "before_created_at")
                 )
+                try Task.checkCancellation()
                 return .success([
                     "jobs": records.map(Self.recordPayload),
                     "count": records.count,
@@ -176,6 +221,8 @@ public struct RuntimeJobToolPack: AsyncContextualToolPackHandling, Sendable {
             default:
                 return nil
             }
+        } catch is CancellationError {
+            throw CancellationError()
         } catch let error as RuntimeJobError {
             return .failure(code: error.code, message: error.localizedDescription, retryable: false)
         } catch let error as ProjectContextError {
@@ -192,7 +239,8 @@ public struct RuntimeJobToolPack: AsyncContextualToolPackHandling, Sendable {
     private static func request(
         name: String,
         arguments: [String: Any],
-        context: ToolInvocationContext
+        context: ToolInvocationContext,
+        didPersist: (@Sendable (RuntimeJobRecord) -> Void)? = nil
     ) throws -> RuntimeJobRequest {
         let replayText = ToolArgHelpers.string(arguments, "replay_class")
         guard let replayText, let replayClass = RuntimeReplayClass(rawValue: replayText) else {
@@ -264,8 +312,31 @@ public struct RuntimeJobToolPack: AsyncContextualToolPackHandling, Sendable {
             timeout: .seconds(timeout),
             maximumInlineOutputBytes: inline,
             replayClass: replayClass,
-            idempotencyKey: idempotency
+            idempotencyKey: idempotency,
+            persistenceObserver: didPersist ?? { _ in }
         )
+    }
+
+    private static func submissionPayload(_ record: RuntimeJobRecord) -> [String: Any] {
+        [
+            "job_id": record.jobID.uuidString.lowercased(),
+            "state": record.state.rawValue,
+            "project_id": record.projectID.description,
+            "project_generation": record.projectGeneration.rawValue,
+        ]
+    }
+
+    private static func submissionPayload(
+        jobID: UUID,
+        state: RuntimeJobState,
+        context: ToolInvocationContext
+    ) -> [String: Any] {
+        [
+            "job_id": jobID.uuidString.lowercased(),
+            "state": state.rawValue,
+            "project_id": context.projectID.description,
+            "project_generation": context.projectGeneration.rawValue,
+        ]
     }
 
     private static func requireAuthorization(_ name: String, context: ToolInvocationContext) throws {

@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "gate_id": "G09",
-  "instructions": "Current-source P09 host-adapter qualification. Historical passes remain evidence but do not qualify the final runtime, security, and packaging source.",
+  "instructions": "Exact-revision P09 host-adapter qualification for 52f8aca47463f88fa94276115fb5c2070ca683ef.",
   "criteria_results": [
     {
       "criterion": "host capability report exists",
@@ -9,111 +9,144 @@
       "evidence": [
         {
           "path": ".forge-codex/evidence/P09-host-capability-report.json",
-          "sha256": "c0c7c4016a857c70ddb71c22f08d2b2eb511f804335f2b20044d40c24ef71860"
+          "sha256": "b7c7ae9a1d8d9302448e31c8673142e66cbc4e1080ddf6152d8067ddb56b2d75"
+        },
+        {
+          "path": ".forge-codex/evidence/EVID-20260827T105148Z-30b18f1784.json",
+          "sha256": "6958ac05ab6e699d3264526c965d739d8e6e2ee34d3ac0a4e816b92c33a4babe"
         }
       ]
     },
     {
       "criterion": "required plugin target builds and tests",
-      "passed": false,
+      "passed": true,
       "evidence": [
         {
-          "path": ".forge-codex/evidence/P09-host-capability-report.json",
-          "sha256": "c0c7c4016a857c70ddb71c22f08d2b2eb511f804335f2b20044d40c24ef71860"
+          "path": ".forge-codex/evidence/P09-resource-owner-matrix.json",
+          "sha256": "be9f2d9b9d711e5852f7a17ea2d6ffd52b540cc3e85c1242df2363797e3a5104"
         },
         {
-          "path": ".forge-codex/evidence/EVID-20260826T234631Z-cae1c73a2f.json",
-          "sha256": "42d19e1586faea11970da0c0febe533bb708ad40ce59b4a269ee41b458884d40"
+          "path": ".forge-codex/evidence/EVID-20260827T103142Z-31aeee7a3f.json",
+          "sha256": "562a6a3758ce30fbb580f0f26e480f76432526caea46fc744a73b834b6063325"
+        },
+        {
+          "path": ".forge-codex/evidence/EVID-20260827T103242Z-f2a67a3569.json",
+          "sha256": "1768996bf110201389fa45d899ccbb06da6e210a8e7c8418d74a200c56353ecd"
+        },
+        {
+          "path": ".forge-codex/evidence/EVID-20260827T105148Z-30b18f1784.json",
+          "sha256": "6958ac05ab6e699d3264526c965d739d8e6e2ee34d3ac0a4e816b92c33a4babe"
         }
       ]
     },
     {
       "criterion": "full no-operator rollover passes in a supported mode",
-      "passed": false,
+      "passed": true,
       "evidence": [
         {
           "path": ".forge-codex/evidence/P09-host-capability-report.json",
-          "sha256": "c0c7c4016a857c70ddb71c22f08d2b2eb511f804335f2b20044d40c24ef71860"
+          "sha256": "b7c7ae9a1d8d9302448e31c8673142e66cbc4e1080ddf6152d8067ddb56b2d75"
+        },
+        {
+          "path": ".forge-codex/evidence/P09-feature-parity.json",
+          "sha256": "3f9b9f26cd42c153b537e007ac0317c8bf7c3074b91f7e0bdf268a4b2696601f"
         },
         {
           "path": ".forge-autonomy-state/evidence/FC-E2E-001/live-lmstudio-managed-continuity.json",
-          "sha256": "cb90eec59b7129fd89dd4a88b597f59120d706c8de91133bb36f259f748f9c23"
+          "sha256": "7861db2e43dff59892b85b6bb914540b891a630c07f7ae882c69954f5e01702b"
         },
         {
-          "path": ".forge-autonomy-state/evidence/FC-RELEASE-001/test-results.json",
-          "sha256": "9f2a6a473bc09d3f09de9de33936635028a1427960d5ab47317f706fa1034472"
+          "path": ".forge-codex/evidence/EVID-20260827T105148Z-30b18f1784.json",
+          "sha256": "6958ac05ab6e699d3264526c965d739d8e6e2ee34d3ac0a4e816b92c33a4babe"
         }
       ]
     },
     {
       "criterion": "external MCP-only compatibility passes",
-      "passed": false,
+      "passed": true,
       "evidence": [
         {
-          "path": ".forge-codex/evidence/P09-host-capability-report.json",
-          "sha256": "c0c7c4016a857c70ddb71c22f08d2b2eb511f804335f2b20044d40c24ef71860"
+          "path": ".forge-codex/evidence/P09-external-mcp-compatibility.json",
+          "sha256": "e567663b11502ec6707a1737826a5ebc0a81f274586180d14db5a480106c9820"
         },
         {
-          "path": ".forge-codex/evidence/P09-external-mcp-compatibility.json",
-          "sha256": "5495fbc9e99436894b12d6b67a3b9c80921323261cbdaf482d3e0259def13225"
+          "path": ".forge-codex/evidence/EVID-20260827T103306Z-a585799235.json",
+          "sha256": "b42c9bf936923cbadb8babd701f8a45596e0df0700bab39a0b2ba98b2492575b"
+        },
+        {
+          "path": ".forge-codex/evidence/EVID-20260827T103315Z-ea299d27a2.json",
+          "sha256": "fbc49951ecf34e6596b9942231e87cde1645cb19fd0f132d4b11910d74a8f28c"
+        },
+        {
+          "path": ".forge-codex/evidence/EVID-20260827T105148Z-30b18f1784.json",
+          "sha256": "6958ac05ab6e699d3264526c965d739d8e6e2ee34d3ac0a4e816b92c33a4babe"
         }
       ]
     },
     {
       "criterion": "private UI automation scan passes",
-      "passed": false,
+      "passed": true,
       "evidence": [
         {
           "path": ".forge-codex/evidence/P09-host-capability-report.json",
-          "sha256": "c0c7c4016a857c70ddb71c22f08d2b2eb511f804335f2b20044d40c24ef71860"
+          "sha256": "b7c7ae9a1d8d9302448e31c8673142e66cbc4e1080ddf6152d8067ddb56b2d75"
         },
         {
-          "path": ".forge-codex/evidence/EVID-20260826T234718Z-32f5e2f934.json",
-          "sha256": "9183b99e765440514647170a09abb484559ca39d163cecf4e19af0f0267a4b6b"
+          "path": ".forge-codex/evidence/EVID-20260827T103321Z-9af37ac353.json",
+          "sha256": "c8aeeac1ea96688136851877e29ce23e6224d3fedb9a50e11e1e365e90446d09"
+        },
+        {
+          "path": ".forge-codex/evidence/EVID-20260827T105148Z-30b18f1784.json",
+          "sha256": "6958ac05ab6e699d3264526c965d739d8e6e2ee34d3ac0a4e816b92c33a4babe"
         }
       ]
     }
   ],
   "commands": [
     {
-      "command": "swift test --scratch-path /tmp/forge-g09-tests-20260826b -Xswiftc -warnings-as-errors --filter NativeSessionHostPluginTests",
+      "command": "swift build -c release --scratch-path /tmp/forge-g09-52f8aca.IuXsao --target ForgeNativeSessionHostPlugin --jobs 4",
       "exit_code": 0,
-      "evidence": ".forge-codex/evidence/EVID-20260826T234631Z-cae1c73a2f.json"
+      "evidence": ".forge-codex/evidence/EVID-20260827T103142Z-31aeee7a3f.json"
     },
     {
-      "command": "python3 .forge-codex/scripts/check_p08_continuity.py --binary /tmp/forge-g09-release-20260826/release/forge-conductor --output .forge-codex/evidence/P09-external-mcp-compatibility.json",
+      "command": "env -u FORGE_LIVE_LMSTUDIO_MODEL -u FORGE_LIVE_LMSTUDIO_BASE_URL -u FORGE_LIVE_LMSTUDIO_EVIDENCE swift test --scratch-path /tmp/forge-g09-52f8aca.IuXsao -Xswiftc -warnings-as-errors --filter NativeSessionHostPluginTests",
       "exit_code": 0,
-      "evidence": ".forge-codex/evidence/EVID-20260826T234711Z-f708331f5f.json"
+      "evidence": ".forge-codex/evidence/EVID-20260827T103242Z-f2a67a3569.json"
+    },
+    {
+      "command": "swift build -c release --scratch-path /tmp/forge-g09-52f8aca.IuXsao --product forge-conductor --jobs 4",
+      "exit_code": 0,
+      "evidence": ".forge-codex/evidence/EVID-20260827T103306Z-a585799235.json"
+    },
+    {
+      "command": "python3 .forge-codex/scripts/check_p08_continuity.py --binary /tmp/forge-g09-52f8aca.IuXsao/release/forge-conductor --output .forge-codex/evidence/P09-external-mcp-compatibility.json",
+      "exit_code": 0,
+      "evidence": ".forge-codex/evidence/EVID-20260827T103315Z-ea299d27a2.json"
     },
     {
       "command": "python3 .forge-codex/scripts/check_private_ui_automation.py",
       "exit_code": 0,
-      "evidence": ".forge-codex/evidence/EVID-20260826T234718Z-32f5e2f934.json"
-    },
-    {
-      "command": "env FORGE_LIVE_LMSTUDIO_MODEL=qwen/qwen3.8-27b swift test -Xswiftc -warnings-as-errors --filter NativeSessionHostPluginTests/testLiveLMStudioFreshRootAcknowledgementAndAutomaticContinuation",
-      "exit_code": 0,
-      "evidence": ".forge-autonomy-state/evidence/FC-E2E-001/commands.jsonl"
+      "evidence": ".forge-codex/evidence/EVID-20260827T103321Z-9af37ac353.json"
     },
     {
       "command": "swift test -Xswiftc -warnings-as-errors",
-      "exit_code": 1,
+      "exit_code": 0,
       "evidence": ".forge-autonomy-state/evidence/FC-RELEASE-001/commands.jsonl"
     },
     {
       "command": "swift test -c release -Xswiftc -warnings-as-errors",
-      "exit_code": 1,
+      "exit_code": 0,
       "evidence": ".forge-autonomy-state/evidence/FC-RELEASE-001/commands.jsonl"
     },
     {
-      "command": "swift test -Xswiftc -warnings-as-errors --filter RuntimeExecutionJobTests --skip RuntimeExecutionJobTests.testBootstrapRouter",
+      "command": "env FORGE_LIVE_LMSTUDIO_MODEL=qwen/qwen3.8-27b FORGE_LIVE_LMSTUDIO_BASE_URL=http://127.0.0.1:1234 FORGE_LIVE_LMSTUDIO_EVIDENCE=.forge-autonomy-state/evidence/FC-E2E-001/live-lmstudio-managed-continuity-52f8aca.json swift test -Xswiftc -warnings-as-errors --filter NativeSessionHostPluginTests/testLiveLMStudioFreshRootAcknowledgementAndAutomaticContinuation",
       "exit_code": 0,
-      "evidence": ".forge-autonomy-state/evidence/FC-RUNTIME-001/commands.jsonl"
+      "evidence": ".forge-autonomy-state/evidence/FC-E2E-001/commands.jsonl"
     },
     {
-      "command": "xcodebuild -only-testing:ForgeConductorTests/RuntimeExecutionJobTests test-without-building",
+      "command": "python3 .forge-codex/scripts/check_p09_completion.py",
       "exit_code": 0,
-      "evidence": ".forge-autonomy-state/evidence/FC-RUNTIME-001/commands.jsonl"
+      "evidence": ".forge-codex/evidence/EVID-20260827T105148Z-30b18f1784.json"
     }
   ]
 }

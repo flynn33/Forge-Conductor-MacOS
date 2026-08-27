@@ -1,0 +1,37 @@
+Test Suite 'Selected tests' started at 2026-08-27 07:52:24.113.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-27 07:52:24.114.
+Test Suite 'ContinuityTests' started at 2026-08-27 07:52:24.114.
+Test Case '-[ForgeConductorTests.ContinuityTests testNonemptyUnversionedStoreFailsClosedWithoutMutatingDatabase]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Tests/ForgeConductorTests/ContinuityTests.swift:1286: error: -[ForgeConductorTests.ContinuityTests testNonemptyUnversionedStoreFailsClosedWithoutMutatingDatabase] : XCTAssertThrowsError failed: did not throw an error
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Tests/ForgeConductorTests/ContinuityTests.swift:1292: error: -[ForgeConductorTests.ContinuityTests testNonemptyUnversionedStoreFailsClosedWithoutMutatingDatabase] : XCTAssertEqual failed: ("65536 bytes") is not equal to ("8192 bytes")
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Tests/ForgeConductorTests/ContinuityTests.swift:1293: error: -[ForgeConductorTests.ContinuityTests testNonemptyUnversionedStoreFailsClosedWithoutMutatingDatabase] : XCTAssertFalse failed
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Tests/ForgeConductorTests/ContinuityTests.swift:1294: error: -[ForgeConductorTests.ContinuityTests testNonemptyUnversionedStoreFailsClosedWithoutMutatingDatabase] : XCTAssertFalse failed
+Test Case '-[ForgeConductorTests.ContinuityTests testNonemptyUnversionedStoreFailsClosedWithoutMutatingDatabase]' failed (0.136 seconds).
+Test Suite 'ContinuityTests' failed at 2026-08-27 07:52:24.250.
+	 Executed 1 test, with 4 failures (0 unexpected) in 0.136 (0.137) seconds
+Test Suite 'ProjectMemoryTests' started at 2026-08-27 07:52:24.250.
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testNonemptyUnversionedDatabaseFailsClosedWithoutMutatingDatabase]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Tests/ForgeConductorTests/ProjectMemoryTests.swift:274: error: -[ForgeConductorTests.ProjectMemoryTests testNonemptyUnversionedDatabaseFailsClosedWithoutMutatingDatabase] : XCTAssertThrowsError failed: did not throw an error
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Tests/ForgeConductorTests/ProjectMemoryTests.swift:286: error: -[ForgeConductorTests.ProjectMemoryTests testNonemptyUnversionedDatabaseFailsClosedWithoutMutatingDatabase] : XCTAssertEqual failed: ("184320 bytes") is not equal to ("8192 bytes")
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Tests/ForgeConductorTests/ProjectMemoryTests.swift:287: error: -[ForgeConductorTests.ProjectMemoryTests testNonemptyUnversionedDatabaseFailsClosedWithoutMutatingDatabase] : XCTAssertFalse failed
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Tests/ForgeConductorTests/ProjectMemoryTests.swift:288: error: -[ForgeConductorTests.ProjectMemoryTests testNonemptyUnversionedDatabaseFailsClosedWithoutMutatingDatabase] : XCTAssertFalse failed
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testNonemptyUnversionedDatabaseFailsClosedWithoutMutatingDatabase]' failed (0.012 seconds).
+Test Suite 'ProjectMemoryTests' failed at 2026-08-27 07:52:24.263.
+	 Executed 1 test, with 4 failures (0 unexpected) in 0.012 (0.013) seconds
+Test Suite 'RuntimeExecutionJobTests' started at 2026-08-27 07:52:24.263.
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testNonemptyUnversionedRuntimeDatabaseFailsClosedWithoutMutation]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Tests/ForgeConductorTests/RuntimeExecutionJobTests.swift:878: error: -[ForgeConductorTests.RuntimeExecutionJobTests testNonemptyUnversionedRuntimeDatabaseFailsClosedWithoutMutation] : XCTAssertThrowsError failed: did not throw an error
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Tests/ForgeConductorTests/RuntimeExecutionJobTests.swift:884: error: -[ForgeConductorTests.RuntimeExecutionJobTests testNonemptyUnversionedRuntimeDatabaseFailsClosedWithoutMutation] : XCTAssertEqual failed: ("69632 bytes") is not equal to ("8192 bytes")
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Tests/ForgeConductorTests/RuntimeExecutionJobTests.swift:885: error: -[ForgeConductorTests.RuntimeExecutionJobTests testNonemptyUnversionedRuntimeDatabaseFailsClosedWithoutMutation] : XCTAssertFalse failed
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Tests/ForgeConductorTests/RuntimeExecutionJobTests.swift:886: error: -[ForgeConductorTests.RuntimeExecutionJobTests testNonemptyUnversionedRuntimeDatabaseFailsClosedWithoutMutation] : XCTAssertFalse failed
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testNonemptyUnversionedRuntimeDatabaseFailsClosedWithoutMutation]' failed (0.017 seconds).
+Test Suite 'RuntimeExecutionJobTests' failed at 2026-08-27 07:52:24.280.
+	 Executed 1 test, with 4 failures (0 unexpected) in 0.017 (0.017) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' failed at 2026-08-27 07:52:24.280.
+	 Executed 3 tests, with 12 failures (0 unexpected) in 0.166 (0.166) seconds
+Test Suite 'Selected tests' failed at 2026-08-27 07:52:24.280.
+	 Executed 3 tests, with 12 failures (0 unexpected) in 0.166 (0.167) seconds
+◇ Test run started.
+↳ Testing Library Version: 1501
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

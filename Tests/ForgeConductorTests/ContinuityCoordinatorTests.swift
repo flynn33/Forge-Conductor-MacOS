@@ -58,23 +58,21 @@ private actor RecordingHostAdapter: SessionHostAdapter {
 }
 
 final class ContinuityCoordinatorTests: XCTestCase {
-    func testLegacyAgentSnapshotAndMergeCollectionsStayBounded() throws {
+    func testLegacyAgentSnapshotAndMergePreserveSingleOpenClientSession() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("forge-continuity-snapshot-bound-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
         let app = try ForgeApp.bootstrap(home: root.appendingPathComponent("home", isDirectory: true))
         defer { app.shutdown() }
         let client = ClientID("snapshot-bound")
-        for _ in 0..<(ContextContinuityService.maximumAgentSnapshots + 16) {
-            _ = try app.store.sessionStart(agentID: "debug", clientID: client)
-        }
+        _ = try app.store.sessionStart(agentID: "debug", clientID: client)
 
         let handoff = try app.continuity.handoff(
             arguments: ["goal": "Bound agent snapshots"], clientID: client
         )
         let firstPacket = try XCTUnwrap(handoff["packet"] as? [String: Any])
         let firstAgents = try XCTUnwrap(firstPacket["agents"] as? [[String: Any]])
-        XCTAssertEqual(firstAgents.count, ContextContinuityService.maximumAgentSnapshots)
+        XCTAssertEqual(firstAgents.count, 1)
 
         let checkpoint = try app.continuity.checkpoint(
             arguments: ["handoff_id": try XCTUnwrap(handoff["handoff_id"] as? String)],
@@ -82,7 +80,7 @@ final class ContinuityCoordinatorTests: XCTestCase {
         )
         let mergedPacket = try XCTUnwrap(checkpoint["packet"] as? [String: Any])
         let mergedAgents = try XCTUnwrap(mergedPacket["agents"] as? [[String: Any]])
-        XCTAssertEqual(mergedAgents.count, ContextContinuityService.maximumAgentSnapshots)
+        XCTAssertEqual(mergedAgents.count, 1)
     }
 
     func testEveryTransitionCrashPointRecoversWithoutDuplicateSuccessor() async throws {

@@ -887,6 +887,711 @@
     },
     {
       "detail": "valid",
+      "name": "json:evidence/EVID-20260827T100505Z-099fb2070c.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T100602Z-155cb4ac09.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T100625Z-0e6c307f55.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T100635Z-0c30766975.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T100640Z-568f10afeb.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T103142Z-31aeee7a3f.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T103242Z-f2a67a3569.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T103306Z-a585799235.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T103315Z-ea299d27a2.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T103321Z-9af37ac353.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T105148Z-30b18f1784.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T110620Z-8e7143e237.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T111100Z-bf65158d11.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T111352Z-4905c61d4d.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T111912Z-5250ad10ed.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T112130Z-a6055a30d0.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T112221Z-678531195f.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T112622Z-4d5aea029d.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T112943Z-4d9a2700de.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T112955Z-a3d2080290.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T113114Z-ae0d7d93fe.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T113141Z-d65692a2a6.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T113325Z-48cf0c4330.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T113335Z-74c3caadd6.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T113708Z-c44fecb9ea.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T113923Z-2c6fd79219.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T114018Z-bf8c321d41.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T115248Z-271e31b2db.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T115532Z-50cd86d07e.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T115848Z-56a5f22a1d.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T120131Z-1b4103b7ef.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T120140Z-2bfd43e9d5.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T120248Z-21127b46c1.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T120259Z-01fd5f7224.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T120259Z-281be14e9d.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T120316Z-cf926da54b.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T120316Z-dc97141420.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T120334Z-6aca4d4ce0.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T120358Z-66046e15c8.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T120520Z-f760b1722f.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T122519Z-9b81cdf7f2.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T122542Z-5ccf3cea22.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T122706Z-901dbb73bb.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T122813Z-1b6f5e3041.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T122849Z-3ecd07786f.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T122858Z-337d7f1d3c.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T122907Z-cfb21c9859.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T122926Z-e45900e86c.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T123016Z-08444ba4fb.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T123143Z-c5bdb99352.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T125155Z-b9d68d8e9b.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T125329Z-dc9fc7a51d.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T125513Z-3d2feb7bae.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T125532Z-257b8d98ca.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T125659Z-881cfd353e.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T125820Z-22fc7d7bd5.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T125832Z-a99dd8bff7.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T130046Z-3047d59e40.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T130101Z-63d3fc7ea6.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T130445Z-e9daab704c.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T130609Z-095131732b.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T130742Z-371bcb04b8.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T133242Z-ab3bd07aeb.artifact-000-P10-manager-http-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T133242Z-ab3bd07aeb.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T133250Z-25ae715e69.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T133313Z-ff0a88379f.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T133447Z-11bd9e2ec8.artifact-000-P10-manager-http-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T133447Z-11bd9e2ec8.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T133650Z-0c68aea973.artifact-000-P10-manager-http-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T133650Z-0c68aea973.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T133822Z-cb9e048a14.artifact-000-P10-manager-http-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T133822Z-cb9e048a14.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T134318Z-8d9cc542be.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T135047Z-6efbeed7d9.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T135227Z-5a11fa6b34.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T135451Z-c5e612c716.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T135632Z-f613fa8741.artifact-000-P10-cli-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T135632Z-f613fa8741.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T135718Z-044963baf2.artifact-000-P10-protocol-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T135718Z-044963baf2.artifact-001-P10-mcp-runtime-transcript.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T135718Z-044963baf2.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T135728Z-cf4fe3aa95.artifact-000-P10-manager-http-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T135728Z-cf4fe3aa95.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T135739Z-0469864570.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T135859Z-3619e6abd2.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T141927Z-de023a0ba8.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T142105Z-014bf8a5d6.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T142332Z-c032fe55e7.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T142437Z-68d3916523.artifact-000-P10-cli-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T142437Z-68d3916523.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T142449Z-d7a54b0892.artifact-000-P10-protocol-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T142449Z-d7a54b0892.artifact-001-P10-mcp-runtime-transcript.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T142449Z-d7a54b0892.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T142457Z-81f486396f.artifact-000-P10-manager-http-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T142457Z-81f486396f.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T142943Z-91834eb1f1.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T143212Z-8ca31604b8.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T143450Z-acb1cc81e2.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T143556Z-c6d39ea4ac.artifact-000-P10-cli-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T143556Z-c6d39ea4ac.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T143605Z-cfa4328943.artifact-000-P10-protocol-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T143605Z-cfa4328943.artifact-001-P10-mcp-runtime-transcript.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T143605Z-cfa4328943.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T143614Z-159edd265d.artifact-000-P10-manager-http-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T143614Z-159edd265d.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T161138Z-6e4e0134f8.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T161328Z-2a835789ec.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T161653Z-671fc6f5e4.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T161806Z-0acce7939b.artifact-000-P10-cli-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T161806Z-0acce7939b.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T161816Z-0a2cf31412.artifact-000-P10-protocol-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T161816Z-0a2cf31412.artifact-001-P10-mcp-runtime-transcript.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T161816Z-0a2cf31412.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T161831Z-64cf524597.artifact-000-P10-manager-http-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T161831Z-64cf524597.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T162026Z-657b44b26e.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T164841Z-6bf9142f15.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T171828Z-ee74ab54ac.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T172012Z-a901c12095.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T172437Z-8215666a1c.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T172553Z-3d3df2b2a4.artifact-000-P10-cli-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T172553Z-3d3df2b2a4.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T172603Z-de92af96dc.artifact-000-P10-protocol-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T172603Z-de92af96dc.artifact-001-P10-mcp-runtime-transcript.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T172603Z-de92af96dc.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T172612Z-81f3efabf2.artifact-000-P10-manager-http-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T172612Z-81f3efabf2.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T172622Z-833584f5bf.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T180654Z-3e03d91bdd.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T180842Z-dc6310b299.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T191720Z-d45ecb441f.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T191841Z-5f67a75f7f.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T192048Z-c407e087b1.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T192339Z-da4a278395.artifact-000-P10-cli-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T192339Z-da4a278395.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T192348Z-20d5fd93cc.artifact-000-P10-protocol-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T192348Z-20d5fd93cc.artifact-001-P10-mcp-runtime-transcript.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T192348Z-20d5fd93cc.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T192358Z-70c269abf8.artifact-000-P10-manager-http-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T192358Z-70c269abf8.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T192529Z-d093ae9d1f.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
       "name": "json:evidence/P02-telemetry-baseline.json",
       "passed": true
     },
@@ -978,6 +1683,21 @@
     {
       "detail": "valid",
       "name": "json:evidence/P09-resource-owner-matrix.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P10-cli-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P10-manager-http-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P10-mcp-runtime-transcript.json",
       "passed": true
     },
     {
@@ -1133,6 +1853,16 @@
     {
       "detail": "valid",
       "name": "json:state/baseline/characterization-tests.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/baseline/cli-contract.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/baseline/manager-http-contract.json",
       "passed": true
     },
     {
@@ -1717,7 +2447,22 @@
     },
     {
       "detail": "compiled",
+      "name": "python:scripts/check_p10_cli_compatibility.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
       "name": "python:scripts/check_p10_completion.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/check_p10_manager_http_compatibility.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/check_p10_protocol_compatibility.py",
       "passed": true
     },
     {
@@ -1728,6 +2473,11 @@
     {
       "detail": "compiled",
       "name": "python:scripts/check_private_ui_automation.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/evidence_support.py",
       "passed": true
     },
     {
@@ -1773,6 +2523,11 @@
     {
       "detail": "compiled",
       "name": "python:scripts/statectl.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/test_evidence_controls.py",
       "passed": true
     },
     {
@@ -1995,6 +2750,6 @@
   "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex",
   "schema_version": 1,
   "valid": true,
-  "validated_at": "2026-08-27T03:15:05.116174+00:00",
+  "validated_at": "2026-08-27T19:26:27.146955+00:00",
   "warnings": []
 }

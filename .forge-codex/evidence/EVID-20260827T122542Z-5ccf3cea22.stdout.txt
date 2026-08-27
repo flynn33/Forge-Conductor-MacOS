@@ -1,0 +1,29 @@
+Test Suite 'Selected tests' started at 2026-08-27 07:27:01.443.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-27 07:27:01.444.
+Test Suite 'ContinuityTests' started at 2026-08-27 07:27:01.444.
+Test Case '-[ForgeConductorTests.ContinuityTests testVerifiedMigrationBackupCapturesWALAndRejectsTamperedReuse]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testVerifiedMigrationBackupCapturesWALAndRejectsTamperedReuse]' passed (0.035 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testVerifiedMigrationBackupEnforcesBoundsAndRejectsLinkedArtifacts]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testVerifiedMigrationBackupEnforcesBoundsAndRejectsLinkedArtifacts]' passed (0.003 seconds).
+Test Case '-[ForgeConductorTests.ContinuityTests testVerifiedMigrationLockIsBoundedAndOwnerOnly]' started.
+Test Case '-[ForgeConductorTests.ContinuityTests testVerifiedMigrationLockIsBoundedAndOwnerOnly]' passed (0.021 seconds).
+Test Suite 'ContinuityTests' passed at 2026-08-27 07:27:01.503.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.059 (0.060) seconds
+Test Suite 'ProjectMemoryTests' started at 2026-08-27 07:27:01.503.
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testConcurrentInitializersSerializeVersionOneMigration]' started.
+Test Case '-[ForgeConductorTests.ProjectMemoryTests testConcurrentInitializersSerializeVersionOneMigration]' passed (0.025 seconds).
+Test Suite 'ProjectMemoryTests' passed at 2026-08-27 07:27:01.529.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.025 (0.026) seconds
+Test Suite 'RuntimeExecutionJobTests' started at 2026-08-27 07:27:01.529.
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testConcurrentInitializersSerializeVersionTwoMigration]' started.
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testConcurrentInitializersSerializeVersionTwoMigration]' passed (0.010 seconds).
+Test Suite 'RuntimeExecutionJobTests' passed at 2026-08-27 07:27:01.539.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.010 (0.010) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-08-27 07:27:01.539.
+	 Executed 5 tests, with 0 failures (0 unexpected) in 0.095 (0.096) seconds
+Test Suite 'Selected tests' passed at 2026-08-27 07:27:01.539.
+	 Executed 5 tests, with 0 failures (0 unexpected) in 0.095 (0.096) seconds
+◇ Test run started.
+↳ Testing Library Version: 1501
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

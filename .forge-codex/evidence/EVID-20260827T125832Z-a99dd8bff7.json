@@ -1,0 +1,34 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 3909,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T125832Z-a99dd8bff7.stdout.txt",
+      "sha256": "e2bf089f92d8cb4b3daff1d3769831aa5ca86e92354df4082c9cc4a6c019b62a"
+    },
+    {
+      "bytes": 436,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T125832Z-a99dd8bff7.stderr.txt",
+      "sha256": "133229e506a71058cc6ed015f4857df2be25a860aad33c6c7642319cc076e54d"
+    }
+  ],
+  "command": "env FORGE_SKIP_PS=1 swift test -c release --no-parallel -Xswiftc -warnings-as-errors --filter 'ContinuityTests.testVersionTwoStoreMigratesPopulatedDataReopensAndRerunsIdempotently|ContinuityTests.testVersionThreeStoreMigratesWithoutLosingHandoff|ContinuityTests.testConcurrentVersionThreeMigrationIsIdempotent|ContinuityTests.testNonemptyUnversionedStoreFailsClosedWithoutMutatingDatabase|ProjectMemoryTests.testVersionOneDatabaseMigratesPopulatedDataReopensAndRerunsIdempotently|ProjectMemoryTests.testConcurrentInitializersSerializeVersionOneMigration|ProjectMemoryTests.testNonemptyUnversionedDatabaseFailsClosedWithoutMutatingDatabase|RuntimeExecutionJobTests.testSchemaV2MigratesForwardWithProcessIdentityAndIdempotencyReceiptStorage|RuntimeExecutionJobTests.testConcurrentInitializersSerializeVersionTwoMigration|RuntimeExecutionJobTests.testNonemptyUnversionedRuntimeDatabaseFailsClosedWithoutMutation'",
+  "ended_at": "2026-08-27T12:59:34.175010+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260827T125832Z-a99dd8bff7",
+  "kind": "p10-sqlite-migration-regression-release",
+  "related_findings": [
+    "FC-MIGRATION-MATRIX-001"
+  ],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-27T12:58:32.429100+00:00",
+  "timed_out": false
+}

@@ -1,27 +1,238 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "phase": "P10",
-  "status": "incomplete",
-  "reconciled_at": "2026-08-26T23:55:21Z",
-  "passing_current_scope": {
-    "suite": "strict Debug and Release SwiftPM suites",
-    "executed_each": 395,
-    "skipped_each": 2,
-    "failures_each": 0,
-    "covered_fixtures": [
-      "continuity schema migration and restart",
-      "legacy continuity handoff migration",
-      "project memory restart and recovery",
-      "unsupported and corrupt project-memory preservation",
-      "native session ledger restart",
-      "managed continuity v2 crash recovery"
+  "status": "passed",
+  "generated_at": "2026-08-27T19:24:35Z",
+  "tested_tree": {
+    "head": "167c4419d87b63b4f4427e07c620be7ea67cb5a3",
+    "working_tree": false
+  },
+  "source_manifest": {
+    "bytes": 8239721,
+    "file_count": 234,
+    "schema_version": 1,
+    "sha256": "74ce62d056b3c0a38789bc41dc39f7a6ae6954df904457525508344146b11fd6"
+  },
+  "strict_suites": {
+    "debug": {
+      "evidence_id": "EVID-20260827T191841Z-5f67a75f7f",
+      "executed": 498,
+      "skipped": 4,
+      "failures": 0
+    },
+    "release": {
+      "evidence_id": "EVID-20260827T192048Z-c407e087b1",
+      "executed": 498,
+      "skipped": 4,
+      "failures": 0
+    }
+  },
+  "fixtures": [
+    {
+      "id": "config-v1-to-v2",
+      "source_format": "configuration v1 or unversioned JSON",
+      "target_version": 2,
+      "status": "passed",
+      "proof": [
+        "populated migration",
+        "verified exact backup",
+        "prepared receipt reconciliation",
+        "close and reopen",
+        "idempotent concurrent rerun"
+      ],
+      "evidence_ids": [
+        "EVID-20260827T191841Z-5f67a75f7f",
+        "EVID-20260827T192048Z-c407e087b1"
+      ]
+    },
+    {
+      "id": "global-sqlite-v2-to-v5",
+      "source_format": "global SQLite schema v2",
+      "target_version": 5,
+      "status": "passed",
+      "proof": [
+        "populated semantic fixture",
+        "online WAL-aware owner-only backup",
+        "quick_check and source-version verification under one bounded deadline",
+        "entry-boundary moved-file rejection before recovery artifacts",
+        "pre-COMMIT stable pathname replacement rolls back schema and receipts while retaining prepared recovery artifacts",
+        "changed restored source receives a bounded immutable second lineage",
+        "archived completion repairs an interrupted active manifest without discarding later writes",
+        "close and reopen",
+        "idempotent rerun"
+      ],
+      "evidence_ids": [
+        "EVID-20260827T191841Z-5f67a75f7f",
+        "EVID-20260827T192048Z-c407e087b1"
+      ]
+    },
+    {
+      "id": "global-sqlite-v3-to-v5",
+      "source_format": "global SQLite schema v3",
+      "target_version": 5,
+      "status": "passed",
+      "proof": [
+        "populated handoff fixture",
+        "online WAL-aware owner-only backup",
+        "concurrent initialization",
+        "real child-process SIGKILL after durable preparation",
+        "kernel interprocess lock exclusion and release after process death",
+        "prepared manifest recovery with exact receipt and matching active and archived completion",
+        "real child-process SIGKILL after schema and receipt COMMIT but before manifest completion",
+        "post-COMMIT restart preserves the exact handoff, receipt, backup, lineage, and manifest identity",
+        "close and reopen",
+        "idempotent rerun"
+      ],
+      "evidence_ids": [
+        "EVID-20260827T191841Z-5f67a75f7f",
+        "EVID-20260827T192048Z-c407e087b1"
+      ]
+    },
+    {
+      "id": "project-memory-v1-to-v2",
+      "source_format": "project-memory SQLite schema v1",
+      "target_version": 2,
+      "status": "passed",
+      "proof": [
+        "populated records, tags, handoff, and rollover fixture",
+        "online WAL-aware owner-only backup",
+        "eight-way serialized initialization",
+        "pre-COMMIT stable pathname replacement rolls back schema and receipts while retaining the exact original prepared backup",
+        "deterministic bounded corrupt-family preservation",
+        "close and reopen",
+        "idempotent rerun"
+      ],
+      "evidence_ids": [
+        "EVID-20260827T191841Z-5f67a75f7f",
+        "EVID-20260827T192048Z-c407e087b1"
+      ]
+    },
+    {
+      "id": "legacy-continuity-v1-import",
+      "source_format": "legacy continuity v1 JSON",
+      "target_version": 2,
+      "status": "passed",
+      "proof": [
+        "exact-project import",
+        "ambiguous-record quarantine",
+        "source bytes preserved",
+        "bounded canonical classification before mutation",
+        "import, quarantine, per-candidate outcome ledger, exact counts, and receipt commit atomically",
+        "receipt-insert failure rolls back every authoritative side effect",
+        "derived quarantine projection is repaired exactly on replay",
+        "concurrent identical migration converges on one unsplit receipt",
+        "aliased filenames share one verified imported row across restart",
+        "malformed exact rows and tampered outcome, count, hash, or ledger fields fail closed",
+        "verified legacy receipt details upgrade transactionally to schema v2",
+        "completed replay is idempotent"
+      ],
+      "evidence_ids": [
+        "EVID-20260827T191841Z-5f67a75f7f",
+        "EVID-20260827T192048Z-c407e087b1"
+      ]
+    },
+    {
+      "id": "legacy-continuity-v2-import",
+      "source_format": "legacy continuity v2 JSON",
+      "target_version": 2,
+      "status": "passed",
+      "proof": [
+        "binding preserved across restart",
+        "source bytes preserved",
+        "atomic side effects and schema-v2 per-candidate receipt outcomes",
+        "verified legacy receipt details upgrade transactionally",
+        "completed replay is idempotent"
+      ],
+      "evidence_ids": [
+        "EVID-20260827T191841Z-5f67a75f7f",
+        "EVID-20260827T192048Z-c407e087b1"
+      ]
+    },
+    {
+      "id": "native-ledger-v1-to-v2",
+      "source_format": "native managed-session ledger v1 JSON",
+      "target_version": 2,
+      "status": "passed",
+      "proof": [
+        "exact owner-only legacy-byte backup",
+        "synthetic provider identity quarantined",
+        "prepared target restart recovery",
+        "four bounded immutable lineages for changed restored sources",
+        "fifth distinct lineage fails closed without replacing the active manifest",
+        "close and reopen",
+        "idempotent rerun"
+      ],
+      "evidence_ids": [
+        "EVID-20260827T191841Z-5f67a75f7f",
+        "EVID-20260827T192048Z-c407e087b1"
+      ]
+    },
+    {
+      "id": "runtime-job-v2-to-v5",
+      "source_format": "runtime-job SQLite schema v2",
+      "target_version": 5,
+      "status": "passed",
+      "proof": [
+        "populated terminal-job fixture",
+        "online WAL-aware owner-only backup",
+        "eight-way serialized initialization",
+        "pre-COMMIT stable pathname replacement rolls back schema and receipts while retaining the exact original prepared backup",
+        "registered runtime v2 migration produces a verified recovery lineage",
+        "co-resident control-plane bootstrap produces a version-zero runtime recovery lineage",
+        "close and reopen",
+        "idempotent rerun"
+      ],
+      "evidence_ids": [
+        "EVID-20260827T191841Z-5f67a75f7f",
+        "EVID-20260827T192048Z-c407e087b1"
+      ]
+    }
+  ],
+  "excluded_surfaces": [
+    {
+      "id": "project-control-plane-v1",
+      "disposition": "not_applicable",
+      "reason": "the control-plane repository was introduced at schema v2 and has no shipped v1 fixture",
+      "current_behavior": "fresh empty version 0 and exact current version 2 are accepted; fictional v1 and nonempty unversioned databases fail closed without mutation",
+      "evidence_id": "EVID-20260827T191841Z-5f67a75f7f"
+    }
+  ],
+  "pathname_trust_boundary": {
+    "status": "qualified",
+    "stable_replacement": "fails_closed",
+    "precommit_transaction": "rolls_back_schema_and_receipts_with_prepared_recovery_artifacts_retained",
+    "platform_observations": {
+      "debug": "failed_closed_after_restore",
+      "release": "failed_closed_after_restore"
+    },
+    "excluded_threats": [
+      "hostile_same_user_between_check_namespace_substitution",
+      "hostile_same_user_direct_database_family_mutation"
+    ],
+    "requirements_to_broaden": [
+      "custom_sqlite_vfs_for_database_family_identity",
+      "independent_privilege_boundary_for_direct_mutation"
     ]
   },
-  "preserved_prior_evidence": [
-    "EVID-20260823T210632Z-016869a17f",
-    "EVID-20260823T210727Z-dd0087ce58"
-  ],
-  "rollback_policy": "transactions roll back on failure and source databases are preserved rather than deleted",
-  "remaining_requirement": "regenerate the complete legacy fixture inventory for the current data model and prove every fixture migrates and reopens before marking the all-fixtures criterion passed",
-  "current_evidence": ".forge-autonomy-state/evidence/FC-RELEASE-001/test-results.json"
+  "backup_qualification": {
+    "status": "passed",
+    "completed": [
+      "bounded online SQLite backup includes WAL state",
+      "backup files are owner-only from creation",
+      "symlink, hard-link, FIFO, and stale temporary artifacts fail closed without blocking",
+      "byte and end-to-end snapshot verification deadlines fail closed",
+      "prepared and completed manifests bind source, backup, target, versions, hashes, bytes, and rollback instructions",
+      "SQLite receipts are committed with the target schema transaction",
+      "restored changed sources use four bounded immutable recovery lineages",
+      "a real child-process SIGKILL proves prepared-manifest recovery and kernel lock release",
+      "a second real child-process SIGKILL proves committed-schema and receipt recovery before manifest completion",
+      "completed archive promotion repairs an interrupted active manifest while preserving later writes",
+      "project-memory, runtime, and native-ledger migrations use bounded process and interprocess initialization locks",
+      "stable SQLite pathname replacement fails closed at backup and pre-COMMIT boundaries",
+      "pre-COMMIT rejection rolls back schema and receipts while retaining verified prepared recovery artifacts",
+      "the current macOS VFS restored-path result is recorded without extending the hostile same-user trust boundary"
+    ],
+    "remaining": []
+  },
+  "remaining_requirements": []
 }

@@ -1,0 +1,53 @@
+{
+  "artifacts": [
+    {
+      "bytes": 20506,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T113325Z-48cf0c4330.stdout.txt",
+      "sha256": "bb0c768a30131611130fca16bfc01fd201c9af5683b51b4a4e16cd87bd7a34bd"
+    },
+    {
+      "bytes": 0,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T113325Z-48cf0c4330.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "artifact_integrity_reconciliation": {
+    "preserved_artifacts": [
+      {
+        "basis": "recorded stdout has identical byte count and SHA-256",
+        "bytes": 20506,
+        "original_path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/P10-protocol-compatibility-report.json",
+        "preserved_path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/EVID-20260827T113325Z-48cf0c4330.stdout.txt",
+        "sha256": "bb0c768a30131611130fca16bfc01fd201c9af5683b51b4a4e16cd87bd7a34bd"
+      }
+    ],
+    "status": "partially_preserved",
+    "unavailable_artifacts": [
+      {
+        "bytes": 315688,
+        "original_path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/P10-mcp-runtime-transcript.json",
+        "reason": "shared output path was overwritten before an evidence-ID-specific copy was preserved",
+        "sha256": "396295a2c86636d1fe39126c1fdc08518ae840a7587ca74a70c501ee9f398c94"
+      }
+    ]
+  },
+  "command": "python3 .forge-codex/scripts/check_p10_protocol_compatibility.py --binary .build/release/forge-conductor --output .forge-codex/evidence/P10-protocol-compatibility-report.json --transcript-output .forge-codex/evidence/P10-mcp-runtime-transcript.json",
+  "ended_at": "2026-08-27T11:33:27.896857+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260827T113325Z-48cf0c4330",
+  "kind": "p10-executable-mcp-compatibility",
+  "related_findings": [
+    "FC-MCP-SCHEMA-001"
+  ],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 1,
+  "started_at": "2026-08-27T11:33:25.725769+00:00",
+  "timed_out": false
+}
