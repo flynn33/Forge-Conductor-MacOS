@@ -122,6 +122,10 @@ final class LMStudioContractFixtureServer: URLProtocol, @unchecked Sendable {
             if requestText.contains("fixture-response-truncated") {
                 return errorRoute(status: 400, code: "response_truncated")
             }
+            if requestText.contains("fixture-require-output-token-bound"),
+               object["max_output_tokens"] as? Int != 321 {
+                return errorRoute(status: 400, code: "missing_output_token_bound")
+            }
             if requestText.contains("fixture-require-auth"),
                request.value(forHTTPHeaderField: "Authorization") != "Bearer fixture-token" {
                 return errorRoute(status: 401, code: "invalid_api_token")

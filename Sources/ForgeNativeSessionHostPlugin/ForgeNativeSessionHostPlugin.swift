@@ -112,6 +112,7 @@ public struct LMStudioProviderConfiguration: Codable, Sendable, Equatable {
     public var maximumResponseBytes: Int
     public var maximumTextBytes: Int
     public var maximumToolArgumentBytes: Int
+    public var maximumOutputTokens: Int
 
     public init(
         baseURL: URL = URL(string: "http://127.0.0.1:1234")!,
@@ -127,7 +128,8 @@ public struct LMStudioProviderConfiguration: Codable, Sendable, Equatable {
         maximumSSEEventBytes: Int = 256 * 1024,
         maximumResponseBytes: Int = 2 * 1024 * 1024,
         maximumTextBytes: Int = 512 * 1024,
-        maximumToolArgumentBytes: Int = 256 * 1024
+        maximumToolArgumentBytes: Int = 256 * 1024,
+        maximumOutputTokens: Int = 4_096
     ) {
         self.baseURL = baseURL
         self.modelKey = modelKey
@@ -143,6 +145,7 @@ public struct LMStudioProviderConfiguration: Codable, Sendable, Equatable {
         self.maximumResponseBytes = maximumResponseBytes
         self.maximumTextBytes = maximumTextBytes
         self.maximumToolArgumentBytes = maximumToolArgumentBytes
+        self.maximumOutputTokens = maximumOutputTokens
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -160,6 +163,7 @@ public struct LMStudioProviderConfiguration: Codable, Sendable, Equatable {
         case maximumResponseBytes = "maximum_response_bytes"
         case maximumTextBytes = "maximum_text_bytes"
         case maximumToolArgumentBytes = "maximum_tool_argument_bytes"
+        case maximumOutputTokens = "maximum_output_tokens"
     }
 
     public init(from decoder: Decoder) throws {
@@ -202,7 +206,10 @@ public struct LMStudioProviderConfiguration: Codable, Sendable, Equatable {
             ) ?? 512 * 1024,
             maximumToolArgumentBytes: try values.decodeIfPresent(
                 Int.self, forKey: .maximumToolArgumentBytes
-            ) ?? 256 * 1024
+            ) ?? 256 * 1024,
+            maximumOutputTokens: try values.decodeIfPresent(
+                Int.self, forKey: .maximumOutputTokens
+            ) ?? 4_096
         )
     }
 
@@ -246,6 +253,11 @@ public struct LMStudioProviderConfiguration: Codable, Sendable, Equatable {
               maximumTextBytes <= maximumResponseBytes,
               maximumToolArgumentBytes <= maximumResponseBytes else {
             throw LMStudioProviderError.invalidConfiguration("payload limits are outside supported bounds")
+        }
+        guard (1...4_096).contains(maximumOutputTokens) else {
+            throw LMStudioProviderError.invalidConfiguration(
+                "maximum output tokens are outside supported bounds"
+            )
         }
         return self
     }
@@ -1356,12 +1368,14 @@ private struct LMStudioResponsesPayload: Encodable {
     var model: String
     var store = true
     var stream = true
+    var maximumOutputTokens: Int
     var previousResponseID: String?
     var input: [LMStudioEncodedInput]
     var tools: [LMStudioFunctionTool]
 
     private enum CodingKeys: String, CodingKey {
         case model, store, stream
+        case maximumOutputTokens = "max_output_tokens"
         case previousResponseID = "previous_response_id"
         case input, tools
     }
@@ -1655,7 +1669,11 @@ public actor LMStudioRESTClient {
             )
         }
         let payload = LMStudioResponsesPayload(
-            model: model, previousResponseID: previousResponseID, input: input, tools: tools
+            model: model,
+            maximumOutputTokens: configuration.maximumOutputTokens,
+            previousResponseID: previousResponseID,
+            input: input,
+            tools: tools
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
@@ -2765,7 +2783,7 @@ public actor LMStudioManagedSessionHostAdapterV2: SessionHostAdapterV2 {
     }
 
     private static let bootstrapSystemPrompt = """
-    Validate the bounded Forge continuity handoff. Call forge_continuity_ack exactly once with every required identity field. Do not call any other tool and do not continue project work in this response.
+    This instruction governs only the fresh-root bootstrap response. Validate the bounded Forge continuity handoff and call forge_continuity_ack exactly once with every required identity field. Do not call any other tool or continue project work in the bootstrap response. In a later response rooted at this one, treat acknowledgement as complete, do not call forge_continuity_ack again, and follow the new continuation input.
     """
 
     private func validate(
@@ -3933,7 +3951,7 @@ public enum ForgeNativeSessionHostPlugin {
         configurationKeys: [
             "storage_directory", "base_url", "model_key", "keychain_token_reference",
             "connect_timeout_seconds", "first_byte_timeout_seconds",
-            "idle_timeout_seconds", "total_timeout_seconds",
+            "idle_timeout_seconds", "total_timeout_seconds", "maximum_output_tokens",
         ],
         privacyRequirements: [
             "no complete transcript persistence", "redacted diagnostics",

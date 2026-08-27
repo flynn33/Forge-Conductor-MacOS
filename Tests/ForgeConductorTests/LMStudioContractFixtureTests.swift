@@ -152,6 +152,17 @@ final class LMStudioContractFixtureTests: XCTestCase {
         XCTAssertEqual(continuation.usage.totalTokens, 136)
     }
 
+    func testManagedTransportSendsConfiguredOutputTokenBound() async throws {
+        let transport = try makeTransport(maximumOutputTokens: 321)
+        let turn = try await transport.createRoot(LMStudioRootRequest(
+            systemPrompt: "fixture-require-output-token-bound",
+            userInput: "bounded",
+            tools: [],
+            idempotencyKey: "fixture-output-token-bound"
+        ))
+        XCTAssertEqual(turn.responseID, "resp_lms_fixture_root")
+    }
+
     func testIncrementalDecoderBoundsIdentifiersAndRedaction() throws {
         let url = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -252,6 +263,12 @@ final class LMStudioContractFixtureTests: XCTestCase {
                 body: Data(#"{"error":{"message":"maximum context length exceeded"}}"#.utf8)
             ),
             .contextOverflow
+        )
+        XCTAssertEqual(
+            LMStudioProviderSignalClassifier.classify(
+                #"{"status":"incomplete","incomplete_details":{"reason":"max_output_tokens"}}"#
+            ),
+            .responseTruncated
         )
     }
 
@@ -392,6 +409,7 @@ final class LMStudioContractFixtureTests: XCTestCase {
         idleTimeoutSeconds: Double = 1,
         totalTimeoutSeconds: Double = 2,
         maximumSSELineBytes: Int = 64 * 1024,
+        maximumOutputTokens: Int = 4_096,
         authorization: any LMStudioAuthorizationProviding = LMStudioNoAuthorization()
     ) throws -> LMStudioManagedSessionTransport {
         let configuration = LMStudioProviderConfiguration(
@@ -407,7 +425,8 @@ final class LMStudioContractFixtureTests: XCTestCase {
             maximumSSEEventBytes: 256 * 1024,
             maximumResponseBytes: 2 * 1024 * 1024,
             maximumTextBytes: 512 * 1024,
-            maximumToolArgumentBytes: 256 * 1024
+            maximumToolArgumentBytes: 256 * 1024,
+            maximumOutputTokens: maximumOutputTokens
         )
         let sessionConfiguration = URLSessionConfiguration.ephemeral
         sessionConfiguration.protocolClasses = [LMStudioContractFixtureServer.self]

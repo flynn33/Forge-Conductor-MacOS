@@ -85,6 +85,7 @@ private actor ScriptedManagedTransport: LMStudioManagedTransporting {
     private var attempts = 0
     private var receipts: [String: LMStudioResponseTurn] = [:]
     private var sawPersistedIntent = false
+    private var bootstrapSystemPrompt: String?
 
     init(mode: Mode, ledgerURL: URL) {
         self.mode = mode
@@ -110,6 +111,7 @@ private actor ScriptedManagedTransport: LMStudioManagedTransporting {
 
     func createRoot(_ request: LMStudioRootRequest) async throws -> LMStudioResponseTurn {
         attempts += 1
+        bootstrapSystemPrompt = request.systemPrompt
         if let ledgerText = try? String(contentsOf: ledgerURL, encoding: .utf8),
            ledgerText.contains("\"status\":\"intent\""),
            !ledgerText.contains(request.idempotencyKey) {
@@ -136,8 +138,10 @@ private actor ScriptedManagedTransport: LMStudioManagedTransporting {
 
     func cancel(operationID: String) async {}
 
-    func stats() -> (attempts: Int, sawPersistedIntent: Bool) {
-        (attempts, sawPersistedIntent)
+    func stats() -> (
+        attempts: Int, sawPersistedIntent: Bool, bootstrapSystemPrompt: String?
+    ) {
+        (attempts, sawPersistedIntent, bootstrapSystemPrompt)
     }
 
     private static func turn(for request: LMStudioRootRequest) throws -> LMStudioResponseTurn {
@@ -274,6 +278,35 @@ final class NativeSessionHostPluginTests: XCTestCase {
             identifier: ForgeNativeSessionHostPlugin.identifier, storageDirectory: root
         )
         XCTAssertTrue(adapter is LMStudioManagedSessionHostAdapter)
+    }
+
+    func testProviderConfigurationDefaultsAndBoundsOutputTokens() throws {
+        let data = try JSONSerialization.data(withJSONObject: [
+            "base_url": "https://lmstudio.fixture",
+            "model_key": "fixture/tool-model",
+        ], options: [.sortedKeys])
+        let configuration = try JSONDecoder().decode(
+            LMStudioProviderConfiguration.self,
+            from: data
+        )
+        XCTAssertEqual(configuration.maximumOutputTokens, 4_096)
+        XCTAssertNoThrow(try configuration.validated())
+
+        var boundary = configuration
+        boundary.maximumOutputTokens = 1
+        XCTAssertNoThrow(try boundary.validated())
+        boundary.maximumOutputTokens = 4_096
+        XCTAssertNoThrow(try boundary.validated())
+        boundary.maximumOutputTokens = 0
+        XCTAssertThrowsError(try boundary.validated())
+        boundary.maximumOutputTokens = 4_097
+        XCTAssertThrowsError(try boundary.validated())
+
+        let encoded = try JSONEncoder().encode(configuration)
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+        )
+        XCTAssertEqual(object["maximum_output_tokens"] as? Int, 4_096)
     }
 
     func testProductionRegistrationUsesKeychainAuthorizationForConfiguredReference() async throws {
@@ -534,6 +567,12 @@ final class NativeSessionHostPluginTests: XCTestCase {
         let stats = await transport.stats()
         XCTAssertEqual(stats.attempts, 1)
         XCTAssertTrue(stats.sawPersistedIntent)
+        XCTAssertTrue(stats.bootstrapSystemPrompt?.contains(
+            "only the fresh-root bootstrap response"
+        ) == true)
+        XCTAssertTrue(stats.bootstrapSystemPrompt?.contains(
+            "In a later response rooted at this one"
+        ) == true)
         let acceptedStatus = await restarted.candidateStatus(
             forIdempotencyKey: fixture.request.idempotencyKey
         )
@@ -767,7 +806,8 @@ final class NativeSessionHostPluginTests: XCTestCase {
             connectTimeoutSeconds: 5,
             firstByteTimeoutSeconds: 90,
             idleTimeoutSeconds: 180,
-            totalTimeoutSeconds: 300
+            totalTimeoutSeconds: 300,
+            maximumOutputTokens: 4_096
         )
         let transport = try LMStudioManagedSessionTransport(configuration: configuration)
         let capabilities = try await transport.probe()
@@ -785,11 +825,13 @@ final class NativeSessionHostPluginTests: XCTestCase {
         )
         let used = max(0, capabilities.contextLength - 5_120)
         let fixture = try makeV2Fixture(
-            mission: "Acknowledge this exact durable handoff, then continue its first open action.",
+            mission: "Acknowledge this exact durable handoff, then report the continuation marker.",
             idempotencyKey: "live-managed-continuity-\(UUID().uuidString.lowercased())",
             modelKey: modelKey,
             contextCapacity: capabilities.contextLength,
-            contextUsed: used
+            contextUsed: used,
+            nextAction: "Reply with FORGE_CONTINUATION_READY and no other final-answer text.",
+            nextActionSuccessCondition: "The response contains FORGE_CONTINUATION_READY"
         )
         let receipt = try await adapter.createAndBootstrap(
             request: fixture.request,
@@ -830,6 +872,10 @@ final class NativeSessionHostPluginTests: XCTestCase {
         XCTAssertEqual(continuation.previousResponseID, receipt.providerResponseID)
         XCTAssertGreaterThan(continuation.usage?.inputTokens ?? 0, 0)
         XCTAssertGreaterThan(continuation.usage?.totalTokens ?? 0, 0)
+        XCTAssertLessThanOrEqual(continuation.usage?.outputTokens ?? .max, 4_096)
+        XCTAssertTrue(continuation.messages.joined(separator: "\n").contains(
+            "FORGE_CONTINUATION_READY"
+        ))
         let reconciled = try await provider.lookup(idempotencyKey: continuationKey)
         XCTAssertEqual(reconciled, continuation)
 
@@ -862,6 +908,8 @@ final class NativeSessionHostPluginTests: XCTestCase {
                 "acknowledgement_validated": true,
                 "fresh_root_validated": true,
                 "automatic_continuation_validated": true,
+                "automatic_continuation_marker_validated": true,
+                "maximum_output_tokens": configuration.maximumOutputTokens,
             ]
             let data = try JSONSerialization.data(
                 withJSONObject: evidence,
@@ -1013,7 +1061,9 @@ final class NativeSessionHostPluginTests: XCTestCase {
         operationID: UUID = UUID(),
         modelKey: String = "fixture/tool-model",
         contextCapacity: Int = 32_768,
-        contextUsed: Int = 28_000
+        contextUsed: Int = 28_000,
+        nextAction: String = "Continue automatically",
+        nextActionSuccessCondition: String = "Exact bootstrap acknowledgement is accepted"
     ) throws -> V2Fixture {
         let projectID = ProjectID()
         let generation = ProjectGeneration.initial
@@ -1080,9 +1130,9 @@ final class NativeSessionHostPluginTests: XCTestCase {
             "evidence_references": [] as [[String: Any]],
             "next_actions": [[
                 "order": 1,
-                "action": "Continue automatically",
+                "action": nextAction,
                 "command": "",
-                "success_condition": "Exact bootstrap acknowledgement is accepted",
+                "success_condition": nextActionSuccessCondition,
             ]],
             "context_budget": [
                 "capacity": contextCapacity,

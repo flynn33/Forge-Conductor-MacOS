@@ -165,8 +165,9 @@ public actor ManagedContinuityWorker: ManagedRunContinuityExecuting {
         _ adapterID: String
     ) throws -> any SessionHostAdapterV2
 
-    public static let automaticContinuationPrompt =
-        "Continue from the acknowledged durable handoff. Execute the first open action without replaying completed work."
+    public static let automaticContinuationPrompt = """
+    The bootstrap-only acknowledgement is complete; do not acknowledge it again. Continue from the acknowledged durable handoff, execute exactly the first open action without replaying completed work, and then stop this turn.
+    """
 
     /// Exact provider input committed by the rollover transaction and later dispatched
     /// by the managed provider loop. Callers must not rebuild or re-encode this payload.
