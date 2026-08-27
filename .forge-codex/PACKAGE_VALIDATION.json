@@ -1527,6 +1527,16 @@
     },
     {
       "detail": "valid",
+      "name": "json:evidence/EVID-20260827T180654Z-3e03d91bdd.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T180842Z-dc6310b299.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
       "name": "json:evidence/P02-telemetry-baseline.json",
       "passed": true
     },
@@ -2685,6 +2695,6 @@
   "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex",
   "schema_version": 1,
   "valid": true,
-  "validated_at": "2026-08-27T18:05:23.085950+00:00",
+  "validated_at": "2026-08-27T18:13:33.488888+00:00",
   "warnings": []
 }
