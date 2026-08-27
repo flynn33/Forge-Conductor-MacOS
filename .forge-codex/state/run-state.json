@@ -460,9 +460,20 @@
       "status": "resolved",
       "title": "Live MCP process snapshot assertion is unstable against active LM Studio helpers",
       "updated_at": "2026-08-26T23:54:28.248701+00:00"
+    },
+    {
+      "created_at": "2026-08-27T09:58:35.953791+00:00",
+      "evidence_class": "E0",
+      "id": "FC-SHELL-FIXTURE-001",
+      "notes": "Resolved without changing production policy. Separate project workspaces preserve the legacy shell and context-adoption fixtures while RuntimeProcessSandbox continues rejecting manager output inside a child-writable root. Focused regression CMD-20260827T100009Z-6003c44aa0 passes 4/4. Exact-tree Debug CMD-20260827T100050Z-5dbe9ae0e1 and Release CMD-20260827T100219Z-ff6e44637c each pass 445 tests with 3 expected skips and 0 failures. Features: MCP-TOOL-SHELL and MCP-TOOL-CONTEXT-GET. Release boundary: G10/G12.",
+      "path": "Tests/ForgeConductorTests/RuntimeExecutionJobTests.swift",
+      "severity": "High",
+      "status": "resolved",
+      "title": "Shell compatibility fixtures overlap protected runtime output",
+      "updated_at": "2026-08-27T10:04:07.999945+00:00"
     }
   ],
-  "last_event_sequence": 248,
+  "last_event_sequence": 250,
   "phases": {
     "P00": {
       "attempts": 1,
@@ -545,12 +556,12 @@
   },
   "repository": {
     "branch": "repair/autonomous-continuity",
-    "commit": "b72d6e8dc00681477224fb1b79859f553bc02558",
+    "commit": "05d3a6cd9183c8bbf9a34a0f0a6e88d6ac00ce2a",
     "dirty": true,
     "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy"
   },
   "run_id": "aba90ab1-be80-4cc5-aa0b-23dd54d4a24d",
   "schema_version": 1,
   "status": "active",
-  "updated_at": "2026-08-27T03:12:17.324967+00:00"
+  "updated_at": "2026-08-27T10:04:08.000301+00:00"
 }
