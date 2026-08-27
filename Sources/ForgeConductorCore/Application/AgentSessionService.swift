@@ -14,6 +14,8 @@ public final class AgentSessionService: SessionManaging, @unchecked Sendable {
     private let diagnostics: DiagnosticLog
     private let clock: any Clock
     private let idleTTL: TimeInterval
+    private let beforeBindingCacheInstallObserver: (@Sendable (SessionID) -> Void)?
+    private let beforeSessionCompletionCommitObserver: (@Sendable (SessionID) -> Void)?
 
     private var memoryBindings: [String: ActiveBinding] = [:]
     private let lock = NSLock()
@@ -25,7 +27,9 @@ public final class AgentSessionService: SessionManaging, @unchecked Sendable {
         audit: AuditService,
         diagnostics: DiagnosticLog,
         clock: any Clock = SystemClock(),
-        idleTTL: TimeInterval = 14_400
+        idleTTL: TimeInterval = 14_400,
+        beforeBindingCacheInstallObserver: (@Sendable (SessionID) -> Void)? = nil,
+        beforeSessionCompletionCommitObserver: (@Sendable (SessionID) -> Void)? = nil
     ) {
         self.store = store
         self.catalog = catalog
@@ -33,11 +37,20 @@ public final class AgentSessionService: SessionManaging, @unchecked Sendable {
         self.diagnostics = diagnostics
         self.clock = clock
         self.idleTTL = idleTTL
+        self.beforeBindingCacheInstallObserver = beforeBindingCacheInstallObserver
+        self.beforeSessionCompletionCommitObserver = beforeSessionCompletionCommitObserver
     }
 
     // MARK: - Public API
 
-    public func start(agentID: String, goal: String, clientID: ClientID, cwd: String? = nil) throws -> [String: Any] {
+    public func start(
+        agentID: String,
+        goal: String,
+        clientID: ClientID,
+        cwd: String? = nil,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> [String: Any] {
+        try cancellation?.checkCancellation()
         guard let spec = catalog.get(agentID) else {
             return ToolResult.failure(
                 code: "agent_not_found",
@@ -46,18 +59,22 @@ public final class AgentSessionService: SessionManaging, @unchecked Sendable {
             ).payload
         }
 
-        try pruneStale()
         let supersedeSummary = try JSONSupport.string(from: [
             "event": "superseded",
             "ok_to_reuse": true,
             "message": "Closed because a new agent session started",
             "new_agent_id": agentID,
         ])
-        _ = try store.sessionCloseOpen(for: clientID, summary: supersedeSummary)
-
-        let session = try store.sessionStart(agentID: agentID, clientID: clientID)
+        let timestamp = clock.now()
+        let proposedSession = AgentSession(
+            agentID: agentID,
+            clientID: clientID,
+            status: .open,
+            createdAt: timestamp,
+            updatedAt: timestamp
+        )
         let binding = ActiveBinding(
-            sessionID: session.id,
+            sessionID: proposedSession.id,
             agentID: agentID,
             goal: goal,
             toolsPrimary: spec.tools,
@@ -66,10 +83,8 @@ public final class AgentSessionService: SessionManaging, @unchecked Sendable {
             doneDefinition: spec.doneDefinition,
             cwd: cwd
         )
-        try setBinding(clientID: clientID, binding: binding)
-
         let runState: [String: Any] = [
-            "session_id": session.id.rawValue,
+            "session_id": proposedSession.id.rawValue,
             "agent_id": agentID,
             "goal": goal,
             "cwd": cwd as Any,
@@ -77,13 +92,16 @@ public final class AgentSessionService: SessionManaging, @unchecked Sendable {
             "output_schema": spec.outputSchema,
             "first_moves": spec.firstMoves,
         ]
-        try store.memorySet(
-            key: "agent_run/\(session.id.rawValue)",
-            body: try JSONSupport.string(from: runState.compactNSNull()),
-            tags: ["agent_run", agentID]
+        let session = try store.sessionStartReplacingOpen(
+            session: proposedSession,
+            supersedeSummary: supersedeSummary,
+            bindingBody: try bindingBody(binding),
+            runBody: try JSONSupport.string(from: runState.compactNSNull()),
+            cancellation: cancellation
         )
+        installMemoryBindingIfDurableMatches(clientID: clientID, binding: binding)
 
-        try audit.append(
+        appendAuditBestEffort(
             tool: "agent_run_start",
             status: "ok",
             clientID: clientID.rawValue,
@@ -123,15 +141,36 @@ public final class AgentSessionService: SessionManaging, @unchecked Sendable {
         ]
     }
 
-    public func status(sessionID: SessionID, clientID: ClientID?) throws -> [String: Any] {
-        var session = try store.sessionGet(id: sessionID)
+    public func status(
+        sessionID: SessionID,
+        clientID: ClientID?,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> [String: Any] {
+        var session = try store.sessionGet(id: sessionID, cancellation: cancellation)
         var reattached = false
+        var activeCancellation = cancellation
         if let clientID, session?.status.isOpen == true {
-            reattached = try attach(sessionID: sessionID, clientID: clientID)
-            session = try store.sessionGet(id: sessionID)
+            reattached = try attach(
+                sessionID: sessionID,
+                clientID: clientID,
+                cancellation: cancellation
+            )
+            // Reattach can durably update ownership even when the public Boolean
+            // remains false because the client identifier did not change.
+            activeCancellation = nil
+            session = try store.sessionGet(id: sessionID, cancellation: nil)
         }
         if let session, session.status.isOpen {
-            _ = try? store.sessionTouch(id: sessionID)
+            do {
+                _ = try store.sessionTouch(id: sessionID, cancellation: activeCancellation)
+                activeCancellation = nil
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch is ToolCallDeadlineExceeded {
+                throw ToolCallDeadlineExceeded()
+            } catch {
+                // Status remains useful when its best-effort idle timestamp cannot update.
+            }
         }
         var idleSec: Int?
         var abandonRisk = false
@@ -148,7 +187,9 @@ public final class AgentSessionService: SessionManaging, @unchecked Sendable {
                 reminder! += " Idle ~\(idle)s — high risk of auto-close."
             }
         }
-        let binding = clientID.flatMap { getBinding(clientID: $0) }
+        let binding = try clientID.flatMap {
+            try rehydrate(clientID: $0, cancellation: activeCancellation)
+        }
         return [
             "ok": true,
             "session": session.map(sessionDict) as Any,
@@ -170,9 +211,10 @@ public final class AgentSessionService: SessionManaging, @unchecked Sendable {
     public func complete(
         sessionID: SessionID,
         report: [String: Any]?,
-        clientID: ClientID?
+        clientID: ClientID?,
+        cancellation: ToolCallCancellation? = nil
     ) throws -> [String: Any] {
-        guard let session = try store.sessionGet(id: sessionID) else {
+        guard let session = try store.sessionGet(id: sessionID, cancellation: cancellation) else {
             return ToolResult.failure(
                 code: "session_not_found",
                 message: "Unknown session \(sessionID.rawValue)",
@@ -181,7 +223,10 @@ public final class AgentSessionService: SessionManaging, @unchecked Sendable {
         }
 
         let reportObj = report ?? [:]
-        let runBody = try store.memoryGet(key: "agent_run/\(sessionID.rawValue)")
+        let runBody = try store.memoryGet(
+            key: "agent_run/\(sessionID.rawValue)",
+            cancellation: cancellation
+        )
         var schema: [String] = []
         var goal = ""
         if let runBody,
@@ -195,6 +240,7 @@ public final class AgentSessionService: SessionManaging, @unchecked Sendable {
 
         var missing: [String] = []
         for key in schema {
+            try cancellation?.checkCancellation()
             let v = reportObj[key]
             if v == nil { missing.append(key); continue }
             if let s = v as? String, s.isEmpty { missing.append(key); continue }
@@ -208,14 +254,35 @@ public final class AgentSessionService: SessionManaging, @unchecked Sendable {
             "missing_schema_keys": missing,
         ]
         let summary = try JSONSupport.string(from: summaryObj)
-        let closed = try store.sessionEnd(id: sessionID, summary: String(summary.prefix(4000)))
+        beforeSessionCompletionCommitObserver?(sessionID)
+        let closed = try store.sessionEndClearingBinding(
+            id: sessionID,
+            summary: String(summary.prefix(4000)),
+            clientID: clientID,
+            cancellation: cancellation
+        )
 
-        if let clientID {
-            try clearBinding(clientID: clientID, sessionID: sessionID)
+        if let committedClientID = closed.clientID {
+            removeMemoryBindingAfterCommit(
+                clientID: committedClientID,
+                sessionID: sessionID
+            )
+        }
+        if let preflightClientID = session.clientID,
+           preflightClientID != closed.clientID {
+            removeMemoryBindingAfterCommit(
+                clientID: preflightClientID,
+                sessionID: sessionID
+            )
+        }
+        if let clientID,
+           clientID != closed.clientID,
+           clientID != session.clientID {
+            removeMemoryBindingAfterCommit(clientID: clientID, sessionID: sessionID)
         }
 
         let status = missing.isEmpty ? "ok" : "warn"
-        try audit.append(
+        appendAuditBestEffort(
             tool: "agent_run_complete",
             status: status,
             clientID: clientID?.rawValue,
@@ -257,16 +324,31 @@ public final class AgentSessionService: SessionManaging, @unchecked Sendable {
     }
 
     public func binding(for clientID: ClientID) -> ActiveBinding? {
-        getBinding(clientID: clientID)
+        try? rehydrate(clientID: clientID, cancellation: nil)
+    }
+
+    public func binding(
+        for clientID: ClientID,
+        cancellation: ToolCallCancellation?
+    ) throws -> ActiveBinding? {
+        try rehydrate(clientID: clientID, cancellation: cancellation)
     }
 
     @discardableResult
-    public func attach(sessionID: SessionID, clientID: ClientID) throws -> Bool {
-        guard let session = try store.sessionGet(id: sessionID), session.status.isOpen else {
+    public func attach(
+        sessionID: SessionID,
+        clientID: ClientID,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> Bool {
+        guard let session = try store.sessionGet(id: sessionID, cancellation: cancellation),
+              session.status.isOpen else {
             return false
         }
         if session.clientID == clientID,
-           getBinding(clientID: clientID)?.sessionID == sessionID {
+           try rehydrate(
+            clientID: clientID,
+            cancellation: cancellation
+           )?.sessionID == sessionID {
             return false
         }
 
@@ -282,7 +364,10 @@ public final class AgentSessionService: SessionManaging, @unchecked Sendable {
         var toolsForbidden: [String] = []
         var outputSchema: [String] = []
         var doneDefinition: [String] = []
-        if let runBody = try store.memoryGet(key: "agent_run/\(sessionID.rawValue)"),
+        if let runBody = try store.memoryGet(
+            key: "agent_run/\(sessionID.rawValue)",
+            cancellation: cancellation
+        ),
            let run = try? JSONSupport.object(from: Data(runBody.utf8)) {
             goal = run["goal"] as? String ?? ""
             cwd = run["cwd"] as? String
@@ -313,12 +398,13 @@ public final class AgentSessionService: SessionManaging, @unchecked Sendable {
             clientID: clientID,
             bindingBody: body,
             agentID: session.agentID,
-            supersedeSummary: supersedeSummary
+            supersedeSummary: supersedeSummary,
+            cancellation: cancellation
         )
         if let previousClient, previousClient != clientID {
-            removeMemoryBinding(clientID: previousClient, sessionID: sessionID)
+            removeMemoryBindingAfterCommit(clientID: previousClient, sessionID: sessionID)
         }
-        setMemoryBinding(clientID: clientID, binding: binding)
+        installMemoryBindingIfDurableMatches(clientID: clientID, binding: binding)
         diagnostics.info("agent_session_reattached", [
             "agent_id": session.agentID,
             "session_id": sessionID.rawValue,
@@ -327,117 +413,217 @@ public final class AgentSessionService: SessionManaging, @unchecked Sendable {
         return previousClient != clientID
     }
 
-    public func rehydrate(clientID: ClientID) throws -> ActiveBinding? {
-        if let binding = getBinding(clientID: clientID) {
-            if let session = try store.sessionGet(id: binding.sessionID),
-               session.status.isOpen,
-               session.clientID == clientID {
-                return binding
-            }
-            try clearBinding(clientID: clientID, sessionID: binding.sessionID)
-        }
-        // From memory note
-        if let body = try store.memoryGet(key: "agent_active/\(clientID.rawValue)"),
-           let data = body.data(using: .utf8),
-           let obj = try? JSONSupport.object(from: data),
-           obj["cleared"] as? Bool != true,
-           let sid = obj["session_id"] as? String {
-            if let sess = try store.sessionGet(id: SessionID(sid)),
-               sess.status.isOpen,
-               sess.clientID == clientID {
-                let binding = ActiveBinding(
-                    sessionID: SessionID(sid),
-                    agentID: obj["agent_id"] as? String ?? sess.agentID,
-                    goal: obj["goal"] as? String ?? "",
-                    toolsPrimary: obj["tools_primary"] as? [String] ?? [],
-                    toolsForbidden: obj["tools_forbidden"] as? [String] ?? [],
-                    outputSchema: obj["output_schema"] as? [String] ?? [],
-                    doneDefinition: obj["done_definition"] as? [String] ?? [],
-                    cwd: obj["cwd"] as? String
+    public func rehydrate(
+        clientID: ClientID,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ActiveBinding? {
+        var activeCancellation = cancellation
+        for _ in 0..<4 {
+            try activeCancellation?.checkCancellation()
+            if let cached = try getBinding(
+                clientID: clientID,
+                cancellation: activeCancellation
+            ) {
+                if try store.agentBindingMatches(
+                    clientID: clientID,
+                    sessionID: cached.sessionID,
+                    cancellation: activeCancellation
+                ) {
+                    return cached
+                }
+                let deleted = try store.agentBindingDeleteIfMatches(
+                    clientID: clientID,
+                    sessionID: cached.sessionID,
+                    cancellation: activeCancellation
                 )
-                setMemoryBinding(clientID: clientID, binding: binding)
-                diagnostics.info("agent_binding_rehydrated", [
-                    "source": "memory",
-                    "agent_id": binding.agentID,
-                    "session_id": sid,
-                ])
-                return binding
-            }
-        }
-        // Open session fallback
-        for st in [SessionStatus.open, .active, .running, .started] {
-            let list = try store.sessionList(status: st).filter { $0.clientID == clientID }
-            if let s = list.sorted(by: { $0.updatedAt > $1.updatedAt }).first {
-                let spec = catalog.get(s.agentID)
-                let binding = ActiveBinding(
-                    sessionID: s.id,
-                    agentID: s.agentID,
-                    goal: "",
-                    toolsPrimary: spec?.tools ?? [],
-                    toolsForbidden: spec?.toolsForbidden ?? [],
-                    outputSchema: spec?.outputSchema ?? [],
-                    doneDefinition: spec?.doneDefinition ?? []
+                removeMemoryBindingAfterCommit(
+                    clientID: clientID,
+                    sessionID: cached.sessionID
                 )
-                try setBinding(clientID: clientID, binding: binding)
-                diagnostics.warn("agent_binding_rehydrated", [
-                    "source": "open_session",
-                    "agent_id": binding.agentID,
-                    "session_id": s.id.rawValue,
-                    "message": "In-process binding missing; rehydrated from SQLite",
-                ])
-                return binding
+                if deleted { activeCancellation = nil }
+            }
+
+            if let body = try store.memoryGet(
+                key: "agent_active/\(clientID.rawValue)",
+                cancellation: activeCancellation
+            ) {
+                if let data = body.data(using: .utf8),
+                   let object = try? JSONSupport.object(from: data),
+                   object["cleared"] as? Bool != true,
+                   let rawSessionID = object["session_id"] as? String,
+                   let session = try store.sessionGet(
+                    id: SessionID(rawSessionID),
+                    cancellation: activeCancellation
+                   ),
+                   session.status.isOpen,
+                   session.clientID == clientID {
+                    let spec = catalog.get(session.agentID)
+                    let binding = ActiveBinding(
+                        sessionID: session.id,
+                        agentID: object["agent_id"] as? String ?? session.agentID,
+                        goal: object["goal"] as? String ?? "",
+                        toolsPrimary: object["tools_primary"] as? [String] ?? spec?.tools ?? [],
+                        toolsForbidden: object["tools_forbidden"] as? [String]
+                            ?? spec?.toolsForbidden ?? [],
+                        outputSchema: object["output_schema"] as? [String]
+                            ?? spec?.outputSchema ?? [],
+                        doneDefinition: object["done_definition"] as? [String]
+                            ?? spec?.doneDefinition ?? [],
+                        cwd: object["cwd"] as? String
+                    )
+                    if installMemoryBindingIfDurableMatches(
+                        clientID: clientID,
+                        binding: binding
+                    ) {
+                        diagnostics.info("agent_binding_rehydrated", [
+                            "source": "memory",
+                            "agent_id": binding.agentID,
+                            "session_id": rawSessionID,
+                        ])
+                        return binding
+                    }
+                    continue
+                }
+
+                let deleted = try store.agentBindingDeleteIfUnchanged(
+                    clientID: clientID,
+                    expectedBody: body,
+                    cancellation: activeCancellation
+                )
+                if deleted { activeCancellation = nil }
+                continue
+            }
+
+            guard let session = try store.sessionOpen(
+                for: clientID,
+                cancellation: activeCancellation
+            ) else {
+                return nil
+            }
+            let spec = catalog.get(session.agentID)
+            let binding = ActiveBinding(
+                sessionID: session.id,
+                agentID: session.agentID,
+                goal: "",
+                toolsPrimary: spec?.tools ?? [],
+                toolsForbidden: spec?.toolsForbidden ?? [],
+                outputSchema: spec?.outputSchema ?? [],
+                doneDefinition: spec?.doneDefinition ?? []
+            )
+            let installed = try store.sessionInstallBindingIfUnchanged(
+                sessionID: session.id,
+                clientID: clientID,
+                expectedCurrentSessionID: nil,
+                bindingBody: try bindingBody(binding),
+                agentID: session.agentID,
+                cancellation: activeCancellation
+            )
+            if installed {
+                activeCancellation = nil
+                if installMemoryBindingIfDurableMatches(
+                    clientID: clientID,
+                    binding: binding
+                ) {
+                    diagnostics.warn("agent_binding_rehydrated", [
+                        "source": "open_session",
+                        "agent_id": binding.agentID,
+                        "session_id": session.id.rawValue,
+                        "message": "In-process binding missing; rehydrated from SQLite",
+                    ])
+                    return binding
+                }
             }
         }
-        return nil
+        throw StoreError.conflict(
+            "Agent binding changed repeatedly while rehydrating \(clientID.rawValue)"
+        )
     }
 
     public func touchIfActive(clientID: ClientID) {
-        if let b = getBinding(clientID: clientID) {
-            _ = try? store.sessionTouch(id: b.sessionID)
+        try? touchIfActive(clientID: clientID, cancellation: nil)
+    }
+
+    public func touchIfActive(
+        clientID: ClientID,
+        cancellation: ToolCallCancellation?
+    ) throws {
+        if let binding = try rehydrate(clientID: clientID, cancellation: cancellation) {
+            _ = try store.sessionTouch(id: binding.sessionID, cancellation: cancellation)
         }
     }
 
     public func pruneStale() throws {
+        _ = try pruneStale(cancellation: nil)
+    }
+
+    @discardableResult
+    public func pruneStale(cancellation: ToolCallCancellation?) throws -> Bool {
         let cutoff = clock.now().addingTimeInterval(-idleTTL)
-        for st in [SessionStatus.open, .active, .running, .started] {
-            for s in try store.sessionList(status: st) where s.updatedAt < cutoff {
-                let age = Int(clock.now().timeIntervalSince(s.updatedAt))
-                let summary = try JSONSupport.string(from: [
-                    "event": "auto_closed_stale",
-                    "ok_to_reuse": true,
-                    "age_sec": age,
-                    "message": "Session abandoned without agent_run_complete (idle \(age)s).",
-                ])
-                _ = try store.sessionEnd(id: s.id, summary: summary)
-                diagnostics.warn("agent_session_auto_closed", [
-                    "agent_id": s.agentID,
-                    "session_id": s.id.rawValue,
-                    "age_sec": "\(age)",
-                ])
-                try? audit.append(
-                    tool: "agent_session_auto_closed",
-                    status: "warn",
-                    clientID: s.clientID?.rawValue,
-                    args: [
-                        "session_id": s.id.rawValue,
-                        "agent_id": s.agentID,
-                        "age_sec": age,
-                        "ok_to_reuse": true,
-                    ],
-                    error: "abandoned session auto-closed after \(age)s idle",
-                    mutating: true
+        let closed = try store.sessionPruneStale(
+            cutoff: cutoff,
+            cancellation: cancellation
+        )
+        for session in closed {
+            if let clientID = session.clientID {
+                removeMemoryBindingAfterCommit(
+                    clientID: clientID,
+                    sessionID: session.id
                 )
             }
+            let age: Int
+            if let summary = session.summary,
+               let object = try? JSONSupport.object(from: Data(summary.utf8)),
+               let storedAge = object["age_sec"] as? Int {
+                age = storedAge
+            } else {
+                age = 0
+            }
+            diagnostics.warn("agent_session_auto_closed", [
+                "agent_id": session.agentID,
+                "session_id": session.id.rawValue,
+                "age_sec": "\(age)",
+            ])
+            appendAuditBestEffort(
+                tool: "agent_session_auto_closed",
+                status: "warn",
+                clientID: session.clientID?.rawValue,
+                args: [
+                    "session_id": session.id.rawValue,
+                    "agent_id": session.agentID,
+                    "age_sec": age,
+                    "ok_to_reuse": true,
+                ],
+                error: "abandoned session auto-closed after \(age)s idle",
+                mutating: true
+            )
+        }
+        return !closed.isEmpty
+    }
+
+    private func appendAuditBestEffort(
+        tool: String,
+        status: String,
+        clientID: String?,
+        args: [String: Any]?,
+        error: String? = nil,
+        mutating: Bool
+    ) {
+        if !audit.attemptAppend(
+            tool: tool,
+            status: status,
+            clientID: clientID,
+            args: args,
+            error: error,
+            mutating: mutating
+        ) {
+            diagnostics.warn("agent_lifecycle_audit_dropped", [
+                "tool": tool,
+                "client_id": clientID ?? "",
+            ])
         }
     }
 
     // MARK: - Binding storage
-
-    private func setBinding(clientID: ClientID, binding: ActiveBinding) throws {
-        let body = try bindingBody(binding)
-        try store.memorySet(key: "agent_active/\(clientID.rawValue)", body: body, tags: ["agent_active", binding.agentID])
-        setMemoryBinding(clientID: clientID, binding: binding)
-    }
 
     private func bindingBody(_ binding: ActiveBinding) throws -> String {
         try JSONSupport.string(from: [
@@ -452,38 +638,94 @@ public final class AgentSessionService: SessionManaging, @unchecked Sendable {
         ].compactNSNull())
     }
 
-    private func clearBinding(clientID: ClientID, sessionID: SessionID) throws {
-        removeMemoryBinding(clientID: clientID, sessionID: sessionID)
-        _ = try store.memoryDelete(key: "agent_active/\(clientID.rawValue)")
-    }
-
-    private func removeMemoryBinding(clientID: ClientID, sessionID: SessionID) {
-        lock.lock()
-        if memoryBindings[clientID.rawValue]?.sessionID == sessionID {
-            memoryBindings.removeValue(forKey: clientID.rawValue)
+    private func removeMemoryBinding(
+        clientID: ClientID,
+        sessionID: SessionID,
+        cancellation: ToolCallCancellation?
+    ) throws {
+        try withBindingLock(cancellation: cancellation) {
+            if memoryBindings[clientID.rawValue]?.sessionID == sessionID {
+                memoryBindings.removeValue(forKey: clientID.rawValue)
+            }
         }
-        lock.unlock()
     }
 
-    private func getBinding(clientID: ClientID) -> ActiveBinding? {
-        lock.lock(); defer { lock.unlock() }
-        return memoryBindings[clientID.rawValue]
-    }
-
-    private func setMemoryBinding(clientID: ClientID, binding: ActiveBinding) {
-        lock.lock()
-        if memoryBindings[clientID.rawValue] == nil,
-           memoryBindings.count >= Self.maxMemoryBindings,
-           let victim = memoryBindings.keys.filter({ $0 != clientID.rawValue }).sorted().first {
-            memoryBindings.removeValue(forKey: victim)
+    private func removeMemoryBindingAfterCommit(clientID: ClientID, sessionID: SessionID) {
+        do {
+            try removeMemoryBinding(clientID: clientID, sessionID: sessionID, cancellation: nil)
+        } catch {
+            diagnostics.warn("agent_binding_cache_cleanup_deferred", [
+                "client_id": clientID.rawValue,
+                "session_id": sessionID.rawValue,
+                "error": "\(error)",
+            ])
         }
-        memoryBindings[clientID.rawValue] = binding
-        lock.unlock()
+    }
+
+    private func getBinding(
+        clientID: ClientID,
+        cancellation: ToolCallCancellation?
+    ) throws -> ActiveBinding? {
+        try withBindingLock(cancellation: cancellation) {
+            memoryBindings[clientID.rawValue]
+        }
+    }
+
+    @discardableResult
+    private func installMemoryBindingIfDurableMatches(
+        clientID: ClientID,
+        binding: ActiveBinding
+    ) -> Bool {
+        beforeBindingCacheInstallObserver?(binding.sessionID)
+        do {
+            return try withBindingLock(cancellation: nil) {
+                guard try store.agentBindingMatches(
+                    clientID: clientID,
+                    sessionID: binding.sessionID,
+                    cancellation: nil
+                ) else {
+                    if memoryBindings[clientID.rawValue]?.sessionID == binding.sessionID {
+                        memoryBindings.removeValue(forKey: clientID.rawValue)
+                    }
+                    return false
+                }
+                if memoryBindings[clientID.rawValue] == nil,
+                   memoryBindings.count >= Self.maxMemoryBindings,
+                   let victim = memoryBindings.keys
+                    .filter({ $0 != clientID.rawValue }).sorted().first {
+                    memoryBindings.removeValue(forKey: victim)
+                }
+                memoryBindings[clientID.rawValue] = binding
+                return true
+            }
+        } catch {
+            diagnostics.warn("agent_binding_cache_update_deferred", [
+                "client_id": clientID.rawValue,
+                "session_id": binding.sessionID.rawValue,
+                "error": "\(error)",
+            ])
+            return false
+        }
+    }
+
+    private func withBindingLock<T>(
+        cancellation: ToolCallCancellation?,
+        _ body: () throws -> T
+    ) throws -> T {
+        let deadline = DispatchTime.now().uptimeNanoseconds + 3_000_000_000
+        while !lock.lock(before: Date().addingTimeInterval(0.01)) {
+            try cancellation?.checkCancellation()
+            guard DispatchTime.now().uptimeNanoseconds < deadline else {
+                throw StoreError.execFailed("agent binding cache is busy")
+            }
+        }
+        defer { lock.unlock() }
+        try cancellation?.checkCancellation()
+        return try body()
     }
 
     var memoryBindingCount: Int {
-        lock.lock(); defer { lock.unlock() }
-        return memoryBindings.count
+        (try? withBindingLock(cancellation: nil) { memoryBindings.count }) ?? 0
     }
 
     private func sessionDict(_ s: AgentSession) -> [String: Any] {

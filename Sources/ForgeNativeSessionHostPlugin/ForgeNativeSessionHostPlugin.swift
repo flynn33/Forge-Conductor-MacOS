@@ -276,7 +276,14 @@ public struct LMStudioProviderConfiguration: Codable, Sendable, Equatable {
               byteCount.intValue > 0, byteCount.intValue <= maximumFileBytes else {
             throw LMStudioProviderError.invalidConfiguration("configuration file is empty or oversized")
         }
-        let data = try Data(contentsOf: url, options: [.mappedIfSafe])
+        let data: Data
+        do {
+            data = try OwnerOnlyAtomicFile.read(from: url, maximumBytes: maximumFileBytes)
+        } catch {
+            throw LMStudioProviderError.invalidConfiguration(
+                "configuration file could not be read safely"
+            )
+        }
         do {
             return try JSONDecoder().decode(Self.self, from: data).validated()
         } catch let error as LMStudioProviderError {
@@ -3402,10 +3409,7 @@ public actor LMStudioManagedSessionHostAdapterV2: SessionHostAdapterV2 {
 
     private static func persist(_ ledger: ManagedSessionLedgerV2, to url: URL) throws {
         let data = try encodedLedger(ledger)
-        try data.write(
-            to: url, options: [.atomic, .completeFileProtectionUnlessOpen]
-        )
-        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        try OwnerOnlyAtomicFile.write(data, to: url)
     }
 
     private static func encodedLedger(_ ledger: ManagedSessionLedgerV2) throws -> Data {
@@ -3431,7 +3435,7 @@ public actor LMStudioManagedSessionHostAdapterV2: SessionHostAdapterV2 {
               size.intValue > 0, size.intValue <= maximumLedgerBytes else {
             throw SessionHostAdapterV2Error.ledgerIntegrity("ledger file is empty or oversized")
         }
-        let data = try Data(contentsOf: url, options: [.mappedIfSafe])
+        let data = try OwnerOnlyAtomicFile.read(from: url, maximumBytes: maximumLedgerBytes)
         guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw SessionHostAdapterV2Error.ledgerIntegrity("ledger is not a JSON object")
         }
@@ -3789,6 +3793,7 @@ public actor ForgeNativeSessionHostAdapter: SessionHostAdapter {
     public nonisolated let version = ForgeNativeSessionHostPlugin.version
 
     public static let maximumRecords = 4096
+    public static let maximumLedgerBytes = 4 * 1024 * 1024
     public static let maximumResponseChunks = 256
     public static let maximumChunkBytes = 16 * 1024
     public static let maximumResponseBytes = 256 * 1024
@@ -4009,16 +4014,16 @@ public actor ForgeNativeSessionHostAdapter: SessionHostAdapter {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         let data = try encoder.encode(ledger)
-        try data.write(
-            to: ledgerURL,
-            options: Data.WritingOptions([.atomic, .completeFileProtectionUnlessOpen])
-        )
-        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: ledgerURL.path)
+        guard data.count <= Self.maximumLedgerBytes else {
+            throw NativeHostPluginError.storageLimit
+        }
+        try OwnerOnlyAtomicFile.write(data, to: ledgerURL)
     }
 
     private static func loadLedger(from url: URL) throws -> NativeSessionLedger {
         guard FileManager.default.fileExists(atPath: url.path) else { return NativeSessionLedger() }
-        let value = try JSONDecoder().decode(NativeSessionLedger.self, from: Data(contentsOf: url))
+        let data = try OwnerOnlyAtomicFile.read(from: url, maximumBytes: maximumLedgerBytes)
+        let value = try JSONDecoder().decode(NativeSessionLedger.self, from: data)
         guard value.schemaVersion == 1, value.records.count <= maximumRecords else {
             throw NativeHostPluginError.malformedResponse("unsupported or oversized ledger")
         }

@@ -12,6 +12,11 @@ struct RuntimeArtifactRetentionCandidate: Sendable, Equatable {
     let retainedBytes: UInt64
 }
 
+enum RuntimeJobCommitKind: Sendable, Equatable {
+    case submission
+    case cancellation
+}
+
 public actor RuntimeJobRepository {
     public static let schemaVersion = 5
     public static let maximumListLimit = 100
@@ -177,6 +182,7 @@ public actor RuntimeJobRepository {
     public let databaseURL: URL
 
     private let clock: any Clock
+    private let afterMutationCommitObserver: (@Sendable (RuntimeJobCommitKind) -> Void)?
     private var database: OpaquePointer?
     private var openRegistration: SQLiteOpenRegistration?
 
@@ -189,7 +195,9 @@ public actor RuntimeJobRepository {
             databaseURL: databaseURL,
             clock: clock,
             busyTimeoutMilliseconds: busyTimeoutMilliseconds,
-            beforeMigrationCommitObserver: nil
+            beforeMigrationCommitObserver: nil,
+            tableInfoStepObserver: nil,
+            afterMutationCommitObserver: nil
         )
     }
 
@@ -197,7 +205,9 @@ public actor RuntimeJobRepository {
         databaseURL: URL,
         clock: any Clock = SystemClock(),
         busyTimeoutMilliseconds: Int = 5_000,
-        beforeMigrationCommitObserver: (@Sendable () throws -> Void)?
+        beforeMigrationCommitObserver: (@Sendable () throws -> Void)?,
+        tableInfoStepObserver: (@Sendable () -> Int32?)? = nil,
+        afterMutationCommitObserver: (@Sendable (RuntimeJobCommitKind) -> Void)? = nil
     ) throws {
         guard (1...30_000).contains(busyTimeoutMilliseconds) else {
             throw RuntimeJobError.storageFailure("busy timeout must be between 1 and 30000 milliseconds")
@@ -205,6 +215,7 @@ public actor RuntimeJobRepository {
         let standardizedDatabaseURL = databaseURL.standardizedFileURL
         self.databaseURL = standardizedDatabaseURL
         self.clock = clock
+        self.afterMutationCommitObserver = afterMutationCommitObserver
         try FileManager.default.createDirectory(
             at: standardizedDatabaseURL.deletingLastPathComponent(),
             withIntermediateDirectories: true
@@ -214,7 +225,8 @@ public actor RuntimeJobRepository {
             databaseURL: standardizedDatabaseURL,
             busyTimeoutMilliseconds: busyTimeoutMilliseconds,
             timestamp: ISO8601.string(from: clock.now()),
-            beforeMigrationCommitObserver: beforeMigrationCommitObserver
+            beforeMigrationCommitObserver: beforeMigrationCommitObserver,
+            tableInfoStepObserver: tableInfoStepObserver
         )
         do {
             openRegistration = try VerifiedMigrationBackup.registerOpenDatabase(
@@ -252,6 +264,7 @@ public actor RuntimeJobRepository {
         generation: ProjectGeneration,
         idempotencyKey: String
     ) throws -> RuntimeJobRecord? {
+        try Task.checkCancellation()
         let key = try Self.boundedIdempotencyKey(idempotencyKey)
         if let record = try queryOne(
             Self.selectRecord +
@@ -278,8 +291,10 @@ public actor RuntimeJobRepository {
         request: RuntimeJobRequest,
         commandSummary: String,
         timeoutSeconds: Int,
-        requestArtifactRelativePath: String?
+        requestArtifactRelativePath: String?,
+        commitObserver: (@Sendable (RuntimeJobRecord) -> Void)? = nil
     ) throws -> RuntimeJobRecord {
+        try Task.checkCancellation()
         let summary = try Self.bounded(commandSummary, maximumBytes: 2_048, field: "command summary")
         let idempotency = try request.idempotencyKey.map(Self.boundedIdempotencyKey)
         let requestPath = try requestArtifactRelativePath.map {
@@ -290,7 +305,11 @@ public actor RuntimeJobRepository {
         }
         let now = ISO8601.string(from: clock.now())
 
-        return try transaction {
+        return try transaction(
+            checkTaskCancellation: true,
+            commitKind: .submission,
+            commitObserver: commitObserver
+        ) {
             try validateCurrentProject(request.context)
             if let idempotency,
                let existing = try existingJobUnlocked(
@@ -554,31 +573,52 @@ public actor RuntimeJobRepository {
     }
 
     @discardableResult
-    public func requestCancellation(jobID: UUID, context: ToolInvocationContext) throws -> RuntimeJobRecord {
-        let current = try job(jobID, context: context)
-        if current.state.isTerminal { return current }
-        let now = ISO8601.string(from: clock.now())
-        switch current.state {
-        case .queued:
-            _ = try execute(
-                """
-                UPDATE execution_jobs SET state='cancelled',completed_at=?,updated_at=?
-                WHERE job_id=? AND state='queued'
-                """,
-                bindings: [.text(now), .text(now), .text(Self.uuid(jobID))]
-            )
-        case .running:
-            _ = try execute(
-                "UPDATE execution_jobs SET state='cancelling',updated_at=? WHERE job_id=? AND state='running'",
-                bindings: [.text(now), .text(Self.uuid(jobID))]
-            )
-        case .cancelling:
-            break
-        case .completed, .failed, .timedOut, .cancelled, .quarantinedStale:
-            break
+    public func requestCancellation(
+        jobID: UUID,
+        context: ToolInvocationContext,
+        commitObserver: (@Sendable (RuntimeJobRecord) -> Void)? = nil
+    ) throws -> RuntimeJobRecord {
+        try Task.checkCancellation()
+        return try transaction(
+            checkTaskCancellation: true,
+            commitKind: .cancellation,
+            commitObserver: commitObserver
+        ) {
+            try validateCurrentProject(context)
+            guard let current = try jobUnlocked(jobID) else {
+                throw RuntimeJobError.jobNotFound(jobID)
+            }
+            guard current.projectID == context.projectID,
+                  current.projectGeneration == context.projectGeneration,
+                  current.runID == context.runID || context.runID == nil else {
+                throw RuntimeJobError.jobScopeMismatch(jobID)
+            }
+            if current.state.isTerminal { return current }
+            let now = ISO8601.string(from: clock.now())
+            switch current.state {
+            case .queued:
+                _ = try execute(
+                    """
+                    UPDATE execution_jobs SET state='cancelled',completed_at=?,updated_at=?
+                    WHERE job_id=? AND state='queued'
+                    """,
+                    bindings: [.text(now), .text(now), .text(Self.uuid(jobID))]
+                )
+            case .running:
+                _ = try execute(
+                    "UPDATE execution_jobs SET state='cancelling',updated_at=? WHERE job_id=? AND state='running'",
+                    bindings: [.text(now), .text(Self.uuid(jobID))]
+                )
+            case .cancelling:
+                break
+            case .completed, .failed, .timedOut, .cancelled, .quarantinedStale:
+                break
+            }
+            guard let refreshed = try jobUnlocked(jobID) else {
+                throw RuntimeJobError.jobNotFound(jobID)
+            }
+            return refreshed
         }
-        guard let refreshed = try jobUnlocked(jobID) else { throw RuntimeJobError.jobNotFound(jobID) }
-        return refreshed
     }
 
     @discardableResult
@@ -1301,11 +1341,22 @@ public actor RuntimeJobRepository {
         return try body(statement)
     }
 
-    private func transaction<Value>(_ body: () throws -> Value) throws -> Value {
+    private func transaction<Value>(
+        checkTaskCancellation: Bool = false,
+        commitKind: RuntimeJobCommitKind? = nil,
+        commitObserver: ((Value) -> Void)? = nil,
+        _ body: () throws -> Value
+    ) throws -> Value {
+        if checkTaskCancellation { try Task.checkCancellation() }
         try execute("BEGIN IMMEDIATE")
         do {
             let value = try body()
+            if checkTaskCancellation { try Task.checkCancellation() }
             try execute("COMMIT")
+            commitObserver?(value)
+            if let commitKind {
+                afterMutationCommitObserver?(commitKind)
+            }
             return value
         } catch {
             _ = try? execute("ROLLBACK")
@@ -1366,7 +1417,8 @@ public actor RuntimeJobRepository {
         databaseURL: URL,
         busyTimeoutMilliseconds: Int,
         timestamp: String,
-        beforeMigrationCommitObserver: (@Sendable () throws -> Void)?
+        beforeMigrationCommitObserver: (@Sendable () throws -> Void)?,
+        tableInfoStepObserver: (@Sendable () -> Int32?)?
     ) throws -> OpaquePointer {
         var migrationManifest: VerifiedMigrationBackupManifest?
         return try VerifiedMigrationBackup.withMigrationLock(
@@ -1430,7 +1482,8 @@ public actor RuntimeJobRepository {
                 busyTimeoutMilliseconds: busyTimeoutMilliseconds,
                 timestamp: timestamp,
                 migrationManifest: migrationManifest,
-                beforeMigrationCommitObserver: beforeMigrationCommitObserver
+                beforeMigrationCommitObserver: beforeMigrationCommitObserver,
+                tableInfoStepObserver: tableInfoStepObserver
             )
         }
     }
@@ -1440,7 +1493,8 @@ public actor RuntimeJobRepository {
         busyTimeoutMilliseconds: Int,
         timestamp: String,
         migrationManifest initialManifest: VerifiedMigrationBackupManifest?,
-        beforeMigrationCommitObserver: (@Sendable () throws -> Void)?
+        beforeMigrationCommitObserver: (@Sendable () throws -> Void)?,
+        tableInfoStepObserver: (@Sendable () -> Int32?)?
     ) throws -> OpaquePointer {
         var connection: OpaquePointer?
         let flags = SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
@@ -1539,30 +1593,33 @@ public actor RuntimeJobRepository {
                     )
                 }
                 try rawExecute(schema, database: connection)
-                if !rawTableHasColumn(
+                if try !rawTableHasColumn(
                     table: "runtime_job_output_streams",
                     column: "artifact_evicted_at",
-                    database: connection
+                    database: connection,
+                    stepObserver: tableInfoStepObserver
                 ) {
                     try rawExecute(
                         "ALTER TABLE runtime_job_output_streams ADD COLUMN artifact_evicted_at TEXT",
                         database: connection
                     )
                 }
-                if !rawTableHasColumn(
+                if try !rawTableHasColumn(
                     table: "execution_jobs",
                     column: "process_start_seconds",
-                    database: connection
+                    database: connection,
+                    stepObserver: tableInfoStepObserver
                 ) {
                     try rawExecute(
                         "ALTER TABLE execution_jobs ADD COLUMN process_start_seconds INTEGER CHECK(process_start_seconds>0)",
                         database: connection
                     )
                 }
-                if !rawTableHasColumn(
+                if try !rawTableHasColumn(
                     table: "execution_jobs",
                     column: "process_start_microseconds",
-                    database: connection
+                    database: connection,
+                    stepObserver: tableInfoStepObserver
                 ) {
                     try rawExecute(
                         """
@@ -1572,10 +1629,11 @@ public actor RuntimeJobRepository {
                         database: connection
                     )
                 }
-                if !rawTableHasColumn(
+                if try !rawTableHasColumn(
                     table: "runtime_job_output_streams",
                     column: "artifact_device_identifier",
-                    database: connection
+                    database: connection,
+                    stepObserver: tableInfoStepObserver
                 ) {
                     try rawExecute(
                         """
@@ -1586,10 +1644,11 @@ public actor RuntimeJobRepository {
                         database: connection
                     )
                 }
-                if !rawTableHasColumn(
+                if try !rawTableHasColumn(
                     table: "runtime_job_output_streams",
                     column: "artifact_file_identifier",
-                    database: connection
+                    database: connection,
+                    stepObserver: tableInfoStepObserver
                 ) {
                     try rawExecute(
                         """
@@ -1600,10 +1659,11 @@ public actor RuntimeJobRepository {
                         database: connection
                     )
                 }
-                if !rawTableHasColumn(
+                if try !rawTableHasColumn(
                     table: "runtime_job_details",
                     column: "termination_phase",
-                    database: connection
+                    database: connection,
+                    stepObserver: tableInfoStepObserver
                 ) {
                     try rawExecute(
                         """
@@ -1616,20 +1676,22 @@ public actor RuntimeJobRepository {
                         database: connection
                     )
                 }
-                if !rawTableHasColumn(
+                if try !rawTableHasColumn(
                     table: "runtime_job_details",
                     column: "termination_probe_deadline",
-                    database: connection
+                    database: connection,
+                    stepObserver: tableInfoStepObserver
                 ) {
                     try rawExecute(
                         "ALTER TABLE runtime_job_details ADD COLUMN termination_probe_deadline TEXT",
                         database: connection
                     )
                 }
-                if !rawTableHasColumn(
+                if try !rawTableHasColumn(
                     table: "runtime_job_details",
                     column: "termination_error_summary",
-                    database: connection
+                    database: connection,
+                    stepObserver: tableInfoStepObserver
                 ) {
                     try rawExecute(
                         "ALTER TABLE runtime_job_details ADD COLUMN termination_error_summary TEXT",
@@ -1857,16 +1919,30 @@ public actor RuntimeJobRepository {
     private static func rawTableHasColumn(
         table: String,
         column: String,
-        database: OpaquePointer
-    ) -> Bool {
+        database: OpaquePointer,
+        stepObserver: (@Sendable () -> Int32?)?
+    ) throws -> Bool {
         var statement: OpaquePointer?
-        guard sqlite3_prepare_v2(database, "PRAGMA table_info(\(table))", -1, &statement, nil) == SQLITE_OK,
-              let statement else { return false }
-        defer { sqlite3_finalize(statement) }
-        while sqlite3_step(statement) == SQLITE_ROW {
-            if optionalText(statement, column: 1) == column { return true }
+        let prepare = sqlite3_prepare_v2(database, "PRAGMA table_info(\(table))", -1, &statement, nil)
+        guard prepare == SQLITE_OK, let statement else {
+            throw RuntimeJobError.storageFailure(
+                "SQLite table-info prepare failed with code \(prepare): \(String(cString: sqlite3_errmsg(database)))"
+            )
         }
-        return false
+        defer { sqlite3_finalize(statement) }
+        while true {
+            let step = stepObserver?() ?? sqlite3_step(statement)
+            switch step {
+            case SQLITE_ROW:
+                if optionalText(statement, column: 1) == column { return true }
+            case SQLITE_DONE:
+                return false
+            default:
+                throw RuntimeJobError.storageFailure(
+                    "SQLite table-info step failed with code \(step): \(String(cString: sqlite3_errmsg(database)))"
+                )
+            }
+        }
     }
 
     private static func decodeRecord(_ statement: OpaquePointer) throws -> RuntimeJobRecord {

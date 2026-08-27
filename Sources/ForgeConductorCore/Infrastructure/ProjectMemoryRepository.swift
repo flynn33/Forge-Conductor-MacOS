@@ -250,9 +250,78 @@ struct LegacyContinuityMigrationBatch: Sendable {
     }
 }
 
+private final class ProjectMemorySQLiteControl {
+    private static let busyLimitNanoseconds: UInt64 = 3_000_000_000
+    private static let busyPollSeconds: TimeInterval = 0.01
+
+    let cancellation: ToolCallCancellation?
+    private let busyRetryObserver: (@Sendable () -> Void)?
+    private let busyDeadlineUptimeNanoseconds: UInt64
+    private var reportedBusy = false
+
+    init(
+        cancellation: ToolCallCancellation?,
+        busyRetryObserver: (@Sendable () -> Void)?
+    ) {
+        self.cancellation = cancellation
+        self.busyRetryObserver = busyRetryObserver
+        busyDeadlineUptimeNanoseconds = DispatchTime.now().uptimeNanoseconds
+            .addingReportingOverflow(Self.busyLimitNanoseconds).partialValue
+    }
+
+    func checkCancellation() throws {
+        try cancellation?.checkCancellation()
+    }
+
+    func shouldInterrupt() -> Bool {
+        cancellation?.isCancelled == true || cancellation?.isDeadlineExceeded == true
+    }
+
+    func waitForBusyRetry() -> Int32 {
+        if !reportedBusy {
+            reportedBusy = true
+            busyRetryObserver?()
+        }
+        guard !shouldInterrupt() else { return 0 }
+        let now = DispatchTime.now().uptimeNanoseconds
+        guard now < busyDeadlineUptimeNanoseconds else { return 0 }
+        let fallbackRemaining = TimeInterval(busyDeadlineUptimeNanoseconds - now) / 1_000_000_000
+        let requestedRemaining = cancellation?.remainingTimeInterval ?? fallbackRemaining
+        let delay = min(Self.busyPollSeconds, fallbackRemaining, requestedRemaining)
+        guard delay > 0 else { return 0 }
+        Thread.sleep(forTimeInterval: delay)
+        return shouldInterrupt() || DispatchTime.now().uptimeNanoseconds >= busyDeadlineUptimeNanoseconds
+            ? 0
+            : 1
+    }
+}
+
+private func projectMemorySQLiteBusyHandler(
+    _ context: UnsafeMutableRawPointer?,
+    _ priorAttempts: Int32
+) -> Int32 {
+    guard let context else { return 0 }
+    return Unmanaged<ProjectMemorySQLiteControl>.fromOpaque(context)
+        .takeUnretainedValue()
+        .waitForBusyRetry()
+}
+
+private func projectMemorySQLiteProgressHandler(_ context: UnsafeMutableRawPointer?) -> Int32 {
+    guard let context else { return 0 }
+    return Unmanaged<ProjectMemorySQLiteControl>.fromOpaque(context)
+        .takeUnretainedValue()
+        .shouldInterrupt() ? 1 : 0
+}
+
 public final class ProjectMemoryRepository: @unchecked Sendable {
     public static let schemaVersion = 2
     private static let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+
+    private struct ContinuityProjectionRepair {
+        let kind: String
+        let recordID: String
+        let sourceVersion: String
+    }
 
     public let projectID: String
     public let directory: URL
@@ -261,6 +330,10 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
     private let clock: any Clock
     private let enableFTS5: Bool
     private let beforeMigrationCommitObserver: (@Sendable () throws -> Void)?
+    private let busyRetryObserver: (@Sendable () -> Void)?
+    private let didMutationCommitObserver: (@Sendable () -> Void)?
+    private let rowStepObserver: (@Sendable () throws -> Void)?
+    private let beforeContinuityProjectionWriteObserver: (@Sendable (String, String, String) -> Void)?
     private let lock = NSLock()
     private var db: OpaquePointer?
     private var openRegistration: SQLiteOpenRegistration?
@@ -269,14 +342,20 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         projectID: String,
         directory: URL,
         clock: any Clock = SystemClock(),
-        enableFTS5: Bool = true
+        enableFTS5: Bool = true,
+        cancellation: ToolCallCancellation? = nil
     ) throws {
         try self.init(
             projectID: projectID,
             directory: directory,
             clock: clock,
             enableFTS5: enableFTS5,
-            beforeMigrationCommitObserver: nil
+            cancellation: cancellation,
+            busyRetryObserver: nil,
+            didMutationCommitObserver: nil,
+            beforeMigrationCommitObserver: nil,
+            rowStepObserver: nil,
+            beforeContinuityProjectionWriteObserver: nil
         )
     }
 
@@ -285,8 +364,14 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         directory: URL,
         clock: any Clock = SystemClock(),
         enableFTS5: Bool = true,
-        beforeMigrationCommitObserver: (@Sendable () throws -> Void)?
+        cancellation: ToolCallCancellation? = nil,
+        busyRetryObserver: (@Sendable () -> Void)? = nil,
+        didMutationCommitObserver: (@Sendable () -> Void)? = nil,
+        beforeMigrationCommitObserver: (@Sendable () throws -> Void)?,
+        rowStepObserver: (@Sendable () throws -> Void)? = nil,
+        beforeContinuityProjectionWriteObserver: (@Sendable (String, String, String) -> Void)? = nil
     ) throws {
+        try cancellation?.checkCancellation()
         guard UUID(uuidString: projectID) != nil else {
             throw ProjectMemoryError.invalidRequest("project_id must be a UUID")
         }
@@ -297,6 +382,10 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         self.clock = clock
         self.enableFTS5 = enableFTS5
         self.beforeMigrationCommitObserver = beforeMigrationCommitObserver
+        self.busyRetryObserver = busyRetryObserver
+        self.didMutationCommitObserver = didMutationCommitObserver
+        self.rowStepObserver = rowStepObserver
+        self.beforeContinuityProjectionWriteObserver = beforeContinuityProjectionWriteObserver
         try FileManager.default.createDirectory(
             at: standardizedDirectory,
             withIntermediateDirectories: true
@@ -305,7 +394,10 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
             [.posixPermissions: 0o700],
             ofItemAtPath: standardizedDirectory.path
         )
-        try openAndMigrate()
+        try openAndMigrate(cancellation: cancellation)
+        // Projection files are rebuildable views. A prior crash or filesystem
+        // failure leaves a durable repair intent that is retried on every open.
+        _ = try? repairContinuityProjections(cancellation: cancellation)
     }
 
     deinit { close() }
@@ -322,49 +414,84 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         }
     }
 
-    public func quickCheck() throws -> Bool {
-        try queryOne("PRAGMA quick_check;") { statement in
+    public func quickCheck(cancellation: ToolCallCancellation? = nil) throws -> Bool {
+        try queryOne("PRAGMA quick_check;", cancellation: cancellation) { statement in
             text(statement, 0) == "ok"
         } ?? false
     }
 
-    public func remember(_ write: ProjectMemoryWrite) throws -> (ProjectMemoryRecord, String) {
-        lock.lock()
-        defer { lock.unlock() }
-        return try transactionUnlocked {
-            try rememberUnlocked(write)
+    public func remember(
+        _ write: ProjectMemoryWrite,
+        cancellation: ToolCallCancellation? = nil,
+        commitReceipt: (((ProjectMemoryRecord, String)) -> ToolResult)? = nil
+    ) throws -> (ProjectMemoryRecord, String) {
+        try withLockedSQLiteOperation(cancellation: cancellation) {
+            try transactionUnlocked(
+                cancellation: cancellation,
+                didCommit: didMutationCommitObserver,
+                commitReceipt: commitReceipt
+            ) {
+                try cancellation?.checkCancellation()
+                return try rememberUnlocked(write)
+            }
         }
     }
 
-    public func rememberBatch(_ writes: [ProjectMemoryWrite]) throws -> [(ProjectMemoryRecord, String)] {
-        lock.lock()
-        defer { lock.unlock() }
-        return try transactionUnlocked {
-            try writes.map(rememberUnlocked)
+    public func rememberBatch(
+        _ writes: [ProjectMemoryWrite],
+        cancellation: ToolCallCancellation? = nil,
+        commitReceipt: (([(ProjectMemoryRecord, String)]) -> ToolResult)? = nil
+    ) throws -> [(ProjectMemoryRecord, String)] {
+        try withLockedSQLiteOperation(cancellation: cancellation) {
+            try transactionUnlocked(
+                cancellation: cancellation,
+                didCommit: didMutationCommitObserver,
+                commitReceipt: commitReceipt
+            ) {
+                var results: [(ProjectMemoryRecord, String)] = []
+                results.reserveCapacity(writes.count)
+                for write in writes {
+                    try cancellation?.checkCancellation()
+                    results.append(try rememberUnlocked(write))
+                }
+                return results
+            }
         }
     }
 
-    public func get(id: String, includeTombstone: Bool = false) throws -> ProjectMemoryRecord? {
+    public func get(
+        id: String,
+        includeTombstone: Bool = false,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ProjectMemoryRecord? {
         let tombstone = includeTombstone ? "" : " AND is_tombstone=0"
         return try withStatement(
-            Self.recordSelect + " WHERE id=? AND project_id=?\(tombstone) LIMIT 1"
+            Self.recordSelect + " WHERE id=? AND project_id=?\(tombstone) LIMIT 1",
+            cancellation: cancellation
         ) { statement in
             bind(statement, 1, id)
             bind(statement, 2, projectID)
-            guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+            guard try stepRow(statement) else { return nil }
             return record(statement)
         }
     }
 
-    public func get(ids: [String], includeBody: Bool, maximumCount: Int) throws -> [ProjectMemoryRecord] {
+    public func get(
+        ids: [String],
+        includeBody: Bool,
+        maximumCount: Int,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> [ProjectMemoryRecord] {
         var output: [ProjectMemoryRecord] = []
         for id in ids.prefix(maximumCount) {
-            if let item = try get(id: id) {
+            try cancellation?.checkCancellation()
+            if let item = try get(id: id, cancellation: cancellation) {
                 var value = item
                 if !includeBody { value.body = nil }
                 output.append(value)
             }
         }
+        try cancellation?.checkCancellation()
         return output
     }
 
@@ -374,99 +501,126 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         title: String?,
         summary: String?,
         body: String?,
-        tags: [String]?
+        tags: [String]?,
+        cancellation: ToolCallCancellation? = nil,
+        commitReceipt: ((ProjectMemoryRecord) -> ToolResult)? = nil
     ) throws -> ProjectMemoryRecord {
-        lock.lock()
-        defer { lock.unlock() }
-        return try transactionUnlocked {
-            guard let current = try recordByIDUnlocked(id, includeTombstone: false) else {
-                throw ProjectMemoryError.recordNotFound(id)
+        try withLockedSQLiteOperation(cancellation: cancellation) {
+            try transactionUnlocked(
+                cancellation: cancellation,
+                didCommit: didMutationCommitObserver,
+                commitReceipt: commitReceipt
+            ) {
+                try cancellation?.checkCancellation()
+                guard let current = try recordByIDUnlocked(id, includeTombstone: false) else {
+                    throw ProjectMemoryError.recordNotFound(id)
+                }
+                guard current.version == expectedVersion else {
+                    throw ProjectMemoryError.conflict("expected version \(expectedVersion), current version \(current.version)")
+                }
+                let nextTitle = title ?? current.title
+                let nextSummary = summary ?? current.summary
+                let nextBody = body ?? current.body
+                let nextTags = tags ?? current.tags
+                let hash = Self.contentHash(
+                    kind: current.kind,
+                    title: nextTitle,
+                    summary: nextSummary,
+                    body: nextBody,
+                    tags: nextTags
+                )
+                let timestamp = ISO8601.string(from: clock.now())
+                try withStatementUnlocked(
+                    """
+                    UPDATE memory_records SET version=version+1, title=?, summary=?, body=?,
+                        updated_at=?, last_accessed_at=?, content_hash=?
+                    WHERE id=? AND project_id=? AND version=? AND is_tombstone=0
+                    """
+                ) { statement in
+                    bind(statement, 1, nextTitle)
+                    bind(statement, 2, nextSummary)
+                    bind(statement, 3, nextBody)
+                    bind(statement, 4, timestamp)
+                    bind(statement, 5, timestamp)
+                    bind(statement, 6, hash)
+                    bind(statement, 7, id)
+                    bind(statement, 8, projectID)
+                    sqlite3_bind_int(statement, 9, Int32(expectedVersion))
+                    try stepDone(statement)
+                }
+                try replaceTagsUnlocked(recordID: id, tags: nextTags)
+                try appendEventUnlocked(action: "updated", recordID: id, detail: hash)
+                guard let updated = try recordByIDUnlocked(id, includeTombstone: false) else {
+                    throw ProjectMemoryError.recordNotFound(id)
+                }
+                return updated
             }
-            guard current.version == expectedVersion else {
-                throw ProjectMemoryError.conflict("expected version \(expectedVersion), current version \(current.version)")
-            }
-            let nextTitle = title ?? current.title
-            let nextSummary = summary ?? current.summary
-            let nextBody = body ?? current.body
-            let nextTags = tags ?? current.tags
-            let hash = Self.contentHash(
-                kind: current.kind,
-                title: nextTitle,
-                summary: nextSummary,
-                body: nextBody,
-                tags: nextTags
-            )
-            let timestamp = ISO8601.string(from: clock.now())
-            try withStatementUnlocked(
-                """
-                UPDATE memory_records SET version=version+1, title=?, summary=?, body=?,
-                    updated_at=?, last_accessed_at=?, content_hash=?
-                WHERE id=? AND project_id=? AND version=? AND is_tombstone=0
-                """
-            ) { statement in
-                bind(statement, 1, nextTitle)
-                bind(statement, 2, nextSummary)
-                bind(statement, 3, nextBody)
-                bind(statement, 4, timestamp)
-                bind(statement, 5, timestamp)
-                bind(statement, 6, hash)
-                bind(statement, 7, id)
-                bind(statement, 8, projectID)
-                sqlite3_bind_int(statement, 9, Int32(expectedVersion))
-                try stepDone(statement)
-            }
-            try replaceTagsUnlocked(recordID: id, tags: nextTags)
-            try appendEventUnlocked(action: "updated", recordID: id, detail: hash)
-            guard let updated = try recordByIDUnlocked(id, includeTombstone: false) else {
-                throw ProjectMemoryError.recordNotFound(id)
-            }
-            return updated
         }
     }
 
-    public func forget(id: String) throws -> Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return try transactionUnlocked {
-            let timestamp = ISO8601.string(from: clock.now())
-            try withStatementUnlocked(
-                """
-                UPDATE memory_records SET is_tombstone=1, version=version+1,
-                    body=NULL, updated_at=?, last_accessed_at=?
-                WHERE id=? AND project_id=? AND is_tombstone=0
-                """
-            ) { statement in
-                bind(statement, 1, timestamp)
-                bind(statement, 2, timestamp)
-                bind(statement, 3, id)
-                bind(statement, 4, projectID)
-                try stepDone(statement)
+    public func forget(
+        id: String,
+        cancellation: ToolCallCancellation? = nil,
+        commitReceipt: ((Bool) -> ToolResult)? = nil
+    ) throws -> Bool {
+        try withLockedSQLiteOperation(cancellation: cancellation) {
+            try transactionUnlocked(
+                cancellation: cancellation,
+                didCommit: didMutationCommitObserver,
+                commitReceipt: commitReceipt
+            ) {
+                try cancellation?.checkCancellation()
+                let timestamp = ISO8601.string(from: clock.now())
+                try withStatementUnlocked(
+                    """
+                    UPDATE memory_records SET is_tombstone=1, version=version+1,
+                        body=NULL, updated_at=?, last_accessed_at=?
+                    WHERE id=? AND project_id=? AND is_tombstone=0
+                    """
+                ) { statement in
+                    bind(statement, 1, timestamp)
+                    bind(statement, 2, timestamp)
+                    bind(statement, 3, id)
+                    bind(statement, 4, projectID)
+                    try stepDone(statement)
+                }
+                let changed = sqlite3_changes(db) > 0
+                if changed { try appendEventUnlocked(action: "tombstoned", recordID: id, detail: nil) }
+                return changed
             }
-            let changed = sqlite3_changes(db) > 0
-            if changed { try appendEventUnlocked(action: "tombstoned", recordID: id, detail: nil) }
-            return changed
         }
     }
 
-    public func link(sourceID: String, targetID: String, relation: String) throws -> Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return try transactionUnlocked {
-            guard try recordByIDUnlocked(sourceID, includeTombstone: false) != nil,
-                  try recordByIDUnlocked(targetID, includeTombstone: false) != nil else {
-                throw ProjectMemoryError.recordNotFound("source or target record")
+    public func link(
+        sourceID: String,
+        targetID: String,
+        relation: String,
+        cancellation: ToolCallCancellation? = nil,
+        commitReceipt: ((Bool) -> ToolResult)? = nil
+    ) throws -> Bool {
+        try withLockedSQLiteOperation(cancellation: cancellation) {
+            try transactionUnlocked(
+                cancellation: cancellation,
+                didCommit: didMutationCommitObserver,
+                commitReceipt: commitReceipt
+            ) {
+                try cancellation?.checkCancellation()
+                guard try recordByIDUnlocked(sourceID, includeTombstone: false) != nil,
+                      try recordByIDUnlocked(targetID, includeTombstone: false) != nil else {
+                    throw ProjectMemoryError.recordNotFound("source or target record")
+                }
+                try withStatementUnlocked(
+                    "INSERT OR IGNORE INTO memory_links(project_id,source_id,target_id,relation,created_at) VALUES(?,?,?,?,?)"
+                ) { statement in
+                    bind(statement, 1, projectID)
+                    bind(statement, 2, sourceID)
+                    bind(statement, 3, targetID)
+                    bind(statement, 4, relation)
+                    bind(statement, 5, ISO8601.string(from: clock.now()))
+                    try stepDone(statement)
+                }
+                return sqlite3_changes(db) > 0
             }
-            try withStatementUnlocked(
-                "INSERT OR IGNORE INTO memory_links(project_id,source_id,target_id,relation,created_at) VALUES(?,?,?,?,?)"
-            ) { statement in
-                bind(statement, 1, projectID)
-                bind(statement, 2, sourceID)
-                bind(statement, 3, targetID)
-                bind(statement, 4, relation)
-                bind(statement, 5, ISO8601.string(from: clock.now()))
-                try stepDone(statement)
-            }
-            return sqlite3_changes(db) > 0
         }
     }
 
@@ -474,7 +628,8 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         kinds: [String],
         sessionID: String?,
         limit: Int,
-        offset: Int
+        offset: Int,
+        cancellation: ToolCallCancellation? = nil
     ) throws -> [ProjectMemoryRecord] {
         var sql = Self.recordSelect + " WHERE project_id=? AND is_tombstone=0"
         if !kinds.isEmpty {
@@ -482,7 +637,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         }
         if sessionID != nil { sql += " AND session_id=?" }
         sql += " ORDER BY updated_at DESC,id ASC LIMIT ? OFFSET ?"
-        return try withStatement(sql) { statement in
+        return try withStatement(sql, cancellation: cancellation) { statement in
             var index: Int32 = 1
             bind(statement, index, projectID); index += 1
             for kind in kinds { bind(statement, index, kind); index += 1 }
@@ -490,7 +645,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
             sqlite3_bind_int(statement, index, Int32(limit)); index += 1
             sqlite3_bind_int(statement, index, Int32(offset))
             var output: [ProjectMemoryRecord] = []
-            while sqlite3_step(statement) == SQLITE_ROW { output.append(record(statement)) }
+            while try stepRow(statement) { output.append(record(statement)) }
             return output
         }
     }
@@ -501,7 +656,8 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         tags: [String],
         sessionID: String?,
         limit: Int,
-        offset: Int
+        offset: Int,
+        cancellation: ToolCallCancellation? = nil
     ) throws -> [(ProjectMemoryRecord, Double)] {
         let escaped = Self.escapeLike(query)
         let pattern = "%\(escaped)%"
@@ -524,7 +680,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
             sql += " AND EXISTS(SELECT 1 FROM memory_record_tags rt JOIN memory_tags t ON t.id=rt.tag_id WHERE rt.record_id=r.id AND t.name=?)"
         }
         sql += " ORDER BY rank_score DESC,updated_at DESC,id ASC LIMIT ? OFFSET ?"
-        return try withStatement(sql) { statement in
+        return try withStatement(sql, cancellation: cancellation) { statement in
             var index: Int32 = 1
             bind(statement, index, query); index += 1
             bind(statement, index, query); index += 1
@@ -542,17 +698,29 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
             sqlite3_bind_int(statement, index, Int32(limit)); index += 1
             sqlite3_bind_int(statement, index, Int32(offset))
             var output: [(ProjectMemoryRecord, Double)] = []
-            while sqlite3_step(statement) == SQLITE_ROW {
+            while try stepRow(statement) {
                 output.append((record(statement), sqlite3_column_double(statement, 20)))
             }
             return output
         }
     }
 
-    public func status() throws -> [String: Any] {
-        let count = try scalarInt("SELECT COUNT(*) FROM memory_records WHERE project_id=? AND is_tombstone=0", value: projectID)
-        let tombstones = try scalarInt("SELECT COUNT(*) FROM memory_records WHERE project_id=? AND is_tombstone=1", value: projectID)
-        let events = try scalarInt("SELECT COUNT(*) FROM event_journal WHERE project_id=?", value: projectID)
+    public func status(cancellation: ToolCallCancellation? = nil) throws -> [String: Any] {
+        let count = try scalarInt(
+            "SELECT COUNT(*) FROM memory_records WHERE project_id=? AND is_tombstone=0",
+            value: projectID,
+            cancellation: cancellation
+        )
+        let tombstones = try scalarInt(
+            "SELECT COUNT(*) FROM memory_records WHERE project_id=? AND is_tombstone=1",
+            value: projectID,
+            cancellation: cancellation
+        )
+        let events = try scalarInt(
+            "SELECT COUNT(*) FROM event_journal WHERE project_id=?",
+            value: projectID,
+            cancellation: cancellation
+        )
         let databaseBytes = Self.fileSize(databaseURL)
         let walBytes = Self.fileSize(URL(fileURLWithPath: databaseURL.path + "-wal"))
         return [
@@ -564,12 +732,18 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
             "database_bytes": databaseBytes,
             "wal_bytes": walBytes,
             "fts5": supportsFTS5,
-            "integrity": try quickCheck() ? "ok" : "failed",
+            "integrity": try quickCheck(cancellation: cancellation) ? "ok" : "failed",
         ]
     }
 
-    public func exportRecords() throws -> [[String: Any]] {
-        let records = try recent(kinds: [], sessionID: nil, limit: 10_000, offset: 0)
+    public func exportRecords(
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> [[String: Any]] {
+        let records = try recent(
+            kinds: [], sessionID: nil, limit: 10_000, offset: 0,
+            cancellation: cancellation
+        )
+        try cancellation?.checkCancellation()
         return records.map { $0.asDictionary(includeBody: true) }
     }
 
@@ -580,90 +754,108 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         predecessorSessionID: String,
         handoffID: String,
         adapterID: String,
-        idempotencyKey: String
+        idempotencyKey: String,
+        cancellation: ToolCallCancellation? = nil
     ) throws -> ContinuityOperation {
-        lock.lock(); defer { lock.unlock() }
-        return try transactionUnlocked {
-            if let existing = try continuityOperationByIdempotencyUnlocked(idempotencyKey) {
-                return existing
+        try withLockedSQLiteOperation(cancellation: cancellation) {
+            try transactionUnlocked(
+                cancellation: cancellation,
+                didCommit: didMutationCommitObserver
+            ) {
+                if let existing = try continuityOperationByIdempotencyUnlocked(idempotencyKey) {
+                    return existing
+                }
+                if let active = try continuityActiveOperationUnlocked() {
+                    throw ProjectMemoryError.conflict("rollover already active: \(active.operationID)")
+                }
+                let timestamp = ISO8601.string(from: clock.now())
+                let checksum = Self.continuityChecksum(
+                    operationID: operationID, state: .active, successorSessionID: nil,
+                    handoffID: handoffID, attempt: 0
+                )
+                try withStatementUnlocked(
+                    """
+                    INSERT INTO rollover_operations(
+                      operation_id,project_id,predecessor_session_id,successor_session_id,handoff_id,
+                      state,attempt,adapter_id,idempotency_key,acknowledged_session_id,
+                      acknowledged_handoff_id,created_at,updated_at,last_error,retry_at,state_checksum,
+                      schema_version,quarantine_state,migration_source
+                    ) VALUES(?,?,?,NULL,?, ?,0,?,?,NULL,NULL,?,?,NULL,NULL,?,1,NULL,'compatibility_v1')
+                    """
+                ) { statement in
+                    bind(statement, 1, operationID); bind(statement, 2, projectID)
+                    bind(statement, 3, predecessorSessionID); bind(statement, 4, handoffID)
+                    bind(statement, 5, ContinuityState.active.rawValue); bind(statement, 6, adapterID)
+                    bind(statement, 7, idempotencyKey); bind(statement, 8, timestamp)
+                    bind(statement, 9, timestamp); bind(statement, 10, checksum)
+                    try stepDone(statement)
+                }
+                try appendTransitionUnlocked(
+                    operationID: operationID, from: nil, to: .active, attempt: 0,
+                    adapterID: adapterID, evidence: "operation_created", checksum: checksum
+                )
+                guard let created = try continuityOperationUnlocked(operationID) else {
+                    throw ProjectMemoryError.integrityFailure("created rollover operation is unreadable")
+                }
+                return created
             }
-            if let active = try continuityActiveOperationUnlocked() {
-                throw ProjectMemoryError.conflict("rollover already active: \(active.operationID)")
-            }
-            let timestamp = ISO8601.string(from: clock.now())
-            let checksum = Self.continuityChecksum(
-                operationID: operationID, state: .active, successorSessionID: nil,
-                handoffID: handoffID, attempt: 0
-            )
-            try withStatementUnlocked(
-                """
-                INSERT INTO rollover_operations(
-                  operation_id,project_id,predecessor_session_id,successor_session_id,handoff_id,
-                  state,attempt,adapter_id,idempotency_key,acknowledged_session_id,
-                  acknowledged_handoff_id,created_at,updated_at,last_error,retry_at,state_checksum,
-                  schema_version,quarantine_state,migration_source
-                ) VALUES(?,?,?,NULL,?, ?,0,?,?,NULL,NULL,?,?,NULL,NULL,?,1,NULL,'compatibility_v1')
-                """
-            ) { statement in
-                bind(statement, 1, operationID); bind(statement, 2, projectID)
-                bind(statement, 3, predecessorSessionID); bind(statement, 4, handoffID)
-                bind(statement, 5, ContinuityState.active.rawValue); bind(statement, 6, adapterID)
-                bind(statement, 7, idempotencyKey); bind(statement, 8, timestamp)
-                bind(statement, 9, timestamp); bind(statement, 10, checksum)
-                try stepDone(statement)
-            }
-            try appendTransitionUnlocked(
-                operationID: operationID, from: nil, to: .active, attempt: 0,
-                adapterID: adapterID, evidence: "operation_created", checksum: checksum
-            )
-            guard let created = try continuityOperationUnlocked(operationID) else {
-                throw ProjectMemoryError.integrityFailure("created rollover operation is unreadable")
-            }
-            return created
         }
     }
 
-    public func continuityStoreHandoff(_ handoff: ContinuityHandoff) throws {
+    public func continuityStoreHandoff(
+        _ handoff: ContinuityHandoff,
+        cancellation: ToolCallCancellation? = nil
+    ) throws {
+        try cancellation?.checkCancellation()
         let validated = try handoff.validated()
         let payload = try JSONSupport.string(from: validated.asDictionary())
-        lock.lock(); defer { lock.unlock() }
-        try transactionUnlocked {
-            guard let operation = try continuityOperationUnlocked(validated.operationID),
-                  operation.projectID == projectID, operation.handoffID == validated.handoffID,
-                  operation.state == .active || operation.state == .checkpointPreparing else {
-                throw ProjectMemoryError.conflict("handoff does not match checkpoint preparation")
-            }
-            try withStatementUnlocked(
-                """
-                INSERT INTO continuity_handoffs(
-                  handoff_id,project_id,operation_id,payload_json,content_sha256,created_at,
-                  schema_version,quarantine_state,migration_source
-                ) VALUES(?,?,?,?,?,?,'1.0',NULL,'compatibility_v1')
-                ON CONFLICT(handoff_id) DO UPDATE SET
-                  payload_json=excluded.payload_json,content_sha256=excluded.content_sha256,
-                  schema_version='1.0',quarantine_state=NULL,
-                  migration_source='compatibility_v1'
-                WHERE continuity_handoffs.operation_id=excluded.operation_id
-                  AND continuity_handoffs.project_id=excluded.project_id
-                """
-            ) { statement in
-                bind(statement, 1, validated.handoffID); bind(statement, 2, projectID)
-                bind(statement, 3, validated.operationID); bind(statement, 4, payload)
-                bind(statement, 5, validated.contentSHA256); bind(statement, 6, validated.createdAt)
-                try stepDone(statement)
-            }
-            guard sqlite3_changes(db) == 1 else {
-                throw ProjectMemoryError.conflict("handoff identifier is already bound to a different operation")
+        try cancellation?.checkCancellation()
+        try withLockedSQLiteOperation(cancellation: cancellation) {
+            try transactionUnlocked(
+                cancellation: cancellation,
+                didCommit: didMutationCommitObserver
+            ) {
+                guard let operation = try continuityOperationUnlocked(validated.operationID),
+                      operation.projectID == projectID, operation.handoffID == validated.handoffID,
+                      operation.state == .active || operation.state == .checkpointPreparing else {
+                    throw ProjectMemoryError.conflict("handoff does not match checkpoint preparation")
+                }
+                try withStatementUnlocked(
+                    """
+                    INSERT INTO continuity_handoffs(
+                      handoff_id,project_id,operation_id,payload_json,content_sha256,created_at,
+                      schema_version,quarantine_state,migration_source
+                    ) VALUES(?,?,?,?,?,?,'1.0',NULL,'compatibility_v1')
+                    ON CONFLICT(handoff_id) DO UPDATE SET
+                      payload_json=excluded.payload_json,content_sha256=excluded.content_sha256,
+                      schema_version='1.0',quarantine_state=NULL,
+                      migration_source='compatibility_v1'
+                    WHERE continuity_handoffs.operation_id=excluded.operation_id
+                      AND continuity_handoffs.project_id=excluded.project_id
+                    """
+                ) { statement in
+                    bind(statement, 1, validated.handoffID); bind(statement, 2, projectID)
+                    bind(statement, 3, validated.operationID); bind(statement, 4, payload)
+                    bind(statement, 5, validated.contentSHA256); bind(statement, 6, validated.createdAt)
+                    try stepDone(statement)
+                }
+                guard sqlite3_changes(db) == 1 else {
+                    throw ProjectMemoryError.conflict("handoff identifier is already bound to a different operation")
+                }
             }
         }
     }
 
-    public func continuityHandoff(id: String) throws -> ContinuityHandoff? {
+    public func continuityHandoff(
+        id: String,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuityHandoff? {
         try withStatement(
-            "SELECT payload_json,content_sha256 FROM continuity_handoffs WHERE handoff_id=? AND project_id=? LIMIT 1"
+            "SELECT payload_json,content_sha256 FROM continuity_handoffs WHERE handoff_id=? AND project_id=? LIMIT 1",
+            cancellation: cancellation
         ) { statement in
             bind(statement, 1, id); bind(statement, 2, projectID)
-            guard sqlite3_step(statement) == SQLITE_ROW,
+            guard try stepRow(statement),
                   let payload = text(statement, 0), let data = payload.data(using: .utf8),
                   let object = try? JSONSupport.object(from: data),
                   let handoff = ContinuityHandoff.fromDictionary(object),
@@ -678,64 +870,82 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         expected: ContinuityState,
         to next: ContinuityState,
         successorSessionID: String? = nil,
-        evidence: String? = nil
+        evidence: String? = nil,
+        cancellation: ToolCallCancellation? = nil
     ) throws -> ContinuityOperation {
         guard expected.next == next else {
             throw ProjectMemoryError.invalidRequest("invalid transition \(expected.rawValue) -> \(next.rawValue)")
         }
-        lock.lock(); defer { lock.unlock() }
-        return try transactionUnlocked {
-            guard let operation = try continuityOperationUnlocked(operationID) else {
-                throw ProjectMemoryError.recordNotFound(operationID)
-            }
-            if operation.state == next { return operation }
-            guard operation.state == expected else {
-                throw ProjectMemoryError.conflict("expected \(expected.rawValue), current \(operation.state.rawValue)")
-            }
-            let successor = successorSessionID ?? operation.successorSessionID
-            if next == .successorCreated, successor == nil {
-                throw ProjectMemoryError.invalidRequest("successor session is required")
-            }
-            if next == .checkpointPersisted {
-                guard try continuityHandoffExistsUnlocked(id: operation.handoffID) else {
-                    throw ProjectMemoryError.integrityFailure("checkpoint handoff is not durable")
+        return try withLockedSQLiteOperation(cancellation: cancellation) {
+            try transactionUnlocked(
+                cancellation: cancellation,
+                didCommit: didMutationCommitObserver
+            ) {
+                guard let operation = try continuityOperationUnlocked(operationID) else {
+                    throw ProjectMemoryError.recordNotFound(operationID)
                 }
-            }
-            let attempt = operation.attempt + 1
-            let checksum = Self.continuityChecksum(
-                operationID: operationID, state: next, successorSessionID: successor,
-                handoffID: operation.handoffID, attempt: attempt
-            )
-            let timestamp = ISO8601.string(from: clock.now())
-            try withStatementUnlocked(
-                """
-                UPDATE rollover_operations SET state=?,attempt=?,successor_session_id=?,
-                  updated_at=?,last_error=NULL,retry_at=NULL,state_checksum=?
-                WHERE operation_id=? AND project_id=? AND state=?
-                """
-            ) { statement in
-                bind(statement, 1, next.rawValue); sqlite3_bind_int(statement, 2, Int32(attempt))
-                bind(statement, 3, successor); bind(statement, 4, timestamp); bind(statement, 5, checksum)
-                bind(statement, 6, operationID); bind(statement, 7, projectID); bind(statement, 8, expected.rawValue)
-                try stepDone(statement)
-            }
-            guard sqlite3_changes(db) == 1 else { throw ProjectMemoryError.conflict("transition compare-and-set failed") }
-            try appendTransitionUnlocked(
-                operationID: operationID, from: expected, to: next, attempt: attempt,
-                adapterID: operation.adapterID, evidence: evidence, checksum: checksum
-            )
-            if next == .predecessorSealed, let successor {
+                if operation.state == next { return operation }
+                guard operation.state == expected else {
+                    throw ProjectMemoryError.conflict(
+                        "expected \(expected.rawValue), current \(operation.state.rawValue)"
+                    )
+                }
+                let successor = successorSessionID ?? operation.successorSessionID
+                if next == .successorCreated, successor == nil {
+                    throw ProjectMemoryError.invalidRequest("successor session is required")
+                }
+                if next == .checkpointPersisted {
+                    guard try continuityHandoffExistsUnlocked(id: operation.handoffID) else {
+                        throw ProjectMemoryError.integrityFailure(
+                            "checkpoint handoff is not durable"
+                        )
+                    }
+                }
+                let attempt = operation.attempt + 1
+                let checksum = Self.continuityChecksum(
+                    operationID: operationID, state: next, successorSessionID: successor,
+                    handoffID: operation.handoffID, attempt: attempt
+                )
+                let timestamp = ISO8601.string(from: clock.now())
                 try withStatementUnlocked(
-                    "INSERT INTO project_active_sessions(project_id,session_id,updated_at) VALUES(?,?,?) ON CONFLICT(project_id) DO UPDATE SET session_id=excluded.session_id,updated_at=excluded.updated_at"
+                    """
+                    UPDATE rollover_operations SET state=?,attempt=?,successor_session_id=?,
+                      updated_at=?,last_error=NULL,retry_at=NULL,state_checksum=?
+                    WHERE operation_id=? AND project_id=? AND state=?
+                    """
                 ) { statement in
-                    bind(statement, 1, projectID); bind(statement, 2, successor); bind(statement, 3, timestamp)
+                    bind(statement, 1, next.rawValue)
+                    sqlite3_bind_int(statement, 2, Int32(attempt))
+                    bind(statement, 3, successor)
+                    bind(statement, 4, timestamp)
+                    bind(statement, 5, checksum)
+                    bind(statement, 6, operationID)
+                    bind(statement, 7, projectID)
+                    bind(statement, 8, expected.rawValue)
                     try stepDone(statement)
                 }
+                guard sqlite3_changes(db) == 1 else {
+                    throw ProjectMemoryError.conflict("transition compare-and-set failed")
+                }
+                try appendTransitionUnlocked(
+                    operationID: operationID, from: expected, to: next, attempt: attempt,
+                    adapterID: operation.adapterID, evidence: evidence, checksum: checksum
+                )
+                if next == .predecessorSealed, let successor {
+                    try withStatementUnlocked(
+                        "INSERT INTO project_active_sessions(project_id,session_id,updated_at) VALUES(?,?,?) ON CONFLICT(project_id) DO UPDATE SET session_id=excluded.session_id,updated_at=excluded.updated_at"
+                    ) { statement in
+                        bind(statement, 1, projectID)
+                        bind(statement, 2, successor)
+                        bind(statement, 3, timestamp)
+                        try stepDone(statement)
+                    }
+                }
+                guard let updated = try continuityOperationUnlocked(operationID) else {
+                    throw ProjectMemoryError.integrityFailure("transition result is unreadable")
+                }
+                return updated
             }
-            guard let updated = try continuityOperationUnlocked(operationID) else {
-                throw ProjectMemoryError.integrityFailure("transition result is unreadable")
-            }
-            return updated
         }
     }
 
@@ -743,116 +953,190 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         operationID: String,
         handoffID: String,
         successorSessionID: String,
-        adapterID: String
+        adapterID: String,
+        cancellation: ToolCallCancellation? = nil
     ) throws -> ContinuityOperation {
-        lock.lock(); defer { lock.unlock() }
-        return try transactionUnlocked {
-            guard let operation = try continuityOperationUnlocked(operationID) else {
-                throw ProjectMemoryError.recordNotFound(operationID)
-            }
-            if operation.state == .successorAcknowledged || operation.state == .predecessorSealed {
-                guard operation.acknowledgedHandoffID == handoffID,
-                      operation.acknowledgedSessionID == successorSessionID else {
-                    throw ProjectMemoryError.conflict("a different successor acknowledgment is already committed")
+        try withLockedSQLiteOperation(cancellation: cancellation) {
+            try transactionUnlocked(
+                cancellation: cancellation,
+                didCommit: didMutationCommitObserver
+            ) {
+                guard let operation = try continuityOperationUnlocked(operationID) else {
+                    throw ProjectMemoryError.recordNotFound(operationID)
                 }
-                return operation
+                if operation.state == .successorAcknowledged
+                    || operation.state == .predecessorSealed {
+                    guard operation.acknowledgedHandoffID == handoffID,
+                          operation.acknowledgedSessionID == successorSessionID else {
+                        throw ProjectMemoryError.conflict(
+                            "a different successor acknowledgment is already committed"
+                        )
+                    }
+                    return operation
+                }
+                guard operation.state == .successorBootstrapping,
+                      operation.handoffID == handoffID,
+                      operation.successorSessionID == successorSessionID,
+                      operation.adapterID == adapterID else {
+                    throw ProjectMemoryError.conflict(
+                        "acknowledgment does not match exact handoff, successor, and adapter"
+                    )
+                }
+                let next = ContinuityState.successorAcknowledged
+                let attempt = operation.attempt + 1
+                let checksum = Self.continuityChecksum(
+                    operationID: operationID, state: next,
+                    successorSessionID: successorSessionID,
+                    handoffID: handoffID, attempt: attempt
+                )
+                let timestamp = ISO8601.string(from: clock.now())
+                try withStatementUnlocked(
+                    """
+                    UPDATE rollover_operations SET state=?,attempt=?,acknowledged_session_id=?,
+                      acknowledged_handoff_id=?,updated_at=?,state_checksum=?,last_error=NULL,retry_at=NULL
+                    WHERE operation_id=? AND project_id=? AND state=?
+                    """
+                ) { statement in
+                    bind(statement, 1, next.rawValue)
+                    sqlite3_bind_int(statement, 2, Int32(attempt))
+                    bind(statement, 3, successorSessionID)
+                    bind(statement, 4, handoffID)
+                    bind(statement, 5, timestamp)
+                    bind(statement, 6, checksum)
+                    bind(statement, 7, operationID)
+                    bind(statement, 8, projectID)
+                    bind(statement, 9, ContinuityState.successorBootstrapping.rawValue)
+                    try stepDone(statement)
+                }
+                guard sqlite3_changes(db) == 1 else {
+                    throw ProjectMemoryError.conflict(
+                        "acknowledgment compare-and-set failed"
+                    )
+                }
+                try withStatementUnlocked(
+                    "UPDATE continuity_handoffs SET acknowledged_session_id=?,acknowledged_at=? WHERE handoff_id=? AND project_id=?"
+                ) { statement in
+                    bind(statement, 1, successorSessionID)
+                    bind(statement, 2, timestamp)
+                    bind(statement, 3, handoffID)
+                    bind(statement, 4, projectID)
+                    try stepDone(statement)
+                }
+                try appendTransitionUnlocked(
+                    operationID: operationID, from: .successorBootstrapping, to: next,
+                    attempt: attempt, adapterID: adapterID,
+                    evidence: "exact_acknowledgment", checksum: checksum
+                )
+                guard let updated = try continuityOperationUnlocked(operationID) else {
+                    throw ProjectMemoryError.integrityFailure(
+                        "acknowledgment result is unreadable"
+                    )
+                }
+                return updated
             }
-            guard operation.state == .successorBootstrapping,
-                  operation.handoffID == handoffID,
-                  operation.successorSessionID == successorSessionID,
-                  operation.adapterID == adapterID else {
-                throw ProjectMemoryError.conflict("acknowledgment does not match exact handoff, successor, and adapter")
-            }
-            let next = ContinuityState.successorAcknowledged
-            let attempt = operation.attempt + 1
-            let checksum = Self.continuityChecksum(
-                operationID: operationID, state: next, successorSessionID: successorSessionID,
-                handoffID: handoffID, attempt: attempt
-            )
-            let timestamp = ISO8601.string(from: clock.now())
-            try withStatementUnlocked(
-                """
-                UPDATE rollover_operations SET state=?,attempt=?,acknowledged_session_id=?,
-                  acknowledged_handoff_id=?,updated_at=?,state_checksum=?,last_error=NULL,retry_at=NULL
-                WHERE operation_id=? AND project_id=? AND state=?
-                """
-            ) { statement in
-                bind(statement, 1, next.rawValue); sqlite3_bind_int(statement, 2, Int32(attempt))
-                bind(statement, 3, successorSessionID); bind(statement, 4, handoffID)
-                bind(statement, 5, timestamp); bind(statement, 6, checksum)
-                bind(statement, 7, operationID); bind(statement, 8, projectID)
-                bind(statement, 9, ContinuityState.successorBootstrapping.rawValue); try stepDone(statement)
-            }
-            guard sqlite3_changes(db) == 1 else { throw ProjectMemoryError.conflict("acknowledgment compare-and-set failed") }
-            try withStatementUnlocked(
-                "UPDATE continuity_handoffs SET acknowledged_session_id=?,acknowledged_at=? WHERE handoff_id=? AND project_id=?"
-            ) { statement in
-                bind(statement, 1, successorSessionID); bind(statement, 2, timestamp)
-                bind(statement, 3, handoffID); bind(statement, 4, projectID); try stepDone(statement)
-            }
-            try appendTransitionUnlocked(
-                operationID: operationID, from: .successorBootstrapping, to: next,
-                attempt: attempt, adapterID: adapterID, evidence: "exact_acknowledgment", checksum: checksum
-            )
-            guard let updated = try continuityOperationUnlocked(operationID) else {
-                throw ProjectMemoryError.integrityFailure("acknowledgment result is unreadable")
-            }
-            return updated
         }
     }
 
-    public func continuityRecordRetry(operationID: String, error: String, retryAt: String?) throws {
+    public func continuityRecordRetry(
+        operationID: String,
+        error: String,
+        retryAt: String?,
+        cancellation: ToolCallCancellation? = nil
+    ) throws {
+        let isV2 = try withLockedSQLiteOperation(cancellation: cancellation) {
+            try transactionUnlocked(
+                cancellation: cancellation,
+                didCommit: didMutationCommitObserver
+            ) {
+                try withStatementUnlocked(
+                    "UPDATE rollover_operations SET last_error=?,retry_at=?,updated_at=? WHERE operation_id=? AND project_id=? AND quarantine_state IS NULL"
+                ) { statement in
+                    bind(statement, 1, String(error.prefix(2048))); bind(statement, 2, retryAt)
+                    bind(statement, 3, ISO8601.string(from: clock.now())); bind(statement, 4, operationID)
+                    bind(statement, 5, projectID); try stepDone(statement)
+                }
+                guard try continuityOperationV2Unlocked(operationID) != nil else {
+                    return false
+                }
+                try enqueueContinuityProjectionRepairUnlocked(
+                    kind: "operation",
+                    recordID: operationID
+                )
+                return true
+            }
+        }
+        if isV2 {
+            attemptContinuityProjectionRepair(kind: "operation", recordID: operationID)
+        }
+    }
+
+    public func continuityOperation(
+        id: String,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuityOperation? {
         try withStatement(
-            "UPDATE rollover_operations SET last_error=?,retry_at=?,updated_at=? WHERE operation_id=? AND project_id=? AND quarantine_state IS NULL"
+            Self.continuityOperationSelect + " WHERE operation_id=? AND project_id=? LIMIT 1",
+            cancellation: cancellation
         ) { statement in
-            bind(statement, 1, String(error.prefix(2048))); bind(statement, 2, retryAt)
-            bind(statement, 3, ISO8601.string(from: clock.now())); bind(statement, 4, operationID)
-            bind(statement, 5, projectID); try stepDone(statement)
-        }
-    }
-
-    public func continuityOperation(id: String) throws -> ContinuityOperation? {
-        try withStatement(Self.continuityOperationSelect + " WHERE operation_id=? AND project_id=? LIMIT 1") { statement in
             bind(statement, 1, id); bind(statement, 2, projectID)
-            guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+            guard try stepRow(statement) else { return nil }
             return continuityOperation(statement)
         }
     }
 
-    public func continuityOperation(idempotencyKey: String) throws -> ContinuityOperation? {
+    public func continuityOperation(
+        idempotencyKey: String,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuityOperation? {
         try withStatement(
             Self.continuityOperationSelect
                 + " WHERE project_id=? AND idempotency_key=? AND schema_version=1"
-                + " AND quarantine_state IS NULL LIMIT 1"
+                + " AND quarantine_state IS NULL LIMIT 1",
+            cancellation: cancellation
         ) { statement in
             bind(statement, 1, projectID)
             bind(statement, 2, idempotencyKey)
-            guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+            guard try stepRow(statement) else { return nil }
             return continuityOperation(statement)
         }
     }
 
-    public func continuityActiveOperation() throws -> ContinuityOperation? {
+    public func continuityActiveOperation(
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuityOperation? {
         try withStatement(
             Self.continuityOperationSelect
                 + " WHERE project_id=? AND state<>'predecessorSealed'"
-                + " AND quarantine_state IS NULL ORDER BY updated_at DESC LIMIT 1"
+                + " AND quarantine_state IS NULL ORDER BY updated_at DESC LIMIT 1",
+            cancellation: cancellation
         ) { statement in
             bind(statement, 1, projectID)
-            guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+            guard try stepRow(statement) else { return nil }
             return continuityOperation(statement)
         }
     }
 
-    public func continuityActiveSessionID() throws -> String? {
-        try withStatement("SELECT session_id FROM project_active_sessions WHERE project_id=?") { statement in
+    public func continuityActiveSessionID(
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> String? {
+        try withStatement(
+            "SELECT session_id FROM project_active_sessions WHERE project_id=?",
+            cancellation: cancellation
+        ) { statement in
             bind(statement, 1, projectID)
-            return sqlite3_step(statement) == SQLITE_ROW ? text(statement, 0) : nil
+            return try stepRow(statement) ? text(statement, 0) : nil
         }
     }
 
-    public func continuityTransitionCount(operationID: String) throws -> Int {
-        try scalarInt("SELECT COUNT(*) FROM rollover_transitions WHERE operation_id=?", value: operationID)
+    public func continuityTransitionCount(
+        operationID: String,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> Int {
+        try scalarInt(
+            "SELECT COUNT(*) FROM rollover_transitions WHERE operation_id=?",
+            value: operationID,
+            cancellation: cancellation
+        )
     }
 
     // MARK: - Project continuity V2
@@ -863,8 +1147,11 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         predecessorProviderResponseID: String?,
         adapterID: String,
         idempotencyKey: String,
-        budgetObservationID: String? = nil
+        budgetObservationID: String? = nil,
+        cancellation: ToolCallCancellation? = nil,
+        repairProjectionImmediately: Bool = true
     ) throws -> ContinuityOperationV2 {
+        try cancellation?.checkCancellation()
         let validated = try handoff.validated()
         guard validated.projectID == projectID,
               let generation = validated.projectGeneration,
@@ -891,10 +1178,12 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
             )
         }
         let payload = try JSONSupport.string(from: validated.asDictionary())
-        lock.lock()
-        let operation: ContinuityOperationV2
-        do {
-            operation = try transactionUnlocked {
+        try cancellation?.checkCancellation()
+        let operation = try withLockedSQLiteOperation(cancellation: cancellation) {
+            try transactionUnlocked(
+                cancellation: cancellation,
+                didCommit: didMutationCommitObserver
+            ) {
                 if let existing = try continuityOperationV2ByIdempotencyUnlocked(idempotencyKey) {
                     guard existing.operationID == validated.operationID,
                           existing.handoffID == validated.handoffID,
@@ -912,6 +1201,14 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
                         generation: generation,
                         runID: runID,
                         predecessorResponseID: handoffPredecessorResponse
+                    )
+                    try enqueueContinuityProjectionRepairUnlocked(
+                        kind: "handoff",
+                        recordID: validated.handoffID
+                    )
+                    try enqueueContinuityProjectionRepairUnlocked(
+                        kind: "operation",
+                        recordID: existing.operationID
                     )
                     return existing
                 }
@@ -978,22 +1275,33 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
                     runID: runID,
                     predecessorResponseID: handoffPredecessorResponse
                 )
+                try enqueueContinuityProjectionRepairUnlocked(
+                    kind: "handoff",
+                    recordID: validated.handoffID
+                )
+                try enqueueContinuityProjectionRepairUnlocked(
+                    kind: "operation",
+                    recordID: validated.operationID
+                )
                 guard let created = try continuityOperationV2Unlocked(validated.operationID) else {
                     throw ProjectMemoryError.integrityFailure("created V2 rollover operation is unreadable")
                 }
                 return created
             }
-            lock.unlock()
-        } catch {
-            lock.unlock()
-            throw error
         }
-        try writeHandoffProjection(validated)
-        try writeOperationProjection(operation)
+        if repairProjectionImmediately {
+            attemptContinuityProjectionRepair(kind: "handoff", recordID: validated.handoffID)
+            attemptContinuityProjectionRepair(kind: "operation", recordID: operation.operationID)
+        }
         return operation
     }
 
-    public func continuityStoreHandoffV2(_ handoff: ContinuityHandoffV2) throws {
+    public func continuityStoreHandoffV2(
+        _ handoff: ContinuityHandoffV2,
+        cancellation: ToolCallCancellation? = nil,
+        repairProjectionImmediately: Bool = true
+    ) throws {
+        try cancellation?.checkCancellation()
         let validated = try handoff.validated()
         guard validated.projectID == projectID,
               let generation = validated.projectGeneration,
@@ -1010,9 +1318,12 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
             throw ProjectMemoryError.invalidRequest("provider_response_id must be a string or null")
         }
         let payload = try JSONSupport.string(from: validated.asDictionary())
-        lock.lock()
-        do {
-            try transactionUnlocked {
+        try cancellation?.checkCancellation()
+        try withLockedSQLiteOperation(cancellation: cancellation) {
+            try transactionUnlocked(
+                cancellation: cancellation,
+                didCommit: didMutationCommitObserver
+            ) {
                 try continuityPersistHandoffV2Unlocked(
                     validated,
                     payload: payload,
@@ -1020,26 +1331,32 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
                     runID: runID,
                     predecessorResponseID: predecessorResponseID
                 )
+                try enqueueContinuityProjectionRepairUnlocked(
+                    kind: "handoff",
+                    recordID: validated.handoffID
+                )
             }
-            lock.unlock()
-        } catch {
-            lock.unlock()
-            throw error
         }
-        try writeHandoffProjection(validated)
+        if repairProjectionImmediately {
+            attemptContinuityProjectionRepair(kind: "handoff", recordID: validated.handoffID)
+        }
     }
 
-    public func continuityHandoffV2(id: String) throws -> ContinuityHandoffV2? {
+    public func continuityHandoffV2(
+        id: String,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuityHandoffV2? {
         try withStatement(
             """
             SELECT payload_json,content_sha256 FROM continuity_handoffs
             WHERE handoff_id=? AND project_id=? AND schema_version='2.0'
               AND quarantine_state IS NULL LIMIT 1
-            """
+            """,
+            cancellation: cancellation
         ) { statement in
             bind(statement, 1, id)
             bind(statement, 2, projectID)
-            guard sqlite3_step(statement) == SQLITE_ROW,
+            guard try stepRow(statement),
                   let payload = text(statement, 0),
                   let data = payload.data(using: .utf8),
                   let object = try? JSONSupport.object(from: data),
@@ -1053,41 +1370,50 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         }
     }
 
-    public func continuityOperationV2(id: String) throws -> ContinuityOperationV2? {
+    public func continuityOperationV2(
+        id: String,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuityOperationV2? {
         try withStatement(
             Self.continuityOperationV2Select
-                + " WHERE operation_id=? AND project_id=? AND schema_version=2 LIMIT 1"
+                + " WHERE operation_id=? AND project_id=? AND schema_version=2 LIMIT 1",
+            cancellation: cancellation
         ) { statement in
             bind(statement, 1, id)
             bind(statement, 2, projectID)
-            guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+            guard try stepRow(statement) else { return nil }
             return try continuityOperationV2(statement)
         }
     }
 
     public func continuityOperationV2(
-        idempotencyKey: String
+        idempotencyKey: String,
+        cancellation: ToolCallCancellation? = nil
     ) throws -> ContinuityOperationV2? {
         try withStatement(
             Self.continuityOperationV2Select
                 + " WHERE project_id=? AND idempotency_key=? AND schema_version=2"
-                + " AND quarantine_state IS NULL LIMIT 1"
+                + " AND quarantine_state IS NULL LIMIT 1",
+            cancellation: cancellation
         ) { statement in
             bind(statement, 1, projectID)
             bind(statement, 2, idempotencyKey)
-            guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+            guard try stepRow(statement) else { return nil }
             return try continuityOperationV2(statement)
         }
     }
 
-    public func continuityActiveOperationV2() throws -> ContinuityOperationV2? {
+    public func continuityActiveOperationV2(
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuityOperationV2? {
         try withStatement(
             Self.continuityOperationV2Select
                 + " WHERE project_id=? AND schema_version=2 AND quarantine_state IS NULL"
-                + " AND state<>'predecessorSealed' ORDER BY updated_at DESC LIMIT 1"
+                + " AND state<>'predecessorSealed' ORDER BY updated_at DESC LIMIT 1",
+            cancellation: cancellation
         ) { statement in
             bind(statement, 1, projectID)
-            guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+            guard try stepRow(statement) else { return nil }
             return try continuityOperationV2(statement)
         }
     }
@@ -1098,15 +1424,20 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         to next: ContinuityState,
         successorSessionID: String? = nil,
         successorProviderResponseID: String? = nil,
-        evidence: String? = nil
+        evidence: String? = nil,
+        cancellation: ToolCallCancellation? = nil,
+        repairProjectionImmediately: Bool = true,
+        didCommitCanonical: (@Sendable (ContinuityOperationV2) -> Void)? = nil
     ) throws -> ContinuityOperationV2 {
         guard expected.next == next else {
             throw ProjectMemoryError.invalidRequest("invalid V2 transition \(expected.rawValue) -> \(next.rawValue)")
         }
-        lock.lock()
-        let operation: ContinuityOperationV2
-        do {
-            operation = try transactionUnlocked {
+        let operation = try withLockedSQLiteOperation(cancellation: cancellation) {
+            try transactionUnlocked(
+                cancellation: cancellation,
+                didCommit: didMutationCommitObserver,
+                didCommitResult: didCommitCanonical
+            ) {
                 guard let current = try continuityOperationV2Unlocked(operationID) else {
                     throw ProjectMemoryError.recordNotFound(operationID)
                 }
@@ -1123,6 +1454,10 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
                             "V2 transition replay names a different provider response"
                         )
                     }
+                    try enqueueContinuityProjectionRepairUnlocked(
+                        kind: "operation",
+                        recordID: operationID
+                    )
                     return current
                 }
                 guard current.state == expected else {
@@ -1204,32 +1539,43 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
                 guard let updated = try continuityOperationV2Unlocked(operationID) else {
                     throw ProjectMemoryError.integrityFailure("V2 transition result is unreadable")
                 }
+                try enqueueContinuityProjectionRepairUnlocked(
+                    kind: "operation",
+                    recordID: operationID
+                )
                 return updated
             }
-            lock.unlock()
-        } catch {
-            lock.unlock()
-            throw error
         }
-        try writeOperationProjection(operation)
+        if repairProjectionImmediately {
+            attemptContinuityProjectionRepair(kind: "operation", recordID: operation.operationID)
+        }
         return operation
     }
 
     public func continuityAcknowledgeV2(
         operationID: String,
-        receipt: BootstrapReceipt
+        receipt: BootstrapReceipt,
+        cancellation: ToolCallCancellation? = nil
     ) throws -> ContinuityOperationV2 {
-        guard let preflight = try continuityOperationV2(id: operationID),
+        guard let preflight = try continuityOperationV2(
+                  id: operationID,
+                  cancellation: cancellation
+              ),
               receipt.acknowledgement.operationID.uuidString.caseInsensitiveCompare(operationID) == .orderedSame,
-              let handoff = try continuityHandoffV2(id: preflight.handoffID) else {
+              let handoff = try continuityHandoffV2(
+                  id: preflight.handoffID,
+                  cancellation: cancellation
+              ) else {
             throw ProjectMemoryError.integrityFailure("V2 handoff is missing or invalid")
         }
         try receipt.acknowledgement.validate(handoff: handoff)
         let acknowledgementSHA256 = Self.bootstrapAcknowledgementSHA256(receipt.acknowledgement)
-        lock.lock()
-        let operation: ContinuityOperationV2
-        do {
-            operation = try transactionUnlocked {
+        try cancellation?.checkCancellation()
+        let operation = try withLockedSQLiteOperation(cancellation: cancellation) {
+            try transactionUnlocked(
+                cancellation: cancellation,
+                didCommit: didMutationCommitObserver
+            ) {
                 guard let current = try continuityOperationV2Unlocked(operationID) else {
                     throw ProjectMemoryError.recordNotFound(operationID)
                 }
@@ -1239,6 +1585,10 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
                           current.acknowledgementSHA256 == acknowledgementSHA256 else {
                         throw ProjectMemoryError.conflict("a different V2 acknowledgement is committed")
                     }
+                    try enqueueContinuityProjectionRepairUnlocked(
+                        kind: "operation",
+                        recordID: operationID
+                    )
                     return current
                 }
                 guard current.state == .successorBootstrapping,
@@ -1316,57 +1666,75 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
                 guard let updated = try continuityOperationV2Unlocked(operationID) else {
                     throw ProjectMemoryError.integrityFailure("V2 acknowledgement result is unreadable")
                 }
+                try enqueueContinuityProjectionRepairUnlocked(
+                    kind: "operation",
+                    recordID: operationID
+                )
                 return updated
             }
-            lock.unlock()
-        } catch {
-            lock.unlock()
-            throw error
         }
-        try writeOperationProjection(operation)
+        attemptContinuityProjectionRepair(kind: "operation", recordID: operation.operationID)
         return operation
     }
 
     @discardableResult
-    public func continuityMarkContinuationIssuedV2(operationID: String) throws -> Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return try transactionUnlocked {
-            guard let operation = try continuityOperationV2Unlocked(operationID) else {
-                throw ProjectMemoryError.recordNotFound(operationID)
+    public func continuityMarkContinuationIssuedV2(
+        operationID: String,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> Bool {
+        let changed = try withLockedSQLiteOperation(cancellation: cancellation) {
+            try transactionUnlocked(
+                cancellation: cancellation,
+                didCommit: didMutationCommitObserver
+            ) {
+                guard let operation = try continuityOperationV2Unlocked(operationID) else {
+                    throw ProjectMemoryError.recordNotFound(operationID)
+                }
+                guard operation.state == .predecessorSealed else {
+                    throw ProjectMemoryError.conflict("automatic continuation requires a sealed predecessor")
+                }
+                if operation.continuationIssued {
+                    try enqueueContinuityProjectionRepairUnlocked(
+                        kind: "operation",
+                        recordID: operationID
+                    )
+                    return false
+                }
+                let timestamp = ISO8601.string(from: clock.now())
+                try withStatementUnlocked(
+                    """
+                    UPDATE rollover_operations SET continuation_issued=1,updated_at=?
+                    WHERE operation_id=? AND project_id=? AND schema_version=2
+                      AND continuation_issued=0 AND state='predecessorSealed'
+                    """
+                ) { statement in
+                    bind(statement, 1, timestamp)
+                    bind(statement, 2, operationID)
+                    bind(statement, 3, projectID)
+                    try stepDone(statement)
+                }
+                guard sqlite3_changes(db) == 1 else {
+                    throw ProjectMemoryError.conflict("automatic continuation compare-and-set failed")
+                }
+                try withStatementUnlocked(
+                    """
+                    UPDATE continuity_handoffs SET continuation_issued=1
+                    WHERE handoff_id=? AND project_id=? AND schema_version='2.0'
+                    """
+                ) { statement in
+                    bind(statement, 1, operation.handoffID)
+                    bind(statement, 2, projectID)
+                    try stepDone(statement)
+                }
+                try enqueueContinuityProjectionRepairUnlocked(
+                    kind: "operation",
+                    recordID: operationID
+                )
+                return true
             }
-            guard operation.state == .predecessorSealed else {
-                throw ProjectMemoryError.conflict("automatic continuation requires a sealed predecessor")
-            }
-            if operation.continuationIssued { return false }
-            let timestamp = ISO8601.string(from: clock.now())
-            try withStatementUnlocked(
-                """
-                UPDATE rollover_operations SET continuation_issued=1,updated_at=?
-                WHERE operation_id=? AND project_id=? AND schema_version=2
-                  AND continuation_issued=0 AND state='predecessorSealed'
-                """
-            ) { statement in
-                bind(statement, 1, timestamp)
-                bind(statement, 2, operationID)
-                bind(statement, 3, projectID)
-                try stepDone(statement)
-            }
-            guard sqlite3_changes(db) == 1 else {
-                throw ProjectMemoryError.conflict("automatic continuation compare-and-set failed")
-            }
-            try withStatementUnlocked(
-                """
-                UPDATE continuity_handoffs SET continuation_issued=1
-                WHERE handoff_id=? AND project_id=? AND schema_version='2.0'
-                """
-            ) { statement in
-                bind(statement, 1, operation.handoffID)
-                bind(statement, 2, projectID)
-                try stepDone(statement)
-            }
-            return true
         }
+        attemptContinuityProjectionRepair(kind: "operation", recordID: operationID)
+        return changed
     }
 
     private struct LegacyQuarantineProjection {
@@ -1636,7 +2004,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         ) { statement -> (String, String)? in
             bind(statement, 1, projectID)
             bind(statement, 2, write.payloadSHA256)
-            guard sqlite3_step(statement) == SQLITE_ROW,
+            guard try stepRow(statement),
                   let identifier = text(statement, 0),
                   let payloadJSON = text(statement, 1) else { return nil }
             return (identifier, payloadJSON)
@@ -1687,7 +2055,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
             bind(statement, 1, write.handoffID)
             bind(statement, 2, write.operationID)
             bind(statement, 3, projectID)
-            guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+            guard try stepRow(statement) else { return nil }
             return (
                 text(statement, 0) ?? "",
                 text(statement, 1) ?? "",
@@ -1840,7 +2208,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
             bind(statement, 2, write.operationID)
             bind(statement, 3, projectID)
             bind(statement, 4, write.contentSHA256)
-            guard sqlite3_step(statement) == SQLITE_ROW else { return false }
+            guard try stepRow(statement) else { return false }
             let storedGeneration: UInt64?
             if sqlite3_column_type(statement, 5) == SQLITE_NULL {
                 storedGeneration = nil
@@ -1896,11 +2264,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         for identifier in unique.keys.sorted() {
             guard let data = unique[identifier] else { continue }
             let projection = directory.appendingPathComponent("\(identifier).json")
-            try data.write(to: projection, options: [.atomic, .completeFileProtectionUnlessOpen])
-            try? FileManager.default.setAttributes(
-                [.posixPermissions: 0o600],
-                ofItemAtPath: projection.path
-            )
+            try OwnerOnlyAtomicFile.write(data, to: projection)
         }
     }
 
@@ -1959,7 +2323,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
             """
         ) { statement -> LegacyMigrationReceiptReadback? in
             bind(statement, 1, receiptID)
-            guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+            guard try stepRow(statement) else { return nil }
             guard let storedProjectID = text(statement, 0),
                   text(statement, 1) == "legacy_global",
                   text(statement, 2) == ContinuityHandoffV2.schemaVersion,
@@ -2297,7 +2661,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
                 + " WHERE operation_id=? AND project_id=? AND quarantine_state IS NULL LIMIT 1"
         ) { statement in
             bind(statement, 1, id); bind(statement, 2, projectID)
-            guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+            guard try stepRow(statement) else { return nil }
             return continuityOperation(statement)
         }
     }
@@ -2308,7 +2672,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
                 + " WHERE project_id=? AND idempotency_key=? AND quarantine_state IS NULL LIMIT 1"
         ) { statement in
             bind(statement, 1, projectID); bind(statement, 2, key)
-            guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+            guard try stepRow(statement) else { return nil }
             return continuityOperation(statement)
         }
     }
@@ -2320,7 +2684,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
                 + " AND quarantine_state IS NULL ORDER BY updated_at DESC LIMIT 1"
         ) { statement in
             bind(statement, 1, projectID)
-            guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+            guard try stepRow(statement) else { return nil }
             return continuityOperation(statement)
         }
     }
@@ -2330,7 +2694,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
             "SELECT 1 FROM continuity_handoffs WHERE handoff_id=? AND project_id=? AND quarantine_state IS NULL LIMIT 1"
         ) { statement in
             bind(statement, 1, id); bind(statement, 2, projectID)
-            return sqlite3_step(statement) == SQLITE_ROW
+            return try stepRow(statement)
         }
     }
 
@@ -2393,7 +2757,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         )? in
             bind(statement, 1, handoff.handoffID)
             bind(statement, 2, projectID)
-            guard sqlite3_step(statement) == SQLITE_ROW,
+            guard try stepRow(statement),
                   let storedOperationID = text(statement, 0),
                   let storedPayload = text(statement, 1),
                   let storedChecksum = text(statement, 2),
@@ -2463,7 +2827,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         ) { statement in
             bind(statement, 1, id)
             bind(statement, 2, projectID)
-            guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+            guard try stepRow(statement) else { return nil }
             return try continuityOperationV2(statement)
         }
     }
@@ -2478,8 +2842,44 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         ) { statement in
             bind(statement, 1, projectID)
             bind(statement, 2, key)
-            guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+            guard try stepRow(statement) else { return nil }
             return try continuityOperationV2(statement)
+        }
+    }
+
+    private func continuityCurrentOperationV2Unlocked() throws -> ContinuityOperationV2? {
+        try withStatementUnlocked(
+            Self.continuityOperationV2Select
+                + " WHERE project_id=? AND schema_version=2 AND quarantine_state IS NULL"
+                + " ORDER BY updated_at DESC,rowid DESC LIMIT 1"
+        ) { statement in
+            bind(statement, 1, projectID)
+            guard try stepRow(statement) else { return nil }
+            return try continuityOperationV2(statement)
+        }
+    }
+
+    private func continuityHandoffV2Unlocked(_ id: String) throws -> ContinuityHandoffV2? {
+        try withStatementUnlocked(
+            """
+            SELECT payload_json,content_sha256 FROM continuity_handoffs
+            WHERE handoff_id=? AND project_id=? AND schema_version='2.0'
+              AND quarantine_state IS NULL LIMIT 1
+            """
+        ) { statement in
+            bind(statement, 1, id)
+            bind(statement, 2, projectID)
+            guard try stepRow(statement),
+                  let payload = text(statement, 0),
+                  let data = payload.data(using: .utf8),
+                  let object = try? JSONSupport.object(from: data),
+                  let handoff = ContinuityHandoffV2.fromDictionary(object),
+                  handoff.contentSHA256 == text(statement, 1),
+                  handoff.calculatedSHA256() == handoff.contentSHA256,
+                  (try? handoff.validated()) != nil else {
+                return nil
+            }
+            return handoff
         }
     }
 
@@ -2492,7 +2892,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         ) { statement in
             bind(statement, 1, id)
             bind(statement, 2, projectID)
-            return sqlite3_step(statement) == SQLITE_ROW
+            return try stepRow(statement)
         }
     }
 
@@ -2582,7 +2982,273 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         directory.appendingPathComponent("continuity", isDirectory: true)
     }
 
-    private func writeHandoffProjection(_ handoff: ContinuityHandoffV2) throws {
+    public func continuityProjectionRepairPending(
+        operationID: String? = nil,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> Bool {
+        try withLockedSQLiteOperation(cancellation: cancellation, checkAfterSuccess: true) {
+            try withStatementUnlocked(
+                operationID == nil
+                    ? "SELECT 1 FROM continuity_projection_repairs WHERE project_id=? LIMIT 1"
+                    : """
+                      SELECT 1 FROM continuity_projection_repairs
+                      WHERE project_id=? AND (
+                        record_id=? OR record_id=(
+                          SELECT handoff_id FROM rollover_operations
+                          WHERE project_id=? AND operation_id=? LIMIT 1
+                        )
+                      ) LIMIT 1
+                      """
+            ) { statement in
+                bind(statement, 1, projectID)
+                if let operationID {
+                    bind(statement, 2, operationID)
+                    bind(statement, 3, projectID)
+                    bind(statement, 4, operationID)
+                }
+                return try stepRow(statement)
+            }
+        }
+    }
+
+    @discardableResult
+    public func repairContinuityProjections(
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> Int {
+        let repairs = try withLockedSQLiteOperation(
+            cancellation: cancellation,
+            checkAfterSuccess: true
+        ) {
+            try withStatementUnlocked(
+                """
+                SELECT projection_kind,record_id,source_version
+                FROM continuity_projection_repairs
+                WHERE project_id=? ORDER BY created_at,projection_kind,record_id LIMIT 256
+                """
+            ) { statement in
+                bind(statement, 1, projectID)
+                var values: [ContinuityProjectionRepair] = []
+                while try stepRow(statement) {
+                    guard let kind = text(statement, 0),
+                          let recordID = text(statement, 1),
+                          let sourceVersion = text(statement, 2) else {
+                        throw ProjectMemoryError.integrityFailure(
+                            "continuity projection repair intent is incomplete"
+                        )
+                    }
+                    values.append(
+                        ContinuityProjectionRepair(
+                            kind: kind,
+                            recordID: recordID,
+                            sourceVersion: sourceVersion
+                        )
+                    )
+                }
+                return values
+            }
+        }
+
+        var repaired = 0
+        for repair in repairs {
+            try cancellation?.checkCancellation()
+            if attemptContinuityProjectionRepair(kind: repair.kind, recordID: repair.recordID) {
+                repaired += 1
+            }
+        }
+        return repaired
+    }
+
+    private func enqueueContinuityProjectionRepairUnlocked(
+        kind: String,
+        recordID: String
+    ) throws {
+        guard ["handoff", "operation"].contains(kind),
+              UUID(uuidString: recordID) != nil else {
+            throw ProjectMemoryError.integrityFailure(
+                "continuity projection repair identity is invalid"
+            )
+        }
+        let sourceVersion = try continuityProjectionSourceVersionUnlocked(
+            kind: kind,
+            recordID: recordID
+        )
+        let timestamp = ISO8601.string(from: clock.now())
+        try withStatementUnlocked(
+            """
+            INSERT INTO continuity_projection_repairs(
+              project_id,projection_kind,record_id,source_version,attempt,last_error,
+              created_at,updated_at
+            ) VALUES(?,?,?,?,0,NULL,?,?)
+            ON CONFLICT(project_id,projection_kind,record_id) DO UPDATE SET
+              source_version=excluded.source_version,attempt=0,last_error=NULL,
+              updated_at=excluded.updated_at
+            """
+        ) { statement in
+            bind(statement, 1, projectID)
+            bind(statement, 2, kind)
+            bind(statement, 3, recordID)
+            bind(statement, 4, sourceVersion)
+            bind(statement, 5, timestamp)
+            bind(statement, 6, timestamp)
+            try stepDone(statement)
+        }
+    }
+
+    @discardableResult
+    private func attemptContinuityProjectionRepair(
+        kind: String,
+        recordID: String
+    ) -> Bool {
+        do {
+            return try withLockedSQLiteOperation(cancellation: nil) {
+                try transactionUnlocked {
+                    guard let repair = try continuityProjectionRepairUnlocked(
+                        kind: kind,
+                        recordID: recordID
+                    ) else {
+                        return false
+                    }
+                    let sourceVersion = try continuityProjectionSourceVersionUnlocked(
+                        kind: kind,
+                        recordID: recordID
+                    )
+                    if sourceVersion != repair.sourceVersion {
+                        try enqueueContinuityProjectionRepairUnlocked(
+                            kind: kind,
+                            recordID: recordID
+                        )
+                    }
+                    beforeContinuityProjectionWriteObserver?(kind, recordID, sourceVersion)
+                    switch kind {
+                    case "handoff":
+                        guard let handoff = try continuityHandoffV2Unlocked(recordID) else {
+                            throw ProjectMemoryError.integrityFailure(
+                                "handoff projection repair source is missing"
+                            )
+                        }
+                        let latestHandoffID = try continuityCurrentOperationV2Unlocked()?.handoffID
+                            ?? handoff.handoffID
+                        try writeHandoffProjection(
+                            handoff,
+                            latestHandoffID: latestHandoffID
+                        )
+                    case "operation":
+                        guard let operation = try continuityOperationV2Unlocked(recordID) else {
+                            throw ProjectMemoryError.integrityFailure(
+                                "operation projection repair source is missing"
+                            )
+                        }
+                        try writeOperationProjection(
+                            operation,
+                            current: try continuityCurrentOperationV2Unlocked() ?? operation
+                        )
+                    default:
+                        throw ProjectMemoryError.integrityFailure(
+                            "continuity projection repair kind is invalid"
+                        )
+                    }
+                    guard try continuityProjectionSourceVersionUnlocked(
+                        kind: kind,
+                        recordID: recordID
+                    ) == sourceVersion else {
+                        return false
+                    }
+                    try withStatementUnlocked(
+                        """
+                        DELETE FROM continuity_projection_repairs
+                        WHERE project_id=? AND projection_kind=? AND record_id=?
+                          AND source_version=?
+                        """
+                    ) { statement in
+                        bind(statement, 1, projectID)
+                        bind(statement, 2, kind)
+                        bind(statement, 3, recordID)
+                        bind(statement, 4, sourceVersion)
+                        try stepDone(statement)
+                    }
+                    return sqlite3_changes(db) == 1
+                }
+            }
+        } catch {
+            let message = String(error.localizedDescription.prefix(2_048))
+            try? withLockedSQLiteOperation(cancellation: nil) {
+                try withStatementUnlocked(
+                    """
+                    UPDATE continuity_projection_repairs
+                    SET attempt=attempt+1,last_error=?,updated_at=?
+                    WHERE project_id=? AND projection_kind=? AND record_id=?
+                    """
+                ) { statement in
+                    bind(statement, 1, message)
+                    bind(statement, 2, ISO8601.string(from: clock.now()))
+                    bind(statement, 3, projectID)
+                    bind(statement, 4, kind)
+                    bind(statement, 5, recordID)
+                    try stepDone(statement)
+                }
+            }
+            return false
+        }
+    }
+
+    private func continuityProjectionRepairUnlocked(
+        kind: String,
+        recordID: String
+    ) throws -> ContinuityProjectionRepair? {
+        try withStatementUnlocked(
+            """
+            SELECT projection_kind,record_id,source_version
+            FROM continuity_projection_repairs
+            WHERE project_id=? AND projection_kind=? AND record_id=? LIMIT 1
+            """
+        ) { statement in
+            bind(statement, 1, projectID)
+            bind(statement, 2, kind)
+            bind(statement, 3, recordID)
+            guard try stepRow(statement),
+                  let storedKind = text(statement, 0),
+                  let storedRecordID = text(statement, 1),
+                  let sourceVersion = text(statement, 2) else {
+                return nil
+            }
+            return ContinuityProjectionRepair(
+                kind: storedKind,
+                recordID: storedRecordID,
+                sourceVersion: sourceVersion
+            )
+        }
+    }
+
+    private func continuityProjectionSourceVersionUnlocked(
+        kind: String,
+        recordID: String
+    ) throws -> String {
+        switch kind {
+        case "handoff":
+            guard let handoff = try continuityHandoffV2Unlocked(recordID) else {
+                throw ProjectMemoryError.integrityFailure(
+                    "handoff projection repair source is missing"
+                )
+            }
+            return handoff.contentSHA256
+        case "operation":
+            guard let operation = try continuityOperationV2Unlocked(recordID) else {
+                throw ProjectMemoryError.integrityFailure(
+                    "operation projection repair source is missing"
+                )
+            }
+            return JSONSupport.sha256Hex(try JSONSupport.data(from: operation.asDictionary()))
+        default:
+            throw ProjectMemoryError.integrityFailure(
+                "continuity projection repair kind is invalid"
+            )
+        }
+    }
+
+    private func writeHandoffProjection(
+        _ handoff: ContinuityHandoffV2,
+        latestHandoffID: String
+    ) throws {
         guard UUID(uuidString: handoff.handoffID) != nil else {
             throw ProjectMemoryError.invalidRequest("handoff_id must be a UUID")
         }
@@ -2596,15 +3262,16 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: root.path)
         let data = try handoff.encodedJSON()
         let handoffURL = handoffs.appendingPathComponent("\(handoff.handoffID.lowercased()).json")
-        try data.write(to: handoffURL, options: [.atomic, .completeFileProtectionUnlessOpen])
-        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: handoffURL.path)
-        let latest = Data("\(handoff.handoffID.lowercased())\n".utf8)
+        try OwnerOnlyAtomicFile.write(data, to: handoffURL)
+        let latest = Data("\(latestHandoffID.lowercased())\n".utf8)
         let latestURL = root.appendingPathComponent("LATEST")
-        try latest.write(to: latestURL, options: [.atomic, .completeFileProtectionUnlessOpen])
-        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: latestURL.path)
+        try OwnerOnlyAtomicFile.write(latest, to: latestURL)
     }
 
-    private func writeOperationProjection(_ operation: ContinuityOperationV2) throws {
+    private func writeOperationProjection(
+        _ operation: ContinuityOperationV2,
+        current: ContinuityOperationV2
+    ) throws {
         guard UUID(uuidString: operation.operationID) != nil else {
             throw ProjectMemoryError.invalidRequest("operation_id must be a UUID")
         }
@@ -2614,11 +3281,10 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: root.path)
         let data = try JSONSupport.data(from: operation.asDictionary())
         let operationURL = operations.appendingPathComponent("\(operation.operationID.lowercased()).json")
-        try data.write(to: operationURL, options: [.atomic, .completeFileProtectionUnlessOpen])
-        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: operationURL.path)
+        try OwnerOnlyAtomicFile.write(data, to: operationURL)
+        let currentData = try JSONSupport.data(from: current.asDictionary())
         let currentURL = root.appendingPathComponent("CURRENT.json")
-        try data.write(to: currentURL, options: [.atomic, .completeFileProtectionUnlessOpen])
-        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: currentURL.path)
+        try OwnerOnlyAtomicFile.write(currentData, to: currentURL)
     }
 
     private func appendTransitionUnlocked(
@@ -2694,12 +3360,14 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
 
     // MARK: - Schema and writes
 
-    private func openAndMigrate() throws {
+    private func openAndMigrate(cancellation: ToolCallCancellation? = nil) throws {
+        try cancellation?.checkCancellation()
         var migrationManifest: VerifiedMigrationBackupManifest?
         try VerifiedMigrationBackup.withMigrationLock(
             databaseURL: databaseURL,
             timeoutSeconds: 60
         ) {
+            try cancellation?.checkCancellation()
             do {
                 try VerifiedMigrationBackup.withNonMutatingSQLitePreflight(
                     databaseURL: databaseURL
@@ -2734,13 +3402,19 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
             } catch {
                 throw ProjectMemoryError.invalidRequest(error.localizedDescription)
             }
-            try openAndMigrateLocked(migrationManifest: migrationManifest)
+            try cancellation?.checkCancellation()
+            try openAndMigrateLocked(
+                migrationManifest: migrationManifest,
+                cancellation: cancellation
+            )
         }
     }
 
     private func openAndMigrateLocked(
-        migrationManifest initialManifest: VerifiedMigrationBackupManifest?
+        migrationManifest initialManifest: VerifiedMigrationBackupManifest?,
+        cancellation: ToolCallCancellation? = nil
     ) throws {
+        try cancellation?.checkCancellation()
         var handle: OpaquePointer?
         let flags = SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
         guard sqlite3_open_v2(databaseURL.path, &handle, flags, nil) == SQLITE_OK, let handle else {
@@ -2776,7 +3450,12 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
                 )
             }
             try execUnlocked("PRAGMA busy_timeout=3000; PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA synchronous=NORMAL;")
-            try migrateUnlocked(migrationManifest: migrationManifest)
+            try withSQLiteControlUnlocked(cancellation: cancellation) {
+                try migrateUnlocked(
+                    migrationManifest: migrationManifest,
+                    cancellation: cancellation
+                )
+            }
             try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: databaseURL.path)
             openRegistration = try VerifiedMigrationBackup.registerOpenDatabase(at: databaseURL)
         } catch {
@@ -2822,8 +3501,10 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
     }
 
     private func migrateUnlocked(
-        migrationManifest initialManifest: VerifiedMigrationBackupManifest?
+        migrationManifest initialManifest: VerifiedMigrationBackupManifest?,
+        cancellation: ToolCallCancellation? = nil
     ) throws {
+        try cancellation?.checkCancellation()
         let prior = try pragmaUserVersionUnlocked()
         guard prior <= Self.schemaVersion else { throw ProjectMemoryError.unsupportedVersion(prior) }
         var migrationManifest = initialManifest
@@ -2839,6 +3520,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
             }
         }
         try transactionUnlocked(
+            cancellation: cancellation,
             beforeCommit: needsDurableCompletion ? { [self] in
                 try beforeMigrationCommitObserver?()
                 guard let db else {
@@ -2934,6 +3616,12 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
               integrity_result TEXT NOT NULL,details_json TEXT NOT NULL DEFAULT '{}',
               started_at TEXT NOT NULL,completed_at TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS continuity_projection_repairs(
+              project_id TEXT NOT NULL,projection_kind TEXT NOT NULL,record_id TEXT NOT NULL,
+              source_version TEXT NOT NULL DEFAULT '',attempt INTEGER NOT NULL DEFAULT 0,
+              last_error TEXT,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,
+              PRIMARY KEY(project_id,projection_kind,record_id)
+            );
             CREATE UNIQUE INDEX IF NOT EXISTS idx_rollover_active_project
               ON rollover_operations(project_id)
               WHERE state <> 'predecessorSealed' AND quarantine_state IS NULL;
@@ -2943,6 +3631,14 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
             CREATE INDEX IF NOT EXISTS idx_memory_project_kind ON memory_records(project_id,kind,is_tombstone);
             CREATE INDEX IF NOT EXISTS idx_memory_project_session ON memory_records(project_id,session_id,is_tombstone);
             """)
+            if try !tableColumnExistsUnlocked(
+                table: "continuity_projection_repairs",
+                column: "source_version"
+            ) {
+                try execUnlocked(
+                    "ALTER TABLE continuity_projection_repairs ADD COLUMN source_version TEXT NOT NULL DEFAULT '';"
+                )
+            }
             if prior == 1 {
                 try execUnlocked("""
                 ALTER TABLE continuity_handoffs ADD COLUMN schema_version TEXT NOT NULL DEFAULT '1.0';
@@ -3176,7 +3872,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         let suffix = includeTombstone ? "" : " AND is_tombstone=0"
         return try withStatementUnlocked(Self.recordSelect + " WHERE id=? AND project_id=?\(suffix) LIMIT 1") { statement in
             bind(statement, 1, id); bind(statement, 2, projectID)
-            guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+            guard try stepRow(statement) else { return nil }
             return record(statement)
         }
     }
@@ -3184,7 +3880,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
     private func recordByHashUnlocked(kind: String, hash: String) throws -> ProjectMemoryRecord? {
         try withStatementUnlocked(Self.recordSelect + " WHERE project_id=? AND kind=? AND content_hash=? AND is_tombstone=0 LIMIT 1") { statement in
             bind(statement, 1, projectID); bind(statement, 2, kind); bind(statement, 3, hash)
-            guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+            guard try stepRow(statement) else { return nil }
             return record(statement)
         }
     }
@@ -3192,8 +3888,19 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
     private func recordByIdempotencyKeyUnlocked(_ key: String) throws -> ProjectMemoryRecord? {
         try withStatementUnlocked(Self.recordSelect + " WHERE project_id=? AND idempotency_key=? LIMIT 1") { statement in
             bind(statement, 1, projectID); bind(statement, 2, key)
-            guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+            guard try stepRow(statement) else { return nil }
             return record(statement)
+        }
+    }
+
+    private func tableColumnExistsUnlocked(table: String, column: String) throws -> Bool {
+        try withStatementUnlocked("PRAGMA table_info(\(table));") { statement in
+            while try stepRow(statement) {
+                if text(statement, 1) == column {
+                    return true
+                }
+            }
+            return false
         }
     }
 
@@ -3203,21 +3910,49 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         guard sqlite3_exec(db, sql, nil, nil, &error) == SQLITE_OK else {
             let message = error.map { String(cString: $0) } ?? String(cString: sqlite3_errmsg(db))
             sqlite3_free(error)
-            if sqlite3_errcode(db) == SQLITE_BUSY { throw ProjectMemoryError.databaseBusy }
-            if sqlite3_errcode(db) == SQLITE_FULL { throw ProjectMemoryError.storageFull }
+            let code = sqlite3_errcode(db)
+            if code == SQLITE_BUSY || code == SQLITE_LOCKED {
+                throw ProjectMemoryError.databaseBusy
+            }
+            if code == SQLITE_FULL { throw ProjectMemoryError.storageFull }
             throw StoreError.execFailed(message)
         }
     }
 
     private func transactionUnlocked<T>(
+        cancellation: ToolCallCancellation? = nil,
         beforeCommit: (() throws -> Void)? = nil,
+        didCommit: (() -> Void)? = nil,
+        didCommitResult: ((T) -> Void)? = nil,
+        commitReceipt: ((T) -> ToolResult)? = nil,
         _ body: () throws -> T
     ) throws -> T {
+        try cancellation?.checkCancellation()
         try execUnlocked("BEGIN IMMEDIATE;")
         do {
             let value = try body()
             try beforeCommit?()
-            try execUnlocked("COMMIT;")
+            if let cancellation {
+                if let commitReceipt {
+                    try cancellation.withCommitAuthorization(
+                        committedResult: commitReceipt(value)
+                    ) {
+                        try execUnlocked("COMMIT;")
+                    }
+                } else {
+                    try cancellation.withCommitAuthorization(committedResult: value) {
+                        try execUnlocked("COMMIT;")
+                    }
+                }
+            } else {
+                try execUnlocked("COMMIT;")
+            }
+            // Publish the exact canonical value immediately after the successful
+            // COMMIT and after releasing the cancellation authorization fence.
+            // Generic post-commit observers may block for diagnostics, so they
+            // must not delay a durable outcome receipt or hold cancellation.
+            didCommitResult?(value)
+            didCommit?()
             return value
         } catch {
             try? execUnlocked("ROLLBACK;")
@@ -3225,48 +3960,135 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         }
     }
 
-    private func withStatement<T>(_ sql: String, _ body: (OpaquePointer) throws -> T) throws -> T {
-        lock.lock(); defer { lock.unlock() }
-        return try withStatementUnlocked(sql, body)
+    private func withStatement<T>(
+        _ sql: String,
+        cancellation: ToolCallCancellation? = nil,
+        _ body: (OpaquePointer) throws -> T
+    ) throws -> T {
+        try withLockedSQLiteOperation(
+            cancellation: cancellation,
+            checkAfterSuccess: true
+        ) {
+            try withStatementUnlocked(sql, body)
+        }
     }
 
     private func withStatementUnlocked<T>(_ sql: String, _ body: (OpaquePointer) throws -> T) throws -> T {
         guard let db else { throw StoreError.openFailed("closed project memory database") }
         var statement: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK, let statement else {
+        let result = sqlite3_prepare_v2(db, sql, -1, &statement, nil)
+        guard result == SQLITE_OK, let statement else {
+            if result == SQLITE_BUSY || result == SQLITE_LOCKED {
+                throw ProjectMemoryError.databaseBusy
+            }
+            if result == SQLITE_FULL { throw ProjectMemoryError.storageFull }
             throw StoreError.execFailed(String(cString: sqlite3_errmsg(db)))
         }
         defer { sqlite3_finalize(statement) }
         return try body(statement)
     }
 
-    private func queryOne<T>(_ sql: String, _ body: (OpaquePointer) -> T) throws -> T? {
-        try withStatement(sql) { statement in sqlite3_step(statement) == SQLITE_ROW ? body(statement) : nil }
+    private func queryOne<T>(
+        _ sql: String,
+        cancellation: ToolCallCancellation? = nil,
+        _ body: (OpaquePointer) -> T
+    ) throws -> T? {
+        try withStatement(sql, cancellation: cancellation) { statement in
+            try stepRow(statement) ? body(statement) : nil
+        }
     }
 
-    private func scalarInt(_ sql: String, value: String) throws -> Int {
-        try withStatement(sql) { statement in
+    private func scalarInt(
+        _ sql: String,
+        value: String,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> Int {
+        try withStatement(sql, cancellation: cancellation) { statement in
             bind(statement, 1, value)
-            return sqlite3_step(statement) == SQLITE_ROW ? Int(sqlite3_column_int64(statement, 0)) : 0
+            return try stepRow(statement) ? Int(sqlite3_column_int64(statement, 0)) : 0
+        }
+    }
+
+    private func withLockedSQLiteOperation<T>(
+        cancellation: ToolCallCancellation?,
+        checkAfterSuccess: Bool = false,
+        _ body: () throws -> T
+    ) throws -> T {
+        while !lock.lock(before: Date().addingTimeInterval(0.01)) {
+            try cancellation?.checkCancellation()
+        }
+        defer { lock.unlock() }
+        return try withSQLiteControlUnlocked(cancellation: cancellation) {
+            let value = try body()
+            if checkAfterSuccess {
+                try cancellation?.checkCancellation()
+            }
+            return value
+        }
+    }
+
+    private func withSQLiteControlUnlocked<T>(
+        cancellation: ToolCallCancellation?,
+        _ body: () throws -> T
+    ) throws -> T {
+        guard let db else { throw StoreError.openFailed("closed project memory database") }
+        let control = ProjectMemorySQLiteControl(
+            cancellation: cancellation,
+            busyRetryObserver: busyRetryObserver
+        )
+        try control.checkCancellation()
+        let context = Unmanaged.passUnretained(control).toOpaque()
+        sqlite3_busy_handler(db, projectMemorySQLiteBusyHandler, context)
+        sqlite3_progress_handler(db, 1_000, projectMemorySQLiteProgressHandler, context)
+        defer {
+            sqlite3_progress_handler(db, 0, nil, nil)
+            sqlite3_busy_timeout(db, 3_000)
+        }
+        do {
+            return try body()
+        } catch {
+            try control.checkCancellation()
+            throw error
         }
     }
 
     private func pragmaUserVersionUnlocked() throws -> Int {
         try withStatementUnlocked("PRAGMA user_version;") { statement in
-            sqlite3_step(statement) == SQLITE_ROW ? Int(sqlite3_column_int(statement, 0)) : 0
+            try stepRow(statement) ? Int(sqlite3_column_int(statement, 0)) : 0
         }
     }
 
     private func quickCheckUnlocked() throws -> Bool {
         try withStatementUnlocked("PRAGMA quick_check;") { statement in
-            sqlite3_step(statement) == SQLITE_ROW && text(statement, 0) == "ok"
+            try stepRow(statement) && text(statement, 0) == "ok"
+        }
+    }
+
+    private func stepRow(_ statement: OpaquePointer) throws -> Bool {
+        try rowStepObserver?()
+        let result = sqlite3_step(statement)
+        switch result {
+        case SQLITE_ROW:
+            return true
+        case SQLITE_DONE:
+            return false
+        case SQLITE_BUSY, SQLITE_LOCKED:
+            throw ProjectMemoryError.databaseBusy
+        case SQLITE_FULL:
+            throw ProjectMemoryError.storageFull
+        default:
+            throw StoreError.execFailed(
+                db.map { String(cString: sqlite3_errmsg($0)) } ?? "SQLite row step failed"
+            )
         }
     }
 
     private func stepDone(_ statement: OpaquePointer) throws {
         let result = sqlite3_step(statement)
         guard result == SQLITE_DONE else {
-            if result == SQLITE_BUSY { throw ProjectMemoryError.databaseBusy }
+            if result == SQLITE_BUSY || result == SQLITE_LOCKED {
+                throw ProjectMemoryError.databaseBusy
+            }
             if result == SQLITE_FULL { throw ProjectMemoryError.storageFull }
             throw StoreError.execFailed(db.map { String(cString: sqlite3_errmsg($0)) } ?? "SQLite step failed")
         }

@@ -8,9 +8,14 @@ import Foundation
 
 /// Minimal multi-page PDF writer (Helvetica, markdown-ish headings) — stdlib only.
 public enum PDFWriter {
-    public static func write(path: URL, content: String, title: String = "") throws -> [String: Any] {
+    public static func write(
+        path: URL,
+        content: String,
+        title: String = "",
+        cancellationCheck: (() throws -> Void)? = nil
+    ) throws -> [String: Any] {
+        try cancellationCheck?()
         let parent = path.deletingLastPathComponent()
-        try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
 
         let pageW = 612
         let pageH = 792
@@ -19,7 +24,7 @@ public enum PDFWriter {
         let bottomY = 50
         let lineH = 14
 
-        let rows = layoutLines(content)
+        let rows = try layoutLines(content, cancellationCheck: cancellationCheck)
         var pages: [String] = []
         var y = topY
         var stream: [String] = []
@@ -46,6 +51,7 @@ public enum PDFWriter {
         }
 
         for (style, text) in rows {
+            try cancellationCheck?()
             if style == "blank" {
                 y -= lineH / 2
                 if y < bottomY { flush() }
@@ -90,6 +96,7 @@ public enum PDFWriter {
 
         var pageIDs: [Int] = []
         for streamBody in pages {
+            try cancellationCheck?()
             let raw = Data(streamBody.utf8)
             var content = Data()
             content.append(contentsOf: "<< /Length \(raw.count) >>\nstream\n".utf8)
@@ -109,6 +116,7 @@ public enum PDFWriter {
         buf.append(contentsOf: [0x25, 0xE2, 0xE3, 0xCF, 0xD3, 0x0A])
         var offsets: [Int] = [0]
         for (i, obj) in objects.enumerated() {
+            try cancellationCheck?()
             offsets.append(buf.count)
             buf.append(contentsOf: "\(i + 1) 0 obj\n".utf8)
             buf.append(obj)
@@ -129,6 +137,8 @@ public enum PDFWriter {
 
         """.utf8)
 
+        try cancellationCheck?()
+        try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
         try buf.write(to: path, options: .atomic)
         return [
             "ok": true,
@@ -148,10 +158,14 @@ public enum PDFWriter {
             .replacingOccurrences(of: "\r", with: "")
     }
 
-    private static func layoutLines(_ content: String) -> [(String, String)] {
+    private static func layoutLines(
+        _ content: String,
+        cancellationCheck: (() throws -> Void)?
+    ) throws -> [(String, String)] {
         var rows: [(String, String)] = []
         var inCode = false
         for raw in content.split(separator: "\n", omittingEmptySubsequences: false).map(String.init) {
+            try cancellationCheck?()
             let line = raw
             if line.trimmingCharacters(in: .whitespaces).hasPrefix("```") {
                 inCode.toggle()
@@ -185,7 +199,7 @@ public enum PDFWriter {
                 .replacingOccurrences(of: "_", with: "")
                 .replacingOccurrences(of: "`", with: "")
             let width = (style == "h1" || style == "h2" || style == "h3") ? 88 : 92
-            for part in wrap(text, width: width) {
+            for part in try wrap(text, width: width, cancellationCheck: cancellationCheck) {
                 rows.append((style, part))
             }
         }
@@ -193,13 +207,18 @@ public enum PDFWriter {
         return rows
     }
 
-    private static func wrap(_ text: String, width: Int) -> [String] {
+    private static func wrap(
+        _ text: String,
+        width: Int,
+        cancellationCheck: (() throws -> Void)?
+    ) throws -> [String] {
         let words = text.split(separator: " ").map(String.init)
         guard !words.isEmpty else { return [""] }
         var lines: [String] = []
         var cur: [String] = []
         var n = 0
         for w in words {
+            try cancellationCheck?()
             let add = w.count + (cur.isEmpty ? 0 : 1)
             if n + add > width, !cur.isEmpty {
                 lines.append(cur.joined(separator: " "))

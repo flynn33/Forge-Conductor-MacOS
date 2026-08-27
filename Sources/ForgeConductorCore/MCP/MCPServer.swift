@@ -12,6 +12,8 @@ import CoreFoundation
 public final class MCPServer: @unchecked Sendable {
     public static let defaultMaximumConcurrentRequests = 8
     public static let defaultShutdownWaitSeconds: TimeInterval = 15
+    public static let defaultRequestTimeoutSeconds = ToolRouter.defaultCallTimeoutSeconds
+    public static let defaultResponseWriteTimeoutSeconds: TimeInterval = 2
 
     private enum RequestKey: Hashable {
         case string(String)
@@ -20,9 +22,9 @@ public final class MCPServer: @unchecked Sendable {
 
     private enum RequestRegistration {
         case accepted(ToolCallCancellation)
-        case preCancelled
         case duplicate
         case capacityExceeded
+        case deliveryClosed
     }
 
     private let app: ForgeApp
@@ -32,17 +34,18 @@ public final class MCPServer: @unchecked Sendable {
     private let toolDefinitionCatalog: Result<ToolDefinitionCatalog, Error>
     private let maximumConcurrentRequests: Int
     private let shutdownWaitSeconds: TimeInterval
+    private let requestTimeoutSeconds: TimeInterval
+    private let responseWriteTimeoutSeconds: TimeInterval
     private let requestQueue = DispatchQueue(
         label: "forge.mcp.requests",
         qos: .userInitiated,
         attributes: .concurrent
     )
-    private let lock = NSLock()
+    private let responseWriteLock = NSLock()
     private let cancellationLock = NSLock()
+    private let didCloseResponseDeliveryObserver: (@Sendable () -> Void)?
     private var responseDeliveryOpen = false
     private var activeRequests: [RequestKey: ToolCallCancellation] = [:]
-    private var cancelledRequestIDs: Set<RequestKey> = []
-    private var cancellationOrder: [RequestKey] = []
 
     public init(
         app: ForgeApp,
@@ -51,13 +54,23 @@ public final class MCPServer: @unchecked Sendable {
             environmentValue: ProcessInfo.processInfo.environment["FORGE_MCP_ROLE"]
         ),
         maximumConcurrentRequests: Int = MCPServer.defaultMaximumConcurrentRequests,
-        shutdownWaitSeconds: TimeInterval = MCPServer.defaultShutdownWaitSeconds
+        shutdownWaitSeconds: TimeInterval = MCPServer.defaultShutdownWaitSeconds,
+        requestTimeoutSeconds: TimeInterval = MCPServer.defaultRequestTimeoutSeconds,
+        responseWriteTimeoutSeconds: TimeInterval = MCPServer.defaultResponseWriteTimeoutSeconds,
+        didCloseResponseDeliveryObserver: (@Sendable () -> Void)? = nil
     ) {
         self.app = app
         self.clientID = clientID
         self.role = role
         self.maximumConcurrentRequests = max(1, min(maximumConcurrentRequests, 64))
         self.shutdownWaitSeconds = max(0.1, min(shutdownWaitSeconds, 30))
+        self.requestTimeoutSeconds = requestTimeoutSeconds.isFinite
+            ? max(0.001, requestTimeoutSeconds)
+            : Self.defaultRequestTimeoutSeconds
+        self.responseWriteTimeoutSeconds = responseWriteTimeoutSeconds.isFinite
+            ? max(0.01, min(responseWriteTimeoutSeconds, 30))
+            : Self.defaultResponseWriteTimeoutSeconds
+        self.didCloseResponseDeliveryObserver = didCloseResponseDeliveryObserver
         self.deploymentID = ProcessInfo.processInfo.environment["FORGE_DEPLOYMENT_ID"]?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         self.toolDefinitionCatalog = Result {
@@ -177,12 +190,34 @@ public final class MCPServer: @unchecked Sendable {
             return nil
         }
 
-        if let cancellation {
-            if cancellation.isCancelled {
-                return errorResponse(id: id, code: -32800, message: "Cancelled")
+        // MCP request methods require a correlatable JSON-RPC identifier. Treat
+        // every other id-less/null-id method as an unsupported notification and
+        // never dispatch it into a mutating tool path.
+        guard !isNotification else { return nil }
+
+        let requestCancellation = cancellation
+            ?? ToolCallCancellation(timeoutSeconds: requestTimeoutSeconds)
+        do {
+            try requestCancellation.checkCancellation()
+            if method == "tools/call",
+               let milliseconds = try Self.requestedDeadlineMilliseconds(in: message) {
+                // A transport-admitted token already carries the earlier absolute
+                // deadline, so tightening again here can never discard queue time.
+                try requestCancellation.tightenDeadline(milliseconds: milliseconds)
             }
-        } else if let requestID = Self.requestKey(id), consumePreCancellation(requestID) {
+        } catch is CancellationError {
+            if isNotification { return nil }
             return errorResponse(id: id, code: -32800, message: "Cancelled")
+        } catch is ToolCallDeadlineExceeded {
+            if isNotification { return nil }
+            return deadlineExceededResponse(id: id, method: method)
+        } catch {
+            if isNotification { return nil }
+            return errorResponse(
+                id: id,
+                code: -32602,
+                message: error.localizedDescription
+            )
         }
 
         do {
@@ -247,16 +282,9 @@ public final class MCPServer: @unchecked Sendable {
                     name: name,
                     arguments: arguments,
                     clientID: clientID,
-                    cancellation: cancellation
+                    cancellation: requestCancellation
                 )
-                let text = (try? JSONSupport.string(from: result.payload)) ?? "{\"ok\":false}"
-                return ok(id: id, result: [
-                    "content": [
-                        ["type": "text", "text": text] as [String: Any],
-                    ],
-                    "isError": result.isError || !result.ok,
-                    "structuredContent": result.payload,
-                ])
+                return toolCallResponse(id: id, result: result)
             case "resources/list":
                 return ok(id: id, result: ["resources": [] as [Any]])
             case "prompts/list":
@@ -268,6 +296,9 @@ public final class MCPServer: @unchecked Sendable {
         } catch is CancellationError {
             if isNotification { return nil }
             return errorResponse(id: id, code: -32800, message: "Cancelled")
+        } catch is ToolCallDeadlineExceeded {
+            if isNotification { return nil }
+            return deadlineExceededResponse(id: id, method: method)
         } catch {
             if isNotification { return nil }
             return errorResponse(id: id, code: -32000, message: "\(error)")
@@ -311,9 +342,10 @@ public final class MCPServer: @unchecked Sendable {
             return
         }
 
-        switch registerRequest(requestID) {
-        case .preCancelled:
-            try write(errorResponse(id: id, code: -32800, message: "Cancelled"), to: output)
+        let cancellation = ToolCallCancellation(timeoutSeconds: requestTimeoutSeconds)
+        switch registerRequest(requestID, cancellation: cancellation) {
+        case .deliveryClosed:
+            throw MCPStreamError.responseDeliveryClosed
         case .duplicate:
             try write(
                 errorResponse(id: id, code: -32600, message: "Invalid Request: duplicate active id"),
@@ -329,6 +361,30 @@ public final class MCPServer: @unchecked Sendable {
                 to: output
             )
         case .accepted(let cancellation):
+            do {
+                if let requestedDeadlineMilliseconds = try Self.requestedDeadlineMilliseconds(
+                    in: message
+                ) {
+                    try cancellation.tightenDeadline(
+                        milliseconds: requestedDeadlineMilliseconds
+                    )
+                }
+            } catch is CancellationError {
+                finishRequest(requestID, cancellation: cancellation)
+                try write(errorResponse(id: id, code: -32800, message: "Cancelled"), to: output)
+                return
+            } catch is ToolCallDeadlineExceeded {
+                finishRequest(requestID, cancellation: cancellation)
+                try write(deadlineExceededResponse(id: id, method: "tools/call"), to: output)
+                return
+            } catch {
+                finishRequest(requestID, cancellation: cancellation)
+                try write(
+                    errorResponse(id: id, code: -32602, message: error.localizedDescription),
+                    to: output
+                )
+                return
+            }
             let envelope = MCPRequestEnvelope(message)
             workers.enter()
             requestQueue.async { [self] in
@@ -348,16 +404,15 @@ public final class MCPServer: @unchecked Sendable {
         }
     }
 
-    private func registerRequest(_ requestID: RequestKey) -> RequestRegistration {
+    private func registerRequest(
+        _ requestID: RequestKey,
+        cancellation: ToolCallCancellation
+    ) -> RequestRegistration {
         cancellationLock.lock()
         defer { cancellationLock.unlock() }
-        if cancelledRequestIDs.remove(requestID) != nil {
-            cancellationOrder.removeAll { $0 == requestID }
-            return .preCancelled
-        }
+        guard responseDeliveryOpen else { return .deliveryClosed }
         if activeRequests[requestID] != nil { return .duplicate }
         guard activeRequests.count < maximumConcurrentRequests else { return .capacityExceeded }
-        let cancellation = ToolCallCancellation()
         activeRequests[requestID] = cancellation
         return .accepted(cancellation)
     }
@@ -380,23 +435,7 @@ public final class MCPServer: @unchecked Sendable {
             active.cancel()
             return
         }
-        if cancelledRequestIDs.insert(requestID).inserted {
-            cancellationOrder.append(requestID)
-        }
-        if cancellationOrder.count > 256 {
-            cancelledRequestIDs.remove(cancellationOrder.removeFirst())
-        }
         cancellationLock.unlock()
-    }
-
-    private func consumePreCancellation(_ requestID: RequestKey) -> Bool {
-        cancellationLock.lock()
-        defer { cancellationLock.unlock() }
-        let cancelled = cancelledRequestIDs.remove(requestID) != nil
-        if cancelled {
-            cancellationOrder.removeAll { $0 == requestID }
-        }
-        return cancelled
     }
 
     private func cancelActiveRequests() {
@@ -434,6 +473,40 @@ public final class MCPServer: @unchecked Sendable {
         return nil
     }
 
+    private static func requestedDeadlineMilliseconds(
+        in message: [String: Any]
+    ) throws -> Int? {
+        guard message["method"] as? String == "tools/call" else { return nil }
+        let params = message["params"] as? [String: Any] ?? [:]
+        let arguments = params["arguments"] as? [String: Any] ?? [:]
+        return try ToolRouter.requestedDeadlineMilliseconds(in: arguments)
+    }
+
+    private func deadlineExceededResponse(id: Any?, method: String) -> [String: Any] {
+        guard method == "tools/call" else {
+            return errorResponse(id: id, code: -32000, message: "deadline_exceeded")
+        }
+        return toolCallResponse(
+            id: id,
+            result: .failure(
+                code: "deadline_exceeded",
+                message: "Tool call deadline exceeded",
+                retryable: true
+            )
+        )
+    }
+
+    private func toolCallResponse(id: Any?, result: ToolResult) -> [String: Any] {
+        let text = (try? JSONSupport.string(from: result.payload)) ?? "{\"ok\":false}"
+        return ok(id: id, result: [
+            "content": [
+                ["type": "text", "text": text] as [String: Any],
+            ],
+            "isError": result.isError || !result.ok,
+            "structuredContent": result.payload,
+        ])
+    }
+
     private func ok(id: Any?, result: [String: Any]) -> [String: Any] {
         var resp: [String: Any] = [
             "jsonrpc": "2.0",
@@ -457,20 +530,100 @@ public final class MCPServer: @unchecked Sendable {
 
     private func write(_ object: [String: Any], to handle: FileHandle) throws {
         let packet = try MCPStdioTransport.encode(object)
-        lock.lock()
-        defer { lock.unlock() }
-        guard responseDeliveryOpen else { return }
-        // One compact JSON-RPC message per line is the MCP stdio transport.
-        try handle.write(contentsOf: packet)
-        if handle.fileDescriptor >= 0 {
-            fflush(stdout)
+        responseWriteLock.lock()
+        defer { responseWriteLock.unlock() }
+        guard isResponseDeliveryOpen else { return }
+        do {
+            try writeBounded(packet, descriptor: handle.fileDescriptor)
+        } catch {
+            setResponseDelivery(open: false)
+            throw error
         }
     }
 
     private func setResponseDelivery(open: Bool) {
-        lock.lock()
+        cancellationLock.lock()
+        let didClose = responseDeliveryOpen && !open
         responseDeliveryOpen = open
-        lock.unlock()
+        let active = open ? [] : Array(activeRequests.values)
+        cancellationLock.unlock()
+        for cancellation in active {
+            cancellation.cancel()
+        }
+        if didClose {
+            didCloseResponseDeliveryObserver?()
+        }
+    }
+
+    private var isResponseDeliveryOpen: Bool {
+        cancellationLock.lock()
+        defer { cancellationLock.unlock() }
+        return responseDeliveryOpen
+    }
+
+    private func writeBounded(_ packet: Data, descriptor: Int32) throws {
+        guard descriptor >= 0 else {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(EBADF))
+        }
+        let originalFlags = Darwin.fcntl(descriptor, F_GETFL)
+        guard originalFlags >= 0 else {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+        }
+        guard Darwin.fcntl(descriptor, F_SETFL, originalFlags | O_NONBLOCK) == 0 else {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+        }
+        _ = Darwin.fcntl(descriptor, F_SETNOSIGPIPE, 1)
+        defer { _ = Darwin.fcntl(descriptor, F_SETFL, originalFlags) }
+
+        let timeoutNanoseconds = UInt64(responseWriteTimeoutSeconds * 1_000_000_000)
+        let startedAt = DispatchTime.now().uptimeNanoseconds
+        let deadline = startedAt.addingReportingOverflow(timeoutNanoseconds).overflow
+            ? UInt64.max
+            : startedAt + timeoutNanoseconds
+
+        try packet.withUnsafeBytes { bytes in
+            guard let baseAddress = bytes.baseAddress else { return }
+            var offset = 0
+            while offset < packet.count {
+                guard isResponseDeliveryOpen else { return }
+                let now = DispatchTime.now().uptimeNanoseconds
+                guard now < deadline else {
+                    throw MCPStreamError.responseWriteTimedOut(responseWriteTimeoutSeconds)
+                }
+                let remainingNanoseconds = deadline - now
+                let roundedMilliseconds = max(UInt64(1), (remainingNanoseconds + 999_999) / 1_000_000)
+                let pollMilliseconds = Int32(min(UInt64(Int32.max), roundedMilliseconds))
+                var writable = pollfd(fd: descriptor, events: Int16(POLLOUT), revents: 0)
+                let pollResult = Darwin.poll(&writable, 1, pollMilliseconds)
+                if pollResult == 0 {
+                    throw MCPStreamError.responseWriteTimedOut(responseWriteTimeoutSeconds)
+                }
+                if pollResult < 0 {
+                    if errno == EINTR { continue }
+                    throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+                }
+                let failureEvents = Int16(POLLERR | POLLHUP | POLLNVAL)
+                if writable.revents & failureEvents != 0 {
+                    throw NSError(domain: NSPOSIXErrorDomain, code: Int(EPIPE))
+                }
+                let written = Darwin.write(
+                    descriptor,
+                    baseAddress.advanced(by: offset),
+                    packet.count - offset
+                )
+                if written > 0 {
+                    offset += written
+                    continue
+                }
+                if written < 0, errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK {
+                    continue
+                }
+                throw NSError(
+                    domain: NSPOSIXErrorDomain,
+                    code: Int(written < 0 ? errno : EIO)
+                )
+            }
+        }
     }
 }
 
@@ -598,6 +751,8 @@ public final class MCPStreamReader {
 public enum MCPStreamError: Error, LocalizedError, Sendable {
     case messageTooLarge(Int)
     case requestShutdownTimedOut(TimeInterval)
+    case responseWriteTimedOut(TimeInterval)
+    case responseDeliveryClosed
 
     public var errorDescription: String? {
         switch self {
@@ -605,6 +760,10 @@ public enum MCPStreamError: Error, LocalizedError, Sendable {
             "MCP message exceeds the \(maximum)-byte limit"
         case .requestShutdownTimedOut(let seconds):
             "MCP requests did not stop within the \(seconds)-second shutdown deadline"
+        case .responseWriteTimedOut(let seconds):
+            "MCP response delivery exceeded the \(seconds)-second transport deadline"
+        case .responseDeliveryClosed:
+            "MCP response delivery is closed"
         }
     }
 }

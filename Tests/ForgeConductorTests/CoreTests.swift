@@ -641,6 +641,22 @@ final class CoreTests: XCTestCase {
         XCTAssertTrue(event.argsJSON?.contains("redacted") == true)
     }
 
+    func testToolAuditRecursivelyRedactsBatchContents() throws {
+        let sensitiveValue = "nested-sensitive-content-\(UUID().uuidString)"
+        let sanitized = ToolAuditSanitizer.sanitize([
+            "items": [[
+                "title": "safe title",
+                "body": sensitiveValue,
+                "summary": sensitiveValue,
+            ]],
+        ])
+        let encoded = try JSONSupport.string(from: sanitized)
+
+        XCTAssertFalse(encoded.contains(sensitiveValue), encoded)
+        XCTAssertTrue(encoded.contains("safe title"), encoded)
+        XCTAssertTrue(encoded.contains("redacted"), encoded)
+    }
+
     func testAgentListTool() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         let r = try app.tools.call(name: "agent_list", arguments: [:], clientID: ClientID("t4"))

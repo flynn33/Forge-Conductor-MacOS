@@ -57,6 +57,444 @@ final class MCPProtocolAndDiagnosticsTests: XCTestCase {
         )
     }
 
+    func testWireRejectsInvalidToolDeadlineAtAdmission() throws {
+        let fixture = try MCPWireFixture(maximumConcurrentRequests: 1)
+        fixture.start()
+        var stopped = false
+        defer {
+            if !stopped { _ = fixture.stop() }
+        }
+
+        let invalidDeadlines: [Any] = [true, "25", 0, 60_001, 1.5]
+        for (offset, deadline) in invalidDeadlines.enumerated() {
+            let requestID = 100 + offset
+            try fixture.send([
+                "jsonrpc": "2.0",
+                "id": requestID,
+                "method": "tools/call",
+                "params": [
+                    "name": "forge_status",
+                    "arguments": ["deadline_ms": deadline],
+                ] as [String: Any],
+            ])
+            let response = try fixture.responses.read(timeout: 3)
+            XCTAssertEqual((response["id"] as? NSNumber)?.intValue, requestID)
+            let error = try XCTUnwrap(response["error"] as? [String: Any])
+            XCTAssertEqual((error["code"] as? NSNumber)?.intValue, -32602)
+            XCTAssertTrue((error["message"] as? String)?.contains("deadline_ms") == true)
+
+            try fixture.send([
+                "jsonrpc": "2.0",
+                "id": requestID,
+                "method": "ping",
+            ])
+            let reused = try fixture.responses.read(timeout: 3)
+            XCTAssertEqual((reused["id"] as? NSNumber)?.intValue, requestID)
+            XCTAssertNotNil(reused["result"] as? [String: Any])
+        }
+
+        try fixture.send([
+            "jsonrpc": "2.0",
+            "method": "notifications/cancelled",
+            "params": ["requestId": 160],
+        ])
+        try fixture.send([
+            "jsonrpc": "2.0",
+            "id": 160,
+            "method": "ping",
+        ])
+        let requestAfterUnknownCancellation = try fixture.responses.read(timeout: 3)
+        XCTAssertEqual((requestAfterUnknownCancellation["id"] as? NSNumber)?.intValue, 160)
+        XCTAssertNotNil(requestAfterUnknownCancellation["result"] as? [String: Any])
+        try fixture.send([
+            "jsonrpc": "2.0",
+            "id": 160,
+            "method": "ping",
+        ])
+        let reusedAfterCancellation = try fixture.responses.read(timeout: 3)
+        XCTAssertNotNil(reusedAfterCancellation["result"] as? [String: Any])
+
+        let stopError = fixture.stop()
+        stopped = true
+        XCTAssertNil(stopError)
+    }
+
+    func testResponseBackpressureCannotBlockServerShutdown() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("forge-mcp-backpressure-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let app = try ForgeApp.bootstrap(home: root.appendingPathComponent("home", isDirectory: true))
+        let input = Pipe()
+        let output = Pipe()
+        let finished = DispatchSemaphore(value: 0)
+        let errors = MCPWireErrorBox()
+        defer {
+            try? input.fileHandleForReading.close()
+            try? input.fileHandleForWriting.close()
+            try? output.fileHandleForReading.close()
+            try? output.fileHandleForWriting.close()
+            _ = app.shutdown()
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        let server = MCPServer(
+            app: app,
+            clientID: ClientID("mcp-backpressure"),
+            maximumConcurrentRequests: 8,
+            shutdownWaitSeconds: 2,
+            responseWriteTimeoutSeconds: 0.1
+        )
+        DispatchQueue(label: "forge.test.mcp-backpressure").async {
+            do {
+                try server.run(
+                    input: input.fileHandleForReading,
+                    output: output.fileHandleForWriting
+                )
+            } catch {
+                errors.store(error)
+            }
+            finished.signal()
+        }
+
+        for requestID in 200..<208 {
+            try input.fileHandleForWriting.write(contentsOf: MCPStdioTransport.encode([
+                "jsonrpc": "2.0",
+                "id": requestID,
+                "method": "tools/list",
+            ]))
+        }
+        usleep(400_000)
+        try input.fileHandleForWriting.close()
+
+        XCTAssertEqual(finished.wait(timeout: .now() + 3), .success)
+        guard let error = errors.take() else {
+            return XCTFail("saturated response transport must report its bounded failure")
+        }
+        guard case MCPStreamError.responseWriteTimedOut = error else {
+            return XCTFail("unexpected response transport error: \(error)")
+        }
+    }
+
+    func testClosedResponseDeliveryRejectsLaterMutationBeforeDispatch() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "forge-mcp-closed-delivery-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        let home = root.appendingPathComponent("home", isDirectory: true)
+        let projectRoot = root.appendingPathComponent("project", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+        let app = try ForgeApp.bootstrap(home: home)
+        let clientID = ClientID("mcp-closed-delivery")
+        let initialized = try app.tools.call(
+            name: "project_memory.initialize",
+            arguments: ["project_path": projectRoot.path],
+            clientID: clientID
+        )
+        XCTAssertTrue(initialized.ok, "\(initialized.payload)")
+        let input = Pipe()
+        let output = Pipe()
+        let deliveryClosed = DispatchSemaphore(value: 0)
+        let finished = DispatchSemaphore(value: 0)
+        let errors = MCPWireErrorBox()
+        let marker = projectRoot.appendingPathComponent("must-not-be-written.txt")
+        let notificationMarker = projectRoot.appendingPathComponent(
+            "notification-must-not-be-written.txt"
+        )
+        let nullIDMarker = projectRoot.appendingPathComponent(
+            "null-id-must-not-be-written.txt"
+        )
+        defer {
+            try? input.fileHandleForReading.close()
+            try? input.fileHandleForWriting.close()
+            try? output.fileHandleForReading.close()
+            try? output.fileHandleForWriting.close()
+            _ = app.shutdown()
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        let server = MCPServer(
+            app: app,
+            clientID: clientID,
+            maximumConcurrentRequests: 8,
+            shutdownWaitSeconds: 2,
+            responseWriteTimeoutSeconds: 0.05,
+            didCloseResponseDeliveryObserver: { deliveryClosed.signal() }
+        )
+        DispatchQueue(label: "forge.test.mcp-closed-delivery").async {
+            do {
+                try server.run(
+                    input: input.fileHandleForReading,
+                    output: output.fileHandleForWriting
+                )
+            } catch {
+                errors.store(error)
+            }
+            finished.signal()
+        }
+
+        for requestID in 300..<308 {
+            try input.fileHandleForWriting.write(contentsOf: MCPStdioTransport.encode([
+                "jsonrpc": "2.0",
+                "id": requestID,
+                "method": "tools/list",
+            ]))
+        }
+        XCTAssertEqual(
+            deliveryClosed.wait(timeout: .now() + 3),
+            .success,
+            "response backpressure did not close delivery"
+        )
+
+        try input.fileHandleForWriting.write(contentsOf: MCPStdioTransport.encode([
+            "jsonrpc": "2.0",
+            "method": "tools/call",
+            "params": [
+                "name": "fs_write",
+                "arguments": [
+                    "path": notificationMarker.path,
+                    "content": "late notification mutation",
+                ],
+            ] as [String: Any],
+        ]))
+        try input.fileHandleForWriting.write(contentsOf: MCPStdioTransport.encode([
+            "jsonrpc": "2.0",
+            "id": NSNull(),
+            "method": "tools/call",
+            "params": [
+                "name": "fs_write",
+                "arguments": [
+                    "path": nullIDMarker.path,
+                    "content": "late null-id mutation",
+                ],
+            ] as [String: Any],
+        ]))
+        try input.fileHandleForWriting.write(contentsOf: MCPStdioTransport.encode([
+            "jsonrpc": "2.0",
+            "id": 308,
+            "method": "tools/call",
+            "params": [
+                "name": "fs_write",
+                "arguments": ["path": marker.path, "content": "late mutation"],
+            ] as [String: Any],
+        ]))
+        try input.fileHandleForWriting.close()
+
+        XCTAssertEqual(finished.wait(timeout: .now() + 3), .success)
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: marker.path),
+            "a request admitted after response delivery closed committed a mutation"
+        )
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: notificationMarker.path),
+            "an id-less tools/call notification committed a mutation"
+        )
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: nullIDMarker.path),
+            "a null-id tools/call notification committed a mutation"
+        )
+        guard let error = errors.take() else {
+            return XCTFail("closed response delivery must terminate request admission")
+        }
+        guard case MCPStreamError.responseDeliveryClosed = error else {
+            return XCTFail("unexpected closed-delivery error: \(error)")
+        }
+    }
+
+    func testWireToolDeadlineStopsInFlightWorkAndReturnsStructuredFailure() throws {
+        let fixture = try MCPWireFixture(maximumConcurrentRequests: 1)
+        fixture.start()
+        var stopped = false
+        defer {
+            if !stopped { _ = fixture.stop() }
+        }
+
+        try fixture.send([
+            "jsonrpc": "2.0",
+            "id": 120,
+            "method": "tools/call",
+            "params": [
+                "name": "shell_exec",
+                "arguments": [
+                    "command": "sleep 5",
+                    "cwd": fixture.projectRoot.path,
+                    "timeout_sec": 10,
+                    "deadline_ms": 100,
+                ] as [String: Any],
+            ] as [String: Any],
+        ])
+
+        let response = try fixture.responses.read(timeout: 3)
+        XCTAssertEqual((response["id"] as? NSNumber)?.intValue, 120)
+        XCTAssertNil(response["error"])
+        let result = try XCTUnwrap(response["result"] as? [String: Any])
+        XCTAssertEqual(result["isError"] as? Bool, true)
+        let structured = try XCTUnwrap(result["structuredContent"] as? [String: Any])
+        XCTAssertEqual(structured["code"] as? String, "deadline_exceeded")
+        XCTAssertEqual(structured["ok"] as? Bool, false)
+        XCTAssertFalse(try fixture.responses.hasMessage(timeout: 0.3))
+
+        let stopError = fixture.stop()
+        stopped = true
+        XCTAssertNil(stopError)
+    }
+
+    func testWireDefaultRequestDeadlineBoundsToolCallsWithoutOverride() throws {
+        let fixture = try MCPWireFixture(
+            maximumConcurrentRequests: 1,
+            requestTimeoutSeconds: 0.1
+        )
+        fixture.start()
+        var stopped = false
+        defer {
+            if !stopped { _ = fixture.stop() }
+        }
+
+        try fixture.send([
+            "jsonrpc": "2.0",
+            "id": 121,
+            "method": "tools/call",
+            "params": [
+                "name": "shell_exec",
+                "arguments": [
+                    "command": "sleep 5",
+                    "cwd": fixture.projectRoot.path,
+                    "timeout_sec": 10,
+                ] as [String: Any],
+            ] as [String: Any],
+        ])
+
+        let response = try fixture.responses.read(timeout: 3)
+        let result = try XCTUnwrap(response["result"] as? [String: Any])
+        let structured = try XCTUnwrap(result["structuredContent"] as? [String: Any])
+        XCTAssertEqual(structured["code"] as? String, "deadline_exceeded")
+
+        let stopError = fixture.stop()
+        stopped = true
+        XCTAssertNil(stopError)
+    }
+
+    func testWireCancellationStopsBlockingNonShellSearchWithoutLateResponse() throws {
+        let fixture = try MCPWireFixture(maximumConcurrentRequests: 1)
+        fixture.start()
+        var stopped = false
+        defer {
+            if !stopped { _ = fixture.stop() }
+        }
+
+        let searchRoot = fixture.projectRoot.appendingPathComponent(
+            "blocking-cancel-search",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: searchRoot, withIntermediateDirectories: false)
+        let fifo = searchRoot.appendingPathComponent("input.pipe")
+        XCTAssertEqual(Darwin.mkfifo(fifo.path, mode_t(0o600)), 0)
+
+        try fixture.send([
+            "jsonrpc": "2.0",
+            "id": 130,
+            "method": "tools/call",
+            "params": [
+                "name": "search_text",
+                "arguments": [
+                    "path": searchRoot.path,
+                    "pattern": "never-written-needle",
+                ],
+            ] as [String: Any],
+        ])
+        let writer = try XCTUnwrap(
+            MCPWireFixture.openFIFOWhenReaderIsReady(fifo, timeout: 3),
+            "search_text did not begin reading the FIFO"
+        )
+        defer { _ = Darwin.close(writer) }
+
+        try fixture.send([
+            "jsonrpc": "2.0",
+            "method": "notifications/cancelled",
+            "params": ["requestId": 130],
+        ])
+        let response = try fixture.responses.read(timeout: 3)
+        XCTAssertEqual((response["id"] as? NSNumber)?.intValue, 130)
+        XCTAssertNil(response["result"])
+        let cancellation = try XCTUnwrap(response["error"] as? [String: Any])
+        XCTAssertEqual((cancellation["code"] as? NSNumber)?.intValue, -32800)
+        XCTAssertEqual(cancellation["message"] as? String, "Cancelled")
+        XCTAssertTrue(MCPWireFixture.waitUntilFIFOHasNoReader(fifo, timeout: 2))
+
+        try fixture.send([
+            "jsonrpc": "2.0",
+            "id": 131,
+            "method": "ping",
+        ])
+        let ping = try fixture.responses.read(timeout: 3)
+        XCTAssertEqual((ping["id"] as? NSNumber)?.intValue, 131)
+        XCTAssertNotNil(ping["result"] as? [String: Any])
+        XCTAssertFalse(try fixture.responses.hasMessage(timeout: 0.3))
+
+        let stopError = fixture.stop()
+        stopped = true
+        XCTAssertNil(stopError)
+    }
+
+    func testWireDeadlineStopsBlockingNonShellSearchWithoutLateResponse() throws {
+        let fixture = try MCPWireFixture(maximumConcurrentRequests: 1)
+        fixture.start()
+        var stopped = false
+        defer {
+            if !stopped { _ = fixture.stop() }
+        }
+
+        let searchRoot = fixture.projectRoot.appendingPathComponent(
+            "blocking-deadline-search",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: searchRoot, withIntermediateDirectories: false)
+        let fifo = searchRoot.appendingPathComponent("input.pipe")
+        XCTAssertEqual(Darwin.mkfifo(fifo.path, mode_t(0o600)), 0)
+
+        try fixture.send([
+            "jsonrpc": "2.0",
+            "id": 132,
+            "method": "tools/call",
+            "params": [
+                "name": "search_text",
+                "arguments": [
+                    "path": searchRoot.path,
+                    "pattern": "never-written-needle",
+                    "deadline_ms": 2_000,
+                ] as [String: Any],
+            ] as [String: Any],
+        ])
+        let writer = try XCTUnwrap(
+            MCPWireFixture.openFIFOWhenReaderIsReady(fifo, timeout: 1),
+            "search_text did not begin reading the FIFO before its deadline"
+        )
+        defer { _ = Darwin.close(writer) }
+
+        let response = try fixture.responses.read(timeout: 4)
+        XCTAssertEqual((response["id"] as? NSNumber)?.intValue, 132)
+        XCTAssertNil(response["error"])
+        let result = try XCTUnwrap(response["result"] as? [String: Any])
+        XCTAssertEqual(result["isError"] as? Bool, true)
+        let structured = try XCTUnwrap(result["structuredContent"] as? [String: Any])
+        XCTAssertEqual(structured["ok"] as? Bool, false)
+        XCTAssertEqual(structured["code"] as? String, "deadline_exceeded")
+        XCTAssertTrue(MCPWireFixture.waitUntilFIFOHasNoReader(fifo, timeout: 2))
+
+        try fixture.send([
+            "jsonrpc": "2.0",
+            "id": 133,
+            "method": "ping",
+        ])
+        let ping = try fixture.responses.read(timeout: 3)
+        XCTAssertEqual((ping["id"] as? NSNumber)?.intValue, 133)
+        XCTAssertNotNil(ping["result"] as? [String: Any])
+        XCTAssertFalse(try fixture.responses.hasMessage(timeout: 0.3))
+
+        let stopError = fixture.stop()
+        stopped = true
+        XCTAssertNil(stopError)
+    }
+
     func testConcurrentRequestsPreserveTypedIDsAndCompleteOutOfOrder() throws {
         let fixture = try MCPWireFixture(maximumConcurrentRequests: 2)
         fixture.start()
@@ -146,7 +584,7 @@ final class MCPProtocolAndDiagnosticsTests: XCTestCase {
         XCTAssertNil(stopError)
     }
 
-    func testCancellationAfterSynchronousMutationReturnsCommittedResult() throws {
+    func testCancellationDuringPreCommitStopsMutationAndPreservesHead() throws {
         let fixture = try MCPWireFixture(maximumConcurrentRequests: 1)
         var stopped = false
         defer {
@@ -231,14 +669,231 @@ final class MCPProtocolAndDiagnosticsTests: XCTestCase {
 
         let response = try fixture.responses.read(timeout: 8)
         XCTAssertEqual((response["id"] as? NSNumber)?.intValue, 51)
+        XCTAssertNil(response["result"])
+        let cancellation = try XCTUnwrap(response["error"] as? [String: Any])
+        XCTAssertEqual((cancellation["code"] as? NSNumber)?.intValue, -32800)
+        XCTAssertEqual(cancellation["message"] as? String, "Cancelled")
+        let headAfter = try runGit(["rev-parse", "HEAD"]).stdout
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        XCTAssertEqual(headAfter, headBefore)
+        XCTAssertFalse(try fixture.responses.hasMessage(timeout: 0.5))
+
+        let stopError = fixture.stop()
+        stopped = true
+        XCTAssertNil(stopError)
+    }
+
+    func testCancellationDuringPostCommitReturnsReconciledSuccess() throws {
+        let fixture = try MCPWireFixture(maximumConcurrentRequests: 1)
+        var stopped = false
+        defer {
+            if !stopped { _ = fixture.stop() }
+        }
+
+        let runner = ProcessRunner()
+        @discardableResult
+        func runGit(_ arguments: [String]) throws -> ProcessResult {
+            let result = try runner.run(
+                executable: "/usr/bin/git",
+                arguments: arguments,
+                currentDirectory: fixture.projectRoot.path,
+                timeoutSec: 10
+            )
+            XCTAssertEqual(result.exitCode, 0, result.stderr)
+            return result
+        }
+
+        _ = try runGit(["init", "--quiet"])
+        _ = try runGit(["config", "user.name", "Forge Fixture"])
+        _ = try runGit(["config", "user.email", "fixture@forge.invalid"])
+        _ = try runGit(["config", "commit.gpgsign", "false"])
+        let tracked = fixture.projectRoot.appendingPathComponent("tracked.txt")
+        try Data("before\n".utf8).write(to: tracked)
+        _ = try runGit(["add", "tracked.txt"])
+        _ = try runGit(["commit", "--quiet", "-m", "Seed post-commit fixture"])
+        let headBefore = try runGit(["rev-parse", "HEAD"]).stdout
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let hook = fixture.projectRoot.appendingPathComponent(".git/hooks/post-commit")
+        let release = fixture.projectRoot.appendingPathComponent("post-commit-hook-release")
+        defer { try? Data().write(to: release) }
+        let preCommitHook = fixture.projectRoot.appendingPathComponent(".git/hooks/pre-commit")
+        try Data(
+            """
+            #!/bin/sh
+            printf 'hook-adjusted\n' > tracked.txt
+            /usr/bin/git add tracked.txt
+
+            """.utf8
+        ).write(to: preCommitHook)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755],
+            ofItemAtPath: preCommitHook.path
+        )
+        let commitMessageHook = fixture.projectRoot.appendingPathComponent(".git/hooks/commit-msg")
+        try Data(
+            """
+            #!/bin/sh
+            printf '%s\n' 'Hook-adjusted commit message' > "$1"
+
+            """.utf8
+        ).write(to: commitMessageHook)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755],
+            ofItemAtPath: commitMessageHook.path
+        )
+        try Data(
+            """
+            #!/bin/sh
+            : > post-commit-hook-ready
+            attempt=0
+            while [ ! -f post-commit-hook-release ]; do
+              attempt=$((attempt + 1))
+              [ "$attempt" -lt 200 ] || exit 75
+              sleep 0.05
+            done
+
+            """.utf8
+        ).write(to: hook)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: hook.path)
+        try Data("after\n".utf8).write(to: tracked)
+        _ = try runGit(["add", "tracked.txt"])
+
+        fixture.start()
+        try fixture.send([
+            "jsonrpc": "2.0",
+            "id": 53,
+            "method": "tools/call",
+            "params": [
+                "name": "git_commit",
+                "arguments": [
+                    "cwd": fixture.projectRoot.path,
+                    "message": "Requested subject   \n\n\nRequested body   ",
+                ] as [String: Any],
+            ] as [String: Any],
+        ])
+
+        let ready = fixture.projectRoot.appendingPathComponent("post-commit-hook-ready")
+        XCTAssertTrue(MCPWireFixture.waitForFile(ready, timeout: 5))
+        let committedHead = try runGit(["rev-parse", "HEAD"]).stdout
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        XCTAssertNotEqual(committedHead, headBefore, "HEAD must advance before post-commit returns")
+
+        try fixture.send([
+            "jsonrpc": "2.0",
+            "method": "notifications/cancelled",
+            "params": ["requestId": 53],
+        ])
+
+        let response = try fixture.responses.read(timeout: 8)
+        XCTAssertEqual((response["id"] as? NSNumber)?.intValue, 53)
         XCTAssertNil(response["error"])
         let result = try XCTUnwrap(response["result"] as? [String: Any])
         XCTAssertEqual(result["isError"] as? Bool, false)
         let structured = try XCTUnwrap(result["structuredContent"] as? [String: Any])
+        XCTAssertEqual(structured["ok"] as? Bool, true)
         XCTAssertEqual((structured["exit_code"] as? NSNumber)?.intValue, 0)
-        let headAfter = try runGit(["rev-parse", "HEAD"]).stdout
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        XCTAssertNotEqual(headAfter, headBefore)
+        XCTAssertEqual(structured["commit"] as? String, committedHead)
+        XCTAssertEqual(structured["reconciled"] as? Bool, true)
+        XCTAssertEqual(
+            try runGit(["show", "HEAD:tracked.txt"]).stdout,
+            "hook-adjusted\n"
+        )
+        XCTAssertEqual(
+            try runGit(["log", "-1", "--format=%B"]).stdout
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+            "Hook-adjusted commit message"
+        )
+        XCTAssertFalse(try fixture.responses.hasMessage(timeout: 0.5))
+
+        let stopError = fixture.stop()
+        stopped = true
+        XCTAssertNil(stopError)
+    }
+
+    func testCancellationAfterGitAddIndexCommitReturnsReconciledSuccess() throws {
+        let fixture = try MCPWireFixture(maximumConcurrentRequests: 1)
+        var stopped = false
+        defer {
+            if !stopped { _ = fixture.stop() }
+        }
+
+        let runner = ProcessRunner()
+        @discardableResult
+        func runGit(_ arguments: [String]) throws -> ProcessResult {
+            let result = try runner.run(
+                executable: "/usr/bin/git",
+                arguments: arguments,
+                currentDirectory: fixture.projectRoot.path,
+                timeoutSec: 10
+            )
+            XCTAssertEqual(result.exitCode, 0, result.stderr)
+            return result
+        }
+
+        _ = try runGit(["init", "--quiet"])
+        _ = try runGit(["config", "user.name", "Forge Fixture"])
+        _ = try runGit(["config", "user.email", "fixture@forge.invalid"])
+        _ = try runGit(["config", "commit.gpgsign", "false"])
+        let tracked = fixture.projectRoot.appendingPathComponent("tracked.txt")
+        try Data("before\n".utf8).write(to: tracked)
+        _ = try runGit(["add", "tracked.txt"])
+        _ = try runGit(["commit", "--quiet", "-m", "Seed add fixture"])
+
+        let hook = fixture.projectRoot.appendingPathComponent(".git/hooks/post-index-change")
+        let release = fixture.projectRoot.appendingPathComponent("post-index-hook-release")
+        defer { try? Data().write(to: release) }
+        try Data(
+            """
+            #!/bin/sh
+            [ -f post-index-hook-ready ] && exit 0
+            /usr/bin/git diff --cached --quiet -- tracked.txt && exit 0
+            : > post-index-hook-ready
+            attempt=0
+            while [ ! -f post-index-hook-release ]; do
+              attempt=$((attempt + 1))
+              [ "$attempt" -lt 200 ] || exit 75
+              sleep 0.05
+            done
+
+            """.utf8
+        ).write(to: hook)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: hook.path)
+        try Data("after\n".utf8).write(to: tracked)
+
+        fixture.start()
+        try fixture.send([
+            "jsonrpc": "2.0",
+            "id": 54,
+            "method": "tools/call",
+            "params": [
+                "name": "git_add",
+                "arguments": [
+                    "cwd": fixture.projectRoot.path,
+                    "path": "tracked.txt",
+                ] as [String: Any],
+            ] as [String: Any],
+        ])
+        let ready = fixture.projectRoot.appendingPathComponent("post-index-hook-ready")
+        XCTAssertTrue(MCPWireFixture.waitForFile(ready, timeout: 5))
+
+        try fixture.send([
+            "jsonrpc": "2.0",
+            "method": "notifications/cancelled",
+            "params": ["requestId": 54],
+        ])
+
+        let response = try fixture.responses.read(timeout: 8)
+        XCTAssertEqual((response["id"] as? NSNumber)?.intValue, 54)
+        XCTAssertNil(response["error"])
+        let result = try XCTUnwrap(response["result"] as? [String: Any])
+        XCTAssertEqual(result["isError"] as? Bool, false)
+        let structured = try XCTUnwrap(result["structuredContent"] as? [String: Any])
+        XCTAssertEqual(structured["ok"] as? Bool, true)
+        XCTAssertEqual((structured["exit_code"] as? NSNumber)?.intValue, 0)
+        XCTAssertEqual(structured["reconciled"] as? Bool, true)
+        XCTAssertNotNil(structured["index_fingerprint"] as? String)
+        XCTAssertEqual(try runGit(["show", ":tracked.txt"]).stdout, "after\n")
         XCTAssertFalse(try fixture.responses.hasMessage(timeout: 0.5))
 
         let stopError = fixture.stop()
@@ -360,6 +1015,7 @@ final class MCPProtocolAndDiagnosticsTests: XCTestCase {
         XCTAssertEqual(record.fields["operation_id"], "operation-17")
         XCTAssertEqual(record.fields["count"], "3")
 
+        XCTAssertTrue(log.flush(timeout: 2))
         let persisted = try String(contentsOf: paths.masterDiagnostics, encoding: .utf8)
         XCTAssertFalse(persisted.contains(privatePath))
         XCTAssertFalse(persisted.contains(privateGoal))
@@ -430,7 +1086,10 @@ private final class MCPWireFixture {
     private let finished = DispatchSemaphore(value: 0)
     private let errorBox = MCPWireErrorBox()
 
-    init(maximumConcurrentRequests: Int) throws {
+    init(
+        maximumConcurrentRequests: Int,
+        requestTimeoutSeconds: TimeInterval = MCPServer.defaultRequestTimeoutSeconds
+    ) throws {
         root = FileManager.default.temporaryDirectory
             .appendingPathComponent("forge-test-mcp-wire-\(UUID().uuidString)", isDirectory: true)
         let home = root.appendingPathComponent("home", isDirectory: true)
@@ -452,7 +1111,8 @@ private final class MCPWireFixture {
                 app: app,
                 clientID: clientID,
                 maximumConcurrentRequests: maximumConcurrentRequests,
-                shutdownWaitSeconds: 10
+                shutdownWaitSeconds: 10,
+                requestTimeoutSeconds: requestTimeoutSeconds
             )
             responses = MCPWireResponseReader(handle: output.fileHandleForReading)
         } catch {
@@ -499,6 +1159,40 @@ private final class MCPWireFixture {
             usleep(10_000)
         }
         return FileManager.default.fileExists(atPath: url.path)
+    }
+
+    static func openFIFOWhenReaderIsReady(_ url: URL, timeout: TimeInterval) -> Int32? {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            let descriptor = url.path.withCString {
+                Darwin.open($0, O_WRONLY | O_NONBLOCK)
+            }
+            if descriptor >= 0 { return descriptor }
+            guard errno == ENXIO else { return nil }
+            usleep(10_000)
+        }
+        return nil
+    }
+
+    static func waitUntilFIFOHasNoReader(_ url: URL, timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            let descriptor = url.path.withCString {
+                Darwin.open($0, O_WRONLY | O_NONBLOCK)
+            }
+            if descriptor < 0 {
+                if errno == ENXIO { return true }
+                return false
+            }
+            _ = Darwin.close(descriptor)
+            usleep(10_000)
+        }
+        let descriptor = url.path.withCString {
+            Darwin.open($0, O_WRONLY | O_NONBLOCK)
+        }
+        if descriptor < 0 { return errno == ENXIO }
+        _ = Darwin.close(descriptor)
+        return false
     }
 
     static func readPID(_ url: URL) throws -> Int32 {

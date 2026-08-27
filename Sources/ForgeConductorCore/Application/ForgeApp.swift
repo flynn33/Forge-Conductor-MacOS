@@ -225,7 +225,21 @@ public final class ForgeApp: @unchecked Sendable {
         }
         projectMemory.closeAll()
         projectContexts.close()
+        guard audit.shutdownAttempts(timeout: 2) else {
+            return RuntimeJobShutdownReport(
+                completed: false,
+                unresolvedJobIDs: report.unresolvedJobIDs,
+                persistencePendingJobIDs: report.persistencePendingJobIDs
+            )
+        }
         store.close()
+        guard diagnostics.shutdown(timeout: 2) else {
+            return RuntimeJobShutdownReport(
+                completed: false,
+                unresolvedJobIDs: report.unresolvedJobIDs,
+                persistencePendingJobIDs: report.persistencePendingJobIDs
+            )
+        }
         return report
     }
 

@@ -3,6 +3,7 @@
 
 import XCTest
 import SQLite3
+import Darwin
 @testable import ForgeConductorCore
 
 final class ProjectMemoryTests: XCTestCase {
@@ -261,6 +262,35 @@ final class ProjectMemoryTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: database), modified)
         XCTAssertNotEqual(before, modified)
         app?.shutdown()
+    }
+
+    func testImportRejectsSpecialFileWithoutBlockingPastDeadline() throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let projectID = try initialize(app, project: projectA)
+        let exports = home.appendingPathComponent(
+            "Projects/\(projectID)/exports",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: exports, withIntermediateDirectories: true)
+        let fifo = exports.appendingPathComponent("blocked-import.fifo")
+        XCTAssertEqual(mkfifo(fifo.path, S_IRUSR | S_IWUSR), 0)
+
+        let startedAt = Date()
+        let result = try app.tools.call(
+            name: "project_memory.import",
+            arguments: [
+                "project_id": projectID,
+                "artifact": fifo.path,
+                "preview": true,
+                "deadline_ms": 100,
+            ],
+            clientID: ClientID("project-memory-test")
+        )
+
+        XCTAssertLessThan(Date().timeIntervalSince(startedAt), 1)
+        XCTAssertFalse(result.ok)
+        XCTAssertEqual(result.payload["code"] as? String, "invalid_request")
     }
 
     func testNonemptyUnversionedDatabaseFailsClosedWithoutMutatingDatabase() throws {
@@ -947,6 +977,236 @@ final class ProjectMemoryTests: XCTestCase {
         XCTAssertEqual(status["record_count"] as? Int, 0)
     }
 
+    func testDeadlinePreemptsDatabaseLockWithoutPartialWrite() throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let projectID = try initialize(app, project: projectA)
+        let databaseURL = home.appendingPathComponent("Projects/\(projectID)/memory.sqlite3")
+        var locker: OpaquePointer?
+        XCTAssertEqual(sqlite3_open(databaseURL.path, &locker), SQLITE_OK)
+        let opened = try XCTUnwrap(locker)
+        defer { sqlite3_exec(opened, "ROLLBACK;", nil, nil, nil); sqlite3_close(opened) }
+        XCTAssertEqual(sqlite3_exec(opened, "BEGIN IMMEDIATE;", nil, nil, nil), SQLITE_OK)
+
+        let startedAt = Date()
+        let result = try app.tools.call(
+            name: "project_memory.remember",
+            arguments: [
+                "project_id": projectID,
+                "kind": "fact",
+                "title": "Deadline locked",
+                "summary": "must not commit",
+                "deadline_ms": 100,
+            ],
+            clientID: ClientID("project-memory-test")
+        )
+        let elapsed = Date().timeIntervalSince(startedAt)
+
+        XCTAssertFalse(result.ok)
+        XCTAssertEqual(result.payload["code"] as? String, "deadline_exceeded")
+        XCTAssertLessThan(elapsed, 1)
+        sqlite3_exec(opened, "ROLLBACK;", nil, nil, nil)
+        let status = try call(app, "project_memory.status", ["project_id": projectID])
+        XCTAssertEqual(status["record_count"] as? Int, 0)
+    }
+
+    func testCancellationPreemptsActiveDatabaseLockWithoutPartialWrite() async throws {
+        let projectID = UUID().uuidString.lowercased()
+        let directory = home.appendingPathComponent("project-memory-cancel-lock", isDirectory: true)
+        let busyReached = DispatchSemaphore(value: 0)
+        let repository = try ProjectMemoryRepository(
+            projectID: projectID,
+            directory: directory,
+            enableFTS5: false,
+            busyRetryObserver: {
+                busyReached.signal()
+            },
+            beforeMigrationCommitObserver: nil
+        )
+        defer { repository.close() }
+
+        var locker: OpaquePointer?
+        XCTAssertEqual(sqlite3_open(repository.databaseURL.path, &locker), SQLITE_OK)
+        let opened = try XCTUnwrap(locker)
+        defer { sqlite3_exec(opened, "ROLLBACK;", nil, nil, nil); sqlite3_close(opened) }
+        XCTAssertEqual(sqlite3_exec(opened, "BEGIN IMMEDIATE;", nil, nil, nil), SQLITE_OK)
+
+        let cancellation = ToolCallCancellation(timeoutSeconds: 5)
+        let write = ProjectMemoryWrite(
+            kind: "fact",
+            title: "Cancellation locked",
+            summary: "must not commit"
+        )
+        let operation = Task.detached {
+            try repository.remember(write, cancellation: cancellation)
+        }
+
+        XCTAssertEqual(busyReached.wait(timeout: .now() + 1), .success)
+        let cancelledAt = Date()
+        cancellation.cancel()
+        do {
+            _ = try await operation.value
+            XCTFail("cancelled SQLite operation returned a result")
+        } catch is CancellationError {
+            // Expected: active cancellation interrupts the bounded busy handler.
+        } catch {
+            XCTFail("unexpected cancellation error: \(error)")
+        }
+        XCTAssertLessThan(Date().timeIntervalSince(cancelledAt), 1)
+
+        sqlite3_exec(opened, "ROLLBACK;", nil, nil, nil)
+        let status = try repository.status()
+        XCTAssertEqual(status["record_count"] as? Int, 0)
+    }
+
+    func testCancellationAfterCommitReturnsCommittedResult() throws {
+        let projectID = UUID().uuidString.lowercased()
+        let directory = home.appendingPathComponent("project-memory-committed-result", isDirectory: true)
+        let cancellation = ToolCallCancellation(timeoutSeconds: 5)
+        let repository = try ProjectMemoryRepository(
+            projectID: projectID,
+            directory: directory,
+            enableFTS5: false,
+            didMutationCommitObserver: {
+                cancellation.cancel()
+            },
+            beforeMigrationCommitObserver: nil
+        )
+        defer { repository.close() }
+
+        let (record, disposition) = try repository.remember(
+            ProjectMemoryWrite(
+                kind: "fact",
+                title: "Committed result",
+                summary: "the committed mutation remains authoritative"
+            ),
+            cancellation: cancellation
+        )
+
+        XCTAssertEqual(disposition, "inserted")
+        XCTAssertEqual(record.title, "Committed result")
+        XCTAssertTrue(cancellation.isCancelled)
+        let status = try repository.status()
+        XCTAssertEqual(status["record_count"] as? Int, 1)
+    }
+
+    func testExportCancellationBeforeAtomicPublicationLeavesNoArtifact() throws {
+        let paths = AppPaths(home: home)
+        try paths.ensureLayout()
+        let cancellation = ToolCallCancellation(timeoutSeconds: 5)
+        let memory = ProjectMemoryService(
+            paths: paths,
+            clock: SystemClock(),
+            limits: .current,
+            afterIdentityMetadataWriteObserver: nil,
+            didIdentityRegistryCommitObserver: nil,
+            beforeContinuityProjectionWriteObserver: nil,
+            beforeExportCommitObserver: {
+                cancellation.cancel()
+            }
+        )
+        defer { memory.closeAll() }
+        let descriptor = try memory.initialize(path: projectA.path)
+        let projectID = try XCTUnwrap(descriptor["project_id"] as? String)
+        _ = try memory.remember(
+            projectID: projectID,
+            write: ProjectMemoryWrite(
+                kind: "fact",
+                title: "Cancelled export",
+                summary: "must not publish after authority is revoked"
+            )
+        )
+
+        XCTAssertThrowsError(
+            try memory.export(projectID: projectID, cancellation: cancellation)
+        ) { error in
+            XCTAssertTrue(error is CancellationError, "unexpected error: \(error)")
+        }
+
+        let exports = paths.projectsDir
+            .appendingPathComponent(projectID, isDirectory: true)
+            .appendingPathComponent("exports", isDirectory: true)
+        let artifacts = (try? FileManager.default.contentsOfDirectory(
+            at: exports,
+            includingPropertiesForKeys: nil
+        )) ?? []
+        XCTAssertTrue(artifacts.filter { $0.pathExtension == "json" }.isEmpty)
+
+        memory.closeAll()
+        let reopened = ProjectMemoryService(paths: paths)
+        defer { reopened.closeAll() }
+        let committedCancellation = ToolCallCancellation(timeoutSeconds: 5)
+        let exported = try reopened.export(
+            projectID: projectID,
+            cancellation: committedCancellation
+        )
+        let receipt = try XCTUnwrap(
+            committedCancellation.committedResult(as: ToolResult.self)
+        )
+        XCTAssertTrue(receipt.ok)
+        XCTAssertEqual(
+            receipt.payload["artifact"] as? String,
+            exported["artifact"] as? String
+        )
+        XCTAssertEqual(
+            receipt.payload["checksum"] as? String,
+            exported["checksum"] as? String
+        )
+        XCTAssertTrue(FileManager.default.fileExists(
+            atPath: try XCTUnwrap(exported["artifact"] as? String)
+        ))
+    }
+
+    func testReadStepFailuresNeverAppearAsEmptyOrPartialResults() throws {
+        let projectID = UUID().uuidString.lowercased()
+        let directory = home.appendingPathComponent("project-memory-row-step-errors", isDirectory: true)
+        let fault = ProjectMemoryRowStepFault()
+        let repository = try ProjectMemoryRepository(
+            projectID: projectID,
+            directory: directory,
+            enableFTS5: false,
+            beforeMigrationCommitObserver: nil,
+            rowStepObserver: { try fault.observe() }
+        )
+        defer { repository.close() }
+
+        var recordIDs: [String] = []
+        for index in 0..<2 {
+            let (record, _) = try repository.remember(ProjectMemoryWrite(
+                kind: "fact",
+                title: "Checked row \(index)",
+                summary: "checked SQLite row semantics \(index)"
+            ))
+            recordIDs.append(record.id)
+        }
+
+        fault.arm(afterSuccessfulSteps: 0)
+        assertDatabaseBusy(try repository.get(id: recordIDs[0]))
+
+        fault.arm(afterSuccessfulSteps: 1)
+        assertDatabaseBusy(try repository.recent(
+            kinds: [], sessionID: nil, limit: 10, offset: 0
+        ))
+
+        fault.arm(afterSuccessfulSteps: 1)
+        assertDatabaseBusy(try repository.search(
+            query: "Checked", kinds: [], tags: [], sessionID: nil, limit: 10, offset: 0
+        ))
+
+        fault.arm(afterSuccessfulSteps: 0)
+        assertDatabaseBusy(try repository.status())
+    }
+
+    private func assertDatabaseBusy<T>(
+        _ operation: @autoclosure () throws -> T,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertThrowsError(try operation(), file: file, line: line) { error in
+            XCTAssertEqual(error as? ProjectMemoryError, .databaseBusy, file: file, line: line)
+        }
+    }
+
     private func initialize(
         _ app: ForgeApp,
         project: URL,
@@ -1165,5 +1425,26 @@ final class ProjectMemoryTests: XCTestCase {
             throw ProjectMemoryError.integrityFailure(String(cString: sqlite3_errmsg(database)))
         }
         return sqlite3_column_text(statement, 0).map { String(cString: $0) }
+    }
+}
+
+private final class ProjectMemoryRowStepFault: @unchecked Sendable {
+    private let lock = NSLock()
+    private var remainingSuccessfulSteps: Int?
+
+    func arm(afterSuccessfulSteps count: Int) {
+        lock.lock()
+        remainingSuccessfulSteps = max(0, count)
+        lock.unlock()
+    }
+
+    func observe() throws {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let remainingSuccessfulSteps else { return }
+        guard remainingSuccessfulSteps > 0 else {
+            throw ProjectMemoryError.databaseBusy
+        }
+        self.remainingSuccessfulSteps = remainingSuccessfulSteps - 1
     }
 }

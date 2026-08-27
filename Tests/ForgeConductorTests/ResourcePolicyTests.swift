@@ -156,6 +156,7 @@ final class ResourcePolicyTests: XCTestCase {
             ))
         }
 
+        XCTAssertTrue(log.flush(timeout: 5))
         XCTAssertEqual(log.recent(limit: .max).count, 5)
         for url in [
             paths.masterDiagnostics,

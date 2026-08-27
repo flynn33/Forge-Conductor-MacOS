@@ -1109,7 +1109,7 @@ final class ContinuityTests: XCTestCase {
         XCTAssertEqual(prepared.state, .prepared)
         XCTAssertEqual(prepared.storageKind, .sqlite)
         XCTAssertEqual(prepared.sourceVersion, 2)
-        XCTAssertEqual(prepared.targetVersion, 5)
+        XCTAssertEqual(prepared.targetVersion, SQLiteStore.schemaVersion)
         XCTAssertEqual(prepared.backupFilename, backupURL.lastPathComponent)
         XCTAssertEqual(
             prepared.backupSHA256,
@@ -1119,7 +1119,7 @@ final class ContinuityTests: XCTestCase {
             FileManager.default.fileExists(
                 atPath: VerifiedMigrationBackup.archivedManifestURL(
                     for: backupURL,
-                    targetVersion: 5
+                    targetVersion: SQLiteStore.schemaVersion
                 ).path
             )
         )
@@ -1213,7 +1213,10 @@ final class ContinuityTests: XCTestCase {
 
         let first = try SQLiteStore(path: databaseURL)
         try assertLegacySemantics(in: first)
-        XCTAssertEqual(try sqliteFixtureInt(at: databaseURL, sql: "SELECT version FROM schema_version;"), 5)
+        XCTAssertEqual(
+            try sqliteFixtureInt(at: databaseURL, sql: "SELECT version FROM schema_version;"),
+            SQLiteStore.schemaVersion
+        )
         let backupURL = tempHome.appendingPathComponent("store.pre-migration-v2.sqlite3")
         XCTAssertEqual(try sqliteFixtureInt(at: backupURL, sql: "SELECT version FROM schema_version;"), 2)
         XCTAssertEqual(try sqliteFixtureText(at: backupURL, sql: "PRAGMA quick_check;"), "ok")
@@ -1238,7 +1241,7 @@ final class ContinuityTests: XCTestCase {
         XCTAssertEqual(migrationManifest.state, .completed)
         XCTAssertEqual(migrationManifest.storageKind, .sqlite)
         XCTAssertEqual(migrationManifest.sourceVersion, 2)
-        XCTAssertEqual(migrationManifest.targetVersion, 5)
+        XCTAssertEqual(migrationManifest.targetVersion, SQLiteStore.schemaVersion)
         XCTAssertEqual(migrationManifest.backupSHA256, JSONSupport.sha256Hex(try Data(contentsOf: backupURL)))
         XCTAssertNotNil(migrationManifest.targetSHA256)
         XCTAssertEqual(
@@ -1252,7 +1255,7 @@ final class ContinuityTests: XCTestCase {
             FileManager.default.fileExists(
                 atPath: VerifiedMigrationBackup.archivedManifestURL(
                     for: backupURL,
-                    targetVersion: 5
+                    targetVersion: SQLiteStore.schemaVersion
                 ).path
             )
         )
@@ -1285,7 +1288,10 @@ final class ContinuityTests: XCTestCase {
         XCTAssertEqual(try reopened.auditRecent(limit: 10).count, 1)
         try reopened.migrate()
         try assertLegacySemantics(in: reopened)
-        XCTAssertEqual(try sqliteFixtureInt(at: databaseURL, sql: "SELECT version FROM schema_version;"), 5)
+        XCTAssertEqual(
+            try sqliteFixtureInt(at: databaseURL, sql: "SELECT version FROM schema_version;"),
+            SQLiteStore.schemaVersion
+        )
         XCTAssertEqual(try Data(contentsOf: backupURL), firstBackupData)
         reopened.close()
 
@@ -1386,7 +1392,7 @@ final class ContinuityTests: XCTestCase {
             FileManager.default.fileExists(
                 atPath: VerifiedMigrationBackup.archivedManifestURL(
                     for: secondBackupURL,
-                    targetVersion: 5
+                    targetVersion: SQLiteStore.schemaVersion
                 ).path
             )
         )
@@ -1416,7 +1422,7 @@ final class ContinuityTests: XCTestCase {
         let backupURL = tempHome.appendingPathComponent("store.pre-migration-v2.sqlite3")
         let archiveURL = VerifiedMigrationBackup.archivedManifestURL(
             for: backupURL,
-            targetVersion: 5
+            targetVersion: SQLiteStore.schemaVersion
         )
         let archivedBytes = try Data(contentsOf: archiveURL)
 
@@ -1557,7 +1563,10 @@ final class ContinuityTests: XCTestCase {
         XCTAssertEqual(try reopened.store.handoffGet(id: currentID)?.goal, "State written after migration")
         try reopened.store.migrate()
         XCTAssertEqual(try reopened.store.handoffList(limit: 10).map(\.id), [currentID, legacyPacket.id])
-        XCTAssertEqual(try sqliteFixtureInt(at: databaseURL, sql: "SELECT version FROM schema_version;"), 5)
+        XCTAssertEqual(
+            try sqliteFixtureInt(at: databaseURL, sql: "SELECT version FROM schema_version;"),
+            SQLiteStore.schemaVersion
+        )
         XCTAssertEqual(try Data(contentsOf: backupURL), firstBackupData)
     }
 
@@ -1609,7 +1618,10 @@ final class ContinuityTests: XCTestCase {
         XCTAssertEqual(try reopened.handoffLatest()?.id, packet.id)
         XCTAssertEqual(try reopened.memoryGet(key: "continuity/latest"), packet.id)
         XCTAssertEqual(try reopened.handoffList(limit: 10).map(\.id), [packet.id])
-        XCTAssertEqual(try sqliteFixtureInt(at: databaseURL, sql: "SELECT version FROM schema_version;"), 5)
+        XCTAssertEqual(
+            try sqliteFixtureInt(at: databaseURL, sql: "SELECT version FROM schema_version;"),
+            SQLiteStore.schemaVersion
+        )
         XCTAssertEqual(try Data(contentsOf: backupURL), firstBackupData)
     }
 
@@ -1686,7 +1698,7 @@ final class ContinuityTests: XCTestCase {
         XCTAssertEqual(prepared.state, .prepared)
         XCTAssertEqual(prepared.storageKind, .sqlite)
         XCTAssertEqual(prepared.sourceVersion, 3)
-        XCTAssertEqual(prepared.targetVersion, 5)
+        XCTAssertEqual(prepared.targetVersion, SQLiteStore.schemaVersion)
         XCTAssertEqual(prepared.backupFilename, backupURL.lastPathComponent)
         XCTAssertEqual(
             prepared.backupSHA256,
@@ -1733,7 +1745,10 @@ final class ContinuityTests: XCTestCase {
         XCTAssertEqual(recoveredPacket.nextActions, legacyPacket.nextActions)
         recovered.close()
 
-        XCTAssertEqual(try sqliteFixtureInt(at: databaseURL, sql: "SELECT version FROM schema_version;"), 5)
+        XCTAssertEqual(
+            try sqliteFixtureInt(at: databaseURL, sql: "SELECT version FROM schema_version;"),
+            SQLiteStore.schemaVersion
+        )
         XCTAssertEqual(try Data(contentsOf: backupURL), backupData)
         let completed = try JSONDecoder().decode(
             VerifiedMigrationBackupManifest.self,
@@ -1759,7 +1774,7 @@ final class ContinuityTests: XCTestCase {
                 from: Data(
                     contentsOf: VerifiedMigrationBackup.archivedManifestURL(
                         for: backupURL,
-                        targetVersion: 5
+                        targetVersion: SQLiteStore.schemaVersion
                     )
                 )
             ),
@@ -1789,7 +1804,7 @@ final class ContinuityTests: XCTestCase {
         let readyURL = tempHome.appendingPathComponent("migration-commit-ready")
         let archiveURL = VerifiedMigrationBackup.archivedManifestURL(
             for: backupURL,
-            targetVersion: 5
+            targetVersion: SQLiteStore.schemaVersion
         )
         let activeManifestURL = VerifiedMigrationBackup.activeManifestURL(for: databaseURL)
         let legacyPacket = HandoffPacket(
@@ -1851,7 +1866,7 @@ final class ContinuityTests: XCTestCase {
         XCTAssertEqual(prepared.state, .prepared)
         XCTAssertEqual(prepared.storageKind, .sqlite)
         XCTAssertEqual(prepared.sourceVersion, 3)
-        XCTAssertEqual(prepared.targetVersion, 5)
+        XCTAssertEqual(prepared.targetVersion, SQLiteStore.schemaVersion)
         XCTAssertEqual(prepared.sourceFilename, databaseURL.lastPathComponent)
         XCTAssertEqual(prepared.backupFilename, backupURL.lastPathComponent)
         XCTAssertNil(prepared.targetSHA256)
@@ -1872,7 +1887,10 @@ final class ContinuityTests: XCTestCase {
             legacyJSON
         )
 
-        XCTAssertEqual(try sqliteFixtureInt(at: databaseURL, sql: "SELECT version FROM schema_version;"), 5)
+        XCTAssertEqual(
+            try sqliteFixtureInt(at: databaseURL, sql: "SELECT version FROM schema_version;"),
+            SQLiteStore.schemaVersion
+        )
         XCTAssertEqual(try sqliteFixtureText(at: databaseURL, sql: "PRAGMA quick_check;"), "ok")
         XCTAssertEqual(
             try sqliteFixtureInt(
@@ -1949,7 +1967,10 @@ final class ContinuityTests: XCTestCase {
         XCTAssertEqual(try recovered.handoffList(limit: 10).map(\.id), [legacyPacket.id])
         recovered.close()
 
-        XCTAssertEqual(try sqliteFixtureInt(at: databaseURL, sql: "SELECT version FROM schema_version;"), 5)
+        XCTAssertEqual(
+            try sqliteFixtureInt(at: databaseURL, sql: "SELECT version FROM schema_version;"),
+            SQLiteStore.schemaVersion
+        )
         XCTAssertEqual(try sqliteFixtureInt(at: databaseURL, sql: "SELECT COUNT(*) FROM schema_version;"), 1)
         XCTAssertEqual(try sqliteFixtureText(at: databaseURL, sql: "PRAGMA quick_check;"), "ok")
         XCTAssertEqual(
@@ -2050,7 +2071,7 @@ final class ContinuityTests: XCTestCase {
                         backupURL: databaseURL.deletingLastPathComponent()
                             .appendingPathComponent("store.pre-migration-v3.sqlite3"),
                         sourceVersion: 3,
-                        targetVersion: 5,
+                        targetVersion: SQLiteStore.schemaVersion,
                         versionQuery: "SELECT version FROM schema_version LIMIT 1"
                     )
                 guard prepared.state == .prepared else {
@@ -2085,7 +2106,7 @@ final class ContinuityTests: XCTestCase {
                 guard manifest.state == .prepared,
                       manifest.storageKind == .sqlite,
                       manifest.sourceVersion == 3,
-                      manifest.targetVersion == 5 else {
+                      manifest.targetVersion == SQLiteStore.schemaVersion else {
                     throw SQLiteFixtureError.failure(
                         "migration child reached the commit boundary with an invalid manifest"
                     )
@@ -2138,7 +2159,10 @@ final class ContinuityTests: XCTestCase {
 
         let freshURL = tempHome.appendingPathComponent("fresh-store.sqlite")
         let fresh = try SQLiteStore(path: freshURL)
-        XCTAssertEqual(try sqliteFixtureInt(at: freshURL, sql: "SELECT version FROM schema_version;"), 5)
+        XCTAssertEqual(
+            try sqliteFixtureInt(at: freshURL, sql: "SELECT version FROM schema_version;"),
+            SQLiteStore.schemaVersion
+        )
         fresh.close()
     }
 
@@ -2730,7 +2754,7 @@ final class ContinuityTests: XCTestCase {
             sourceURL: sourceURL,
             backup: backup,
             sourceVersion: 1,
-            targetVersion: 5,
+            targetVersion: SQLiteStore.schemaVersion,
             storageKind: .sqlite
         )
         try FileManager.default.removeItem(at: sourceURL)
@@ -2772,7 +2796,7 @@ final class ContinuityTests: XCTestCase {
             sourceURL: databaseURL,
             backup: try XCTUnwrap(backup),
             sourceVersion: 2,
-            targetVersion: 5,
+            targetVersion: SQLiteStore.schemaVersion,
             storageKind: .sqlite
         )
         try withSQLiteFixture(at: databaseURL) { database in
@@ -2830,7 +2854,7 @@ final class ContinuityTests: XCTestCase {
             sourceURL: databaseURL,
             backup: try XCTUnwrap(backup),
             sourceVersion: 2,
-            targetVersion: 5,
+            targetVersion: SQLiteStore.schemaVersion,
             storageKind: .sqlite
         )
         try FileManager.default.removeItem(at: databaseURL)
@@ -2839,7 +2863,7 @@ final class ContinuityTests: XCTestCase {
                 database,
                 sql: """
                 CREATE TABLE schema_version(version INTEGER NOT NULL);
-                INSERT INTO schema_version(version) VALUES(5);
+                INSERT INTO schema_version(version) VALUES(\(SQLiteStore.schemaVersion));
                 CREATE TABLE unrelated_target(value TEXT NOT NULL);
                 INSERT INTO unrelated_target(value) VALUES('must survive rejection');
                 """
@@ -3832,10 +3856,13 @@ private struct ThrowingLoopToolPack: ToolPackHandling {
     func handle(
         name: String,
         arguments: [String: Any],
+        context: ToolInvocationContext?,
         clientID: ClientID,
-        app: ForgeApp
+        app: ForgeApp,
+        cancellation: ToolCallCancellation?
     ) throws -> ToolResult? {
         guard name == "throwing_test_tool" else { return nil }
+        try cancellation?.checkCancellation()
         throw ThrowingLoopToolPackError.forced
     }
 }
