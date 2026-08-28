@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-28T13:05:22.324598+00:00",
+  "captured_at": "2026-08-28T13:15:37.960080+00:00",
   "environment_keys_present": [
     "CODEX_APP_TOOLS_PIPE_PATH",
     "CODEX_CI",
@@ -67,7 +67,7 @@
     ],
     "repository": {
       "branch": "repair/filesystem-race-mitigation",
-      "commit": "6288210d82270b26add5f0e078d150bc4377bd62",
+      "commit": "f721ce063104817e9f08013350ab855bac708c77",
       "dirty": true,
       "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation"
     },

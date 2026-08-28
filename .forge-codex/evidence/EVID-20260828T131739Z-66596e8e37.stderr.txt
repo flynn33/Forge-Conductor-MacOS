@@ -1,0 +1,2 @@
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/dist/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher: replacing existing signature
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/dist/Forge Conductor.app: replacing existing signature

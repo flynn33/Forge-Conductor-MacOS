@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-08-28T13:12:50Z",
+  "updated_at": "2026-08-28T13:17:52Z",
   "run_id": "1e48ce8e-c41f-4d6d-a0e6-c3201200671b",
   "branch": "repair/filesystem-race-mitigation",
   "base_branch": "main",
@@ -38,7 +38,8 @@
     "doctor EVID-20260828T130522Z-a830cc844e and selector EVID-20260828T130522Z-9f6e40e665 retain all four deferred findings, G09-G12 nonpassing, and P10 selected",
     "P10 boundary EVID-20260828T130522Z-849134968b and completion boundary EVID-20260828T130523Z-73516c6e94 intentionally fail; no phase or release completion is claimed",
     "current G09 acceptance boundary EVID-20260828T130426Z-af339f479f fails because direct-adapter evidence is not manager-owned forced-rollover authority",
-    "GitHub readback confirmed open PR 12 from repair/filesystem-race-mitigation at f721ce063104817e9f08013350ab855bac708c77 into main at 6288210d82270b26add5f0e078d150bc4377bd62"
+    "GitHub readback confirmed open PR 12 from repair/filesystem-race-mitigation at f721ce063104817e9f08013350ab855bac708c77 into main at 6288210d82270b26add5f0e078d150bc4377bd62",
+    "local app smoke EVID-20260828T131739Z-66596e8e37 ad-hoc signs, launches, and process-verifies dist/Forge Conductor.app on the current source manifest; it is local exploratory-test evidence, not signed native UI authority"
   ],
   "current_environment_results": [
     "Developer Mode remains disabled",

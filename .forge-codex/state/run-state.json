@@ -380,6 +380,7 @@
     "EVID-20260828T130522Z-9f6e40e665",
     "EVID-20260828T130522Z-a830cc844e",
     "EVID-20260828T130523Z-73516c6e94",
+    "EVID-20260828T131739Z-66596e8e37",
     "a5466d4e5b4d7a10f87df64ddfdb58b6b8ca5159a57c20527e98802a822245d7",
     "a5d4276cbf14db3a91baa7f6b79fb8cdb3fb042a2eaf663d3219ff36b5451667",
     "b3dc11a8dc286fa33b6567ff62089692e64787b23a66718cfe1766dc27195724",
@@ -571,6 +572,8 @@
     }
   },
   "handoffs": [
+    "00d75d8d-ee0a-41ca-aedf-0b2fa1496ab8",
+    "810010d7-b872-41ff-8d51-414b7270ca9d",
     "82441ec1-a7ed-4137-8ec5-3d2dd99739bb",
     "ee862f4a-ebcc-466f-9817-1881ff1a6172",
     "fdaa1903-9dea-4989-97a6-4a5518e2eddf"
@@ -819,7 +822,7 @@
       "updated_at": "2026-08-28T12:52:15.126800+00:00"
     }
   ],
-  "last_event_sequence": 499,
+  "last_event_sequence": 504,
   "phases": {
     "P00": {
       "attempts": 1,
@@ -902,12 +905,12 @@
   },
   "repository": {
     "branch": "repair/filesystem-race-mitigation",
-    "commit": "f721ce063104817e9f08013350ab855bac708c77",
+    "commit": "5bb563f2cad717ce192272648ff15da034ace830",
     "dirty": true,
     "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation"
   },
   "run_id": "aba90ab1-be80-4cc5-aa0b-23dd54d4a24d",
   "schema_version": 1,
   "status": "active",
-  "updated_at": "2026-08-28T13:13:56.555223+00:00"
+  "updated_at": "2026-08-28T13:18:41.500673+00:00"
 }

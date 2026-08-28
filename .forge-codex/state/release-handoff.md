@@ -79,6 +79,14 @@ misread as phase or release completion. Current G09 acceptance validation
 `EVID-20260828T130426Z-af339f479f` also fails because the historical direct
 adapter result is not manager-owned forced-rollover authority.
 
+Local app smoke `EVID-20260828T131739Z-66596e8e37` builds the current source
+manifest through `script/build_and_run.sh --verify`, stages the app at
+`dist/Forge Conductor.app`, applies and verifies an ad-hoc hardened-runtime
+signature, launches it, and confirms the native process remains running. This
+makes the checkpoint available for local exploratory testing. It is not a
+signed XCUITest execution, has no configured TeamIdentifier, and does not close
+shell compatibility, native validation, P10, or any release gate.
+
 ## Published checkpoint identity
 
 - Active branch: `repair/filesystem-race-mitigation`
