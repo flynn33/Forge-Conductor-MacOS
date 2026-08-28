@@ -79,11 +79,17 @@ misread as phase or release completion. Current G09 acceptance validation
 `EVID-20260828T130426Z-af339f479f` also fails because the historical direct
 adapter result is not manager-owned forced-rollover authority.
 
-## Checkpoint identity during preparation
+## Published checkpoint identity
 
 - Active branch: `repair/filesystem-race-mitigation`
-- Pre-publication HEAD and base `main`: `6288210d82270b26add5f0e078d150bc4377bd62`
-- Current pull request: not opened at this preparation point
+- Published source checkpoint HEAD: `f721ce063104817e9f08013350ab855bac708c77`
+- Base branch and SHA: `main` at
+  `6288210d82270b26add5f0e078d150bc4377bd62`
+- Current pull request: #12,
+  `https://github.com/flynn33/Forge-Conductor-MacOS/pull/12`
+- GitHub readback at publication recorded PR #12 as open from
+  `repair/filesystem-race-mitigation@f721ce063104817e9f08013350ab855bac708c77`
+  into `main@6288210d82270b26add5f0e078d150bc4377bd62`.
 - Pull request #9 (`repair/autonomous-continuity` at
   `6321bd98012e5f60b2779bbb401cc2827f372b16`) was based on
   `ae0ceace702274857afce3097ac7cde18b7a6c63` and closed without merge.
@@ -95,10 +101,9 @@ adapter result is not manager-owned forced-rollover authority.
   `92122970c54cf549cdc5002db23044ed0b3552cb`) was based directly on the #10
   merge and was squash-merged as
   `6288210d82270b26add5f0e078d150bc4377bd62`, the current base.
-
-The checkpoint committer must replace this preparation identity with the exact
-published HEAD and new pull-request number before treating the next checkpoint
-as published.
+- Pull request #12 is the current partial P10 mitigation checkpoint. It follows
+  #11 and does not close P10, E2, shell compatibility, native validation,
+  autonomous continuity, or G09-G12.
 
 ## Historical 0.9.0 outcome
 

@@ -1,4 +1,4 @@
-{
+  {
   "findings": [
     {
       "affected_feature_ids": [
@@ -552,9 +552,11 @@
     {
       "affected_feature_ids": ["MCP-TOOL-FILESYSTEM"],
       "assigned_phase": "P10",
-      "evidence_class": "E2",
-      "fix_commits": [],
-      "id": "FC-FILESYSTEM-PATH-TOCTOU-001",
+    "evidence_class": "E2",
+    "fix_commits": [
+      "f721ce063104817e9f08013350ab855bac708c77"
+    ],
+    "id": "FC-FILESYSTEM-PATH-TOCTOU-001",
       "ownership_disposition": "Descriptor-relative traversal and bounded quarantine-and-verify mitigate final-component substitution but do not eliminate it. A global 32-slot owner-only receipt ledger bounds simultaneous tracked recovery state across cooperating Forge processes and ordinary crashes; corrupt receipts, unavailable or rebound parents, failed rollback, and terminal-durability-unconfirmed transitions retain a slot. Rollback refuses a quarantine occupant whose identity differs from the receipt. Combined namespace-instability and durability-unconfirmed results retain the live install receipt, and cross-volume cleanup merges any second retained receipt. Receipt unlink followed by failed ledger-directory sync does not falsely claim a nonexistent live recovery path, although a stale receipt may conservatively reappear after a crash. A same-user writer can discover and swap the quarantine name after final verification and before the terminal unlinkat or renameatx_np. One winning race can mutate one entry under the pinned authorized parent; a final-link unlink can lose unbounded bytes and a directory rename can relocate an unbounded subtree. One recursive request can reuse released slots across up to 100000 planned entries, so the 32-slot bound does not limit cumulative adversarial wrong-object mutations and is not a same-UID adversarial guarantee. Cross-volume work is deadline-bounded to 300 seconds, but a terminal namespace syscall or fsync already executing under the lock has no independent wall-time deadline. Initial path anchoring, destination hierarchy creation, and hard-link ctime ambiguity remain separate E2 residuals. Current-source Debug EVID-20260828T124332Z-1e2a050c0e and Release EVID-20260828T124624Z-00a3dd27c2 each pass 657 tests with four expected skips; the finding remains open.",
       "runtime_proof": [
         "Tests/ForgeConductorTests/FilesystemCancellationTests.swift",
@@ -591,9 +593,11 @@
     {
       "affected_feature_ids": ["MCP-TOOL-SHELL", "UI-TAB-MANAGER"],
       "assigned_phase": "P10",
-      "evidence_class": "E0",
-      "fix_commits": [],
-      "id": "FC-SHELL-COMPAT-QUALIFICATION-001",
+    "evidence_class": "E0",
+    "fix_commits": [
+      "f721ce063104817e9f08013350ab855bac708c77"
+    ],
+    "id": "FC-SHELL-COMPAT-QUALIFICATION-001",
       "ownership_disposition": "Current-source regressions cover clean-install enablement, schema-v1 disabled-state migration, current schema-v2 explicit opt-out preservation, tools/list registration, execution, and the established shell_exec login-bash result contract. Released schema-v1 configs did not persist a signal that can distinguish the shipped false default from a user-chosen false value. Restart coverage at that boundary is manager-service restart plus ForgeApp teardown/rebootstrap inside the test process, not LaunchAgent or native app process relaunch. shell_exec remains distinct from additive clean-profile bash.run. Debug EVID-20260828T124332Z-1e2a050c0e and Release EVID-20260828T124624Z-00a3dd27c2 pass the current strict matrix; current MCP and manager compatibility are EVID-20260828T125651Z-ad5ebff94c and EVID-20260828T125046Z-c15d53c9c9. The Settings XCUITest includes visibility, control, save, reload, and actual app relaunch, but EVID-20260828T124634Z-c6c0c861da is unsigned build-only evidence and no native execution is accepted. Native execution remains blocked by signing and Developer Mode, so shell compatibility remains open.",
       "runtime_proof": [
         "Tests/ForgeConductorTests/AppConfigAndDoctorTests.swift",

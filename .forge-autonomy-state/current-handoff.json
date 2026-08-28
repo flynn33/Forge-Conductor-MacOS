@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-08-28T13:05:24Z",
+  "updated_at": "2026-08-28T13:12:50Z",
   "run_id": "1e48ce8e-c41f-4d6d-a0e6-c3201200671b",
   "branch": "repair/filesystem-race-mitigation",
   "base_branch": "main",
   "baseline_commit": "6288210d82270b26add5f0e078d150bc4377bd62",
-  "published_source_commit": "6288210d82270b26add5f0e078d150bc4377bd62",
-  "working_tree": true,
-  "publication_status": "pending: published_source_commit is the current main base, not the uncommitted working tree; final HEAD and pull-request number require post-push GitHub readback",
+  "published_source_commit": "f721ce063104817e9f08013350ab855bac708c77",
+  "working_tree": false,
+  "publication_status": "published as the source checkpoint in open pull request 12; GitHub readback confirmed repair/filesystem-race-mitigation at f721ce063104817e9f08013350ab855bac708c77 into main at 6288210d82270b26add5f0e078d150bc4377bd62",
   "current_work_package": "P10 filesystem race mitigation and shell compatibility qualification",
   "current_phase": "P10",
   "completed_work_packages": [
@@ -24,7 +24,7 @@
     "9": "closed without merge; repair/autonomous-continuity at 6321bd98012e5f60b2779bbb401cc2827f372b16; superseded by PR 10 because the trees are identical",
     "10": "squash merged as 7808790d9f52f4ec287434d45826bfa0e5586892 from repair/cancellation-recovery at 4b887fcc423284d0a60f57baed3adab4b943a576",
     "11": "based on PR 10 merge and squash merged as 6288210d82270b26add5f0e078d150bc4377bd62 from repair/filesystem-path-hardening at 92122970c54cf549cdc5002db23044ed0b3552cb",
-    "next": "pending creation from repair/filesystem-race-mitigation to main"
+    "12": "open partial P10 checkpoint from repair/filesystem-race-mitigation at f721ce063104817e9f08013350ab855bac708c77 into main at 6288210d82270b26add5f0e078d150bc4377bd62; all deferred gates remain open"
   },
   "verified_results": [
     "current-source strict SwiftPM Debug: 657 tests, 4 skipped, 0 failures (EVID-20260828T124332Z-1e2a050c0e)",
@@ -37,7 +37,8 @@
     "publication controls pass in EVID-20260828T130418Z-5574c5b7d8, EVID-20260828T130424Z-8504424e70, EVID-20260828T130424Z-7eb8ebf490, EVID-20260828T130425Z-686a1e57bc, and EVID-20260828T130426Z-9f1dba3882",
     "doctor EVID-20260828T130522Z-a830cc844e and selector EVID-20260828T130522Z-9f6e40e665 retain all four deferred findings, G09-G12 nonpassing, and P10 selected",
     "P10 boundary EVID-20260828T130522Z-849134968b and completion boundary EVID-20260828T130523Z-73516c6e94 intentionally fail; no phase or release completion is claimed",
-    "current G09 acceptance boundary EVID-20260828T130426Z-af339f479f fails because direct-adapter evidence is not manager-owned forced-rollover authority"
+    "current G09 acceptance boundary EVID-20260828T130426Z-af339f479f fails because direct-adapter evidence is not manager-owned forced-rollover authority",
+    "GitHub readback confirmed open PR 12 from repair/filesystem-race-mitigation at f721ce063104817e9f08013350ab855bac708c77 into main at 6288210d82270b26add5f0e078d150bc4377bd62"
   ],
   "current_environment_results": [
     "Developer Mode remains disabled",

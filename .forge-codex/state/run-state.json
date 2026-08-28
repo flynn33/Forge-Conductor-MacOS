@@ -571,6 +571,7 @@
     }
   },
   "handoffs": [
+    "82441ec1-a7ed-4137-8ec5-3d2dd99739bb",
     "ee862f4a-ebcc-466f-9817-1881ff1a6172",
     "fdaa1903-9dea-4989-97a6-4a5518e2eddf"
   ],
@@ -818,7 +819,7 @@
       "updated_at": "2026-08-28T12:52:15.126800+00:00"
     }
   ],
-  "last_event_sequence": 497,
+  "last_event_sequence": 499,
   "phases": {
     "P00": {
       "attempts": 1,
@@ -901,12 +902,12 @@
   },
   "repository": {
     "branch": "repair/filesystem-race-mitigation",
-    "commit": "6288210d82270b26add5f0e078d150bc4377bd62",
+    "commit": "f721ce063104817e9f08013350ab855bac708c77",
     "dirty": true,
     "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation"
   },
   "run_id": "aba90ab1-be80-4cc5-aa0b-23dd54d4a24d",
   "schema_version": 1,
   "status": "active",
-  "updated_at": "2026-08-28T13:08:44.317961+00:00"
+  "updated_at": "2026-08-28T13:13:56.555223+00:00"
 }
