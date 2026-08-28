@@ -1,0 +1,53 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 10210,
+      "path": ".forge-codex/evidence/EVID-20260828T003223Z-ed54aab219.stdout.txt",
+      "sha256": "c5a14f6b547ced661066a04d58eb0311edf0900a18523e000a8088d6a2bb7c61",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 16476,
+      "path": ".forge-codex/evidence/EVID-20260828T003223Z-ed54aab219.stderr.txt",
+      "sha256": "cc60499e2618b5df5d58cc8095c1609809cbef8957cb510ac653fe4a1cfb2cf8",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "command": "swift test --filter Filesystem",
+  "ended_at": "2026-08-28T00:32:49.468680+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Cancellation-Recovery",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260828T003223Z-ed54aab219",
+  "kind": "filesystem-path-hardening",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [
+    "FC-FILESYSTEM-PATH-TOCTOU-001"
+  ],
+  "related_gates": [],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 8930398,
+    "file_count": 241,
+    "schema_version": 1,
+    "sha256": "8660e5401938ea5c6254c21406492bfbedf2f573e79455ee5285e061191b3ff7"
+  },
+  "source_manifest_after": {
+    "bytes": 8930398,
+    "file_count": 241,
+    "schema_version": 1,
+    "sha256": "8660e5401938ea5c6254c21406492bfbedf2f573e79455ee5285e061191b3ff7"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-28T00:32:23.676044+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

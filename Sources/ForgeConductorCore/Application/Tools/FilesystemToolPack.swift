@@ -15,23 +15,32 @@ public struct FilesystemToolPack: ToolPackHandling {
     private static let maximumMutationSeconds: TimeInterval = 300
     public static let maximumListEntries = 1_000
     private let deletionStepObserver: (@Sendable (Int) -> Void)?
+    private let deletionMutationObserver: (@Sendable (DeletionMutationStep) -> Void)?
     private let moveStepObserver: (@Sendable (MoveStep) -> Void)?
     private let forceCrossVolumeMove: Bool
     private let directorySynchronizer: @Sendable (URL) throws -> Void
 
     enum MoveStep: Sendable, Equatable {
         case preparedDestinationDirectories
+        case beforeSameVolumeRename
+        case beforeDestinationInstall
         case copiedToStaging
         case installedDestination
         case beforeSourceFenceVerification
+        case beforeSourceEntryRemoval(String)
         case synchronizingStagingEntry(Int)
         case reconcilingHardLinkGroup
         case removedStagingEntry(Int)
         case removedSourceEntry(Int)
     }
 
+    enum DeletionMutationStep: Sendable, Equatable {
+        case beforeRemoving(String)
+    }
+
     public init() {
         deletionStepObserver = nil
+        deletionMutationObserver = nil
         moveStepObserver = nil
         forceCrossVolumeMove = false
         directorySynchronizer = { try Self.synchronizeDirectory($0) }
@@ -39,6 +48,7 @@ public struct FilesystemToolPack: ToolPackHandling {
 
     init(deletionStepObserver: (@Sendable (Int) -> Void)?) {
         self.deletionStepObserver = deletionStepObserver
+        deletionMutationObserver = nil
         moveStepObserver = nil
         forceCrossVolumeMove = false
         directorySynchronizer = { try Self.synchronizeDirectory($0) }
@@ -50,6 +60,7 @@ public struct FilesystemToolPack: ToolPackHandling {
         forceCrossVolumeMove: Bool
     ) {
         self.deletionStepObserver = deletionStepObserver
+        deletionMutationObserver = nil
         self.moveStepObserver = moveStepObserver
         self.forceCrossVolumeMove = forceCrossVolumeMove
         directorySynchronizer = { try Self.synchronizeDirectory($0) }
@@ -62,9 +73,18 @@ public struct FilesystemToolPack: ToolPackHandling {
         directorySynchronizer: @escaping @Sendable (URL) throws -> Void
     ) {
         self.deletionStepObserver = deletionStepObserver
+        deletionMutationObserver = nil
         self.moveStepObserver = moveStepObserver
         self.forceCrossVolumeMove = forceCrossVolumeMove
         self.directorySynchronizer = directorySynchronizer
+    }
+
+    init(deletionMutationObserver: (@Sendable (DeletionMutationStep) -> Void)?) {
+        deletionStepObserver = nil
+        self.deletionMutationObserver = deletionMutationObserver
+        moveStepObserver = nil
+        forceCrossVolumeMove = false
+        directorySynchronizer = { try Self.synchronizeDirectory($0) }
     }
 
     public var toolNames: [String] {
@@ -377,6 +397,16 @@ public struct FilesystemToolPack: ToolPackHandling {
                 retryable: false
             )
         }
+        guard let rootEntry = plan.first(where: { $0.relativePath == "." }) else {
+            throw SourceFenceError.changed
+        }
+        let expectedIdentities = Dictionary(
+            uniqueKeysWithValues: plan.map { ($0.relativePath, $0.identity) }
+        )
+        let pinnedRoot = try Self.pinnedTreeRoot(
+            at: url,
+            expectedIdentity: rootEntry.identity
+        )
 
         var removedCount = 0
         for entry in plan {
@@ -392,15 +422,16 @@ public struct FilesystemToolPack: ToolPackHandling {
                     error: error
                 )
             }
-            let result = entry.isDirectory
-                ? entry.url.path.withCString { Darwin.rmdir($0) }
-                : entry.url.path.withCString { Darwin.unlink($0) }
-            guard result == 0 else {
-                let error = NSError(
-                    domain: NSPOSIXErrorDomain,
-                    code: Int(errno),
-                    userInfo: [NSFilePathErrorKey: entry.url.path]
+            do {
+                try Self.removeEntry(
+                    entry,
+                    root: pinnedRoot,
+                    expectedIdentities: expectedIdentities,
+                    beforeRemoval: {
+                        deletionMutationObserver?(.beforeRemoving(entry.relativePath))
+                    }
                 )
+            } catch {
                 guard removedCount > 0 else { throw error }
                 return Self.partialMutationResult(
                     operation: "delete",
@@ -412,6 +443,15 @@ public struct FilesystemToolPack: ToolPackHandling {
             }
             removedCount += 1
             deletionStepObserver?(removedCount)
+        }
+        if Self.pathEntryExists(url) {
+            return Self.partialMutationResult(
+                operation: "delete",
+                source: url,
+                destination: nil,
+                completedEntries: removedCount,
+                error: SourceFenceError.changed
+            )
         }
         return .success([
             "path": url.path,
@@ -434,13 +474,14 @@ public struct FilesystemToolPack: ToolPackHandling {
         let s = ToolArgHelpers.resolvePath(src)
         let d = ToolArgHelpers.resolvePath(dest)
         try cancellation?.checkCancellation()
-        guard try Self.itemType(at: s).exists else {
+        guard let sourceInformation = try Self.lstatInformationIfExists(at: s) else {
             throw NSError(
                 domain: NSPOSIXErrorDomain,
                 code: Int(ENOENT),
                 userInfo: [NSFilePathErrorKey: s.path]
             )
         }
+        let sourceIdentity = PathIdentity(sourceInformation)
         let createdDestinationDirectories: [URL]
         do {
             createdDestinationDirectories = try createDurableDirectoryHierarchy(
@@ -472,13 +513,65 @@ public struct FilesystemToolPack: ToolPackHandling {
                 createdDirectories: createdDestinationDirectories
             )
         }
-        let renameResult = forceCrossVolumeMove
-            ? -1
-            : Self.renameExclusively(source: s, destination: d)
-        if renameResult == 0 {
+        var requiresCrossVolumeMove = forceCrossVolumeMove
+        var sameVolumeRenameReceipt: PinnedRenameReceipt?
+        if !requiresCrossVolumeMove {
+            do {
+                sameVolumeRenameReceipt = try Self.renameExclusively(
+                    source: s,
+                    destination: d,
+                    expectedSourceIdentity: sourceIdentity,
+                    beforeRename: {
+                        try cancellation?.checkCancellation()
+                        moveStepObserver?(.beforeSameVolumeRename)
+                        try cancellation?.checkCancellation()
+                    }
+                )
+            } catch {
+                let nsError = error as NSError
+                if nsError.domain == NSPOSIXErrorDomain, nsError.code == Int(EXDEV) {
+                    requiresCrossVolumeMove = true
+                } else {
+                    guard !createdDestinationDirectories.isEmpty else {
+                        if error is SourceFenceError {
+                            return .failure(
+                                code: "source_changed",
+                                message: error.localizedDescription,
+                                retryable: false
+                            )
+                        }
+                        throw error
+                    }
+                    return Self.partialMoveResult(
+                        source: s,
+                        destination: d,
+                        completedEntries: createdDestinationDirectories.count,
+                        error: error,
+                        createdDirectories: createdDestinationDirectories
+                    )
+                }
+            }
+        }
+        if !requiresCrossVolumeMove {
+            guard let sameVolumeRenameReceipt else {
+                throw SourceFenceError.changed
+            }
+            if !sameVolumeRenameReceipt.requestedNamespaceStable {
+                let durabilityConfirmed = (try? Self.synchronizePinnedRenameParents(
+                    sameVolumeRenameReceipt
+                )) != nil
+                return Self.namespaceChangedAfterRenameResult(
+                    source: s,
+                    destination: d,
+                    completedEntries: max(1, createdDestinationDirectories.count),
+                    durabilityConfirmed: durabilityConfirmed,
+                    createdDirectories: createdDestinationDirectories
+                )
+            }
             // Rename is the irreversible boundary. A late cancellation must not
             // conceal the completed move.
             do {
+                try Self.synchronizePinnedRenameParents(sameVolumeRenameReceipt)
                 try synchronizeMoveParents(source: s, destination: d)
                 return Self.committedMoveResult(
                     source: s,
@@ -495,26 +588,11 @@ public struct FilesystemToolPack: ToolPackHandling {
                 )
             }
         }
-        let renameError = forceCrossVolumeMove ? EXDEV : errno
-        guard renameError == EXDEV else {
-            let error = NSError(
-                domain: NSPOSIXErrorDomain,
-                code: Int(renameError),
-                userInfo: [NSFilePathErrorKey: s.path]
-            )
-            guard !createdDestinationDirectories.isEmpty else { throw error }
-            return Self.partialMoveResult(
-                source: s,
-                destination: d,
-                completedEntries: createdDestinationDirectories.count,
-                error: error,
-                createdDirectories: createdDestinationDirectories
-            )
-        }
 
         return try crossVolumeMove(
             source: s,
             destination: d,
+            expectedSourceIdentity: sourceIdentity,
             createdDestinationDirectories: createdDestinationDirectories,
             cancellation: cancellation
         )
@@ -523,6 +601,7 @@ public struct FilesystemToolPack: ToolPackHandling {
     private func crossVolumeMove(
         source: URL,
         destination: URL,
+        expectedSourceIdentity: PathIdentity,
         createdDestinationDirectories: [URL],
         cancellation: ToolCallCancellation?
     ) throws -> ToolResult {
@@ -553,6 +632,9 @@ public struct FilesystemToolPack: ToolPackHandling {
                 cancellation: cancellation,
                 deadline: operationDeadline
             )
+            guard sourceFence.entriesByRelativePath["."]?.pathIdentity == expectedSourceIdentity else {
+                throw SourceFenceError.changed
+            }
         } catch {
             return try prepublicationMoveFailureResult(
                 source: source,
@@ -568,16 +650,37 @@ public struct FilesystemToolPack: ToolPackHandling {
             ".forge-move-\(UUID().uuidString.lowercased())"
         )
         let staging = stagingRoot.appendingPathComponent("payload")
+        var pinnedStagingTree: PinnedDeletionTree?
+        var stagingPayloadInstalled = false
         defer {
-            let stagingExisted = (try? Self.itemType(at: stagingRoot).exists) == true
+            let stagingExisted = pinnedStagingTree.map(Self.conservativelyPinnedDeletionTreeExists)
+                ?? ((try? Self.itemType(at: stagingRoot).exists) == true)
             if stagingExisted {
                 do {
-                    try Self.discardPrivateStaging(
-                        at: stagingRoot,
-                        cancellation: cancellation,
-                        deadline: operationDeadline,
-                        stepObserver: moveStepObserver
-                    )
+                    if let pinnedStagingTree {
+                        if stagingPayloadInstalled {
+                            try Self.discardPublishedStagingRoot(
+                                pinnedStagingTree,
+                                cancellation: cancellation,
+                                deadline: operationDeadline,
+                                stepObserver: moveStepObserver
+                            )
+                        } else {
+                            try Self.discardPinnedDeletionTree(
+                                pinnedStagingTree,
+                                cancellation: cancellation,
+                                deadline: operationDeadline,
+                                stepObserver: moveStepObserver
+                            )
+                        }
+                    } else {
+                        try Self.discardPrivateStaging(
+                            at: stagingRoot,
+                            cancellation: cancellation,
+                            deadline: operationDeadline,
+                            stepObserver: moveStepObserver
+                        )
+                    }
                     try Self.checkMutationBoundary(
                         cancellation: cancellation,
                         deadline: operationDeadline
@@ -678,6 +781,7 @@ public struct FilesystemToolPack: ToolPackHandling {
             )
         }
 
+        let stagedRootIdentity: PathIdentity
         do {
             try Self.synchronizeTree(
                 at: staging,
@@ -709,6 +813,15 @@ public struct FilesystemToolPack: ToolPackHandling {
             guard stagedFence.copiedContent == sourceFence.copiedContent else {
                 throw SourceFenceError.changed
             }
+            guard let stagedRoot = stagedFence.entriesByRelativePath["."] else {
+                throw SourceFenceError.changed
+            }
+            stagedRootIdentity = stagedRoot.pathIdentity
+            pinnedStagingTree = try Self.pinnedDeletionTree(
+                at: stagingRoot,
+                cancellation: cancellation,
+                deadline: operationDeadline
+            )
         } catch {
             return try stagingFailureResult(
                 source: source,
@@ -721,25 +834,71 @@ public struct FilesystemToolPack: ToolPackHandling {
             )
         }
 
-        guard Self.renameExclusively(source: staging, destination: destination) == 0 else {
-            let installError = NSError(
-                domain: NSPOSIXErrorDomain,
-                code: Int(errno),
-                userInfo: [NSFilePathErrorKey: destination.path]
+        let installReceipt: PinnedRenameReceipt
+        do {
+            installReceipt = try Self.renameExclusively(
+                source: staging,
+                destination: destination,
+                expectedSourceIdentity: stagedRootIdentity,
+                beforeRename: {
+                    try Self.checkMutationBoundary(
+                        cancellation: cancellation,
+                        deadline: operationDeadline
+                    )
+                    moveStepObserver?(.beforeDestinationInstall)
+                    try Self.checkMutationBoundary(
+                        cancellation: cancellation,
+                        deadline: operationDeadline
+                    )
+                }
             )
+        } catch {
             return try stagingFailureResult(
                 source: source,
                 destination: destination,
                 stagingRoot: stagingRoot,
-                error: installError,
+                error: error,
                 createdDestinationDirectories: createdDestinationDirectories,
                 cancellation: cancellation,
-                deadline: operationDeadline
+                deadline: operationDeadline,
+                pinnedStagingTree: pinnedStagingTree
+            )
+        }
+        stagingPayloadInstalled = true
+        if !installReceipt.requestedNamespaceStable {
+            _ = try? Self.synchronizePinnedRenameParents(installReceipt)
+            if let pinnedStagingTree {
+                try? Self.discardPublishedStagingRoot(
+                    pinnedStagingTree,
+                    cancellation: nil,
+                    deadline: operationDeadline,
+                    stepObserver: moveStepObserver
+                )
+            }
+            return Self.namespaceChangedAfterRenameResult(
+                source: source,
+                destination: destination,
+                completedEntries: 1,
+                durabilityConfirmed: false,
+                createdDirectories: createdDestinationDirectories
             )
         }
         do {
-            try Self.discardPrivateStaging(
-                at: stagingRoot,
+            try Self.synchronizePinnedRenameParents(installReceipt)
+        } catch {
+            return Self.partialMoveResult(
+                source: source,
+                destination: destination,
+                completedEntries: 1,
+                error: error,
+                destinationComplete: true,
+                createdDirectories: createdDestinationDirectories
+            )
+        }
+        do {
+            guard let pinnedStagingTree else { throw SourceFenceError.changed }
+            try Self.discardPublishedStagingRoot(
+                pinnedStagingTree,
                 cancellation: cancellation,
                 deadline: operationDeadline,
                 stepObserver: moveStepObserver
@@ -754,7 +913,8 @@ public struct FilesystemToolPack: ToolPackHandling {
                 createdDirectories: createdDestinationDirectories
             )
             result.payload["staging_path"] = stagingRoot.path
-            let stagingExists = Self.pathEntryExists(stagingRoot)
+            let stagingExists = pinnedStagingTree.map(Self.conservativelyPinnedDeletionTreeExists)
+                ?? Self.pathEntryExists(stagingRoot)
             result.payload["staging_cleanup_required"] = stagingExists
             result.payload["staging_exists"] = stagingExists
             return result
@@ -834,27 +994,53 @@ public struct FilesystemToolPack: ToolPackHandling {
         }
 
         var expectedEntries = sourceFence.entriesByRelativePath
+        let sourceIdentities = expectedEntries.mapValues(\.pathIdentity)
+        guard let expectedRoot = expectedEntries["."] else {
+            return Self.sourceFencePartialResult(
+                source: source,
+                destination: destination,
+                completedEntries: 0,
+                error: SourceFenceError.changed,
+                createdDirectories: createdDestinationDirectories
+            )
+        }
+        let pinnedSourceRoot: PinnedTreeRoot
+        do {
+            pinnedSourceRoot = try Self.pinnedTreeRoot(
+                at: source,
+                expectedIdentity: expectedRoot.pathIdentity
+            )
+        } catch {
+            return Self.sourceFencePartialResult(
+                source: source,
+                destination: destination,
+                completedEntries: 0,
+                error: error,
+                createdDirectories: createdDestinationDirectories
+            )
+        }
         var hardLinkGroups = sourceFence.hardLinkGroups
         var removedCount = 0
         for entry in plan {
             do {
-                // This per-entry content/identity check narrows the replacement
-                // window immediately before unlink/rmdir. Fully eliminating the
-                // remaining syscall-sized race requires a descriptor-relative
-                // openat/unlinkat traversal that pins every intermediate parent.
-                let relativePath = try Self.verifiedDeletionCandidate(
+                let relativePath = try Self.removeVerifiedDeletionCandidate(
                     entry,
-                    sourceRoot: source,
+                    pinnedRoot: pinnedSourceRoot,
                     expectedByRelativePath: expectedEntries,
+                    expectedIdentities: sourceIdentities,
                     hardLinkGroups: hardLinkGroups,
                     cancellation: cancellation,
-                    deadline: operationDeadline
+                    deadline: operationDeadline,
+                    beforeRemoval: {
+                        moveStepObserver?(.beforeSourceEntryRemoval(entry.relativePath))
+                    }
                 )
-                try Self.removeEntry(entry)
                 removedCount += 1
                 try Self.reconcileExpectedLinkStateAfterRemoval(
                     removedRelativePath: relativePath,
                     sourceRoot: source,
+                    pinnedRoot: pinnedSourceRoot,
+                    expectedIdentities: sourceIdentities,
                     expectedByRelativePath: &expectedEntries,
                     hardLinkGroups: &hardLinkGroups,
                     stepObserver: moveStepObserver,
@@ -892,9 +1078,48 @@ public struct FilesystemToolPack: ToolPackHandling {
         )
     }
 
+    private struct PathIdentity: Equatable {
+        let device: Int64
+        let inode: UInt64
+        let mode: UInt32
+        let owner: UInt32
+        let group: UInt32
+
+        init(device: Int64, inode: UInt64, mode: UInt32, owner: UInt32, group: UInt32) {
+            self.device = device
+            self.inode = inode
+            self.mode = mode
+            self.owner = owner
+            self.group = group
+        }
+
+        init(_ information: stat) {
+            device = Int64(information.st_dev)
+            inode = UInt64(information.st_ino)
+            mode = UInt32(information.st_mode)
+            owner = UInt32(information.st_uid)
+            group = UInt32(information.st_gid)
+        }
+
+        var isDirectory: Bool {
+            mode & UInt32(S_IFMT) == UInt32(S_IFDIR)
+        }
+
+        func matches(_ information: stat) -> Bool {
+            device == Int64(information.st_dev)
+                && inode == UInt64(information.st_ino)
+                && mode == UInt32(information.st_mode)
+                && owner == UInt32(information.st_uid)
+                && group == UInt32(information.st_gid)
+        }
+    }
+
     private struct DeletionEntry {
-        var url: URL
-        var isDirectory: Bool
+        let url: URL
+        let relativePath: String
+        let identity: PathIdentity
+
+        var isDirectory: Bool { identity.isDirectory }
     }
 
     private enum FilesystemMutationError: Error {
@@ -935,6 +1160,16 @@ public struct FilesystemToolPack: ToolPackHandling {
                 permissions: mode & 0o7777,
                 size: kind == .directory ? 0 : size,
                 contentSHA256: contentSHA256
+            )
+        }
+
+        var pathIdentity: PathIdentity {
+            PathIdentity(
+                device: device,
+                inode: inode,
+                mode: mode,
+                owner: owner,
+                group: group
             )
         }
 
@@ -1066,23 +1301,271 @@ public struct FilesystemToolPack: ToolPackHandling {
         }
     }
 
+    private final class PinnedFileDescriptor {
+        let rawValue: Int32
+
+        init(_ rawValue: Int32) {
+            self.rawValue = rawValue
+        }
+
+        deinit {
+            _ = Darwin.close(rawValue)
+        }
+    }
+
+    private struct PinnedPathParent {
+        let directory: PinnedFileDescriptor
+        let entryName: String
+        let path: URL
+        let identity: PathIdentity
+    }
+
+    private struct PinnedTreeRoot {
+        let parent: PinnedPathParent
+        let directory: PinnedFileDescriptor?
+    }
+
+    private struct PinnedDeletionTree {
+        let plan: [DeletionEntry]
+        let root: PinnedTreeRoot
+        let expectedIdentities: [String: PathIdentity]
+    }
+
+    private struct PinnedRenameReceipt {
+        let sourceParent: PinnedPathParent
+        let destinationParent: PinnedPathParent
+        let requestedNamespaceStable: Bool
+    }
+
+    private static func pinnedDirectory(at directory: URL) throws -> PinnedFileDescriptor {
+        let requestedDirectory = directory.standardizedFileURL
+        var resolvedBuffer = [CChar](repeating: 0, count: Int(PATH_MAX) + 1)
+        let resolvedPointer = requestedDirectory.path.withCString {
+            Darwin.realpath($0, &resolvedBuffer)
+        }
+        guard resolvedPointer != nil else {
+            throw posixError(errno, path: requestedDirectory.path)
+        }
+        let resolvedPath = String(cString: resolvedBuffer)
+        guard resolvedPath.hasPrefix("/") else {
+            throw posixError(EINVAL, path: resolvedPath)
+        }
+        let rootDescriptor = "/".withCString {
+            Darwin.open($0, O_SEARCH | O_CLOEXEC | O_NOFOLLOW_ANY)
+        }
+        guard rootDescriptor >= 0 else {
+            throw posixError(errno, path: "/")
+        }
+        var current = PinnedFileDescriptor(rootDescriptor)
+        var traversedPath = ""
+        for componentSlice in resolvedPath.split(separator: "/") {
+            let component = String(componentSlice)
+            guard !component.isEmpty, component != ".", component != ".." else {
+                throw posixError(EINVAL, path: resolvedPath)
+            }
+            let nextDescriptor = component.withCString {
+                Darwin.openat(
+                    current.rawValue,
+                    $0,
+                    O_SEARCH | O_CLOEXEC | O_NOFOLLOW_ANY | O_RESOLVE_BENEATH
+                )
+            }
+            traversedPath += "/" + component
+            guard nextDescriptor >= 0 else {
+                throw posixError(errno, path: traversedPath)
+            }
+            current = PinnedFileDescriptor(nextDescriptor)
+        }
+        return current
+    }
+
+    private static func pinnedParent(of url: URL) throws -> PinnedPathParent {
+        let standardizedURL = url.standardizedFileURL
+        let entryName = standardizedURL.lastPathComponent
+        guard standardizedURL.path != "/",
+              !entryName.isEmpty,
+              entryName != ".",
+              entryName != "..",
+              !entryName.contains("/") else {
+            throw posixError(EINVAL, path: standardizedURL.path)
+        }
+        let parentPath = standardizedURL.deletingLastPathComponent().standardizedFileURL
+        let directory = try pinnedDirectory(at: parentPath)
+        var directoryInformation = stat()
+        guard Darwin.fstat(directory.rawValue, &directoryInformation) == 0 else {
+            throw posixError(errno, path: parentPath.path)
+        }
+        return PinnedPathParent(
+            directory: directory,
+            entryName: entryName,
+            path: parentPath,
+            identity: PathIdentity(directoryInformation)
+        )
+    }
+
+    private static func pinnedParentStillNamesSameDirectory(_ parent: PinnedPathParent) -> Bool {
+        do {
+            let current = try pinnedDirectory(at: parent.path)
+            var information = stat()
+            return Darwin.fstat(current.rawValue, &information) == 0
+                && parent.identity.matches(information)
+        } catch {
+            return false
+        }
+    }
+
+    private static func pinnedTreeRoot(
+        at root: URL,
+        expectedIdentity: PathIdentity
+    ) throws -> PinnedTreeRoot {
+        let parent = try pinnedParent(of: root)
+        let pathInformation = try fstatatInformation(
+            parentDescriptor: parent.directory.rawValue,
+            entryName: parent.entryName
+        )
+        guard expectedIdentity.matches(pathInformation) else {
+            throw SourceFenceError.changed
+        }
+        guard expectedIdentity.isDirectory else {
+            return PinnedTreeRoot(parent: parent, directory: nil)
+        }
+        let rootDescriptor = parent.entryName.withCString {
+            Darwin.openat(
+                parent.directory.rawValue,
+                $0,
+                O_SEARCH | O_CLOEXEC | O_NOFOLLOW | O_RESOLVE_BENEATH
+            )
+        }
+        guard rootDescriptor >= 0 else {
+            throw posixError(errno, path: root.path)
+        }
+        let pinnedRoot = PinnedFileDescriptor(rootDescriptor)
+        var openedInformation = stat()
+        guard Darwin.fstat(pinnedRoot.rawValue, &openedInformation) == 0,
+              expectedIdentity.matches(openedInformation) else {
+            throw SourceFenceError.changed
+        }
+        return PinnedTreeRoot(
+            parent: parent,
+            directory: pinnedRoot
+        )
+    }
+
+    private static func withPinnedEntryParent<Value>(
+        relativePath: String,
+        root: PinnedTreeRoot,
+        expectedIdentities: [String: PathIdentity],
+        _ operation: (Int32, String) throws -> Value
+    ) throws -> Value {
+        if relativePath == "." {
+            return try withExtendedLifetime(root.parent.directory) {
+                try operation(root.parent.directory.rawValue, root.parent.entryName)
+            }
+        }
+        let components = relativePath.split(separator: "/", omittingEmptySubsequences: false)
+            .map(String.init)
+        guard let entryName = components.last,
+              !entryName.isEmpty,
+              entryName != ".",
+              entryName != "..",
+              let rootDirectory = root.directory else {
+            throw SourceFenceError.changed
+        }
+
+        return try withExtendedLifetime(rootDirectory) {
+            var currentDescriptor = rootDirectory.rawValue
+            var ownedDirectory: PinnedFileDescriptor?
+            var traversed: [String] = []
+            for component in components.dropLast() {
+                guard !component.isEmpty, component != ".", component != ".." else {
+                    throw SourceFenceError.changed
+                }
+                traversed.append(component)
+                let nextDescriptor = component.withCString {
+                    Darwin.openat(
+                        currentDescriptor,
+                        $0,
+                        O_SEARCH | O_CLOEXEC | O_NOFOLLOW_ANY | O_RESOLVE_BENEATH
+                    )
+                }
+                guard nextDescriptor >= 0 else { throw SourceFenceError.changed }
+                let nextDirectory = PinnedFileDescriptor(nextDescriptor)
+                var directoryInformation = stat()
+                let traversedPath = traversed.joined(separator: "/")
+                guard Darwin.fstat(nextDirectory.rawValue, &directoryInformation) == 0,
+                      let expected = expectedIdentities[traversedPath],
+                      expected.isDirectory,
+                      expected.matches(directoryInformation) else {
+                    throw SourceFenceError.changed
+                }
+                ownedDirectory = nextDirectory
+                currentDescriptor = nextDirectory.rawValue
+            }
+            return try withExtendedLifetime(ownedDirectory) {
+                try operation(currentDescriptor, entryName)
+            }
+        }
+    }
+
+    private static func fstatatInformation(
+        parentDescriptor: Int32,
+        entryName: String
+    ) throws -> stat {
+        var information = stat()
+        let result = entryName.withCString {
+            Darwin.fstatat(parentDescriptor, $0, &information, AT_SYMLINK_NOFOLLOW)
+        }
+        guard result == 0 else {
+            throw posixError(errno, path: entryName)
+        }
+        return information
+    }
+
+    private static func fstatatInformationIfExists(
+        parentDescriptor: Int32,
+        entryName: String
+    ) throws -> stat? {
+        var information = stat()
+        let result = entryName.withCString {
+            Darwin.fstatat(parentDescriptor, $0, &information, AT_SYMLINK_NOFOLLOW)
+        }
+        guard result == 0 else {
+            if errno == ENOENT { return nil }
+            throw posixError(errno, path: entryName)
+        }
+        return information
+    }
+
+    private static func posixError(_ code: Int32, path: String) -> NSError {
+        NSError(
+            domain: NSPOSIXErrorDomain,
+            code: Int(code),
+            userInfo: [NSFilePathErrorKey: path]
+        )
+    }
+
     private static func recursiveDeletionPlan(
         at root: URL,
         cancellation: ToolCallCancellation?,
         deadline: TimeInterval? = nil
     ) throws -> [DeletionEntry] {
         try checkMutationBoundary(cancellation: cancellation, deadline: deadline)
-        let rootType = try itemType(at: root)
-        guard rootType.exists else {
+        let standardizedRoot = root.standardizedFileURL
+        guard let rootInformation = try lstatInformationIfExists(at: standardizedRoot) else {
             throw CocoaError(.fileNoSuchFile)
         }
-        guard rootType.isDirectory else {
-            return [DeletionEntry(url: root, isDirectory: false)]
+        let rootEntry = DeletionEntry(
+            url: standardizedRoot,
+            relativePath: ".",
+            identity: PathIdentity(rootInformation)
+        )
+        guard rootEntry.isDirectory else {
+            return [rootEntry]
         }
 
         var enumerationError: Error?
         guard let enumerator = FileManager.default.enumerator(
-            at: root,
+            at: standardizedRoot,
             includingPropertiesForKeys: nil,
             options: [],
             errorHandler: { _, error in
@@ -1096,10 +1579,17 @@ public struct FilesystemToolPack: ToolPackHandling {
         entries.reserveCapacity(min(1_024, Self.maximumRecursiveMutationEntries))
         while let child = enumerator.nextObject() as? URL {
             try checkMutationBoundary(cancellation: cancellation, deadline: deadline)
-            let type = try itemType(at: child)
-            guard type.exists else { continue }
-            if !type.isDirectory { enumerator.skipDescendants() }
-            entries.append(DeletionEntry(url: child, isDirectory: type.isDirectory))
+            let standardizedChild = child.standardizedFileURL
+            guard let childInformation = try lstatInformationIfExists(at: standardizedChild) else {
+                continue
+            }
+            let entry = DeletionEntry(
+                url: standardizedChild,
+                relativePath: try sourceRelativePath(for: standardizedChild, root: standardizedRoot),
+                identity: PathIdentity(childInformation)
+            )
+            if !entry.isDirectory { enumerator.skipDescendants() }
+            entries.append(entry)
             if entries.count == Self.maximumRecursiveMutationEntries - 1 {
                 guard enumerator.nextObject() == nil else {
                     throw FilesystemMutationError.entryLimitExceeded
@@ -1108,7 +1598,7 @@ public struct FilesystemToolPack: ToolPackHandling {
             }
         }
         if let enumerationError { throw enumerationError }
-        entries.append(DeletionEntry(url: root, isDirectory: true))
+        entries.append(rootEntry)
         entries.sort {
             let leftDepth = $0.url.pathComponents.count
             let rightDepth = $1.url.pathComponents.count
@@ -1117,6 +1607,86 @@ public struct FilesystemToolPack: ToolPackHandling {
             return $0.url.path > $1.url.path
         }
         return entries
+    }
+
+    private static func pinnedDeletionTree(
+        at root: URL,
+        cancellation: ToolCallCancellation?,
+        deadline: TimeInterval
+    ) throws -> PinnedDeletionTree {
+        let plan = try recursiveDeletionPlan(
+            at: root,
+            cancellation: cancellation,
+            deadline: deadline
+        )
+        guard let rootEntry = plan.first(where: { $0.relativePath == "." }) else {
+            throw SourceFenceError.changed
+        }
+        let expectedIdentities = Dictionary(
+            uniqueKeysWithValues: plan.map { ($0.relativePath, $0.identity) }
+        )
+        return PinnedDeletionTree(
+            plan: plan,
+            root: try pinnedTreeRoot(at: root, expectedIdentity: rootEntry.identity),
+            expectedIdentities: expectedIdentities
+        )
+    }
+
+    private static func pinnedDeletionTreeExists(_ tree: PinnedDeletionTree) throws -> Bool {
+        guard let rootEntry = tree.plan.first(where: { $0.relativePath == "." }) else {
+            throw SourceFenceError.changed
+        }
+        guard let information = try fstatatInformationIfExists(
+            parentDescriptor: tree.root.parent.directory.rawValue,
+            entryName: tree.root.parent.entryName
+        ) else { return false }
+        return rootEntry.identity.matches(information)
+    }
+
+    private static func conservativelyPinnedDeletionTreeExists(_ tree: PinnedDeletionTree) -> Bool {
+        (try? pinnedDeletionTreeExists(tree)) ?? true
+    }
+
+    private static func discardPinnedDeletionTree(
+        _ tree: PinnedDeletionTree,
+        cancellation: ToolCallCancellation?,
+        deadline: TimeInterval,
+        stepObserver: (@Sendable (MoveStep) -> Void)?
+    ) throws {
+        do {
+            for (index, entry) in tree.plan.enumerated() {
+                try checkMutationBoundary(cancellation: cancellation, deadline: deadline)
+                try removeEntry(
+                    entry,
+                    root: tree.root,
+                    expectedIdentities: tree.expectedIdentities
+                )
+                stepObserver?(.removedStagingEntry(index + 1))
+            }
+        } catch {
+            _ = try? synchronizePinnedDirectory(tree.root.parent)
+            throw error
+        }
+        try synchronizePinnedDirectory(tree.root.parent)
+    }
+
+    private static func discardPublishedStagingRoot(
+        _ tree: PinnedDeletionTree,
+        cancellation: ToolCallCancellation?,
+        deadline: TimeInterval,
+        stepObserver: (@Sendable (MoveStep) -> Void)?
+    ) throws {
+        try checkMutationBoundary(cancellation: cancellation, deadline: deadline)
+        guard let rootEntry = tree.plan.first(where: { $0.relativePath == "." }) else {
+            throw SourceFenceError.changed
+        }
+        try removeEntry(
+            rootEntry,
+            root: tree.root,
+            expectedIdentities: tree.expectedIdentities
+        )
+        stepObserver?(.removedStagingEntry(1))
+        try synchronizePinnedDirectory(tree.root.parent)
     }
 
     private static func checkMutationBoundary(
@@ -1140,20 +1710,34 @@ public struct FilesystemToolPack: ToolPackHandling {
             cancellation: cancellation,
             deadline: deadline
         )
+        guard let rootEntry = plan.first(where: { $0.relativePath == "." }) else {
+            throw SourceFenceError.changed
+        }
+        let expectedIdentities = Dictionary(
+            uniqueKeysWithValues: plan.map { ($0.relativePath, $0.identity) }
+        )
+        let pinnedRoot = try pinnedTreeRoot(
+            at: standardizedRoot,
+            expectedIdentity: rootEntry.identity
+        )
         var entries: [SourceFenceEntry] = []
         entries.reserveCapacity(plan.count)
-        for deletionEntry in plan.sorted(by: { $0.url.path < $1.url.path }) {
+        for deletionEntry in plan.sorted(by: { $0.relativePath < $1.relativePath }) {
             try checkMutationBoundary(cancellation: cancellation, deadline: deadline)
-            let relativePath = try sourceRelativePath(
-                for: deletionEntry.url.standardizedFileURL,
-                root: standardizedRoot
-            )
-            entries.append(try captureSourceFenceEntry(
-                at: deletionEntry.url,
-                relativePath: relativePath,
-                cancellation: cancellation,
-                deadline: deadline
-            ))
+            entries.append(try withPinnedEntryParent(
+                relativePath: deletionEntry.relativePath,
+                root: pinnedRoot,
+                expectedIdentities: expectedIdentities
+            ) { parentDescriptor, entryName in
+                try captureSourceFenceEntry(
+                    parentDescriptor: parentDescriptor,
+                    entryName: entryName,
+                    displayPath: deletionEntry.url.path,
+                    relativePath: deletionEntry.relativePath,
+                    cancellation: cancellation,
+                    deadline: deadline
+                )
+            })
         }
         return SourceFence(entries: entries)
     }
@@ -1180,19 +1764,18 @@ public struct FilesystemToolPack: ToolPackHandling {
         }
     }
 
-    private static func verifiedDeletionCandidate(
+    private static func removeVerifiedDeletionCandidate(
         _ deletionEntry: DeletionEntry,
-        sourceRoot: URL,
+        pinnedRoot: PinnedTreeRoot,
         expectedByRelativePath: [String: SourceFenceEntry],
+        expectedIdentities: [String: PathIdentity],
         hardLinkGroups: [SourceFenceIdentity: HardLinkGroupState],
         cancellation: ToolCallCancellation?,
-        deadline: TimeInterval
+        deadline: TimeInterval,
+        beforeRemoval: () -> Void
     ) throws -> String {
         do {
-            let relativePath = try sourceRelativePath(
-                for: deletionEntry.url.standardizedFileURL,
-                root: sourceRoot.standardizedFileURL
-            )
+            let relativePath = deletionEntry.relativePath
             guard let recorded = expectedByRelativePath[relativePath] else {
                 throw SourceFenceError.changed
             }
@@ -1215,16 +1798,34 @@ public struct FilesystemToolPack: ToolPackHandling {
                     expected = recorded
                 }
             }
-            let actual = try captureSourceFenceEntry(
-                at: deletionEntry.url,
+            return try withPinnedEntryParent(
                 relativePath: relativePath,
-                cancellation: cancellation,
-                deadline: deadline
-            )
-            guard expected.matchesDeletionCandidate(actual) else {
-                throw SourceFenceError.changed
+                root: pinnedRoot,
+                expectedIdentities: expectedIdentities
+            ) { parentDescriptor, entryName in
+                beforeRemoval()
+                let actual = try captureSourceFenceEntry(
+                    parentDescriptor: parentDescriptor,
+                    entryName: entryName,
+                    displayPath: deletionEntry.url.path,
+                    relativePath: relativePath,
+                    cancellation: cancellation,
+                    deadline: deadline
+                )
+                guard expected.matchesDeletionCandidate(actual) else {
+                    throw SourceFenceError.changed
+                }
+                let flags = deletionEntry.isDirectory
+                    ? AT_REMOVEDIR
+                    : 0
+                let result = entryName.withCString {
+                    Darwin.unlinkat(parentDescriptor, $0, flags)
+                }
+                guard result == 0 else {
+                    throw posixError(errno, path: deletionEntry.url.path)
+                }
+                return relativePath
             }
-            return relativePath
         } catch is CancellationError {
             throw CancellationError()
         } catch let error as ToolCallDeadlineExceeded {
@@ -1237,6 +1838,8 @@ public struct FilesystemToolPack: ToolPackHandling {
     private static func reconcileExpectedLinkStateAfterRemoval(
         removedRelativePath: String,
         sourceRoot: URL,
+        pinnedRoot: PinnedTreeRoot,
+        expectedIdentities: [String: PathIdentity],
         expectedByRelativePath: inout [String: SourceFenceEntry],
         hardLinkGroups: inout [SourceFenceIdentity: HardLinkGroupState],
         stepObserver: (@Sendable (MoveStep) -> Void)?,
@@ -1259,12 +1862,20 @@ public struct FilesystemToolPack: ToolPackHandling {
         let representativeURL = representativePath == "."
             ? standardizedRoot
             : standardizedRoot.appendingPathComponent(representativePath)
-        let actual = try captureSourceFenceEntry(
-            at: representativeURL,
+        let actual = try withPinnedEntryParent(
             relativePath: representativePath,
-            cancellation: cancellation,
-            deadline: deadline
-        )
+            root: pinnedRoot,
+            expectedIdentities: expectedIdentities
+        ) { parentDescriptor, entryName in
+            try captureSourceFenceEntry(
+                parentDescriptor: parentDescriptor,
+                entryName: entryName,
+                displayPath: representativeURL.path,
+                relativePath: representativePath,
+                cancellation: cancellation,
+                deadline: deadline
+            )
+        }
         let expectedLinkCount = group.linkCount - 1
         guard let recordedRepresentative = expectedByRelativePath[representativePath] else {
             throw SourceFenceError.changed
@@ -1290,17 +1901,25 @@ public struct FilesystemToolPack: ToolPackHandling {
     }
 
     private static func captureSourceFenceEntry(
-        at url: URL,
+        parentDescriptor: Int32,
+        entryName: String,
+        displayPath: String,
         relativePath: String,
         cancellation: ToolCallCancellation?,
         deadline: TimeInterval
     ) throws -> SourceFenceEntry {
         try checkMutationBoundary(cancellation: cancellation, deadline: deadline)
-        let initialPathInformation = try lstatInformation(at: url)
+        let initialPathInformation = try fstatatInformation(
+            parentDescriptor: parentDescriptor,
+            entryName: entryName
+        )
         let kindBits = initialPathInformation.st_mode & S_IFMT
 
         if kindBits == S_IFDIR {
-            let finalPathInformation = try lstatInformation(at: url)
+            let finalPathInformation = try fstatatInformation(
+                parentDescriptor: parentDescriptor,
+                entryName: entryName
+            )
             guard stableMetadataMatches(initialPathInformation, finalPathInformation) else {
                 throw SourceFenceError.changed
             }
@@ -1315,15 +1934,18 @@ public struct FilesystemToolPack: ToolPackHandling {
         if kindBits == S_IFLNK {
             var target = [UInt8](repeating: 0, count: Int(PATH_MAX) + 1)
             let count = target.withUnsafeMutableBytes { bytes in
-                url.path.withCString {
-                    Darwin.readlink($0, bytes.baseAddress, bytes.count)
+                entryName.withCString {
+                    Darwin.readlinkat(parentDescriptor, $0, bytes.baseAddress, bytes.count)
                 }
             }
             guard count >= 0, count < target.count else {
                 throw SourceFenceError.changed
             }
             try checkMutationBoundary(cancellation: cancellation, deadline: deadline)
-            let finalPathInformation = try lstatInformation(at: url)
+            let finalPathInformation = try fstatatInformation(
+                parentDescriptor: parentDescriptor,
+                entryName: entryName
+            )
             guard stableMetadataMatches(initialPathInformation, finalPathInformation),
                   Int64(count) == finalPathInformation.st_size else {
                 throw SourceFenceError.changed
@@ -1340,10 +1962,14 @@ public struct FilesystemToolPack: ToolPackHandling {
         }
 
         guard kindBits == S_IFREG else {
-            throw SourceFenceError.unsupported(url.path)
+            throw SourceFenceError.unsupported(displayPath)
         }
-        let descriptor = url.path.withCString {
-            Darwin.open($0, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW)
+        let descriptor = entryName.withCString {
+            Darwin.openat(
+                parentDescriptor,
+                $0,
+                O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW | O_RESOLVE_BENEATH
+            )
         }
         guard descriptor >= 0 else { throw SourceFenceError.changed }
         defer { _ = Darwin.close(descriptor) }
@@ -1376,7 +2002,10 @@ public struct FilesystemToolPack: ToolPackHandling {
               stableMetadataMatches(openedInformation, finalDescriptorInformation) else {
             throw SourceFenceError.changed
         }
-        let finalPathInformation = try lstatInformation(at: url)
+        let finalPathInformation = try fstatatInformation(
+            parentDescriptor: parentDescriptor,
+            entryName: entryName
+        )
         guard stableMetadataMatches(finalDescriptorInformation, finalPathInformation) else {
             throw SourceFenceError.changed
         }
@@ -1435,6 +2064,15 @@ public struct FilesystemToolPack: ToolPackHandling {
                 code: Int(errno),
                 userInfo: [NSFilePathErrorKey: url.path]
             )
+        }
+        return information
+    }
+
+    private static func lstatInformationIfExists(at url: URL) throws -> stat? {
+        var information = stat()
+        guard url.path.withCString({ Darwin.lstat($0, &information) }) == 0 else {
+            if errno == ENOENT { return nil }
+            throw posixError(errno, path: url.path)
         }
         return information
     }
@@ -1542,6 +2180,27 @@ public struct FilesystemToolPack: ToolPackHandling {
         return ToolResult(ok: true, payload: payload, isError: false)
     }
 
+    private static func namespaceChangedAfterRenameResult(
+        source: URL,
+        destination: URL,
+        completedEntries: Int,
+        durabilityConfirmed: Bool,
+        createdDirectories: [URL]
+    ) -> ToolResult {
+        var result = partialMoveResult(
+            source: source,
+            destination: destination,
+            completedEntries: completedEntries,
+            error: SourceFenceError.changed,
+            destinationComplete: false,
+            createdDirectories: createdDirectories
+        )
+        result.payload["committed"] = true
+        result.payload["requested_namespace_stable"] = false
+        result.payload["durability_confirmed"] = durabilityConfirmed
+        return result
+    }
+
     private static func itemType(at url: URL) throws -> (exists: Bool, isDirectory: Bool) {
         var information = stat()
         guard url.path.withCString({ Darwin.lstat($0, &information) }) == 0 else {
@@ -1559,30 +2218,126 @@ public struct FilesystemToolPack: ToolPackHandling {
         (try? itemType(at: url).exists) == true
     }
 
-    private static func removeEntry(_ entry: DeletionEntry) throws {
-        let result = entry.isDirectory
-            ? entry.url.path.withCString { Darwin.rmdir($0) }
-            : entry.url.path.withCString { Darwin.unlink($0) }
-        guard result == 0 else {
-            throw NSError(
-                domain: NSPOSIXErrorDomain,
-                code: Int(errno),
-                userInfo: [NSFilePathErrorKey: entry.url.path]
+    private static func removeEntry(
+        _ entry: DeletionEntry,
+        root: PinnedTreeRoot,
+        expectedIdentities: [String: PathIdentity],
+        beforeRemoval: () -> Void = {}
+    ) throws {
+        try withPinnedEntryParent(
+            relativePath: entry.relativePath,
+            root: root,
+            expectedIdentities: expectedIdentities
+        ) { parentDescriptor, entryName in
+            beforeRemoval()
+            let information = try fstatatInformation(
+                parentDescriptor: parentDescriptor,
+                entryName: entryName
             )
+            guard entry.identity.matches(information) else {
+                throw SourceFenceError.changed
+            }
+            let flags = entry.isDirectory
+                ? AT_REMOVEDIR
+                : 0
+            let result = entryName.withCString {
+                Darwin.unlinkat(parentDescriptor, $0, flags)
+            }
+            guard result == 0 else {
+                throw posixError(errno, path: entry.url.path)
+            }
         }
     }
 
-    private static func renameExclusively(source: URL, destination: URL) -> Int32 {
-        source.path.withCString { sourcePath in
-            destination.path.withCString { destinationPath in
-                Darwin.renameatx_np(
-                    AT_FDCWD,
-                    sourcePath,
-                    AT_FDCWD,
-                    destinationPath,
-                    UInt32(RENAME_EXCL)
-                )
+    private static func renameExclusively(
+        source: URL,
+        destination: URL,
+        expectedSourceIdentity: PathIdentity,
+        beforeRename: () throws -> Void
+    ) throws -> PinnedRenameReceipt {
+        let sourceParent = try pinnedParent(of: source)
+
+        func performRename(destinationParent: PinnedPathParent) throws -> PinnedRenameReceipt {
+            try beforeRename()
+            guard pinnedParentStillNamesSameDirectory(sourceParent),
+                  pinnedParentStillNamesSameDirectory(destinationParent) else {
+                throw SourceFenceError.changed
             }
+            let sourceInformation = try fstatatInformation(
+                parentDescriptor: sourceParent.directory.rawValue,
+                entryName: sourceParent.entryName
+            )
+            guard expectedSourceIdentity.matches(sourceInformation) else {
+                throw SourceFenceError.changed
+            }
+            let result = sourceParent.entryName.withCString { sourceName in
+                destinationParent.entryName.withCString { destinationName in
+                    Darwin.renameatx_np(
+                        sourceParent.directory.rawValue,
+                        sourceName,
+                        destinationParent.directory.rawValue,
+                        destinationName,
+                        UInt32(RENAME_EXCL)
+                    )
+                }
+            }
+            guard result == 0 else {
+                throw posixError(errno, path: destination.path)
+            }
+            let destinationIdentityMatches: Bool
+            do {
+                destinationIdentityMatches = expectedSourceIdentity.matches(
+                    try fstatatInformation(
+                        parentDescriptor: destinationParent.directory.rawValue,
+                        entryName: destinationParent.entryName
+                    )
+                )
+            } catch {
+                destinationIdentityMatches = false
+            }
+            let sourceNameIsVacant: Bool
+            do {
+                sourceNameIsVacant = try fstatatInformationIfExists(
+                    parentDescriptor: sourceParent.directory.rawValue,
+                    entryName: sourceParent.entryName
+                ) == nil
+            } catch {
+                sourceNameIsVacant = false
+            }
+            let requestedNamespaceStable = pinnedParentStillNamesSameDirectory(sourceParent)
+                && pinnedParentStillNamesSameDirectory(destinationParent)
+                && destinationIdentityMatches
+                && sourceNameIsVacant
+            return PinnedRenameReceipt(
+                sourceParent: sourceParent,
+                destinationParent: destinationParent,
+                requestedNamespaceStable: requestedNamespaceStable
+            )
+        }
+
+        if sourceParent.path == destination.deletingLastPathComponent().standardizedFileURL {
+            let destinationParent = PinnedPathParent(
+                directory: sourceParent.directory,
+                entryName: destination.lastPathComponent,
+                path: sourceParent.path,
+                identity: sourceParent.identity
+            )
+            return try performRename(destinationParent: destinationParent)
+        } else {
+            return try performRename(destinationParent: pinnedParent(of: destination))
+        }
+    }
+
+    private static func synchronizePinnedRenameParents(_ receipt: PinnedRenameReceipt) throws {
+        try synchronizePinnedDirectory(receipt.destinationParent)
+        if receipt.sourceParent.identity != receipt.destinationParent.identity {
+            try synchronizePinnedDirectory(receipt.sourceParent)
+        }
+    }
+
+    private static func synchronizePinnedDirectory(_ parent: PinnedPathParent) throws {
+        guard Darwin.fsync(parent.directory.rawValue) == 0 else {
+            throw posixError(errno, path: parent.path.path)
         }
     }
 
@@ -1676,9 +2431,23 @@ public struct FilesystemToolPack: ToolPackHandling {
             cancellation: cancellation,
             deadline: deadline
         )
+        guard let rootEntry = plan.first(where: { $0.relativePath == "." }) else {
+            throw SourceFenceError.changed
+        }
+        let expectedIdentities = Dictionary(
+            uniqueKeysWithValues: plan.map { ($0.relativePath, $0.identity) }
+        )
+        let pinnedRoot = try pinnedTreeRoot(
+            at: staging,
+            expectedIdentity: rootEntry.identity
+        )
         for (index, entry) in plan.enumerated() {
             try checkMutationBoundary(cancellation: cancellation, deadline: deadline)
-            try removeEntry(entry)
+            try removeEntry(
+                entry,
+                root: pinnedRoot,
+                expectedIdentities: expectedIdentities
+            )
             stepObserver?(.removedStagingEntry(index + 1))
         }
     }
@@ -1690,17 +2459,28 @@ public struct FilesystemToolPack: ToolPackHandling {
         error: Error,
         createdDestinationDirectories: [URL],
         cancellation: ToolCallCancellation?,
-        deadline: TimeInterval
+        deadline: TimeInterval,
+        pinnedStagingTree: PinnedDeletionTree? = nil
     ) throws -> ToolResult {
-        let stagingExistedBeforeCleanup = Self.pathEntryExists(stagingRoot)
+        let stagingExistedBeforeCleanup = pinnedStagingTree.map(Self.conservativelyPinnedDeletionTreeExists)
+            ?? Self.pathEntryExists(stagingRoot)
         do {
             if stagingExistedBeforeCleanup {
-                try Self.discardPrivateStaging(
-                    at: stagingRoot,
-                    cancellation: cancellation,
-                    deadline: deadline,
-                    stepObserver: moveStepObserver
-                )
+                if let pinnedStagingTree {
+                    try Self.discardPinnedDeletionTree(
+                        pinnedStagingTree,
+                        cancellation: cancellation,
+                        deadline: deadline,
+                        stepObserver: moveStepObserver
+                    )
+                } else {
+                    try Self.discardPrivateStaging(
+                        at: stagingRoot,
+                        cancellation: cancellation,
+                        deadline: deadline,
+                        stepObserver: moveStepObserver
+                    )
+                }
                 try Self.checkMutationBoundary(cancellation: cancellation, deadline: deadline)
                 try directorySynchronizer(destination.deletingLastPathComponent())
                 try Self.checkMutationBoundary(cancellation: cancellation, deadline: deadline)
@@ -1720,7 +2500,8 @@ public struct FilesystemToolPack: ToolPackHandling {
                 createdDirectories: createdDestinationDirectories
             )
             result.payload["staging_path"] = stagingRoot.path
-            let stagingExists = Self.pathEntryExists(stagingRoot)
+            let stagingExists = pinnedStagingTree.map(Self.conservativelyPinnedDeletionTreeExists)
+                ?? Self.pathEntryExists(stagingRoot)
             result.payload["staging_cleanup_required"] = stagingExists
             result.payload["staging_exists"] = stagingExists
             result.payload["staging_cleanup_error"] = cleanupError.localizedDescription

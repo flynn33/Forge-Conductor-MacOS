@@ -1,0 +1,235 @@
+[0/1] Planning build
+Building for debugging...
+[0/12] Write swift-version--58304C5D6DBC2206.txt
+[2/114] Emitting module ForgeRuntimeLauncher
+[3/114] Compiling ForgeRuntimeLauncher main.swift
+[3/114] Write Objects.LinkFileList
+[4/114] Linking forge-runtime-launcher
+[5/114] Applying forge-runtime-launcher
+[7/114] Emitting module ForgeConductorCore
+[8/121] Compiling ForgeConductorCore SearchToolPack.swift
+[9/121] Compiling ForgeConductorCore ShellToolPack.swift
+[10/121] Compiling ForgeConductorCore ToolArgHelpers.swift
+[11/121] Compiling ForgeConductorCore DashboardHTML.swift
+[12/121] Compiling ForgeConductorCore DashboardHTTPRequest.swift
+[13/121] Compiling ForgeConductorCore DashboardServer.swift
+[14/121] Compiling ForgeConductorCore HTTPResponder.swift
+[15/121] Compiling ForgeConductorCore ManagerRoutes.swift
+[16/121] Compiling ForgeConductorCore MCPServer.swift
+[17/121] Compiling ForgeConductorCore ManagerDashboardClient.swift
+[18/121] Compiling ForgeConductorCore ManagerInstaller.swift
+[19/121] Compiling ForgeConductorCore ManagerNode.swift
+[20/121] Compiling ForgeConductorCore ManagerPIDFile.swift
+[21/121] Compiling ForgeConductorCore ManagerRuntime.swift
+[22/121] Compiling ForgeConductorCore ManagerSettingsNormalizer.swift
+[23/121] Compiling ForgeConductorCore ContinuityLifecycleToolPack.swift
+[24/121] Compiling ForgeConductorCore ContinuityToolPack.swift
+[25/121] Compiling ForgeConductorCore DocsToolPack.swift
+[26/121] Compiling ForgeConductorCore FilesystemToolPack.swift
+[27/121] Compiling ForgeConductorCore GitToolPack.swift
+[28/121] Compiling ForgeConductorCore MemoryToolPack.swift
+[29/121] Compiling ForgeConductorCore ProjectMemoryToolPack.swift
+[30/121] Compiling ForgeConductorCore RuntimeJobToolPack.swift
+[31/121] Compiling ForgeConductorCore ForgeUIModels.swift
+[32/121] Compiling ForgeConductorCore TelemetryModels.swift
+[33/121] Compiling ForgeConductorCore ProcessDiscovery.swift
+[34/121] Compiling ForgeConductorCore RealtimeMetricsEngine.swift
+[35/121] Compiling ForgeConductorCore SystemCollector.swift
+[36/121] Compiling ForgeConductorCore TelemetryService.swift
+[37/121] Compiling ForgeConductorCore resource_bundle_accessor.swift
+[38/121] Compiling ForgeConductorCore ProcessMetricsCollector.swift
+[39/121] Compiling ForgeConductorCore RAMCollector.swift
+[40/121] Compiling ForgeConductorCore ForgeCollector.swift
+[41/121] Compiling ForgeConductorCore LMStudioDeployService.swift
+[42/121] Compiling ForgeConductorCore LMStudioEnvironment.swift
+[43/121] Compiling ForgeConductorCore LMStudioMCPPluginInstaller.swift
+[44/121] Compiling ForgeConductorCore LatestValueMailbox.swift
+[45/121] Compiling ForgeConductorCore ForgeApp.swift
+[46/121] Compiling ForgeConductorCore ForgeProcessEntry.swift
+[47/121] Compiling ForgeConductorCore LegacyContinuityMigrator.swift
+[48/121] Compiling ForgeConductorCore ManagedAutonomyRuntime.swift
+[49/121] Compiling ForgeConductorCore ManagedContinuityWorker.swift
+[50/121] Compiling ForgeConductorCore ManagedProjectRunStepExecutor.swift
+[51/121] Compiling ForgeConductorCore PersistedManagedRunBudgetEvaluator.swift
+[52/121] Compiling ForgeConductorCore ProjectContextService.swift
+[53/121] Compiling ForgeConductorCore ForgeSnapshot.swift
+[54/121] Compiling ForgeConductorCore HandoffPacket.swift
+[55/121] Compiling ForgeConductorCore HostAdapterRegistry.swift
+[56/121] Compiling ForgeConductorCore JSONSupport.swift
+[57/121] Compiling ForgeConductorCore LMStudioConnector.swift
+[58/121] Compiling ForgeConductorCore ManagedModelProvider.swift
+[59/121] Compiling ForgeConductorCore ManagerModels.swift
+[60/121] Compiling ForgeConductorCore Models.swift
+[61/121] Compiling ForgeConductorCore ProjectMemoryService.swift
+[62/121] Compiling ForgeConductorCore ProjectRunCoordinator.swift
+[63/121] Compiling ForgeConductorCore RuntimeJobSubsystem.swift
+[64/121] Compiling ForgeConductorCore ToolAuthorizationService.swift
+[65/121] Compiling ForgeConductorCore ToolDefinitionCatalog.swift
+[66/121] Compiling ForgeConductorCore ToolInvocationBroker.swift
+[67/121] Compiling ForgeConductorCore ToolRouter.swift
+[68/121] Compiling ForgeConductorCore AgentToolPack.swift
+[69/121] Compiling ForgeConductorCore CPUCollector.swift
+[70/121] Compiling ForgeConductorCore CPUFrequencyEstimator.swift
+[71/121] Compiling ForgeConductorCore DiskIOCollector.swift
+[72/121] Compiling ForgeConductorCore DiskVolumeCollector.swift
+[73/121] Compiling ForgeConductorCore GPUCollector.swift
+[74/121] Compiling ForgeConductorCore IOKitPropertyWalk.swift
+[75/121] Compiling ForgeConductorCore PowerSourcesCollector.swift
+[76/121] Compiling ForgeConductorCore OperationalRoutes.swift
+[77/121] Compiling ForgeConductorCore TelemetryRoutes.swift
+[78/121] Compiling ForgeConductorCore AppConfig.swift
+[79/121] Compiling ForgeConductorCore AutonomyModels.swift
+[80/121] Compiling ForgeConductorCore ContextBudgetModels.swift
+[81/121] Compiling ForgeConductorCore ContinuityModels.swift
+[82/121] Compiling ForgeConductorCore ContinuityV2Models.swift
+[83/121] Compiling ForgeConductorCore DoctorModels.swift
+[84/121] Compiling ForgeConductorCore AgentCatalog.swift
+[85/121] Compiling ForgeConductorCore AgentSessionService.swift
+[86/121] Compiling ForgeConductorCore AutonomySupervisor.swift
+[87/121] Compiling ForgeConductorCore ContextBudgetSupervisor.swift
+[88/121] Compiling ForgeConductorCore ContextContinuityService.swift
+[89/121] Compiling ForgeConductorCore ContinuityAutomation.swift
+[90/121] Compiling ForgeConductorCore ContinuityCoordinator.swift
+[91/121] Compiling ForgeConductorCore ExecutionJobService.swift
+[92/121] Compiling ForgeConductorCore ProjectContextModels.swift
+[93/121] Compiling ForgeConductorCore ProjectMemoryModels.swift
+[94/121] Compiling ForgeConductorCore Protocols.swift
+[95/121] Compiling ForgeConductorCore RuntimeJobModels.swift
+[96/121] Compiling ForgeConductorCore AppPaths.swift
+[97/121] Compiling ForgeConductorCore AuditService.swift
+[98/121] Compiling ForgeConductorCore ConfigStore.swift
+[99/121] Compiling ForgeConductorCore DashboardPortGuard.swift
+[100/121] Compiling ForgeConductorCore ResourcePolicy.swift
+[101/121] Compiling ForgeConductorCore RuntimeJobRepository.swift
+[102/121] Compiling ForgeConductorCore RuntimeObservability.swift
+[103/121] Compiling ForgeConductorCore RuntimeProcessSupervisor.swift
+[104/121] Compiling ForgeConductorCore SQLiteStore.swift
+[105/121] Compiling ForgeConductorCore VerifiedMigrationBackup.swift
+[106/121] Compiling ForgeConductorCore MCPServeVerifier.swift
+[107/121] Compiling ForgeConductorCore DiagnosticLog.swift
+[108/121] Compiling ForgeConductorCore OwnerOnlyAtomicFile.swift
+[109/121] Compiling ForgeConductorCore PDFWriter.swift
+[110/121] Compiling ForgeConductorCore ProcessRunner.swift
+[111/121] Compiling ForgeConductorCore ProjectControlPlaneRepository.swift
+[112/121] Compiling ForgeConductorCore ProjectMemoryRepository.swift
+[113/121] Compiling ForgeConductorCore ResourceBundle.swift
+[114/123] Emitting module ForgeNativeSessionHostPlugin
+[115/123] Compiling ForgeNativeSessionHostPlugin ForgeNativeSessionHostPlugin.swift
+[116/159] Emitting module ForgeConductorCLI
+[117/159] Compiling ForgeConductorCLI ForgeConductorMain.swift
+[117/159] Write Objects.LinkFileList
+[118/159] Linking forge-conductor
+[119/159] Applying forge-conductor
+[121/159] Compiling ForgeConductorApp MetalGaugeResources.swift
+[122/159] Compiling ForgeConductorApp MetalLoadChart.swift
+[123/159] Compiling ForgeConductorApp MetalMeterView.swift
+[124/159] Emitting module ForgeConductorApp
+[125/161] Compiling ForgeConductorApp ProjectsViewModel.swift
+[126/161] Compiling ForgeConductorApp ProviderViewModel.swift
+[127/161] Compiling ForgeConductorApp RuntimesViewModel.swift
+[128/161] Compiling ForgeConductorApp ContentView.swift
+[129/161] Compiling ForgeConductorApp DiagnosticsView.swift
+[130/209] Compiling ForgeConductorTests NativeAppSmokeTests.swift
+[131/209] Compiling ForgeConductorTests MachHostMetricsTests.swift
+[132/209] Compiling ForgeConductorTests LMStudioContractFixtureTests.swift
+[133/209] Compiling ForgeConductorTests LatestValueMailboxTests.swift
+[134/209] Compiling ForgeConductorTests FilesystemCancellationTests.swift
+[135/209] Compiling ForgeConductorTests ForgeProcessEntryTests.swift
+[136/209] Compiling ForgeConductorTests G1G10AcceptanceTests.swift
+[137/209] Compiling ForgeConductorTests HTTPTestHelpers.swift
+[138/209] Compiling ForgeConductorTests MCPProtocolAndDiagnosticsTests.swift
+[139/209] Compiling ForgeConductorTests LMStudioConnectorReliabilityTests.swift
+[140/209] Compiling ForgeConductorTests LMStudioContractFixtureServer.swift
+[141/209] Compiling ForgeConductorTests DashboardTests.swift
+[142/209] Compiling ForgeConductorTests DiagnosticBoundaryTests.swift
+[143/209] Compiling ForgeConductorTests ReleaseStressTests.swift
+[144/209] Compiling ForgeConductorTests ResourcePolicyTests.swift
+[145/209] Compiling ForgeConductorTests ManagedAutonomyRuntimeTests.swift
+[146/209] Compiling ForgeConductorTests ManagedContinuityWorkerTests.swift
+[147/209] Compiling ForgeConductorTests ManagedModelProviderBridgeTests.swift
+[148/209] Compiling ForgeConductorTests AutonomousContinuityAcceptanceTests.swift
+[149/209] Compiling ForgeConductorTests AutonomySupervisorTests.swift
+[150/209] Compiling ForgeConductorTests ContinuityV2Tests.swift
+[151/209] Compiling ForgeConductorTests ManagedProjectRunStepExecutorTests.swift
+[152/209] Compiling ForgeConductorTests ManagerTests.swift
+[153/209] Compiling ForgeConductorTests MemoryToolTests.swift
+[154/209] Compiling ForgeConductorTests ContextBudgetSupervisorTests.swift
+[155/209] Compiling ForgeConductorTests ContinuityCoordinatorTests.swift
+[156/209] Compiling ForgeConductorTests ContinuityTests.swift
+[156/209] Write Objects.LinkFileList
+[157/209] Linking forge-conductor-app
+[158/209] Applying forge-conductor-app
+[160/209] Emitting module ForgeConductorTests
+[161/212] Compiling ForgeConductorTests ProcessRunnerTests.swift
+[162/212] Compiling ForgeConductorTests ProductPathReliabilityTests.swift
+[163/212] Compiling ForgeConductorTests ProjectContextIntegrationTests.swift
+[168/212] Compiling ForgeConductorTests ToolDefinitionCatalogTests.swift
+[169/212] Compiling ForgeConductorTests ToolRouterDeadlineTests.swift
+[170/212] Compiling ForgeConductorTests resource_bundle_accessor.swift
+[175/212] Compiling ForgeConductorTests CoreTests.swift
+[176/212] Compiling ForgeConductorTests DashboardSecurityTests.swift
+[181/212] Compiling ForgeConductorTests RigParityTests.swift
+[182/212] Compiling ForgeConductorTests LegacyContinuityCancellationTests.swift
+[183/212] Compiling ForgeConductorTests LifecycleOwnershipTests.swift
+[184/212] Compiling ForgeConductorTests LiveCollectorEvidenceTests.swift
+[186/212] Compiling ForgeConductorTests NativeSessionHostPluginTests.swift
+[187/212] Compiling ForgeConductorTests NativeTelemetryTests.swift
+[188/212] Compiling ForgeConductorTests OwnerOnlyAtomicFileTests.swift
+[189/212] Compiling ForgeConductorTests ProjectControlPlaneRepositoryTests.swift
+[190/212] Compiling ForgeConductorTests ProjectMemoryTests.swift
+[191/212] Compiling ForgeConductorTests RealtimeStreamTests.swift
+[196/212] Compiling ForgeConductorTests AppConfigAndDoctorTests.swift
+[199/212] Compiling ForgeConductorTests CommittedResultRecoveryTests.swift
+[204/212] Compiling ForgeConductorTests RuntimeExecutionJobTests.swift
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Cancellation-Recovery/Tests/ForgeConductorTests/RuntimeExecutionJobTests.swift:3714:80: warning: converting non-Sendable function value to '@Sendable (RuntimeJobCommitKind) -> Void' may introduce data races
+3712 |     func testRuntimeSubmissionReceiptIsPublishedAtCommitBeforeRepositoryReturns() async throws {
+3713 |         let gate = RepositoryCommitGate(expectedKind: .submission)
+3714 |         let fixture = try await Fixture.make(afterMutationCommitObserver: gate.observe)
+     |                                                                                `- warning: converting non-Sendable function value to '@Sendable (RuntimeJobCommitKind) -> Void' may introduce data races
+3715 |         defer {
+3716 |             gate.release()
+
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Cancellation-Recovery/Tests/ForgeConductorTests/RuntimeExecutionJobTests.swift:3784:80: warning: converting non-Sendable function value to '@Sendable (RuntimeJobCommitKind) -> Void' may introduce data races
+3782 |     func testRuntimeCancellationReceiptIsPublishedAtCommitBeforeRepositoryReturns() async throws {
+3783 |         let gate = RepositoryCommitGate(expectedKind: .cancellation)
+3784 |         let fixture = try await Fixture.make(afterMutationCommitObserver: gate.observe)
+     |                                                                                `- warning: converting non-Sendable function value to '@Sendable (RuntimeJobCommitKind) -> Void' may introduce data races
+3785 |         defer {
+3786 |             gate.release()
+[205/212] Compiling ForgeConductorTests RuntimeObservabilityTests.swift
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Cancellation-Recovery/Tests/ForgeConductorTests/RuntimeExecutionJobTests.swift:3714:80: warning: converting non-Sendable function value to '@Sendable (RuntimeJobCommitKind) -> Void' may introduce data races
+3712 |     func testRuntimeSubmissionReceiptIsPublishedAtCommitBeforeRepositoryReturns() async throws {
+3713 |         let gate = RepositoryCommitGate(expectedKind: .submission)
+3714 |         let fixture = try await Fixture.make(afterMutationCommitObserver: gate.observe)
+     |                                                                                `- warning: converting non-Sendable function value to '@Sendable (RuntimeJobCommitKind) -> Void' may introduce data races
+3715 |         defer {
+3716 |             gate.release()
+
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Cancellation-Recovery/Tests/ForgeConductorTests/RuntimeExecutionJobTests.swift:3784:80: warning: converting non-Sendable function value to '@Sendable (RuntimeJobCommitKind) -> Void' may introduce data races
+3782 |     func testRuntimeCancellationReceiptIsPublishedAtCommitBeforeRepositoryReturns() async throws {
+3783 |         let gate = RepositoryCommitGate(expectedKind: .cancellation)
+3784 |         let fixture = try await Fixture.make(afterMutationCommitObserver: gate.observe)
+     |                                                                                `- warning: converting non-Sendable function value to '@Sendable (RuntimeJobCommitKind) -> Void' may introduce data races
+3785 |         defer {
+3786 |             gate.release()
+[206/212] Compiling ForgeConductorTests TelemetryContractTests.swift
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Cancellation-Recovery/Tests/ForgeConductorTests/RuntimeExecutionJobTests.swift:3714:80: warning: converting non-Sendable function value to '@Sendable (RuntimeJobCommitKind) -> Void' may introduce data races
+3712 |     func testRuntimeSubmissionReceiptIsPublishedAtCommitBeforeRepositoryReturns() async throws {
+3713 |         let gate = RepositoryCommitGate(expectedKind: .submission)
+3714 |         let fixture = try await Fixture.make(afterMutationCommitObserver: gate.observe)
+     |                                                                                `- warning: converting non-Sendable function value to '@Sendable (RuntimeJobCommitKind) -> Void' may introduce data races
+3715 |         defer {
+3716 |             gate.release()
+
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Cancellation-Recovery/Tests/ForgeConductorTests/RuntimeExecutionJobTests.swift:3784:80: warning: converting non-Sendable function value to '@Sendable (RuntimeJobCommitKind) -> Void' may introduce data races
+3782 |     func testRuntimeCancellationReceiptIsPublishedAtCommitBeforeRepositoryReturns() async throws {
+3783 |         let gate = RepositoryCommitGate(expectedKind: .cancellation)
+3784 |         let fixture = try await Fixture.make(afterMutationCommitObserver: gate.observe)
+     |                                                                                `- warning: converting non-Sendable function value to '@Sendable (RuntimeJobCommitKind) -> Void' may introduce data races
+3785 |         defer {
+3786 |             gate.release()
+[211/214] Compiling ForgeConductorPackageTests runner.swift
+[212/214] Emitting module ForgeConductorPackageTests
+[212/214] Write Objects.LinkFileList
+[213/214] Linking ForgeConductorPackageTests
+Build complete! (17.46s)

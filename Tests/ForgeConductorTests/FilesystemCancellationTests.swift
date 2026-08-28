@@ -93,6 +93,41 @@ final class FilesystemCancellationTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: outside), Data("preserve".utf8))
     }
 
+    func testRecursiveDeletePinsIntermediateParentBeforeUnlink() throws {
+        let root = home.appendingPathComponent("pinned-delete-tree", isDirectory: true)
+        let branch = root.appendingPathComponent("branch", isDirectory: true)
+        let relocatedBranch = root.appendingPathComponent("branch-original", isDirectory: true)
+        let item = branch.appendingPathComponent("item.txt")
+        try FileManager.default.createDirectory(at: branch, withIntermediateDirectories: true)
+        try Data("original".utf8).write(to: item)
+        let mutation = DirectorySwapMutation(
+            originalParent: branch,
+            relocatedParent: relocatedBranch,
+            replacementName: item.lastPathComponent,
+            replacementData: Data("replacement".utf8)
+        )
+        let pack = FilesystemToolPack(deletionMutationObserver: { step in
+            guard step == .beforeRemoving("branch/item.txt") else { return }
+            mutation.apply()
+        })
+
+        let result = try XCTUnwrap(try pack.handle(
+            name: "fs_delete",
+            arguments: ["path": root.path],
+            context: nil,
+            clientID: ClientID("pinned-delete-parent"),
+            app: app,
+            cancellation: ToolCallCancellation(timeoutSeconds: 5)
+        ))
+
+        XCTAssertNil(mutation.error)
+        XCTAssertFalse(result.ok)
+        XCTAssertEqual(result.payload["control_code"] as? String, "source_changed")
+        XCTAssertEqual(result.payload["completed_entries"] as? Int, 1)
+        XCTAssertEqual(try Data(contentsOf: branch.appendingPathComponent("item.txt")), Data("replacement".utf8))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: relocatedBranch.appendingPathComponent("item.txt").path))
+    }
+
     func testSameVolumeMoveDoesNotOverwriteExistingDestination() throws {
         let source = home.appendingPathComponent("same-volume-source.txt")
         let destination = home.appendingPathComponent("same-volume-destination.txt")
@@ -110,6 +145,115 @@ final class FilesystemCancellationTests: XCTestCase {
 
         XCTAssertEqual(try Data(contentsOf: source), Data("source".utf8))
         XCTAssertEqual(try Data(contentsOf: destination), Data("destination".utf8))
+    }
+
+    func testSameVolumeMoveRejectsReboundSourceParent() throws {
+        let sourceParent = home.appendingPathComponent("same-volume-source-parent", isDirectory: true)
+        let relocatedParent = home.appendingPathComponent("same-volume-source-original", isDirectory: true)
+        let source = sourceParent.appendingPathComponent("source.txt")
+        let destination = home.appendingPathComponent("same-volume-pinned-destination.txt")
+        try FileManager.default.createDirectory(at: sourceParent, withIntermediateDirectories: true)
+        try Data("original".utf8).write(to: source)
+        let mutation = DirectorySwapMutation(
+            originalParent: sourceParent,
+            relocatedParent: relocatedParent,
+            replacementName: source.lastPathComponent,
+            replacementData: Data("replacement".utf8)
+        )
+        let pack = FilesystemToolPack(
+            deletionStepObserver: nil,
+            moveStepObserver: { step in
+                guard step == .beforeSameVolumeRename else { return }
+                mutation.apply()
+            },
+            forceCrossVolumeMove: false
+        )
+
+        let result = try XCTUnwrap(try pack.handle(
+            name: "fs_move",
+            arguments: ["path": source.path, "dest": destination.path],
+            context: nil,
+            clientID: ClientID("pinned-same-volume-parent"),
+            app: app,
+            cancellation: ToolCallCancellation(timeoutSeconds: 5)
+        ))
+
+        XCTAssertNil(mutation.error)
+        XCTAssertFalse(result.ok)
+        XCTAssertEqual(result.payload["code"] as? String, "source_changed")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+        XCTAssertEqual(try Data(contentsOf: source), Data("replacement".utf8))
+        XCTAssertEqual(
+            try Data(contentsOf: relocatedParent.appendingPathComponent("source.txt")),
+            Data("original".utf8)
+        )
+    }
+
+    func testSameVolumeMoveRejectsReboundDestinationParent() throws {
+        let source = home.appendingPathComponent("same-volume-destination-race-source.txt")
+        let destinationParent = home.appendingPathComponent("same-volume-destination-parent", isDirectory: true)
+        let relocatedParent = home.appendingPathComponent("same-volume-destination-original", isDirectory: true)
+        let destination = destinationParent.appendingPathComponent("destination.txt")
+        try FileManager.default.createDirectory(at: destinationParent, withIntermediateDirectories: true)
+        try Data("original".utf8).write(to: source)
+        let mutation = DirectorySwapMutation(
+            originalParent: destinationParent,
+            relocatedParent: relocatedParent,
+            replacementName: "replacement.txt",
+            replacementData: Data("replacement".utf8)
+        )
+        let pack = FilesystemToolPack(
+            deletionStepObserver: nil,
+            moveStepObserver: { step in
+                guard step == .beforeSameVolumeRename else { return }
+                mutation.apply()
+            },
+            forceCrossVolumeMove: false
+        )
+
+        let result = try XCTUnwrap(try pack.handle(
+            name: "fs_move",
+            arguments: ["path": source.path, "dest": destination.path],
+            context: nil,
+            clientID: ClientID("rebound-same-volume-destination"),
+            app: app,
+            cancellation: ToolCallCancellation(timeoutSeconds: 5)
+        ))
+
+        XCTAssertNil(mutation.error)
+        XCTAssertFalse(result.ok)
+        XCTAssertEqual(result.payload["code"] as? String, "source_changed")
+        XCTAssertEqual(try Data(contentsOf: source), Data("original".utf8))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: relocatedParent.appendingPathComponent("destination.txt").path))
+    }
+
+    func testSameVolumeCancellationBeforeRenamePreservesSource() throws {
+        let source = home.appendingPathComponent("cancelled-same-volume-source.txt")
+        let destination = home.appendingPathComponent("cancelled-same-volume-destination.txt")
+        try Data("original".utf8).write(to: source)
+        let cancellation = ToolCallCancellation(timeoutSeconds: 5)
+        let pack = FilesystemToolPack(
+            deletionStepObserver: nil,
+            moveStepObserver: { step in
+                guard step == .beforeSameVolumeRename else { return }
+                cancellation.cancel()
+            },
+            forceCrossVolumeMove: false
+        )
+
+        XCTAssertThrowsError(try pack.handle(
+            name: "fs_move",
+            arguments: ["path": source.path, "dest": destination.path],
+            context: nil,
+            clientID: ClientID("cancel-before-same-volume-rename"),
+            app: app,
+            cancellation: cancellation
+        )) { error in
+            XCTAssertTrue(error is CancellationError, "unexpected error: \(error)")
+        }
+        XCTAssertEqual(try Data(contentsOf: source), Data("original".utf8))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
     }
 
     func testMissingMoveSourceDoesNotCreateDestinationHierarchy() throws {
@@ -191,6 +335,116 @@ final class FilesystemCancellationTests: XCTestCase {
             try FileManager.default.contentsOfDirectory(atPath: home.path)
                 .contains { $0.hasPrefix(".forge-move-") }
         )
+    }
+
+    func testCrossVolumeMoveRejectsSourceReplacedBeforeFenceCapture() throws {
+        let source = home.appendingPathComponent("pre-fence-replaced-source.txt")
+        let destination = home.appendingPathComponent("pre-fence-destination.txt")
+        try Data("original".utf8).write(to: source)
+        let pack = FilesystemToolPack(
+            deletionStepObserver: nil,
+            moveStepObserver: { step in
+                guard step == .preparedDestinationDirectories else { return }
+                try? FileManager.default.removeItem(at: source)
+                try? Data("replacement".utf8).write(to: source)
+            },
+            forceCrossVolumeMove: true
+        )
+
+        let result = try XCTUnwrap(try pack.handle(
+            name: "fs_move",
+            arguments: ["path": source.path, "dest": destination.path],
+            context: nil,
+            clientID: ClientID("pre-fence-source-replacement"),
+            app: app,
+            cancellation: ToolCallCancellation(timeoutSeconds: 5)
+        ))
+
+        XCTAssertFalse(result.ok)
+        XCTAssertEqual(result.payload["code"] as? String, "source_changed")
+        XCTAssertEqual(try Data(contentsOf: source), Data("replacement".utf8))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+    }
+
+    func testCrossVolumeMoveRejectsReboundDestinationParentAndCleansPinnedStaging() throws {
+        let source = home.appendingPathComponent("cross-volume-destination-race-source.txt")
+        let destinationParent = home.appendingPathComponent("cross-volume-destination-parent", isDirectory: true)
+        let relocatedParent = home.appendingPathComponent("cross-volume-destination-original", isDirectory: true)
+        let destination = destinationParent.appendingPathComponent("destination.txt")
+        try FileManager.default.createDirectory(at: destinationParent, withIntermediateDirectories: true)
+        try Data("original".utf8).write(to: source)
+        let mutation = DirectorySwapMutation(
+            originalParent: destinationParent,
+            relocatedParent: relocatedParent,
+            replacementName: "replacement.txt",
+            replacementData: Data("replacement".utf8)
+        )
+        let pack = FilesystemToolPack(
+            deletionStepObserver: nil,
+            moveStepObserver: { step in
+                guard step == .beforeDestinationInstall else { return }
+                mutation.apply()
+            },
+            forceCrossVolumeMove: true
+        )
+
+        let result = try XCTUnwrap(try pack.handle(
+            name: "fs_move",
+            arguments: ["path": source.path, "dest": destination.path],
+            context: nil,
+            clientID: ClientID("rebound-cross-volume-destination"),
+            app: app,
+            cancellation: ToolCallCancellation(timeoutSeconds: 5)
+        ))
+
+        XCTAssertNil(mutation.error)
+        XCTAssertFalse(result.ok)
+        XCTAssertEqual(result.payload["code"] as? String, "source_changed")
+        XCTAssertEqual(try Data(contentsOf: source), Data("original".utf8))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: relocatedParent.appendingPathComponent("destination.txt").path))
+        XCTAssertFalse(
+            try FileManager.default.contentsOfDirectory(atPath: destinationParent.path)
+                .contains { $0.hasPrefix(".forge-move-") }
+        )
+        XCTAssertFalse(
+            try FileManager.default.contentsOfDirectory(atPath: relocatedParent.path)
+                .contains { $0.hasPrefix(".forge-move-") }
+        )
+    }
+
+    func testCrossVolumeCancellationBeforeInstallPreservesSourceAndReportsStaging() throws {
+        let source = home.appendingPathComponent("cancelled-cross-volume-source.txt")
+        let destination = home.appendingPathComponent("cancelled-cross-volume-destination.txt")
+        try Data("original".utf8).write(to: source)
+        let cancellation = ToolCallCancellation(timeoutSeconds: 5)
+        let pack = FilesystemToolPack(
+            deletionStepObserver: nil,
+            moveStepObserver: { step in
+                guard step == .beforeDestinationInstall else { return }
+                cancellation.cancel()
+            },
+            forceCrossVolumeMove: true
+        )
+
+        let result = try XCTUnwrap(try pack.handle(
+            name: "fs_move",
+            arguments: ["path": source.path, "dest": destination.path],
+            context: nil,
+            clientID: ClientID("cancel-before-cross-volume-install"),
+            app: app,
+            cancellation: cancellation
+        ))
+
+        XCTAssertFalse(result.ok)
+        XCTAssertEqual(result.payload["control_code"] as? String, "request_cancelled")
+        XCTAssertEqual(result.payload["source_exists"] as? Bool, true)
+        XCTAssertEqual(result.payload["destination_exists"] as? Bool, false)
+        XCTAssertEqual(result.payload["staging_cleanup_required"] as? Bool, true)
+        XCTAssertEqual(try Data(contentsOf: source), Data("original".utf8))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+        let stagingPath = try XCTUnwrap(result.payload["staging_path"] as? String)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: stagingPath))
     }
 
     func testCrossVolumeCancellationAfterInstallReportsBothDurableStates() throws {
@@ -301,6 +555,48 @@ final class FilesystemCancellationTests: XCTestCase {
             try Data(contentsOf: destination.appendingPathComponent("a-preserved.txt")),
             Data("preserve".utf8)
         )
+    }
+
+    func testCrossVolumeRemovalPinsIntermediateSourceParent() throws {
+        let source = home.appendingPathComponent("pinned-cross-source", isDirectory: true)
+        let branch = source.appendingPathComponent("branch", isDirectory: true)
+        let relocatedBranch = source.appendingPathComponent("branch-original", isDirectory: true)
+        let item = branch.appendingPathComponent("item.txt")
+        let destination = home.appendingPathComponent("pinned-cross-destination", isDirectory: true)
+        try FileManager.default.createDirectory(at: branch, withIntermediateDirectories: true)
+        try Data("original".utf8).write(to: item)
+        let mutation = DirectorySwapMutation(
+            originalParent: branch,
+            relocatedParent: relocatedBranch,
+            replacementName: item.lastPathComponent,
+            replacementData: Data("replacement".utf8)
+        )
+        let pack = FilesystemToolPack(
+            deletionStepObserver: nil,
+            moveStepObserver: { step in
+                guard step == .beforeSourceEntryRemoval("branch/item.txt") else { return }
+                mutation.apply()
+            },
+            forceCrossVolumeMove: true
+        )
+
+        let result = try XCTUnwrap(try pack.handle(
+            name: "fs_move",
+            arguments: ["path": source.path, "dest": destination.path],
+            context: nil,
+            clientID: ClientID("pinned-cross-volume-parent"),
+            app: app,
+            cancellation: ToolCallCancellation(timeoutSeconds: 5)
+        ))
+
+        XCTAssertNil(mutation.error)
+        XCTAssertFalse(result.ok)
+        XCTAssertEqual(result.payload["control_code"] as? String, "source_changed")
+        XCTAssertEqual(result.payload["completed_entries"] as? Int, 1)
+        XCTAssertEqual(result.payload["destination_complete"] as? Bool, true)
+        XCTAssertEqual(try Data(contentsOf: branch.appendingPathComponent("item.txt")), Data("replacement".utf8))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: relocatedBranch.appendingPathComponent("item.txt").path))
+        XCTAssertEqual(try Data(contentsOf: destination.appendingPathComponent("branch/item.txt")), Data("original".utf8))
     }
 
     func testCrossVolumeMoveReconcilesMetadataChangedByRemovingSiblingHardLink() throws {
@@ -775,5 +1071,58 @@ private final class FirstStagingDirectorySyncFailure: @unchecked Sendable {
         if shouldFail { failed = true }
         lock.unlock()
         if shouldFail { throw InjectedFailure.synchronize }
+    }
+}
+
+private final class DirectorySwapMutation: @unchecked Sendable {
+    private let lock = NSLock()
+    private let originalParent: URL
+    private let relocatedParent: URL
+    private let replacementName: String
+    private let replacementData: Data
+    private var applied = false
+    private var storedError: Error?
+
+    init(
+        originalParent: URL,
+        relocatedParent: URL,
+        replacementName: String,
+        replacementData: Data
+    ) {
+        self.originalParent = originalParent
+        self.relocatedParent = relocatedParent
+        self.replacementName = replacementName
+        self.replacementData = replacementData
+    }
+
+    var error: Error? {
+        lock.lock()
+        defer { lock.unlock() }
+        return storedError
+    }
+
+    func apply() {
+        lock.lock()
+        guard !applied else {
+            lock.unlock()
+            return
+        }
+        applied = true
+        lock.unlock()
+
+        do {
+            try FileManager.default.moveItem(at: originalParent, to: relocatedParent)
+            try FileManager.default.createDirectory(
+                at: originalParent,
+                withIntermediateDirectories: false
+            )
+            try replacementData.write(
+                to: originalParent.appendingPathComponent(replacementName)
+            )
+        } catch {
+            lock.lock()
+            storedError = error
+            lock.unlock()
+        }
     }
 }
