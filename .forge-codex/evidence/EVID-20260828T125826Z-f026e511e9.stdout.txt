@@ -1,0 +1,15 @@
+{
+  "passed": false,
+  "errors": [
+    "gate-passed:G09: passed; This record preserves the exact-revision adapter qualification. The live scenario invoked the adapter directly and does not establish current manager-owned threshold-forced rollover authority. Current release qualification requires exact successor acknowledgement, predecessor fencing and idempotent sealing, automatic continuation, GUI-closed operation, and recovery from every durable crash state in one real-provider forced-rollover scenario.",
+    "gate-ledger-passed:G09: blocked_dependency",
+    "gate-current-release-authority:G09: This record preserves the exact-revision adapter qualification. The live scenario invoked the adapter directly and does not establish current manager-owned threshold-forced rollover authority. Current release qualification requires exact successor acknowledgement, predecessor fencing and idempotent sealing, automatic continuation, GUI-closed operation, and recovery from every durable crash state in one real-provider forced-rollover scenario.",
+    "gate-passed:G10: blocked",
+    "gate-ledger-passed:G10: blocked_dependency",
+    "gate-passed:G11: blocked",
+    "gate-ledger-passed:G11: blocked_dependency",
+    "critical-high-findings-resolved: ['FC-FILESYSTEM-PATH-TOCTOU-001', 'FC-SHELL-COMPAT-QUALIFICATION-001', 'FC-UI-QUALIFICATION-001', 'FC-AUTONOMOUS-CONTINUITY-E2E-001']",
+    "autonomous-rollover-mode-proven: forge.native-session-host"
+  ],
+  "report": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/state/completion-report.json"
+}

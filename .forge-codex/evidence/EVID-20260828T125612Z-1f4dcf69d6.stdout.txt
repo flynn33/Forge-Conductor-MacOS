@@ -1,0 +1,74 @@
+{
+  "selected_phase": "P10",
+  "reason": "resume_running",
+  "phase": {
+    "dependencies": [
+      "P03",
+      "P04",
+      "P05",
+      "P06",
+      "P07",
+      "P08",
+      "P09"
+    ],
+    "hard_gates": [
+      "G10"
+    ],
+    "id": "P10",
+    "name": "Migration compatibility and feature parity",
+    "outputs": [
+      "parity-report",
+      "migration-report",
+      "protocol-compatibility-report"
+    ],
+    "parallel_safe": false,
+    "priority": 60
+  },
+  "open_issues": [
+    {
+      "created_at": "2026-08-27T11:18:41.745343+00:00",
+      "evidence_class": "E0",
+      "id": "FC-UI-QUALIFICATION-001",
+      "notes": "EVID-20260828T124634Z-c6c0c861da proves the current native Settings shell-control XCUITest target compiles with CODE_SIGNING_ALLOWED=NO; it is build-only evidence and executed zero tests. Developer Mode remains disabled and the available Apple Development identity team does not match the project configuration. Native UI validation remains deferred and release-blocking until an authorized host and matching signing configuration execute the recorded XCUITest matrix.",
+      "path": ".forge-autonomy-state/evidence/FC-UI-001/test-results.json",
+      "severity": "High",
+      "status": "deferred",
+      "title": "Native UI qualification prerequisites are unavailable",
+      "updated_at": "2026-08-28T12:52:14.959617+00:00"
+    },
+    {
+      "created_at": "2026-08-27T23:39:59.864993+00:00",
+      "evidence_class": "E2",
+      "id": "FC-FILESYSTEM-PATH-TOCTOU-001",
+      "notes": "Current-source Debug EVID-20260828T124332Z-1e2a050c0e and Release EVID-20260828T124624Z-00a3dd27c2 each pass 657 warnings-as-errors tests with four expected host-dependent skips. The full four-path atomic RENAME_SWAP matrix, fixed 32-slot receipt ledger, unsafe-rollback refusal, combined namespace-instability and durability failures, and two-receipt recovery merge are covered. Descriptor-relative operations and renameatx_np mitigate but do not eliminate the final verifier-to-terminal-syscall race because public macOS APIs have no expected-identity conditional mutation. One winning race can mutate one entry under the pinned parent; a final-link unlink can lose unbounded bytes and a directory rename can relocate an unbounded subtree. One recursive request can expose up to 100000 separate opportunities; 32 bounds simultaneous cooperative recovery state only. Terminal namespace syscalls and fsync already executing under the ledger lock have no independent wall-time deadline. Initial path anchoring, destination hierarchy creation, and hard-link ctime ambiguity remain E2.",
+      "path": "Sources/ForgeConductorCore/Application/Tools/FilesystemToolPack.swift",
+      "severity": "High",
+      "status": "deferred",
+      "title": "Filesystem mutation paths retain descriptor-relative race windows",
+      "updated_at": "2026-08-28T12:52:14.619663+00:00"
+    },
+    {
+      "created_at": "2026-08-28T10:20:34.631148+00:00",
+      "evidence_class": "E0",
+      "id": "FC-SHELL-COMPAT-QUALIFICATION-001",
+      "notes": "Current-source Debug EVID-20260828T124332Z-1e2a050c0e and Release EVID-20260828T124624Z-00a3dd27c2 each pass 657 warnings-as-errors tests with four expected host-dependent skips. EVID-20260828T125032Z-f15bab4972 proves current MCP tools/list compatibility and EVID-20260828T125046Z-c15d53c9c9 proves current manager Settings routes. Tests cover clean-install enablement, accidental legacy-disabled migration, explicit opt-out, execution, manager and application restart, and the established shell_exec synchronous /bin/bash -lc result contract. Clean-profile bash.run remains additive. EVID-20260828T124634Z-c6c0c861da compiles the native Settings visibility, control, and relaunch XCUITest with signing disabled but executes no test. Shell compatibility remains open and release-blocking.",
+      "path": "Tests/ForgeConductorUITests/ForgeConductorUITests.swift",
+      "severity": "High",
+      "status": "deferred",
+      "title": "Shell compatibility qualification requires native Settings execution",
+      "updated_at": "2026-08-28T12:52:14.791695+00:00"
+    },
+    {
+      "created_at": "2026-08-28T10:20:34.787513+00:00",
+      "evidence_class": "E0",
+      "id": "FC-AUTONOMOUS-CONTINUITY-E2E-001",
+      "notes": "The prior live provider proof directly invoked an adapter and does not prove one manager-owned threshold-forced real-provider rollover. Release authority still requires exact successor acknowledgment, predecessor fencing and idempotent sealing, automatic continuation, GUI-closed operation, and recovery from every durable crash state in that scenario. Unit and synthetic-host tests are supporting evidence only. Autonomous continuity remains open and release-blocking.",
+      "path": ".forge-autonomy-state/blockers/FC-E2E-001.json",
+      "severity": "High",
+      "status": "deferred",
+      "title": "Autonomous continuity lacks full real-provider forced-rollover authority",
+      "updated_at": "2026-08-28T12:52:15.126800+00:00"
+    }
+  ],
+  "timestamp": "2026-08-28T12:56:12.432511+00:00"
+}

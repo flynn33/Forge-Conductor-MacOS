@@ -55,8 +55,22 @@ for gid in required:
         result=json.loads(path.read_text())
     except Exception as exc:
         check(f"gate-result-valid:{gid}",False,repr(exc));continue
-    check(f"gate-passed:{gid}",result.get("status")=="passed",result.get("status"))
+    current_authority=True
+    authority_detail="current or unspecified"
+    acceptance_path=pkg/"state/acceptance"/f"{gid}.json"
+    if acceptance_path.is_file():
+        try:
+            acceptance=json.loads(acceptance_path.read_text())
+            current_authority=acceptance.get("current_release_authority") is not False
+            authority_detail=acceptance.get("authority_note",acceptance.get("authority_scope","current or unspecified"))
+        except Exception as exc:
+            current_authority=False
+            authority_detail=repr(exc)
+    result_status=result.get("status")
+    result_detail=result_status if current_authority else f"{result_status}; {authority_detail}"
+    check(f"gate-passed:{gid}",result_status=="passed" and current_authority,result_detail)
     check(f"gate-ledger-passed:{gid}",state["gates"].get(gid,{}).get("status")=="passed",state["gates"].get(gid,{}).get("status"))
+    check(f"gate-current-release-authority:{gid}",current_authority,authority_detail)
     for artifact in result.get("artifacts",[]):
         p=Path(artifact["path"])
         check(f"gate-artifact-exists:{gid}:{p.name}",p.is_file(),str(p))

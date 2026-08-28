@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "work_package": "FC-UI-001",
-  "captured_at": "2026-08-26T23:29:28.112021+00:00",
+  "captured_at": "2026-08-28T12:46:48.868737+00:00",
   "overall_status": "blocked",
   "evidence_complete": false,
   "results": [
@@ -53,6 +53,19 @@
         "developer_mode": "disabled",
         "required_team_signing_identity_present": false,
         "other_code_signing_identities_present": true
+      }
+    },
+    {
+      "id": "FC-UI-SHELL-SETTINGS-BUILD-ONLY",
+      "evidence_id": "EVID-20260828T124634Z-c6c0c861da",
+      "exit_code": 0,
+      "status": "passed_build_only",
+      "observed": {
+        "compiled": true,
+        "executed_tests": 0,
+        "selected_test": "ForgeConductorUITests.testManagerSettingsControlsAndPersistsProjectShellPolicy",
+        "code_signing_allowed": false,
+        "qualification_effect": "none"
       }
     }
   ],

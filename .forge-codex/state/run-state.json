@@ -351,6 +351,36 @@
     "EVID-20260827T233917Z-a20d351011",
     "EVID-20260827T234534Z-7538388418",
     "EVID-20260828T003223Z-ed54aab219",
+    "EVID-20260828T102647Z-323b23d4e1",
+    "EVID-20260828T102813Z-b40aa90842",
+    "EVID-20260828T103105Z-49877a6c76",
+    "EVID-20260828T103516Z-d3f3c3c03d",
+    "EVID-20260828T103807Z-20f7b4d90d",
+    "EVID-20260828T104056Z-8011646489",
+    "EVID-20260828T122439Z-d1a60fb637",
+    "EVID-20260828T123045Z-c5d37cd558",
+    "EVID-20260828T124332Z-1e2a050c0e",
+    "EVID-20260828T124624Z-00a3dd27c2",
+    "EVID-20260828T124634Z-c6c0c861da",
+    "EVID-20260828T125021Z-6c31192210",
+    "EVID-20260828T125032Z-f15bab4972",
+    "EVID-20260828T125046Z-c15d53c9c9",
+    "EVID-20260828T125600Z-80144153b8",
+    "EVID-20260828T125612Z-1f4dcf69d6",
+    "EVID-20260828T125651Z-ad5ebff94c",
+    "EVID-20260828T125726Z-0146321ddb",
+    "EVID-20260828T125826Z-f026e511e9",
+    "EVID-20260828T130418Z-5574c5b7d8",
+    "EVID-20260828T130424Z-7eb8ebf490",
+    "EVID-20260828T130424Z-8504424e70",
+    "EVID-20260828T130425Z-686a1e57bc",
+    "EVID-20260828T130426Z-9f1dba3882",
+    "EVID-20260828T130426Z-af339f479f",
+    "EVID-20260828T130522Z-849134968b",
+    "EVID-20260828T130522Z-9f6e40e665",
+    "EVID-20260828T130522Z-a830cc844e",
+    "EVID-20260828T130523Z-73516c6e94",
+    "EVID-20260828T131739Z-66596e8e37",
     "a5466d4e5b4d7a10f87df64ddfdb58b6b8ca5159a57c20527e98802a822245d7",
     "a5d4276cbf14db3a91baa7f6b79fb8cdb3fb042a2eaf663d3219ff36b5451667",
     "b3dc11a8dc286fa33b6567ff62089692e64787b23a66718cfe1766dc27195724",
@@ -463,7 +493,7 @@
       "updated_at": "2026-08-23T20:45:54.629465+00:00"
     },
     "G09": {
-      "evaluator": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.json",
+      "evaluator": ".forge-autonomy-state/blockers/FC-E2E-001.json",
       "evidence_ids": [
         ".forge-codex/state/gate-results/G09.json",
         "1f33d16848f966a2cfeae1e1cae73fa3912a9cf38e9c300b8318fb57160e49ad",
@@ -483,8 +513,8 @@
         "d6e5a77279a6ade1d31a44a2ecc61451eddbe179b8c82c2a4cfd628e50b0b204",
         "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       ],
-      "status": "passed",
-      "updated_at": "2026-08-27T10:55:48.906371+00:00"
+      "status": "blocked_dependency",
+      "updated_at": "2026-08-28T10:21:49.171287+00:00"
     },
     "G10": {
       "evaluator": "forge-gate-handler",
@@ -541,7 +571,13 @@
       "updated_at": "2026-08-27T03:12:17.245745+00:00"
     }
   },
-  "handoffs": [],
+  "handoffs": [
+    "00d75d8d-ee0a-41ca-aedf-0b2fa1496ab8",
+    "810010d7-b872-41ff-8d51-414b7270ca9d",
+    "82441ec1-a7ed-4137-8ec5-3d2dd99739bb",
+    "ee862f4a-ebcc-466f-9817-1881ff1a6172",
+    "fdaa1903-9dea-4989-97a6-4a5518e2eddf"
+  ],
   "issues": [
     {
       "created_at": "2026-08-23T18:33:09.575651+00:00",
@@ -569,23 +605,23 @@
       "created_at": "2026-08-26T18:29:37.546573+00:00",
       "evidence_class": "E1",
       "id": "FC-AUTONOMY-001",
-      "notes": "Resolved by production registration of the configuration-gated LM Studio managed v2 adapter. Exact published revision 52f8aca47463f88fa94276115fb5c2070ca683ef passed the Release plugin build, 16 plugin contract tests with one expected live skip, Debug and Release strict suites with 447 tests each, nine external MCP compatibility checks, zero private UI automation scan violations, and real fresh-root acknowledgement plus automatic continuation in CMD-20260827T103812Z-17ac760a12. G09 passed through EVID-20260827T105148Z-30b18f1784.",
+      "notes": "Resolved narrowly by production registration of the configuration-gated LM Studio managed v2 adapter and exact-revision direct-adapter evidence at 52f8aca47463f88fa94276115fb5c2070ca683ef. That evidence proves provider session creation, exact handoff acknowledgement, and a linked continuation only for the recorded adapter-invocation scenario. It does not prove manager-owned threshold-forced rollover, predecessor fencing and idempotent sealing, GUI-closed operation, or durable crash-state recovery. FC-AUTONOMOUS-CONTINUITY-E2E-001 remains deferred and release-blocking.",
       "path": "Sources/ForgeNativeSessionHostPlugin/ForgeNativeSessionHostPlugin.swift",
       "severity": "High",
       "status": "resolved",
       "title": "Release transport is synthetic and cannot prove autonomous rollover",
-      "updated_at": "2026-08-27T10:59:16.687167+00:00"
+      "updated_at": "2026-08-28T11:15:34.194498+00:00"
     },
     {
       "created_at": "2026-08-26T18:29:37.687402+00:00",
       "evidence_class": "E1",
       "id": "FC-SHELL-DEFAULT-001",
-      "notes": "Resolved by schema-v2 default-enabled policy, verified legacy-disabled-default migration, and persisted settings toggles in both manager settings surfaces. EVID-20260826T235235Z-1a8c68eef0, EVID-20260826T235244Z-b5ed8ebe5c, and EVID-20260826T235254Z-ee03413577 pass; current Debug and Release 395-test strict suites also pass.",
+      "notes": "Resolved at the implementation and non-native regression boundary: schema-v2 defaults project shell tools enabled, accidental legacy-disabled defaults migrate enabled, explicit user opt-out is preserved, and persisted controls exist in manager and native Settings surfaces. shell_exec remains registered and retains its login-Bash compatibility contract; clean-profile bash.run is additive. Native Settings execution is not proven because Developer Mode and matching signing are unavailable. FC-SHELL-COMPAT-QUALIFICATION-001 and FC-UI-QUALIFICATION-001 remain deferred and release-blocking.",
       "path": "Sources/ForgeConductorCore/Domain/AppConfig.swift",
       "severity": "High",
       "status": "resolved",
       "title": "Fresh configuration defaults shell off and has no migration or UI toggle",
-      "updated_at": "2026-08-26T23:54:28.174542+00:00"
+      "updated_at": "2026-08-28T11:15:34.355070+00:00"
     },
     {
       "created_at": "2026-08-26T18:30:45.040874+00:00",
@@ -613,12 +649,12 @@
       "created_at": "2026-08-27T10:16:25.080799+00:00",
       "evidence_class": "E0",
       "id": "FC-LIVE-ROLLOVER-001",
-      "notes": "Resolved by an enforced 4096-token provider output bound and an unambiguous bootstrap-to-continuation turn contract. Exact published revision 52f8aca47463f88fa94276115fb5c2070ca683ef passed the real LM Studio fresh-root, acknowledgement, marker-bearing automatic continuation, response ancestry, exact model identity, and provider-exact usage proof in CMD-20260827T103812Z-17ac760a12. The continuation used 82 output tokens and 2403 total tokens. Focused contract CMD-20260827T103019Z-caacf56201 and both 447-test strict suites passed. Cleanup CMD-20260827T104150Z-7623857663 and CMD-20260827T104156Z-7ba27baea0 restored the unloaded and stopped baseline.",
+      "notes": "Resolved narrowly for the observed provider-deadline defect by enforcing a 4096-token output bound and an unambiguous bootstrap-to-continuation turn contract at exact revision 52f8aca47463f88fa94276115fb5c2070ca683ef. The recorded direct-adapter run is supporting evidence, not autonomous-continuity release authority. The manager-owned threshold-forced real-provider scenario, exact successor acknowledgement, predecessor fencing and idempotent sealing, GUI-closed automatic continuation, and every durable crash-state recovery path remain open under FC-AUTONOMOUS-CONTINUITY-E2E-001.",
       "path": "Tests/ForgeConductorTests/NativeSessionHostPluginTests.swift",
       "severity": "High",
       "status": "resolved",
       "title": "Live automatic continuation exhausts bounded provider deadline",
-      "updated_at": "2026-08-27T10:59:24.626731+00:00"
+      "updated_at": "2026-08-28T11:15:34.275626+00:00"
     },
     {
       "created_at": "2026-08-27T11:05:52.650923+00:00",
@@ -657,12 +693,12 @@
       "created_at": "2026-08-27T11:18:41.745343+00:00",
       "evidence_class": "E0",
       "id": "FC-UI-QUALIFICATION-001",
-      "notes": "Developer Mode is disabled. The available valid Apple Development identity has OU 9AQ2C2838M while the project is configured for team 2Y25RTLZET. Prior ad hoc execution timed out enabling automation mode. Independent host-safe work may continue, but G10 UI qualification requires an authorized host configuration and a usable matching signing identity or an approved project signing configuration.",
+      "notes": "EVID-20260828T124634Z-c6c0c861da proves the current native Settings shell-control XCUITest target compiles with CODE_SIGNING_ALLOWED=NO; it is build-only evidence and executed zero tests. Developer Mode remains disabled and the available Apple Development identity team does not match the project configuration. Native UI validation remains deferred and release-blocking until an authorized host and matching signing configuration execute the recorded XCUITest matrix.",
       "path": ".forge-autonomy-state/evidence/FC-UI-001/test-results.json",
       "severity": "High",
       "status": "deferred",
       "title": "Native UI qualification prerequisites are unavailable",
-      "updated_at": "2026-08-27T11:18:41.745206+00:00"
+      "updated_at": "2026-08-28T12:52:14.959617+00:00"
     },
     {
       "created_at": "2026-08-27T11:28:30.339203+00:00",
@@ -756,15 +792,37 @@
       "created_at": "2026-08-27T23:39:59.864993+00:00",
       "evidence_class": "E2",
       "id": "FC-FILESYSTEM-PATH-TOCTOU-001",
-      "notes": "Descriptor-relative parent traversal, explicit descriptor lifetimes, original-source identity across EXDEV fallback, rebound-parent rejection, pinned staging cleanup, and pinned-parent durability are implemented. EVID-20260828T003223Z-ed54aab219 passes 33 filesystem-related tests, including 29 mutation and cancellation probes. Residual E2 remains because final-component verification and unlinkat or renameatx_np are separate syscalls; pathname anchoring and destination-hierarchy creation also remain path based, and hard-link ctime has a narrow unlink-to-refresh ambiguity. Keep deferred until a checked final-component mutation design and deterministic leaf-race probes exist; do not infer confirmed reachability.",
+      "notes": "Current-source Debug EVID-20260828T124332Z-1e2a050c0e and Release EVID-20260828T124624Z-00a3dd27c2 each pass 657 warnings-as-errors tests with four expected host-dependent skips. The full four-path atomic RENAME_SWAP matrix, fixed 32-slot receipt ledger, unsafe-rollback refusal, combined namespace-instability and durability failures, and two-receipt recovery merge are covered. Descriptor-relative operations and renameatx_np mitigate but do not eliminate the final verifier-to-terminal-syscall race because public macOS APIs have no expected-identity conditional mutation. One winning race can mutate one entry under the pinned parent; a final-link unlink can lose unbounded bytes and a directory rename can relocate an unbounded subtree. One recursive request can expose up to 100000 separate opportunities; 32 bounds simultaneous cooperative recovery state only. Terminal namespace syscalls and fsync already executing under the ledger lock have no independent wall-time deadline. Initial path anchoring, destination hierarchy creation, and hard-link ctime ambiguity remain E2.",
       "path": "Sources/ForgeConductorCore/Application/Tools/FilesystemToolPack.swift",
       "severity": "High",
       "status": "deferred",
       "title": "Filesystem mutation paths retain descriptor-relative race windows",
-      "updated_at": "2026-08-28T00:33:13.334809+00:00"
+      "updated_at": "2026-08-28T12:52:14.619663+00:00"
+    },
+    {
+      "created_at": "2026-08-28T10:20:34.631148+00:00",
+      "evidence_class": "E0",
+      "id": "FC-SHELL-COMPAT-QUALIFICATION-001",
+      "notes": "Current-source Debug EVID-20260828T124332Z-1e2a050c0e and Release EVID-20260828T124624Z-00a3dd27c2 each pass 657 warnings-as-errors tests with four expected host-dependent skips. EVID-20260828T125651Z-ad5ebff94c proves current MCP tools/list compatibility with all declared protocol artifacts preserved, and EVID-20260828T125046Z-c15d53c9c9 proves current manager Settings routes. Tests cover clean-install enablement, accidental legacy-disabled migration, explicit opt-out, execution, manager and application restart, and the established shell_exec synchronous /bin/bash -lc result contract. Clean-profile bash.run remains additive. EVID-20260828T124634Z-c6c0c861da compiles the native Settings visibility, control, and relaunch XCUITest with signing disabled but executes no test. Shell compatibility remains open and release-blocking.",
+      "path": "Tests/ForgeConductorUITests/ForgeConductorUITests.swift",
+      "severity": "High",
+      "status": "deferred",
+      "title": "Shell compatibility qualification requires native Settings execution",
+      "updated_at": "2026-08-28T12:57:35.256775+00:00"
+    },
+    {
+      "created_at": "2026-08-28T10:20:34.787513+00:00",
+      "evidence_class": "E0",
+      "id": "FC-AUTONOMOUS-CONTINUITY-E2E-001",
+      "notes": "The prior live provider proof directly invoked an adapter and does not prove one manager-owned threshold-forced real-provider rollover. Release authority still requires exact successor acknowledgment, predecessor fencing and idempotent sealing, automatic continuation, GUI-closed operation, and recovery from every durable crash state in that scenario. Unit and synthetic-host tests are supporting evidence only. Autonomous continuity remains open and release-blocking.",
+      "path": ".forge-autonomy-state/blockers/FC-E2E-001.json",
+      "severity": "High",
+      "status": "deferred",
+      "title": "Autonomous continuity lacks full real-provider forced-rollover authority",
+      "updated_at": "2026-08-28T12:52:15.126800+00:00"
     }
   ],
-  "last_event_sequence": 445,
+  "last_event_sequence": 504,
   "phases": {
     "P00": {
       "attempts": 1,
@@ -822,9 +880,9 @@
     },
     "P09": {
       "attempts": 1,
-      "last_error": null,
-      "status": "passed",
-      "updated_at": "2026-08-27T10:55:53.214102+00:00"
+      "last_error": "Real-provider manager-owned forced-rollover authority remains incomplete under FC-AUTONOMOUS-CONTINUITY-E2E-001.",
+      "status": "blocked_dependency",
+      "updated_at": "2026-08-28T10:21:49.003768+00:00"
     },
     "P10": {
       "attempts": 2,
@@ -846,13 +904,13 @@
     }
   },
   "repository": {
-    "branch": "repair/cancellation-recovery",
-    "commit": "4b887fcc423284d0a60f57baed3adab4b943a576",
+    "branch": "repair/filesystem-race-mitigation",
+    "commit": "5bb563f2cad717ce192272648ff15da034ace830",
     "dirty": true,
-    "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Cancellation-Recovery"
+    "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation"
   },
   "run_id": "aba90ab1-be80-4cc5-aa0b-23dd54d4a24d",
   "schema_version": 1,
   "status": "active",
-  "updated_at": "2026-08-28T00:33:13.334953+00:00"
+  "updated_at": "2026-08-28T13:18:41.500673+00:00"
 }

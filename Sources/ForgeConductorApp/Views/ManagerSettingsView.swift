@@ -19,7 +19,10 @@ struct ManagerSettingsView: View {
                 LabeledContent("State", value: model.serviceState)
                 LabeledContent("Active", value: model.serviceActive ? "yes" : "no")
                 if let msg = model.managerMessage {
-                    Text(msg).font(.caption).foregroundStyle(.secondary)
+                    Text(msg)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("manager-message")
                 }
                 HStack(spacing: 10) {
                     Button("Start") { model.managerStart() }
@@ -64,8 +67,10 @@ struct ManagerSettingsView: View {
                 Toggle("Auto-restart HTTP if it drops", isOn: $model.setAutoRestart)
                 HStack(spacing: 10) {
                     Button("Reload from disk") { model.loadSettingsFromConfig() }
+                        .accessibilityIdentifier("settings-reload")
                     Button("Save settings") { model.saveSettings() }
                         .buttonStyle(.borderedProminent)
+                        .accessibilityIdentifier("settings-save")
                 }
                 .padding(.vertical, 2)
             }

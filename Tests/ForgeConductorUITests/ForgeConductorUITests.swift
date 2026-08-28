@@ -129,6 +129,52 @@ final class ForgeConductorUITests: XCTestCase {
         }
     }
 
+    func testManagerSettingsControlsAndPersistsProjectShellPolicy() throws {
+        let fixture = try OperatorManagerUITestFixture()
+        relaunch(with: fixture)
+
+        app.typeKey(",", modifierFlags: .command)
+        var shellToggle = app.checkBoxes["settings-shell-enabled"]
+        XCTAssertTrue(
+            shellToggle.waitForExistence(timeout: 5),
+            "The macOS Settings scene must expose the project shell policy"
+        )
+        XCTAssertTrue(waitForValue("1", on: shellToggle))
+
+        shellToggle.click()
+        let save = app.buttons["settings-save"]
+        makeHittable(save)
+        save.click()
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            fixture.settingsUpdateCount == 1 && !fixture.shellEnabled
+        })
+
+        let reload = app.buttons["settings-reload"]
+        makeHittable(reload)
+        reload.click()
+        shellToggle = app.checkBoxes["settings-shell-enabled"]
+        XCTAssertTrue(waitForValue("0", on: shellToggle))
+
+        app.terminate()
+        app.launch()
+        app.typeKey(",", modifierFlags: .command)
+        shellToggle = app.checkBoxes["settings-shell-enabled"]
+        XCTAssertTrue(
+            shellToggle.waitForExistence(timeout: 5),
+            "The macOS Settings scene must remain available after relaunch"
+        )
+        XCTAssertTrue(waitForValue("0", on: shellToggle))
+
+        shellToggle.click()
+        let relaunchedSave = app.buttons["settings-save"]
+        makeHittable(relaunchedSave)
+        relaunchedSave.click()
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            fixture.settingsUpdateCount == 2 && fixture.shellEnabled
+        })
+        XCTAssertTrue(waitForValue("1", on: shellToggle))
+    }
+
     func testOperatorSurfacesReportUnavailableManagerHonestly() throws {
         for tabID in ["tab-projects", "tab-autonomy", "tab-continuity", "tab-runtimes", "tab-provider", "tab-evidence"] {
             let tab = app.buttons[tabID]
@@ -300,6 +346,18 @@ final class ForgeConductorUITests: XCTestCase {
         }
         XCTAssertTrue(element.isHittable)
     }
+
+    private func waitUntil(
+        timeout: TimeInterval,
+        condition: () -> Bool
+    ) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if condition() { return true }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        }
+        return condition()
+    }
 }
 
 private final class OperatorManagerUITestFixture: @unchecked Sendable {
@@ -320,6 +378,8 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     private var mutableStartRequestBodies: [Data] = []
     private var mutableAcceptedStart = false
     private var mutableAcceptedStartRunID: String?
+    private var mutableShellEnabled = true
+    private var mutableSettingsUpdateCount = 0
     private(set) var port: UInt16 = 0
 
     var startRequestCount: Int { locked { mutableStartRequestCount } }
@@ -328,6 +388,8 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     var startRequestRunIDs: [String] { locked { mutableStartRequestRunIDs } }
     var startRequestBodies: [Data] { locked { mutableStartRequestBodies } }
     var acceptedStartRunID: String { locked { mutableAcceptedStartRunID ?? "" } }
+    var shellEnabled: Bool { locked { mutableShellEnabled } }
+    var settingsUpdateCount: Int { locked { mutableSettingsUpdateCount } }
 
     init(failStartResponse: Bool = false) throws {
         self.failStartResponse = failStartResponse
@@ -435,6 +497,24 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
         connection: NWConnection
     ) {
         switch request.path {
+        case "/api/manager/status":
+            respond(status: 200, object: managerStatus(), to: connection)
+        case "/api/manager/settings":
+            if !request.body.isEmpty {
+                guard request.headers["authorization"]?.hasPrefix("Bearer ") == true,
+                      let object = try? JSONSerialization.jsonObject(with: request.body) as? [String: Any],
+                      let patch = object["settings"] as? [String: Any],
+                      let shell = patch["shell"] as? [String: Any],
+                      let enabled = shell["enabled"] as? Bool else {
+                    respond(status: 401, object: ["message": "missing settings authorization or shell policy"], to: connection)
+                    return
+                }
+                locked {
+                    mutableShellEnabled = enabled
+                    mutableSettingsUpdateCount += 1
+                }
+            }
+            respond(status: 200, object: managerSettings(), to: connection)
         case "/api/manager/operator/snapshot":
             respond(status: 200, object: snapshot(), to: connection)
         case "/api/manager/autonomy/status":
@@ -551,6 +631,65 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             ],
             "runtime": runtimePolicy(),
             "events": [],
+        ]
+    }
+
+    private func managerStatus() -> [String: Any] {
+        [
+            "ok": true,
+            "manager": true,
+            "state": "running",
+            "desired_running": true,
+            "http_listening": true,
+            "service_active": true,
+            "pid": 1,
+            "restart_count": 0,
+            "auto_restart": true,
+            "watchdog_interval_sec": 3,
+            "open_browser_on_start": false,
+            "dashboard": [
+                "host": "127.0.0.1",
+                "port": Int(port),
+                "refresh_interval_sec": 8,
+            ] as [String: Any],
+            "home": "/tmp/forge-operator-fixture",
+            "version": "0.9.0",
+        ]
+    }
+
+    private func managerSettings() -> [String: Any] {
+        let enabled = locked { mutableShellEnabled }
+        return [
+            "ok": true,
+            "dashboard": [
+                "host": "127.0.0.1",
+                "port": Int(port),
+                "refresh_interval_sec": 8,
+            ] as [String: Any],
+            "manager": [
+                "auto_restart": true,
+                "watchdog_interval_sec": 3,
+                "open_browser_on_start": false,
+            ] as [String: Any],
+            "sessions": ["idle_ttl_sec": 14_400] as [String: Any],
+            "shell": [
+                "enabled": enabled,
+                "user_disabled": !enabled,
+                "policy_version": 2,
+                "policy_origin": enabled ? "user_enabled" : "user_disabled",
+                "default_timeout_sec": 30,
+                "migration": [
+                    "state": "not_required",
+                    "receipt_valid": false,
+                ] as [String: Any],
+                "runtimes": [
+                    "zsh": ["available": true, "path": "/bin/zsh"],
+                    "bash": ["available": true, "path": "/bin/bash"],
+                    "python": ["available": false],
+                    "powershell": ["available": false],
+                ] as [String: Any],
+            ] as [String: Any],
+            "log_level": "info",
         ]
     }
 

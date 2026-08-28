@@ -1,0 +1,6 @@
+{
+  "valid": true,
+  "checks": 605,
+  "errors": [],
+  "report": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/PACKAGE_VALIDATION.json"
+}

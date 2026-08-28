@@ -1,8 +1,13 @@
 # Forge Conductor user guide
 
-Version **0.9.0**. This guide is for operators who run Forge Conductor with [LM Studio](https://lmstudio.ai) on macOS.
+Version **0.9.0**, with the current unreleased P10 behavior called out explicitly.
+This guide is for operators who run Forge Conductor with
+[LM Studio](https://lmstudio.ai) on macOS.
 
-It describes behavior that is implemented and tested in this tree. Where something is *not* automated, that is stated plainly.
+The current tree is not release-qualified. P10, filesystem E2, shell
+compatibility, native UI validation, and autonomous continuity remain open.
+Where implementation has only non-native or build-only evidence, that boundary
+is stated plainly.
 
 Related detail (developer-oriented):
 
@@ -27,7 +32,7 @@ Forge does **not**:
 
 Forge **does**:
 
-- expose filesystem, git, memory, agent, continuity, and opt-in shell tools to the model
+- expose filesystem, git, memory, agent, continuity, and project-scoped shell tools to the model
 - persist task state under `~/.forge-conductor`
 - checkpoint and hand off that state without waiting for the model to remember `session_*`
 - block further project tools on a chat that has already been handed off, until `context_get`
@@ -97,10 +102,29 @@ forge-conductor version    # should print 0.9.0
 plutil -p ~/.lmstudio/mcp.json
 ```
 
-`shell_exec` is disabled by default. It can be enabled only through trusted local
-configuration in `~/.forge-conductor/config.json` by setting `shell.enabled` to
-`true`; model arguments and dashboard settings cannot enable it. Even when
-enabled, commands require an authorized workspace and have a 120-second maximum.
+On a clean install, project shell tools are enabled by default. Schema-v1
+configurations persisted no provenance capable of distinguishing the shipped
+disabled default from a user-chosen false value, so they migrate to enabled. An
+explicit schema-v2 user opt-out records provenance and remains disabled. The current native
+app exposes **Enable project shell tools** and the default timeout in Settings,
+and the same policy is persisted in `~/.forge-conductor/config.json`. Model tool
+arguments cannot change this operator policy.
+
+`shell_exec` remains registered in MCP `tools/list`, including when the operator
+has opted out. When enabled, it requires an authorized project workspace, runs
+the command synchronously through `/bin/bash -lc`, enforces the 120-second
+maximum, and retains its established result fields (`ok`, `exit_code`, `stdout`,
+`stderr`, timeout and truncation fields, `command`, and `cwd`). `bash.run` is an
+additive durable-job tool that starts Bash with profile and rc files disabled;
+it does not replace or redefine `shell_exec`.
+
+The non-native policy, migration, registration, execution, and result-contract
+regressions exist in the current tree. Restart coverage at that boundary uses a
+manager-service restart plus `ForgeApp` teardown/rebootstrap inside the test
+process. The Settings XCUITest includes an actual app terminate/relaunch flow,
+but it has build-only evidence: Developer Mode and a matching signing
+configuration are still required for native execution. Neither native relaunch
+nor shell compatibility is release-qualified.
 
 ---
 
@@ -121,7 +145,15 @@ LM Studio only starts the `serve` processes when a chat has those MCP servers se
 
 ---
 
-## 6. Continuity (what is automatic)
+## 6. Continuity (packet automation and current boundary)
+
+The checkpoint and handoff behavior below is implemented. The current release
+candidate has not yet proven autonomous session succession through a
+manager-owned, threshold-forced real-provider rollover. Until that test also
+proves exact successor acknowledgment, predecessor fencing, idempotent sealing,
+automatic continuation, GUI-closed operation, and crash-state recovery, use the
+new-chat recipe as the operational path rather than treating autonomous
+continuity as qualified.
 
 ### 6.1 What the model can still call
 
@@ -223,7 +255,7 @@ Default bind: `http://127.0.0.1:7788/` (loopback).
 | Rig | Host CPU / RAM / GPU / disk (sampled continuously) |
 | LM Studio MCP | Live Forge stdio servers, configured roles, LM Studio host processes |
 | Agents / Tools / Feed | Sessions and recent tool audit |
-| Manager | Start/stop the HTTP control plane |
+| Manager / Settings | Start/stop the HTTP control plane; inspect and change the persisted project-shell policy |
 
 `primary_alive` / `fallback_alive` are true only when a **stdio `serve` process** for that role is running. That happens when a chat has MCP enabled, not merely because the GUI is open.
 
@@ -239,7 +271,7 @@ Host metrics run at ~30 Hz in the native UI. That is intentional and uses CPU ev
 |------|---------|------------|
 | `context_budget_exceeded` | This chat was handed off. Project tools are blocked on this client. | New chat + `context_get` |
 | `identical_call_loop` | Same tool + same args 9 times. | Change arguments, or new chat + `context_get` |
-| `shell_disabled` | General shell execution is off in trusted local configuration. | Leave it disabled, or enable `shell.enabled` locally if the deployment requires it |
+| `shell_disabled` | The operator explicitly opted out of project shell tools, or the configured policy is not enabled. | Use the native Project shell setting or a valid local policy update; model arguments cannot override it |
 | `active_session_required` | `shell_exec` / some git tools need a workspace (agent `cwd` or adopted packet `cwd`). | `agent_run_start` with `cwd`, or `context_get` if a packet has one |
 | `path_outside_allowed_roots` | Path is outside Forge home, configured roots, agent/packet cwd, and (for writes) not a permitted home read. | Use a path inside the workspace; do not write outside it |
 | `tool_forbidden` / `tool_not_granted` | Current agent playbook does not allow that tool. | Different agent, or complete the session |
@@ -261,6 +293,9 @@ LM Studio may send all `tools/call` traffic to one of them (often fallback). Tha
 
 - Forge will not open a new LM Studio window or tab.
 - Forge will not compact the current chat’s token window.
+- The current checkpoint does not yet qualify manager-owned autonomous
+  succession. A directly invoked provider-adapter test is not a substitute for
+  the required forced-rollover scenario.
 - `/Applications/Forge Conductor.app` is not updated by `install` if the OS refuses the overwrite. Check **version** on the binary LM Studio actually spawns.
 - `forge-conductor install` from the CLI may stage a **CLI** binary inside `~/.forge-conductor/Forge Conductor.app`. That bundle is not a substitute for the SwiftUI GUI in `dist/` or a proper app-bundle install.
 - Read-only tools can list most of your home directory. Treat that as a real permission, not a sandbox.

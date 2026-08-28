@@ -1,0 +1,56 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 182990,
+      "path": ".forge-codex/evidence/EVID-20260828T122439Z-d1a60fb637.stdout.txt",
+      "sha256": "2863c5164d8c8cf5fc0a2b9b91c5bcfc4353fb5786b748afe60047e596b58169",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 12352,
+      "path": ".forge-codex/evidence/EVID-20260828T122439Z-d1a60fb637.stderr.txt",
+      "sha256": "4da686a6bd72fa8f672b40ce468a6c2cc60ff5d7940a7c4811892e4a094d428a",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "command": "swift test -Xswiftc -warnings-as-errors --no-parallel",
+  "ended_at": "2026-08-28T12:27:15.465561+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 1,
+  "id": "EVID-20260828T122439Z-d1a60fb637",
+  "kind": "p10-full-debug",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [
+    "FC-FILESYSTEM-PATH-TOCTOU-001",
+    "FC-SHELL-COMPAT-QUALIFICATION-001"
+  ],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 9064599,
+    "file_count": 242,
+    "schema_version": 1,
+    "sha256": "99efd899b462959dfc14ca85f2011ee604f6870b3c8c44583893320e4e7f30af"
+  },
+  "source_manifest_after": {
+    "bytes": 9064599,
+    "file_count": 242,
+    "schema_version": 1,
+    "sha256": "99efd899b462959dfc14ca85f2011ee604f6870b3c8c44583893320e4e7f30af"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-28T12:24:39.429052+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

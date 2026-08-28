@@ -1,0 +1,60 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 7105,
+      "path": ".forge-codex/evidence/EVID-20260828T130426Z-af339f479f.artifact-000-G09.json",
+      "sha256": "bd208e0d50fa39c35a8c6f024ac51c57e5f3c63bb1673239c3faa1049e909c3e",
+      "source_path": ".forge-codex/state/acceptance/G09.json",
+      "storage": "evidence-id-specific-copy"
+    },
+    {
+      "bytes": 3940,
+      "path": ".forge-codex/evidence/EVID-20260828T130426Z-af339f479f.stdout.txt",
+      "sha256": "b68d6e8a3c2e6ef1d55bec681b3ee66b053c559484f26993d5ba4d46f88119e6",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260828T130426Z-af339f479f.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "command": "python3 .forge-codex/scripts/validate_acceptance.py G09 --repo .",
+  "ended_at": "2026-08-28T13:04:26.737331+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 1,
+  "id": "EVID-20260828T130426Z-af339f479f",
+  "kind": "acceptance-boundary",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [],
+  "related_gates": [
+    "G09"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 9082957,
+    "file_count": 242,
+    "schema_version": 1,
+    "sha256": "bc7b2f66d381d8fa4cd51b9e4da78b8c8486572385e05425c07d94922e8c3106"
+  },
+  "source_manifest_after": {
+    "bytes": 9082957,
+    "file_count": 242,
+    "schema_version": 1,
+    "sha256": "bc7b2f66d381d8fa4cd51b9e4da78b8c8486572385e05425c07d94922e8c3106"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-28T13:04:26.706026+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

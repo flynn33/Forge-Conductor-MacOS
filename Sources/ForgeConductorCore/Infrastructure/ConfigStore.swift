@@ -291,10 +291,20 @@ public final class ConfigStore: ConfigurationProviding, @unchecked Sendable {
         target["config_schema_version"] = AppConfig.currentSchemaVersion
         target["config_migration_id"] = migrationID
         var shell = target["shell"] as? [String: Any] ?? [:]
-        shell["enabled"] = true
-        shell["user_disabled"] = false
+        // The released schema-v1 writer persisted only `enabled`, whose false
+        // value represented both the shipped default and any user choice. It
+        // therefore supplied no provenance that could distinguish an opt-out.
+        // Honor provenance fields only when a forward/backported writer supplied
+        // them explicitly; ordinary v1 disabled state migrates to enabled.
+        let recognizedOptOutMetadata = shell["user_disabled"] as? Bool == true
+            || shell["policy_origin"] as? String == "user_disabled"
+        let migratedPolicyOrigin = recognizedOptOutMetadata
+            ? "user_disabled"
+            : "legacy_disabled_default_migrated"
+        shell["enabled"] = !recognizedOptOutMetadata
+        shell["user_disabled"] = recognizedOptOutMetadata
         shell["policy_version"] = AppConfig.currentSchemaVersion
-        shell["policy_origin"] = "legacy_disabled_default_migrated"
+        shell["policy_origin"] = migratedPolicyOrigin
         if integer(shell["default_timeout_sec"]) == nil {
             shell["default_timeout_sec"] = 30
         }
@@ -318,6 +328,7 @@ public final class ConfigStore: ConfigurationProviding, @unchecked Sendable {
             backupSHA: backupSHA,
             targetName: targetName,
             targetSHA: targetSHA,
+            policyOrigin: migratedPolicyOrigin,
             startedAt: startedAt,
             completedAt: nil
         )
@@ -330,10 +341,10 @@ public final class ConfigStore: ConfigurationProviding, @unchecked Sendable {
               integer(persisted["config_schema_version"]) == AppConfig.currentSchemaVersion,
               persisted["config_migration_id"] as? String == migrationID,
               let persistedShell = persisted["shell"] as? [String: Any],
-              persistedShell["enabled"] as? Bool == true,
-              persistedShell["user_disabled"] as? Bool == false,
+              persistedShell["enabled"] as? Bool == !recognizedOptOutMetadata,
+              persistedShell["user_disabled"] as? Bool == recognizedOptOutMetadata,
               integer(persistedShell["policy_version"]) == AppConfig.currentSchemaVersion,
-              persistedShell["policy_origin"] as? String == "legacy_disabled_default_migrated" else {
+              persistedShell["policy_origin"] as? String == migratedPolicyOrigin else {
             throw ConfigMigrationError.targetVerificationFailed
         }
 
@@ -352,7 +363,9 @@ public final class ConfigStore: ConfigurationProviding, @unchecked Sendable {
                 receiptValid: true,
                 migrationID: migrationID,
                 diagnosticPending: true,
-                detail: "Legacy implicit shell policy migrated to schema v2"
+                detail: recognizedOptOutMetadata
+                    ? "Explicit shell opt-out provenance preserved in schema v2"
+                    : "Legacy implicit shell policy migrated to schema v2"
             )
         )
     }
@@ -442,6 +455,7 @@ public final class ConfigStore: ConfigurationProviding, @unchecked Sendable {
         backupSHA: String,
         targetName: String,
         targetSHA: String,
+        policyOrigin: String,
         startedAt: String,
         completedAt: String?
     ) -> [String: Any] {
@@ -457,7 +471,7 @@ public final class ConfigStore: ConfigurationProviding, @unchecked Sendable {
             "target_schema_version": AppConfig.currentSchemaVersion,
             "target_filename": targetName,
             "target_sha256": targetSHA,
-            "policy_origin": "legacy_disabled_default_migrated",
+            "policy_origin": policyOrigin,
             "started_at": startedAt,
             "completed_at": completedAt as Any,
             "diagnostic_emitted": false,

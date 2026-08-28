@@ -19,15 +19,21 @@ public struct FilesystemToolPack: ToolPackHandling {
     private let moveStepObserver: (@Sendable (MoveStep) -> Void)?
     private let forceCrossVolumeMove: Bool
     private let directorySynchronizer: @Sendable (URL) throws -> Void
+    private let quarantineDirectorySynchronizer: @Sendable (Int32, URL) throws -> Void
 
     enum MoveStep: Sendable, Equatable {
         case preparedDestinationDirectories
         case beforeSameVolumeRename
+        case afterVerifyingSameVolumeSource
+        case afterPublishingSameVolumeDestination
         case beforeDestinationInstall
+        case afterVerifyingStagingPayload(String)
+        case afterPublishingStagingPayload
         case copiedToStaging
         case installedDestination
         case beforeSourceFenceVerification
         case beforeSourceEntryRemoval(String)
+        case afterVerifyingSourceEntry(String)
         case synchronizingStagingEntry(Int)
         case reconcilingHardLinkGroup
         case removedStagingEntry(Int)
@@ -36,6 +42,8 @@ public struct FilesystemToolPack: ToolPackHandling {
 
     enum DeletionMutationStep: Sendable, Equatable {
         case beforeRemoving(String)
+        case afterVerifying(String)
+        case afterQuarantining(String)
     }
 
     public init() {
@@ -44,6 +52,9 @@ public struct FilesystemToolPack: ToolPackHandling {
         moveStepObserver = nil
         forceCrossVolumeMove = false
         directorySynchronizer = { try Self.synchronizeDirectory($0) }
+        quarantineDirectorySynchronizer = {
+            try Self.synchronizeDirectoryDescriptor($0, path: $1)
+        }
     }
 
     init(deletionStepObserver: (@Sendable (Int) -> Void)?) {
@@ -52,6 +63,9 @@ public struct FilesystemToolPack: ToolPackHandling {
         moveStepObserver = nil
         forceCrossVolumeMove = false
         directorySynchronizer = { try Self.synchronizeDirectory($0) }
+        quarantineDirectorySynchronizer = {
+            try Self.synchronizeDirectoryDescriptor($0, path: $1)
+        }
     }
 
     init(
@@ -64,27 +78,40 @@ public struct FilesystemToolPack: ToolPackHandling {
         self.moveStepObserver = moveStepObserver
         self.forceCrossVolumeMove = forceCrossVolumeMove
         directorySynchronizer = { try Self.synchronizeDirectory($0) }
+        quarantineDirectorySynchronizer = {
+            try Self.synchronizeDirectoryDescriptor($0, path: $1)
+        }
     }
 
     init(
         deletionStepObserver: (@Sendable (Int) -> Void)?,
         moveStepObserver: (@Sendable (MoveStep) -> Void)?,
         forceCrossVolumeMove: Bool,
-        directorySynchronizer: @escaping @Sendable (URL) throws -> Void
+        directorySynchronizer: @escaping @Sendable (URL) throws -> Void,
+        quarantineDirectorySynchronizer: @escaping @Sendable (Int32, URL) throws -> Void = {
+            try Self.synchronizeDirectoryDescriptor($0, path: $1)
+        }
     ) {
         self.deletionStepObserver = deletionStepObserver
         deletionMutationObserver = nil
         self.moveStepObserver = moveStepObserver
         self.forceCrossVolumeMove = forceCrossVolumeMove
         self.directorySynchronizer = directorySynchronizer
+        self.quarantineDirectorySynchronizer = quarantineDirectorySynchronizer
     }
 
-    init(deletionMutationObserver: (@Sendable (DeletionMutationStep) -> Void)?) {
+    init(
+        deletionMutationObserver: (@Sendable (DeletionMutationStep) -> Void)?,
+        quarantineDirectorySynchronizer: @escaping @Sendable (Int32, URL) throws -> Void = {
+            try Self.synchronizeDirectoryDescriptor($0, path: $1)
+        }
+    ) {
         deletionStepObserver = nil
         self.deletionMutationObserver = deletionMutationObserver
         moveStepObserver = nil
         forceCrossVolumeMove = false
         directorySynchronizer = { try Self.synchronizeDirectory($0) }
+        self.quarantineDirectorySynchronizer = quarantineDirectorySynchronizer
     }
 
     public var toolNames: [String] {
@@ -108,8 +135,18 @@ public struct FilesystemToolPack: ToolPackHandling {
         case "fs_list": return try fsList(arguments, cancellation: cancellation)
         case "fs_glob": return try fsGlob(arguments, runner: ProcessRunner(), cancellation: cancellation)
         case "fs_mkdir": return try fsMkdir(arguments, cancellation: cancellation)
-        case "fs_delete": return try fsDelete(arguments, cancellation: cancellation)
-        case "fs_move": return try fsMove(arguments, cancellation: cancellation)
+        case "fs_delete":
+            return try fsDelete(
+                arguments,
+                quarantineLedger: FilesystemQuarantineLedger(paths: app.paths),
+                cancellation: cancellation
+            )
+        case "fs_move":
+            return try fsMove(
+                arguments,
+                quarantineLedger: FilesystemQuarantineLedger(paths: app.paths),
+                cancellation: cancellation
+            )
         default: return nil
         }
     }
@@ -380,6 +417,7 @@ public struct FilesystemToolPack: ToolPackHandling {
 
     private func fsDelete(
         _ args: [String: Any],
+        quarantineLedger: FilesystemQuarantineLedger,
         cancellation: ToolCallCancellation?
     ) throws -> ToolResult {
         guard let path = ToolArgHelpers.string(args, "path") else {
@@ -422,16 +460,28 @@ public struct FilesystemToolPack: ToolPackHandling {
                     error: error
                 )
             }
+            let terminalOutcome: QuarantineTerminalOutcome
             do {
-                try Self.removeEntry(
+                terminalOutcome = try Self.removeEntry(
                     entry,
                     root: pinnedRoot,
                     expectedIdentities: expectedIdentities,
+                    quarantineLedger: quarantineLedger,
+                    quarantineDirectorySynchronizer: quarantineDirectorySynchronizer,
                     beforeRemoval: {
                         deletionMutationObserver?(.beforeRemoving(entry.relativePath))
+                    },
+                    afterVerification: {
+                        deletionMutationObserver?(.afterVerifying(entry.relativePath))
+                    },
+                    afterQuarantine: { quarantinePath in
+                        deletionMutationObserver?(.afterQuarantining(quarantinePath))
                     }
                 )
             } catch {
+                if removedCount == 0, error is SourceFenceError {
+                    return Self.sourceChangedFailure(error)
+                }
                 guard removedCount > 0 else { throw error }
                 return Self.partialMutationResult(
                     operation: "delete",
@@ -442,6 +492,29 @@ public struct FilesystemToolPack: ToolPackHandling {
                 )
             }
             removedCount += 1
+            if !terminalOutcome.durabilityConfirmed {
+                let recoveryPath = terminalOutcome.retainedReceiptPath ?? "unknown"
+                if removedCount == plan.count, Self.pathEntryConfirmedAbsent(url) {
+                    return .success([
+                        "path": url.path,
+                        "deleted": true,
+                        "deleted_entries": removedCount,
+                        "committed": true,
+                        "durability_confirmed": false,
+                        "ledger_cleanup_required": true,
+                        "recovery_required": true,
+                        "recovery_path": recoveryPath,
+                        "recovery_paths": [recoveryPath],
+                    ])
+                }
+                return Self.partialMutationResult(
+                    operation: "delete",
+                    source: url,
+                    destination: nil,
+                    completedEntries: removedCount,
+                    error: SourceFenceError.terminalReceiptRetained(recoveryPath)
+                )
+            }
             deletionStepObserver?(removedCount)
         }
         if Self.pathEntryExists(url) {
@@ -462,6 +535,7 @@ public struct FilesystemToolPack: ToolPackHandling {
 
     private func fsMove(
         _ args: [String: Any],
+        quarantineLedger: FilesystemQuarantineLedger,
         cancellation: ToolCallCancellation?
     ) throws -> ToolResult {
         guard let src = ToolArgHelpers.string(args, "path")
@@ -521,10 +595,18 @@ public struct FilesystemToolPack: ToolPackHandling {
                     source: s,
                     destination: d,
                     expectedSourceIdentity: sourceIdentity,
+                    quarantineLedger: quarantineLedger,
+                    directorySynchronizer: directorySynchronizer,
                     beforeRename: {
                         try cancellation?.checkCancellation()
                         moveStepObserver?(.beforeSameVolumeRename)
                         try cancellation?.checkCancellation()
+                    },
+                    afterVerification: {
+                        moveStepObserver?(.afterVerifyingSameVolumeSource)
+                    },
+                    afterRename: {
+                        moveStepObserver?(.afterPublishingSameVolumeDestination)
                     }
                 )
             } catch {
@@ -534,11 +616,7 @@ public struct FilesystemToolPack: ToolPackHandling {
                 } else {
                     guard !createdDestinationDirectories.isEmpty else {
                         if error is SourceFenceError {
-                            return .failure(
-                                code: "source_changed",
-                                message: error.localizedDescription,
-                                retryable: false
-                            )
+                            return Self.sourceChangedFailure(error)
                         }
                         throw error
                     }
@@ -557,36 +635,27 @@ public struct FilesystemToolPack: ToolPackHandling {
                 throw SourceFenceError.changed
             }
             if !sameVolumeRenameReceipt.requestedNamespaceStable {
-                let durabilityConfirmed = (try? Self.synchronizePinnedRenameParents(
-                    sameVolumeRenameReceipt
-                )) != nil
                 return Self.namespaceChangedAfterRenameResult(
                     source: s,
                     destination: d,
                     completedEntries: max(1, createdDestinationDirectories.count),
-                    durabilityConfirmed: durabilityConfirmed,
+                    durabilityConfirmed: sameVolumeRenameReceipt.durabilityConfirmed,
+                    retainedReceiptPath: sameVolumeRenameReceipt.retainedReceiptPath,
                     createdDirectories: createdDestinationDirectories
                 )
             }
             // Rename is the irreversible boundary. A late cancellation must not
             // conceal the completed move.
-            do {
-                try Self.synchronizePinnedRenameParents(sameVolumeRenameReceipt)
-                try synchronizeMoveParents(source: s, destination: d)
-                return Self.committedMoveResult(
-                    source: s,
-                    destination: d,
-                    durabilityConfirmed: true,
-                    durabilityError: nil
-                )
-            } catch {
-                return Self.committedMoveResult(
-                    source: s,
-                    destination: d,
-                    durabilityConfirmed: false,
-                    durabilityError: error
-                )
-            }
+            return Self.committedMoveResult(
+                source: s,
+                destination: d,
+                durabilityConfirmed: sameVolumeRenameReceipt.durabilityConfirmed,
+                durabilityError: sameVolumeRenameReceipt.durabilityConfirmed
+                    ? nil
+                    : SourceFenceError.terminalReceiptRetained(
+                        sameVolumeRenameReceipt.retainedReceiptPath ?? "unknown"
+                    )
+            )
         }
 
         return try crossVolumeMove(
@@ -594,6 +663,7 @@ public struct FilesystemToolPack: ToolPackHandling {
             destination: d,
             expectedSourceIdentity: sourceIdentity,
             createdDestinationDirectories: createdDestinationDirectories,
+            quarantineLedger: quarantineLedger,
             cancellation: cancellation
         )
     }
@@ -603,6 +673,7 @@ public struct FilesystemToolPack: ToolPackHandling {
         destination: URL,
         expectedSourceIdentity: PathIdentity,
         createdDestinationDirectories: [URL],
+        quarantineLedger: FilesystemQuarantineLedger,
         cancellation: ToolCallCancellation?
     ) throws -> ToolResult {
         if try Self.itemType(at: destination).exists {
@@ -654,13 +725,15 @@ public struct FilesystemToolPack: ToolPackHandling {
         var stagingPayloadInstalled = false
         defer {
             let stagingExisted = pinnedStagingTree.map(Self.conservativelyPinnedDeletionTreeExists)
-                ?? ((try? Self.itemType(at: stagingRoot).exists) == true)
+                ?? Self.pathEntryExists(stagingRoot)
             if stagingExisted {
                 do {
                     if let pinnedStagingTree {
                         if stagingPayloadInstalled {
                             try Self.discardPublishedStagingRoot(
                                 pinnedStagingTree,
+                                quarantineLedger: quarantineLedger,
+                                quarantineDirectorySynchronizer: quarantineDirectorySynchronizer,
                                 cancellation: cancellation,
                                 deadline: operationDeadline,
                                 stepObserver: moveStepObserver
@@ -668,6 +741,8 @@ public struct FilesystemToolPack: ToolPackHandling {
                         } else {
                             try Self.discardPinnedDeletionTree(
                                 pinnedStagingTree,
+                                quarantineLedger: quarantineLedger,
+                                quarantineDirectorySynchronizer: quarantineDirectorySynchronizer,
                                 cancellation: cancellation,
                                 deadline: operationDeadline,
                                 stepObserver: moveStepObserver
@@ -676,6 +751,8 @@ public struct FilesystemToolPack: ToolPackHandling {
                     } else {
                         try Self.discardPrivateStaging(
                             at: stagingRoot,
+                            quarantineLedger: quarantineLedger,
+                            quarantineDirectorySynchronizer: quarantineDirectorySynchronizer,
                             cancellation: cancellation,
                             deadline: operationDeadline,
                             stepObserver: moveStepObserver
@@ -701,6 +778,7 @@ public struct FilesystemToolPack: ToolPackHandling {
                 stagingRoot: stagingRoot,
                 error: failure.underlying,
                 createdDestinationDirectories: createdDestinationDirectories,
+                quarantineLedger: quarantineLedger,
                 cancellation: cancellation,
                 deadline: operationDeadline
             )
@@ -711,6 +789,7 @@ public struct FilesystemToolPack: ToolPackHandling {
                 stagingRoot: stagingRoot,
                 error: error,
                 createdDestinationDirectories: createdDestinationDirectories,
+                quarantineLedger: quarantineLedger,
                 cancellation: cancellation,
                 deadline: operationDeadline
             )
@@ -735,6 +814,7 @@ public struct FilesystemToolPack: ToolPackHandling {
                     stagingRoot: stagingRoot,
                     error: ToolCallDeadlineExceeded(),
                     createdDestinationDirectories: createdDestinationDirectories,
+                    quarantineLedger: quarantineLedger,
                     cancellation: cancellation,
                     deadline: operationDeadline
                 )
@@ -755,6 +835,7 @@ public struct FilesystemToolPack: ToolPackHandling {
                     stagingRoot: stagingRoot,
                     error: copyError,
                     createdDestinationDirectories: createdDestinationDirectories,
+                    quarantineLedger: quarantineLedger,
                     cancellation: cancellation,
                     deadline: operationDeadline
                 )
@@ -766,6 +847,7 @@ public struct FilesystemToolPack: ToolPackHandling {
                 stagingRoot: stagingRoot,
                 error: CancellationError(),
                 createdDestinationDirectories: createdDestinationDirectories,
+                quarantineLedger: quarantineLedger,
                 cancellation: cancellation,
                 deadline: operationDeadline
             )
@@ -776,6 +858,7 @@ public struct FilesystemToolPack: ToolPackHandling {
                 stagingRoot: stagingRoot,
                 error: error,
                 createdDestinationDirectories: createdDestinationDirectories,
+                quarantineLedger: quarantineLedger,
                 cancellation: cancellation,
                 deadline: operationDeadline
             )
@@ -829,6 +912,7 @@ public struct FilesystemToolPack: ToolPackHandling {
                 stagingRoot: stagingRoot,
                 error: error,
                 createdDestinationDirectories: createdDestinationDirectories,
+                quarantineLedger: quarantineLedger,
                 cancellation: cancellation,
                 deadline: operationDeadline
             )
@@ -840,6 +924,8 @@ public struct FilesystemToolPack: ToolPackHandling {
                 source: staging,
                 destination: destination,
                 expectedSourceIdentity: stagedRootIdentity,
+                quarantineLedger: quarantineLedger,
+                directorySynchronizer: directorySynchronizer,
                 beforeRename: {
                     try Self.checkMutationBoundary(
                         cancellation: cancellation,
@@ -850,6 +936,12 @@ public struct FilesystemToolPack: ToolPackHandling {
                         cancellation: cancellation,
                         deadline: operationDeadline
                     )
+                },
+                afterVerification: {
+                    moveStepObserver?(.afterVerifyingStagingPayload(staging.path))
+                },
+                afterRename: {
+                    moveStepObserver?(.afterPublishingStagingPayload)
                 }
             )
         } catch {
@@ -859,6 +951,7 @@ public struct FilesystemToolPack: ToolPackHandling {
                 stagingRoot: stagingRoot,
                 error: error,
                 createdDestinationDirectories: createdDestinationDirectories,
+                quarantineLedger: quarantineLedger,
                 cancellation: cancellation,
                 deadline: operationDeadline,
                 pinnedStagingTree: pinnedStagingTree
@@ -866,31 +959,57 @@ public struct FilesystemToolPack: ToolPackHandling {
         }
         stagingPayloadInstalled = true
         if !installReceipt.requestedNamespaceStable {
-            _ = try? Self.synchronizePinnedRenameParents(installReceipt)
+            var stagingCleanupError: Error?
             if let pinnedStagingTree {
-                try? Self.discardPublishedStagingRoot(
-                    pinnedStagingTree,
-                    cancellation: nil,
-                    deadline: operationDeadline,
-                    stepObserver: moveStepObserver
-                )
+                do {
+                    try Self.discardPublishedStagingRoot(
+                        pinnedStagingTree,
+                        quarantineLedger: quarantineLedger,
+                        quarantineDirectorySynchronizer: quarantineDirectorySynchronizer,
+                        cancellation: nil,
+                        deadline: operationDeadline,
+                        stepObserver: moveStepObserver
+                    )
+                } catch {
+                    stagingCleanupError = error
+                }
             }
-            return Self.namespaceChangedAfterRenameResult(
+            var result = Self.namespaceChangedAfterRenameResult(
                 source: source,
                 destination: destination,
                 completedEntries: 1,
-                durabilityConfirmed: false,
+                durabilityConfirmed: installReceipt.durabilityConfirmed,
+                retainedReceiptPath: installReceipt.retainedReceiptPath,
                 createdDirectories: createdDestinationDirectories
             )
+            if let stagingCleanupError {
+                result.payload["staging_path"] = stagingRoot.path
+                let stagingPresence = pinnedStagingTree.map(Self.pinnedDeletionTreePresence)
+                    ?? Self.pathEntryPresence(stagingRoot)
+                Self.recordStagingPresence(stagingPresence, in: &result.payload)
+                result.payload["staging_cleanup_error"] = stagingCleanupError.localizedDescription
+                let existingRecoveryPaths = result.payload["recovery_paths"] as? [String] ?? []
+                let cleanupRecoveryPaths = (stagingCleanupError as? SourceFenceError)?.recoveryPaths ?? []
+                let combinedRecoveryPaths = Array(
+                    Set(existingRecoveryPaths + cleanupRecoveryPaths)
+                ).sorted()
+                if let recoveryPath = combinedRecoveryPaths.first {
+                    result.payload["ledger_cleanup_required"] = true
+                    result.payload["recovery_required"] = true
+                    result.payload["recovery_path"] = recoveryPath
+                    result.payload["recovery_paths"] = combinedRecoveryPaths
+                }
+            }
+            return result
         }
-        do {
-            try Self.synchronizePinnedRenameParents(installReceipt)
-        } catch {
+        if !installReceipt.durabilityConfirmed {
             return Self.partialMoveResult(
                 source: source,
                 destination: destination,
                 completedEntries: 1,
-                error: error,
+                error: SourceFenceError.terminalReceiptRetained(
+                    installReceipt.retainedReceiptPath ?? "unknown"
+                ),
                 destinationComplete: true,
                 createdDirectories: createdDestinationDirectories
             )
@@ -899,6 +1018,8 @@ public struct FilesystemToolPack: ToolPackHandling {
             guard let pinnedStagingTree else { throw SourceFenceError.changed }
             try Self.discardPublishedStagingRoot(
                 pinnedStagingTree,
+                quarantineLedger: quarantineLedger,
+                quarantineDirectorySynchronizer: quarantineDirectorySynchronizer,
                 cancellation: cancellation,
                 deadline: operationDeadline,
                 stepObserver: moveStepObserver
@@ -913,10 +1034,10 @@ public struct FilesystemToolPack: ToolPackHandling {
                 createdDirectories: createdDestinationDirectories
             )
             result.payload["staging_path"] = stagingRoot.path
-            let stagingExists = pinnedStagingTree.map(Self.conservativelyPinnedDeletionTreeExists)
-                ?? Self.pathEntryExists(stagingRoot)
-            result.payload["staging_cleanup_required"] = stagingExists
-            result.payload["staging_exists"] = stagingExists
+            let stagingPresence = pinnedStagingTree.map(Self.pinnedDeletionTreePresence)
+                ?? Self.pathEntryPresence(stagingRoot)
+            Self.recordStagingPresence(stagingPresence, in: &result.payload)
+            result.payload["staging_cleanup_error"] = error.localizedDescription
             return result
         }
         moveStepObserver?(.installedDestination)
@@ -1023,21 +1144,45 @@ public struct FilesystemToolPack: ToolPackHandling {
         var removedCount = 0
         for entry in plan {
             do {
-                let relativePath = try Self.removeVerifiedDeletionCandidate(
+                let removal = try Self.removeVerifiedDeletionCandidate(
                     entry,
                     pinnedRoot: pinnedSourceRoot,
                     expectedByRelativePath: expectedEntries,
                     expectedIdentities: sourceIdentities,
                     hardLinkGroups: hardLinkGroups,
+                    quarantineLedger: quarantineLedger,
                     cancellation: cancellation,
                     deadline: operationDeadline,
                     beforeRemoval: {
                         moveStepObserver?(.beforeSourceEntryRemoval(entry.relativePath))
+                    },
+                    afterVerification: {
+                        moveStepObserver?(.afterVerifyingSourceEntry(entry.relativePath))
                     }
                 )
                 removedCount += 1
+                if !removal.terminal.durabilityConfirmed {
+                    let recoveryPath = removal.terminal.retainedReceiptPath ?? "unknown"
+                    let error = SourceFenceError.terminalReceiptRetained(recoveryPath)
+                    if removedCount == plan.count, Self.pathEntryConfirmedAbsent(source) {
+                        return Self.committedMoveResult(
+                            source: source,
+                            destination: destination,
+                            durabilityConfirmed: false,
+                            durabilityError: error,
+                            movedEntries: removedCount
+                        )
+                    }
+                    return Self.sourceFencePartialResult(
+                        source: source,
+                        destination: destination,
+                        completedEntries: removedCount,
+                        error: error,
+                        createdDirectories: createdDestinationDirectories
+                    )
+                }
                 try Self.reconcileExpectedLinkStateAfterRemoval(
-                    removedRelativePath: relativePath,
+                    removedRelativePath: removal.relativePath,
                     sourceRoot: source,
                     pinnedRoot: pinnedSourceRoot,
                     expectedIdentities: sourceIdentities,
@@ -1194,6 +1339,25 @@ public struct FilesystemToolPack: ToolPackHandling {
                 && contentSHA256 == candidate.contentSHA256
         }
 
+        func matchesQuarantinedDeletionCandidate(_ candidate: SourceFenceEntry) -> Bool {
+            guard relativePath == candidate.relativePath,
+                  kind == candidate.kind,
+                  device == candidate.device,
+                  inode == candidate.inode,
+                  mode == candidate.mode,
+                  owner == candidate.owner,
+                  group == candidate.group else { return false }
+            guard kind != .directory else { return true }
+            // Renaming into the private quarantine may advance ctime on the
+            // same inode. Identity, link count, content-bearing metadata, and
+            // the content digest must still match before destructive removal.
+            return linkCount == candidate.linkCount
+                && size == candidate.size
+                && modifiedSeconds == candidate.modifiedSeconds
+                && modifiedNanoseconds == candidate.modifiedNanoseconds
+                && contentSHA256 == candidate.contentSHA256
+        }
+
         func matchesAfterRemovingSiblingLink(
             _ candidate: SourceFenceEntry,
             expectedLinkCount: UInt64
@@ -1289,12 +1453,52 @@ public struct FilesystemToolPack: ToolPackHandling {
 
     private enum SourceFenceError: Error, LocalizedError {
         case changed
+        case quarantineBusy
+        case quarantineCapacityExhausted([String])
+        case quarantineTransitionRetained(String)
+        case quarantineRetained(String)
+        case terminalReceiptRetained(String)
+        case rollbackReceiptRetained(String)
+        case quarantineUnavailable(String, String?)
         case unsupported(String)
+
+        var recoveryPaths: [String] {
+            switch self {
+            case .quarantineCapacityExhausted(let paths):
+                return paths
+            case .quarantineTransitionRetained(let path):
+                return [path]
+            case .quarantineRetained(let path):
+                return [path]
+            case .terminalReceiptRetained(let path):
+                return [path]
+            case .rollbackReceiptRetained(let path):
+                return [path]
+            case .quarantineUnavailable(_, let recoveryPath):
+                return recoveryPath.map { [$0] } ?? []
+            case .changed, .quarantineBusy, .unsupported:
+                return []
+            }
+        }
 
         var errorDescription: String? {
             switch self {
             case .changed:
-                return "The move source changed while its cross-volume copy was being reconciled"
+                return "The filesystem entry changed before the requested mutation could be reconciled"
+            case .quarantineBusy:
+                return "The filesystem quarantine ledger is busy"
+            case .quarantineCapacityExhausted:
+                return "The filesystem quarantine is full and requires recovery before another mutation can proceed"
+            case .quarantineTransitionRetained(let path):
+                return "The initial filesystem quarantine transition committed without confirmed durability; recovery is required at \(path)"
+            case .quarantineRetained(let path):
+                return "The filesystem quarantine transition requires recovery at \(path)"
+            case .terminalReceiptRetained(let path):
+                return "The filesystem mutation committed, but durability or receipt cleanup was not confirmed; recovery is required at \(path)"
+            case .rollbackReceiptRetained(let path):
+                return "The filesystem rollback restored the requested namespace, but durability or receipt cleanup was not confirmed; recovery is required at \(path)"
+            case .quarantineUnavailable(let message, _):
+                return "The filesystem quarantine is unavailable: \(message)"
             case .unsupported(let path):
                 return "The move source contains an unsupported filesystem entry: \(path)"
             }
@@ -1332,9 +1536,19 @@ public struct FilesystemToolPack: ToolPackHandling {
     }
 
     private struct PinnedRenameReceipt {
-        let sourceParent: PinnedPathParent
-        let destinationParent: PinnedPathParent
         let requestedNamespaceStable: Bool
+        let durabilityConfirmed: Bool
+        let retainedReceiptPath: String?
+    }
+
+    private struct QuarantineTerminalOutcome {
+        let durabilityConfirmed: Bool
+        let retainedReceiptPath: String?
+    }
+
+    private struct VerifiedRemovalOutcome {
+        let relativePath: String
+        let terminal: QuarantineTerminalOutcome
     }
 
     private static func pinnedDirectory(at directory: URL) throws -> PinnedFileDescriptor {
@@ -1647,8 +1861,20 @@ public struct FilesystemToolPack: ToolPackHandling {
         (try? pinnedDeletionTreeExists(tree)) ?? true
     }
 
+    private static func pinnedDeletionTreePresence(
+        _ tree: PinnedDeletionTree
+    ) -> PathEntryPresence {
+        do {
+            return try pinnedDeletionTreeExists(tree) ? .present : .absent
+        } catch {
+            return .unknown
+        }
+    }
+
     private static func discardPinnedDeletionTree(
         _ tree: PinnedDeletionTree,
+        quarantineLedger: FilesystemQuarantineLedger,
+        quarantineDirectorySynchronizer: ((Int32, URL) throws -> Void)? = nil,
         cancellation: ToolCallCancellation?,
         deadline: TimeInterval,
         stepObserver: (@Sendable (MoveStep) -> Void)?
@@ -1656,11 +1882,13 @@ public struct FilesystemToolPack: ToolPackHandling {
         do {
             for (index, entry) in tree.plan.enumerated() {
                 try checkMutationBoundary(cancellation: cancellation, deadline: deadline)
-                try removeEntry(
+                try requireDurableRemoval(try removeEntry(
                     entry,
                     root: tree.root,
-                    expectedIdentities: tree.expectedIdentities
-                )
+                    expectedIdentities: tree.expectedIdentities,
+                    quarantineLedger: quarantineLedger,
+                    quarantineDirectorySynchronizer: quarantineDirectorySynchronizer
+                ))
                 stepObserver?(.removedStagingEntry(index + 1))
             }
         } catch {
@@ -1672,6 +1900,8 @@ public struct FilesystemToolPack: ToolPackHandling {
 
     private static func discardPublishedStagingRoot(
         _ tree: PinnedDeletionTree,
+        quarantineLedger: FilesystemQuarantineLedger,
+        quarantineDirectorySynchronizer: ((Int32, URL) throws -> Void)? = nil,
         cancellation: ToolCallCancellation?,
         deadline: TimeInterval,
         stepObserver: (@Sendable (MoveStep) -> Void)?
@@ -1680,11 +1910,13 @@ public struct FilesystemToolPack: ToolPackHandling {
         guard let rootEntry = tree.plan.first(where: { $0.relativePath == "." }) else {
             throw SourceFenceError.changed
         }
-        try removeEntry(
+        try requireDurableRemoval(try removeEntry(
             rootEntry,
             root: tree.root,
-            expectedIdentities: tree.expectedIdentities
-        )
+            expectedIdentities: tree.expectedIdentities,
+            quarantineLedger: quarantineLedger,
+            quarantineDirectorySynchronizer: quarantineDirectorySynchronizer
+        ))
         stepObserver?(.removedStagingEntry(1))
         try synchronizePinnedDirectory(tree.root.parent)
     }
@@ -1759,6 +1991,8 @@ public struct FilesystemToolPack: ToolPackHandling {
             throw CancellationError()
         } catch let error as ToolCallDeadlineExceeded {
             throw error
+        } catch let error as SourceFenceError {
+            throw error
         } catch {
             throw SourceFenceError.changed
         }
@@ -1770,10 +2004,12 @@ public struct FilesystemToolPack: ToolPackHandling {
         expectedByRelativePath: [String: SourceFenceEntry],
         expectedIdentities: [String: PathIdentity],
         hardLinkGroups: [SourceFenceIdentity: HardLinkGroupState],
+        quarantineLedger: FilesystemQuarantineLedger,
         cancellation: ToolCallCancellation?,
         deadline: TimeInterval,
-        beforeRemoval: () -> Void
-    ) throws -> String {
+        beforeRemoval: () -> Void,
+        afterVerification: () -> Void
+    ) throws -> VerifiedRemovalOutcome {
         do {
             let relativePath = deletionEntry.relativePath
             guard let recorded = expectedByRelativePath[relativePath] else {
@@ -1815,20 +2051,114 @@ public struct FilesystemToolPack: ToolPackHandling {
                 guard expected.matchesDeletionCandidate(actual) else {
                     throw SourceFenceError.changed
                 }
-                let flags = deletionEntry.isDirectory
-                    ? AT_REMOVEDIR
-                    : 0
-                let result = entryName.withCString {
-                    Darwin.unlinkat(parentDescriptor, $0, flags)
+                afterVerification()
+                let reservation = try quarantineEntry(
+                    parentDescriptor: parentDescriptor,
+                    parentPath: deletionEntry.url.deletingLastPathComponent(),
+                    entryName: entryName,
+                    leafIdentity: FilesystemQuarantineIdentity(
+                        device: actual.device,
+                        inode: actual.inode,
+                        mode: actual.mode,
+                        owner: actual.owner,
+                        group: actual.group
+                    ),
+                    operation: "cross_volume_source_cleanup",
+                    quarantineLedger: quarantineLedger
+                )
+                let quarantined: SourceFenceEntry
+                do {
+                    quarantined = try captureSourceFenceEntry(
+                        parentDescriptor: parentDescriptor,
+                        entryName: reservation.quarantineName,
+                        displayPath: deletionEntry.url.path,
+                        relativePath: relativePath,
+                        cancellation: cancellation,
+                        deadline: deadline
+                    )
+                } catch {
+                    try restoreQuarantinedEntry(
+                        parentDescriptor: parentDescriptor,
+                        parentPath: deletionEntry.url.deletingLastPathComponent(),
+                        originalName: entryName,
+                        reservation: reservation,
+                        quarantineLedger: quarantineLedger
+                    )
+                    throw translatedQuarantineError(error)
                 }
-                guard result == 0 else {
-                    throw posixError(errno, path: deletionEntry.url.path)
+                guard expected.matchesQuarantinedDeletionCandidate(quarantined) else {
+                    try restoreQuarantinedEntry(
+                        parentDescriptor: parentDescriptor,
+                        parentPath: deletionEntry.url.deletingLastPathComponent(),
+                        originalName: entryName,
+                        reservation: reservation,
+                        quarantineLedger: quarantineLedger
+                    )
+                    throw SourceFenceError.changed
                 }
-                return relativePath
+                let quarantinedIdentity = FilesystemQuarantineIdentity(
+                    device: quarantined.device,
+                    inode: quarantined.inode,
+                    mode: quarantined.mode,
+                    owner: quarantined.owner,
+                    group: quarantined.group
+                )
+                do {
+                    let terminal = try quarantineLedger.performTerminal(
+                        reservation,
+                        expectedLeafIdentity: quarantinedIdentity,
+                        parentIdentityVerifier: {
+                            directoryDescriptor(
+                                parentDescriptor,
+                                matches: reservation.parentIdentity
+                            )
+                        },
+                        leafIdentityVerifier: {
+                            namedEntry(
+                                named: reservation.quarantineName,
+                                in: parentDescriptor,
+                                matches: quarantinedIdentity
+                            )
+                        }
+                    ) {
+                        let flags = deletionEntry.isDirectory ? AT_REMOVEDIR : 0
+                        let result = reservation.quarantineName.withCString {
+                            Darwin.unlinkat(parentDescriptor, $0, flags)
+                        }
+                        guard result == 0 else {
+                            throw posixError(errno, path: deletionEntry.url.path)
+                        }
+                        let durabilityConfirmed = (try? synchronizeDirectoryDescriptor(
+                            parentDescriptor,
+                            path: deletionEntry.url.deletingLastPathComponent()
+                        )) != nil
+                        return ((), durabilityConfirmed)
+                    }
+                    return VerifiedRemovalOutcome(
+                        relativePath: relativePath,
+                        terminal: QuarantineTerminalOutcome(
+                            durabilityConfirmed: terminal.durabilityConfirmed,
+                            retainedReceiptPath: terminal.durabilityConfirmed
+                                ? nil
+                                : reservation.receiptURL.path
+                        )
+                    )
+                } catch {
+                    try restoreQuarantinedEntry(
+                        parentDescriptor: parentDescriptor,
+                        parentPath: deletionEntry.url.deletingLastPathComponent(),
+                        originalName: entryName,
+                        reservation: reservation,
+                        quarantineLedger: quarantineLedger
+                    )
+                    throw translatedQuarantineError(error)
+                }
             }
         } catch is CancellationError {
             throw CancellationError()
         } catch let error as ToolCallDeadlineExceeded {
+            throw error
+        } catch let error as SourceFenceError {
             throw error
         } catch {
             throw SourceFenceError.changed
@@ -2148,14 +2478,6 @@ public struct FilesystemToolPack: ToolPackHandling {
         }
     }
 
-    private func synchronizeMoveParents(source: URL, destination: URL) throws {
-        let sourceParent = source.deletingLastPathComponent().standardizedFileURL
-        let destinationParent = destination.deletingLastPathComponent().standardizedFileURL
-        var parents = [destinationParent]
-        if sourceParent.path != destinationParent.path { parents.append(sourceParent) }
-        for parent in parents { try directorySynchronizer(parent) }
-    }
-
     private static func committedMoveResult(
         source: URL,
         destination: URL,
@@ -2167,17 +2489,120 @@ public struct FilesystemToolPack: ToolPackHandling {
             "ok": true,
             "src": source.path,
             "dest": destination.path,
-            "source_exists": pathEntryExists(source),
-            "destination_exists": pathEntryExists(destination),
             "committed": true,
             "durability_confirmed": durabilityConfirmed,
         ]
+        recordPathPresence(
+            source,
+            valueKey: "source_exists",
+            knownKey: "source_presence_known",
+            in: &payload
+        )
+        recordPathPresence(
+            destination,
+            valueKey: "destination_exists",
+            knownKey: "destination_presence_known",
+            in: &payload
+        )
         if let movedEntries { payload["moved_entries"] = movedEntries }
         if let durabilityError {
             payload["durability_error"] = durabilityError.localizedDescription
             payload["reconciled"] = true
+            let recoveryPaths = (durabilityError as? SourceFenceError)?.recoveryPaths ?? []
+            if let recoveryPath = recoveryPaths.first {
+                payload["ledger_cleanup_required"] = true
+                payload["recovery_required"] = true
+                payload["recovery_path"] = recoveryPath
+                payload["recovery_paths"] = recoveryPaths
+            }
         }
         return ToolResult(ok: true, payload: payload, isError: false)
+    }
+
+    private static func sourceChangedFailure(_ error: Error) -> ToolResult {
+        let code: String
+        let retryable: Bool
+        switch error as? SourceFenceError {
+        case .quarantineBusy:
+            code = "quarantine_busy"
+            retryable = true
+        case .quarantineCapacityExhausted:
+            code = "quarantine_capacity_exhausted"
+            retryable = false
+        case .quarantineTransitionRetained:
+            code = "quarantine_transition_retained"
+            retryable = false
+        case .quarantineUnavailable:
+            code = "quarantine_unavailable"
+            retryable = false
+        case .rollbackReceiptRetained:
+            code = "filesystem_durability_unconfirmed"
+            retryable = false
+        case .terminalReceiptRetained:
+            code = "filesystem_durability_unconfirmed"
+            retryable = false
+        default:
+            code = "source_changed"
+            retryable = false
+        }
+        var result = ToolResult.failure(
+            code: code,
+            message: error.localizedDescription,
+            retryable: retryable
+        )
+        let recoveryPaths = (error as? SourceFenceError)?.recoveryPaths ?? []
+        if let recoveryPath = recoveryPaths.first {
+            result.payload["recovery_required"] = true
+            result.payload["recovery_path"] = recoveryPath
+            result.payload["recovery_paths"] = recoveryPaths
+        }
+        if case .quarantineCapacityExhausted = error as? SourceFenceError {
+            result.payload["committed"] = false
+            result.payload["namespace_mutated"] = false
+            result.payload["quarantine_capacity"] = FilesystemQuarantineLedger.maximumReservations
+            result.payload["quarantine_occupied"] = recoveryPaths.count
+        }
+        if case .quarantineBusy = error as? SourceFenceError {
+            result.payload["committed"] = false
+            result.payload["namespace_mutated"] = false
+        }
+        if case .quarantineTransitionRetained = error as? SourceFenceError {
+            result.payload["committed"] = false
+            result.payload["namespace_mutated"] = true
+            result.payload["rollback_attempted"] = false
+            result.payload["durability_confirmed"] = false
+            result.payload["ledger_cleanup_required"] = true
+        }
+        if case .quarantineUnavailable = error as? SourceFenceError {
+            result.payload["committed"] = false
+            result.payload["namespace_mutated"] = false
+            if !recoveryPaths.isEmpty {
+                result.payload["ledger_cleanup_required"] = true
+            }
+        }
+        if case .quarantineRetained = error as? SourceFenceError {
+            result.payload["committed"] = false
+            result.payload["namespace_mutated"] = true
+            result.payload["rollback_attempted"] = true
+            result.payload["rollback_confirmed"] = false
+            result.payload["durability_confirmed"] = false
+            result.payload["ledger_cleanup_required"] = true
+        }
+        if case .terminalReceiptRetained = error as? SourceFenceError {
+            result.payload["committed"] = true
+            result.payload["namespace_mutated"] = true
+            result.payload["durability_confirmed"] = false
+            result.payload["ledger_cleanup_required"] = true
+        }
+        if case .rollbackReceiptRetained = error as? SourceFenceError {
+            result.payload["committed"] = false
+            result.payload["namespace_mutated"] = true
+            result.payload["rollback_attempted"] = true
+            result.payload["rollback_confirmed"] = false
+            result.payload["durability_confirmed"] = false
+            result.payload["ledger_cleanup_required"] = true
+        }
+        return result
     }
 
     private static func namespaceChangedAfterRenameResult(
@@ -2185,6 +2610,7 @@ public struct FilesystemToolPack: ToolPackHandling {
         destination: URL,
         completedEntries: Int,
         durabilityConfirmed: Bool,
+        retainedReceiptPath: String?,
         createdDirectories: [URL]
     ) -> ToolResult {
         var result = partialMoveResult(
@@ -2198,6 +2624,13 @@ public struct FilesystemToolPack: ToolPackHandling {
         result.payload["committed"] = true
         result.payload["requested_namespace_stable"] = false
         result.payload["durability_confirmed"] = durabilityConfirmed
+        if !durabilityConfirmed {
+            let recoveryPath = retainedReceiptPath ?? "unknown"
+            result.payload["ledger_cleanup_required"] = true
+            result.payload["recovery_required"] = true
+            result.payload["recovery_path"] = recoveryPath
+            result.payload["recovery_paths"] = [recoveryPath]
+        }
         return result
     }
 
@@ -2214,16 +2647,91 @@ public struct FilesystemToolPack: ToolPackHandling {
         return (true, information.st_mode & S_IFMT == S_IFDIR)
     }
 
+    private enum PathEntryPresence {
+        case present
+        case absent
+        case unknown
+    }
+
+    private static func pathEntryPresence(_ url: URL) -> PathEntryPresence {
+        do {
+            return try itemType(at: url).exists ? .present : .absent
+        } catch {
+            return .unknown
+        }
+    }
+
     private static func pathEntryExists(_ url: URL) -> Bool {
-        (try? itemType(at: url).exists) == true
+        // Unknown is intentionally conservative: never turn EIO, EACCES, or
+        // ENOTDIR into a confirmed absence in a mutation result.
+        pathEntryPresence(url) != .absent
+    }
+
+    private static func pathEntryConfirmedAbsent(_ url: URL) -> Bool {
+        pathEntryPresence(url) == .absent
+    }
+
+    private static func recordPathPresence(
+        _ url: URL,
+        valueKey: String,
+        knownKey: String,
+        in payload: inout [String: Any]
+    ) {
+        switch pathEntryPresence(url) {
+        case .present:
+            payload[valueKey] = true
+            payload[knownKey] = true
+        case .absent:
+            payload[valueKey] = false
+            payload[knownKey] = true
+        case .unknown:
+            payload[valueKey] = NSNull()
+            payload[knownKey] = false
+        }
+    }
+
+    private static func recordStagingPresence(
+        _ presence: PathEntryPresence,
+        in payload: inout [String: Any]
+    ) {
+        switch presence {
+        case .present:
+            payload["staging_cleanup_required"] = true
+            payload["staging_exists"] = true
+            payload["staging_presence_known"] = true
+        case .absent:
+            payload["staging_cleanup_required"] = false
+            payload["staging_exists"] = false
+            payload["staging_presence_known"] = true
+        case .unknown:
+            // Cleanup remains required until absence is proven, but the wire
+            // result must not turn an inspection failure into observed presence.
+            payload["staging_cleanup_required"] = true
+            payload["staging_exists"] = NSNull()
+            payload["staging_presence_known"] = false
+        }
+    }
+
+    private static func requireDurableRemoval(
+        _ outcome: QuarantineTerminalOutcome
+    ) throws {
+        guard outcome.durabilityConfirmed else {
+            throw SourceFenceError.terminalReceiptRetained(
+                outcome.retainedReceiptPath ?? "unknown"
+            )
+        }
     }
 
     private static func removeEntry(
         _ entry: DeletionEntry,
         root: PinnedTreeRoot,
         expectedIdentities: [String: PathIdentity],
-        beforeRemoval: () -> Void = {}
-    ) throws {
+        quarantineLedger: FilesystemQuarantineLedger,
+        quarantineDirectorySynchronizer: ((Int32, URL) throws -> Void)? = nil,
+        beforeRemoval: () -> Void = {},
+        afterVerification: () -> Void = {},
+        afterQuarantine: (String) -> Void = { _ in }
+    ) throws -> QuarantineTerminalOutcome {
         try withPinnedEntryParent(
             relativePath: entry.relativePath,
             root: root,
@@ -2237,14 +2745,91 @@ public struct FilesystemToolPack: ToolPackHandling {
             guard entry.identity.matches(information) else {
                 throw SourceFenceError.changed
             }
-            let flags = entry.isDirectory
-                ? AT_REMOVEDIR
-                : 0
-            let result = entryName.withCString {
-                Darwin.unlinkat(parentDescriptor, $0, flags)
+            afterVerification()
+            let parentPath = entry.url.deletingLastPathComponent()
+            let reservation = try quarantineEntry(
+                parentDescriptor: parentDescriptor,
+                parentPath: parentPath,
+                entryName: entryName,
+                leafIdentity: FilesystemQuarantineIdentity(information),
+                operation: "delete",
+                quarantineLedger: quarantineLedger,
+                directorySynchronizer: quarantineDirectorySynchronizer
+            )
+            afterQuarantine(reservation.quarantineURL.path)
+            let quarantinedInformation: stat
+            do {
+                quarantinedInformation = try fstatatInformation(
+                    parentDescriptor: parentDescriptor,
+                    entryName: reservation.quarantineName
+                )
+            } catch {
+                try restoreQuarantinedEntry(
+                    parentDescriptor: parentDescriptor,
+                    parentPath: parentPath,
+                    originalName: entryName,
+                    reservation: reservation,
+                    quarantineLedger: quarantineLedger
+                )
+                throw translatedQuarantineError(error)
             }
-            guard result == 0 else {
-                throw posixError(errno, path: entry.url.path)
+            guard entry.identity.matches(quarantinedInformation) else {
+                try restoreQuarantinedEntry(
+                    parentDescriptor: parentDescriptor,
+                    parentPath: parentPath,
+                    originalName: entryName,
+                    reservation: reservation,
+                    quarantineLedger: quarantineLedger
+                )
+                throw SourceFenceError.changed
+            }
+            let quarantinedIdentity = FilesystemQuarantineIdentity(quarantinedInformation)
+            do {
+                let terminal = try quarantineLedger.performTerminal(
+                    reservation,
+                    expectedLeafIdentity: quarantinedIdentity,
+                    parentIdentityVerifier: {
+                        directoryDescriptor(
+                            parentDescriptor,
+                            matches: reservation.parentIdentity
+                        )
+                    },
+                    leafIdentityVerifier: {
+                        namedEntry(
+                            named: reservation.quarantineName,
+                            in: parentDescriptor,
+                            matches: quarantinedIdentity
+                        )
+                    }
+                ) {
+                    let flags = entry.isDirectory ? AT_REMOVEDIR : 0
+                    let result = reservation.quarantineName.withCString {
+                        Darwin.unlinkat(parentDescriptor, $0, flags)
+                    }
+                    guard result == 0 else {
+                        throw posixError(errno, path: entry.url.path)
+                    }
+                    let durabilityConfirmed = (try? synchronizeDirectoryDescriptor(
+                        parentDescriptor,
+                        path: parentPath
+                    )) != nil
+                    return ((), durabilityConfirmed)
+                }
+                return QuarantineTerminalOutcome(
+                    durabilityConfirmed: terminal.durabilityConfirmed,
+                    retainedReceiptPath: terminal.durabilityConfirmed
+                        ? nil
+                        : reservation.receiptURL.path
+                )
+            } catch {
+                try restoreQuarantinedEntry(
+                    parentDescriptor: parentDescriptor,
+                    parentPath: parentPath,
+                    originalName: entryName,
+                    reservation: reservation,
+                    quarantineLedger: quarantineLedger
+                )
+                throw translatedQuarantineError(error)
             }
         }
     }
@@ -2253,7 +2838,11 @@ public struct FilesystemToolPack: ToolPackHandling {
         source: URL,
         destination: URL,
         expectedSourceIdentity: PathIdentity,
-        beforeRename: () throws -> Void
+        quarantineLedger: FilesystemQuarantineLedger,
+        directorySynchronizer: (URL) throws -> Void,
+        beforeRename: () throws -> Void,
+        afterVerification: () -> Void,
+        afterRename: () -> Void
     ) throws -> PinnedRenameReceipt {
         let sourceParent = try pinnedParent(of: source)
 
@@ -2270,48 +2859,130 @@ public struct FilesystemToolPack: ToolPackHandling {
             guard expectedSourceIdentity.matches(sourceInformation) else {
                 throw SourceFenceError.changed
             }
-            let result = sourceParent.entryName.withCString { sourceName in
-                destinationParent.entryName.withCString { destinationName in
-                    Darwin.renameatx_np(
-                        sourceParent.directory.rawValue,
-                        sourceName,
-                        destinationParent.directory.rawValue,
-                        destinationName,
-                        UInt32(RENAME_EXCL)
-                    )
-                }
-            }
-            guard result == 0 else {
-                throw posixError(errno, path: destination.path)
-            }
-            let destinationIdentityMatches: Bool
+            afterVerification()
+            let reservation = try quarantineEntry(
+                parentDescriptor: sourceParent.directory.rawValue,
+                parentPath: sourceParent.path,
+                entryName: sourceParent.entryName,
+                leafIdentity: FilesystemQuarantineIdentity(sourceInformation),
+                operation: "move_publish",
+                quarantineLedger: quarantineLedger
+            )
+            let quarantinedInformation: stat
             do {
-                destinationIdentityMatches = expectedSourceIdentity.matches(
-                    try fstatatInformation(
-                        parentDescriptor: destinationParent.directory.rawValue,
-                        entryName: destinationParent.entryName
-                    )
+                quarantinedInformation = try fstatatInformation(
+                    parentDescriptor: sourceParent.directory.rawValue,
+                    entryName: reservation.quarantineName
                 )
             } catch {
-                destinationIdentityMatches = false
-            }
-            let sourceNameIsVacant: Bool
-            do {
-                sourceNameIsVacant = try fstatatInformationIfExists(
+                try restoreQuarantinedEntry(
                     parentDescriptor: sourceParent.directory.rawValue,
-                    entryName: sourceParent.entryName
-                ) == nil
-            } catch {
-                sourceNameIsVacant = false
+                    parentPath: sourceParent.path,
+                    originalName: sourceParent.entryName,
+                    reservation: reservation,
+                    quarantineLedger: quarantineLedger
+                )
+                throw translatedQuarantineError(error)
             }
-            let requestedNamespaceStable = pinnedParentStillNamesSameDirectory(sourceParent)
-                && pinnedParentStillNamesSameDirectory(destinationParent)
-                && destinationIdentityMatches
-                && sourceNameIsVacant
+            guard expectedSourceIdentity.matches(quarantinedInformation) else {
+                try restoreQuarantinedEntry(
+                    parentDescriptor: sourceParent.directory.rawValue,
+                    parentPath: sourceParent.path,
+                    originalName: sourceParent.entryName,
+                    reservation: reservation,
+                    quarantineLedger: quarantineLedger
+                )
+                throw SourceFenceError.changed
+            }
+            let quarantinedIdentity = FilesystemQuarantineIdentity(quarantinedInformation)
+            let terminalOutcome: (value: Bool, durabilityConfirmed: Bool)
+            do {
+                terminalOutcome = try quarantineLedger.performTerminal(
+                    reservation,
+                    expectedLeafIdentity: quarantinedIdentity,
+                    parentIdentityVerifier: {
+                        directoryDescriptor(
+                            sourceParent.directory.rawValue,
+                            matches: reservation.parentIdentity
+                        )
+                    },
+                    leafIdentityVerifier: {
+                        namedEntry(
+                            named: reservation.quarantineName,
+                            in: sourceParent.directory.rawValue,
+                            matches: quarantinedIdentity
+                        )
+                    }
+                ) {
+                    let result = reservation.quarantineName.withCString { sourceName in
+                        destinationParent.entryName.withCString { destinationName in
+                            Darwin.renameatx_np(
+                                sourceParent.directory.rawValue,
+                                sourceName,
+                                destinationParent.directory.rawValue,
+                                destinationName,
+                                UInt32(RENAME_EXCL)
+                            )
+                        }
+                    }
+                    guard result == 0 else {
+                        throw posixError(errno, path: destination.path)
+                    }
+                    afterRename()
+                    let destinationIdentityMatches: Bool
+                    do {
+                        destinationIdentityMatches = expectedSourceIdentity.matches(
+                            try fstatatInformation(
+                                parentDescriptor: destinationParent.directory.rawValue,
+                                entryName: destinationParent.entryName
+                            )
+                        )
+                    } catch {
+                        destinationIdentityMatches = false
+                    }
+                    let sourceNameIsVacant: Bool
+                    do {
+                        sourceNameIsVacant = try fstatatInformationIfExists(
+                            parentDescriptor: sourceParent.directory.rawValue,
+                            entryName: sourceParent.entryName
+                        ) == nil
+                    } catch {
+                        sourceNameIsVacant = false
+                    }
+                    let requestedNamespaceStable = pinnedParentStillNamesSameDirectory(sourceParent)
+                        && pinnedParentStillNamesSameDirectory(destinationParent)
+                        && destinationIdentityMatches
+                        && sourceNameIsVacant
+                    let durabilityConfirmed: Bool
+                    do {
+                        try synchronizePinnedDirectory(destinationParent)
+                        try directorySynchronizer(destinationParent.path)
+                        if sourceParent.identity != destinationParent.identity {
+                            try synchronizePinnedDirectory(sourceParent)
+                            try directorySynchronizer(sourceParent.path)
+                        }
+                        durabilityConfirmed = true
+                    } catch {
+                        durabilityConfirmed = false
+                    }
+                    return (requestedNamespaceStable, durabilityConfirmed)
+                }
+            } catch {
+                try restoreQuarantinedEntry(
+                    parentDescriptor: sourceParent.directory.rawValue,
+                    parentPath: sourceParent.path,
+                    originalName: sourceParent.entryName,
+                    reservation: reservation,
+                    quarantineLedger: quarantineLedger
+                )
+                throw translatedQuarantineError(error)
+            }
             return PinnedRenameReceipt(
-                sourceParent: sourceParent,
-                destinationParent: destinationParent,
-                requestedNamespaceStable: requestedNamespaceStable
+                requestedNamespaceStable: terminalOutcome.value,
+                durabilityConfirmed: terminalOutcome.durabilityConfirmed,
+                retainedReceiptPath: terminalOutcome.durabilityConfirmed
+                    ? nil
+                    : reservation.receiptURL.path
             )
         }
 
@@ -2328,11 +2999,184 @@ public struct FilesystemToolPack: ToolPackHandling {
         }
     }
 
-    private static func synchronizePinnedRenameParents(_ receipt: PinnedRenameReceipt) throws {
-        try synchronizePinnedDirectory(receipt.destinationParent)
-        if receipt.sourceParent.identity != receipt.destinationParent.identity {
-            try synchronizePinnedDirectory(receipt.sourceParent)
+    private static func quarantineEntry(
+        parentDescriptor: Int32,
+        parentPath: URL,
+        entryName: String,
+        leafIdentity: FilesystemQuarantineIdentity,
+        operation: String,
+        quarantineLedger: FilesystemQuarantineLedger,
+        directorySynchronizer: ((Int32, URL) throws -> Void)? = nil
+    ) throws -> FilesystemQuarantineReservation {
+        var parentInformation = stat()
+        guard Darwin.fstat(parentDescriptor, &parentInformation) == 0 else {
+            throw posixError(errno, path: parentPath.path)
         }
+        do {
+            return try quarantineLedger.reserveAndQuarantine(
+                parent: parentPath,
+                originalName: entryName,
+                parentIdentity: FilesystemQuarantineIdentity(parentInformation),
+                leafIdentity: leafIdentity,
+                operation: operation,
+                transition: { reservation in
+                    let result = entryName.withCString { sourceName in
+                        reservation.quarantineName.withCString { destinationName in
+                            Darwin.renameatx_np(
+                                parentDescriptor,
+                                sourceName,
+                                parentDescriptor,
+                                destinationName,
+                                UInt32(RENAME_EXCL)
+                            )
+                        }
+                    }
+                    guard result == 0 else {
+                        throw posixError(
+                            errno,
+                            path: parentPath.appendingPathComponent(entryName).path
+                        )
+                    }
+                    if let directorySynchronizer {
+                        try directorySynchronizer(parentDescriptor, parentPath)
+                    } else {
+                        try synchronizeDirectoryDescriptor(parentDescriptor, path: parentPath)
+                    }
+                }
+            )
+        } catch let error as FilesystemQuarantineLedgerError {
+            switch error {
+            case .capacityExhausted:
+                throw SourceFenceError.quarantineCapacityExhausted(error.recoveryPaths)
+            case .transitionRetained(let path):
+                throw SourceFenceError.quarantineTransitionRetained(path)
+            case .receiptRetained(let path, _):
+                throw SourceFenceError.quarantineUnavailable(
+                    error.localizedDescription,
+                    path
+                )
+            case .lockTimeout:
+                throw SourceFenceError.quarantineBusy
+            default:
+                throw SourceFenceError.quarantineUnavailable(
+                    error.localizedDescription,
+                    error.recoveryPaths.first
+                )
+            }
+        }
+    }
+
+    private static func restoreQuarantinedEntry(
+        parentDescriptor: Int32,
+        parentPath: URL,
+        originalName: String,
+        reservation: FilesystemQuarantineReservation,
+        quarantineLedger: FilesystemQuarantineLedger
+    ) throws {
+        let quarantinedIdentity: FilesystemQuarantineIdentity
+        do {
+            quarantinedIdentity = FilesystemQuarantineIdentity(
+                try fstatatInformation(
+                    parentDescriptor: parentDescriptor,
+                    entryName: reservation.quarantineName
+                )
+            )
+        } catch {
+            throw SourceFenceError.quarantineRetained(reservation.receiptURL.path)
+        }
+        guard quarantinedIdentity == reservation.leafIdentity else {
+            throw SourceFenceError.quarantineRetained(reservation.receiptURL.path)
+        }
+        do {
+            let terminal = try quarantineLedger.performTerminal(
+                reservation,
+                expectedLeafIdentity: reservation.leafIdentity,
+                parentIdentityVerifier: {
+                    directoryDescriptor(
+                        parentDescriptor,
+                        matches: reservation.parentIdentity
+                    )
+                },
+                leafIdentityVerifier: {
+                    namedEntry(
+                        named: reservation.quarantineName,
+                        in: parentDescriptor,
+                        matches: reservation.leafIdentity
+                    )
+                }
+            ) {
+                let result = reservation.quarantineName.withCString { sourceName in
+                    originalName.withCString { destinationName in
+                        Darwin.renameatx_np(
+                            parentDescriptor,
+                            sourceName,
+                            parentDescriptor,
+                            destinationName,
+                            UInt32(RENAME_EXCL)
+                        )
+                    }
+                }
+                guard result == 0 else {
+                    throw posixError(
+                        errno,
+                        path: parentPath.appendingPathComponent(originalName).path
+                    )
+                }
+                let durabilityConfirmed = (try? synchronizeDirectoryDescriptor(
+                    parentDescriptor,
+                    path: parentPath
+                )) != nil
+                return ((), durabilityConfirmed)
+            }
+            guard terminal.durabilityConfirmed else {
+                throw SourceFenceError.rollbackReceiptRetained(
+                    reservation.receiptURL.path
+                )
+            }
+        } catch let error as SourceFenceError {
+            throw error
+        } catch {
+            throw SourceFenceError.quarantineRetained(reservation.receiptURL.path)
+        }
+    }
+
+    private static func translatedQuarantineError(_ error: Error) -> Error {
+        guard let ledgerError = error as? FilesystemQuarantineLedgerError else {
+            return error
+        }
+        if case .invalidPath = ledgerError {
+            return SourceFenceError.changed
+        }
+        return error
+    }
+
+    private static func synchronizeDirectoryDescriptor(_ descriptor: Int32, path: URL) throws {
+        guard Darwin.fsync(descriptor) == 0 else {
+            throw posixError(errno, path: path.path)
+        }
+    }
+
+    private static func directoryDescriptor(
+        _ descriptor: Int32,
+        matches identity: FilesystemQuarantineIdentity
+    ) -> Bool {
+        var information = stat()
+        return Darwin.fstat(descriptor, &information) == 0
+            && identity.matches(information)
+    }
+
+    private static func namedEntry(
+        named name: String,
+        in descriptor: Int32,
+        matches identity: FilesystemQuarantineIdentity
+    ) -> Bool {
+        guard let information = try? fstatatInformation(
+            parentDescriptor: descriptor,
+            entryName: name
+        ) else {
+            return false
+        }
+        return identity.matches(information)
     }
 
     private static func synchronizePinnedDirectory(_ parent: PinnedPathParent) throws {
@@ -2420,6 +3264,8 @@ public struct FilesystemToolPack: ToolPackHandling {
 
     private static func discardPrivateStaging(
         at staging: URL,
+        quarantineLedger: FilesystemQuarantineLedger,
+        quarantineDirectorySynchronizer: ((Int32, URL) throws -> Void)? = nil,
         cancellation: ToolCallCancellation?,
         deadline: TimeInterval,
         stepObserver: (@Sendable (MoveStep) -> Void)?
@@ -2443,11 +3289,13 @@ public struct FilesystemToolPack: ToolPackHandling {
         )
         for (index, entry) in plan.enumerated() {
             try checkMutationBoundary(cancellation: cancellation, deadline: deadline)
-            try removeEntry(
+            try requireDurableRemoval(try removeEntry(
                 entry,
                 root: pinnedRoot,
-                expectedIdentities: expectedIdentities
-            )
+                expectedIdentities: expectedIdentities,
+                quarantineLedger: quarantineLedger,
+                quarantineDirectorySynchronizer: quarantineDirectorySynchronizer
+            ))
             stepObserver?(.removedStagingEntry(index + 1))
         }
     }
@@ -2458,6 +3306,7 @@ public struct FilesystemToolPack: ToolPackHandling {
         stagingRoot: URL,
         error: Error,
         createdDestinationDirectories: [URL],
+        quarantineLedger: FilesystemQuarantineLedger,
         cancellation: ToolCallCancellation?,
         deadline: TimeInterval,
         pinnedStagingTree: PinnedDeletionTree? = nil
@@ -2469,6 +3318,8 @@ public struct FilesystemToolPack: ToolPackHandling {
                 if let pinnedStagingTree {
                     try Self.discardPinnedDeletionTree(
                         pinnedStagingTree,
+                        quarantineLedger: quarantineLedger,
+                        quarantineDirectorySynchronizer: quarantineDirectorySynchronizer,
                         cancellation: cancellation,
                         deadline: deadline,
                         stepObserver: moveStepObserver
@@ -2476,6 +3327,8 @@ public struct FilesystemToolPack: ToolPackHandling {
                 } else {
                     try Self.discardPrivateStaging(
                         at: stagingRoot,
+                        quarantineLedger: quarantineLedger,
+                        quarantineDirectorySynchronizer: quarantineDirectorySynchronizer,
                         cancellation: cancellation,
                         deadline: deadline,
                         stepObserver: moveStepObserver
@@ -2487,7 +3340,15 @@ public struct FilesystemToolPack: ToolPackHandling {
             }
         } catch let cleanupError {
             let reportedError: Error
-            if cleanupError is CancellationError || cleanupError is ToolCallDeadlineExceeded {
+            let cleanupRecoveryPaths = (cleanupError as? SourceFenceError)?.recoveryPaths ?? []
+            let primaryRecoveryPaths = (error as? SourceFenceError)?.recoveryPaths ?? []
+            if !cleanupRecoveryPaths.isEmpty {
+                reportedError = cleanupError
+            } else if !primaryRecoveryPaths.isEmpty {
+                reportedError = error
+            } else if cleanupError is CancellationError
+                || cleanupError is ToolCallDeadlineExceeded
+                || cleanupError is SourceFenceError {
                 reportedError = cleanupError
             } else {
                 reportedError = error
@@ -2500,10 +3361,18 @@ public struct FilesystemToolPack: ToolPackHandling {
                 createdDirectories: createdDestinationDirectories
             )
             result.payload["staging_path"] = stagingRoot.path
-            let stagingExists = pinnedStagingTree.map(Self.conservativelyPinnedDeletionTreeExists)
-                ?? Self.pathEntryExists(stagingRoot)
-            result.payload["staging_cleanup_required"] = stagingExists
-            result.payload["staging_exists"] = stagingExists
+            let stagingPresence = pinnedStagingTree.map(Self.pinnedDeletionTreePresence)
+                ?? Self.pathEntryPresence(stagingRoot)
+            Self.recordStagingPresence(stagingPresence, in: &result.payload)
+            let combinedRecoveryPaths = Array(
+                Set(primaryRecoveryPaths + cleanupRecoveryPaths)
+            ).sorted()
+            if let recoveryPath = combinedRecoveryPaths.first {
+                result.payload["recovery_required"] = true
+                result.payload["recovery_path"] = recoveryPath
+                result.payload["recovery_paths"] = combinedRecoveryPaths
+                result.payload["ledger_cleanup_required"] = true
+            }
             result.payload["staging_cleanup_error"] = cleanupError.localizedDescription
             return result
         }
@@ -2519,11 +3388,7 @@ public struct FilesystemToolPack: ToolPackHandling {
         if error is CancellationError { throw CancellationError() }
         if let deadline = error as? ToolCallDeadlineExceeded { throw deadline }
         if error is SourceFenceError {
-            return .failure(
-                code: "source_changed",
-                message: error.localizedDescription,
-                retryable: false
-            )
+            return Self.sourceChangedFailure(error)
         }
         return .failure(
             code: "move_failed",
@@ -2550,11 +3415,7 @@ public struct FilesystemToolPack: ToolPackHandling {
         if error is CancellationError { throw CancellationError() }
         if let deadline = error as? ToolCallDeadlineExceeded { throw deadline }
         if error is SourceFenceError {
-            return .failure(
-                code: "source_changed",
-                message: error.localizedDescription,
-                retryable: false
-            )
+            return Self.sourceChangedFailure(error)
         }
         return .failure(code: "move_failed", message: error.localizedDescription)
     }
@@ -2591,6 +3452,8 @@ public struct FilesystemToolPack: ToolPackHandling {
         let reportedError: Error
         if error is CancellationError || error is ToolCallDeadlineExceeded {
             reportedError = error
+        } else if error is SourceFenceError {
+            reportedError = error
         } else {
             reportedError = SourceFenceError.changed
         }
@@ -2603,7 +3466,12 @@ public struct FilesystemToolPack: ToolPackHandling {
             createdDirectories: createdDirectories
         )
         result.payload["source_fence_verified"] = false
-        result.payload["source_preserved"] = pathEntryExists(source)
+        recordPathPresence(
+            source,
+            valueKey: "source_preserved",
+            knownKey: "source_preservation_known",
+            in: &result.payload
+        )
         return result
     }
 
@@ -2620,6 +3488,18 @@ public struct FilesystemToolPack: ToolPackHandling {
             controlCode = "request_cancelled"
         } else if error is ToolCallDeadlineExceeded {
             controlCode = "deadline_exceeded"
+        } else if case .quarantineBusy = error as? SourceFenceError {
+            controlCode = "quarantine_busy"
+        } else if case .quarantineCapacityExhausted = error as? SourceFenceError {
+            controlCode = "quarantine_capacity_exhausted"
+        } else if case .quarantineTransitionRetained = error as? SourceFenceError {
+            controlCode = "quarantine_transition_retained"
+        } else if case .quarantineUnavailable = error as? SourceFenceError {
+            controlCode = "quarantine_unavailable"
+        } else if case .terminalReceiptRetained = error as? SourceFenceError {
+            controlCode = "filesystem_durability_unconfirmed"
+        } else if case .rollbackReceiptRetained = error as? SourceFenceError {
+            controlCode = "filesystem_durability_unconfirmed"
         } else if error is SourceFenceError {
             controlCode = "source_changed"
         } else {
@@ -2634,13 +3514,69 @@ public struct FilesystemToolPack: ToolPackHandling {
             "source": source.path,
             "completed_entries": completedEntries,
             "control_code": controlCode,
-            "source_exists": pathEntryExists(source),
             "reconciled": true,
         ]
+        recordPathPresence(
+            source,
+            valueKey: "source_exists",
+            knownKey: "source_presence_known",
+            in: &payload
+        )
         if let destination {
             payload["destination"] = destination.path
-            payload["destination_exists"] = pathEntryExists(destination)
+            recordPathPresence(
+                destination,
+                valueKey: "destination_exists",
+                knownKey: "destination_presence_known",
+                in: &payload
+            )
             payload["destination_complete"] = destinationComplete
+        }
+        let recoveryPaths = (error as? SourceFenceError)?.recoveryPaths ?? []
+        if let recoveryPath = recoveryPaths.first {
+            payload["recovery_required"] = true
+            payload["recovery_path"] = recoveryPath
+            payload["recovery_paths"] = recoveryPaths
+        }
+        if case .quarantineCapacityExhausted = error as? SourceFenceError {
+            payload["quarantine_capacity"] = FilesystemQuarantineLedger.maximumReservations
+            payload["quarantine_occupied"] = recoveryPaths.count
+        }
+        if case .quarantineTransitionRetained = error as? SourceFenceError {
+            payload["committed"] = false
+            payload["namespace_mutated"] = true
+            payload["rollback_attempted"] = false
+            payload["durability_confirmed"] = false
+            payload["ledger_cleanup_required"] = true
+        }
+        if case .quarantineUnavailable = error as? SourceFenceError {
+            payload["committed"] = false
+            payload["namespace_mutated"] = false
+            if !recoveryPaths.isEmpty {
+                payload["ledger_cleanup_required"] = true
+            }
+        }
+        if case .quarantineRetained = error as? SourceFenceError {
+            payload["committed"] = false
+            payload["namespace_mutated"] = true
+            payload["rollback_attempted"] = true
+            payload["rollback_confirmed"] = false
+            payload["durability_confirmed"] = false
+            payload["ledger_cleanup_required"] = true
+        }
+        if case .terminalReceiptRetained = error as? SourceFenceError {
+            payload["committed"] = true
+            payload["namespace_mutated"] = true
+            payload["durability_confirmed"] = false
+            payload["ledger_cleanup_required"] = true
+        }
+        if case .rollbackReceiptRetained = error as? SourceFenceError {
+            payload["committed"] = false
+            payload["namespace_mutated"] = true
+            payload["rollback_attempted"] = true
+            payload["rollback_confirmed"] = false
+            payload["durability_confirmed"] = false
+            payload["ledger_cleanup_required"] = true
         }
         return ToolResult(ok: false, payload: payload, isError: true)
     }

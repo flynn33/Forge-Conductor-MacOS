@@ -215,6 +215,7 @@
 		P10B00000000000000000020 /* RuntimeObservabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = P10F00000000000000000020 /* RuntimeObservabilityTests.swift */; };
 		P11B00000000000000000001 /* ReleaseStressTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = P11F00000000000000000001 /* ReleaseStressTests.swift */; };
 		B27B00000000000000000001 /* Infrastructure/OwnerOnlyAtomicFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27F00000000000000000001 /* Infrastructure/OwnerOnlyAtomicFile.swift */; };
+		B28B00000000000000000001 /* Infrastructure/FilesystemQuarantineLedger.swift in Sources */ = {isa = PBXBuildFile; fileRef = B28F00000000000000000001 /* Infrastructure/FilesystemQuarantineLedger.swift */; };
 		B27B00000000000000000002 /* CommittedResultRecoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27F00000000000000000002 /* CommittedResultRecoveryTests.swift */; };
 		B27B00000000000000000003 /* DiagnosticBoundaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27F00000000000000000003 /* DiagnosticBoundaryTests.swift */; };
 		B27B00000000000000000004 /* FilesystemCancellationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27F00000000000000000004 /* FilesystemCancellationTests.swift */; };
@@ -531,6 +532,7 @@
 		P10F00000000000000000020 /* RuntimeObservabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeObservabilityTests.swift; sourceTree = "<group>"; };
 		P11F00000000000000000001 /* ReleaseStressTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseStressTests.swift; sourceTree = "<group>"; };
 		B27F00000000000000000001 /* Infrastructure/OwnerOnlyAtomicFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Infrastructure/OwnerOnlyAtomicFile.swift; sourceTree = "<group>"; };
+		B28F00000000000000000001 /* Infrastructure/FilesystemQuarantineLedger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Infrastructure/FilesystemQuarantineLedger.swift; sourceTree = "<group>"; };
 		B27F00000000000000000002 /* CommittedResultRecoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommittedResultRecoveryTests.swift; sourceTree = "<group>"; };
 		B27F00000000000000000003 /* DiagnosticBoundaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticBoundaryTests.swift; sourceTree = "<group>"; };
 		B27F00000000000000000004 /* FilesystemCancellationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilesystemCancellationTests.swift; sourceTree = "<group>"; };
@@ -797,6 +799,7 @@
 				P10F00000000000000000009 /* Infrastructure/ProjectMemoryRepository.swift */,
 				71D3A9C84F6E42B1A5D809CE /* Infrastructure/VerifiedMigrationBackup.swift */,
 				B27F00000000000000000001 /* Infrastructure/OwnerOnlyAtomicFile.swift */,
+				B28F00000000000000000001 /* Infrastructure/FilesystemQuarantineLedger.swift */,
 				P10F00000000000000000010 /* Application/ProjectMemoryService.swift */,
 				P10F00000000000000000011 /* Application/Tools/ProjectMemoryToolPack.swift */,
 				P10F00000000000000000012 /* Infrastructure/ResourcePolicy.swift */,
@@ -1233,6 +1236,7 @@
 				P10B00000000000000000009 /* Infrastructure/ProjectMemoryRepository.swift in Sources */,
 				C482E7FA103B4D6F95A18C20 /* Infrastructure/VerifiedMigrationBackup.swift in Sources */,
 				B27B00000000000000000001 /* Infrastructure/OwnerOnlyAtomicFile.swift in Sources */,
+				B28B00000000000000000001 /* Infrastructure/FilesystemQuarantineLedger.swift in Sources */,
 				P10B00000000000000000010 /* Application/ProjectMemoryService.swift in Sources */,
 				P10B00000000000000000011 /* Application/Tools/ProjectMemoryToolPack.swift in Sources */,
 				P10B00000000000000000012 /* Infrastructure/ResourcePolicy.swift in Sources */,

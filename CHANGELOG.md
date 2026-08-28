@@ -6,6 +6,57 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 for marketing versions (`MAJOR.MINOR.PATCH`).
 
+## [Unreleased]
+
+This is an in-progress P10 checkpoint, not a qualified release. P10,
+filesystem E2, shell compatibility, native UI validation, autonomous continuity,
+and the final release gates remain open.
+
+### Changed
+
+- Fresh configurations enable project shell tools by default. Migration enables
+  schema-v1 configurations whose disabled value had no provenance; schema-v1
+  could not distinguish the shipped default from a user-chosen false value.
+  Explicit schema-v2 user opt-outs remain disabled. The persisted policy is exposed in the
+  native Project shell settings.
+- `shell_exec` retains its registered MCP name, synchronous `/bin/bash -lc`
+  execution, authorization requirements, 120-second ceiling, cancellation
+  behavior, and established result contract. Clean-profile `bash.run` remains a
+  separate additive durable-job tool.
+- Filesystem destructive paths use descriptor-relative checks plus bounded
+  quarantine-and-verify around direct deletion, same-volume publication,
+  cross-volume staging publication, and post-copy source removal. This is a
+  mitigation, not elimination of substitution races. Rollback refuses a
+  quarantine occupant that no longer matches the recorded identity. Presence
+  inspection failures use JSON `null` plus a `*_presence_known=false` marker;
+  conservative cleanup requirements remain Boolean. A committed publication
+  whose requested namespace becomes unstable while durability is unconfirmed
+  returns its live receipt as required ledger recovery, merging any additional
+  retained staging-cleanup receipt into the same result.
+
+### Open qualification and security boundaries
+
+- A same-user writer can still swap a quarantine name between final verification
+  and the terminal mutation. One successful race can affect one entry under the
+  pinned authorized parent; final-link deletion can lose an unbounded number of
+  bytes and a directory rename can relocate an unbounded subtree. A recursive
+  request can reuse the 32 slots across up to 100,000 entries, so the slot bound
+  limits simultaneous cooperative recovery state rather than cumulative
+  adversarial wrong-object mutations. Initial path
+  anchoring, destination hierarchy creation, and hard-link ctime ambiguity also
+  remain E2.
+- The shell policy, migration, MCP registration, execution, compatibility
+  contract, and restart paths have non-native regressions. The native Settings
+  test has build-only evidence. Developer Mode is disabled and the available
+  signing identity does not match the configured team, so native UI and shell
+  compatibility qualification remain deferred and release-blocking.
+- Historical G09 evidence covers an exact-revision, directly invoked live
+  provider adapter. Current autonomous-continuity authority still requires one
+  manager-owned, threshold-forced real-provider rollover proving exact successor
+  acknowledgment, predecessor fencing and idempotent sealing, automatic
+  continuation, GUI-closed operation, and recovery from every durable crash
+  state. Unit and synthetic-host tests do not satisfy this gate.
+
 ## [0.9.0] — 2026-08-23
 
 ### Added

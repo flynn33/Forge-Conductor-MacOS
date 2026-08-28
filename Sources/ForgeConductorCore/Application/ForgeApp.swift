@@ -87,6 +87,7 @@ public final class ForgeApp: @unchecked Sendable {
     public static func bootstrap(home: URL? = nil, clock: any Clock = SystemClock()) throws -> ForgeApp {
         let paths = AppPaths(home: home)
         try paths.ensureLayout()
+        _ = try? FilesystemQuarantineLedger(paths: paths).reconcile()
         let config = ConfigStore(paths: paths)
         let store = try SQLiteStore(path: paths.storeSQLite, clock: clock)
         let audit = AuditService(store: store, paths: paths)

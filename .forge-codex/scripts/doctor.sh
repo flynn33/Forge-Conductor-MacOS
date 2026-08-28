@@ -14,6 +14,8 @@ from pathlib import Path
 
 root = Path(sys.argv[1])
 out = Path(sys.argv[2])
+state_path = root / ".forge-codex" / "state" / "run-state.json"
+gate_plan_path = root / ".forge-codex" / "plans" / "gates.json"
 
 def command(argv):
     exe = shutil.which(argv[0])
@@ -40,6 +42,50 @@ markers = {
     "workspaces": [str(p.relative_to(root)) for p in root.glob("*.xcworkspace")],
     "projects": [str(p.relative_to(root)) for p in root.glob("*.xcodeproj")],
 }
+
+execution_state = {
+    "available": False,
+    "current_work": None,
+    "open_issues": [],
+    "nonpassing_hard_gates": [],
+}
+try:
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    gate_plan = json.loads(gate_plan_path.read_text(encoding="utf-8"))
+    hard_gate_ids = {
+        gate["id"]
+        for gate in gate_plan.get("gates", [])
+        if gate.get("type") in {"hard", "hard_runtime"}
+    }
+    execution_state = {
+        "available": True,
+        "run_status": state.get("status"),
+        "current_work": state.get("current_work"),
+        "repository": state.get("repository", {}),
+        "open_issues": [
+            {
+                "id": issue.get("id"),
+                "title": issue.get("title"),
+                "status": issue.get("status"),
+                "severity": issue.get("severity"),
+                "evidence_class": issue.get("evidence_class"),
+                "notes": issue.get("notes"),
+            }
+            for issue in state.get("issues", [])
+            if issue.get("status") != "resolved"
+        ],
+        "nonpassing_hard_gates": [
+            {
+                "id": gate_id,
+                "status": state.get("gates", {}).get(gate_id, {}).get("status", "not_started"),
+            }
+            for gate_id in sorted(hard_gate_ids)
+            if state.get("gates", {}).get(gate_id, {}).get("status") != "passed"
+        ],
+    }
+except (OSError, ValueError, TypeError, KeyError) as exc:
+    execution_state["error"] = repr(exc)
+
 payload = {
     "schema_version": 1,
     "captured_at": datetime.now(timezone.utc).isoformat(),
@@ -49,10 +95,17 @@ payload = {
     "repository_root": str(root),
     "tools": tools,
     "project_markers": markers,
+    "execution_state": execution_state,
     "environment_keys_present": sorted(k for k in os.environ if k.startswith(("CI","CODEX","XCODE","SWIFT","FORGE"))),
 }
 tmp = out.with_suffix(".tmp")
 tmp.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 os.replace(tmp, out)
-print(json.dumps({"environment_file": str(out), "macos_runtime_capable": payload["macos_runtime_capable"]}))
+print(json.dumps({
+    "environment_file": str(out),
+    "macos_runtime_capable": payload["macos_runtime_capable"],
+    "current_work": execution_state.get("current_work"),
+    "open_issues": execution_state.get("open_issues", []),
+    "nonpassing_hard_gates": execution_state.get("nonpassing_hard_gates", []),
+}))
 PY

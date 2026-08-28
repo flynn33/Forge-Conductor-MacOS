@@ -90,6 +90,47 @@ MIGRATION_SAFEGUARD_TESTS = (
 MIGRATION_PLATFORM_OBSERVATION_TESTS = (
     "testSQLiteMainFileMovedGuardRecordsRestoredPathCycleWithoutTrustClaim",
 )
+REQUIRED_SHELL_STRICT_TESTS = (
+    "testFreshConfigUsesSchemaV2DefaultEnabledShellPolicy",
+    "testLegacyShellMigrationBackupReceiptAndExplicitDisableRemainValid",
+    "testCurrentSchemaShellPolicyPreservesExplicitUserOptOut",
+    "testShellExecutesByDefaultInsideAuthorizedProjectWorkspace",
+    "testMigratedLegacyConfigExecutesAuthorizedShellByDefault",
+    "testExplicitShellDisableUsesDistinctAuthorizationReason",
+    "testShellPolicyAndCompatibilitySurviveManagerAndAppRestart",
+    "testLegacyBashLoginCompatibilityProfileIsExposedWithoutChangingShellToolPack",
+    "testBootstrapDefaultRouterRegistersRuntimeSurfaceExactlyOnceAndMCPDescriptors",
+    "testBootstrapRouterLegacyShellExecUsesBoundProjectAndCompatibilityContract",
+    "testLegacyShellTimeoutSchemaRemainsCompatibleWithRuntimeClamping",
+    "testInProcessMCPHandshakeToolsList",
+)
+REQUIRED_FILESYSTEM_SECURITY_TESTS = (
+    "testRecursiveDeletePreservesLeafSwappedAfterVerification",
+    "testSameVolumeMoveDoesNotPublishLeafSwappedAfterVerification",
+    "testSameVolumeNamespaceInstabilityWithUnconfirmedDurabilityRetainsRecoveryReceipt",
+    "testCrossVolumeInstallDoesNotPublishStagingLeafSwappedAfterVerification",
+    "testCrossVolumeNamespaceInstabilityWithUnconfirmedDurabilityRetainsRecoveryReceipt",
+    "testCrossVolumeNamespaceInstabilityMergesInstallAndStagingRecoveryReceipts",
+    "testCrossVolumeSourceRemovalPreservesLeafSwappedAfterVerification",
+    "testRollbackRefusesSubstitutedQuarantineOccupant",
+    "testDeleteQuarantineIsGloballyBoundedAndRecoveredAcrossRestart",
+    "testCorruptQuarantineReceiptRemainsOccupiedAndRecoveryVisible",
+    "testPreexistingDeterministicQuarantineNameIsNotClaimed",
+    "testStaleQuarantineReservationCannotReleaseReusedSlot",
+    "testConcurrentQuarantineReservationsNeverExceedGlobalCapacity",
+    "testRestartDoesNotTreatMissingNamesAsTerminalProof",
+    "testInitialQuarantineSyncFailureReportsRetainedTransitionWithoutRollback",
+    "testDeleteReportsUnknownPresenceWithoutFalseExistenceClaim",
+    "testUnavailableQuarantineLedgerFailsClosedBeforeNamespaceMutation",
+    "testPostUnlinkReceiptSyncFailureDoesNotClaimMissingRecoveryPath",
+    "testReceiptRemovalFailureRetainsTerminalRecoveryPath",
+    "testPostPublicationStagingFailurePreservesRecoveryAndUnknownPresence",
+    "testRetainedStagingRecoveryDoesNotClaimAbsentStagingPathNeedsCleanup",
+)
+REQUIRED_SHELL_UI_TESTS = (
+    "testManagerShowsProjectShellPolicyControls",
+    "testManagerSettingsControlsAndPersistsProjectShellPolicy",
+)
 RESTORED_PATH_OBSERVATION_PREFIX = "FORGE_SQLITE_RESTORED_PATH_OBSERVATION="
 RESTORED_PATH_OBSERVATION_VALUES = {
     "accepted_after_restore",
@@ -272,6 +313,7 @@ for source in (
     "ProjectMemoryRepository.swift",
     "RuntimeJobRepository.swift",
     "VerifiedMigrationBackup.swift",
+    "FilesystemQuarantineLedger.swift",
     "ContinuityTests.swift",
     "NativeSessionHostPluginTests.swift",
     "ProjectMemoryTests.swift",
@@ -343,6 +385,16 @@ for configuration, output in strict_outputs.items():
         check(
             f"{test_name}]' passed" in output,
             f"{configuration} strict suite has no passing migration platform observation: {test_name}",
+        )
+    for test_name in REQUIRED_SHELL_STRICT_TESTS:
+        check(
+            f"{test_name}]' passed" in output,
+            f"{configuration} strict suite has no passing shell compatibility proof: {test_name}",
+        )
+    for test_name in REQUIRED_FILESYSTEM_SECURITY_TESTS:
+        check(
+            f"{test_name}]' passed" in output,
+            f"{configuration} strict suite has no passing filesystem security proof: {test_name}",
         )
 restored_path_observations: dict[str, str | None] = {}
 for configuration, output in strict_outputs.items():
@@ -445,6 +497,7 @@ if ui.get("behavioral_status") == "passed":
     if isinstance(ui_relative, str):
         preserved_report(ui_record, ui_relative, "native UI qualification")
     manifest_report(ui_report, "native UI qualification")
+    ui_output = stdout_text(ui_record, "native UI qualification")
     check(ui_report.get("status") == "passed" and ui_report.get("ok") is True, "native UI report is not passed")
     xctest = ui_report.get("xctest", {})
     check(xctest.get("attempts", 0) >= 1 and xctest.get("passing_attempts", 0) >= 1 and xctest.get("executed", 0) > 0 and xctest.get("failures") == 0, "native UI XCTest semantics are incomplete")
@@ -452,6 +505,11 @@ if ui.get("behavioral_status") == "passed":
     check(authorization.get("developer_mode_enabled") is True and authorization.get("signing_identity_usable") is True and authorization.get("automation_authorized") is True, "native UI authorization prerequisites are not proven")
     checks = ui_report.get("checks", {})
     check(isinstance(checks, dict) and REQUIRED_UI_CHECKS == {key for key, value in checks.items() if value is True}, "native UI command/settings/accessibility/reconnect/redaction matrix is incomplete")
+    for test_name in REQUIRED_SHELL_UI_TESTS:
+        check(
+            f"{test_name}]' passed" in ui_output,
+            f"native UI qualification has no passing shell Settings proof: {test_name}",
+        )
 
 result = {
     "ok": not failures,

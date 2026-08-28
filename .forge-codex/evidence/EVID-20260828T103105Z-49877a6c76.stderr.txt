@@ -1,0 +1,41 @@
+Building for production...
+[0/35] Copying responses-root.sse
+[0/35] Write sources
+[1/35] Copying tools-catalog.js
+[1/35] Copying review.md
+[1/35] Copying responses-continuation.sse
+[2/35] Copying security.md
+[2/35] Copying test.md
+[2/35] Copying style.css
+[2/35] Write sources
+[2/35] Copying research.md
+[2/35] Copying models-loaded.json
+[4/35] Copying index.html
+[4/35] Copying telemetry_contract_keys.json
+[4/35] Copying precommit-audit.md
+[4/35] Copying explore.md
+[15/35] Write sources
+[19/35] Copying app.js
+[19/35] /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.build/arm64-apple-macosx/release/ForgeConductorPackageTests.derived/runner.swift
+[20/35] Copying implement.md
+[20/35] Copying plan.md
+[20/35] Copying debug.md
+[21/35] Copying docs.md
+[25/35] Write sources
+[26/35] Write swift-version--58304C5D6DBC2206.txt
+[28/37] Compiling ForgeRuntimeLauncher main.swift
+[28/37] Write Objects.LinkFileList
+[29/37] Linking forge-runtime-launcher
+[31/37] Compiling ForgeConductorCore AgentCatalog.swift
+[32/38] Compiling ForgeNativeSessionHostPlugin ForgeNativeSessionHostPlugin.swift
+[33/40] Compiling ForgeConductorCLI ForgeConductorMain.swift
+[33/40] Write Objects.LinkFileList
+[34/40] Linking forge-conductor
+[36/41] Compiling ForgeConductorApp AppDeployController.swift
+[36/41] Write Objects.LinkFileList
+[37/41] Linking forge-conductor-app
+[39/41] Compiling ForgeConductorTests AppConfigAndDoctorTests.swift
+[40/42] Compiling ForgeConductorPackageTests runner.swift
+[40/42] Write Objects.LinkFileList
+[41/42] Linking ForgeConductorPackageTests
+Build complete! (102.68s)

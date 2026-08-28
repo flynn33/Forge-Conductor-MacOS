@@ -25,7 +25,10 @@ public enum MCPServeVerifier {
         "memory_delete",
         "memory_search",
     ]
-    public static let requiredProductTools = requiredContinuityTools.union(requiredMemoryTools)
+    public static let requiredCompatibilityTools: Set<String> = ["shell_exec"]
+    public static let requiredProductTools = requiredContinuityTools
+        .union(requiredMemoryTools)
+        .union(requiredCompatibilityTools)
 
     public struct Result: Sendable, Equatable {
         public var ok: Bool

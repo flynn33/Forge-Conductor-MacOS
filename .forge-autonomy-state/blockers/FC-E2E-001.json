@@ -3,16 +3,21 @@
   "work_package": "FC-E2E-001",
   "status": "partial_dependency_blocked",
   "recorded_at": "2026-08-26T23:45:46Z",
-  "summary": "Real LM Studio fresh-root acknowledgement and automatic continuation passed, but UI and performance dependencies and the remaining hard scenario matrix are incomplete.",
-  "passed_command_reference": "CMD-20260826T224938Z-9660289413",
-  "passed_evidence": ".forge-autonomy-state/evidence/FC-E2E-001/live-lmstudio-managed-continuity.json",
+  "summary": "A direct-adapter real LM Studio fresh-root acknowledgment and linked continuation passed, but it is supporting evidence only. The manager-owned forced-rollover authority scenario and its UI, fencing, and crash-recovery requirements remain incomplete.",
+  "passed_command_reference": "CMD-20260827T103812Z-17ac760a12",
+  "passed_evidence": ".forge-autonomy-state/evidence/FC-E2E-001/live-lmstudio-managed-continuity-52f8aca.json",
   "open": [
-    "GUI closure and reconnect under an active managed run",
+    "threshold-forced rollover initiated by the manager against the real provider",
+    "exact successor acknowledgment within that forced-rollover scenario",
+    "predecessor authority fencing and idempotent sealing within that scenario",
+    "automatic continuation under manager ownership",
+    "GUI-closed operation and reconnect under the active managed run",
+    "recovery from every durable rollover crash state against the real provider",
     "emergency overflow recovery",
     "auth failure and reset-fencing system scenarios",
     "combined multi-project model and shell isolation",
     "final feature-parity comparison",
     "FC-UI-001 and FC-PERF-001 completion"
   ],
-  "resume_condition": "Resolve the UI and profiling blockers, run the remaining hard scenarios, and repeat the real-provider proof if provider configuration changes."
+  "resume_condition": "When the real provider is available, run one manager-owned threshold-forced rollover proving exact successor acknowledgment, predecessor fencing and sealing, automatic continuation with the GUI closed, and durable crash-state recovery. UI and profiling remain separate release blockers and do not turn unit or direct-adapter evidence into autonomous-continuity authority. Complete the remaining hard scenarios and repeat provider proof if provider configuration changes."
 }

@@ -1,0 +1,140 @@
+{
+  "captured_at": "2026-08-28T13:05:22.324598+00:00",
+  "environment_keys_present": [
+    "CODEX_APP_TOOLS_PIPE_PATH",
+    "CODEX_CI",
+    "CODEX_INTERNAL_ORIGINATOR_OVERRIDE",
+    "CODEX_MCP_NODE_PATH",
+    "CODEX_PERMISSION_PROFILE",
+    "CODEX_SESSION_ID",
+    "CODEX_SHELL",
+    "CODEX_THREAD_ID"
+  ],
+  "execution_state": {
+    "available": true,
+    "current_work": "P10",
+    "nonpassing_hard_gates": [
+      {
+        "id": "G09",
+        "status": "blocked_dependency"
+      },
+      {
+        "id": "G10",
+        "status": "blocked_dependency"
+      },
+      {
+        "id": "G11",
+        "status": "blocked_dependency"
+      },
+      {
+        "id": "G12",
+        "status": "blocked_dependency"
+      }
+    ],
+    "open_issues": [
+      {
+        "evidence_class": "E0",
+        "id": "FC-UI-QUALIFICATION-001",
+        "notes": "EVID-20260828T124634Z-c6c0c861da proves the current native Settings shell-control XCUITest target compiles with CODE_SIGNING_ALLOWED=NO; it is build-only evidence and executed zero tests. Developer Mode remains disabled and the available Apple Development identity team does not match the project configuration. Native UI validation remains deferred and release-blocking until an authorized host and matching signing configuration execute the recorded XCUITest matrix.",
+        "severity": "High",
+        "status": "deferred",
+        "title": "Native UI qualification prerequisites are unavailable"
+      },
+      {
+        "evidence_class": "E2",
+        "id": "FC-FILESYSTEM-PATH-TOCTOU-001",
+        "notes": "Current-source Debug EVID-20260828T124332Z-1e2a050c0e and Release EVID-20260828T124624Z-00a3dd27c2 each pass 657 warnings-as-errors tests with four expected host-dependent skips. The full four-path atomic RENAME_SWAP matrix, fixed 32-slot receipt ledger, unsafe-rollback refusal, combined namespace-instability and durability failures, and two-receipt recovery merge are covered. Descriptor-relative operations and renameatx_np mitigate but do not eliminate the final verifier-to-terminal-syscall race because public macOS APIs have no expected-identity conditional mutation. One winning race can mutate one entry under the pinned parent; a final-link unlink can lose unbounded bytes and a directory rename can relocate an unbounded subtree. One recursive request can expose up to 100000 separate opportunities; 32 bounds simultaneous cooperative recovery state only. Terminal namespace syscalls and fsync already executing under the ledger lock have no independent wall-time deadline. Initial path anchoring, destination hierarchy creation, and hard-link ctime ambiguity remain E2.",
+        "severity": "High",
+        "status": "deferred",
+        "title": "Filesystem mutation paths retain descriptor-relative race windows"
+      },
+      {
+        "evidence_class": "E0",
+        "id": "FC-SHELL-COMPAT-QUALIFICATION-001",
+        "notes": "Current-source Debug EVID-20260828T124332Z-1e2a050c0e and Release EVID-20260828T124624Z-00a3dd27c2 each pass 657 warnings-as-errors tests with four expected host-dependent skips. EVID-20260828T125651Z-ad5ebff94c proves current MCP tools/list compatibility with all declared protocol artifacts preserved, and EVID-20260828T125046Z-c15d53c9c9 proves current manager Settings routes. Tests cover clean-install enablement, accidental legacy-disabled migration, explicit opt-out, execution, manager and application restart, and the established shell_exec synchronous /bin/bash -lc result contract. Clean-profile bash.run remains additive. EVID-20260828T124634Z-c6c0c861da compiles the native Settings visibility, control, and relaunch XCUITest with signing disabled but executes no test. Shell compatibility remains open and release-blocking.",
+        "severity": "High",
+        "status": "deferred",
+        "title": "Shell compatibility qualification requires native Settings execution"
+      },
+      {
+        "evidence_class": "E0",
+        "id": "FC-AUTONOMOUS-CONTINUITY-E2E-001",
+        "notes": "The prior live provider proof directly invoked an adapter and does not prove one manager-owned threshold-forced real-provider rollover. Release authority still requires exact successor acknowledgment, predecessor fencing and idempotent sealing, automatic continuation, GUI-closed operation, and recovery from every durable crash state in that scenario. Unit and synthetic-host tests are supporting evidence only. Autonomous continuity remains open and release-blocking.",
+        "severity": "High",
+        "status": "deferred",
+        "title": "Autonomous continuity lacks full real-provider forced-rollover authority"
+      }
+    ],
+    "repository": {
+      "branch": "repair/filesystem-race-mitigation",
+      "commit": "6288210d82270b26add5f0e078d150bc4377bd62",
+      "dirty": true,
+      "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation"
+    },
+    "run_status": "active"
+  },
+  "machine": "arm64",
+  "macos_runtime_capable": true,
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "project_markers": {
+    "package_swift": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/Package.swift",
+    "projects": [
+      "ForgeConductor.xcodeproj"
+    ],
+    "workspaces": [
+      "ForgeConductor.xcworkspace"
+    ]
+  },
+  "repository_root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation",
+  "schema_version": 1,
+  "tools": {
+    "bash": {
+      "available": true,
+      "exit_code": 0,
+      "output": "GNU bash, version 3.2.57(1)-release (arm64-apple-darwin25)\nCopyright (C) 2007 Free Software Foundation, Inc.\n",
+      "path": "/bin/bash"
+    },
+    "git": {
+      "available": true,
+      "exit_code": 0,
+      "output": "git version 2.50.1 (Apple Git-155)\n",
+      "path": "/usr/bin/git"
+    },
+    "python3": {
+      "available": true,
+      "exit_code": 0,
+      "output": "Python 3.9.6\n",
+      "path": "/usr/bin/python3"
+    },
+    "sqlite3": {
+      "available": true,
+      "exit_code": 0,
+      "output": "3.51.0 2025-06-12 13:14:41 f0ca7bba1c5e232e5d279fad6338121ab55af0c8c68c84cdfb18ba5114dcaapl (64-bit)\n",
+      "path": "/usr/bin/sqlite3"
+    },
+    "swift": {
+      "available": true,
+      "exit_code": 0,
+      "output": "swift-driver version: 1.127.14.1 Apple Swift version 6.2.3 (swiftlang-6.2.3.3.21 clang-1700.6.3.2)\nTarget: arm64-apple-macosx26.0\n",
+      "path": "/usr/bin/swift"
+    },
+    "xcodebuild": {
+      "available": true,
+      "exit_code": 0,
+      "output": "Xcode 26.2\nBuild version 17C52\n",
+      "path": "/usr/bin/xcodebuild"
+    },
+    "xcrun": {
+      "available": true,
+      "exit_code": 0,
+      "output": "xcrun version 72.\n",
+      "path": "/usr/bin/xcrun"
+    },
+    "xctrace": {
+      "available": true,
+      "exit_code": 0,
+      "output": "xctrace version 26.0 (17C52)\n",
+      "path": "/usr/bin/xcrun"
+    }
+  }
+}

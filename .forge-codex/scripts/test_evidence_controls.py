@@ -25,12 +25,161 @@ from check_p10_protocol_compatibility import (
 SCRIPT_ROOT = pathlib.Path(__file__).resolve().parent
 RECORDER = SCRIPT_ROOT / "record_command.py"
 COMPLETION_CHECKER = SCRIPT_ROOT / "check_p10_completion.py"
+DOCTOR = SCRIPT_ROOT / "doctor.sh"
+STATECTL = SCRIPT_ROOT / "statectl.py"
 
 
 class EvidenceControlTests(unittest.TestCase):
     def write_json(self, path: pathlib.Path, value: object) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    def test_completion_requires_full_filesystem_security_matrix(self) -> None:
+        checker = COMPLETION_CHECKER.read_text(encoding="utf-8")
+        required = (
+            "testRecursiveDeletePreservesLeafSwappedAfterVerification",
+            "testSameVolumeMoveDoesNotPublishLeafSwappedAfterVerification",
+            "testSameVolumeNamespaceInstabilityWithUnconfirmedDurabilityRetainsRecoveryReceipt",
+            "testCrossVolumeInstallDoesNotPublishStagingLeafSwappedAfterVerification",
+            "testCrossVolumeNamespaceInstabilityWithUnconfirmedDurabilityRetainsRecoveryReceipt",
+            "testCrossVolumeNamespaceInstabilityMergesInstallAndStagingRecoveryReceipts",
+            "testCrossVolumeSourceRemovalPreservesLeafSwappedAfterVerification",
+            "testRollbackRefusesSubstitutedQuarantineOccupant",
+            "testDeleteQuarantineIsGloballyBoundedAndRecoveredAcrossRestart",
+            "testPostUnlinkReceiptSyncFailureDoesNotClaimMissingRecoveryPath",
+            "testReceiptRemovalFailureRetainsTerminalRecoveryPath",
+            "testPostPublicationStagingFailurePreservesRecoveryAndUnknownPresence",
+            "testRetainedStagingRecoveryDoesNotClaimAbsentStagingPathNeedsCleanup",
+        )
+        self.assertIn("REQUIRED_FILESYSTEM_SECURITY_TESTS", checker)
+        self.assertIn("for test_name in REQUIRED_FILESYSTEM_SECURITY_TESTS", checker)
+        for test_name in required:
+            self.assertIn(f'"{test_name}"', checker)
+
+    def test_doctor_reports_open_issues_and_nonpassing_hard_gates(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            script = root / ".forge-codex/scripts/doctor.sh"
+            script.parent.mkdir(parents=True)
+            script.write_text(DOCTOR.read_text(encoding="utf-8"), encoding="utf-8")
+            self.write_json(
+                root / ".forge-codex/state/run-state.json",
+                {
+                    "status": "active",
+                    "current_work": "P10",
+                    "repository": {"branch": "fixture", "commit": "abc123", "dirty": True},
+                    "issues": [
+                        {"id": "RESOLVED", "status": "resolved", "severity": "High"},
+                        {
+                            "id": "OPEN-E2",
+                            "title": "Residual race",
+                            "status": "deferred",
+                            "severity": "High",
+                            "evidence_class": "E2",
+                            "notes": "mitigation remains incomplete",
+                        },
+                    ],
+                    "gates": {
+                        "G09": {"status": "blocked_dependency"},
+                        "G10": {"status": "blocked_environment"},
+                        "G12": {"status": "not_started"},
+                    },
+                },
+            )
+            self.write_json(
+                root / ".forge-codex/plans/gates.json",
+                {
+                    "gates": [
+                        {"id": "G09", "type": "hard"},
+                        {"id": "G10", "type": "hard"},
+                        {"id": "G12", "type": "hard"},
+                        {"id": "INFO", "type": "informational"},
+                    ]
+                },
+            )
+
+            result = subprocess.run(
+                ["bash", str(script)],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            report = json.loads(result.stdout)
+            self.assertEqual(report["current_work"], "P10")
+            self.assertEqual([item["id"] for item in report["open_issues"]], ["OPEN-E2"])
+            self.assertEqual(
+                [item["id"] for item in report["nonpassing_hard_gates"]],
+                ["G09", "G10", "G12"],
+            )
+            environment = json.loads(
+                (root / ".forge-codex/state/environment.json").read_text(encoding="utf-8")
+            )
+            self.assertTrue(environment["execution_state"]["available"])
+            self.assertEqual(environment["execution_state"]["current_work"], "P10")
+
+    def test_statectl_issue_event_preserves_residual_details(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            scripts = root / ".forge-codex/scripts"
+            scripts.mkdir(parents=True)
+            statectl = scripts / "statectl.py"
+            statectl.write_text(STATECTL.read_text(encoding="utf-8"), encoding="utf-8")
+            statectl.chmod(0o755)
+            self.write_json(root / ".forge-codex/plans/phases.json", {"phases": []})
+            self.write_json(root / ".forge-codex/plans/gates.json", {"gates": []})
+
+            initialize = subprocess.run(
+                [sys.executable, str(statectl), "--repo", str(root), "init"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(initialize.returncode, 0, initialize.stdout + initialize.stderr)
+            update = subprocess.run(
+                [
+                    sys.executable,
+                    str(statectl),
+                    "--repo",
+                    str(root),
+                    "issue",
+                    "RESIDUAL-E2",
+                    "--title",
+                    "Residual race",
+                    "--status",
+                    "deferred",
+                    "--severity",
+                    "High",
+                    "--evidence-class",
+                    "E2",
+                    "--path",
+                    "Sources/Mutation.swift",
+                    "--notes",
+                    "Mitigation does not eliminate the race.",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(update.returncode, 0, update.stdout + update.stderr)
+            event = json.loads(
+                (root / ".forge-codex/state/events.jsonl")
+                .read_text(encoding="utf-8")
+                .splitlines()[-1]
+            )
+            self.assertEqual(event["type"], "issue_updated")
+            self.assertEqual(
+                event["payload"],
+                {
+                    "id": "RESIDUAL-E2",
+                    "title": "Residual race",
+                    "status": "deferred",
+                    "severity": "High",
+                    "evidence_class": "E2",
+                    "path": "Sources/Mutation.swift",
+                    "notes": "Mitigation does not eliminate the race.",
+                },
+            )
 
     def make_repository(self, root: pathlib.Path, *, ledger_exit: int = 0) -> None:
         (root / "Sources").mkdir(parents=True)
@@ -327,6 +476,7 @@ path.write_text(json.dumps(value) + "\\n", encoding="utf-8")
                         "ProjectMemoryRepository.swift",
                         "RuntimeJobRepository.swift",
                         "VerifiedMigrationBackup.swift",
+                        "FilesystemQuarantineLedger.swift",
                         "ContinuityTests.swift",
                         "NativeSessionHostPluginTests.swift",
                         "ProjectMemoryTests.swift",
@@ -495,6 +645,21 @@ path.write_text(json.dumps(value) + "\\n", encoding="utf-8")
             self.assertIn("manager current success matrix is not exactly 17 of 17", result.stdout)
             self.assertIn(
                 "native UI command/settings/accessibility/reconnect/redaction matrix is incomplete",
+                result.stdout,
+            )
+            self.assertIn(
+                "debug strict suite has no passing shell compatibility proof: "
+                "testShellPolicyAndCompatibilitySurviveManagerAndAppRestart",
+                result.stdout,
+            )
+            self.assertIn(
+                "release strict suite has no passing shell compatibility proof: "
+                "testBootstrapRouterLegacyShellExecUsesBoundProjectAndCompatibilityContract",
+                result.stdout,
+            )
+            self.assertIn(
+                "native UI qualification has no passing shell Settings proof: "
+                "testManagerSettingsControlsAndPersistsProjectShellPolicy",
                 result.stdout,
             )
 
