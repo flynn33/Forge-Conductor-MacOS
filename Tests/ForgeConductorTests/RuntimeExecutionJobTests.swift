@@ -3711,7 +3711,9 @@ final class RuntimeExecutionJobTests: XCTestCase {
 
     func testRuntimeSubmissionReceiptIsPublishedAtCommitBeforeRepositoryReturns() async throws {
         let gate = RepositoryCommitGate(expectedKind: .submission)
-        let fixture = try await Fixture.make(afterMutationCommitObserver: gate.observe)
+        let fixture = try await Fixture.make(afterMutationCommitObserver: { kind in
+            gate.observe(kind)
+        })
         defer {
             gate.release()
             try? FileManager.default.removeItem(at: fixture.root)
@@ -3781,7 +3783,9 @@ final class RuntimeExecutionJobTests: XCTestCase {
 
     func testRuntimeCancellationReceiptIsPublishedAtCommitBeforeRepositoryReturns() async throws {
         let gate = RepositoryCommitGate(expectedKind: .cancellation)
-        let fixture = try await Fixture.make(afterMutationCommitObserver: gate.observe)
+        let fixture = try await Fixture.make(afterMutationCommitObserver: { kind in
+            gate.observe(kind)
+        })
         defer {
             gate.release()
             try? FileManager.default.removeItem(at: fixture.root)

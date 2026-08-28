@@ -247,6 +247,11 @@ def cmd_attempt(args) -> int:
 
 def cmd_issue(args) -> int:
     repo = locate_repo(args.repo)
+    event_payload = {"id": args.id}
+    for key in ("title", "status", "severity", "evidence_class", "path", "notes"):
+        value = getattr(args, key)
+        if value is not None:
+            event_payload[key] = value
     def apply(state):
         existing = next((i for i in state["issues"] if i["id"] == args.id), None)
         record = existing if existing else {"id":args.id}
@@ -258,7 +263,7 @@ def cmd_issue(args) -> int:
                 record[key] = value
         record["updated_at"] = now()
         record.setdefault("created_at", now())
-    mutate(repo, "issue_updated", {"id":args.id,"status":args.status}, apply)
+    mutate(repo, "issue_updated", event_payload, apply)
     return 0
 
 def cmd_reference(args) -> int:

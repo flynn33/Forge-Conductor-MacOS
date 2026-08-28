@@ -32,6 +32,12 @@ if not acceptance.is_file():
     print(f"acceptance record missing: {acceptance}",file=sys.stderr);raise SystemExit(1)
 record=json.loads(acceptance.read_text())
 errors=[]
+if record.get("current_release_authority") is False:
+    scope=record.get("authority_scope","historical")
+    revision=record.get("qualified_source_revision","unknown")
+    errors.append(
+        f"acceptance record is {scope} evidence for {revision}, not current release authority"
+    )
 criteria_by_text={c.get("criterion"):c for c in record.get("criteria_results",[])}
 normalized=[]
 for criterion in gate["criteria"]:

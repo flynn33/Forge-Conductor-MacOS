@@ -516,12 +516,12 @@
       "evidence_class": "E3",
       "fix_commits": [],
       "id": "FC-SEC-SHELL-POLICY",
-      "ownership_disposition": "Unrestricted shell execution is disabled by default and requires trusted local configuration that is not exposed through dashboard settings. Agent or model arguments cannot enable it.",
+      "ownership_disposition": "Resolved narrowly by project binding, canonical authorization roots, per-agent grants, bounded execution, and an operator-owned persisted policy. The current schema-v2 policy is enabled on clean installs. Released schema-v1 configs persisted no provenance capable of distinguishing the shipped disabled default from a user-chosen false value, so their disabled state migrates to enabled; explicit schema-v2 opt-outs record provenance and remain disabled. Agent or model arguments cannot change that policy. shell_exec retains its synchronous login-Bash compatibility contract; clean-profile bash.run is additive. Native Settings execution remains deferred under FC-SHELL-COMPAT-QUALIFICATION-001 and FC-UI-QUALIFICATION-001, so this resolved security finding is not a shell-qualification claim.",
       "runtime_proof": [".forge-codex/evidence/P12-security-scan-summary.json"],
       "severity": "High",
       "status": "resolved",
       "title": "General shell execution bypasses workspace and per-agent tool restrictions",
-      "validation_evidence": ["CoreTests.testShellIsDisabledUnlessTrustedConfigurationEnablesIt"]
+      "validation_evidence": ["CoreTests.testShellRequiresExplicitProjectContext", "CoreTests.testShellExecutesByDefaultInsideAuthorizedProjectWorkspace", "CoreTests.testExplicitShellDisableUsesDistinctAuthorizationReason", "CoreTests.testShellExecPreservesLoginBashAndResponseContract", "RuntimeExecutionJobTests.testLegacyBashLoginCompatibilityProfileIsExposedWithoutChangingShellToolPack"]
     },
     {
       "affected_feature_ids": ["MCP-TOOL-SHELL"],
@@ -550,6 +550,110 @@
       "validation_evidence": ["full Swift test matrix"]
     },
     {
+      "affected_feature_ids": ["MCP-TOOL-FILESYSTEM"],
+      "assigned_phase": "P10",
+      "evidence_class": "E2",
+      "fix_commits": [],
+      "id": "FC-FILESYSTEM-PATH-TOCTOU-001",
+      "ownership_disposition": "Descriptor-relative traversal and bounded quarantine-and-verify mitigate final-component substitution but do not eliminate it. A global 32-slot owner-only receipt ledger bounds simultaneous tracked recovery state across cooperating Forge processes and ordinary crashes; corrupt receipts, unavailable or rebound parents, failed rollback, and terminal-durability-unconfirmed transitions retain a slot. Rollback refuses a quarantine occupant whose identity differs from the receipt. Combined namespace-instability and durability-unconfirmed results retain the live install receipt, and cross-volume cleanup merges any second retained receipt. Receipt unlink followed by failed ledger-directory sync does not falsely claim a nonexistent live recovery path, although a stale receipt may conservatively reappear after a crash. A same-user writer can discover and swap the quarantine name after final verification and before the terminal unlinkat or renameatx_np. One winning race can mutate one entry under the pinned authorized parent; a final-link unlink can lose unbounded bytes and a directory rename can relocate an unbounded subtree. One recursive request can reuse released slots across up to 100000 planned entries, so the 32-slot bound does not limit cumulative adversarial wrong-object mutations and is not a same-UID adversarial guarantee. Cross-volume work is deadline-bounded to 300 seconds, but a terminal namespace syscall or fsync already executing under the lock has no independent wall-time deadline. Initial path anchoring, destination hierarchy creation, and hard-link ctime ambiguity remain separate E2 residuals. Current-source Debug EVID-20260828T124332Z-1e2a050c0e and Release EVID-20260828T124624Z-00a3dd27c2 each pass 657 tests with four expected skips; the finding remains open.",
+      "runtime_proof": [
+        "Tests/ForgeConductorTests/FilesystemCancellationTests.swift",
+        ".forge-codex/evidence/EVID-20260828T124332Z-1e2a050c0e.json",
+        ".forge-codex/evidence/EVID-20260828T124624Z-00a3dd27c2.json"
+      ],
+      "severity": "High",
+      "status": "deferred",
+      "title": "Filesystem mutation paths retain descriptor-relative race windows",
+      "validation_evidence": [
+        "FilesystemCancellationTests.testRecursiveDeletePreservesLeafSwappedAfterVerification",
+        "FilesystemCancellationTests.testSameVolumeMoveDoesNotPublishLeafSwappedAfterVerification",
+        "FilesystemCancellationTests.testCrossVolumeInstallDoesNotPublishStagingLeafSwappedAfterVerification",
+        "FilesystemCancellationTests.testCrossVolumeSourceRemovalPreservesLeafSwappedAfterVerification",
+        "FilesystemCancellationTests.testSameVolumeNamespaceInstabilityWithUnconfirmedDurabilityRetainsRecoveryReceipt",
+        "FilesystemCancellationTests.testCrossVolumeNamespaceInstabilityWithUnconfirmedDurabilityRetainsRecoveryReceipt",
+        "FilesystemCancellationTests.testCrossVolumeNamespaceInstabilityMergesInstallAndStagingRecoveryReceipts",
+        "FilesystemCancellationTests.testDeleteQuarantineIsGloballyBoundedAndRecoveredAcrossRestart",
+        "FilesystemCancellationTests.testCorruptQuarantineReceiptRemainsOccupiedAndRecoveryVisible",
+        "FilesystemCancellationTests.testPreexistingDeterministicQuarantineNameIsNotClaimed",
+        "FilesystemCancellationTests.testStaleQuarantineReservationCannotReleaseReusedSlot",
+        "FilesystemCancellationTests.testConcurrentQuarantineReservationsNeverExceedGlobalCapacity",
+        "FilesystemCancellationTests.testRestartDoesNotTreatMissingNamesAsTerminalProof",
+        "FilesystemCancellationTests.testInitialQuarantineSyncFailureReportsRetainedTransitionWithoutRollback",
+        "FilesystemCancellationTests.testDeleteReportsUnknownPresenceWithoutFalseExistenceClaim",
+        "FilesystemCancellationTests.testRollbackRefusesSubstitutedQuarantineOccupant",
+        "FilesystemCancellationTests.testUnavailableQuarantineLedgerFailsClosedBeforeNamespaceMutation",
+        "FilesystemCancellationTests.testPostUnlinkReceiptSyncFailureDoesNotClaimMissingRecoveryPath",
+        "FilesystemCancellationTests.testReceiptRemovalFailureRetainsTerminalRecoveryPath",
+        "FilesystemCancellationTests.testPostPublicationStagingFailurePreservesRecoveryAndUnknownPresence",
+        "FilesystemCancellationTests.testRetainedStagingRecoveryDoesNotClaimAbsentStagingPathNeedsCleanup"
+      ]
+    },
+    {
+      "affected_feature_ids": ["MCP-TOOL-SHELL", "UI-TAB-MANAGER"],
+      "assigned_phase": "P10",
+      "evidence_class": "E0",
+      "fix_commits": [],
+      "id": "FC-SHELL-COMPAT-QUALIFICATION-001",
+      "ownership_disposition": "Current-source regressions cover clean-install enablement, schema-v1 disabled-state migration, current schema-v2 explicit opt-out preservation, tools/list registration, execution, and the established shell_exec login-bash result contract. Released schema-v1 configs did not persist a signal that can distinguish the shipped false default from a user-chosen false value. Restart coverage at that boundary is manager-service restart plus ForgeApp teardown/rebootstrap inside the test process, not LaunchAgent or native app process relaunch. shell_exec remains distinct from additive clean-profile bash.run. Debug EVID-20260828T124332Z-1e2a050c0e and Release EVID-20260828T124624Z-00a3dd27c2 pass the current strict matrix; current MCP and manager compatibility are EVID-20260828T125651Z-ad5ebff94c and EVID-20260828T125046Z-c15d53c9c9. The Settings XCUITest includes visibility, control, save, reload, and actual app relaunch, but EVID-20260828T124634Z-c6c0c861da is unsigned build-only evidence and no native execution is accepted. Native execution remains blocked by signing and Developer Mode, so shell compatibility remains open.",
+      "runtime_proof": [
+        "Tests/ForgeConductorTests/AppConfigAndDoctorTests.swift",
+        "Tests/ForgeConductorTests/CoreTests.swift",
+        "Tests/ForgeConductorTests/RuntimeExecutionJobTests.swift",
+        "Tests/ForgeConductorTests/ProductPathReliabilityTests.swift",
+        ".forge-codex/evidence/EVID-20260828T124332Z-1e2a050c0e.json",
+        ".forge-codex/evidence/EVID-20260828T124624Z-00a3dd27c2.json",
+        ".forge-codex/evidence/EVID-20260828T125651Z-ad5ebff94c.json",
+        ".forge-codex/evidence/EVID-20260828T125046Z-c15d53c9c9.json",
+        ".forge-codex/evidence/EVID-20260828T124634Z-c6c0c861da.json"
+      ],
+      "severity": "High",
+      "status": "deferred",
+      "title": "Shell compatibility qualification requires native Settings execution",
+      "validation_evidence": [
+        "ForgeConductorUITests.testManagerShowsProjectShellPolicyControls",
+        "ForgeConductorUITests.testManagerSettingsControlsAndPersistsProjectShellPolicy"
+      ]
+    },
+    {
+      "affected_feature_ids": ["UI-TAB-MANAGER", "MCP-TOOL-SHELL"],
+      "assigned_phase": "P10",
+      "evidence_class": "E0",
+      "fix_commits": [],
+      "id": "FC-UI-QUALIFICATION-001",
+      "ownership_disposition": "EVID-20260828T124634Z-c6c0c861da shows that the current native test target compiles unsigned, but it is build-only evidence with zero executed tests. Developer Mode is disabled and the available Apple Development identity does not match the configured team. No XCUITest execution is accepted from an unsigned build-for-testing proof. G10 native UI qualification remains deferred and release-blocking.",
+      "runtime_proof": [
+        ".forge-autonomy-state/evidence/FC-UI-001/test-results.json",
+        ".forge-codex/evidence/EVID-20260828T124634Z-c6c0c861da.json"
+      ],
+      "severity": "High",
+      "status": "deferred",
+      "title": "Native UI qualification prerequisites are unavailable",
+      "validation_evidence": [
+        "Tests/ForgeConductorUITests/ForgeConductorUITests.swift"
+      ]
+    },
+    {
+      "affected_feature_ids": ["DATA-CONTEXT-HANDOFFS"],
+      "assigned_phase": "P09",
+      "evidence_class": "E0",
+      "fix_commits": [],
+      "id": "FC-AUTONOMOUS-CONTINUITY-E2E-001",
+      "ownership_disposition": "The prior live LM Studio run proves a fresh provider root, exact handoff acknowledgment, and a linked continuation when the adapter is invoked directly. It does not prove threshold-forced manager rollover, predecessor fencing and idempotent sealing, automatic continuation under manager ownership, GUI-closed operation, and recovery from every durable crash state as one real-provider scenario. Unit and synthetic-host results are supporting evidence only.",
+      "runtime_proof": [
+        ".forge-autonomy-state/evidence/FC-E2E-001/live-lmstudio-managed-continuity-52f8aca.json",
+        ".forge-autonomy-state/blockers/FC-E2E-001.json"
+      ],
+      "severity": "High",
+      "status": "deferred",
+      "title": "Autonomous continuity lacks full real-provider forced-rollover authority",
+      "validation_evidence": [
+        "real-provider forced rollover with exact successor acknowledgment",
+        "predecessor fencing and idempotent sealing",
+        "automatic continuation with the GUI closed",
+        "durable crash-state recovery"
+      ]
+    },
+    {
       "affected_feature_ids": ["CLI-DASHBOARD", "MGR-BACKGROUND"],
       "assigned_phase": "P12",
       "evidence_class": "E3",
@@ -560,7 +664,7 @@
       "severity": "Medium",
       "status": "open",
       "title": "Loopback dashboard control plane has no client authentication",
-      "validation_evidence": ["Codex Security scan 96f20cd2-930e-4f31-8bd7-0dc9e7e0a954"]
+      "validation_evidence": ["Security scan 96f20cd2-930e-4f31-8bd7-0dc9e7e0a954"]
     },
     {
       "affected_feature_ids": ["CLI-DASHBOARD", "TEL-SSE-DASHBOARD"],
@@ -573,7 +677,7 @@
       "severity": "Low",
       "status": "open",
       "title": "Unbounded idle dashboard connections permit local resource exhaustion",
-      "validation_evidence": ["Codex Security scan 96f20cd2-930e-4f31-8bd7-0dc9e7e0a954"]
+      "validation_evidence": ["Security scan 96f20cd2-930e-4f31-8bd7-0dc9e7e0a954"]
     }
   ],
   "instructions": "Preserve evidence classes. Resolve only with source disposition and the runtime/test proof required by the audit and phase gate.",

@@ -1,0 +1,56 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 398983,
+      "path": ".forge-codex/evidence/EVID-20260828T124634Z-c6c0c861da.stdout.txt",
+      "sha256": "ad438d85fe93c8ac195458ba02b964601b7bb128b248c3f125c23a084353dde8",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 225,
+      "path": ".forge-codex/evidence/EVID-20260828T124634Z-c6c0c861da.stderr.txt",
+      "sha256": "bf0d2274e38490fac62d2a31c10a5198d4930d569352886f63faacabdd292e20",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "command": "xcodebuild -project ForgeConductor.xcodeproj -scheme ForgeConductor -configuration Debug -destination platform=macOS -derivedDataPath /tmp/forge-ui-shell-evidence-final -only-testing:ForgeConductorUITests/ForgeConductorUITests/testManagerSettingsControlsAndPersistsProjectShellPolicy CODE_SIGNING_ALLOWED=NO build-for-testing",
+  "ended_at": "2026-08-28T12:46:48.868737+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260828T124634Z-c6c0c861da",
+  "kind": "p10-shell-settings-build-only",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [
+    "FC-UI-QUALIFICATION-001",
+    "FC-SHELL-COMPAT-QUALIFICATION-001"
+  ],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 9082957,
+    "file_count": 242,
+    "schema_version": 1,
+    "sha256": "bc7b2f66d381d8fa4cd51b9e4da78b8c8486572385e05425c07d94922e8c3106"
+  },
+  "source_manifest_after": {
+    "bytes": 9082957,
+    "file_count": 242,
+    "schema_version": 1,
+    "sha256": "bc7b2f66d381d8fa4cd51b9e4da78b8c8486572385e05425c07d94922e8c3106"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-28T12:46:34.174903+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

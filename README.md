@@ -14,6 +14,13 @@ This project is **not** Claude Code orchestration, CCDT, or `~/.claude/local-mcp
 | **Wiki** | [Project wiki](https://github.com/flynn33/Forge-Conductor-MacOS/wiki) |
 | **Contributions** | **Closed** — see [CONTRIBUTING.md](CONTRIBUTING.md) |
 
+> **Current qualification boundary:** this source line is an in-progress P10
+> checkpoint, not a qualified release. Filesystem E2, shell compatibility,
+> native UI execution, manager-owned autonomous continuity, and the dependent
+> release gates remain open. See
+> [`.forge-codex/state/release-handoff.md`](.forge-codex/state/release-handoff.md)
+> for the active state.
+
 ### How LM Studio connects
 
 LM Studio is the MCP **host**. It spawns a Forge **stdio** server:
@@ -93,21 +100,24 @@ Context and agent handoffs: SQLite `context_handoffs` with rebuildable JSON/Mark
 
 More detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and the [project wiki](https://github.com/flynn33/Forge-Conductor-MacOS/wiki).
 
-## What's new in 0.9.0
+## 0.9.0 baseline and the current P10 checkpoint
 
-This minor release adds durable, project-scoped memory and completes the runtime
-reliability work around continuity, resource ownership, telemetry, and local tool
-authorization.
+The historical 0.9.0 baseline introduced durable, project-scoped memory and the
+runtime reliability implementation around continuity, resource ownership,
+telemetry, and local tool authorization. The current tree contains additional
+P10 work recorded under **Unreleased** in the changelog; that work is not yet
+release-qualified.
 
 | Area | What changed |
 |------|--------------|
 | **Project memory** | Twelve `project_memory.*` tools provide bounded search, optimistic updates, links, batch writes, health, and checksummed import/export. |
-| **Continuity** | A serialized coordinator and native session-host adapter preserve handoff state across process and chat boundaries. |
+| **Continuity** | A serialized coordinator and native session-host adapter preserve handoff state across process and chat boundaries. Manager-owned autonomous rollover still requires the recorded real-provider forced-rollover authority scenario. |
 | **Runtime** | Resource policy, lifecycle ownership, diagnostics, bounded latest-value telemetry, and shared Metal resources reduce unbounded work and retained state. |
 | **Security** | Project shell tools are enabled by default, remain limited to authorized workspace roots, expose an explicit native opt-out, and keep `shell_exec` capped at 120 seconds. |
 
-Legacy `memory_*` and `session_*`/`context_*` tools remain compatible. Full release
-notes and qualification boundaries are in **[CHANGELOG.md](CHANGELOG.md)**.
+Legacy `memory_*` and `session_*`/`context_*` tools remain compatible. Current
+qualification boundaries are in **[CHANGELOG.md](CHANGELOG.md)** and the active
+[checkpoint handoff](.forge-codex/state/release-handoff.md).
 
 ## Design principles
 
@@ -115,10 +125,11 @@ notes and qualification boundaries are in **[CHANGELOG.md](CHANGELOG.md)**.
 2. Apple-native stack (Foundation, SQLite3, Network, Metal) — no Node/Python core.
 3. **LM Studio is the host** for local models; Forge is the MCP tool server + rig.
 4. Durable sessions, memory notes, and context/agent handoffs in SQLite for local-model agent runs.
-5. SwiftPM acceptance tests and native GUI compilation gate release builds; Xcode remains the distribution/signing project.
+5. Current-source SwiftPM matrices and signed native UI execution gate release qualification; native GUI compilation alone is build evidence, not an execution pass. Xcode remains the distribution/signing project.
 
-Current 0.9.0 qualification evidence is recorded in
+The historical 0.9.0 qualification snapshot is recorded in
 [`.forge-codex/evidence/P12-final-validation-report.md`](.forge-codex/evidence/P12-final-validation-report.md).
+It is exact older-checkpoint evidence, not authority for the current P10 tree.
 Earlier audit records remain available under `docs/`.
 
 ## CLI

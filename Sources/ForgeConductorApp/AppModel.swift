@@ -123,11 +123,17 @@ public final class AppModel: ObservableObject {
                     .flatMap(Int.init)
                     .flatMap { (1...65_535).contains($0) ? $0 : nil }
                 if let fixturePort {
+                    let credentials = ManagerControlCredentialStore(paths: forgeApp.paths)
+                    remoteManager = ManagerDashboardClient(
+                        host: "127.0.0.1",
+                        port: fixturePort,
+                        credentials: credentials
+                    )
                     operatorManagerClient.replace(
                         with: OperatorManagerHTTPClient(
                             host: "127.0.0.1",
                             port: fixturePort,
-                            credentials: ManagerControlCredentialStore(paths: forgeApp.paths)
+                            credentials: credentials
                         )
                     )
                     managerMessage = "Attached to operator UI test fixture"

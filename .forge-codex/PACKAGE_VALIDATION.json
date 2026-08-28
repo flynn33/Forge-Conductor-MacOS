@@ -1592,6 +1592,321 @@
     },
     {
       "detail": "valid",
+      "name": "json:evidence/EVID-20260827T211934Z-a744b1e1d1.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T211935Z-0edebe128b.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T211945Z-695f17ed45.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T212011Z-dcbc2f4541.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T212114Z-8a65f1e92b.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T212325Z-24175c9913.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T212325Z-bf0c4e2418.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T212325Z-d7c34d9501.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T212528Z-518ab7b892.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T212528Z-674475b1bd.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T212538Z-c17d5d9b6c.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T212604Z-2853075aa5.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T212606Z-ce5c409c24.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T212608Z-5b1f4f27b0.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T215814Z-89ce0c1520.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T215814Z-ebeefc3719.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T233859Z-44a7b8fe31.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T233917Z-a20d351011.artifact-000-P10-protocol-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T233917Z-a20d351011.artifact-001-P10-mcp-runtime-transcript.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T233917Z-a20d351011.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T234534Z-7538388418.artifact-000-P10-protocol-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T234534Z-7538388418.artifact-001-P10-mcp-runtime-transcript.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260827T234534Z-7538388418.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T003223Z-ed54aab219.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T102647Z-323b23d4e1.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T102813Z-b40aa90842.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T103105Z-49877a6c76.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T103516Z-d3f3c3c03d.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T103807Z-20f7b4d90d.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T104056Z-8011646489.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T122439Z-d1a60fb637.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T123045Z-c5d37cd558.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T124332Z-1e2a050c0e.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T124624Z-00a3dd27c2.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T124634Z-c6c0c861da.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T125021Z-6c31192210.artifact-000-P10-cli-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T125021Z-6c31192210.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T125032Z-f15bab4972.artifact-000-P10-protocol-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T125032Z-f15bab4972.artifact-001-P10-mcp-runtime-transcript.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T125032Z-f15bab4972.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T125046Z-c15d53c9c9.artifact-000-P10-manager-http-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T125046Z-c15d53c9c9.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T125600Z-80144153b8.artifact-000-environment.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T125600Z-80144153b8.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T125612Z-1f4dcf69d6.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T125651Z-ad5ebff94c.artifact-000-P10-protocol-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T125651Z-ad5ebff94c.artifact-001-P10-mcp-runtime-transcript.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T125651Z-ad5ebff94c.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T125726Z-0146321ddb.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T125826Z-f026e511e9.artifact-000-completion-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T125826Z-f026e511e9.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T130418Z-5574c5b7d8.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T130424Z-7eb8ebf490.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T130424Z-8504424e70.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T130425Z-686a1e57bc.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T130426Z-9f1dba3882.artifact-000-PACKAGE_VALIDATION.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T130426Z-9f1dba3882.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T130426Z-af339f479f.artifact-000-G09.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T130426Z-af339f479f.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T130522Z-849134968b.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T130522Z-9f6e40e665.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T130522Z-a830cc844e.artifact-000-environment.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260828T130522Z-a830cc844e.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
       "name": "json:evidence/P02-telemetry-baseline.json",
       "passed": true
     },
@@ -1878,6 +2193,11 @@
     {
       "detail": "valid",
       "name": "json:state/completion-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:state/current-handoff.json",
       "passed": true
     },
     {
@@ -2736,20 +3056,20 @@
       "passed": true
     },
     {
-      "detail": "Authorship-attribution scan passed for /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex",
+      "detail": "Authorship-attribution scan passed for /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex",
       "name": "authorship-attribution-scan",
       "passed": true
     },
     {
-      "detail": "Secret scan passed for /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex",
+      "detail": "Secret scan passed for /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex",
       "name": "secret-scan",
       "passed": true
     }
   ],
   "errors": [],
-  "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex",
+  "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex",
   "schema_version": 1,
   "valid": true,
-  "validated_at": "2026-08-27T19:26:27.146955+00:00",
+  "validated_at": "2026-08-28T13:05:23.494335+00:00",
   "warnings": []
 }

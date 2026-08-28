@@ -1,0 +1,68 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 6789,
+      "path": ".forge-codex/evidence/EVID-20260828T125600Z-80144153b8.artifact-000-environment.json",
+      "sha256": "9a2e483ce86cf524b49bdce8849cbdedc7d8adb5bdea8cc088a08d5a14ac1a89",
+      "source_path": ".forge-codex/state/environment.json",
+      "storage": "evidence-id-specific-copy"
+    },
+    {
+      "bytes": 4006,
+      "path": ".forge-codex/evidence/EVID-20260828T125600Z-80144153b8.stdout.txt",
+      "sha256": "8ed056f15fcd4ee95473328997ab4140623a91f34f2d880972414ba43b0c5830",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260828T125600Z-80144153b8.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "command": "./.forge-codex/scripts/doctor.sh",
+  "ended_at": "2026-08-28T12:56:00.753710+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260828T125600Z-80144153b8",
+  "kind": "p10-doctor-open-gates",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [
+    "FC-FILESYSTEM-PATH-TOCTOU-001",
+    "FC-SHELL-COMPAT-QUALIFICATION-001",
+    "FC-UI-QUALIFICATION-001",
+    "FC-AUTONOMOUS-CONTINUITY-E2E-001"
+  ],
+  "related_gates": [
+    "G09",
+    "G10",
+    "G11",
+    "G12"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 9082957,
+    "file_count": 242,
+    "schema_version": 1,
+    "sha256": "bc7b2f66d381d8fa4cd51b9e4da78b8c8486572385e05425c07d94922e8c3106"
+  },
+  "source_manifest_after": {
+    "bytes": 9082957,
+    "file_count": 242,
+    "schema_version": 1,
+    "sha256": "bc7b2f66d381d8fa4cd51b9e4da78b8c8486572385e05425c07d94922e8c3106"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-28T12:56:00.308640+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

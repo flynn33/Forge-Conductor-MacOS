@@ -1,0 +1,18 @@
+{
+  "baseline_features": 66,
+  "failures": [
+    "parity report is not passed",
+    "parity report records untested features",
+    "parity report has remaining requirements",
+    "native UI qualification is not passed"
+  ],
+  "migration_fixtures": 8,
+  "ok": false,
+  "phase": "P10",
+  "source_manifest": {
+    "bytes": 9082957,
+    "file_count": 242,
+    "schema_version": 1,
+    "sha256": "bc7b2f66d381d8fa4cd51b9e4da78b8c8486572385e05425c07d94922e8c3106"
+  }
+}

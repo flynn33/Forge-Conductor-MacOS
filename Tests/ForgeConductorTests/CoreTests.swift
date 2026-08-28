@@ -581,6 +581,120 @@ final class CoreTests: XCTestCase {
 
         XCTAssertFalse(result.ok)
         XCTAssertEqual(result.payload["code"] as? String, "shell_disabled_by_user")
+
+        let listed = try XCTUnwrap(MCPServer(
+            app: app,
+            clientID: ClientID("user-disabled-shell-tools-list")
+        ).handle([
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/list",
+        ]))
+        let listResult = try XCTUnwrap(listed["result"] as? [String: Any])
+        let descriptors = try XCTUnwrap(listResult["tools"] as? [[String: Any]])
+        XCTAssertEqual(descriptors.filter { $0["name"] as? String == "shell_exec" }.count, 1)
+    }
+
+    func testShellPolicyAndCompatibilitySurviveManagerAndAppRestart() throws {
+        let port = Int.random(in: 29_000...39_000)
+        let projectRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("shell-restart-project-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: projectRoot) }
+
+        var firstApp: ForgeApp? = try ForgeApp.bootstrap(home: tempHome)
+        var firstManager: ManagerNode? = ManagerNode(app: try XCTUnwrap(firstApp))
+        _ = try firstApp?.config.update([
+            "dashboard": ["port": port] as [String: Any],
+            "allowed_roots": [projectRoot.path],
+        ], save: true)
+        _ = try firstManager?.startService()
+        _ = try firstManager?.updateSettings(
+            ManagerSettingsPatch(shellEnabled: false),
+            apply: true
+        )
+        _ = try firstManager?.restartService()
+        XCTAssertFalse((try XCTUnwrap(firstManager)).settingsModel().shellEnabled)
+        XCTAssertTrue((try XCTUnwrap(firstManager)).settingsModel().shellUserDisabled)
+        let firstClient = ClientID("shell-restart-disabled")
+        try startAgentRun(
+            app: try XCTUnwrap(firstApp),
+            clientID: firstClient,
+            agentID: "implement",
+            goal: "verify persisted shell opt-out",
+            projectRoot: projectRoot
+        )
+        let disabled = try (XCTUnwrap(firstApp)).tools.call(
+            name: "shell_exec",
+            arguments: ["command": "true", "cwd": projectRoot.path],
+            clientID: firstClient
+        )
+        XCTAssertFalse(disabled.ok)
+        XCTAssertEqual(disabled.payload["code"] as? String, "shell_disabled_by_user")
+        XCTAssertTrue((try XCTUnwrap(firstApp)).tools.toolNames.contains("shell_exec"))
+        (try XCTUnwrap(firstApp)).shutdown()
+        firstManager = nil
+        firstApp = nil
+
+        var secondApp: ForgeApp? = try ForgeApp.bootstrap(home: tempHome)
+        var secondManager: ManagerNode? = ManagerNode(app: try XCTUnwrap(secondApp))
+        _ = try secondManager?.startService()
+        XCTAssertFalse((try XCTUnwrap(secondManager)).settingsModel().shellEnabled)
+        XCTAssertTrue((try XCTUnwrap(secondManager)).settingsModel().shellUserDisabled)
+        _ = try secondManager?.updateSettings(
+            ManagerSettingsPatch(shellEnabled: true),
+            apply: true
+        )
+        _ = try secondManager?.restartService()
+        XCTAssertTrue((try XCTUnwrap(secondManager)).settingsModel().shellEnabled)
+        XCTAssertFalse((try XCTUnwrap(secondManager)).settingsModel().shellUserDisabled)
+        (try XCTUnwrap(secondApp)).shutdown()
+        secondManager = nil
+        secondApp = nil
+
+        let thirdApp = try ForgeApp.bootstrap(home: tempHome)
+        defer { thirdApp.shutdown() }
+        XCTAssertTrue(thirdApp.config.model.shell.enabled)
+        XCTAssertFalse(thirdApp.config.model.shell.userDisabled)
+        let thirdClient = ClientID("shell-restart-enabled")
+        try startAgentRun(
+            app: thirdApp,
+            clientID: thirdClient,
+            agentID: "implement",
+            goal: "verify shell access after restart",
+            projectRoot: projectRoot
+        )
+        let executed = try thirdApp.tools.call(
+            name: "shell_exec",
+            arguments: [
+                "command": "shopt -q login_shell || exit 97; printf restart-ready",
+                "cwd": projectRoot.path,
+                "timeout_sec": 999,
+            ],
+            clientID: thirdClient
+        )
+        XCTAssertTrue(executed.ok, "\(executed.payload)")
+        XCTAssertEqual((executed.payload["exit_code"] as? NSNumber)?.int32Value, 0)
+        XCTAssertEqual(executed.payload["stdout"] as? String, "restart-ready")
+        XCTAssertEqual(executed.payload["timed_out"] as? Bool, false)
+        for key in [
+            "ok", "exit_code", "stdout", "stderr", "timed_out",
+            "stdout_truncated", "stderr_truncated", "command", "cwd",
+        ] {
+            XCTAssertNotNil(executed.payload[key], "missing shell_exec response key \(key)")
+        }
+
+        let listed = try XCTUnwrap(MCPServer(
+            app: thirdApp,
+            clientID: ClientID("shell-restart-tools-list")
+        ).handle([
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/list",
+        ]))
+        let listResult = try XCTUnwrap(listed["result"] as? [String: Any])
+        let descriptors = try XCTUnwrap(listResult["tools"] as? [[String: Any]])
+        XCTAssertEqual(descriptors.filter { $0["name"] as? String == "shell_exec" }.count, 1)
     }
 
     func testShellExecPreservesLoginBashAndResponseContract() throws {

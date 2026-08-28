@@ -19,7 +19,7 @@
       }
     }
   ],
-  "autonomous_rollover_proven": true,
+  "autonomous_rollover_proven": false,
   "required_plugin_built": true,
   "uses_private_ui_automation": false,
   "test_evidence": [
@@ -30,5 +30,5 @@
     ".forge-autonomy-state/command-logs/FC-AUTO-001/commands.jsonl",
     ".forge-autonomy-state/command-logs/FC-RELEASE-001/commands.jsonl"
   ],
-  "qualification_note": "Mode B is proven through the configured LM Studio REST managed adapter, a fresh provider root, exact handoff acknowledgement, and an automatic continuation rooted in the acknowledged response. External MCP mode remains memory-only and no undocumented external-chat API or private UI automation is claimed."
+  "qualification_note": "Mode B has supporting real-provider evidence for a fresh provider root, exact handoff acknowledgment, and a linked continuation when the adapter is invoked directly. Autonomous continuity is not yet proven because one threshold-forced manager-owned real-provider scenario has not established successor acknowledgment, predecessor fencing and idempotent sealing, automatic continuation, GUI-closed operation, and durable crash-state recovery together. External MCP mode remains memory-only and no undocumented external-chat API or private UI automation is claimed."
 }

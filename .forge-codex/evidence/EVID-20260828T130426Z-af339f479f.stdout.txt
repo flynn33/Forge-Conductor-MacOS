@@ -1,0 +1,33 @@
+{
+  "criteria_results": [
+    {
+      "criterion": "host capability report exists",
+      "passed": true,
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/evidence/P09-host-capability-report.json#b7c7ae9a1d8d9302448e31c8673142e66cbc4e1080ddf6152d8067ddb56b2d75; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/evidence/EVID-20260827T105148Z-30b18f1784.json#6958ac05ab6e699d3264526c965d739d8e6e2ee34d3ac0a4e816b92c33a4babe"
+    },
+    {
+      "criterion": "required plugin target builds and tests",
+      "passed": true,
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/evidence/P09-resource-owner-matrix.json#be9f2d9b9d711e5852f7a17ea2d6ffd52b540cc3e85c1242df2363797e3a5104; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/evidence/EVID-20260827T103142Z-31aeee7a3f.json#562a6a3758ce30fbb580f0f26e480f76432526caea46fc744a73b834b6063325; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/evidence/EVID-20260827T103242Z-f2a67a3569.json#1768996bf110201389fa45d899ccbb06da6e210a8e7c8418d74a200c56353ecd; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/evidence/EVID-20260827T105148Z-30b18f1784.json#6958ac05ab6e699d3264526c965d739d8e6e2ee34d3ac0a4e816b92c33a4babe"
+    },
+    {
+      "criterion": "full no-operator rollover passes in a supported mode",
+      "passed": true,
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/evidence/P09-host-capability-report.json#b7c7ae9a1d8d9302448e31c8673142e66cbc4e1080ddf6152d8067ddb56b2d75; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/evidence/P09-feature-parity.json#3f9b9f26cd42c153b537e007ac0317c8bf7c3074b91f7e0bdf268a4b2696601f; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-autonomy-state/evidence/FC-E2E-001/live-lmstudio-managed-continuity.json#7861db2e43dff59892b85b6bb914540b891a630c07f7ae882c69954f5e01702b; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/evidence/EVID-20260827T105148Z-30b18f1784.json#6958ac05ab6e699d3264526c965d739d8e6e2ee34d3ac0a4e816b92c33a4babe"
+    },
+    {
+      "criterion": "external MCP-only compatibility passes",
+      "passed": true,
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/evidence/P09-external-mcp-compatibility.json#e567663b11502ec6707a1737826a5ebc0a81f274586180d14db5a480106c9820; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/evidence/EVID-20260827T103306Z-a585799235.json#b42c9bf936923cbadb8babd701f8a45596e0df0700bab39a0b2ba98b2492575b; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/evidence/EVID-20260827T103315Z-ea299d27a2.json#fbc49951ecf34e6596b9942231e87cde1645cb19fd0f132d4b11910d74a8f28c; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/evidence/EVID-20260827T105148Z-30b18f1784.json#6958ac05ab6e699d3264526c965d739d8e6e2ee34d3ac0a4e816b92c33a4babe"
+    },
+    {
+      "criterion": "private UI automation scan passes",
+      "passed": true,
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/evidence/P09-host-capability-report.json#b7c7ae9a1d8d9302448e31c8673142e66cbc4e1080ddf6152d8067ddb56b2d75; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/evidence/EVID-20260827T103321Z-9af37ac353.json#c8aeeac1ea96688136851877e29ce23e6224d3fedb9a50e11e1e365e90446d09; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/evidence/EVID-20260827T105148Z-30b18f1784.json#6958ac05ab6e699d3264526c965d739d8e6e2ee34d3ac0a4e816b92c33a4babe"
+    }
+  ],
+  "valid": false,
+  "errors": [
+    "acceptance record is historical_exact_revision evidence for 52f8aca47463f88fa94276115fb5c2070ca683ef, not current release authority"
+  ]
+}

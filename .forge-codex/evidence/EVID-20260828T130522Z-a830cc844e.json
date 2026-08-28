@@ -1,0 +1,60 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 6837,
+      "path": ".forge-codex/evidence/EVID-20260828T130522Z-a830cc844e.artifact-000-environment.json",
+      "sha256": "547ce1117c5e91cef59483cebc59f116bbcf468ba42ed0df1faf2191a8a5655b",
+      "source_path": ".forge-codex/state/environment.json",
+      "storage": "evidence-id-specific-copy"
+    },
+    {
+      "bytes": 4054,
+      "path": ".forge-codex/evidence/EVID-20260828T130522Z-a830cc844e.stdout.txt",
+      "sha256": "8060c5e3d6f413038d3ede2444d60088cf34fdc7801a8a50250e34ea8d37f74d",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260828T130522Z-a830cc844e.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "command": "./.forge-codex/scripts/doctor.sh",
+  "ended_at": "2026-08-28T13:05:22.335601+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260828T130522Z-a830cc844e",
+  "kind": "doctor",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [],
+  "related_gates": [
+    "G12"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 9082957,
+    "file_count": 242,
+    "schema_version": 1,
+    "sha256": "bc7b2f66d381d8fa4cd51b9e4da78b8c8486572385e05425c07d94922e8c3106"
+  },
+  "source_manifest_after": {
+    "bytes": 9082957,
+    "file_count": 242,
+    "schema_version": 1,
+    "sha256": "bc7b2f66d381d8fa4cd51b9e4da78b8c8486572385e05425c07d94922e8c3106"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-28T13:05:22.039829+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

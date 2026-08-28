@@ -1,11 +1,14 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-08-27T10:57:00Z",
+  "updated_at": "2026-08-28T13:05:24Z",
   "run_id": "1e48ce8e-c41f-4d6d-a0e6-c3201200671b",
-  "branch": "repair/autonomous-continuity",
-  "baseline_commit": "b72d6e8dc00681477224fb1b79859f553bc02558",
-  "published_source_commit": "52f8aca47463f88fa94276115fb5c2070ca683ef",
-  "current_work_package": "FC-UI-001",
+  "branch": "repair/filesystem-race-mitigation",
+  "base_branch": "main",
+  "baseline_commit": "6288210d82270b26add5f0e078d150bc4377bd62",
+  "published_source_commit": "6288210d82270b26add5f0e078d150bc4377bd62",
+  "working_tree": true,
+  "publication_status": "pending: published_source_commit is the current main base, not the uncommitted working tree; final HEAD and pull-request number require post-push GitHub readback",
+  "current_work_package": "P10 filesystem race mitigation and shell compatibility qualification",
   "current_phase": "P10",
   "completed_work_packages": [
     "FC-BASE-000",
@@ -13,55 +16,63 @@
     "FC-CTX-001",
     "FC-CONT-001",
     "FC-HOST-001",
-    "FC-AUTO-001",
     "FC-BUDGET-001",
     "FC-ROLL-001",
     "FC-RUNTIME-001"
   ],
+  "pull_request_lineage": {
+    "9": "closed without merge; repair/autonomous-continuity at 6321bd98012e5f60b2779bbb401cc2827f372b16; superseded by PR 10 because the trees are identical",
+    "10": "squash merged as 7808790d9f52f4ec287434d45826bfa0e5586892 from repair/cancellation-recovery at 4b887fcc423284d0a60f57baed3adab4b943a576",
+    "11": "based on PR 10 merge and squash merged as 6288210d82270b26add5f0e078d150bc4377bd62 from repair/filesystem-path-hardening at 92122970c54cf549cdc5002db23044ed0b3552cb",
+    "next": "pending creation from repair/filesystem-race-mitigation to main"
+  },
   "verified_results": [
-    "G09 passed its semantic evaluator and hard gate against exact published revision 52f8aca47463f88fa94276115fb5c2070ca683ef",
-    "strict SwiftPM Debug: 447 tests, 3 skipped, 0 failures (CMD-20260827T103327Z-5d0a028f3d)",
-    "strict SwiftPM Release: 447 tests, 4 skipped, 0 failures (CMD-20260827T103455Z-4b3944647c)",
-    "native host plugin: Release target built and 16 contract tests passed with 1 expected live skip",
-    "external MCP compatibility passed 9 checks and the private UI automation source scan reported zero violations",
-    "real LM Studio rollover passed fresh-root, exact acknowledgement, automatic continuation, marker, response ancestry, exact model identity, and provider-exact usage (CMD-20260827T103812Z-17ac760a12)",
-    "automatic continuation used 82 output tokens under the enforced 4096-token cap",
-    "LM Studio was restored to no loaded model, stopped server, and closed port 1234",
-    "package validation, prohibited-attribution scan, and secret scan passed before the published source checkpoint"
+    "current-source strict SwiftPM Debug: 657 tests, 4 skipped, 0 failures (EVID-20260828T124332Z-1e2a050c0e)",
+    "current-source strict SwiftPM Release: 657 tests, 4 skipped, 0 failures (EVID-20260828T124624Z-00a3dd27c2)",
+    "four deterministic RENAME_SWAP probes exercise direct deletion, same-volume publication, cross-volume staging publication, and post-copy source removal; additional regressions preserve one or two live recovery receipts under combined namespace-instability and durability failures",
+    "shell regressions cover clean enablement, schema-v1 disabled-state migration, schema-v2 explicit opt-out preservation, tools/list, execution, manager and ForgeApp restart, and legacy shell_exec behavior and result shape; released schema-v1 had no opt-out provenance, and native process relaunch remains unexecuted",
+    "current-source executable compatibility passed for CLI EVID-20260828T125021Z-6c31192210, MCP EVID-20260828T125651Z-ad5ebff94c, and manager HTTP EVID-20260828T125046Z-c15d53c9c9",
+    "EVID-20260828T124634Z-c6c0c861da compiles the current Settings shell-control XCUITest target unsigned; it executes zero tests and is not native UI authority",
+    "fixed-capacity, corrupt-receipt, preexisting-name, stale-reservation, concurrent 32-slot ledger, unsafe rollback, unknown presence, and receipt durability tests pass on the current source manifest",
+    "publication controls pass in EVID-20260828T130418Z-5574c5b7d8, EVID-20260828T130424Z-8504424e70, EVID-20260828T130424Z-7eb8ebf490, EVID-20260828T130425Z-686a1e57bc, and EVID-20260828T130426Z-9f1dba3882",
+    "doctor EVID-20260828T130522Z-a830cc844e and selector EVID-20260828T130522Z-9f6e40e665 retain all four deferred findings, G09-G12 nonpassing, and P10 selected",
+    "P10 boundary EVID-20260828T130522Z-849134968b and completion boundary EVID-20260828T130523Z-73516c6e94 intentionally fail; no phase or release completion is claimed",
+    "current G09 acceptance boundary EVID-20260828T130426Z-af339f479f fails because direct-adapter evidence is not manager-owned forced-rollover authority"
   ],
   "current_environment_results": [
-    "console session is unlocked",
     "Developer Mode remains disabled",
-    "installed signing identities use team 9AQ2C2838M while the project requires 2Y25RTLZET",
-    "signed XCUITest remains unavailable without Developer Mode and a matching-team identity",
-    "Instruments task inspection remains authorization-blocked"
-  ],
-  "historical_results_requiring_current_source_refresh": [
-    "complete P10 feature, migration, protocol, and native UI compatibility matrix",
-    "full Xcode unit target",
-    "Address Sanitizer and Thread Sanitizer product-test entry",
-    "Instruments and memgraph captures",
-    "idle and active soaks plus representative-hardware qualification"
+    "the installed Apple Development identity team does not match the project signing configuration",
+    "native signed XCUITest remains unavailable and is release-blocking",
+    "current-source strict Debug, Release, CLI, MCP, manager HTTP, and unsigned Settings-build evidence is recorded",
+    "unsigned build-for-testing is compile evidence only and does not satisfy native execution"
   ],
   "gate_status": {
-    "G09": "passed",
-    "G10": "in_progress_with_ui_environment_blocker",
+    "G09": "blocked_dependency: full real-provider manager-owned forced-rollover authority is incomplete",
+    "G10": "blocked_dependency: P10 parity is incomplete and native UI execution is deferred and release-blocking",
     "G11": "blocked_dependency",
     "G12": "blocked_dependency"
   },
   "open_blockers": [
+    "FC-FILESYSTEM-PATH-TOCTOU-001: High E2; the global 32-slot quarantine ledger bounds cooperating-process recovery state, but quarantine-and-verify mitigates rather than eliminates the remaining final-component race",
+    "FC-SHELL-COMPAT-QUALIFICATION-001: High E0; Settings test is compile-only and shell compatibility is not complete",
+    "FC-UI-QUALIFICATION-001: High E0; native signing and Developer Mode validation is deferred and release-blocking",
+    "FC-AUTONOMOUS-CONTINUITY-E2E-001: High E0; real-provider manager-owned forced-rollover authority is incomplete",
     ".forge-autonomy-state/blockers/FC-UI-001.json",
     ".forge-autonomy-state/blockers/FC-PERF-001.json",
     ".forge-autonomy-state/blockers/FC-E2E-001.json",
     ".forge-autonomy-state/blockers/FC-RELEASE-001.json"
   ],
+  "residual_risk": [
+    "A same-user writer can discover and atomically swap a quarantine basename after final verification and before unlinkat or renameatx_np. One winning race affects one entry under a pinned parent; final-link deletion can lose unbounded bytes and directory publication can relocate an unbounded subtree.",
+    "One recursive request can reuse released slots across up to 100000 planned entries, so the 32-slot accumulation bound limits simultaneous cooperating-process recovery state rather than cumulative adversarial wrong-object mutations. It does not protect against a same-UID writer that can alter owner-controlled receipts or move quarantine parents.",
+    "Initial path anchoring, destination hierarchy creation, and hard-link ctime ambiguity remain E2.",
+    "Unit, synthetic-host, and direct-adapter provider tests are supporting evidence only and do not establish autonomous continuity."
+  ],
   "next_actions": [
-    "Refresh the P10 migration, MCP protocol, and feature-parity proofs against the exact current source.",
-    "Enable Developer Mode and install a valid Mac Development identity for team 2Y25RTLZET, then rerun XCUITest.",
-    "Resolve sanitizer runtime policy or toolchain compatibility and run Address Sanitizer and Thread Sanitizer separately.",
-    "Grant Instruments task-inspection authorization and capture the required traces and memgraph.",
-    "Complete idle and active soaks, representative-hardware, signed app and LaunchAgent lifecycle, notarization, parity, migration, and remaining end-to-end matrices.",
-    "Rerun G10 through G12 and verify_completion.py only after their prerequisites pass."
+    "Publish the partial mitigation checkpoint with every residual risk and deferred gate explicit.",
+    "Run the signed native Settings and UI matrix after Developer Mode and matching signing prerequisites are available.",
+    "Run one manager-owned threshold-forced real-provider rollover proving exact successor acknowledgment, predecessor fencing and idempotent sealing, automatic continuation with the GUI closed, and durable recovery from every rollover crash state.",
+    "Continue P10 without marking P10, E2, shell compatibility, native validation, or autonomous continuity complete."
   ],
   "evidence_root": ".forge-autonomy-state/evidence",
   "command_log_root": ".forge-autonomy-state/command-logs"

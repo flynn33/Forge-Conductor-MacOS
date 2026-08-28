@@ -1,0 +1,75 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 25001,
+      "path": ".forge-codex/evidence/EVID-20260828T125826Z-f026e511e9.artifact-000-completion-report.json",
+      "sha256": "3f78d563ffc40d05a8777159740a3145dfe569898cb9ea8f1fd43cca5a2827f6",
+      "source_path": ".forge-codex/state/completion-report.json",
+      "storage": "evidence-id-specific-copy"
+    },
+    {
+      "bytes": 16728,
+      "path": ".forge-codex/evidence/EVID-20260828T125826Z-f026e511e9.artifact-001-completion-report.md",
+      "sha256": "008b3f690198c80714fc154bcedb9c56ea8fad903274a448888b710742e5c520",
+      "source_path": ".forge-codex/state/completion-report.md",
+      "storage": "evidence-id-specific-copy"
+    },
+    {
+      "bytes": 1579,
+      "path": ".forge-codex/evidence/EVID-20260828T125826Z-f026e511e9.stdout.txt",
+      "sha256": "cb2cd781ca7f315d25e4f224c44582d1c8cbedc8e468e88b0ca7d37ddce48813",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260828T125826Z-f026e511e9.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "command": "python3 .forge-codex/scripts/verify_completion.py --repo . --no-finalize",
+  "ended_at": "2026-08-28T12:58:27.904073+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 1,
+  "id": "EVID-20260828T125826Z-f026e511e9",
+  "kind": "completion-audit-open-gates",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [
+    "FC-FILESYSTEM-PATH-TOCTOU-001",
+    "FC-SHELL-COMPAT-QUALIFICATION-001",
+    "FC-UI-QUALIFICATION-001",
+    "FC-AUTONOMOUS-CONTINUITY-E2E-001"
+  ],
+  "related_gates": [
+    "G09",
+    "G10",
+    "G11",
+    "G12"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 9082957,
+    "file_count": 242,
+    "schema_version": 1,
+    "sha256": "bc7b2f66d381d8fa4cd51b9e4da78b8c8486572385e05425c07d94922e8c3106"
+  },
+  "source_manifest_after": {
+    "bytes": 9082957,
+    "file_count": 242,
+    "schema_version": 1,
+    "sha256": "bc7b2f66d381d8fa4cd51b9e4da78b8c8486572385e05425c07d94922e8c3106"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-28T12:58:26.472749+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

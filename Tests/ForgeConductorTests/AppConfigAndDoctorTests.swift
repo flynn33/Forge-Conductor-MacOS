@@ -148,6 +148,43 @@ final class AppConfigAndDoctorTests: XCTestCase {
         XCTAssertTrue(diagnosticText.contains("shell_policy_migration_completed"))
     }
 
+    func testCurrentSchemaShellPolicyPreservesExplicitUserOptOut() throws {
+        let home = FileManager.default.temporaryDirectory
+            .appendingPathComponent("cfg-explicit-opt-out-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: home) }
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        let paths = AppPaths(home: home)
+        let current: [String: Any] = [
+            "config_schema_version": AppConfig.currentSchemaVersion,
+            "allowed_roots": [home.path],
+            "shell": [
+                "enabled": false,
+                "user_disabled": true,
+                "policy_origin": "user_disabled",
+                "default_timeout_sec": 45,
+            ] as [String: Any],
+        ]
+        try JSONSupport.data(from: current).write(to: paths.configJSON, options: .atomic)
+
+        let store = ConfigStore(paths: paths)
+
+        XCTAssertFalse(store.model.shell.enabled)
+        XCTAssertTrue(store.model.shell.userDisabled)
+        XCTAssertEqual(store.model.shell.policyOrigin, "user_disabled")
+        XCTAssertEqual(store.model.shell.policyVersion, AppConfig.currentSchemaVersion)
+        XCTAssertEqual(store.model.shell.defaultTimeoutSec, 45)
+        XCTAssertEqual(store.shellMigrationStatus.state, "not_required")
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: paths.shellPolicyMigrationReceipt.path
+        ))
+
+        let reloaded = ConfigStore(paths: paths)
+        XCTAssertFalse(reloaded.model.shell.enabled)
+        XCTAssertTrue(reloaded.model.shell.userDisabled)
+        XCTAssertEqual(reloaded.model.shell.policyOrigin, "user_disabled")
+        XCTAssertEqual(reloaded.shellMigrationStatus.state, "not_required")
+    }
+
     func testConcurrentLegacyConfigLoadsPerformOneMigration() throws {
         let home = FileManager.default.temporaryDirectory
             .appendingPathComponent("cfg-concurrent-\(UUID().uuidString)", isDirectory: true)
