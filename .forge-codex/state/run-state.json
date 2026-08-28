@@ -350,6 +350,7 @@
     "EVID-20260827T233859Z-44a7b8fe31",
     "EVID-20260827T233917Z-a20d351011",
     "EVID-20260827T234534Z-7538388418",
+    "EVID-20260828T003223Z-ed54aab219",
     "a5466d4e5b4d7a10f87df64ddfdb58b6b8ca5159a57c20527e98802a822245d7",
     "a5d4276cbf14db3a91baa7f6b79fb8cdb3fb042a2eaf663d3219ff36b5451667",
     "b3dc11a8dc286fa33b6567ff62089692e64787b23a66718cfe1766dc27195724",
@@ -755,15 +756,15 @@
       "created_at": "2026-08-27T23:39:59.864993+00:00",
       "evidence_class": "E2",
       "id": "FC-FILESYSTEM-PATH-TOCTOU-001",
-      "notes": "Cross-volume source identity, parent durability, bounded hard-link indexing, and cleanup reporting are repaired and covered by 41 focused filesystem tests. Residual E2 risk remains in descriptor-by-path intermediate-parent traversal plus verify-to-unlink/rename windows, and in the narrow hard-link ctime ambiguity exactly between sibling unlink and ctime refresh. Close with a pinned descriptor-relative openat/unlinkat/renameat design and dedicated race probes; do not infer a confirmed exploit or leak without E0 reachability.",
+      "notes": "Descriptor-relative parent traversal, explicit descriptor lifetimes, original-source identity across EXDEV fallback, rebound-parent rejection, pinned staging cleanup, and pinned-parent durability are implemented. EVID-20260828T003223Z-ed54aab219 passes 33 filesystem-related tests, including 29 mutation and cancellation probes. Residual E2 remains because final-component verification and unlinkat or renameatx_np are separate syscalls; pathname anchoring and destination-hierarchy creation also remain path based, and hard-link ctime has a narrow unlink-to-refresh ambiguity. Keep deferred until a checked final-component mutation design and deterministic leaf-race probes exist; do not infer confirmed reachability.",
       "path": "Sources/ForgeConductorCore/Application/Tools/FilesystemToolPack.swift",
       "severity": "High",
       "status": "deferred",
       "title": "Filesystem mutation paths retain descriptor-relative race windows",
-      "updated_at": "2026-08-27T23:39:59.864861+00:00"
+      "updated_at": "2026-08-28T00:33:13.334809+00:00"
     }
   ],
-  "last_event_sequence": 443,
+  "last_event_sequence": 445,
   "phases": {
     "P00": {
       "attempts": 1,
@@ -845,13 +846,13 @@
     }
   },
   "repository": {
-    "branch": "repair/autonomous-continuity",
-    "commit": "6e00f250da4c1a6bd9347c539f53237f283e2e11",
+    "branch": "repair/cancellation-recovery",
+    "commit": "4b887fcc423284d0a60f57baed3adab4b943a576",
     "dirty": true,
-    "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy"
+    "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Cancellation-Recovery"
   },
   "run_id": "aba90ab1-be80-4cc5-aa0b-23dd54d4a24d",
   "schema_version": 1,
   "status": "active",
-  "updated_at": "2026-08-27T23:45:57.470409+00:00"
+  "updated_at": "2026-08-28T00:33:13.334953+00:00"
 }

@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-27T23:40:16.427906+00:00",
+  "captured_at": "2026-08-27T23:52:18.863180+00:00",
   "environment_keys_present": [
     "CODEX_APP_TOOLS_PIPE_PATH",
     "CODEX_CI",
@@ -14,7 +14,7 @@
   "macos_runtime_capable": true,
   "platform": "macOS-26.6.2-arm64-arm-64bit",
   "project_markers": {
-    "package_swift": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/Package.swift",
+    "package_swift": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Cancellation-Recovery/Package.swift",
     "projects": [
       "ForgeConductor.xcodeproj"
     ],
@@ -22,7 +22,7 @@
       "ForgeConductor.xcworkspace"
     ]
   },
-  "repository_root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy",
+  "repository_root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Cancellation-Recovery",
   "schema_version": 1,
   "tools": {
     "bash": {
