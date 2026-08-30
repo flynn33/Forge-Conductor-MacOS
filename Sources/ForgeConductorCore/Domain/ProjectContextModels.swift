@@ -224,6 +224,8 @@ public enum ProjectContextError: Error, LocalizedError, Equatable, Sendable {
     case staleProjectGeneration(expected: ProjectGeneration, actual: ProjectGeneration)
     case ownerAlreadyBound(ProjectBindingOwner)
     case resetNotPrepared(ProjectID)
+    case retainedFilesystemRecovery(ProjectID)
+    case resetCancellationFailed(ProjectID)
     case unsupportedSchemaVersion(Int)
     case databaseBusy
     case storageFull
@@ -245,6 +247,8 @@ public enum ProjectContextError: Error, LocalizedError, Equatable, Sendable {
         case .staleProjectGeneration: "stale_project_generation"
         case .ownerAlreadyBound: "binding_owner_conflict"
         case .resetNotPrepared: "project_reset_not_prepared"
+        case .retainedFilesystemRecovery: "project_reset_filesystem_recovery_required"
+        case .resetCancellationFailed: "project_reset_cancellation_failed"
         case .unsupportedSchemaVersion: "unsupported_schema_version"
         case .databaseBusy: "database_busy"
         case .storageFull: "storage_full"
@@ -280,6 +284,10 @@ public enum ProjectContextError: Error, LocalizedError, Equatable, Sendable {
             "Binding owner is already active: \(owner.kind.rawValue):\(owner.id)"
         case .resetNotPrepared(let projectID):
             "Project reset is not prepared: \(projectID)"
+        case .retainedFilesystemRecovery(let projectID):
+            "Project generation reset requires protected filesystem recovery first: \(projectID)"
+        case .resetCancellationFailed(let projectID):
+            "Project generation reset cleanup failed and requires operator recovery: \(projectID)"
         case .unsupportedSchemaVersion(let version):
             "Unsupported control-plane schema version: \(version)"
         case .databaseBusy:

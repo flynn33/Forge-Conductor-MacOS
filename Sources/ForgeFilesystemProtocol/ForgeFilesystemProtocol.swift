@@ -3,7 +3,7 @@ import Foundation
 import Security
 
 public enum ForgeFilesystemProtocolConstants {
-    public static let version = 3
+    public static let version = 4
     public static let productVersion = "0.9.0"
     public static let serviceName = "com.forge-conductor.filesystem-daemon"
     public static let daemonPlistName = "com.forge-conductor.filesystem-daemon.plist"
@@ -298,6 +298,8 @@ public enum ForgeFilesystemErrorCode {
     public static let sourceIdentityMismatch = "filesystem_source_identity_mismatch"
     public static let transactionConflict = "filesystem_transaction_conflict"
     public static let durabilityUnconfirmed = "filesystem_durability_unconfirmed"
+    public static let transactionUnavailable = "filesystem_transaction_unavailable"
+    public static let transactionNotTerminal = "filesystem_transaction_not_terminal"
 }
 
 /// Shared, deterministic policy for deciding whether the privileged service may
@@ -562,6 +564,310 @@ public final class ForgeFilesystemMutationRequest: NSObject, NSSecureCoding, @un
     }
 }
 
+@objc(ForgeFilesystemTransactionDisposition)
+public enum ForgeFilesystemTransactionDisposition: Int, Codable, Sendable {
+    case unavailable = 0
+    case recoveryRequired = 1
+    case committed = 2
+    case restored = 3
+    case rejected = 4
+}
+
+@objc(ForgeFilesystemTransactionControlRequest)
+public final class ForgeFilesystemTransactionControlRequest: NSObject, NSSecureCoding, @unchecked Sendable {
+    public static let supportsSecureCoding = true
+
+    public let protocolVersion: Int
+    public let transactionID: String
+    public let projectID: String
+    public let projectGeneration: UInt64
+    public let rootID: String
+    public let rootIdentity: ForgeFilesystemIdentity
+
+    public init(
+        protocolVersion: Int = ForgeFilesystemProtocolConstants.version,
+        transactionID: String,
+        projectID: String,
+        projectGeneration: UInt64,
+        rootID: String,
+        rootIdentity: ForgeFilesystemIdentity
+    ) {
+        self.protocolVersion = protocolVersion
+        self.transactionID = transactionID
+        self.projectID = projectID
+        self.projectGeneration = projectGeneration
+        self.rootID = rootID
+        self.rootIdentity = rootIdentity
+        super.init()
+    }
+
+    public required init?(coder: NSCoder) {
+        guard let transactionID = coder.decodeObject(
+            of: NSString.self,
+            forKey: "transaction_id"
+        ) as String?,
+              let projectID = coder.decodeObject(
+                  of: NSString.self,
+                  forKey: "project_id"
+              ) as String?,
+              let rootID = coder.decodeObject(
+                  of: NSString.self,
+                  forKey: "root_id"
+              ) as String?,
+              let rootIdentity = coder.decodeObject(
+                  of: ForgeFilesystemIdentity.self,
+                  forKey: "root_identity"
+              ) else {
+            return nil
+        }
+        let decodedProjectGeneration = coder.decodeInt64(forKey: "project_generation")
+        guard decodedProjectGeneration > 0 else { return nil }
+        protocolVersion = coder.decodeInteger(forKey: "protocol_version")
+        self.transactionID = transactionID
+        self.projectID = projectID
+        projectGeneration = UInt64(decodedProjectGeneration)
+        self.rootID = rootID
+        self.rootIdentity = rootIdentity
+        super.init()
+    }
+
+    public func encode(with coder: NSCoder) {
+        coder.encode(protocolVersion, forKey: "protocol_version")
+        coder.encode(transactionID, forKey: "transaction_id")
+        coder.encode(projectID, forKey: "project_id")
+        coder.encode(Int64(bitPattern: projectGeneration), forKey: "project_generation")
+        coder.encode(rootID, forKey: "root_id")
+        coder.encode(rootIdentity, forKey: "root_identity")
+    }
+
+    public func validationError() -> String? {
+        guard protocolVersion == ForgeFilesystemProtocolConstants.version else {
+            return ForgeFilesystemErrorCode.protocolMismatch
+        }
+        guard UUID(uuidString: transactionID) != nil,
+              UUID(uuidString: projectID) != nil,
+              projectGeneration > 0,
+              projectGeneration <= UInt64(Int64.max),
+              !rootID.isEmpty,
+              rootID.utf8.count <= 128 else {
+            return ForgeFilesystemErrorCode.invalidRequest
+        }
+        return nil
+    }
+}
+
+public enum ForgeFilesystemTransactionRecoveryBoundary: Sendable {
+    case beforeIntentPublication
+    case intentPublicationStarted
+    case persistedTransactionPresent
+}
+
+public enum ForgeFilesystemTransactionRecoveryPolicy {
+    /// Once intent publication begins, a durable receipt may exist even when
+    /// the publishing operation reports failure. Every later failure must
+    /// therefore return the original transaction identity to the caller.
+    public static func recoveryTransactionID(
+        _ transactionID: String,
+        at boundary: ForgeFilesystemTransactionRecoveryBoundary
+    ) -> String? {
+        guard UUID(uuidString: transactionID) != nil else { return nil }
+        switch boundary {
+        case .beforeIntentPublication:
+            return nil
+        case .intentPublicationStarted, .persistedTransactionPresent:
+            return transactionID
+        }
+    }
+}
+
+public enum ForgeFilesystemCapturedLeafRollbackDisposition: Equatable, Sendable {
+    case retainForRecovery
+}
+
+public enum ForgeFilesystemCapturedLeafRollbackPolicy {
+    /// A directory descriptor pins an object but does not prove that object still
+    /// resides below the authorized root. macOS exposes no public rename form
+    /// that atomically predicates the destination parent on that containment, so
+    /// a root process must retain the captured leaf instead of restoring it.
+    public static var disposition: ForgeFilesystemCapturedLeafRollbackDisposition {
+        .retainForRecovery
+    }
+}
+
+public enum ForgeFilesystemTransactionAuthorityPolicy {
+    public enum AcknowledgementDecision: Equatable, Sendable {
+        case idempotentSuccess
+        case authorizedCleanup
+        case reject
+    }
+
+    public static func matchesPersistedAuthority(
+        request: ForgeFilesystemTransactionControlRequest,
+        currentRequesterUID: UInt32,
+        persistedRequesterUID: UInt32,
+        persistedTransactionID: String,
+        persistedProjectID: String,
+        persistedProjectGeneration: UInt64,
+        persistedRootID: String,
+        persistedRootIdentity: ForgeFilesystemIdentity
+    ) -> Bool {
+        request.validationError() == nil
+            && ForgeFilesystemRequesterPolicy.matchesPersistedRequester(
+            persistedRequesterUID,
+            currentRequesterUID: currentRequesterUID
+        )
+            && persistedTransactionID.caseInsensitiveCompare(request.transactionID) == .orderedSame
+            && persistedProjectID.caseInsensitiveCompare(request.projectID) == .orderedSame
+            && persistedProjectGeneration == request.projectGeneration
+            && persistedRootID == request.rootID
+            && sameIdentity(persistedRootIdentity, request.rootIdentity)
+    }
+
+    public static func acknowledgementDecision(
+        transactionExists: Bool,
+        authorityMatches: Bool
+    ) -> AcknowledgementDecision {
+        guard transactionExists else { return .idempotentSuccess }
+        return authorityMatches ? .authorizedCleanup : .reject
+    }
+
+    private static func sameIdentity(
+        _ lhs: ForgeFilesystemIdentity,
+        _ rhs: ForgeFilesystemIdentity
+    ) -> Bool {
+        lhs.device == rhs.device
+            && lhs.inode == rhs.inode
+            && lhs.mode == rhs.mode
+            && lhs.owner == rhs.owner
+            && lhs.group == rhs.group
+            && lhs.linkCount == rhs.linkCount
+    }
+}
+
+@objc(ForgeFilesystemTransactionStatus)
+public final class ForgeFilesystemTransactionStatus: NSObject, NSSecureCoding, @unchecked Sendable {
+    public static let supportsSecureCoding = true
+
+    public let protocolVersion: Int
+    public let transactionID: String?
+    public let dispositionRawValue: Int
+    public let code: String
+    public let message: String
+    public let terminal: Bool
+    public let committed: Bool
+    public let durabilityConfirmed: Bool
+    public let recoveryRequired: Bool
+    public let acknowledgementRequired: Bool
+
+    public init(
+        protocolVersion: Int = ForgeFilesystemProtocolConstants.version,
+        transactionID: String?,
+        disposition: ForgeFilesystemTransactionDisposition,
+        code: String,
+        message: String,
+        terminal: Bool,
+        committed: Bool,
+        durabilityConfirmed: Bool,
+        recoveryRequired: Bool,
+        acknowledgementRequired: Bool
+    ) {
+        self.protocolVersion = protocolVersion
+        self.transactionID = transactionID
+        dispositionRawValue = disposition.rawValue
+        self.code = String(code.prefix(128))
+        self.message = String(message.prefix(1_024))
+        self.terminal = terminal
+        self.committed = committed
+        self.durabilityConfirmed = durabilityConfirmed
+        self.recoveryRequired = recoveryRequired
+        self.acknowledgementRequired = acknowledgementRequired
+        super.init()
+    }
+
+    public required init?(coder: NSCoder) {
+        guard let code = coder.decodeObject(of: NSString.self, forKey: "code") as String?,
+              let message = coder.decodeObject(of: NSString.self, forKey: "message") as String? else {
+            return nil
+        }
+        protocolVersion = coder.decodeInteger(forKey: "protocol_version")
+        transactionID = coder.decodeObject(
+            of: NSString.self,
+            forKey: "transaction_id"
+        ) as String?
+        dispositionRawValue = coder.decodeInteger(forKey: "disposition")
+        self.code = String(code.prefix(128))
+        self.message = String(message.prefix(1_024))
+        terminal = coder.decodeBool(forKey: "terminal")
+        committed = coder.decodeBool(forKey: "committed")
+        durabilityConfirmed = coder.decodeBool(forKey: "durability_confirmed")
+        recoveryRequired = coder.decodeBool(forKey: "recovery_required")
+        acknowledgementRequired = coder.decodeBool(forKey: "acknowledgement_required")
+        super.init()
+        guard validationError() == nil else { return nil }
+    }
+
+    public func encode(with coder: NSCoder) {
+        coder.encode(protocolVersion, forKey: "protocol_version")
+        coder.encode(transactionID, forKey: "transaction_id")
+        coder.encode(dispositionRawValue, forKey: "disposition")
+        coder.encode(code, forKey: "code")
+        coder.encode(message, forKey: "message")
+        coder.encode(terminal, forKey: "terminal")
+        coder.encode(committed, forKey: "committed")
+        coder.encode(durabilityConfirmed, forKey: "durability_confirmed")
+        coder.encode(recoveryRequired, forKey: "recovery_required")
+        coder.encode(acknowledgementRequired, forKey: "acknowledgement_required")
+    }
+
+    public var disposition: ForgeFilesystemTransactionDisposition? {
+        ForgeFilesystemTransactionDisposition(rawValue: dispositionRawValue)
+    }
+
+    public func validationError() -> String? {
+        guard protocolVersion == ForgeFilesystemProtocolConstants.version else {
+            return ForgeFilesystemErrorCode.protocolMismatch
+        }
+        guard disposition != nil,
+              !code.isEmpty,
+              code.utf8.count <= 128,
+              message.utf8.count <= 1_024 else {
+            return ForgeFilesystemErrorCode.invalidRequest
+        }
+        switch disposition {
+        case .unavailable:
+            guard transactionID == nil,
+                  !terminal,
+                  !committed,
+                  !durabilityConfirmed,
+                  !recoveryRequired,
+                  !acknowledgementRequired else {
+                return ForgeFilesystemErrorCode.invalidRequest
+            }
+        case .recoveryRequired:
+            guard transactionID.flatMap(UUID.init(uuidString:)) != nil,
+                  !terminal,
+                  !committed,
+                  !durabilityConfirmed,
+                  recoveryRequired,
+                  !acknowledgementRequired else {
+                return ForgeFilesystemErrorCode.invalidRequest
+            }
+        case .committed, .restored, .rejected:
+            guard transactionID.flatMap(UUID.init(uuidString:)) != nil,
+                  terminal,
+                  durabilityConfirmed,
+                  !recoveryRequired,
+                  acknowledgementRequired,
+                  committed == (disposition == .committed) else {
+                return ForgeFilesystemErrorCode.invalidRequest
+            }
+        case nil:
+            return ForgeFilesystemErrorCode.invalidRequest
+        }
+        return nil
+    }
+}
+
 @objc(ForgeFilesystemResponse)
 public final class ForgeFilesystemResponse: NSObject, NSSecureCoding, @unchecked Sendable {
     public static let supportsSecureCoding = true
@@ -572,6 +878,7 @@ public final class ForgeFilesystemResponse: NSObject, NSSecureCoding, @unchecked
     public let committed: Bool
     public let durabilityConfirmed: Bool
     public let recoveryTransactionID: String?
+    public let acknowledgementRequired: Bool
 
     public init(
         ok: Bool,
@@ -579,7 +886,8 @@ public final class ForgeFilesystemResponse: NSObject, NSSecureCoding, @unchecked
         message: String,
         committed: Bool = false,
         durabilityConfirmed: Bool = false,
-        recoveryTransactionID: String? = nil
+        recoveryTransactionID: String? = nil,
+        acknowledgementRequired: Bool = false
     ) {
         self.ok = ok
         self.code = String(code.prefix(128))
@@ -587,6 +895,7 @@ public final class ForgeFilesystemResponse: NSObject, NSSecureCoding, @unchecked
         self.committed = committed
         self.durabilityConfirmed = durabilityConfirmed
         self.recoveryTransactionID = recoveryTransactionID
+        self.acknowledgementRequired = acknowledgementRequired
         super.init()
     }
 
@@ -604,7 +913,9 @@ public final class ForgeFilesystemResponse: NSObject, NSSecureCoding, @unchecked
             of: NSString.self,
             forKey: "recovery_transaction_id"
         ) as String?
+        acknowledgementRequired = coder.decodeBool(forKey: "acknowledgement_required")
         super.init()
+        guard validationError() == nil else { return nil }
     }
 
     public func encode(with coder: NSCoder) {
@@ -614,6 +925,22 @@ public final class ForgeFilesystemResponse: NSObject, NSSecureCoding, @unchecked
         coder.encode(committed, forKey: "committed")
         coder.encode(durabilityConfirmed, forKey: "durability_confirmed")
         coder.encode(recoveryTransactionID, forKey: "recovery_transaction_id")
+        coder.encode(acknowledgementRequired, forKey: "acknowledgement_required")
+    }
+
+    public func validationError() -> String? {
+        guard !code.isEmpty,
+              code.utf8.count <= 128,
+              message.utf8.count <= 1_024 else {
+            return ForgeFilesystemErrorCode.invalidRequest
+        }
+        if acknowledgementRequired {
+            guard durabilityConfirmed,
+                  recoveryTransactionID.flatMap(UUID.init(uuidString:)) != nil else {
+                return ForgeFilesystemErrorCode.invalidRequest
+            }
+        }
+        return nil
     }
 }
 
@@ -624,6 +951,24 @@ public final class ForgeFilesystemResponse: NSObject, NSSecureCoding, @unchecked
 
     func deleteLeaf(
         _ request: ForgeFilesystemMutationRequest,
+        authorizedRoot: FileHandle,
+        withReply reply: @escaping (ForgeFilesystemResponse) -> Void
+    )
+
+    func queryTransaction(
+        _ request: ForgeFilesystemTransactionControlRequest,
+        authorizedRoot: FileHandle,
+        withReply reply: @escaping (ForgeFilesystemTransactionStatus) -> Void
+    )
+
+    func resumeTransaction(
+        _ request: ForgeFilesystemTransactionControlRequest,
+        authorizedRoot: FileHandle,
+        withReply reply: @escaping (ForgeFilesystemResponse) -> Void
+    )
+
+    func acknowledgeTransaction(
+        _ request: ForgeFilesystemTransactionControlRequest,
         authorizedRoot: FileHandle,
         withReply reply: @escaping (ForgeFilesystemResponse) -> Void
     )

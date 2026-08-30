@@ -2267,6 +2267,81 @@
     },
     {
       "detail": "valid",
+      "name": "json:evidence/EVID-20260830T175454Z-372342d6b3.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260830T181007Z-cf5b2b2910.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260830T181921Z-6e1f799cc8.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260830T182219Z-59b2312acd.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260830T184228Z-1bb02068b2.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260830T184522Z-d43b1586b6.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260830T184940Z-e93d7373f7.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260830T185004Z-e546c8ccf3.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260830T185208Z-e7f877382d.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260830T185236Z-9ffb137b4a.artifact-000-P10-signed-shell-manager-qualification.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260830T185236Z-9ffb137b4a.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260830T185419Z-1a7e9d87f7.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260830T185444Z-7878ff2abf.artifact-000-P10-signed-shell-manager-qualification.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260830T185444Z-7878ff2abf.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260830T185902Z-ce0de2b7cb.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
       "name": "json:evidence/P02-telemetry-baseline.json",
       "passed": true
     },
@@ -2388,6 +2463,11 @@
     {
       "detail": "valid",
       "name": "json:evidence/P10-protocol-compatibility-report.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/P10-signed-shell-manager-qualification.json",
       "passed": true
     },
     {
@@ -3172,6 +3252,11 @@
     },
     {
       "detail": "compiled",
+      "name": "python:scripts/qualify_signed_shell_manager.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
       "name": "python:scripts/record_command.py",
       "passed": true
     },
@@ -3208,6 +3293,11 @@
     {
       "detail": "compiled",
       "name": "python:scripts/test_evidence_controls.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/test_qualify_signed_shell_manager.py",
       "passed": true
     },
     {
@@ -3435,6 +3525,6 @@
   "root": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex",
   "schema_version": 1,
   "valid": true,
-  "validated_at": "2026-08-30T15:46:49.816224+00:00",
+  "validated_at": "2026-08-30T19:02:42.308618+00:00",
   "warnings": []
 }

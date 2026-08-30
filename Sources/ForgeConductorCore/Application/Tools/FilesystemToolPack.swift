@@ -7,6 +7,7 @@
 import Foundation
 import Darwin
 import CryptoKit
+import ForgeFilesystemProtocol
 
 /// Filesystem tool pack: read/write/edit/list/glob/mkdir/delete/move.
 public struct FilesystemToolPack: ToolPackHandling {
@@ -121,7 +122,7 @@ public struct FilesystemToolPack: ToolPackHandling {
     }
 
     public var toolNames: [String] {
-        ["fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "fs_delete", "fs_move"]
+        ["fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "fs_delete", "fs_delete_recovery", "fs_move"]
     }
 
     public func handle(
@@ -149,13 +150,41 @@ public struct FilesystemToolPack: ToolPackHandling {
                 return try secureMutationClient.deleteLeaf(
                     at: ToolArgHelpers.resolvePath(path),
                     context: context,
-                    cancellation: cancellation
+                    cancellation: cancellation,
+                    recoveryLedger: SecureFilesystemRecoveryLedger(paths: app.paths),
+                    authorityValidator: { currentContext in
+                        try app.projectContexts.validate(
+                            currentContext,
+                            cancellation: cancellation
+                        )
+                    }
                 )
             }
             return try fsDelete(
                 arguments,
                 quarantineLedger: FilesystemQuarantineLedger(paths: app.paths),
                 cancellation: cancellation
+            )
+        case "fs_delete_recovery":
+            guard let secureMutationClient else {
+                return .failure(
+                    code: ForgeFilesystemErrorCode.capabilityUnavailable,
+                    message: "Protected filesystem recovery is unavailable"
+                )
+            }
+            guard let transactionID = ToolArgHelpers.string(arguments, "transaction_id"),
+                  let action = ToolArgHelpers.string(arguments, "action") else {
+                return .failure(
+                    code: ForgeFilesystemErrorCode.invalidRequest,
+                    message: "transaction_id and action are required"
+                )
+            }
+            return try secureMutationClient.recoverDelete(
+                transactionID: transactionID,
+                action: action,
+                context: context,
+                cancellation: cancellation,
+                recoveryLedger: SecureFilesystemRecoveryLedger(paths: app.paths)
             )
         case "fs_move":
             if secureMutationClient != nil {

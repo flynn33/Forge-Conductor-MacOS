@@ -4,6 +4,13 @@ import XCTest
 import ForgeFilesystemProtocol
 
 final class ForgeFilesystemProtocolTests: XCTestCase {
+    func testCapturedLeafRollbackPolicyNeverRestoresThroughRelocatableParent() {
+        XCTAssertEqual(
+            ForgeFilesystemCapturedLeafRollbackPolicy.disposition,
+            .retainForRecovery
+        )
+    }
+
     func testServiceInfoSecureCodingAndExactRuntimeMatch() throws {
         let codeDirectoryHash = String(repeating: "a", count: 40)
         let expected = ForgeFilesystemServiceInfo(
@@ -209,6 +216,322 @@ final class ForgeFilesystemProtocolTests: XCTestCase {
                 from: data
             )
             XCTAssertNil(decoded, "a negative wire generation must fail secure decoding")
+        } catch {
+            // Throwing is also a fail-closed secure-decoding outcome.
+        }
+    }
+
+    func testTransactionControlRequestSecureCodingRoundTripPreservesAuthorityEnvelope() throws {
+        let mutation = makeRequest(projectGeneration: 41)
+        let request = makeControlRequest(from: mutation)
+        let data = try NSKeyedArchiver.archivedData(
+            withRootObject: request,
+            requiringSecureCoding: true
+        )
+        let decoded = try XCTUnwrap(
+            NSKeyedUnarchiver.unarchivedObject(
+                ofClass: ForgeFilesystemTransactionControlRequest.self,
+                from: data
+            )
+        )
+
+        XCTAssertNil(decoded.validationError())
+        XCTAssertEqual(decoded.protocolVersion, ForgeFilesystemProtocolConstants.version)
+        XCTAssertEqual(decoded.transactionID, mutation.transactionID)
+        XCTAssertEqual(decoded.projectID, mutation.projectID)
+        XCTAssertEqual(decoded.projectGeneration, mutation.projectGeneration)
+        XCTAssertEqual(decoded.rootID, mutation.rootID)
+        XCTAssertEqual(decoded.rootIdentity.device, mutation.rootIdentity.device)
+        XCTAssertEqual(decoded.rootIdentity.inode, mutation.rootIdentity.inode)
+    }
+
+    func testTransactionControlRequestRejectsMismatchedVersionAndInvalidBounds() throws {
+        let mutation = makeRequest()
+        XCTAssertEqual(
+            ForgeFilesystemTransactionControlRequest(
+                protocolVersion: ForgeFilesystemProtocolConstants.version + 1,
+                transactionID: mutation.transactionID,
+                projectID: mutation.projectID,
+                projectGeneration: mutation.projectGeneration,
+                rootID: mutation.rootID,
+                rootIdentity: mutation.rootIdentity
+            ).validationError(),
+            ForgeFilesystemErrorCode.protocolMismatch
+        )
+        XCTAssertEqual(
+            ForgeFilesystemTransactionControlRequest(
+                transactionID: "not-a-uuid",
+                projectID: mutation.projectID,
+                projectGeneration: mutation.projectGeneration,
+                rootID: mutation.rootID,
+                rootIdentity: mutation.rootIdentity
+            ).validationError(),
+            ForgeFilesystemErrorCode.invalidRequest
+        )
+        XCTAssertEqual(
+            ForgeFilesystemTransactionControlRequest(
+                transactionID: mutation.transactionID,
+                projectID: mutation.projectID,
+                projectGeneration: UInt64.max,
+                rootID: mutation.rootID,
+                rootIdentity: mutation.rootIdentity
+            ).validationError(),
+            ForgeFilesystemErrorCode.invalidRequest
+        )
+
+        let invalidWireGeneration = ForgeFilesystemTransactionControlRequest(
+            transactionID: mutation.transactionID,
+            projectID: mutation.projectID,
+            projectGeneration: UInt64.max,
+            rootID: mutation.rootID,
+            rootIdentity: mutation.rootIdentity
+        )
+        let data = try NSKeyedArchiver.archivedData(
+            withRootObject: invalidWireGeneration,
+            requiringSecureCoding: true
+        )
+        do {
+            let decoded = try NSKeyedUnarchiver.unarchivedObject(
+                ofClass: ForgeFilesystemTransactionControlRequest.self,
+                from: data
+            )
+            XCTAssertNil(decoded, "a negative wire generation must fail secure decoding")
+        } catch {
+            // Throwing is also a fail-closed secure-decoding outcome.
+        }
+    }
+
+    func testTransactionAuthorityRequiresExactUIDProjectGenerationAndRootEnvelope() {
+        let mutation = makeRequest(projectGeneration: 7)
+        let baseline = makeControlRequest(from: mutation)
+        let matches: (ForgeFilesystemTransactionControlRequest, UInt32) -> Bool = {
+            request, uid in
+            ForgeFilesystemTransactionAuthorityPolicy.matchesPersistedAuthority(
+                request: request,
+                currentRequesterUID: uid,
+                persistedRequesterUID: 501,
+                persistedTransactionID: mutation.transactionID.uppercased(),
+                persistedProjectID: mutation.projectID.uppercased(),
+                persistedProjectGeneration: mutation.projectGeneration,
+                persistedRootID: mutation.rootID,
+                persistedRootIdentity: mutation.rootIdentity
+            )
+        }
+
+        XCTAssertTrue(matches(baseline, 501))
+        XCTAssertFalse(matches(baseline, 502))
+        XCTAssertFalse(matches(ForgeFilesystemTransactionControlRequest(
+            transactionID: UUID().uuidString,
+            projectID: baseline.projectID,
+            projectGeneration: baseline.projectGeneration,
+            rootID: baseline.rootID,
+            rootIdentity: baseline.rootIdentity
+        ), 501))
+        XCTAssertFalse(matches(ForgeFilesystemTransactionControlRequest(
+            transactionID: baseline.transactionID,
+            projectID: UUID().uuidString,
+            projectGeneration: baseline.projectGeneration,
+            rootID: baseline.rootID,
+            rootIdentity: baseline.rootIdentity
+        ), 501))
+        XCTAssertFalse(matches(ForgeFilesystemTransactionControlRequest(
+            transactionID: baseline.transactionID,
+            projectID: baseline.projectID,
+            projectGeneration: baseline.projectGeneration + 1,
+            rootID: baseline.rootID,
+            rootIdentity: baseline.rootIdentity
+        ), 501))
+        XCTAssertFalse(matches(ForgeFilesystemTransactionControlRequest(
+            transactionID: baseline.transactionID,
+            projectID: baseline.projectID,
+            projectGeneration: baseline.projectGeneration,
+            rootID: "1:3",
+            rootIdentity: baseline.rootIdentity
+        ), 501))
+        XCTAssertFalse(matches(ForgeFilesystemTransactionControlRequest(
+            transactionID: baseline.transactionID,
+            projectID: baseline.projectID,
+            projectGeneration: baseline.projectGeneration,
+            rootID: baseline.rootID,
+            rootIdentity: ForgeFilesystemIdentity(
+                device: baseline.rootIdentity.device,
+                inode: baseline.rootIdentity.inode + 1,
+                mode: baseline.rootIdentity.mode,
+                owner: baseline.rootIdentity.owner,
+                group: baseline.rootIdentity.group,
+                linkCount: baseline.rootIdentity.linkCount
+            )
+        ), 501))
+    }
+
+    func testAcknowledgementIsIdempotentOnlyWhenTransactionIsAbsent() {
+        XCTAssertEqual(
+            ForgeFilesystemTransactionAuthorityPolicy.acknowledgementDecision(
+                transactionExists: false,
+                authorityMatches: false
+            ),
+            .idempotentSuccess
+        )
+        XCTAssertEqual(
+            ForgeFilesystemTransactionAuthorityPolicy.acknowledgementDecision(
+                transactionExists: true,
+                authorityMatches: true
+            ),
+            .authorizedCleanup
+        )
+        XCTAssertEqual(
+            ForgeFilesystemTransactionAuthorityPolicy.acknowledgementDecision(
+                transactionExists: true,
+                authorityMatches: false
+            ),
+            .reject
+        )
+    }
+
+    func testPostIntentPublicationFailureRetainsOriginalTransactionIdentity() {
+        let transactionID = UUID().uuidString.lowercased()
+
+        XCTAssertNil(ForgeFilesystemTransactionRecoveryPolicy.recoveryTransactionID(
+            transactionID,
+            at: .beforeIntentPublication
+        ))
+        XCTAssertEqual(
+            ForgeFilesystemTransactionRecoveryPolicy.recoveryTransactionID(
+                transactionID,
+                at: .intentPublicationStarted
+            ),
+            transactionID
+        )
+    }
+
+    func testExistingNonterminalBindingFailureRetainsOriginalTransactionIdentity() {
+        let transactionID = UUID().uuidString.lowercased()
+
+        XCTAssertEqual(
+            ForgeFilesystemTransactionRecoveryPolicy.recoveryTransactionID(
+                transactionID,
+                at: .persistedTransactionPresent
+            ),
+            transactionID
+        )
+        XCTAssertNil(ForgeFilesystemTransactionRecoveryPolicy.recoveryTransactionID(
+            "not-a-transaction-id",
+            at: .persistedTransactionPresent
+        ))
+    }
+
+    func testTransactionStatusSecureCodingRoundTripPreservesTerminalDisposition() throws {
+        let transactionID = UUID().uuidString.lowercased()
+        let status = ForgeFilesystemTransactionStatus(
+            transactionID: transactionID,
+            disposition: .restored,
+            code: ForgeFilesystemErrorCode.capabilityUnavailable,
+            message: "The captured filesystem leaf was restored",
+            terminal: true,
+            committed: false,
+            durabilityConfirmed: true,
+            recoveryRequired: false,
+            acknowledgementRequired: true
+        )
+        let data = try NSKeyedArchiver.archivedData(
+            withRootObject: status,
+            requiringSecureCoding: true
+        )
+        let decoded = try XCTUnwrap(
+            NSKeyedUnarchiver.unarchivedObject(
+                ofClass: ForgeFilesystemTransactionStatus.self,
+                from: data
+            )
+        )
+
+        XCTAssertNil(decoded.validationError())
+        XCTAssertEqual(decoded.transactionID, transactionID)
+        XCTAssertEqual(decoded.disposition, .restored)
+        XCTAssertTrue(decoded.terminal)
+        XCTAssertFalse(decoded.committed)
+        XCTAssertTrue(decoded.durabilityConfirmed)
+        XCTAssertFalse(decoded.recoveryRequired)
+        XCTAssertTrue(decoded.acknowledgementRequired)
+    }
+
+    func testTransactionStatusSecureDecodingRejectsContradictoryTerminalFlags() throws {
+        let invalid = ForgeFilesystemTransactionStatus(
+            transactionID: UUID().uuidString.lowercased(),
+            disposition: .committed,
+            code: "ok",
+            message: "invalid contradictory status",
+            terminal: true,
+            committed: true,
+            durabilityConfirmed: true,
+            recoveryRequired: true,
+            acknowledgementRequired: true
+        )
+        XCTAssertEqual(invalid.validationError(), ForgeFilesystemErrorCode.invalidRequest)
+        let data = try NSKeyedArchiver.archivedData(
+            withRootObject: invalid,
+            requiringSecureCoding: true
+        )
+        do {
+            let decoded = try NSKeyedUnarchiver.unarchivedObject(
+                ofClass: ForgeFilesystemTransactionStatus.self,
+                from: data
+            )
+            XCTAssertNil(decoded, "contradictory terminal flags must fail secure decoding")
+        } catch {
+            // Throwing is also a fail-closed secure-decoding outcome.
+        }
+    }
+
+    func testTerminalResponseSecureCodingPreservesAcknowledgementRequirement() throws {
+        let transactionID = UUID().uuidString.lowercased()
+        let response = ForgeFilesystemResponse(
+            ok: true,
+            code: "ok",
+            message: "committed",
+            committed: true,
+            durabilityConfirmed: true,
+            recoveryTransactionID: transactionID,
+            acknowledgementRequired: true
+        )
+        let data = try NSKeyedArchiver.archivedData(
+            withRootObject: response,
+            requiringSecureCoding: true
+        )
+        let decoded = try XCTUnwrap(
+            NSKeyedUnarchiver.unarchivedObject(
+                ofClass: ForgeFilesystemResponse.self,
+                from: data
+            )
+        )
+
+        XCTAssertTrue(decoded.ok)
+        XCTAssertTrue(decoded.committed)
+        XCTAssertTrue(decoded.durabilityConfirmed)
+        XCTAssertEqual(decoded.recoveryTransactionID, transactionID)
+        XCTAssertTrue(decoded.acknowledgementRequired)
+    }
+
+    func testTerminalResponseSecureDecodingRejectsUndurableAcknowledgementSignal() throws {
+        let response = ForgeFilesystemResponse(
+            ok: false,
+            code: ForgeFilesystemErrorCode.capabilityUnavailable,
+            message: "invalid terminal response",
+            committed: false,
+            durabilityConfirmed: false,
+            recoveryTransactionID: UUID().uuidString.lowercased(),
+            acknowledgementRequired: true
+        )
+        XCTAssertEqual(response.validationError(), ForgeFilesystemErrorCode.invalidRequest)
+        let data = try NSKeyedArchiver.archivedData(
+            withRootObject: response,
+            requiringSecureCoding: true
+        )
+        do {
+            let decoded = try NSKeyedUnarchiver.unarchivedObject(
+                ofClass: ForgeFilesystemResponse.self,
+                from: data
+            )
+            XCTAssertNil(decoded, "an undurable terminal response must fail secure decoding")
         } catch {
             // Throwing is also a fail-closed secure-decoding outcome.
         }
@@ -442,6 +765,19 @@ final class ForgeFilesystemProtocolTests: XCTestCase {
                 linkCount: 1
             ),
             exactContentRequired: exactContentRequired
+        )
+    }
+
+    private func makeControlRequest(
+        from request: ForgeFilesystemMutationRequest
+    ) -> ForgeFilesystemTransactionControlRequest {
+        ForgeFilesystemTransactionControlRequest(
+            protocolVersion: request.protocolVersion,
+            transactionID: request.transactionID,
+            projectID: request.projectID,
+            projectGeneration: request.projectGeneration,
+            rootID: request.rootID,
+            rootIdentity: request.rootIdentity
         )
     }
 }

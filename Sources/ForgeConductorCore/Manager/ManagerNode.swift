@@ -40,16 +40,47 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     private let lock = NSLock()
     private let runtime = ManagerRuntime()
     private let managedAutonomyFactory: ManagedAutonomyFactory
+    private let generationResetCheckpoint: @Sendable (ProjectID, ProjectGeneration) throws -> Void
     private var managedAutonomy: ManagedAutonomyRuntime?
 
-    public init(
+    public convenience init(
         app: ForgeApp,
         managedAutonomyFactory: @escaping ManagedAutonomyFactory = {
             try ManagedAutonomyRuntime(app: $0)
         }
     ) {
+        self.init(
+            app: app,
+            managedAutonomyFactory: managedAutonomyFactory,
+            generationResetCheckpoint: { _, _ in }
+        )
+    }
+
+    convenience init(
+        app: ForgeApp,
+        generationResetCheckpoint: @escaping @Sendable (
+            ProjectID,
+            ProjectGeneration
+        ) throws -> Void
+    ) {
+        self.init(
+            app: app,
+            managedAutonomyFactory: { try ManagedAutonomyRuntime(app: $0) },
+            generationResetCheckpoint: generationResetCheckpoint
+        )
+    }
+
+    private init(
+        app: ForgeApp,
+        managedAutonomyFactory: @escaping ManagedAutonomyFactory,
+        generationResetCheckpoint: @escaping @Sendable (
+            ProjectID,
+            ProjectGeneration
+        ) throws -> Void
+    ) {
         self.app = app
         self.managedAutonomyFactory = managedAutonomyFactory
+        self.generationResetCheckpoint = generationResetCheckpoint
     }
 
     deinit {
@@ -420,40 +451,60 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         projectID: ProjectID,
         expectedGeneration: ProjectGeneration
     ) throws -> [String: Any] {
-        _ = try app.projectContexts.beginReset(
-            projectID: projectID,
-            expectedGeneration: expectedGeneration
-        )
+        let filesystemRecovery = SecureFilesystemRecoveryLedger(paths: app.paths)
         do {
-            app.projectMemory.closeProject(projectID.description)
-            let receipt = try app.projectContexts.completeReset(
+            return try filesystemRecovery.withRetainedAuthorityFence(
                 projectID: projectID,
-                expectedGeneration: expectedGeneration
-            )
-            app.diagnostics.info(
-                "manager_project_generation_reset",
-                [
-                    "project_id": projectID.description,
-                    "prior_generation": "\(receipt.priorGeneration.rawValue)",
-                    "new_generation": "\(receipt.newGeneration.rawValue)",
-                    "invalidated_bindings": "\(receipt.invalidatedBindingCount)",
-                ],
-                category: .manager
-            )
-            return [
-                "ok": true,
-                "project_id": projectID.description,
-                "prior_generation": receipt.priorGeneration.rawValue,
-                "new_generation": receipt.newGeneration.rawValue,
-                "invalidated_binding_count": receipt.invalidatedBindingCount,
-                "completed_at": receipt.completedAt,
-            ]
-        } catch {
-            try? app.projectContexts.cancelReset(
-                projectID: projectID,
-                expectedGeneration: expectedGeneration
-            )
-            throw error
+                generation: expectedGeneration
+            ) { assertNoRetainedAuthority in
+                _ = try app.projectContexts.beginReset(
+                    projectID: projectID,
+                    expectedGeneration: expectedGeneration
+                )
+                do {
+                    try generationResetCheckpoint(projectID, expectedGeneration)
+                    // Recheck after the control plane enters resetting. Normal
+                    // retainers share the ledger fence; a same-UID namespace
+                    // replacement remains an explicit qualification race.
+                    try assertNoRetainedAuthority()
+                    app.projectMemory.closeProject(projectID.description)
+                    let receipt = try app.projectContexts.completeReset(
+                        projectID: projectID,
+                        expectedGeneration: expectedGeneration
+                    )
+                    app.diagnostics.info(
+                        "manager_project_generation_reset",
+                        [
+                            "project_id": projectID.description,
+                            "prior_generation": "\(receipt.priorGeneration.rawValue)",
+                            "new_generation": "\(receipt.newGeneration.rawValue)",
+                            "invalidated_bindings": "\(receipt.invalidatedBindingCount)",
+                        ],
+                        category: .manager
+                    )
+                    return [
+                        "ok": true,
+                        "project_id": projectID.description,
+                        "prior_generation": receipt.priorGeneration.rawValue,
+                        "new_generation": receipt.newGeneration.rawValue,
+                        "invalidated_binding_count": receipt.invalidatedBindingCount,
+                        "completed_at": receipt.completedAt,
+                    ]
+                } catch {
+                    let operationError = error
+                    do {
+                        try app.projectContexts.cancelReset(
+                            projectID: projectID,
+                            expectedGeneration: expectedGeneration
+                        )
+                    } catch {
+                        throw ProjectContextError.resetCancellationFailed(projectID)
+                    }
+                    throw operationError
+                }
+            }
+        } catch SecureFilesystemRecoveryLedgerError.retainedAuthority {
+            throw ProjectContextError.retainedFilesystemRecovery(projectID)
         }
     }
 

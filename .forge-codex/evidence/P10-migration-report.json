@@ -2,28 +2,28 @@
   "schema_version": 2,
   "phase": "P10",
   "status": "passed",
-  "generated_at": "2026-08-28T12:50:48Z",
+  "generated_at": "2026-08-30T18:50:05Z",
   "tested_tree": {
-    "head": "6288210d82270b26add5f0e078d150bc4377bd62",
+    "head": "3c0b0af0969af8161582285dd53d98a779b2cf5b",
     "working_tree": true
   },
   "source_manifest": {
-    "bytes": 9082957,
-    "file_count": 242,
+    "bytes": 9555398,
+    "file_count": 252,
     "schema_version": 1,
-    "sha256": "bc7b2f66d381d8fa4cd51b9e4da78b8c8486572385e05425c07d94922e8c3106"
+    "sha256": "62361115e3af17e340f56c656b2731bd720e98b3cddceb7d848a040cb6e0a21c"
   },
   "strict_suites": {
     "debug": {
-      "evidence_id": "EVID-20260828T124332Z-1e2a050c0e",
-      "executed": 657,
-      "skipped": 4,
+      "evidence_id": "EVID-20260830T184228Z-1bb02068b2",
+      "executed": 755,
+      "skipped": 2,
       "failures": 0
     },
     "release": {
-      "evidence_id": "EVID-20260828T124624Z-00a3dd27c2",
-      "executed": 657,
-      "skipped": 4,
+      "evidence_id": "EVID-20260830T184522Z-d43b1586b6",
+      "executed": 755,
+      "skipped": 2,
       "failures": 0
     }
   },

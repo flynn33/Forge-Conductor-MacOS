@@ -20,21 +20,27 @@ Current release blockers are:
   The selected partial implementation adds a separately signed root
   LaunchDaemon, a root-owned mode-0700 same-volume namespace, 32 durable
   transaction slots, bounded project bindings, descriptor-relative exclusive
-  capture, post-capture identity verification, durable phases, rollback, and
-  fail-closed production routing with no same-UID fallback. Accepted messages
+  capture, post-capture identity verification, durable phases, retained
+  rollback recovery, and fail-closed production routing with no same-UID
+  fallback. Accepted messages
   must satisfy the NSXPC signing requirement, and each transaction persists the
   non-root requester UID. Requester-owned ACL-free traversal, an owner-writable
   final parent, a supported leaf type, and pre- and post-capture ACL/BSD-flag
   checks are required. This is mitigation, not elimination.
 
-  The descriptor-relative APIs were evaluated explicitly. `openat` with
-  no-follow flags pins traversal but does not mutate; `fstatat` observes an
-  identity but cannot make a later syscall conditional on that identity;
-  `renameatx_np(RENAME_EXCL)` atomically refuses destination replacement but
-  does not require the source to match a previously observed vnode; and
-  `unlinkat` removes a name relative to a pinned directory but has no
-  expected-device/inode/generation predicate. Public macOS APIs therefore do
-  not provide the required identity-conditional terminal mutation.
+  The macOS filesystem APIs were evaluated explicitly. Descriptor-relative
+  `openat` with `O_NOFOLLOW_ANY`/`O_RESOLVE_BENEATH`, `fstat`, `fstatat`,
+  `lstat`, and `openat_authenticated_np` can constrain traversal or observe an
+  identity, but they do not mutate a namespace. `renameat` and
+  `renameatx_np(RENAME_EXCL)` operate relative to pinned parents, and the latter
+  atomically refuses destination replacement, but neither requires the source
+  to match a previously observed vnode. `renameatx_np(RENAME_SWAP)` is the
+  atomic adversarial substitution primitive, not an identity guard. `unlinkat`
+  removes the current name relative to a pinned directory and has no
+  expected-device/inode/generation predicate. Open descriptors, `fcntl`,
+  `fsync`, and `F_FULLFSYNC` support inspection and durability, not selection of
+  the identity consumed by the later namespace syscall. Public macOS APIs
+  therefore do not provide the required identity-conditional terminal mutation.
 
   A same-UID attacker can still substitute the source immediately before
   exclusive capture. One substituted entry can become temporarily or
@@ -44,6 +50,12 @@ Current release blockers are:
   captured expected regular file or symbolic link can be deleted after its
   metadata changes, and a regular file can contain unbounded bytes. Writable
   descriptors and hard links prevent an immutable-content guarantee. The
+  daemon does not automatically restore a captured leaf through a recorded or
+  reopened parent descriptor because that directory can be relocated after
+  validation. It durably retains the captured leaf for recovery instead. This
+  prevents the identified root restore outside the authorized root, but the
+  maximum availability impact is one retained leaf per affected transaction,
+  up to the 32 protected slots per volume. The
   source-level adversarial swap, namespace-instability, durability, retained
   receipt, hard-link, and writable-descriptor regressions are supporting
   evidence. The full signed distinct-process atomic-swap,
@@ -53,12 +65,40 @@ Current release blockers are:
   Initial project bindings are not yet composed with an independently verified
   manager authorization record. Bindings also have no manager-authorized revoke
   or garbage-collection lifecycle; after 256 distinct lifetime project
-  bindings, another project fails closed.
-  Ambiguous submitted calls preserve the original transaction ID, but the
-  public `fs_delete` surface cannot query or resume that transaction after
-  pathname loss. Directory deletion, move, and cross-volume mutation remain
-  disabled in the privileged production route. E2, P10, G10, and G12 stay open.
-- **Caller-sealed helper identity and packaging remain qualifying.** Protocol v3
+  bindings, another project fails closed. Protocol v4 now preserves the exact
+  transaction ID across post-intent and existing-transaction failures, retains
+  terminal committed/restored/rejected outcomes until durable exact
+  acknowledgement, and adds pathless `fs_delete_recovery` query, resume, and
+  acknowledge actions backed by a bounded caller ledger. Interrupted managed
+  recovery calls remain conservatively blocked when their prior result cannot
+  be reconciled. Broker replay also refuses to infer completion from pathname
+  absence after a previously existing protected leaf was dispatched, so an
+  unresolved privileged transaction cannot be converted into synthetic success
+  or redispatched. No automatic post-broker acknowledgement/discovery pass is
+  implemented. The sole caller recovery handle remains below a same-UID-owned
+  application directory: another same-UID process can rename or remove it
+  without forging daemon authority. Per protected volume, up to 32 such losses
+  can strand captured entries or terminal outcomes from normal query/resume/ack
+  reachability and then make later protected mutations fail closed on capacity.
+  Generation reset now holds the caller-ledger lock while checking before and
+  after entering the resetting state and through generation advance. It rejects
+  visible old-generation authority, cancels back to active, and surfaces a
+  distinct cleanup error if cancellation itself fails. Delete retention
+  revalidates current project authority inside that same ledger lock, so a
+  normal request delayed behind reset cannot publish its caller record or reach
+  XPC with the stale generation. A same-UID process can still remove or relocate
+  an already-retained caller record before reset, hide the only handle while its
+  daemon transaction remains, and let generation advance while old authority
+  can still complete. It can also unlink or replace the ledger lock after a
+  retainer validates but before slot publication, allowing reset to acquire a
+  replacement lock and advance while the stale retainer later dispatches.
+  Without daemon-owned discovery or generation revoke, the
+  maximum post-reset impact is up to 32 captured or terminally deleted expected
+  leaves per protected volume; each regular file can contain unbounded bytes.
+  This mitigation does not eliminate the hostile authorization/recovery race.
+  Directory deletion, move, and cross-volume mutation remain disabled in the
+  privileged production route. E2, P10, G10, and G12 stay open.
+- **Caller-sealed helper identity and packaging remain qualifying.** Protocol v4
   reads the running caller's validated sealed per-architecture daemon
   CodeDirectory hashes, conjoins the exact hash with the daemon designated
   requirement before XPC activation, and repeats protocol version, product
@@ -85,8 +125,9 @@ Current release blockers are:
 - **Privileged service update lifecycle is still qualifying.**
   `FC-PRIVILEGED-SERVICE-LIFECYCLE-001` tracks the explicit asynchronous
   unregister/re-register replacement flow, generation fencing, exact live-code
-  requirement, and protocol-v3 handshake. Source tests cover mismatch, timeout,
-  late reply, single dispatch, lost mutation reply, reinstall ordering, and a
+  requirement, and protocol-v4 handshake. Source tests cover mismatch, timeout,
+  late reply, single dispatch, lost mutation reply, retained transaction
+  identity, pathless query/resume/acknowledgement, reinstall ordering, and a
   concurrent Disable superseding reinstall. They do not exercise those paths
   through the real signed asynchronous XPC service. Actual `SMAppService`
   approval, denial, update, disable, unregister/re-register, daemon restart,
@@ -114,16 +155,28 @@ Current release blockers are:
   established synchronous result contract, app rebootstrap, and manager-service
   restart. They do not prove a successful signed native
   `shell_exec` after both app restart and an actual manager-process restart as
-  one qualification scenario, so shell qualification remains open.
+  one qualification scenario. A guarded installed-artifact harness now validates
+  the ordinary signed app and exact staged identities, refuses pre-existing
+  manager state, preserves the established contract, and restores the canonical
+  LaunchAgent, disabled-state entry, and command link after a run. Its 14 focused
+  regressions pass as `EVID-20260830T185902Z-ce0de2b7cb`. The live run
+  `EVID-20260830T185444Z-7878ff2abf` did not qualify shell access: macOS denied
+  `launchctl bootstrap` to the current automation-host process tree, the legacy
+  `launchctl load` fallback returned without a running manager job, and the
+  harness failed closed before any `shell_exec` claim. Cleanup proved the
+  canonical manager job and plist absent and restored the prior command link and
+  launchd disabled-state entry. A foreground Terminal run outside this host
+  restriction is still required, and the install path's false-success fallback
+  remains an explicit product residual. Shell qualification stays open and
+  release-blocking.
 - **Native UI validation remains deferred and release-blocking.** Developer
   Mode is enabled and the valid Apple Development James Daley identity for team
   `9AQ2C2838M` is available. The six bounded signed Debug cases in
   `EVID-20260830T153118Z-752f058222` cover root controls, shell controls,
-  protected-service control visibility, and GUI relaunch. A separate normal
-  signed Debug build and nested-bundle inspection passed as
-  `EVID-20260830T152637Z-91832b005d`,
-  `EVID-20260830T152700Z-00ccac71b7`, and
-  `EVID-20260830T152706Z-1780b97dbf`. These records do not cover the production
+  protected-service control visibility, and GUI relaunch. A current-source
+  normal signed Debug build and paired app/daemon/CLI inspection passed as
+  `EVID-20260830T184940Z-e93d7373f7` and
+  `EVID-20260830T185004Z-e546c8ccf3`. These records do not cover the production
   panel, successful shell execution across app and manager-process restart,
   actual service approval/update/disable behavior, installed-manager identity,
   exact running-helper identity, Release signing, or notarization.
@@ -151,14 +204,13 @@ may be reviewed only with these residual risks and deferred gates visible in its
 description, the state ledger, doctor output, and next-work selection.
 
 The current source manifest is
-`28707961c294df84dcb27f8074a98924e9f2d4fcc2ade0cb95ca42ba0d46e995`
-over 251 inputs. Debug strict evidence
-`EVID-20260830T151948Z-6df8d3afa9` and Release strict evidence
-`EVID-20260830T152225Z-43cd73ae1c` each passed 719 tests with two declared
+`62361115e3af17e340f56c656b2731bd720e98b3cddceb7d848a040cb6e0a21c`
+over 252 inputs. Debug strict evidence
+`EVID-20260830T184228Z-1bb02068b2` and Release strict evidence
+`EVID-20260830T184522Z-d43b1586b6` each passed 755 tests with two declared
 environment skips and no failures. Signed Debug build evidence is
-`EVID-20260830T152637Z-91832b005d`; exact embedded and paired-CLI checks are
-`EVID-20260830T152700Z-00ccac71b7` and
-`EVID-20260830T152706Z-1780b97dbf`. Signed Debug UI evidence
+`EVID-20260830T184940Z-e93d7373f7`; the exact paired app/daemon/CLI check is
+`EVID-20260830T185004Z-e546c8ccf3`. Signed Debug UI evidence
 `EVID-20260830T153118Z-752f058222` passed all six bounded cases.
 
 Post-implementation-push doctor evidence

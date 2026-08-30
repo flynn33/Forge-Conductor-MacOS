@@ -98,6 +98,7 @@ public enum ProductionToolReplayCatalog {
         "fs_glob": .readOnly,
         "fs_mkdir": .idempotent,
         "fs_delete": .reconciled,
+        "fs_delete_recovery": .reconciled,
         "fs_move": .reconciled,
 
         "git_status": .readOnly,
@@ -422,6 +423,15 @@ public struct ProductionToolInvocationReconciler: ToolInvocationReconciling, Sen
                 return .unresolved
             }
             guard FileManager.default.fileExists(atPath: path.path) else {
+                // A descriptor captured an already-missing path before dispatch only
+                // when it carries this explicit precondition. If a previously
+                // existing protected leaf is now missing, pathname absence cannot
+                // distinguish a completed delete from a captured or otherwise
+                // nonterminal privileged transaction. Keep the broker invocation
+                // ambiguous so it cannot conceal retained recovery authority.
+                guard descriptor["precondition"] as? String == "missing" else {
+                    return .unresolved
+                }
                 return .completed(.success(["path": path.path, "deleted": true]))
             }
             guard let pre = descriptor["pre_sha256"] as? String,
@@ -1101,8 +1111,10 @@ public actor ToolInvocationBroker {
               let sessionID = context.providerSessionID, !sessionID.isEmpty else {
             throw ProjectContextError.projectScopeMismatch
         }
-        guard context.authorizationScope.allowedTools.contains(incomingCall.toolName)
-                || context.authorizationScope.allowedTools.contains("*") else {
+        guard ToolGrantSemantics.grants(
+            tool: incomingCall.toolName,
+            from: context.authorizationScope.allowedTools
+        ) else {
             throw AutonomyError.invalidRequest("tool is outside the run authorization scope")
         }
         let call = Self.durableCall(incomingCall)

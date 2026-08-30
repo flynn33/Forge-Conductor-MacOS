@@ -557,9 +557,12 @@
       "f721ce063104817e9f08013350ab855bac708c77"
     ],
     "id": "FC-FILESYSTEM-PATH-TOCTOU-001",
-      "ownership_disposition": "Descriptor-relative traversal and bounded quarantine-and-verify mitigate final-component substitution but do not eliminate it. A global 32-slot owner-only receipt ledger bounds simultaneous tracked recovery state across cooperating Forge processes and ordinary crashes; corrupt receipts, unavailable or rebound parents, failed rollback, and terminal-durability-unconfirmed transitions retain a slot. Rollback refuses a quarantine occupant whose identity differs from the receipt. Combined namespace-instability and durability-unconfirmed results retain the live install receipt, and cross-volume cleanup merges any second retained receipt. Receipt unlink followed by failed ledger-directory sync does not falsely claim a nonexistent live recovery path, although a stale receipt may conservatively reappear after a crash. A same-user writer can discover and swap the quarantine name after final verification and before the terminal unlinkat or renameatx_np. One winning race can mutate one entry under the pinned authorized parent; a final-link unlink can lose unbounded bytes and a directory rename can relocate an unbounded subtree. One recursive request can reuse released slots across up to 100000 planned entries, so the 32-slot bound does not limit cumulative adversarial wrong-object mutations and is not a same-UID adversarial guarantee. Cross-volume work is deadline-bounded to 300 seconds, but a terminal namespace syscall or fsync already executing under the lock has no independent wall-time deadline. Initial path anchoring, destination hierarchy creation, and hard-link ctime ambiguity remain separate E2 residuals. Current-source Debug EVID-20260828T124332Z-1e2a050c0e and Release EVID-20260828T124624Z-00a3dd27c2 each pass 657 tests with four expected skips; the finding remains open.",
+      "ownership_disposition": "Descriptor-relative traversal and bounded quarantine-and-verify mitigate final-component substitution but do not eliminate it. The current partial P10 boundary routes non-directory leaf deletion through a separately signed root LaunchDaemon, an authenticated exact-caller XPC contract, a root-owned same-volume mode-0700 namespace, 32 fixed transaction slots, exclusive descriptor-relative capture, post-capture identity and authorization checks, durable intent/captured/rollback/committed phases, and fail-closed retained rollback recovery. Automatic privileged restore through a recorded or reopened source-parent descriptor is disabled because same-UID relocation after validation could otherwise make root restore one captured leaf outside the authorized root. Protocol v4 adds exact pathless query, resume, and acknowledgement operations; terminal committed, restored, and rejected outcomes are never recycled until exact durable acknowledgement, and a full ledger fails closed. An owner-only bounded caller ledger is persisted before XPC submission and retained until daemon acknowledgement; it is availability state, not daemon authority. An existing transaction with wrong requester/project/generation/root authority cannot be acknowledged. Broker replay does not infer completion from pathname absence after dispatch and does not redispatch an ambiguous protected delete. This is mitigation, not elimination. Public macOS openat/fstatat/unlinkat/renameat/renameatx_np APIs do not combine mutation with an expected source device/inode/vnode-generation predicate. A same-UID writer can still swap the source before exclusive capture or change ACL/BSD metadata through a retained descriptor or hard link after the last check. The maximum terminal impact of the remaining authorization-metadata race is deletion of the one captured expected regular file or symbolic link; a regular file can contain unbounded bytes. A pre-capture substitution can make one current entry temporarily unavailable or recovery-required; an unsupported directory can represent an unbounded subtree but is not eligible for terminal deletion. Writable descriptors and hard links prevent an immutable-content guarantee. With automatic restore disabled, one captured leaf per affected transaction can remain unavailable, up to the 32 protected slots per volume. The caller ledger remains below same-UID-owned application storage; a same-UID process can rename or remove the sole caller recovery handle without forging daemon authority. Up to 32 lost handles per protected volume can strand captured entries or terminal outcomes from normal query/resume/ack reachability and then make later protected mutations fail closed on capacity. Project-generation reset holds the caller-ledger lock across preflight, the resetting state, recheck, and generation advance. It cancels on visible authority and surfaces a distinct error when cancellation fails. Delete retention revalidates current project authority inside that same lock, so a normal request delayed behind reset cannot publish stale caller authority or reach XPC. Same-UID removal or relocation of already-retained records can hide live daemon transactions, and replacement of the locked inode after validation but before slot publication can split retention from reset and permit stale dispatch. Without daemon-owned discovery or generation revoke, maximum post-reset impact is up to 32 captured or terminally deleted expected leaves per protected volume; each regular file can contain unbounded bytes. Initial project authorization composition, binding revoke/garbage collection, automatic post-broker acknowledgement/discovery, directory/move/cross-volume privileged operations, whole-product freshness, and the full signed distinct-process adversarial/crash/volume/upgrade/Release matrices remain open. Unit and source tests are supporting evidence only. FC-FILESYSTEM-PATH-TOCTOU-001, E2, P10, G10, and G12 remain open.",
       "runtime_proof": [
         "Tests/ForgeConductorTests/FilesystemCancellationTests.swift",
+        "Tests/ForgeConductorTests/ForgeFilesystemProtocolTests.swift",
+        "Tests/ForgeConductorTests/SecureFilesystemMutationTests.swift",
+        ".forge-codex/docs/PRIVILEGED_FILESYSTEM_QUALIFICATION.md",
         ".forge-codex/evidence/EVID-20260828T124332Z-1e2a050c0e.json",
         ".forge-codex/evidence/EVID-20260828T124624Z-00a3dd27c2.json"
       ],
@@ -587,7 +590,15 @@
         "FilesystemCancellationTests.testPostUnlinkReceiptSyncFailureDoesNotClaimMissingRecoveryPath",
         "FilesystemCancellationTests.testReceiptRemovalFailureRetainsTerminalRecoveryPath",
         "FilesystemCancellationTests.testPostPublicationStagingFailurePreservesRecoveryAndUnknownPresence",
-        "FilesystemCancellationTests.testRetainedStagingRecoveryDoesNotClaimAbsentStagingPathNeedsCleanup"
+        "FilesystemCancellationTests.testRetainedStagingRecoveryDoesNotClaimAbsentStagingPathNeedsCleanup",
+        "ForgeFilesystemProtocolTests.testTransactionStatusSecureCodingRoundTripPreservesTerminalDisposition",
+        "ForgeFilesystemProtocolTests.testTransactionAuthorityRequiresExactUIDProjectGenerationAndRootEnvelope",
+        "SecureFilesystemMutationTests.testDeletePersistsCallerAuthorityBeforeDispatchAndPathlessRecoverySurvivesRestart",
+        "SecureFilesystemMutationTests.testFullCallerRecoveryLedgerPreventsDeleteDispatch",
+        "SecureFilesystemMutationTests.testRecoveryRejectsDifferentProjectBeforeXPC",
+        "SecureFilesystemMutationTests.testRecoveryRejectsDifferentWritableRootBeforeXPC",
+        "SecureFilesystemMutationTests.testMismatchedDeleteResponseCannotReleaseCallerRecoveryAuthority",
+        "SecureFilesystemMutationTests.testDeleteForbidRuleAlsoForbidsAdditiveRecoveryTool"
       ]
     },
     {
@@ -598,7 +609,7 @@
       "f721ce063104817e9f08013350ab855bac708c77"
     ],
     "id": "FC-SHELL-COMPAT-QUALIFICATION-001",
-      "ownership_disposition": "Current-source regressions cover clean-install enablement, schema-v1 disabled-state migration, current schema-v2 explicit opt-out preservation, tools/list registration, execution, and the established shell_exec login-bash result contract. Released schema-v1 configs did not persist a signal that can distinguish the shipped false default from a user-chosen false value. Restart coverage at that boundary is manager-service restart plus ForgeApp teardown/rebootstrap inside the test process, not LaunchAgent or native app process relaunch. shell_exec remains distinct from additive clean-profile bash.run. Debug EVID-20260828T124332Z-1e2a050c0e and Release EVID-20260828T124624Z-00a3dd27c2 pass the current strict matrix; current MCP and manager compatibility are EVID-20260828T125651Z-ad5ebff94c and EVID-20260828T125046Z-c15d53c9c9. The Settings XCUITest includes visibility, control, save, reload, and actual app relaunch, but EVID-20260828T124634Z-c6c0c861da is unsigned build-only evidence and no native execution is accepted. Native execution remains blocked by signing and Developer Mode, so shell compatibility remains open.",
+      "ownership_disposition": "Source regressions cover clean-install enablement, accidental schema-v1 disabled-state migration, current schema-v2 explicit opt-out preservation, MCP tools/list registration, successful execution, and the established synchronous /bin/bash -lc shell_exec result contract. shell_exec remains distinct from additive clean-profile bash.run, and no shell path enters the privileged filesystem daemon. Signed Debug XCUI evidence EVID-20260830T153118Z-752f058222 proves Settings visibility, control persistence, and GUI relaunch at its exact revision. Current-source Debug and Release evidence EVID-20260830T184228Z-1bb02068b2 and EVID-20260830T184522Z-d43b1586b6 each pass 755 tests with two declared skips and zero failures. The guarded installed-artifact harness validates the ordinary signed app and staged identities, rejects pre-existing manager state and user-controlled symlink aliases, and has 14 passing focused tests in EVID-20260830T185902Z-ce0de2b7cb. Live run EVID-20260830T185444Z-7878ff2abf did not execute shell_exec: macOS denied launchctl bootstrap to the current automation-host process tree, the legacy launchctl load fallback returned without a running manager job, and the harness failed closed and restored the canonical job, plist, command link, and launchd disabled-state entry. A foreground Terminal run outside this host restriction and correction of the false-success fallback remain required. Until a successful signed shell_exec survives real app and installed-manager process restart while preserving the same setting and contract, shell qualification remains deferred and release-blocking.",
       "runtime_proof": [
         "Tests/ForgeConductorTests/AppConfigAndDoctorTests.swift",
         "Tests/ForgeConductorTests/CoreTests.swift",
@@ -608,7 +619,10 @@
         ".forge-codex/evidence/EVID-20260828T124624Z-00a3dd27c2.json",
         ".forge-codex/evidence/EVID-20260828T125651Z-ad5ebff94c.json",
         ".forge-codex/evidence/EVID-20260828T125046Z-c15d53c9c9.json",
-        ".forge-codex/evidence/EVID-20260828T124634Z-c6c0c861da.json"
+        ".forge-codex/evidence/EVID-20260828T124634Z-c6c0c861da.json",
+        ".forge-codex/evidence/EVID-20260830T153118Z-752f058222.json",
+        ".forge-codex/evidence/EVID-20260830T185444Z-7878ff2abf.json",
+        ".forge-codex/evidence/EVID-20260830T185902Z-ce0de2b7cb.json"
       ],
       "severity": "High",
       "status": "deferred",
@@ -624,10 +638,14 @@
       "evidence_class": "E0",
       "fix_commits": [],
       "id": "FC-UI-QUALIFICATION-001",
-      "ownership_disposition": "EVID-20260828T124634Z-c6c0c861da shows that the current native test target compiles unsigned, but it is build-only evidence with zero executed tests. Developer Mode is disabled and the available Apple Development identity does not match the configured team. No XCUITest execution is accepted from an unsigned build-for-testing proof. G10 native UI qualification remains deferred and release-blocking.",
+      "ownership_disposition": "Developer Mode is enabled and the James Daley Apple Development identity for team 9AQ2C2838M is available. Exact-revision signed Debug evidence EVID-20260830T153118Z-752f058222 executed six bounded Settings/relaunch cases covering project roots, shell controls, protected-service control visibility, and GUI relaunch. Separate exact-revision signed Debug build and nested-bundle inspection evidence also passed. These do not prove the production NSOpenPanel path, successful shell execution across both app and installed-manager process restart, actual SMAppService approval/update/disable behavior, installed-manager identity, exact running-helper identity, Release signing, or notarization. Native qualification therefore remains deferred and release-blocking and must never be marked passed from build-only, unit, synthetic-host, or partial XCUI evidence.",
       "runtime_proof": [
         ".forge-autonomy-state/evidence/FC-UI-001/test-results.json",
-        ".forge-codex/evidence/EVID-20260828T124634Z-c6c0c861da.json"
+        ".forge-codex/evidence/EVID-20260828T124634Z-c6c0c861da.json",
+        ".forge-codex/evidence/EVID-20260830T153118Z-752f058222.json",
+        ".forge-codex/evidence/EVID-20260830T152637Z-91832b005d.json",
+        ".forge-codex/evidence/EVID-20260830T152700Z-00ccac71b7.json",
+        ".forge-codex/evidence/EVID-20260830T152706Z-1780b97dbf.json"
       ],
       "severity": "High",
       "status": "deferred",

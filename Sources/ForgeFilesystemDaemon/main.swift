@@ -49,25 +49,106 @@ private final class FilesystemService: NSObject, ForgeFilesystemServiceXPC {
         authorizedRoot: FileHandle,
         withReply reply: @escaping (ForgeFilesystemResponse) -> Void
     ) {
+        reply(withAuthorizedRoot(
+            authorizedRoot,
+            unavailable: ForgeFilesystemResponse(
+                ok: false,
+                code: ForgeFilesystemErrorCode.capabilityUnavailable,
+                message: "The authorized root descriptor is unavailable"
+            )
+        ) { descriptor in
+            deleteEngine.deleteLeaf(
+                request,
+                authorizedRootDescriptor: descriptor,
+                requesterUID: requesterUID
+            )
+        })
+    }
+
+    func queryTransaction(
+        _ request: ForgeFilesystemTransactionControlRequest,
+        authorizedRoot: FileHandle,
+        withReply reply: @escaping (ForgeFilesystemTransactionStatus) -> Void
+    ) {
+        reply(withAuthorizedRoot(
+            authorizedRoot,
+            unavailable: ForgeFilesystemTransactionStatus(
+                transactionID: nil,
+                disposition: .unavailable,
+                code: ForgeFilesystemErrorCode.transactionUnavailable,
+                message: "The filesystem transaction is unavailable",
+                terminal: false,
+                committed: false,
+                durabilityConfirmed: false,
+                recoveryRequired: false,
+                acknowledgementRequired: false
+            )
+        ) { descriptor in
+            deleteEngine.queryTransaction(
+                request,
+                authorizedRootDescriptor: descriptor,
+                requesterUID: requesterUID
+            )
+        })
+    }
+
+    func resumeTransaction(
+        _ request: ForgeFilesystemTransactionControlRequest,
+        authorizedRoot: FileHandle,
+        withReply reply: @escaping (ForgeFilesystemResponse) -> Void
+    ) {
+        reply(withAuthorizedRoot(
+            authorizedRoot,
+            unavailable: ForgeFilesystemResponse(
+                ok: false,
+                code: ForgeFilesystemErrorCode.capabilityUnavailable,
+                message: "The authorized root descriptor is unavailable"
+            )
+        ) { descriptor in
+            deleteEngine.resumeTransaction(
+                request,
+                authorizedRootDescriptor: descriptor,
+                requesterUID: requesterUID
+            )
+        })
+    }
+
+    func acknowledgeTransaction(
+        _ request: ForgeFilesystemTransactionControlRequest,
+        authorizedRoot: FileHandle,
+        withReply reply: @escaping (ForgeFilesystemResponse) -> Void
+    ) {
+        reply(withAuthorizedRoot(
+            authorizedRoot,
+            unavailable: ForgeFilesystemResponse(
+                ok: false,
+                code: ForgeFilesystemErrorCode.capabilityUnavailable,
+                message: "The authorized root descriptor is unavailable"
+            )
+        ) { descriptor in
+            deleteEngine.acknowledgeTransaction(
+                request,
+                authorizedRootDescriptor: descriptor,
+                requesterUID: requesterUID
+            )
+        })
+    }
+
+    private func withAuthorizedRoot<Value>(
+        _ authorizedRoot: FileHandle,
+        unavailable: @autoclosure () -> Value,
+        operation: (Int32) -> Value
+    ) -> Value {
         let descriptor = authorizedRoot.fileDescriptor
         let duplicatedDescriptor = Darwin.dup(descriptor)
         try? authorizedRoot.close()
         guard duplicatedDescriptor >= 0,
               Darwin.fcntl(duplicatedDescriptor, F_SETFD, FD_CLOEXEC) == 0 else {
             if duplicatedDescriptor >= 0 { _ = Darwin.close(duplicatedDescriptor) }
-            reply(ForgeFilesystemResponse(
-                ok: false,
-                code: ForgeFilesystemErrorCode.capabilityUnavailable,
-                message: "The authorized root descriptor is unavailable"
-            ))
-            return
+            return unavailable()
         }
         defer { _ = Darwin.close(duplicatedDescriptor) }
-        reply(deleteEngine.deleteLeaf(
-            request,
-            authorizedRootDescriptor: duplicatedDescriptor,
-            requesterUID: requesterUID
-        ))
+        return operation(duplicatedDescriptor)
     }
 }
 

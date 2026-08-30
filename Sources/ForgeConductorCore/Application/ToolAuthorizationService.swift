@@ -16,6 +16,38 @@ public enum ToolAuthorizationDecision {
     case denied(code: String, message: String)
 }
 
+/// Centralizes additive grant semantics for tools that are required to safely
+/// finish an operation already authorized by another tool. An explicit recovery
+/// grant remains narrower and never grants a new delete.
+enum ToolGrantSemantics {
+    private static let protectedDelete = "fs_delete"
+    private static let protectedDeleteRecovery = "fs_delete_recovery"
+
+    static func grants<C: Collection>(
+        tool: String,
+        from grantedTools: C
+    ) -> Bool where C.Element == String {
+        grantedTools.contains("*")
+            || grantedTools.contains(tool)
+            || (tool == protectedDeleteRecovery && grantedTools.contains(protectedDelete))
+    }
+
+    static func forbids<C: Collection>(
+        tool: String,
+        from forbiddenTools: C
+    ) -> Bool where C.Element == String {
+        forbiddenTools.contains(tool)
+            || (tool == protectedDeleteRecovery && forbiddenTools.contains(protectedDelete))
+    }
+
+    static func expanded(_ grantedTools: Set<String>) -> Set<String> {
+        guard grantedTools.contains(protectedDelete) else { return grantedTools }
+        var expanded = grantedTools
+        expanded.insert(protectedDeleteRecovery)
+        return expanded
+    }
+}
+
 /// Defines the authorization boundary that every tool call must cross before routing.
 public protocol ToolAuthorizing: Sendable {
     func authorize(
@@ -147,7 +179,7 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
                 )
             }
             let allowed = context.authorizationScope.allowedTools
-            guard allowed.contains("*") || allowed.contains(tool) else {
+            guard ToolGrantSemantics.grants(tool: tool, from: allowed) else {
                 return .denied(
                     code: "tool_not_granted",
                     message: "Tool '\(tool)' is outside the durable project authorization scope"
@@ -155,14 +187,14 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
             }
         }
         if let binding {
-            if binding.toolsForbidden.contains(tool) {
+            if ToolGrantSemantics.forbids(tool: tool, from: binding.toolsForbidden) {
                 return .denied(
                     code: "tool_forbidden",
                     message: "Agent '\(binding.agentID)' explicitly forbids tool '\(tool)'"
                 )
             }
             if !binding.toolsPrimary.isEmpty,
-               !binding.toolsPrimary.contains(tool),
+               !ToolGrantSemantics.grants(tool: tool, from: binding.toolsPrimary),
                !Self.sessionLifecycleTools.contains(tool) {
                 return .denied(
                     code: "tool_not_granted",

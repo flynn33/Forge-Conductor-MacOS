@@ -29,6 +29,7 @@ export const TOOL_PACKS = [
       "fs_stat",
       "fs_mkdir",
       "fs_delete",
+      "fs_delete_recovery",
       "fs_move",
     ],
   },

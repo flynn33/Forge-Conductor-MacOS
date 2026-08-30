@@ -1,6 +1,8 @@
 // ProjectContextIntegrationTests.swift
 // Verifies production tool routing through exact durable project bindings.
 
+import Darwin
+import ForgeFilesystemProtocol
 import XCTest
 @testable import ForgeConductorCore
 
@@ -279,6 +281,109 @@ final class ProjectContextIntegrationTests: XCTestCase {
         }
     }
 
+    func testGenerationResetRejectsRetainedFilesystemRecoveryAuthority() throws {
+        try withApplication { app, root in
+            let project = try makeProject(root: root, name: "recovery-reset-project")
+            let manager = ManagerNode(app: app)
+            let registered = try manager.registerProject(
+                path: project.path,
+                displayName: "Recovery Reset Project"
+            )
+            let projectID = ProjectID(try XCTUnwrap(
+                UUID(uuidString: try XCTUnwrap(registered["project_id"] as? String))
+            ))
+
+            let ledger = SecureFilesystemRecoveryLedger(paths: app.paths)
+            let record = Self.makeRecoveryRecord(projectID: projectID, rootPath: project.path)
+            try ledger.retain(record)
+
+            XCTAssertThrowsError(
+                try manager.resetProjectGeneration(
+                    projectID: projectID,
+                    expectedGeneration: .initial
+                )
+            ) { error in
+                XCTAssertEqual(
+                    error as? ProjectContextError,
+                    .retainedFilesystemRecovery(projectID)
+                )
+            }
+
+            let status = try manager.projectStatus(projectID: projectID)
+            XCTAssertEqual(status["project_generation"] as? UInt64, 1)
+            XCTAssertEqual(status["lifecycle_state"] as? String, "active")
+            XCTAssertTrue(try ledger.hasRetainedAuthority(
+                projectID: projectID,
+                generation: .initial
+            ))
+        }
+    }
+
+    func testGenerationResetCancelsWhenFilesystemRecoveryAppearsAfterBegin() throws {
+        try withApplication { app, root in
+            let project = try makeProject(root: root, name: "recovery-reset-race-project")
+            let registered = try ManagerNode(app: app).registerProject(
+                path: project.path,
+                displayName: "Recovery Reset Race Project"
+            )
+            let projectID = ProjectID(try XCTUnwrap(
+                UUID(uuidString: try XCTUnwrap(registered["project_id"] as? String))
+            ))
+            let record = Self.makeRecoveryRecord(projectID: projectID, rootPath: project.path)
+            let manager = ManagerNode(app: app) { _, _ in
+                try Self.writeRecoveryRecordDirectly(record, app: app)
+            }
+
+            XCTAssertThrowsError(
+                try manager.resetProjectGeneration(
+                    projectID: projectID,
+                    expectedGeneration: .initial
+                )
+            ) { error in
+                XCTAssertEqual(
+                    error as? ProjectContextError,
+                    .retainedFilesystemRecovery(projectID)
+                )
+            }
+
+            let status = try manager.projectStatus(projectID: projectID)
+            XCTAssertEqual(status["project_generation"] as? UInt64, 1)
+            XCTAssertEqual(status["lifecycle_state"] as? String, "active")
+            XCTAssertTrue(try SecureFilesystemRecoveryLedger(paths: app.paths)
+                .hasRetainedAuthority(projectID: projectID, generation: .initial))
+        }
+    }
+
+    func testGenerationResetSurfacesCancellationFailure() throws {
+        try withApplication { app, root in
+            let project = try makeProject(root: root, name: "recovery-reset-cleanup-project")
+            let registered = try ManagerNode(app: app).registerProject(
+                path: project.path,
+                displayName: "Recovery Reset Cleanup Project"
+            )
+            let projectID = ProjectID(try XCTUnwrap(
+                UUID(uuidString: try XCTUnwrap(registered["project_id"] as? String))
+            ))
+            let record = Self.makeRecoveryRecord(projectID: projectID, rootPath: project.path)
+            let manager = ManagerNode(app: app) { _, _ in
+                try Self.writeRecoveryRecordDirectly(record, app: app)
+                app.projectContexts.close()
+            }
+
+            XCTAssertThrowsError(
+                try manager.resetProjectGeneration(
+                    projectID: projectID,
+                    expectedGeneration: .initial
+                )
+            ) { error in
+                XCTAssertEqual(
+                    error as? ProjectContextError,
+                    .resetCancellationFailed(projectID)
+                )
+            }
+        }
+    }
+
     private func withApplication(
         _ body: (ForgeApp, URL) throws -> Void
     ) throws {
@@ -303,6 +408,52 @@ final class ProjectContextIntegrationTests: XCTestCase {
         let project = root.appendingPathComponent(name, isDirectory: true)
         try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
         return project
+    }
+
+    private static func makeRecoveryRecord(
+        projectID: ProjectID,
+        rootPath: String
+    ) -> SecureFilesystemRecoveryRecord {
+        let request = ForgeFilesystemMutationRequest(
+            requestID: UUID().uuidString.lowercased(),
+            transactionID: UUID().uuidString.lowercased(),
+            projectID: projectID.description,
+            projectGeneration: ProjectGeneration.initial.rawValue,
+            rootID: "1:2",
+            rootIdentity: ForgeFilesystemIdentity(
+                device: 1,
+                inode: 2,
+                mode: UInt32(S_IFDIR | 0o700),
+                owner: UInt32(geteuid()),
+                group: UInt32(getegid()),
+                linkCount: 1
+            ),
+            relativePathComponents: ["leaf.txt"],
+            access: .deleteLeaf,
+            expectedLeafIdentity: ForgeFilesystemIdentity(
+                device: 1,
+                inode: 3,
+                mode: UInt32(S_IFREG | 0o600),
+                owner: UInt32(geteuid()),
+                group: UInt32(getegid()),
+                linkCount: 1
+            )
+        )
+        return SecureFilesystemRecoveryRecord(
+            request: request,
+            originatingClientID: ClientID("reset-recovery-client"),
+            rootPath: rootPath
+        )
+    }
+
+    private static func writeRecoveryRecordDirectly(
+        _ record: SecureFilesystemRecoveryRecord,
+        app: ForgeApp
+    ) throws {
+        let slot = app.paths.home
+            .appendingPathComponent("privileged-filesystem-recovery", isDirectory: true)
+            .appendingPathComponent("slot-00.json")
+        try OwnerOnlyAtomicFile.write(try JSONEncoder().encode(record), to: slot)
     }
 
     private func initialize(

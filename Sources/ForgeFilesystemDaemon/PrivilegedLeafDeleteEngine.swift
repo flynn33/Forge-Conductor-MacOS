@@ -9,7 +9,12 @@ final class PrivilegedLeafDeleteEngine {
     private static let lockName = ".transactions.lock"
     private static let maximumTransactions = 32
     private static let maximumReceiptBytes = 32 * 1_024
+    private static let maximumAcknowledgementBytes = 48 * 1_024
     private static let maximumBindingBytes = 8 * 1_024
+    private static let terminalOutcomeName = "outcome.json"
+    private static let terminalOutcomePendingName = "outcome.json.pending"
+    private static let acknowledgingName = "acknowledging.json"
+    private static let acknowledgingPendingName = "acknowledging.json.pending"
 
     private let processLock = NSLock()
 
@@ -57,6 +62,341 @@ final class PrivilegedLeafDeleteEngine {
         }
     }
 
+    func queryTransaction(
+        _ request: ForgeFilesystemTransactionControlRequest,
+        authorizedRootDescriptor: Int32,
+        requesterUID: uid_t
+    ) -> ForgeFilesystemTransactionStatus {
+        guard servicePermits(requesterUID: requesterUID) else {
+            return unavailableStatus(
+                code: ForgeFilesystemErrorCode.capabilityUnavailable,
+                message: "The filesystem transaction is unavailable"
+            )
+        }
+
+        processLock.lock()
+        defer { processLock.unlock() }
+
+        do {
+            return try performQuery(
+                request,
+                authorizedRootDescriptor: authorizedRootDescriptor,
+                requesterUID: requesterUID
+            )
+        } catch {
+            return unavailableStatus(
+                code: ForgeFilesystemErrorCode.transactionUnavailable,
+                message: "The filesystem transaction is unavailable"
+            )
+        }
+    }
+
+    func resumeTransaction(
+        _ request: ForgeFilesystemTransactionControlRequest,
+        authorizedRootDescriptor: Int32,
+        requesterUID: uid_t
+    ) -> ForgeFilesystemResponse {
+        guard servicePermits(requesterUID: requesterUID) else {
+            return failure(
+                code: ForgeFilesystemErrorCode.capabilityUnavailable,
+                message: "The filesystem transaction is unavailable"
+            )
+        }
+
+        processLock.lock()
+        defer { processLock.unlock() }
+
+        do {
+            return try performResume(
+                request,
+                authorizedRootDescriptor: authorizedRootDescriptor,
+                requesterUID: requesterUID
+            )
+        } catch let error as EngineFailure {
+            return failure(
+                code: error.code,
+                message: error.message,
+                committed: error.committed,
+                durabilityConfirmed: error.durabilityConfirmed,
+                recoveryTransactionID: error.recoveryTransactionID
+            )
+        } catch {
+            return failure(
+                code: ForgeFilesystemErrorCode.transactionUnavailable,
+                message: "The filesystem transaction is unavailable"
+            )
+        }
+    }
+
+    func acknowledgeTransaction(
+        _ request: ForgeFilesystemTransactionControlRequest,
+        authorizedRootDescriptor: Int32,
+        requesterUID: uid_t
+    ) -> ForgeFilesystemResponse {
+        guard servicePermits(requesterUID: requesterUID) else {
+            return failure(
+                code: ForgeFilesystemErrorCode.capabilityUnavailable,
+                message: "The filesystem transaction is unavailable"
+            )
+        }
+
+        processLock.lock()
+        defer { processLock.unlock() }
+
+        do {
+            return try performAcknowledgement(
+                request,
+                authorizedRootDescriptor: authorizedRootDescriptor,
+                requesterUID: requesterUID
+            )
+        } catch let error as EngineFailure {
+            return failure(
+                code: error.code,
+                message: error.message,
+                committed: error.committed,
+                durabilityConfirmed: error.durabilityConfirmed,
+                recoveryTransactionID: error.recoveryTransactionID
+            )
+        } catch {
+            return failure(
+                code: ForgeFilesystemErrorCode.transactionUnavailable,
+                message: "The filesystem transaction is unavailable"
+            )
+        }
+    }
+
+    private func servicePermits(requesterUID: uid_t) -> Bool {
+        geteuid() == 0
+            && ForgeFilesystemRequesterPolicy.isValidRequesterUID(UInt32(requesterUID))
+            && getpwuid(requesterUID) != nil
+    }
+
+    private func performQuery(
+        _ request: ForgeFilesystemTransactionControlRequest,
+        authorizedRootDescriptor: Int32,
+        requesterUID: uid_t
+    ) throws -> ForgeFilesystemTransactionStatus {
+        try withExistingTransactionInventory(
+            request,
+            authorizedRootDescriptor: authorizedRootDescriptor,
+            requesterUID: requesterUID,
+            reconcileAcknowledgements: false,
+            ifMissing: unavailableStatus(
+                code: ForgeFilesystemErrorCode.transactionUnavailable,
+                message: "The filesystem transaction is unavailable"
+            )
+        ) { inventory, rootInformation in
+            guard let transaction = try controlledTransaction(
+                for: request,
+                requesterUID: requesterUID,
+                rootInformation: rootInformation,
+                in: inventory
+            ), !transaction.acknowledging else {
+                return unavailableStatus(
+                    code: ForgeFilesystemErrorCode.transactionUnavailable,
+                    message: "The filesystem transaction is unavailable"
+                )
+            }
+            if let outcome = transaction.outcome {
+                try synchronize(try requiredDescriptor(for: transaction.slot).rawValue)
+                return outcome.status()
+            }
+            return ForgeFilesystemTransactionStatus(
+                transactionID: transaction.record.transactionID,
+                disposition: .recoveryRequired,
+                code: ForgeFilesystemErrorCode.transactionNotTerminal,
+                message: "The filesystem transaction requires explicit recovery",
+                terminal: false,
+                committed: false,
+                durabilityConfirmed: false,
+                recoveryRequired: true,
+                acknowledgementRequired: false
+            )
+        }
+    }
+
+    private func performResume(
+        _ request: ForgeFilesystemTransactionControlRequest,
+        authorizedRootDescriptor: Int32,
+        requesterUID: uid_t
+    ) throws -> ForgeFilesystemResponse {
+        try withExistingTransactionInventory(
+            request,
+            authorizedRootDescriptor: authorizedRootDescriptor,
+            requesterUID: requesterUID,
+            reconcileAcknowledgements: true,
+            ifMissing: transactionUnavailableResponse()
+        ) { inventory, rootInformation in
+            guard let transaction = try controlledTransaction(
+                for: request,
+                requesterUID: requesterUID,
+                rootInformation: rootInformation,
+                in: inventory
+            ), !transaction.acknowledging else {
+                return transactionUnavailableResponse()
+            }
+            if let outcome = transaction.outcome {
+                return outcome.response()
+            }
+
+            return try preservingRecoveryIdentity(
+                transactionID: transaction.record.transactionID
+            ) {
+                let root = try OwnedDescriptor(duplicating: authorizedRootDescriptor)
+                return try resume(
+                    transaction,
+                    transactionID: transaction.record.transactionID,
+                    rootDescriptor: root.rawValue,
+                    requesterUID: requesterUID
+                )
+            }
+        }
+    }
+
+    private func performAcknowledgement(
+        _ request: ForgeFilesystemTransactionControlRequest,
+        authorizedRootDescriptor: Int32,
+        requesterUID: uid_t
+    ) throws -> ForgeFilesystemResponse {
+        try withExistingTransactionInventory(
+            request,
+            authorizedRootDescriptor: authorizedRootDescriptor,
+            requesterUID: requesterUID,
+            reconcileAcknowledgements: false,
+            ifMissing: acknowledgementCompleteResponse()
+        ) { inventory, rootInformation in
+            let transaction = inventory.active.first(where: {
+                $0.record.transactionID.caseInsensitiveCompare(
+                    request.transactionID
+                ) == .orderedSame
+            })
+            let authorityMatches = transaction?.record.authorizes(
+                request,
+                requesterUID: requesterUID,
+                rootInformation: rootInformation
+            ) ?? false
+            switch ForgeFilesystemTransactionAuthorityPolicy.acknowledgementDecision(
+                transactionExists: transaction != nil,
+                authorityMatches: authorityMatches
+            ) {
+            case .idempotentSuccess:
+                return acknowledgementCompleteResponse()
+            case .reject:
+                throw EngineFailure.transactionUnavailable()
+            case .authorizedCleanup:
+                break
+            }
+            guard let transaction else {
+                throw EngineFailure.transactionUnavailable()
+            }
+            return try preservingRecoveryIdentity(
+                transactionID: transaction.record.transactionID
+            ) {
+                let descriptor = try requiredDescriptor(for: transaction.slot).rawValue
+                guard try namedInformationIfExists("leaf", in: descriptor) == nil else {
+                    throw EngineFailure.namespace(
+                        "The filesystem transaction still retains a protected leaf"
+                    )
+                }
+                if transaction.acknowledging {
+                    try finishAcknowledgement(slotDescriptor: descriptor)
+                    return acknowledgementCompleteResponse()
+                }
+                guard let outcome = transaction.outcome else {
+                    return failure(
+                        code: ForgeFilesystemErrorCode.transactionNotTerminal,
+                        message: "The filesystem transaction is not terminal",
+                        recoveryTransactionID: transaction.record.transactionID
+                    )
+                }
+                try writeAcknowledgement(
+                    record: transaction.record,
+                    outcome: outcome,
+                    slotDescriptor: descriptor
+                )
+                try finishAcknowledgement(slotDescriptor: descriptor)
+                return acknowledgementCompleteResponse()
+            }
+        }
+    }
+
+    private func withExistingTransactionInventory<Value>(
+        _ request: ForgeFilesystemTransactionControlRequest,
+        authorizedRootDescriptor: Int32,
+        requesterUID: uid_t,
+        reconcileAcknowledgements: Bool,
+        ifMissing missingValue: @autoclosure () -> Value,
+        _ operation: (TransactionInventory, stat) throws -> Value
+    ) throws -> Value {
+        try validateControlRequest(request)
+        let root = try OwnedDescriptor(duplicating: authorizedRootDescriptor)
+        let rootInformation = try information(for: root.rawValue)
+        try validateControlRoot(request, information: rootInformation)
+        let volume = try qualifyVolume(rootDescriptor: root.rawValue, root: rootInformation)
+        guard let namespace = try openExistingPrivateDirectory(
+            named: Self.namespaceName,
+            in: volume.mount.rawValue,
+            expectedDevice: rootInformation.st_dev
+        ), let slots = try openExistingPrivateDirectory(
+            named: Self.slotsDirectoryName,
+            in: namespace.rawValue,
+            expectedDevice: rootInformation.st_dev
+        ) else {
+            return missingValue()
+        }
+        return try withNamespaceLock(
+            namespaceDescriptor: namespace.rawValue,
+            createIfMissing: false
+        ) {
+            let inventory = try transactionInventory(
+                slotsDescriptor: slots.rawValue,
+                expectedDevice: rootInformation.st_dev,
+                reconcileAcknowledgements: reconcileAcknowledgements
+            )
+            return try operation(inventory, rootInformation)
+        }
+    }
+
+    private func validateControlRequest(
+        _ request: ForgeFilesystemTransactionControlRequest
+    ) throws {
+        guard request.validationError() == nil else {
+            throw EngineFailure.capability("The filesystem transaction request is invalid")
+        }
+    }
+
+    private func validateControlRoot(
+        _ request: ForgeFilesystemTransactionControlRequest,
+        information: stat
+    ) throws {
+        guard information.st_mode & S_IFMT == S_IFDIR,
+              matchesRoot(request.rootIdentity, information),
+              request.rootID == rootIdentifier(information) else {
+            throw EngineFailure.capability("The authorized root identity does not match")
+        }
+    }
+
+    private func controlledTransaction(
+        for request: ForgeFilesystemTransactionControlRequest,
+        requesterUID: uid_t,
+        rootInformation: stat,
+        in inventory: TransactionInventory
+    ) throws -> ActiveTransaction? {
+        guard let transaction = inventory.active.first(where: {
+            $0.record.transactionID.caseInsensitiveCompare(request.transactionID) == .orderedSame
+        }) else {
+            return nil
+        }
+        guard transaction.record.authorizes(
+            request,
+            requesterUID: requesterUID,
+            rootInformation: rootInformation
+        ) else {
+            throw EngineFailure.transactionUnavailable()
+        }
+        return transaction
+    }
+
     private func performDelete(
         _ request: ForgeFilesystemMutationRequest,
         authorizedRootDescriptor: Int32,
@@ -91,20 +431,25 @@ final class PrivilegedLeafDeleteEngine {
                 requesterUID: requesterUID,
                 in: inventory
             ) {
-                if existing.phase != .committed {
-                    try validateProjectBinding(
-                        request,
-                        requesterUID: requesterUID,
-                        rootInformation: rootInformation,
-                        bindingsDescriptor: bindings.rawValue
+                return try preservingRecoveryIdentity(
+                    transactionID: existing.record.transactionID,
+                    boundary: .persistedTransactionPresent
+                ) {
+                    if existing.outcome == nil, existing.phase != .committed {
+                        try validateProjectBinding(
+                            request,
+                            requesterUID: requesterUID,
+                            rootInformation: rootInformation,
+                            bindingsDescriptor: bindings.rawValue
+                        )
+                    }
+                    return try resume(
+                        existing,
+                        transactionID: existing.record.transactionID,
+                        rootDescriptor: root.rawValue,
+                        requesterUID: requesterUID
                     )
                 }
-                return try resume(
-                    existing,
-                    request: request,
-                    rootDescriptor: root.rawValue,
-                    requesterUID: requesterUID
-                )
             }
 
             let parent = try openSourceParent(
@@ -122,7 +467,8 @@ final class PrivilegedLeafDeleteEngine {
                 expectedIdentity: FilesystemIdentity(request.expectedLeafIdentity)
             )
             guard !inventory.active.contains(where: {
-                $0.phase != .committed
+                $0.outcome == nil
+                    && $0.phase != .committed
                     && $0.record.projectID.caseInsensitiveCompare(request.projectID) == .orderedSame
                     && $0.record.projectGeneration != request.projectGeneration
             }) else {
@@ -143,17 +489,22 @@ final class PrivilegedLeafDeleteEngine {
                 requesterUID: requesterUID,
                 parentIdentity: FilesystemIdentity(parent.information)
             )
-            try writePhase(
-                .intent,
-                record: record,
-                slotDescriptor: try requiredDescriptor(for: slot).rawValue
-            )
-            return try resume(
-                ActiveTransaction(slot: slot, phase: .intent, record: record),
-                request: request,
-                rootDescriptor: root.rawValue,
-                requesterUID: requesterUID
-            )
+            return try preservingRecoveryIdentity(
+                transactionID: request.transactionID,
+                boundary: .intentPublicationStarted
+            ) {
+                try writePhase(
+                    .intent,
+                    record: record,
+                    slotDescriptor: try requiredDescriptor(for: slot).rawValue
+                )
+                return try resume(
+                    ActiveTransaction(slot: slot, phase: .intent, record: record),
+                    transactionID: request.transactionID,
+                    rootDescriptor: root.rawValue,
+                    requesterUID: requesterUID
+                )
+            }
         }
     }
 
@@ -288,13 +639,15 @@ final class PrivilegedLeafDeleteEngine {
 
     private func withNamespaceLock<Value>(
         namespaceDescriptor: Int32,
+        createIfMissing: Bool = true,
         _ operation: () throws -> Value
     ) throws -> Value {
+        let openFlags = O_RDWR | O_CLOEXEC | O_NOFOLLOW | (createIfMissing ? O_CREAT : 0)
         let descriptor = Self.lockName.withCString {
             Darwin.openat(
                 namespaceDescriptor,
                 $0,
-                O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW,
+                openFlags,
                 mode_t(0o600)
             )
         }
@@ -398,11 +751,11 @@ final class PrivilegedLeafDeleteEngine {
 
     private func transactionInventory(
         slotsDescriptor: Int32,
-        expectedDevice: dev_t
+        expectedDevice: dev_t,
+        reconcileAcknowledgements: Bool = true
     ) throws -> TransactionInventory {
         var active: [ActiveTransaction] = []
         var emptySlots: [TransactionSlot] = []
-        var recyclable: [ActiveTransaction] = []
 
         for index in 0..<Self.maximumTransactions {
             let name = String(format: "slot-%02d", index)
@@ -419,21 +772,18 @@ final class PrivilegedLeafDeleteEngine {
                 continue
             }
             let slot = TransactionSlot(index: index, descriptor: descriptor)
-            guard let state = try loadTransaction(from: slot) else {
+            guard let state = try loadTransaction(
+                from: slot,
+                reconcileAcknowledgements: reconcileAcknowledgements
+            ) else {
                 emptySlots.append(slot)
                 continue
             }
             active.append(state)
-            if state.phase == .committed,
-               try namedInformationIfExists("leaf", in: descriptor.rawValue) == nil {
-                recyclable.append(state)
-            }
         }
-        recyclable.sort { $0.record.createdAtMilliseconds < $1.record.createdAtMilliseconds }
         return TransactionInventory(
             active: active,
-            emptySlots: emptySlots,
-            recyclable: recyclable
+            emptySlots: emptySlots
         )
     }
 
@@ -478,14 +828,15 @@ final class PrivilegedLeafDeleteEngine {
             )
             return TransactionSlot(index: empty.index, descriptor: descriptor)
         }
-        guard let terminal = inventory.recyclable.first else {
-            throw EngineFailure.namespace("The bounded transaction ledger is full")
-        }
-        try clearTerminalTransaction(terminal)
-        return terminal.slot
+        throw EngineFailure.namespace(
+            "The bounded transaction ledger is full and requires explicit acknowledgement"
+        )
     }
 
-    private func loadTransaction(from slot: TransactionSlot) throws -> ActiveTransaction? {
+    private func loadTransaction(
+        from slot: TransactionSlot,
+        reconcileAcknowledgements: Bool
+    ) throws -> ActiveTransaction? {
         let slotDescriptor = try requiredDescriptor(for: slot).rawValue
         var selectedPhase: TransactionPhase?
         var selectedRecord: TransactionRecord?
@@ -510,19 +861,93 @@ final class PrivilegedLeafDeleteEngine {
             selectedRecord = record
             selectedPhase = phase
         }
+
+        let acknowledgement: TransactionAcknowledgement?
+        if let data = try readOptionalFile(
+            named: Self.acknowledgingName,
+            in: slotDescriptor,
+            maximumBytes: Self.maximumAcknowledgementBytes
+        ) {
+            do {
+                acknowledgement = try JSONDecoder().decode(
+                    TransactionAcknowledgement.self,
+                    from: data
+                )
+            } catch {
+                throw EngineFailure.namespace("A protected acknowledgement is invalid")
+            }
+            guard acknowledgement?.isStructurallyValid == true else {
+                throw EngineFailure.namespace("A protected acknowledgement is invalid")
+            }
+        } else {
+            acknowledgement = nil
+        }
+
+        let authoritativeRecord = selectedRecord ?? acknowledgement?.record
+        let outcome: TransactionTerminalOutcome?
+        if let data = try readOptionalFile(
+            named: Self.terminalOutcomeName,
+            in: slotDescriptor,
+            maximumBytes: Self.maximumReceiptBytes
+        ) {
+            do {
+                outcome = try JSONDecoder().decode(TransactionTerminalOutcome.self, from: data)
+            } catch {
+                throw EngineFailure.namespace("A protected terminal outcome is invalid")
+            }
+            guard let authoritativeRecord,
+                  outcome?.isValid(for: authoritativeRecord) == true,
+                  selectedPhase == nil || selectedPhase == outcome?.terminalPhase else {
+                throw EngineFailure.namespace("A protected terminal outcome is invalid")
+            }
+        } else {
+            outcome = nil
+        }
+
+        if let acknowledgement {
+            guard
+                  selectedRecord == nil || selectedRecord == acknowledgement.record,
+                  outcome == nil || outcome == acknowledgement.outcome,
+                  try namedInformationIfExists("leaf", in: slotDescriptor) == nil else {
+                throw EngineFailure.namespace("A protected acknowledgement is invalid")
+            }
+            if reconcileAcknowledgements {
+                try finishAcknowledgement(slotDescriptor: slotDescriptor)
+                return nil
+            }
+            return ActiveTransaction(
+                slot: slot,
+                phase: selectedPhase ?? acknowledgement.outcome.terminalPhase,
+                record: acknowledgement.record,
+                outcome: acknowledgement.outcome,
+                acknowledging: true
+            )
+        }
+
         guard let selectedRecord, let selectedPhase else {
             if try namedInformationIfExists("leaf", in: slotDescriptor) != nil {
                 throw EngineFailure.namespace("An untracked protected leaf requires recovery")
             }
-            try removePendingPhaseFiles(slotDescriptor: slotDescriptor)
+            if reconcileAcknowledgements {
+                try removePendingPhaseFiles(slotDescriptor: slotDescriptor)
+            }
             return nil
         }
-        return ActiveTransaction(slot: slot, phase: selectedPhase, record: selectedRecord)
+        if reconcileAcknowledgements {
+            try removePendingPhaseFiles(slotDescriptor: slotDescriptor)
+        }
+        return ActiveTransaction(
+            slot: slot,
+            phase: selectedPhase,
+            record: selectedRecord,
+            outcome: outcome,
+            acknowledging: false
+        )
     }
 
     private func resume(
         _ transaction: ActiveTransaction,
-        request: ForgeFilesystemMutationRequest,
+        transactionID: String,
         rootDescriptor: Int32,
         requesterUID: uid_t
     ) throws -> ForgeFilesystemResponse {
@@ -534,13 +959,16 @@ final class PrivilegedLeafDeleteEngine {
                 "The filesystem transaction belongs to a different requester"
             )
         }
+        if let outcome = transaction.outcome {
+            return outcome.response()
+        }
         let slotDescriptor = try preservingRecoveryIdentity(
-            transactionID: request.transactionID
+            transactionID: transactionID
         ) {
             try requiredDescriptor(for: transaction.slot).rawValue
         }
         let protectedInformation = try preservingRecoveryIdentity(
-            transactionID: request.transactionID
+            transactionID: transactionID
         ) {
             try namedInformationIfExists("leaf", in: slotDescriptor)
         }
@@ -550,10 +978,14 @@ final class PrivilegedLeafDeleteEngine {
             guard protectedInformation == nil else {
                 throw EngineFailure.namespace(
                     "A committed transaction retains a protected leaf",
-                    recoveryTransactionID: request.transactionID
+                    recoveryTransactionID: transactionID
                 )
             }
-            return success()
+            return try terminalResponse(
+                disposition: .committed,
+                record: transaction.record,
+                slotDescriptor: slotDescriptor
+            )
 
         case .captured:
             if protectedInformation == nil {
@@ -568,13 +1000,17 @@ final class PrivilegedLeafDeleteEngine {
                     throw EngineFailure.namespace(
                         "The terminal deletion is present without a durable committed receipt",
                         committed: true,
-                        recoveryTransactionID: request.transactionID
+                        recoveryTransactionID: transactionID
                     )
                 }
-                return success()
+                return try terminalResponse(
+                    disposition: .committed,
+                    record: transaction.record,
+                    slotDescriptor: slotDescriptor
+                )
             }
             return try preservingRecoveryIdentity(
-                transactionID: request.transactionID
+                transactionID: transactionID
             ) {
                 guard (try? validateLeafForDeletion(
                     named: "leaf",
@@ -583,21 +1019,31 @@ final class PrivilegedLeafDeleteEngine {
                 )) != nil else {
                     return try rollbackCapturedLeaf(
                         transaction,
-                        request: request,
-                        rootDescriptor: rootDescriptor,
+                        transactionID: transactionID,
+                        requesterUID: requesterUID
+                    )
+                }
+                guard (try? requestedNamespaceIsStable(
+                    transaction.record,
+                    rootDescriptor: rootDescriptor,
+                    requesterUID: requesterUID
+                )) == true else {
+                    return try rollbackCapturedLeaf(
+                        transaction,
+                        transactionID: transactionID,
                         requesterUID: requesterUID
                     )
                 }
                 return try terminalUnlink(
                     transaction,
-                    request: request,
+                    transactionID: transactionID,
                     requesterUID: requesterUID
                 )
             }
 
         case .rollback:
             return try preservingRecoveryIdentity(
-                transactionID: request.transactionID
+                transactionID: transactionID
             ) {
                 guard protectedInformation != nil else {
                     let parent = try reopenRecordedParent(
@@ -612,17 +1058,17 @@ final class PrivilegedLeafDeleteEngine {
                     )
                     try synchronize(parent.descriptor.rawValue)
                     try synchronize(slotDescriptor)
-                    try clearUncommittedTransaction(transaction)
-                    return failure(
+                    return try terminalResponse(
+                        disposition: .restored,
+                        record: transaction.record,
+                        slotDescriptor: slotDescriptor,
                         code: ForgeFilesystemErrorCode.capabilityUnavailable,
-                        message: "The captured filesystem leaf was restored",
-                        durabilityConfirmed: true
+                        message: "The captured filesystem leaf was restored"
                     )
                 }
                 return try rollbackCapturedLeaf(
                     transaction,
-                    request: request,
-                    rootDescriptor: rootDescriptor,
+                    transactionID: transactionID,
                     requesterUID: requesterUID
                 )
             }
@@ -630,7 +1076,7 @@ final class PrivilegedLeafDeleteEngine {
         case .intent:
             if protectedInformation != nil {
                 return try preservingRecoveryIdentity(
-                    transactionID: request.transactionID
+                    transactionID: transactionID
                 ) {
                     guard (try? validateLeafForDeletion(
                         named: "leaf",
@@ -639,8 +1085,7 @@ final class PrivilegedLeafDeleteEngine {
                     )) != nil else {
                         return try rollbackCapturedLeaf(
                             transaction,
-                            request: request,
-                            rootDescriptor: rootDescriptor,
+                            transactionID: transactionID,
                             requesterUID: requesterUID
                         )
                     }
@@ -655,8 +1100,7 @@ final class PrivilegedLeafDeleteEngine {
                     ) == nil else {
                         return try rollbackCapturedLeaf(
                             transaction,
-                            request: request,
-                            rootDescriptor: rootDescriptor,
+                            transactionID: transactionID,
                             requesterUID: requesterUID
                         )
                     }
@@ -673,14 +1117,14 @@ final class PrivilegedLeafDeleteEngine {
                             phase: .captured,
                             record: transaction.record
                         ),
-                        request: request,
+                        transactionID: transactionID,
                         requesterUID: requesterUID
                     )
                 }
             }
 
             let parent = try preservingRecoveryIdentity(
-                transactionID: request.transactionID
+                transactionID: transactionID
             ) {
                 try reopenRecordedParent(
                     transaction.record,
@@ -689,7 +1133,7 @@ final class PrivilegedLeafDeleteEngine {
                 )
             }
             let sourceInformation = try preservingRecoveryIdentity(
-                transactionID: request.transactionID
+                transactionID: transactionID
             ) {
                 try namedInformationIfExists(
                     transaction.record.leafName,
@@ -697,13 +1141,12 @@ final class PrivilegedLeafDeleteEngine {
                 )
             }
             guard sourceInformation != nil else {
-                try preservingRecoveryIdentity(transactionID: request.transactionID) {
-                    try clearUncommittedTransaction(transaction)
-                }
-                return failure(
+                return try terminalResponse(
+                    disposition: .rejected,
+                    record: transaction.record,
+                    slotDescriptor: slotDescriptor,
                     code: ForgeFilesystemErrorCode.capabilityUnavailable,
-                    message: "The requested filesystem leaf is absent",
-                    durabilityConfirmed: true
+                    message: "The requested filesystem leaf is absent"
                 )
             }
             do {
@@ -713,21 +1156,20 @@ final class PrivilegedLeafDeleteEngine {
                     expectedIdentity: transaction.record.expectedLeafIdentity
                 )
             } catch {
-                try preservingRecoveryIdentity(transactionID: request.transactionID) {
-                    try clearUncommittedTransaction(transaction)
-                }
-                return failure(
+                return try terminalResponse(
+                    disposition: .rejected,
+                    record: transaction.record,
+                    slotDescriptor: slotDescriptor,
                     code: ForgeFilesystemErrorCode.capabilityUnavailable,
-                    message: "The requested leaf is not eligible for requester-authorized deletion",
-                    durabilityConfirmed: true
+                    message: "The requested leaf is not eligible for requester-authorized deletion"
                 )
             }
             return try preservingRecoveryIdentity(
-                transactionID: request.transactionID
+                transactionID: transactionID
             ) {
                 try captureAndDelete(
                     transaction,
-                    request: request,
+                    transactionID: transactionID,
                     parent: parent,
                     requesterUID: requesterUID
                 )
@@ -737,8 +1179,15 @@ final class PrivilegedLeafDeleteEngine {
 
     private func preservingRecoveryIdentity<Result>(
         transactionID: String,
+        boundary: ForgeFilesystemTransactionRecoveryBoundary = .persistedTransactionPresent,
         _ operation: () throws -> Result
     ) throws -> Result {
+        guard let recoveryTransactionID = ForgeFilesystemTransactionRecoveryPolicy
+            .recoveryTransactionID(transactionID, at: boundary) else {
+            throw EngineFailure.capability(
+                "The filesystem transaction identity is invalid"
+            )
+        }
         do {
             return try operation()
         } catch let failure as EngineFailure {
@@ -748,19 +1197,19 @@ final class PrivilegedLeafDeleteEngine {
                 message: failure.message,
                 committed: failure.committed,
                 durabilityConfirmed: failure.durabilityConfirmed,
-                recoveryTransactionID: transactionID
+                recoveryTransactionID: recoveryTransactionID
             )
         } catch {
             throw EngineFailure.namespace(
                 "The protected filesystem transaction requires recovery",
-                recoveryTransactionID: transactionID
+                recoveryTransactionID: recoveryTransactionID
             )
         }
     }
 
     private func captureAndDelete(
         _ transaction: ActiveTransaction,
-        request: ForgeFilesystemMutationRequest,
+        transactionID: String,
         parent: SourceParent,
         requesterUID: uid_t
     ) throws -> ForgeFilesystemResponse {
@@ -787,37 +1236,32 @@ final class PrivilegedLeafDeleteEngine {
         guard result == 0 else {
             let code = errno
             if code == EXDEV {
-                try clearUncommittedTransaction(transaction)
-                return failure(
+                return try terminalResponse(
+                    disposition: .rejected,
+                    record: transaction.record,
+                    slotDescriptor: slotDescriptor,
                     code: ForgeFilesystemErrorCode.volumeUnqualified,
-                    message: "The protected namespace is not on the source volume",
-                    durabilityConfirmed: true
+                    message: "The protected namespace is not on the source volume"
                 )
             }
             if code == ENOENT {
-                do {
-                    try clearUncommittedTransaction(transaction)
-                } catch {
-                    throw EngineFailure.namespace(
-                        "The changed source namespace has a retained intent receipt",
-                        recoveryTransactionID: request.transactionID
-                    )
-                }
-                return failure(
+                return try terminalResponse(
+                    disposition: .rejected,
+                    record: transaction.record,
+                    slotDescriptor: slotDescriptor,
                     code: ForgeFilesystemErrorCode.capabilityUnavailable,
-                    message: "The requested filesystem namespace changed",
-                    durabilityConfirmed: true
+                    message: "The requested filesystem namespace changed"
                 )
             }
             if code == EEXIST {
                 throw EngineFailure.namespace(
                     "The protected capture slot is unexpectedly occupied",
-                    recoveryTransactionID: request.transactionID
+                    recoveryTransactionID: transactionID
                 )
             }
             throw EngineFailure.namespace(
                 "The protected atomic capture failed",
-                recoveryTransactionID: request.transactionID
+                recoveryTransactionID: transactionID
             )
         }
 
@@ -835,10 +1279,8 @@ final class PrivilegedLeafDeleteEngine {
               namespaceStable else {
             return try rollbackCapturedLeaf(
                 transaction,
-                request: request,
-                rootDescriptor: parent.rootDescriptor,
-                requesterUID: requesterUID,
-                fallbackParent: parent
+                transactionID: transactionID,
+                requesterUID: requesterUID
             )
         }
 
@@ -853,7 +1295,7 @@ final class PrivilegedLeafDeleteEngine {
         } catch {
             throw EngineFailure.namespace(
                 "The protected capture requires recovery before deletion",
-                recoveryTransactionID: request.transactionID
+                recoveryTransactionID: transactionID
             )
         }
         return try terminalUnlink(
@@ -862,14 +1304,14 @@ final class PrivilegedLeafDeleteEngine {
                 phase: .captured,
                 record: transaction.record
             ),
-            request: request,
+            transactionID: transactionID,
             requesterUID: requesterUID
         )
     }
 
     private func terminalUnlink(
         _ transaction: ActiveTransaction,
-        request: ForgeFilesystemMutationRequest,
+        transactionID: String,
         requesterUID: uid_t
     ) throws -> ForgeFilesystemResponse {
         guard ForgeFilesystemRequesterPolicy.matchesPersistedRequester(
@@ -888,7 +1330,7 @@ final class PrivilegedLeafDeleteEngine {
         )) != nil else {
             throw EngineFailure.namespace(
                 "The protected leaf identity, ACL, or flags changed before terminal deletion",
-                recoveryTransactionID: request.transactionID
+                recoveryTransactionID: transactionID
             )
         }
 
@@ -898,7 +1340,7 @@ final class PrivilegedLeafDeleteEngine {
         guard "leaf".withCString({ Darwin.unlinkat(descriptor, $0, 0) }) == 0 else {
             throw EngineFailure.namespace(
                 "The protected leaf could not be deleted",
-                recoveryTransactionID: request.transactionID
+                recoveryTransactionID: transactionID
             )
         }
         do {
@@ -912,18 +1354,20 @@ final class PrivilegedLeafDeleteEngine {
             throw EngineFailure.namespace(
                 "The terminal deletion committed without confirmed receipt durability",
                 committed: true,
-                recoveryTransactionID: request.transactionID
+                recoveryTransactionID: transactionID
             )
         }
-        return success()
+        return try terminalResponse(
+            disposition: .committed,
+            record: transaction.record,
+            slotDescriptor: descriptor
+        )
     }
 
     private func rollbackCapturedLeaf(
         _ transaction: ActiveTransaction,
-        request: ForgeFilesystemMutationRequest,
-        rootDescriptor: Int32,
-        requesterUID: uid_t,
-        fallbackParent: SourceParent? = nil
+        transactionID: String,
+        requesterUID: uid_t
     ) throws -> ForgeFilesystemResponse {
         guard ForgeFilesystemRequesterPolicy.matchesPersistedRequester(
             transaction.record.requesterUID,
@@ -933,62 +1377,26 @@ final class PrivilegedLeafDeleteEngine {
                 "The filesystem transaction belongs to a different requester"
             )
         }
-        let parent: SourceParent
-        do {
-            parent = try reopenRecordedParent(
-                transaction.record,
-                rootDescriptor: rootDescriptor,
-                requesterUID: requesterUID
-            )
-        } catch {
-            guard let fallbackParent,
-                  transaction.record.parentIdentity.matchesRoot(fallbackParent.information) else {
-                throw EngineFailure.namespace(
-                    "The captured leaf cannot be restored to its recorded parent",
-                    recoveryTransactionID: request.transactionID
-                )
-            }
-            parent = fallbackParent
-        }
-
         let slotDescriptor = try requiredDescriptor(for: transaction.slot).rawValue
         try writePhase(
             .rollback,
             record: transaction.record,
             slotDescriptor: slotDescriptor
         )
-        let result = "leaf".withCString { sourceName in
-            transaction.record.leafName.withCString { destinationName in
-                Darwin.renameatx_np(
-                    slotDescriptor,
-                    sourceName,
-                    parent.descriptor.rawValue,
-                    destinationName,
-                    UInt32(RENAME_EXCL)
-                )
-            }
-        }
-        guard result == 0 else {
+        // A directory descriptor does not prove that its directory remains below
+        // the authorized root. A same-UID process can relocate even a freshly
+        // reopened parent after validation and before rename. Public macOS rename
+        // APIs cannot make destination containment and parent identity one atomic
+        // predicate, so automatic root-privileged restore is disabled. Retaining
+        // the captured leaf is an availability loss, but it cannot write the leaf
+        // outside the authorized root.
+        switch ForgeFilesystemCapturedLeafRollbackPolicy.disposition {
+        case .retainForRecovery:
             throw EngineFailure.namespace(
-                "The captured leaf is retained for exclusive recovery",
-                recoveryTransactionID: request.transactionID
+                "The captured leaf is retained because its recorded parent cannot be restored safely",
+                recoveryTransactionID: transactionID
             )
         }
-        do {
-            try synchronize(parent.descriptor.rawValue)
-            try synchronize(slotDescriptor)
-            try clearUncommittedTransaction(transaction)
-        } catch {
-            throw EngineFailure.namespace(
-                "The restored leaf has a retained recovery receipt",
-                recoveryTransactionID: request.transactionID
-            )
-        }
-        return failure(
-            code: ForgeFilesystemErrorCode.capabilityUnavailable,
-            message: "The requested filesystem namespace or identity changed",
-            durabilityConfirmed: true
-        )
     }
 
     private func requestedNamespaceIsStable(
@@ -1181,21 +1589,6 @@ final class PrivilegedLeafDeleteEngine {
         return directory
     }
 
-    private func clearUncommittedTransaction(_ transaction: ActiveTransaction) throws {
-        let descriptor = try requiredDescriptor(for: transaction.slot).rawValue
-        guard try namedInformationIfExists("leaf", in: descriptor) == nil else {
-            throw EngineFailure.namespace("A protected leaf prevents receipt cleanup")
-        }
-        try removePhaseFiles(in: descriptor)
-    }
-
-    private func clearTerminalTransaction(_ transaction: ActiveTransaction) throws {
-        guard transaction.phase == .committed else {
-            throw EngineFailure.namespace("Only terminal transactions can be recycled")
-        }
-        try clearUncommittedTransaction(transaction)
-    }
-
     private func removePhaseFiles(in descriptor: Int32) throws {
         for phase in TransactionPhase.allCases {
             try unlinkIfExists(phase.pendingFileName, in: descriptor)
@@ -1208,6 +1601,109 @@ final class PrivilegedLeafDeleteEngine {
         for phase in TransactionPhase.allCases {
             try unlinkIfExists(phase.pendingFileName, in: slotDescriptor)
         }
+        try unlinkIfExists(Self.terminalOutcomePendingName, in: slotDescriptor)
+        try unlinkIfExists(Self.acknowledgingPendingName, in: slotDescriptor)
+        try synchronize(slotDescriptor)
+    }
+
+    private func writeTerminalOutcome(
+        _ outcome: TransactionTerminalOutcome,
+        slotDescriptor: Int32
+    ) throws {
+        try writeExclusiveMetadata(
+            outcome,
+            named: Self.terminalOutcomeName,
+            pendingName: Self.terminalOutcomePendingName,
+            slotDescriptor: slotDescriptor,
+            maximumBytes: Self.maximumReceiptBytes,
+            conflictMessage: "A terminal transaction outcome conflicts with its receipt"
+        )
+    }
+
+    private func writeAcknowledgement(
+        record: TransactionRecord,
+        outcome: TransactionTerminalOutcome,
+        slotDescriptor: Int32
+    ) throws {
+        let acknowledgement = TransactionAcknowledgement(
+            record: record,
+            outcome: outcome
+        )
+        guard acknowledgement.isStructurallyValid else {
+            throw EngineFailure.namespace("A protected acknowledgement is invalid")
+        }
+        try writeExclusiveMetadata(
+            acknowledgement,
+            named: Self.acknowledgingName,
+            pendingName: Self.acknowledgingPendingName,
+            slotDescriptor: slotDescriptor,
+            maximumBytes: Self.maximumAcknowledgementBytes,
+            conflictMessage: "A protected acknowledgement conflicts with its receipt"
+        )
+    }
+
+    private func writeExclusiveMetadata<Value: Codable & Equatable>(
+        _ value: Value,
+        named name: String,
+        pendingName: String,
+        slotDescriptor: Int32,
+        maximumBytes: Int,
+        conflictMessage: String
+    ) throws {
+        let encoded = try JSONEncoder().encode(value)
+        guard encoded.count <= maximumBytes else {
+            throw EngineFailure.capability("The bounded transaction receipt is too large")
+        }
+        if let existing = try readOptionalFile(
+            named: name,
+            in: slotDescriptor,
+            maximumBytes: maximumBytes
+        ) {
+            guard let decoded = try? JSONDecoder().decode(Value.self, from: existing),
+                  decoded == value else {
+                throw EngineFailure.namespace(conflictMessage)
+            }
+            try synchronize(slotDescriptor)
+            return
+        }
+
+        try unlinkIfExists(pendingName, in: slotDescriptor)
+        try synchronize(slotDescriptor)
+        try createDurableFile(
+            named: pendingName,
+            data: encoded,
+            in: slotDescriptor
+        )
+        let result = pendingName.withCString { sourceName in
+            name.withCString { destinationName in
+                Darwin.renameatx_np(
+                    slotDescriptor,
+                    sourceName,
+                    slotDescriptor,
+                    destinationName,
+                    UInt32(RENAME_EXCL)
+                )
+            }
+        }
+        guard result == 0 else {
+            throw EngineFailure.namespace("Protected transaction metadata cannot be published")
+        }
+        try synchronize(slotDescriptor)
+    }
+
+    private func finishAcknowledgement(slotDescriptor: Int32) throws {
+        guard try namedInformationIfExists("leaf", in: slotDescriptor) == nil else {
+            throw EngineFailure.namespace("A protected leaf prevents acknowledgement")
+        }
+
+        // The durable acknowledging record is removed last. A crash before that
+        // point leaves enough authority and outcome data to finish cleanup on retry.
+        try removePhaseFiles(in: slotDescriptor)
+        try unlinkIfExists(Self.terminalOutcomePendingName, in: slotDescriptor)
+        try unlinkIfExists(Self.terminalOutcomeName, in: slotDescriptor)
+        try unlinkIfExists(Self.acknowledgingPendingName, in: slotDescriptor)
+        try synchronize(slotDescriptor)
+        try unlinkIfExists(Self.acknowledgingName, in: slotDescriptor)
         try synchronize(slotDescriptor)
     }
 
@@ -1476,13 +1972,72 @@ final class PrivilegedLeafDeleteEngine {
         "\(UInt64(information.st_dev)):\(UInt64(information.st_ino))"
     }
 
-    private func success() -> ForgeFilesystemResponse {
+    private func terminalResponse(
+        disposition: ForgeFilesystemTransactionDisposition,
+        record: TransactionRecord,
+        slotDescriptor: Int32,
+        code: String = "ok",
+        message: String = "The protected filesystem leaf was deleted"
+    ) throws -> ForgeFilesystemResponse {
+        let outcome = TransactionTerminalOutcome(
+            transactionID: record.transactionID,
+            disposition: disposition,
+            ok: disposition == .committed,
+            code: code,
+            message: message,
+            committed: disposition == .committed,
+            durabilityConfirmed: true,
+            recoveryTransactionID: record.transactionID,
+            acknowledgementRequired: true
+        )
+        guard outcome.isValid(for: record) else {
+            throw EngineFailure.namespace("A terminal transaction outcome is invalid")
+        }
+        do {
+            try writeTerminalOutcome(outcome, slotDescriptor: slotDescriptor)
+        } catch {
+            throw EngineFailure.namespace(
+                "The terminal filesystem outcome requires durable recovery",
+                committed: disposition == .committed,
+                recoveryTransactionID: record.transactionID
+            )
+        }
+        return outcome.response()
+    }
+
+    private func unavailableStatus(
+        code: String,
+        message: String
+    ) -> ForgeFilesystemTransactionStatus {
+        ForgeFilesystemTransactionStatus(
+            transactionID: nil,
+            disposition: .unavailable,
+            code: code,
+            message: message,
+            terminal: false,
+            committed: false,
+            durabilityConfirmed: false,
+            recoveryRequired: false,
+            acknowledgementRequired: false
+        )
+    }
+
+    private func transactionUnavailableResponse() -> ForgeFilesystemResponse {
+        failure(
+            code: ForgeFilesystemErrorCode.transactionUnavailable,
+            message: "The filesystem transaction is unavailable"
+        )
+    }
+
+    private func acknowledgementCompleteResponse() -> ForgeFilesystemResponse {
         ForgeFilesystemResponse(
             ok: true,
             code: "ok",
-            message: "The protected filesystem leaf was deleted",
-            committed: true,
-            durabilityConfirmed: true
+            message: "The filesystem transaction acknowledgement is complete",
+            committed: false,
+            durabilityConfirmed: true,
+            recoveryTransactionID: nil,
+            acknowledgementRequired: false
         )
     }
 
@@ -1561,6 +2116,16 @@ private struct EngineFailure: Error {
         EngineFailure(
             code: ForgeFilesystemErrorCode.volumeUnqualified,
             message: message,
+            committed: false,
+            durabilityConfirmed: false,
+            recoveryTransactionID: nil
+        )
+    }
+
+    static func transactionUnavailable() -> EngineFailure {
+        EngineFailure(
+            code: ForgeFilesystemErrorCode.transactionUnavailable,
+            message: "The filesystem transaction is unavailable",
             committed: false,
             durabilityConfirmed: false,
             recoveryTransactionID: nil
@@ -1711,8 +2276,10 @@ private struct TransactionRecord: Codable, Equatable {
             && UUID(uuidString: transactionID) != nil
             && UUID(uuidString: projectID) != nil
             && projectGeneration > 0
+            && projectGeneration <= UInt64(Int64.max)
             && ForgeFilesystemRequesterPolicy.isValidRequesterUID(requesterUID)
             && !rootID.isEmpty
+            && rootID.utf8.count <= 128
             && accessRawValue == ForgeFilesystemAccess.deleteLeaf.rawValue
             && !relativePathComponents.isEmpty
             && relativePathComponents.count <= ForgeFilesystemProtocolConstants.maximumRelativeComponents
@@ -1741,6 +2308,146 @@ private struct TransactionRecord: Codable, Equatable {
             && accessRawValue == request.accessRawValue
             && expectedLeafIdentity == FilesystemIdentity(request.expectedLeafIdentity)
             && !request.exactContentRequired
+    }
+
+    func authorizes(
+        _ request: ForgeFilesystemTransactionControlRequest,
+        requesterUID: uid_t,
+        rootInformation: stat
+    ) -> Bool {
+        ForgeFilesystemTransactionAuthorityPolicy.matchesPersistedAuthority(
+            request: request,
+            currentRequesterUID: UInt32(requesterUID),
+            persistedRequesterUID: self.requesterUID,
+            persistedTransactionID: transactionID,
+            persistedProjectID: projectID,
+            persistedProjectGeneration: projectGeneration,
+            persistedRootID: rootID,
+            persistedRootIdentity: ForgeFilesystemIdentity(
+                device: rootIdentity.device,
+                inode: rootIdentity.inode,
+                mode: rootIdentity.mode,
+                owner: rootIdentity.owner,
+                group: rootIdentity.group,
+                linkCount: rootIdentity.linkCount
+            )
+        )
+            && rootIdentity.matchesRoot(rootInformation)
+    }
+}
+
+private struct TransactionTerminalOutcome: Codable, Equatable {
+    static let currentSchema = 1
+
+    let schemaVersion: Int
+    let transactionID: String
+    let disposition: ForgeFilesystemTransactionDisposition
+    let ok: Bool
+    let code: String
+    let message: String
+    let committed: Bool
+    let durabilityConfirmed: Bool
+    let recoveryTransactionID: String
+    let acknowledgementRequired: Bool
+
+    init(
+        transactionID: String,
+        disposition: ForgeFilesystemTransactionDisposition,
+        ok: Bool,
+        code: String,
+        message: String,
+        committed: Bool,
+        durabilityConfirmed: Bool,
+        recoveryTransactionID: String,
+        acknowledgementRequired: Bool
+    ) {
+        schemaVersion = Self.currentSchema
+        self.transactionID = transactionID.lowercased()
+        self.disposition = disposition
+        self.ok = ok
+        self.code = String(code.prefix(128))
+        self.message = String(message.prefix(1_024))
+        self.committed = committed
+        self.durabilityConfirmed = durabilityConfirmed
+        self.recoveryTransactionID = recoveryTransactionID.lowercased()
+        self.acknowledgementRequired = acknowledgementRequired
+    }
+
+    func isValid(for record: TransactionRecord) -> Bool {
+        guard schemaVersion == Self.currentSchema,
+              UUID(uuidString: transactionID) != nil,
+              transactionID.caseInsensitiveCompare(record.transactionID) == .orderedSame,
+              recoveryTransactionID.caseInsensitiveCompare(record.transactionID) == .orderedSame,
+              !code.isEmpty,
+              code.utf8.count <= 128,
+              message.utf8.count <= 1_024,
+              durabilityConfirmed,
+              acknowledgementRequired else {
+            return false
+        }
+        switch disposition {
+        case .committed:
+            return ok && committed && code == "ok"
+        case .restored, .rejected:
+            return !ok && !committed && code != "ok"
+        case .unavailable, .recoveryRequired:
+            return false
+        }
+    }
+
+    var terminalPhase: TransactionPhase {
+        switch disposition {
+        case .committed: .committed
+        case .restored: .rollback
+        case .rejected: .intent
+        case .unavailable, .recoveryRequired: .intent
+        }
+    }
+
+    func response() -> ForgeFilesystemResponse {
+        ForgeFilesystemResponse(
+            ok: ok,
+            code: code,
+            message: message,
+            committed: committed,
+            durabilityConfirmed: durabilityConfirmed,
+            recoveryTransactionID: recoveryTransactionID,
+            acknowledgementRequired: acknowledgementRequired
+        )
+    }
+
+    func status() -> ForgeFilesystemTransactionStatus {
+        ForgeFilesystemTransactionStatus(
+            transactionID: transactionID,
+            disposition: disposition,
+            code: code,
+            message: message,
+            terminal: true,
+            committed: committed,
+            durabilityConfirmed: durabilityConfirmed,
+            recoveryRequired: false,
+            acknowledgementRequired: acknowledgementRequired
+        )
+    }
+}
+
+private struct TransactionAcknowledgement: Codable, Equatable {
+    static let currentSchema = 1
+
+    let schemaVersion: Int
+    let record: TransactionRecord
+    let outcome: TransactionTerminalOutcome
+
+    init(record: TransactionRecord, outcome: TransactionTerminalOutcome) {
+        schemaVersion = Self.currentSchema
+        self.record = record
+        self.outcome = outcome
+    }
+
+    var isStructurallyValid: Bool {
+        schemaVersion == Self.currentSchema
+            && record.isStructurallyValid
+            && outcome.isValid(for: record)
     }
 }
 
@@ -1791,10 +2498,25 @@ private struct ActiveTransaction {
     let slot: TransactionSlot
     let phase: TransactionPhase
     let record: TransactionRecord
+    let outcome: TransactionTerminalOutcome?
+    let acknowledging: Bool
+
+    init(
+        slot: TransactionSlot,
+        phase: TransactionPhase,
+        record: TransactionRecord,
+        outcome: TransactionTerminalOutcome? = nil,
+        acknowledging: Bool = false
+    ) {
+        self.slot = slot
+        self.phase = phase
+        self.record = record
+        self.outcome = outcome
+        self.acknowledging = acknowledging
+    }
 }
 
 private struct TransactionInventory {
     let active: [ActiveTransaction]
     let emptySlots: [TransactionSlot]
-    let recyclable: [ActiveTransaction]
 }

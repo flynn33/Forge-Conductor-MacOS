@@ -150,7 +150,8 @@ public struct ToolDefinitionCatalog: Sendable, Equatable {
         guard unknown.isEmpty else {
             throw ToolDefinitionCatalogError.unregisteredAllowedTools(unknown)
         }
-        return definitions.filter { allowedToolNames.contains($0.name) }
+        let expanded = ToolGrantSemantics.expanded(allowedToolNames)
+        return definitions.filter { expanded.contains($0.name) }
     }
 
     public func canonicalJSON(allowedToolNames: Set<String>) throws -> Data {
@@ -261,6 +262,7 @@ private enum ProductionToolDefinitionSource {
         "fs_glob": "Find files by name pattern under a path.",
         "fs_mkdir": "Create a directory.",
         "fs_delete": "Delete a file or directory.",
+        "fs_delete_recovery": "Query, resume, or acknowledge a retained protected delete transaction without reusing the deleted path.",
         "fs_move": "Move/rename a path.",
         "shell_exec": "Run a bash command with timeout.",
         "git_status": "git status --porcelain.",
@@ -374,6 +376,21 @@ private enum ProductionToolDefinitionSource {
                 "type": "object",
                 "properties": ["path": ["type": "string"] as [String: Any]] as [String: Any],
                 "required": name == "fs_list" ? [] as [String] : ["path"],
+            ]
+        case "fs_delete_recovery":
+            return [
+                "type": "object",
+                "properties": [
+                    "transaction_id": [
+                        "type": "string",
+                        "description": "Transaction UUID returned by fs_delete",
+                    ] as [String: Any],
+                    "action": [
+                        "type": "string",
+                        "enum": ["query", "resume", "acknowledge"],
+                    ] as [String: Any],
+                ] as [String: Any],
+                "required": ["transaction_id", "action"],
             ]
         case "fs_write":
             return [

@@ -483,7 +483,7 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
     ]
 
     static let progressTools: Set<String> = [
-        "fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "fs_delete", "fs_move",
+        "fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "fs_delete", "fs_delete_recovery", "fs_move",
         "shell_exec",
         "git_status", "git_diff", "git_log", "git_add", "git_commit",
         "memory_set",
