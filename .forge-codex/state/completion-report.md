@@ -1,7 +1,12 @@
 # Forge Conductor completion verification
 
-- Evaluated: `2026-08-28T13:05:24.324546+00:00`
+- Evaluated: `2026-08-30T22:13:52.553337+00:00`
 - Passed: **False**
+
+## Finalization gate
+
+- G12 status: **blocked_open**
+- G12 is written as passed only after every prerequisite and final integrity check passes and finalization is authorized.
 
 ## Checks
 
@@ -9,146 +14,146 @@
 - [x] `package-valid` — package validation
 - [x] `attribution-clean` — repository scan
 - [x] `secret-scan-clean` — repository scan
-- [x] `gate-result-exists:G00` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/state/gate-results/G00.json
+- [x] `gate-result-exists:G00` — /Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex/state/gate-results/G00.json
 - [x] `gate-passed:G00` — passed
 - [x] `gate-ledger-passed:G00` — passed
 - [x] `gate-current-release-authority:G00` — current or unspecified
-- [x] `gate-artifact-exists:G00:G00.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.stdout.txt
-- [x] `gate-artifact-hash:G00:G00.stdout.txt` — e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-- [x] `gate-artifact-exists:G00:G00.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.stderr.txt
-- [x] `gate-artifact-hash:G00:G00.stderr.txt` — e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-- [x] `gate-artifact-exists:G00:G00.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.criteria.json
-- [x] `gate-artifact-hash:G00:G00.criteria.json` — 1aa97c749b734a48dd19dfca93d250d454f0ee25c9496b2227c0ab6f8f7d842b
-- [x] `gate-result-exists:G01` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/state/gate-results/G01.json
+- [ ] `gate-artifact-exists:G00:G00.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.stdout.txt
+- [ ] `gate-artifact-exists:G00:G00.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.stderr.txt
+- [ ] `gate-artifact-exists:G00:G00.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.criteria.json
+- [x] `gate-result-exists:G01` — /Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex/state/gate-results/G01.json
 - [x] `gate-passed:G01` — passed
 - [x] `gate-ledger-passed:G01` — passed
 - [x] `gate-current-release-authority:G01` — current or unspecified
-- [x] `gate-artifact-exists:G01:G01.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G01.stdout.txt
-- [x] `gate-artifact-hash:G01:G01.stdout.txt` — e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-- [x] `gate-artifact-exists:G01:G01.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G01.stderr.txt
-- [x] `gate-artifact-hash:G01:G01.stderr.txt` — e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-- [x] `gate-artifact-exists:G01:G01.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G01.criteria.json
-- [x] `gate-artifact-hash:G01:G01.criteria.json` — db06fee93b77af7b76208f85e3c0c53c49c5be48c2f61047199f2120f2325daf
-- [x] `gate-result-exists:G02` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/state/gate-results/G02.json
+- [ ] `gate-artifact-exists:G01:G01.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G01.stdout.txt
+- [ ] `gate-artifact-exists:G01:G01.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G01.stderr.txt
+- [ ] `gate-artifact-exists:G01:G01.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G01.criteria.json
+- [x] `gate-result-exists:G02` — /Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex/state/gate-results/G02.json
 - [x] `gate-passed:G02` — passed
 - [x] `gate-ledger-passed:G02` — passed
 - [x] `gate-current-release-authority:G02` — current or unspecified
-- [x] `gate-artifact-exists:G02:G02.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G02.stdout.txt
-- [x] `gate-artifact-hash:G02:G02.stdout.txt` — 72c77100be1e99a6acecdfc985ebf529458708b5de41a8ccb49fbbbbe48b0b3e
-- [x] `gate-artifact-exists:G02:G02.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G02.stderr.txt
-- [x] `gate-artifact-hash:G02:G02.stderr.txt` — e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-- [x] `gate-artifact-exists:G02:G02.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G02.criteria.json
-- [x] `gate-artifact-hash:G02:G02.criteria.json` — 1f33267dc6f77f755f5c8a2b537d600ba9f0b4218d3854af1f24263003af0b49
-- [x] `gate-result-exists:G03` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/state/gate-results/G03.json
+- [ ] `gate-artifact-exists:G02:G02.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G02.stdout.txt
+- [ ] `gate-artifact-exists:G02:G02.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G02.stderr.txt
+- [ ] `gate-artifact-exists:G02:G02.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G02.criteria.json
+- [x] `gate-result-exists:G03` — /Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex/state/gate-results/G03.json
 - [x] `gate-passed:G03` — passed
 - [x] `gate-ledger-passed:G03` — passed
 - [x] `gate-current-release-authority:G03` — current or unspecified
-- [x] `gate-artifact-exists:G03:G03.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G03.stdout.txt
-- [x] `gate-artifact-hash:G03:G03.stdout.txt` — 47d39d678a1d5b15134be9e4a45880a184adb5541942e6ffb2bcaecbfa8362be
-- [x] `gate-artifact-exists:G03:G03.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G03.stderr.txt
-- [x] `gate-artifact-hash:G03:G03.stderr.txt` — e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-- [x] `gate-artifact-exists:G03:G03.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G03.criteria.json
-- [x] `gate-artifact-hash:G03:G03.criteria.json` — 7560820c0530d52b1a97f265cecd284c99a0a416b670919d11204e48eb6b367c
-- [x] `gate-result-exists:G04` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/state/gate-results/G04.json
+- [ ] `gate-artifact-exists:G03:G03.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G03.stdout.txt
+- [ ] `gate-artifact-exists:G03:G03.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G03.stderr.txt
+- [ ] `gate-artifact-exists:G03:G03.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G03.criteria.json
+- [x] `gate-result-exists:G04` — /Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex/state/gate-results/G04.json
 - [x] `gate-passed:G04` — passed
 - [x] `gate-ledger-passed:G04` — passed
 - [x] `gate-current-release-authority:G04` — current or unspecified
-- [x] `gate-artifact-exists:G04:G04.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G04.stdout.txt
-- [x] `gate-artifact-hash:G04:G04.stdout.txt` — fa52a67ada4051cdaf064cb6fc52cdd72cd7957006924443b4e414e2f5abda61
-- [x] `gate-artifact-exists:G04:G04.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G04.stderr.txt
-- [x] `gate-artifact-hash:G04:G04.stderr.txt` — e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-- [x] `gate-artifact-exists:G04:G04.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G04.criteria.json
-- [x] `gate-artifact-hash:G04:G04.criteria.json` — 04fb03812290bdb7b43b973bde31d4399d351e29587f17096a419afd0c824b77
-- [x] `gate-result-exists:G05` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/state/gate-results/G05.json
+- [ ] `gate-artifact-exists:G04:G04.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G04.stdout.txt
+- [ ] `gate-artifact-exists:G04:G04.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G04.stderr.txt
+- [ ] `gate-artifact-exists:G04:G04.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G04.criteria.json
+- [x] `gate-result-exists:G05` — /Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex/state/gate-results/G05.json
 - [x] `gate-passed:G05` — passed
 - [x] `gate-ledger-passed:G05` — passed
 - [x] `gate-current-release-authority:G05` — current or unspecified
-- [x] `gate-artifact-exists:G05:G05.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G05.stdout.txt
-- [x] `gate-artifact-hash:G05:G05.stdout.txt` — cceda1d1209095847a386a86f9048b1de62691c7e7d8ef6a1954b151b7ad759d
-- [x] `gate-artifact-exists:G05:G05.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G05.stderr.txt
-- [x] `gate-artifact-hash:G05:G05.stderr.txt` — e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-- [x] `gate-artifact-exists:G05:G05.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G05.criteria.json
-- [x] `gate-artifact-hash:G05:G05.criteria.json` — 88711d133c06c28d1c6344846856bfac0c409fb3d2627616faa5a8da2d14af39
-- [x] `gate-result-exists:G06` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/state/gate-results/G06.json
+- [ ] `gate-artifact-exists:G05:G05.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G05.stdout.txt
+- [ ] `gate-artifact-exists:G05:G05.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G05.stderr.txt
+- [ ] `gate-artifact-exists:G05:G05.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G05.criteria.json
+- [x] `gate-result-exists:G06` — /Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex/state/gate-results/G06.json
 - [x] `gate-passed:G06` — passed
 - [x] `gate-ledger-passed:G06` — passed
 - [x] `gate-current-release-authority:G06` — current or unspecified
-- [x] `gate-artifact-exists:G06:G06.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G06.stdout.txt
-- [x] `gate-artifact-hash:G06:G06.stdout.txt` — b73cca38f82eb1e02a02cd37a504653a7561c5ed02bdcdfffe9f3891eacddc88
-- [x] `gate-artifact-exists:G06:G06.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G06.stderr.txt
-- [x] `gate-artifact-hash:G06:G06.stderr.txt` — e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-- [x] `gate-artifact-exists:G06:G06.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G06.criteria.json
-- [x] `gate-artifact-hash:G06:G06.criteria.json` — ded439d6b183d7f8074fa2a4bb9d28d6eca6b31d03160a650085360b877dca5a
-- [x] `gate-result-exists:G07` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/state/gate-results/G07.json
+- [ ] `gate-artifact-exists:G06:G06.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G06.stdout.txt
+- [ ] `gate-artifact-exists:G06:G06.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G06.stderr.txt
+- [ ] `gate-artifact-exists:G06:G06.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G06.criteria.json
+- [x] `gate-result-exists:G07` — /Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex/state/gate-results/G07.json
 - [x] `gate-passed:G07` — passed
 - [x] `gate-ledger-passed:G07` — passed
 - [x] `gate-current-release-authority:G07` — current or unspecified
-- [x] `gate-artifact-exists:G07:G07.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G07.stdout.txt
-- [x] `gate-artifact-hash:G07:G07.stdout.txt` — d35955092f94076cf65a68f7ac24f677303902ca70b1a7a7b65fa12524d948a6
-- [x] `gate-artifact-exists:G07:G07.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G07.stderr.txt
-- [x] `gate-artifact-hash:G07:G07.stderr.txt` — e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-- [x] `gate-artifact-exists:G07:G07.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G07.criteria.json
-- [x] `gate-artifact-hash:G07:G07.criteria.json` — 0f5ff5eaffd84882273c49eebfd3e378246b67d2dafdf327735ec4e0a73806b2
-- [x] `gate-result-exists:G08` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/state/gate-results/G08.json
+- [ ] `gate-artifact-exists:G07:G07.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G07.stdout.txt
+- [ ] `gate-artifact-exists:G07:G07.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G07.stderr.txt
+- [ ] `gate-artifact-exists:G07:G07.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G07.criteria.json
+- [x] `gate-result-exists:G08` — /Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex/state/gate-results/G08.json
 - [x] `gate-passed:G08` — passed
 - [x] `gate-ledger-passed:G08` — passed
 - [x] `gate-current-release-authority:G08` — current or unspecified
-- [x] `gate-artifact-exists:G08:G08.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G08.stdout.txt
-- [x] `gate-artifact-hash:G08:G08.stdout.txt` — 456c68fd77f436c47987b7dd6b71d21c2b8a43790b473444e99a331b877da09b
-- [x] `gate-artifact-exists:G08:G08.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G08.stderr.txt
-- [x] `gate-artifact-hash:G08:G08.stderr.txt` — e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-- [x] `gate-artifact-exists:G08:G08.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G08.criteria.json
-- [x] `gate-artifact-hash:G08:G08.criteria.json` — 9400af9cca98362000bcd1426c6557108e041511a348c24617d1ad85f3d6fce1
-- [x] `gate-result-exists:G09` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/state/gate-results/G09.json
+- [ ] `gate-artifact-exists:G08:G08.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G08.stdout.txt
+- [ ] `gate-artifact-exists:G08:G08.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G08.stderr.txt
+- [ ] `gate-artifact-exists:G08:G08.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G08.criteria.json
+- [x] `gate-result-exists:G09` — /Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex/state/gate-results/G09.json
 - [ ] `gate-passed:G09` — passed; This record preserves the exact-revision adapter qualification. The live scenario invoked the adapter directly and does not establish current manager-owned threshold-forced rollover authority. Current release qualification requires exact successor acknowledgement, predecessor fencing and idempotent sealing, automatic continuation, GUI-closed operation, and recovery from every durable crash state in one real-provider forced-rollover scenario.
 - [ ] `gate-ledger-passed:G09` — blocked_dependency
 - [ ] `gate-current-release-authority:G09` — This record preserves the exact-revision adapter qualification. The live scenario invoked the adapter directly and does not establish current manager-owned threshold-forced rollover authority. Current release qualification requires exact successor acknowledgement, predecessor fencing and idempotent sealing, automatic continuation, GUI-closed operation, and recovery from every durable crash state in one real-provider forced-rollover scenario.
-- [x] `gate-artifact-exists:G09:G09.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.stdout.txt
-- [x] `gate-artifact-hash:G09:G09.stdout.txt` — 1f33d16848f966a2cfeae1e1cae73fa3912a9cf38e9c300b8318fb57160e49ad
-- [x] `gate-artifact-exists:G09:G09.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.stderr.txt
-- [x] `gate-artifact-hash:G09:G09.stderr.txt` — e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-- [x] `gate-artifact-exists:G09:G09.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.criteria.json
-- [x] `gate-artifact-hash:G09:G09.criteria.json` — d6e5a77279a6ade1d31a44a2ecc61451eddbe179b8c82c2a4cfd628e50b0b204
-- [x] `gate-result-exists:G10` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/state/gate-results/G10.json
+- [ ] `gate-artifact-exists:G09:G09.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.stdout.txt
+- [ ] `gate-artifact-exists:G09:G09.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.stderr.txt
+- [ ] `gate-artifact-exists:G09:G09.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.criteria.json
+- [x] `gate-result-exists:G10` — /Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex/state/gate-results/G10.json
 - [ ] `gate-passed:G10` — blocked
 - [ ] `gate-ledger-passed:G10` — blocked_dependency
 - [x] `gate-current-release-authority:G10` — current or unspecified
-- [x] `gate-artifact-exists:G10:G10.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G10.stdout.txt
-- [x] `gate-artifact-hash:G10:G10.stdout.txt` — 5bf76ffbb07513d1cc43cf0d3a983c47a6ad603f90587d0b521153c154ef382e
-- [x] `gate-artifact-exists:G10:G10.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G10.stderr.txt
-- [x] `gate-artifact-hash:G10:G10.stderr.txt` — e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-- [x] `gate-artifact-exists:G10:G10.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G10.criteria.json
-- [x] `gate-artifact-hash:G10:G10.criteria.json` — 8567435662f008c740163ca3ad20bddd6d8c71f0fb892ed9c773157835c9afc5
-- [x] `gate-result-exists:G11` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/state/gate-results/G11.json
+- [ ] `gate-artifact-exists:G10:G10.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G10.stdout.txt
+- [ ] `gate-artifact-exists:G10:G10.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G10.stderr.txt
+- [ ] `gate-artifact-exists:G10:G10.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G10.criteria.json
+- [x] `gate-result-exists:G11` — /Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex/state/gate-results/G11.json
 - [ ] `gate-passed:G11` — blocked
 - [ ] `gate-ledger-passed:G11` — blocked_dependency
 - [x] `gate-current-release-authority:G11` — current or unspecified
-- [x] `gate-artifact-exists:G11:G11.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.stdout.txt
-- [x] `gate-artifact-hash:G11:G11.stdout.txt` — 55fab8f7c2c55fef9ce6b0e47c8003fb2b645d05fd17c33f8cb43a399b442fdc
-- [x] `gate-artifact-exists:G11:G11.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.stderr.txt
-- [x] `gate-artifact-hash:G11:G11.stderr.txt` — e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-- [x] `gate-artifact-exists:G11:G11.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.criteria.json
-- [x] `gate-artifact-hash:G11:G11.criteria.json` — 7574917a10600271c1f4cfa7005c3573c8f449969ec130d96493cefde0f568ca
-- [x] `feature-baseline-exists` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/state/feature-baseline.json
+- [ ] `gate-artifact-exists:G11:G11.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.stdout.txt
+- [ ] `gate-artifact-exists:G11:G11.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.stderr.txt
+- [ ] `gate-artifact-exists:G11:G11.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.criteria.json
+- [x] `feature-baseline-exists` — /Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex/state/feature-baseline.json
 - [x] `feature-runtime-inventory-complete` — False
 - [x] `feature-unknown-zero` — {'preserved': 66, 'additive': 0, 'migrated': 0, 'unknown': 0, 'removed': 0, 'untested': 0}
 - [x] `feature-untested-zero` — {'preserved': 66, 'additive': 0, 'migrated': 0, 'unknown': 0, 'removed': 0, 'untested': 0}
 - [x] `feature-removed-zero` — {'preserved': 66, 'additive': 0, 'migrated': 0, 'unknown': 0, 'removed': 0, 'untested': 0}
 - [x] `all-feature-statuses-valid` — ['preserved']
-- [x] `findings-resolution-exists` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/state/findings-resolution.json
-- [ ] `critical-high-findings-resolved` — ['FC-FILESYSTEM-PATH-TOCTOU-001', 'FC-SHELL-COMPAT-QUALIFICATION-001', 'FC-UI-QUALIFICATION-001', 'FC-AUTONOMOUS-CONTINUITY-E2E-001']
-- [x] `host-capability-report-exists` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/.forge-codex/state/host-capability-report.json
+- [x] `findings-resolution-exists` — /Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex/state/findings-resolution.json
+- [ ] `critical-high-findings-resolved` — ['FC-FILESYSTEM-PATH-TOCTOU-001', 'FC-PRIVILEGED-SERVICE-LIFECYCLE-001', 'FC-PRIVILEGED-CALLER-IDENTITY-001', 'FC-SHELL-COMPAT-QUALIFICATION-001', 'FC-UI-QUALIFICATION-001', 'FC-AUTONOMOUS-CONTINUITY-E2E-001']
+- [x] `host-capability-report-exists` — /Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex/state/host-capability-report.json
 - [ ] `autonomous-rollover-mode-proven` — forge.native-session-host
 - [x] `supported-api-only` — False
 
 ## Blocking errors
 
+- gate-artifact-exists:G00:G00.stdout.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.stdout.txt
+- gate-artifact-exists:G00:G00.stderr.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.stderr.txt
+- gate-artifact-exists:G00:G00.criteria.json: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.criteria.json
+- gate-artifact-exists:G01:G01.stdout.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G01.stdout.txt
+- gate-artifact-exists:G01:G01.stderr.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G01.stderr.txt
+- gate-artifact-exists:G01:G01.criteria.json: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G01.criteria.json
+- gate-artifact-exists:G02:G02.stdout.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G02.stdout.txt
+- gate-artifact-exists:G02:G02.stderr.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G02.stderr.txt
+- gate-artifact-exists:G02:G02.criteria.json: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G02.criteria.json
+- gate-artifact-exists:G03:G03.stdout.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G03.stdout.txt
+- gate-artifact-exists:G03:G03.stderr.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G03.stderr.txt
+- gate-artifact-exists:G03:G03.criteria.json: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G03.criteria.json
+- gate-artifact-exists:G04:G04.stdout.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G04.stdout.txt
+- gate-artifact-exists:G04:G04.stderr.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G04.stderr.txt
+- gate-artifact-exists:G04:G04.criteria.json: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G04.criteria.json
+- gate-artifact-exists:G05:G05.stdout.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G05.stdout.txt
+- gate-artifact-exists:G05:G05.stderr.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G05.stderr.txt
+- gate-artifact-exists:G05:G05.criteria.json: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G05.criteria.json
+- gate-artifact-exists:G06:G06.stdout.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G06.stdout.txt
+- gate-artifact-exists:G06:G06.stderr.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G06.stderr.txt
+- gate-artifact-exists:G06:G06.criteria.json: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G06.criteria.json
+- gate-artifact-exists:G07:G07.stdout.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G07.stdout.txt
+- gate-artifact-exists:G07:G07.stderr.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G07.stderr.txt
+- gate-artifact-exists:G07:G07.criteria.json: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G07.criteria.json
+- gate-artifact-exists:G08:G08.stdout.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G08.stdout.txt
+- gate-artifact-exists:G08:G08.stderr.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G08.stderr.txt
+- gate-artifact-exists:G08:G08.criteria.json: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G08.criteria.json
 - gate-passed:G09: passed; This record preserves the exact-revision adapter qualification. The live scenario invoked the adapter directly and does not establish current manager-owned threshold-forced rollover authority. Current release qualification requires exact successor acknowledgement, predecessor fencing and idempotent sealing, automatic continuation, GUI-closed operation, and recovery from every durable crash state in one real-provider forced-rollover scenario.
 - gate-ledger-passed:G09: blocked_dependency
 - gate-current-release-authority:G09: This record preserves the exact-revision adapter qualification. The live scenario invoked the adapter directly and does not establish current manager-owned threshold-forced rollover authority. Current release qualification requires exact successor acknowledgement, predecessor fencing and idempotent sealing, automatic continuation, GUI-closed operation, and recovery from every durable crash state in one real-provider forced-rollover scenario.
+- gate-artifact-exists:G09:G09.stdout.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.stdout.txt
+- gate-artifact-exists:G09:G09.stderr.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.stderr.txt
+- gate-artifact-exists:G09:G09.criteria.json: /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.criteria.json
 - gate-passed:G10: blocked
 - gate-ledger-passed:G10: blocked_dependency
+- gate-artifact-exists:G10:G10.stdout.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G10.stdout.txt
+- gate-artifact-exists:G10:G10.stderr.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G10.stderr.txt
+- gate-artifact-exists:G10:G10.criteria.json: /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G10.criteria.json
 - gate-passed:G11: blocked
 - gate-ledger-passed:G11: blocked_dependency
-- critical-high-findings-resolved: ['FC-FILESYSTEM-PATH-TOCTOU-001', 'FC-SHELL-COMPAT-QUALIFICATION-001', 'FC-UI-QUALIFICATION-001', 'FC-AUTONOMOUS-CONTINUITY-E2E-001']
+- gate-artifact-exists:G11:G11.stdout.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.stdout.txt
+- gate-artifact-exists:G11:G11.stderr.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.stderr.txt
+- gate-artifact-exists:G11:G11.criteria.json: /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.criteria.json
+- critical-high-findings-resolved: ['FC-FILESYSTEM-PATH-TOCTOU-001', 'FC-PRIVILEGED-SERVICE-LIFECYCLE-001', 'FC-PRIVILEGED-CALLER-IDENTITY-001', 'FC-SHELL-COMPAT-QUALIFICATION-001', 'FC-UI-QUALIFICATION-001', 'FC-AUTONOMOUS-CONTINUITY-E2E-001']
 - autonomous-rollover-mode-proven: forge.native-session-host

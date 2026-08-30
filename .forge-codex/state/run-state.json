@@ -675,6 +675,7 @@
     "810010d7-b872-41ff-8d51-414b7270ca9d",
     "82441ec1-a7ed-4137-8ec5-3d2dd99739bb",
     "ee862f4a-ebcc-466f-9817-1881ff1a6172",
+    "fc51f448-84e9-4a30-8d7a-f4b938f60d10",
     "fdaa1903-9dea-4989-97a6-4a5518e2eddf"
   ],
   "issues": [
@@ -1020,7 +1021,7 @@
       "updated_at": "2026-08-30T21:13:27.556007+00:00"
     }
   ],
-  "last_event_sequence": 678,
+  "last_event_sequence": 680,
   "phases": {
     "P00": {
       "attempts": 1,
@@ -1103,12 +1104,12 @@
   },
   "repository": {
     "branch": "security/privileged-filesystem-boundary",
-    "commit": "b1cfeafef25405368201e8e2cce3baee33bdc413",
+    "commit": "8f251a5ec79263a70776f800df6403aca9345c3d",
     "dirty": true,
     "root": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security"
   },
   "run_id": "aba90ab1-be80-4cc5-aa0b-23dd54d4a24d",
   "schema_version": 1,
   "status": "active",
-  "updated_at": "2026-08-30T22:10:21.410761+00:00"
+  "updated_at": "2026-08-30T22:13:00.077121+00:00"
 }

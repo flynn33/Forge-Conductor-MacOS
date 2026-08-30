@@ -5,7 +5,7 @@
 The active repair line is `security/privileged-filesystem-boundary`, based on
 `main` at `8bcc039a2f0d4d17b871d5e968b3b37a663c5ccb` (the pull request #14
 squash merge). The current implementation and evidence checkpoint is
-`ad6e21eeced9c18014157800478ef45e75963782`. A later state-only handoff or
+`8f251a5ec79263a70776f800df6403aca9345c3d`. A later state-only handoff or
 doctor commit may advance the pull request transport HEAD without changing that
 manifest-bound source checkpoint. It is being published in draft pull request
 #15. No current claim is made that P10, the filesystem E2 finding,
@@ -276,7 +276,7 @@ nonpassing G09-G12 gates.
 
 - Active branch: `security/privileged-filesystem-boundary`.
 - Implementation and evidence checkpoint:
-  `ad6e21eeced9c18014157800478ef45e75963782`.
+  `8f251a5ec79263a70776f800df6403aca9345c3d`.
 - A later commit containing only handoff, doctor, selector, or publication
   readback does not change that manifest-bound checkpoint; the pull request
   readback is authoritative for its transport HEAD.
