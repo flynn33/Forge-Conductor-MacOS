@@ -4,10 +4,11 @@
 
 The active repair line is `security/privileged-filesystem-boundary`, based on
 `main` at `8bcc039a2f0d4d17b871d5e968b3b37a663c5ccb` (the pull request #14
-squash merge). The implementation/source checkpoint is
-`bc2cf006d7d87edaf24affdc06a86d7518bc0c2f`; the evidence-only checkpoint is
-`0ce461885a47075ff730b43133793804be37a5ab`. Both are published in draft pull
-request #15. No current claim is made that P10, the filesystem E2 finding,
+squash merge). The current implementation and evidence checkpoint is
+`ad6e21eeced9c18014157800478ef45e75963782`. A later state-only handoff or
+doctor commit may advance the pull request transport HEAD without changing that
+manifest-bound source checkpoint. It is being published in draft pull request
+#15. No current claim is made that P10, the filesystem E2 finding,
 shell compatibility, native UI validation, autonomous continuity,
 representative hardware qualification, or final release qualification is
 complete. Earlier green suites remain exact-revision evidence only and do not
@@ -230,19 +231,17 @@ nonpassing G09-G12 gates.
 ## Current branch and pull-request lineage
 
 - Active branch: `security/privileged-filesystem-boundary`.
-- Implementation/source checkpoint:
-  `bc2cf006d7d87edaf24affdc06a86d7518bc0c2f`.
-- Evidence-only checkpoint:
-  `0ce461885a47075ff730b43133793804be37a5ab`.
-- A later commit containing only this handoff correction does not change either
-  manifest-bound checkpoint; the pull request readback is authoritative for its
-  transport HEAD.
+- Implementation and evidence checkpoint:
+  `ad6e21eeced9c18014157800478ef45e75963782`.
+- A later commit containing only handoff, doctor, selector, or publication
+  readback does not change that manifest-bound checkpoint; the pull request
+  readback is authoritative for its transport HEAD.
 - Base branch and SHA: `main` at
   `8bcc039a2f0d4d17b871d5e968b3b37a663c5ccb`.
 - Current pull request: draft #15,
   `https://github.com/flynn33/Forge-Conductor-MacOS/pull/15`.
-- The last pre-handoff-correction GitHub readback recorded #15 open and draft from
-  `security/privileged-filesystem-boundary@0ce461885a47075ff730b43133793804be37a5ab`
+- The last pre-publication GitHub readback recorded #15 open and draft from
+  `security/privileged-filesystem-boundary@3c0b0af0969af8161582285dd53d98a779b2cf5b`
   into `main@8bcc039a2f0d4d17b871d5e968b3b37a663c5ccb`. The pull request is
   reviewable as a partial checkpoint but has neither merge nor release
   authority.
