@@ -382,6 +382,11 @@
     "EVID-20260828T130523Z-73516c6e94",
     "EVID-20260828T131739Z-66596e8e37",
     "EVID-20260830T004252Z-13ece08ad7",
+    "EVID-20260830T005053Z-620768741f",
+    "EVID-20260830T005122Z-4f8de96db0",
+    "EVID-20260830T005338Z-eac9da6c5b",
+    "EVID-20260830T005415Z-42e93a9bb7",
+    "EVID-20260830T005653Z-8a3be2d1dc",
     "a5466d4e5b4d7a10f87df64ddfdb58b6b8ca5159a57c20527e98802a822245d7",
     "a5d4276cbf14db3a91baa7f6b79fb8cdb3fb042a2eaf663d3219ff36b5451667",
     "b3dc11a8dc286fa33b6567ff62089692e64787b23a66718cfe1766dc27195724",
@@ -832,9 +837,20 @@
       "status": "resolved",
       "title": "Xcode Swift 6 integration does not compile autonomy sources",
       "updated_at": "2026-08-30T00:43:10.037730+00:00"
+    },
+    {
+      "created_at": "2026-08-30T00:50:53.588871+00:00",
+      "evidence_class": "E0",
+      "id": "FC-XCODE-SWIFT6-TESTS-001",
+      "notes": "Resolved by freezing mutable fixture state before concurrent execution, returning only Sendable values across detached-task boundaries, avoiding fixture-wide captures, and isolating XCUIAutomation access on the main actor. EVID-20260830T005653Z-8a3be2d1dc records an exit-zero strict Swift 6 build-for-testing against the final source manifest. EVID-20260830T005338Z-eac9da6c5b records 27 focused tests passing with consistent ad-hoc signing, and EVID-20260830T005415Z-42e93a9bb7 preserves the result-bundle summary: 27 passed, 0 failed, 0 skipped. EVID-20260830T005122Z-4f8de96db0 records an evidence-control artifact-capture failure after its test command exited zero; it is superseded by the successful records and is not treated as pass evidence. UI-target compilation is not native UI execution. P10, G10, native UI validation, shell compatibility, filesystem E2, and autonomous continuity remain open.",
+      "path": "Tests/ForgeConductorTests/RuntimeExecutionJobTests.swift",
+      "severity": "High",
+      "status": "resolved",
+      "title": "Xcode test targets emit Swift 6 concurrency diagnostics",
+      "updated_at": "2026-08-30T00:57:20.404215+00:00"
     }
   ],
-  "last_event_sequence": 507,
+  "last_event_sequence": 517,
   "phases": {
     "P00": {
       "attempts": 1,
@@ -916,13 +932,13 @@
     }
   },
   "repository": {
-    "branch": "repair/swift6-xcode-integration",
-    "commit": "f0d1e873977b10f03c1830452063e385d11a1fc9",
+    "branch": "repair/swift6-test-targets",
+    "commit": "0cb93b4768cc246e86c596cbf1e49ffe2d736dca",
     "dirty": true,
     "root": "/Users/jimdaley/GitHub/Forge-Conductor"
   },
   "run_id": "aba90ab1-be80-4cc5-aa0b-23dd54d4a24d",
   "schema_version": 1,
   "status": "active",
-  "updated_at": "2026-08-30T00:43:10.037865+00:00"
+  "updated_at": "2026-08-30T00:57:20.404353+00:00"
 }

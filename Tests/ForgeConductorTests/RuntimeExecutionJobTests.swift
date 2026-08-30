@@ -4552,7 +4552,7 @@ final class RuntimeExecutionJobTests: XCTestCase {
         }
     }
 
-    private final class Fixture {
+    private final class Fixture: Sendable {
         let root: URL
         let projectRoot: URL
         let projectID: ProjectID

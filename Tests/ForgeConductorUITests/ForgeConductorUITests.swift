@@ -10,31 +10,38 @@ import XCTest
 /// Requires a built `Forge Conductor.app` as the test host (configured in the
 /// ForgeConductorUITests target). Run via:
 /// `xcodebuild -scheme ForgeConductor -destination 'platform=macOS' test`
-final class ForgeConductorUITests: XCTestCase {
+/// XCTest serializes each test-case instance; lifecycle hooks assert main-actor
+/// execution before accessing XCUIAutomation state.
+@MainActor
+final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
     var app: XCUIApplication!
     var testHome: URL!
     private var operatorFixture: OperatorManagerUITestFixture?
 
-    override func setUpWithError() throws {
-        continueAfterFailure = false
-        testHome = FileManager.default.temporaryDirectory
-            .appendingPathComponent("forge-conductor-ui-\(UUID().uuidString)", isDirectory: true)
-        app = XCUIApplication()
-        app.launchArguments += ["--uitesting"]
-        app.launchEnvironment["FORGE_CONDUCTOR_HOME"] = testHome.path
-        app.launchEnvironment["FORGE_SKIP_PS"] = "1"
-        app.launch()
+    nonisolated override func setUpWithError() throws {
+        MainActor.assumeIsolated {
+            continueAfterFailure = false
+            testHome = FileManager.default.temporaryDirectory
+                .appendingPathComponent("forge-conductor-ui-\(UUID().uuidString)", isDirectory: true)
+            app = XCUIApplication()
+            app.launchArguments += ["--uitesting"]
+            app.launchEnvironment["FORGE_CONDUCTOR_HOME"] = testHome.path
+            app.launchEnvironment["FORGE_SKIP_PS"] = "1"
+            app.launch()
+        }
     }
 
-    override func tearDownWithError() throws {
-        app?.terminate()
-        app = nil
-        operatorFixture?.stop()
-        operatorFixture = nil
-        if let testHome {
-            try? FileManager.default.removeItem(at: testHome)
+    nonisolated override func tearDownWithError() throws {
+        MainActor.assumeIsolated {
+            app?.terminate()
+            app = nil
+            operatorFixture?.stop()
+            operatorFixture = nil
+            if let testHome {
+                try? FileManager.default.removeItem(at: testHome)
+            }
+            testHome = nil
         }
-        testHome = nil
     }
 
     func testAppLaunchesAndShowsTitle() throws {

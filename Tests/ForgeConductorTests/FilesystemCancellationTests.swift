@@ -700,9 +700,10 @@ final class FilesystemCancellationTests: XCTestCase {
             ))
         }
         let results = QuarantineReservationResults()
+        let reservationAttempts = attempts
 
-        DispatchQueue.concurrentPerform(iterations: attempts.count) { index in
-            let attempt = attempts[index]
+        DispatchQueue.concurrentPerform(iterations: reservationAttempts.count) { index in
+            let attempt = reservationAttempts[index]
             let ledger = FilesystemQuarantineLedger(
                 root: ledgerRoot,
                 processInstanceID: "concurrent-reservation-\(index)"
