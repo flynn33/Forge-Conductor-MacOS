@@ -148,31 +148,7 @@ final class SecureFilesystemMutationTests: XCTestCase {
     }
 
     func testSubmittedRequestWithoutReplyRetainsOriginalRecoveryTransactionID() throws {
-        let request = ForgeFilesystemMutationRequest(
-            requestID: UUID().uuidString.lowercased(),
-            transactionID: UUID().uuidString.lowercased(),
-            projectID: UUID().uuidString.lowercased(),
-            projectGeneration: 1,
-            rootID: "1:2",
-            rootIdentity: ForgeFilesystemIdentity(
-                device: 1,
-                inode: 2,
-                mode: UInt32(S_IFDIR | 0o700),
-                owner: UInt32(getuid()),
-                group: UInt32(getgid()),
-                linkCount: 1
-            ),
-            relativePathComponents: ["leaf.txt"],
-            access: .deleteLeaf,
-            expectedLeafIdentity: ForgeFilesystemIdentity(
-                device: 1,
-                inode: 3,
-                mode: UInt32(S_IFREG | 0o600),
-                owner: UInt32(getuid()),
-                group: UInt32(getgid()),
-                linkCount: 1
-            )
-        )
+        let request = makeMutationRequest()
 
         let response = XPCSecureFilesystemServiceTransport.uncertainFailure(
             for: request,
@@ -186,31 +162,181 @@ final class SecureFilesystemMutationTests: XCTestCase {
         XCTAssertEqual(response.recoveryTransactionID, request.transactionID)
     }
 
-    func testPackagedDaemonDigestIsExactAndRejectsMissingOrLinkedExecutables() throws {
-        let bundle = root.appendingPathComponent("Fixture.app", isDirectory: true)
-        let macOS = bundle
-            .appendingPathComponent("Contents", isDirectory: true)
-            .appendingPathComponent("MacOS", isDirectory: true)
-        try FileManager.default.createDirectory(at: macOS, withIntermediateDirectories: true)
-        let executable = macOS.appendingPathComponent(
-            ForgeFilesystemProtocolConstants.daemonExecutableName
+    func testHandshakeIdentityMismatchCannotDispatchAndReturnsNoRecoveryID() {
+        let request = makeMutationRequest()
+        var machine = SecureFilesystemHandshakeStateMachine(request: request)
+        let disposition = machine.receiveServiceInfo(
+            makeServiceInfo(codeDirectoryHash: String(repeating: "b", count: 40)),
+            allowedCodeDirectoryHashes: [String(repeating: "a", count: 40)]
         )
-        try Data("current helper bytes".utf8).write(to: executable)
 
-        let expected = try XCTUnwrap(
-            ForgeFilesystemExecutableIdentity.sha256(ofRegularFileAt: executable)
+        XCTAssertEqual(disposition, .finishWithoutDispatch)
+        var dispatchCount = 0
+        XCTAssertFalse(machine.dispatchIfAuthorized { dispatchCount += 1 })
+        XCTAssertEqual(dispatchCount, 0)
+        XCTAssertEqual(machine.phase, .finished)
+        XCTAssertEqual(
+            machine.terminalResponse?.code,
+            ForgeFilesystemErrorCode.helperIdentityMismatch
+        )
+        XCTAssertNil(machine.terminalResponse?.recoveryTransactionID)
+    }
+
+    func testHandshakeTimeoutCannotDispatchAndReturnsNoRecoveryID() {
+        let request = makeMutationRequest()
+        var machine = SecureFilesystemHandshakeStateMachine(request: request)
+
+        XCTAssertTrue(machine.completeWithoutReply(
+            code: ForgeFilesystemErrorCode.helperUnavailable,
+            message: "Secure filesystem service request timed out"
+        ))
+
+        var dispatchCount = 0
+        XCTAssertFalse(machine.dispatchIfAuthorized { dispatchCount += 1 })
+        XCTAssertEqual(dispatchCount, 0)
+        XCTAssertEqual(machine.phase, .finished)
+        XCTAssertNil(machine.terminalResponse?.recoveryTransactionID)
+    }
+
+    func testLateHandshakeAfterTimeoutCannotDispatch() {
+        let request = makeMutationRequest()
+        let allowedHash = String(repeating: "a", count: 40)
+        var machine = SecureFilesystemHandshakeStateMachine(request: request)
+        XCTAssertTrue(machine.completeWithoutReply(
+            code: ForgeFilesystemErrorCode.helperUnavailable,
+            message: "Secure filesystem service request timed out"
+        ))
+
+        let disposition = machine.receiveServiceInfo(
+            makeServiceInfo(codeDirectoryHash: allowedHash),
+            allowedCodeDirectoryHashes: [allowedHash]
+        )
+
+        XCTAssertEqual(disposition, .ignore)
+        var dispatchCount = 0
+        XCTAssertFalse(machine.dispatchIfAuthorized { dispatchCount += 1 })
+        XCTAssertEqual(dispatchCount, 0)
+        XCTAssertNil(machine.terminalResponse?.recoveryTransactionID)
+    }
+
+    func testTimeoutAfterIdentityBeforeSubmissionCannotDispatchAndReturnsNoRecoveryID() {
+        let request = makeMutationRequest()
+        let allowedHash = String(repeating: "a", count: 40)
+        var machine = SecureFilesystemHandshakeStateMachine(request: request)
+        XCTAssertEqual(
+            machine.receiveServiceInfo(
+                makeServiceInfo(codeDirectoryHash: allowedHash),
+                allowedCodeDirectoryHashes: [allowedHash]
+            ),
+            .prepareDispatch
+        )
+
+        XCTAssertTrue(machine.completeWithoutReply(
+            code: ForgeFilesystemErrorCode.helperUnavailable,
+            message: "Secure filesystem service request timed out"
+        ))
+
+        var dispatchCount = 0
+        XCTAssertFalse(machine.dispatchIfAuthorized { dispatchCount += 1 })
+        XCTAssertEqual(dispatchCount, 0)
+        XCTAssertEqual(machine.phase, .finished)
+        XCTAssertNil(machine.terminalResponse?.recoveryTransactionID)
+    }
+
+    func testExactHandshakeMayDispatchOnlyOnceOnConnection() {
+        let request = makeMutationRequest()
+        let allowedHash = String(repeating: "a", count: 40)
+        let serviceInfo = makeServiceInfo(codeDirectoryHash: allowedHash)
+        var machine = SecureFilesystemHandshakeStateMachine(request: request)
+
+        XCTAssertEqual(
+            machine.receiveServiceInfo(
+                serviceInfo,
+                allowedCodeDirectoryHashes: [allowedHash]
+            ),
+            .prepareDispatch
+        )
+        var dispatchCount = 0
+        XCTAssertTrue(machine.dispatchIfAuthorized { dispatchCount += 1 })
+        XCTAssertFalse(machine.dispatchIfAuthorized { dispatchCount += 1 })
+        XCTAssertEqual(dispatchCount, 1)
+        XCTAssertEqual(
+            machine.receiveServiceInfo(
+                serviceInfo,
+                allowedCodeDirectoryHashes: [allowedHash]
+            ),
+            .ignore
+        )
+        XCTAssertEqual(machine.phase, .requestSubmitted)
+    }
+
+    func testSubmittedHandshakeLosingReplyPreservesOriginalTransactionID() {
+        let request = makeMutationRequest()
+        let allowedHash = String(repeating: "a", count: 40)
+        var machine = SecureFilesystemHandshakeStateMachine(request: request)
+        XCTAssertEqual(
+            machine.receiveServiceInfo(
+                makeServiceInfo(codeDirectoryHash: allowedHash),
+                allowedCodeDirectoryHashes: [allowedHash]
+            ),
+            .prepareDispatch
+        )
+        var dispatchCount = 0
+        XCTAssertTrue(machine.dispatchIfAuthorized { dispatchCount += 1 })
+        XCTAssertEqual(dispatchCount, 1)
+
+        XCTAssertTrue(machine.completeWithoutReply(
+            code: ForgeFilesystemErrorCode.helperUnavailable,
+            message: "Secure filesystem service request timed out"
+        ))
+
+        XCTAssertEqual(machine.phase, .finished)
+        XCTAssertEqual(
+            machine.terminalResponse?.recoveryTransactionID,
+            request.transactionID
+        )
+    }
+
+    func testCLINotFoundStatusProbesOnlyWithValidSealedDaemonHashes() {
+        let hashKey = ForgeFilesystemCodeIdentity.daemonCodeDirectoryHashInfoPlistKeys[0]
+        let validInfo: [String: Any] = [
+            hashKey: String(repeating: "a", count: 40),
+        ]
+
+        XCTAssertEqual(
+            XPCSecureFilesystemServiceTransport.transportStatus(
+                reportedStatus: .notFound,
+                securedInfoDictionary: validInfo
+            ),
+            .enabled
         )
         XCTAssertEqual(
-            XPCSecureFilesystemServiceTransport.expectedDaemonExecutableSHA256(in: bundle),
-            expected
+            XPCSecureFilesystemServiceTransport.transportStatus(
+                reportedStatus: .notFound,
+                securedInfoDictionary: nil
+            ),
+            .notFound
         )
-
-        try FileManager.default.removeItem(at: executable)
-        let outside = root.appendingPathComponent("outside-helper")
-        try Data("different helper bytes".utf8).write(to: outside)
-        try FileManager.default.createSymbolicLink(at: executable, withDestinationURL: outside)
-        XCTAssertNil(
-            XPCSecureFilesystemServiceTransport.expectedDaemonExecutableSHA256(in: bundle)
+        XCTAssertEqual(
+            XPCSecureFilesystemServiceTransport.transportStatus(
+                reportedStatus: .notFound,
+                securedInfoDictionary: [:]
+            ),
+            .notFound
+        )
+        XCTAssertEqual(
+            XPCSecureFilesystemServiceTransport.transportStatus(
+                reportedStatus: .notFound,
+                securedInfoDictionary: [hashKey: "malformed"]
+            ),
+            .notFound
+        )
+        XCTAssertEqual(
+            XPCSecureFilesystemServiceTransport.transportStatus(
+                reportedStatus: .notRegistered,
+                securedInfoDictionary: validInfo
+            ),
+            .notRegistered
         )
     }
 
@@ -321,6 +447,41 @@ final class SecureFilesystemMutationTests: XCTestCase {
         let leaf = root.appendingPathComponent(name)
         try Data("preserve".utf8).write(to: leaf)
         return leaf
+    }
+
+    private func makeMutationRequest() -> ForgeFilesystemMutationRequest {
+        ForgeFilesystemMutationRequest(
+            requestID: UUID().uuidString.lowercased(),
+            transactionID: UUID().uuidString.lowercased(),
+            projectID: UUID().uuidString.lowercased(),
+            projectGeneration: 1,
+            rootID: "1:2",
+            rootIdentity: ForgeFilesystemIdentity(
+                device: 1,
+                inode: 2,
+                mode: UInt32(S_IFDIR | 0o700),
+                owner: UInt32(getuid()),
+                group: UInt32(getgid()),
+                linkCount: 1
+            ),
+            relativePathComponents: ["leaf.txt"],
+            access: .deleteLeaf,
+            expectedLeafIdentity: ForgeFilesystemIdentity(
+                device: 1,
+                inode: 3,
+                mode: UInt32(S_IFREG | 0o600),
+                owner: UInt32(getuid()),
+                group: UInt32(getgid()),
+                linkCount: 1
+            )
+        )
+    }
+
+    private func makeServiceInfo(codeDirectoryHash: String) -> ForgeFilesystemServiceInfo {
+        ForgeFilesystemServiceInfo(
+            effectiveUserIdentifier: 0,
+            codeDirectoryHash: codeDirectoryHash
+        )
     }
 
     private func makeContext(root contextRoot: URL? = nil) -> ToolInvocationContext {

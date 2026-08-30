@@ -2,9 +2,13 @@ import Darwin
 import Foundation
 import ForgeFilesystemProtocol
 
-private let daemonExecutableSHA256 = ForgeFilesystemExecutableIdentity.currentExecutableURL()
-    .flatMap { ForgeFilesystemExecutableIdentity.sha256(ofRegularFileAt: $0) }
-    ?? ""
+private let daemonCodeDirectoryHash: String = {
+    guard let hash = ForgeFilesystemCodeIdentity.currentCodeDirectoryHash() else {
+        FileHandle.standardError.write(Data("filesystem service code identity unavailable\n".utf8))
+        exit(EXIT_FAILURE)
+    }
+    return hash
+}()
 
 private final class FilesystemService: NSObject, ForgeFilesystemServiceXPC {
     private let deleteEngine = PrivilegedLeafDeleteEngine()
@@ -18,7 +22,7 @@ private final class FilesystemService: NSObject, ForgeFilesystemServiceXPC {
     func serviceInfo(withReply reply: @escaping (ForgeFilesystemServiceInfo) -> Void) {
         reply(ForgeFilesystemServiceInfo(
             effectiveUserIdentifier: UInt32(geteuid()),
-            executableSHA256: daemonExecutableSHA256
+            codeDirectoryHash: daemonCodeDirectoryHash
         ))
     }
 

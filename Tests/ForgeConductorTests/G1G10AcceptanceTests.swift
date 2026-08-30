@@ -314,7 +314,7 @@ final class G1G10AcceptanceTests: XCTestCase {
             contentsOf: repository.appendingPathComponent("ForgeConductor.xcodeproj/project.pbxproj"),
             encoding: .utf8
         )
-        XCTAssertEqual(project.components(separatedBy: "MARKETING_VERSION = \(version);").count - 1, 10)
+        XCTAssertEqual(project.components(separatedBy: "MARKETING_VERSION = \(version);").count - 1, 12)
     }
 
     func testG9_ResolvePrefersExplicitBinary() {

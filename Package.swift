@@ -38,7 +38,8 @@ let package = Package(
                 "ForgeNativeSessionHostPlugin",
                 "ForgeRuntimeLauncher",
             ],
-            path: "Sources/ForgeConductorCLI"
+            path: "Sources/ForgeConductorCLI",
+            exclude: ["Info.plist"]
         ),
         .executableTarget(
             name: "ForgeRuntimeLauncher",

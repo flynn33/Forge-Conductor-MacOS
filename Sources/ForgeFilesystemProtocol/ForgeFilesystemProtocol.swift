@@ -1,9 +1,9 @@
 import Darwin
-import CryptoKit
 import Foundation
+import Security
 
 public enum ForgeFilesystemProtocolConstants {
-    public static let version = 2
+    public static let version = 3
     public static let productVersion = "0.9.0"
     public static let serviceName = "com.forge-conductor.filesystem-daemon"
     public static let daemonPlistName = "com.forge-conductor.filesystem-daemon.plist"
@@ -36,12 +36,22 @@ public enum ForgeFilesystemProtocolConstants {
         return "(\(requiredAppCodeSigningRequirement)) or (\(managerRequirement))"
     }
 
-    public static var requiredDaemonCodeSigningRequirement: String {
-        requirement(
+    public static func requiredDaemonCodeSigningRequirement<S: Sequence>(
+        codeDirectoryHashes: S
+    ) -> String? where S.Element == String {
+        guard let normalizedHashes = ForgeFilesystemCodeIdentity
+            .normalizedCodeDirectoryHashes(codeDirectoryHashes) else {
+            return nil
+        }
+        let exactIdentityRequirement = normalizedHashes
+            .map { "cdhash H\"\($0)\"" }
+            .joined(separator: " or ")
+        let designatedRequirement = requirement(
             identifier: daemonIdentifier,
             teamIdentifier: activeTeamIdentifier,
             allowDevelopmentCertificate: isDevelopmentBuild
         )
+        return "(\(designatedRequirement)) and (\(exactIdentityRequirement))"
     }
 
     public static var activeTeamIdentifier: String {
@@ -79,49 +89,116 @@ public enum ForgeFilesystemProtocolConstants {
     }
 }
 
-public enum ForgeFilesystemExecutableIdentity {
-    public static func currentExecutableURL() -> URL? {
-        var capacity: UInt32 = 0
-        guard _NSGetExecutablePath(nil, &capacity) == -1, capacity > 1 else {
+public enum ForgeFilesystemCodeIdentity {
+    public static let codeDirectoryHashBytes = 20
+    public static let codeDirectoryHashCharacters = codeDirectoryHashBytes * 2
+    public static let daemonArm64CodeDirectoryHashInfoPlistKey =
+        "ForgeFilesystemDaemonCDHashArm64"
+    public static let daemonX86_64CodeDirectoryHashInfoPlistKey =
+        "ForgeFilesystemDaemonCDHashX86_64"
+    public static let daemonCodeDirectoryHashInfoPlistKeys = [
+        daemonArm64CodeDirectoryHashInfoPlistKey,
+        daemonX86_64CodeDirectoryHashInfoPlistKey,
+    ]
+
+    public static func normalizedCodeDirectoryHash(_ hash: String) -> String? {
+        guard hash.utf8.count == codeDirectoryHashCharacters,
+              hash.utf8.allSatisfy({ byte in
+                  (byte >= 48 && byte <= 57)
+                      || (byte >= 65 && byte <= 70)
+                      || (byte >= 97 && byte <= 102)
+              }) else {
             return nil
         }
-        var buffer = [CChar](repeating: 0, count: Int(capacity))
-        let copied = buffer.withUnsafeMutableBufferPointer { destination in
-            _NSGetExecutablePath(destination.baseAddress, &capacity)
-        }
-        guard copied == 0 else { return nil }
-        return URL(fileURLWithPath: String(cString: buffer))
-            .resolvingSymlinksInPath()
-            .standardizedFileURL
+        return hash.lowercased()
     }
 
-    public static func sha256(ofRegularFileAt url: URL) -> String? {
-        let descriptor = url.path.withCString {
-            Darwin.open($0, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+    public static func normalizedCodeDirectoryHashes<S: Sequence>(
+        _ hashes: S
+    ) -> [String]? where S.Element == String {
+        var normalized = Set<String>()
+        for hash in hashes {
+            guard let value = normalizedCodeDirectoryHash(hash) else {
+                return nil
+            }
+            normalized.insert(value)
         }
-        guard descriptor >= 0 else { return nil }
-        defer { _ = Darwin.close(descriptor) }
+        guard !normalized.isEmpty else {
+            return nil
+        }
+        return normalized.sorted()
+    }
 
-        var information = stat()
-        guard Darwin.fstat(descriptor, &information) == 0,
-              information.st_mode & S_IFMT == S_IFREG else {
+    public static func daemonCodeDirectoryHashes(
+        inSecuredInfoDictionary dictionary: [String: Any]
+    ) -> [String]? {
+        var hashes: [String] = []
+        for key in daemonCodeDirectoryHashInfoPlistKeys where dictionary[key] != nil {
+            guard let hash = dictionary[key] as? String,
+                  let normalized = normalizedCodeDirectoryHash(hash) else {
+                return nil
+            }
+            hashes.append(normalized)
+        }
+        return normalizedCodeDirectoryHashes(hashes)
+    }
+
+    public static func currentCodeDirectoryHash() -> String? {
+        guard let information = currentValidatedSigningInformation(),
+              let uniqueHash = information[kSecCodeInfoUnique] as? Data,
+              uniqueHash.count == codeDirectoryHashBytes else {
+            return nil
+        }
+        return normalizedCodeDirectoryHash(
+            uniqueHash.map { String(format: "%02x", $0) }.joined()
+        )
+    }
+
+    /// Returns the Info.plist dictionary sealed into the currently executing
+    /// code signature. Validation of the live SecCode happens before any
+    /// signing metadata is returned; callers must fail closed on nil.
+    public static func currentSecuredInfoDictionary() -> [String: Any]? {
+        guard let information = currentValidatedSigningInformation() else {
+            return nil
+        }
+        if let dictionary = information[kSecCodeInfoPList] as? [String: Any] {
+            return dictionary
+        }
+        if let dictionary = information[kSecCodeInfoPList] as? NSDictionary {
+            return dictionary as? [String: Any]
+        }
+        return nil
+    }
+
+    private static func currentValidatedSigningInformation() -> [CFString: Any]? {
+        var runningCode: SecCode?
+        let selfStatus = SecCodeCopySelf([], &runningCode)
+        guard selfStatus == errSecSuccess, let runningCode else {
             return nil
         }
 
-        var hasher = SHA256()
-        var bytes = [UInt8](repeating: 0, count: 64 * 1_024)
-        while true {
-            let count = bytes.withUnsafeMutableBytes { destination in
-                Darwin.read(descriptor, destination.baseAddress, destination.count)
-            }
-            guard count >= 0 else {
-                if errno == EINTR { continue }
-                return nil
-            }
-            if count == 0 { break }
-            hasher.update(data: Data(bytes.prefix(count)))
+        var validationFlags = SecCSFlags(rawValue: kSecCSStrictValidate)
+        validationFlags.formUnion(.noNetworkAccess)
+        guard SecCodeCheckValidity(runningCode, validationFlags, nil) == errSecSuccess else {
+            return nil
         }
-        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+
+        // Security.framework documents this API as accepting either a live
+        // SecCode or a SecStaticCode. The Swift importer exposes only the
+        // SecStaticCode spelling, so retain the live object while presenting
+        // the documented common CF object to the imported declaration.
+        let signingInformationCode = unsafeBitCast(runningCode, to: SecStaticCode.self)
+        var rawInformation: CFDictionary?
+        let informationStatus = SecCodeCopySigningInformation(
+            signingInformationCode,
+            SecCSFlags(rawValue: kSecCSSigningInformation),
+            &rawInformation
+        )
+        guard informationStatus == errSecSuccess,
+              let information = rawInformation as? [CFString: Any] else {
+            return nil
+        }
+        return information
     }
 }
 
@@ -133,20 +210,21 @@ public final class ForgeFilesystemServiceInfo: NSObject, NSSecureCoding, @unchec
     public let productVersion: String
     public let serviceIdentifier: String
     public let effectiveUserIdentifier: UInt32
-    public let executableSHA256: String
+    public let codeDirectoryHash: String
 
     public init(
         protocolVersion: Int = ForgeFilesystemProtocolConstants.version,
         productVersion: String = ForgeFilesystemProtocolConstants.productVersion,
         serviceIdentifier: String = ForgeFilesystemProtocolConstants.daemonIdentifier,
         effectiveUserIdentifier: UInt32,
-        executableSHA256: String
+        codeDirectoryHash: String
     ) {
         self.protocolVersion = protocolVersion
         self.productVersion = String(productVersion.prefix(64))
         self.serviceIdentifier = String(serviceIdentifier.prefix(128))
         self.effectiveUserIdentifier = effectiveUserIdentifier
-        self.executableSHA256 = String(executableSHA256.prefix(128)).lowercased()
+        self.codeDirectoryHash = ForgeFilesystemCodeIdentity
+            .normalizedCodeDirectoryHash(codeDirectoryHash) ?? ""
         super.init()
     }
 
@@ -159,10 +237,12 @@ public final class ForgeFilesystemServiceInfo: NSObject, NSSecureCoding, @unchec
                   of: NSString.self,
                   forKey: "service_identifier"
               ) as String?,
-              let executableSHA256 = coder.decodeObject(
+              let codeDirectoryHash = coder.decodeObject(
                   of: NSString.self,
-                  forKey: "executable_sha256"
-              ) as String? else {
+                  forKey: "code_directory_hash"
+              ) as String?,
+              let normalizedCodeDirectoryHash = ForgeFilesystemCodeIdentity
+                  .normalizedCodeDirectoryHash(codeDirectoryHash) else {
             return nil
         }
         let decodedEffectiveUID = coder.decodeInt64(forKey: "effective_uid")
@@ -174,7 +254,7 @@ public final class ForgeFilesystemServiceInfo: NSObject, NSSecureCoding, @unchec
         self.productVersion = String(productVersion.prefix(64))
         self.serviceIdentifier = String(serviceIdentifier.prefix(128))
         effectiveUserIdentifier = UInt32(decodedEffectiveUID)
-        self.executableSHA256 = String(executableSHA256.prefix(128)).lowercased()
+        self.codeDirectoryHash = normalizedCodeDirectoryHash
         super.init()
     }
 
@@ -183,18 +263,21 @@ public final class ForgeFilesystemServiceInfo: NSObject, NSSecureCoding, @unchec
         coder.encode(productVersion, forKey: "product_version")
         coder.encode(serviceIdentifier, forKey: "service_identifier")
         coder.encode(Int64(effectiveUserIdentifier), forKey: "effective_uid")
-        coder.encode(executableSHA256, forKey: "executable_sha256")
+        coder.encode(codeDirectoryHash, forKey: "code_directory_hash")
     }
 
-    public func matchesExpectedService(executableSHA256 expectedSHA256: String) -> Bool {
-        let normalizedExpected = expectedSHA256.lowercased()
+    public func matchesExpectedService<S: Sequence>(
+        allowedCodeDirectoryHashes: S
+    ) -> Bool where S.Element == String {
+        guard let normalizedAllowed = ForgeFilesystemCodeIdentity
+            .normalizedCodeDirectoryHashes(allowedCodeDirectoryHashes) else {
+            return false
+        }
         return protocolVersion == ForgeFilesystemProtocolConstants.version
             && productVersion == ForgeFilesystemProtocolConstants.productVersion
             && serviceIdentifier == ForgeFilesystemProtocolConstants.daemonIdentifier
             && effectiveUserIdentifier == 0
-            && normalizedExpected.count == 64
-            && normalizedExpected.allSatisfy(\.isHexDigit)
-            && executableSHA256 == normalizedExpected
+            && normalizedAllowed.contains(codeDirectoryHash)
     }
 }
 

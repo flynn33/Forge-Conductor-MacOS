@@ -1,13 +1,14 @@
 import Foundation
+import Security
 import XCTest
 import ForgeFilesystemProtocol
 
 final class ForgeFilesystemProtocolTests: XCTestCase {
     func testServiceInfoSecureCodingAndExactRuntimeMatch() throws {
-        let executableSHA256 = String(repeating: "a", count: 64)
+        let codeDirectoryHash = String(repeating: "a", count: 40)
         let expected = ForgeFilesystemServiceInfo(
             effectiveUserIdentifier: 0,
-            executableSHA256: executableSHA256
+            codeDirectoryHash: codeDirectoryHash
         )
         let data = try NSKeyedArchiver.archivedData(
             withRootObject: expected,
@@ -20,34 +21,110 @@ final class ForgeFilesystemProtocolTests: XCTestCase {
             )
         )
 
-        XCTAssertTrue(decoded.matchesExpectedService(executableSHA256: executableSHA256))
+        XCTAssertTrue(decoded.matchesExpectedService(
+            allowedCodeDirectoryHashes: [codeDirectoryHash.uppercased()]
+        ))
         XCTAssertEqual(decoded.protocolVersion, ForgeFilesystemProtocolConstants.version)
         XCTAssertEqual(decoded.productVersion, ForgeFilesystemProtocolConstants.productVersion)
         XCTAssertEqual(decoded.serviceIdentifier, ForgeFilesystemProtocolConstants.daemonIdentifier)
         XCTAssertEqual(decoded.effectiveUserIdentifier, 0)
-        XCTAssertEqual(decoded.executableSHA256, executableSHA256)
+        XCTAssertEqual(decoded.codeDirectoryHash, codeDirectoryHash)
 
         XCTAssertFalse(ForgeFilesystemServiceInfo(
             protocolVersion: ForgeFilesystemProtocolConstants.version + 1,
             effectiveUserIdentifier: 0,
-            executableSHA256: executableSHA256
-        ).matchesExpectedService(executableSHA256: executableSHA256))
+            codeDirectoryHash: codeDirectoryHash
+        ).matchesExpectedService(allowedCodeDirectoryHashes: [codeDirectoryHash]))
         XCTAssertFalse(ForgeFilesystemServiceInfo(
             productVersion: "0.8.0",
             effectiveUserIdentifier: 0,
-            executableSHA256: executableSHA256
-        ).matchesExpectedService(executableSHA256: executableSHA256))
+            codeDirectoryHash: codeDirectoryHash
+        ).matchesExpectedService(allowedCodeDirectoryHashes: [codeDirectoryHash]))
         XCTAssertFalse(ForgeFilesystemServiceInfo(
             serviceIdentifier: "com.example.wrong-daemon",
             effectiveUserIdentifier: 0,
-            executableSHA256: executableSHA256
-        ).matchesExpectedService(executableSHA256: executableSHA256))
+            codeDirectoryHash: codeDirectoryHash
+        ).matchesExpectedService(allowedCodeDirectoryHashes: [codeDirectoryHash]))
         XCTAssertFalse(ForgeFilesystemServiceInfo(
             effectiveUserIdentifier: 501,
-            executableSHA256: executableSHA256
-        ).matchesExpectedService(executableSHA256: executableSHA256))
+            codeDirectoryHash: codeDirectoryHash
+        ).matchesExpectedService(allowedCodeDirectoryHashes: [codeDirectoryHash]))
         XCTAssertFalse(expected.matchesExpectedService(
-            executableSHA256: String(repeating: "b", count: 64)
+            allowedCodeDirectoryHashes: [String(repeating: "b", count: 40)]
+        ))
+        XCTAssertFalse(expected.matchesExpectedService(allowedCodeDirectoryHashes: []))
+        XCTAssertFalse(expected.matchesExpectedService(
+            allowedCodeDirectoryHashes: [codeDirectoryHash, "not-a-cdhash"]
+        ))
+    }
+
+    func testCodeDirectoryHashNormalizationIsStrictAndDeterministic() {
+        let first = String(repeating: "A", count: 40)
+        let second = String(repeating: "b", count: 40)
+
+        XCTAssertEqual(
+            ForgeFilesystemCodeIdentity.normalizedCodeDirectoryHash(first),
+            first.lowercased()
+        )
+        XCTAssertNil(ForgeFilesystemCodeIdentity.normalizedCodeDirectoryHash(
+            String(repeating: "a", count: 39)
+        ))
+        XCTAssertNil(ForgeFilesystemCodeIdentity.normalizedCodeDirectoryHash(
+            String(repeating: "a", count: 39) + "g"
+        ))
+        XCTAssertNil(ForgeFilesystemCodeIdentity.normalizedCodeDirectoryHash(
+            String(repeating: "a", count: 40) + " "
+        ))
+        XCTAssertEqual(
+            ForgeFilesystemCodeIdentity.normalizedCodeDirectoryHashes([
+                second,
+                first,
+                first.lowercased(),
+            ]),
+            [first.lowercased(), second]
+        )
+        XCTAssertNil(ForgeFilesystemCodeIdentity.normalizedCodeDirectoryHashes([]))
+        XCTAssertNil(ForgeFilesystemCodeIdentity.normalizedCodeDirectoryHashes([
+            first,
+            "not-a-cdhash",
+        ]))
+    }
+
+    func testCurrentRunningCodeIdentityProducesStrictCodeDirectoryHash() throws {
+        let hash = try XCTUnwrap(ForgeFilesystemCodeIdentity.currentCodeDirectoryHash())
+
+        XCTAssertEqual(hash.count, ForgeFilesystemCodeIdentity.codeDirectoryHashCharacters)
+        XCTAssertEqual(ForgeFilesystemCodeIdentity.normalizedCodeDirectoryHash(hash), hash)
+    }
+
+    func testSecuredInfoDictionaryHashExtractionFailsClosed() {
+        let arm64 = String(repeating: "a", count: 40)
+        let x86 = String(repeating: "B", count: 40)
+        let arm64Key = ForgeFilesystemCodeIdentity
+            .daemonArm64CodeDirectoryHashInfoPlistKey
+        let x86Key = ForgeFilesystemCodeIdentity
+            .daemonX86_64CodeDirectoryHashInfoPlistKey
+
+        XCTAssertEqual(
+            ForgeFilesystemCodeIdentity.daemonCodeDirectoryHashes(
+                inSecuredInfoDictionary: [x86Key: x86, arm64Key: arm64]
+            ),
+            [arm64, x86.lowercased()]
+        )
+        XCTAssertEqual(
+            ForgeFilesystemCodeIdentity.daemonCodeDirectoryHashes(
+                inSecuredInfoDictionary: [arm64Key: arm64]
+            ),
+            [arm64]
+        )
+        XCTAssertNil(ForgeFilesystemCodeIdentity.daemonCodeDirectoryHashes(
+            inSecuredInfoDictionary: [:]
+        ))
+        XCTAssertNil(ForgeFilesystemCodeIdentity.daemonCodeDirectoryHashes(
+            inSecuredInfoDictionary: [arm64Key: arm64, x86Key: ""]
+        ))
+        XCTAssertNil(ForgeFilesystemCodeIdentity.daemonCodeDirectoryHashes(
+            inSecuredInfoDictionary: [arm64Key: arm64, x86Key: 42]
         ))
     }
 
@@ -137,22 +214,51 @@ final class ForgeFilesystemProtocolTests: XCTestCase {
         }
     }
 
-    func testPeerRequirementsBindExactIdentifiersTeamsAndCertificateClass() {
+    func testPeerRequirementsBindExactIdentifiersTeamsAndCertificateClass() throws {
         let app = ForgeFilesystemProtocolConstants.requiredAppCodeSigningRequirement
         let client = ForgeFilesystemProtocolConstants.requiredClientCodeSigningRequirement
-        let daemon = ForgeFilesystemProtocolConstants.requiredDaemonCodeSigningRequirement
+        let firstHash = String(repeating: "a", count: 40)
+        let secondHash = String(repeating: "B", count: 40)
+        let daemon = try XCTUnwrap(
+            ForgeFilesystemProtocolConstants.requiredDaemonCodeSigningRequirement(
+                codeDirectoryHashes: [secondHash, firstHash, firstHash]
+            )
+        )
 
         XCTAssertTrue(app.contains("identifier \"com.forge-conductor.app\""))
         XCTAssertTrue(client.contains("identifier \"com.forge-conductor.app\""))
         XCTAssertTrue(client.contains("identifier \"com.forge-conductor.cli\""))
         XCTAssertTrue(client.contains(" or "))
-        XCTAssertTrue(daemon.contains("identifier \"com.forge-conductor.filesystem-daemon\""))
+        XCTAssertTrue(daemon.contains(
+            "identifier \"com.forge-conductor.filesystem-daemon\""
+        ))
         XCTAssertTrue(app.contains(ForgeFilesystemProtocolConstants.activeTeamIdentifier))
-        XCTAssertTrue(daemon.contains(ForgeFilesystemProtocolConstants.activeTeamIdentifier))
+        XCTAssertTrue(daemon.contains(
+            ForgeFilesystemProtocolConstants.activeTeamIdentifier
+        ))
         XCTAssertTrue(app.contains("anchor apple generic"))
         XCTAssertTrue(daemon.contains("anchor apple generic"))
         XCTAssertTrue(app.contains("1.2.840.113635.100.6.1"))
         XCTAssertTrue(daemon.contains("1.2.840.113635.100.6.1"))
+        XCTAssertTrue(daemon.contains("cdhash H\"\(firstHash)\""))
+        XCTAssertTrue(daemon.contains("cdhash H\"\(secondHash.lowercased())\""))
+        XCTAssertEqual(daemon.components(separatedBy: "cdhash H\"").count, 3)
+        var compiledRequirement: SecRequirement?
+        XCTAssertEqual(
+            SecRequirementCreateWithString(
+                daemon as CFString,
+                [],
+                &compiledRequirement
+            ),
+            errSecSuccess
+        )
+        XCTAssertNotNil(compiledRequirement)
+        XCTAssertNil(ForgeFilesystemProtocolConstants.requiredDaemonCodeSigningRequirement(
+            codeDirectoryHashes: []
+        ))
+        XCTAssertNil(ForgeFilesystemProtocolConstants.requiredDaemonCodeSigningRequirement(
+            codeDirectoryHashes: [firstHash, "not-a-cdhash"]
+        ))
     }
 
     func testRequesterPolicyRejectsRootAndInvalidUIDs() {

@@ -1,0 +1,55 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 201295,
+      "path": ".forge-codex/evidence/EVID-20260830T151425Z-09e2526950.stdout.txt",
+      "sha256": "53d069f43919da5aaab10327644a0a4b6a3d4f15da41cdabf00d11116a5dbc84",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 13681,
+      "path": ".forge-codex/evidence/EVID-20260830T151425Z-09e2526950.stderr.txt",
+      "sha256": "915bcc65fba346217f5bdd527ee270a5c202213ff1a02a1e26b81f87e5fb87fd",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "command": "swift test",
+  "ended_at": "2026-08-30T15:16:46.590367+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 1,
+  "id": "EVID-20260830T151425Z-09e2526950",
+  "kind": "p10-debug-strict-suite",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [
+    "FC-PRIVILEGED-CALLER-IDENTITY-001"
+  ],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 9394933,
+    "file_count": 251,
+    "schema_version": 1,
+    "sha256": "1ee4f81c5bbec35dbb39f6c8d71e9c499e7d8b1fce72f28fb13cfde265de3c82"
+  },
+  "source_manifest_after": {
+    "bytes": 9394933,
+    "file_count": 251,
+    "schema_version": 1,
+    "sha256": "1ee4f81c5bbec35dbb39f6c8d71e9c499e7d8b1fce72f28fb13cfde265de3c82"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-30T15:14:25.746706+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

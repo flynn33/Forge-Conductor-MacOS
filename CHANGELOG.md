@@ -33,6 +33,12 @@ and the final release gates remain open.
   whose requested namespace becomes unstable while durability is unconfirmed
   returns its live receipt as required ledger recovery, merging any additional
   retained staging-cleanup receipt into the same result.
+- The partial privileged leaf-delete boundary now uses protocol v3 and binds
+  the daemon requirement to exact per-architecture CodeDirectory hashes sealed
+  into each signed caller. The app-scheme build produces one matching
+  app/embedded-CLI/standalone-CLI/daemon artifact set, and app-origin manager
+  installation stages only the embedded CLI plus its signed framework. Missing,
+  symlinked, mismatched, or independently cross-paired artifacts fail closed.
 
 ### Open qualification and security boundaries
 
@@ -46,10 +52,19 @@ and the final release gates remain open.
   anchoring, destination hierarchy creation, and hard-link ctime ambiguity also
   remain E2.
 - The shell policy, migration, MCP registration, execution, compatibility
-  contract, and restart paths have non-native regressions. The native Settings
-  test has build-only evidence. Developer Mode is disabled and the available
-  signing identity does not match the configured team, so native UI and shell
-  compatibility qualification remain deferred and release-blocking.
+  contract, and restart paths pass current-source Debug and Release regressions.
+  Developer Mode is enabled, Apple Development signing uses James Daley on team
+  `9AQ2C2838M`, and the bounded signed Settings/relaunch matrix passes. Native
+  shell qualification still lacks one scenario that executes `shell_exec`
+  successfully after app closure/reopen and an actual installed-manager process
+  restart. Production folder-panel observation, privileged-service lifecycle,
+  release signing, and notarization also remain deferred and release-blocking.
+- Exact caller-sealed helper identity prevents helper-only substitution against
+  a current caller, but it does not establish whole-product rollback freshness.
+  A monotonic root-owned receipt is not implemented; a rolled-back allowlisted
+  daemon retains its full bounded root mutation authority and its vulnerabilities.
+  Distinct installed signed app/manager/CLI XPC, stale-helper, wrong-signer,
+  approval/update/restart, and crash-recovery matrices remain unexecuted.
 - Historical G09 evidence covers an exact-revision, directly invoked live
   provider adapter. Current autonomous-continuity authority still requires one
   manager-owned, threshold-forced real-provider rollover proving exact successor

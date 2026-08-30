@@ -1,0 +1,6 @@
+{
+  "valid": true,
+  "checks": 668,
+  "errors": [],
+  "report": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex/PACKAGE_VALIDATION.json"
+}

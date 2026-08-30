@@ -187,10 +187,10 @@ runtime tool.
 | API or facility | What it provides | Why it is or is not sufficient |
 | --- | --- | --- |
 | `SMAppService.daemon(plistName:)` | Signed app-contained LaunchDaemon registration, admin approval state, launchd lifecycle, and explicit unregister/re-register update behavior. Apple documents that a changed LaunchDaemon plist or executable must be re-registered and recommends unregister-before-register for an executable change; the asynchronous unregister completion is the safe point at which the old process is known to be killed before replacement registration. | Selected for lifecycle only, with an explicit reinstall operation using that completion boundary. It does not authorize a filesystem request or make a namespace mutation identity-conditional. Release use also requires the signed/notarized app and helper upgrade lifecycle to be qualified. |
-| `NSXPCConnection(machServiceName:options:.privileged)` and `NSXPCListener(machServiceName:)` | A launchd-managed privileged transport. The current `setCodeSigningRequirement` and `setConnectionCodeSigningRequirement` expressions reject peers outside the enumerated app or manager/CLI client identifiers and daemon identifier, active team, and certificate class. Before sending a mutation on that same connection, the client also checks the reported protocol version, product version, service identifier, root effective UID, and a path-derived helper SHA-256 against the regular non-symlink helper under the current GUI bundle. | Selected as the partial connection boundary, not an exact live-code boundary. The reported digest is computed from mutable paths by both processes and is not kernel-attested mapped-code identity. A same-team, same-identifier, same-version older daemon can remain admissible if the expected user-writable helper path is rolled back to matching bytes. The maximum impact is that daemon's full bounded root mutation authority and vulnerabilities. The installed manager and raw CLI also lack a caller-relative plist/helper in the current package and fail closed before useful XPC. Closure requires caller-sealed per-architecture CodeDirectory hashes composed into the peer requirement, full app/manager/CLI packaging, and signed process evidence. Public `NSXPCConnection` exposes PID, effective UID/GID, and audit-session identifiers, but not the received message's full audit token, so connection checking still does not satisfy per-message audit identity. |
-| Low-level XPC `xpc_peer_requirement_match_received_message` and Security.framework `SecCodeCreateWithXPCMessage` | macOS 26 can bind a check to the audit token attached to the particular received XPC dictionary. | Required for final per-message identity qualification through a narrow C interoperability layer. Until this is integrated and tested against differently signed and unauthorized clients, E2 remains open. PID-only lookup is not accepted because PID reuse breaks message identity. |
+| `NSXPCConnection(machServiceName:options:.privileged)` and `NSXPCListener(machServiceName:)` | A launchd-managed privileged transport. `setCodeSigningRequirement` requires newly received messages to match or invalidates the connection, and `setConnectionCodeSigningRequirement` rejects a nonmatching incoming peer before the listener delegate. The underlying XPC header states that all received messages are checked. The client now reads the allowed per-architecture daemon CodeDirectory hashes from its own validated running `SecCode` and code-signature-secured Info.plist, conjoins those exact `cdhash` values with the daemon identifier, team, and certificate requirement before activation, and verifies the same hash plus protocol, product version, service identifier, and root effective UID in the handshake before dispatch. | Selected for exact running-peer identity. It no longer trusts a helper-path digest. The signed build generates the caller-sealed hash keys from the separately signed daemon; missing or malformed keys fail closed. A raw CLI may bypass caller-relative `SMAppService.notFound` only to attempt this authenticated XPC probe. This source implementation still requires distinct signed app, installed manager/app, raw CLI, stale-helper, wrong-signer, timeout, upgrade, and restart execution evidence before the identity and packaging rows pass. Code signing prevents helper-only substitution against a current caller but does not establish whole-product rollback freshness; an allowlisted daemon retains its full bounded root mutation authority. |
+| Low-level XPC `xpc_peer_requirement_match_received_message`, Swift XPC `XPCReceivedMessage.senderSatisfies`, and Security.framework `SecCodeCreateWithXPCMessage` | macOS 26 can explicitly match a requirement or create a live `SecCode` from the audit token attached to a particular received XPC dictionary. | Evaluated but not selected for this NSXPC protocol. NSXPC does not expose its internal dictionary to the exported-object method, while its documented signing-requirement API already applies the requirement to new messages and the underlying XPC implementation checks all received messages. A PID-only reconstruction would be weaker because of PID reuse and is not used. These APIs remain appropriate if the transport later moves to low-level or Swift XPC and needs message-specific inspection beyond the enforced peer requirement. |
 | Root directory descriptors plus `openat`, `fstatat`, `renameatx_np`, `unlinkat`, directory `fsync`, and `fcntl(F_FULLFSYNC)` | Descriptor-relative confinement, independent root/source identity checks, exclusive capture, protected terminal deletion, and stronger local-media phase flushes. | Selected inside the daemon. Plain `fsync` alone does not promise power-loss ordering on macOS, so each durability boundary also requires `F_FULLFSYNC`; the signed crash and power-loss qualification is still open. None of these calls alone accepts an expected inode as a mutation precondition; the security property comes from exclusive capture into the protected namespace followed by verification there, not from treating any one syscall as identity-conditional. |
-| `connection.effectiveUserIdentifier`, descriptor ownership/mode checks, `acl_get_fd_np`, and `st_flags` | Conservatively approximate whether the authenticated user could traverse the source hierarchy and remove the leaf without root assistance. | Selected to prevent privilege amplification. Connection UID is never accepted from request data; root, invalid, and non-account UIDs fail closed. This policy is intentionally narrower than all valid macOS permission arrangements and does not replace the still-required per-message audit-token check. |
+| `connection.effectiveUserIdentifier`, descriptor ownership/mode checks, `acl_get_fd_np`, and `st_flags` | Conservatively approximate whether the authenticated user could traverse the source hierarchy and remove the leaf without root assistance. | Selected to prevent privilege amplification. Connection UID is never accepted from request data; root, invalid, and non-account UIDs fail closed. This policy is intentionally narrower than all valid macOS permission arrangements. Its distinct signed-process and UID-binding evidence remains open even though the NSXPC signing requirement applies to every received message. |
 | `renameatx_np(..., RENAME_EXCL)` | Atomically captures whichever entry occupies the authorized source name while refusing destination overwrite. | Selected for capture. It is not an expected-identity rename. The daemon must verify the captured entry inside the protected namespace before any terminal unlink and retain or exclusively roll it back on mismatch. |
 | `renameatx_np(..., RENAME_SWAP)` | Atomically substitutes namespace entries and drives the hostile-process test matrix. | Test primitive only. It proves the pre-capture substitution remains possible and is not a mitigation. |
 
@@ -221,22 +221,37 @@ used to substitute a different pathname occupant. This is an explicit residual
 and must be exercised in the signed attacker matrix; the current checks
 mitigate it but do not eliminate it.
 
-The current checkpoint is partial. The exact live-helper identity expectation
-must be bound into each main caller's signed mapped code or a kernel-attested
-caller entitlement, not inferred only from a replaceable helper path or dynamic
-framework. `NSXPCConnection` must then require the expected CodeDirectory hash
-set before activation. Static outer-bundle validation is useful supplemental
-evidence, but Apple's Security framework documents that static validation is
-only valid while the filesystem object remains unmodified. Code signing also
-does not establish freshness: preventing rollback of the entire validly signed
-caller, expectation, and helper requires a monotonic root-owned version receipt.
-The normal login-manager package is currently an ad-hoc minimal app without the
-daemon or plist, and raw CLI status lookup is caller-relative, so those clients
-fail closed. These availability and identity gaps are tracked by
-`FC-PRIVILEGED-CALLER-IDENTITY-001`.
+The current checkpoint is partial. The source now binds the exact live-helper
+identity expectation into each Xcode-built main caller's code-signature-secured
+Info.plist. `NSXPCConnection` requires that CodeDirectory hash set before
+activation, and the same-connection handshake repeats the exact running hash
+check before dispatch. The canonical Xcode app-scheme graph builds one daemon,
+builds the CLI from that daemon, and makes the app depend on and embed both
+signed products. The app and CLI therefore seal the same per-architecture
+daemon hashes, and the app embeds the raw CLI at
+`Contents/Helpers/forge-conductor` with `CodeSignOnCopy`. Release packaging must
+take the app and standalone CLI from that same build: independently clean app
+and CLI builds are not assumed to reproduce a CodeDirectory hash, and the
+bundle checker rejects a cross-paired CLI whose seal differs.
 
-Per-message audit identity, signed
-adversarial and crash recovery, full volume behavior, approval/denial,
+The installed login-manager path validates the exact app main executable and
+embedded CLI, stages only the embedded CLI rather than extracting the app main,
+and transactionally stages the signed core framework beside the installed raw
+CLI. A complete privileged payload requires the daemon, LaunchDaemon plist,
+embedded CLI, and app framework; missing, symlinked, mismatched, or invalidly
+signed artifacts fail before replacement. A separately signed raw CLI may
+probe the app-owned service only with valid caller-sealed hashes. The clean
+signed Debug arm64 build and runtime checker are supporting package evidence,
+not distinct installed-process or live XPC qualification. Static outer-bundle
+validation also remains valid only while the filesystem object is unmodified.
+Code signing does not establish freshness: preventing rollback of the entire
+validly signed caller, expectation, and helper requires a monotonic root-owned
+version receipt. Full signed app/manager/CLI, stale-helper, upgrade, restart,
+negative-signature, Release, and notarization evidence is still absent, so
+`FC-PRIVILEGED-CALLER-IDENTITY-001` remains open.
+
+Distinct-process signing identity, signed adversarial and crash recovery, full
+volume behavior, approval/denial,
 upgrade/unregister/re-register and stale-helper rejection, signature rejection,
 source-leaf/hard-link/writable-FD
 behavior, and notarized Release lifecycle evidence are still required. An

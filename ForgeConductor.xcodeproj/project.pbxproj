@@ -233,6 +233,7 @@
 		E2F500000000000000000007 /* libForgeFilesystemProtocol.a in Frameworks */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000014 /* libForgeFilesystemProtocol.a */; };
 		E2F500000000000000000008 /* forge-filesystem-daemon in Embed Filesystem Daemon */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000015 /* forge-filesystem-daemon */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		E2F500000000000000000009 /* com.forge-conductor.filesystem-daemon.plist in Embed Filesystem LaunchDaemon Plist */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000016 /* com.forge-conductor.filesystem-daemon.plist */; };
+		E2F500000000000000000049 /* forge-conductor in Embed Manager CLI */ = {isa = PBXBuildFile; fileRef = FAD7DC3FA3A1480E9B4955B1 /* forge-conductor */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		E2F500000000000000000041 /* PrivilegedLeafDeleteEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000043 /* PrivilegedLeafDeleteEngine.swift */; };
 		E2F500000000000000000042 /* SecureFilesystemMutationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000044 /* SecureFilesystemMutationTests.swift */; };
 /* End PBXBuildFile section */
@@ -322,6 +323,20 @@
 			remoteGlobalIDString = E2F500000000000000000026;
 			remoteInfo = ForgeFilesystemDaemon;
 		};
+		E2F500000000000000000047 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FF3F53A3F88F4DF8B3C98871 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E2F500000000000000000026;
+			remoteInfo = ForgeFilesystemDaemon;
+		};
+		E2F50000000000000000004A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FF3F53A3F88F4DF8B3C98871 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 05C234606560407787702A3C;
+			remoteInfo = "forge-conductor";
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -378,6 +393,17 @@
 				E2F500000000000000000009 /* com.forge-conductor.filesystem-daemon.plist in Embed Filesystem LaunchDaemon Plist */,
 			);
 			name = "Embed Filesystem LaunchDaemon Plist";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E2F50000000000000000004B /* Embed Manager CLI */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Helpers;
+			dstSubfolderSpec = 1;
+			files = (
+				E2F500000000000000000049 /* forge-conductor in Embed Manager CLI */,
+			);
+			name = "Embed Manager CLI";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -1010,6 +1036,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 364DA9615EEF4503B64E048F /* Build configuration list for PBXNativeTarget "forge-conductor" */;
 			buildPhases = (
+				E2F500000000000000000046 /* Seal Filesystem Daemon Identity */,
 				EDC2E30003514F1F9A39A3FF /* Sources */,
 				FD857FD53ADB4EB29A390115 /* Frameworks */,
 			);
@@ -1018,6 +1045,7 @@
 			dependencies = (
 				C7B38FE38DB84BD889BDDFC8 /* PBXTargetDependency */,
 				F0A700000000000000000007 /* PBXTargetDependency */,
+				E2F500000000000000000048 /* PBXTargetDependency */,
 			);
 			name = "forge-conductor";
 			productName = "forge-conductor";
@@ -1135,11 +1163,13 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 80CDA28A6A1140C4960F2655 /* Build configuration list for PBXNativeTarget "ForgeConductor" */;
 			buildPhases = (
+				E2F500000000000000000045 /* Seal Filesystem Daemon Identity */,
 				3ABF1A6B59F3473DA6AD1A26 /* Sources */,
 				BD46199A67854F19A9586E75 /* Resources */,
 				D2CE50ED41104B5E981F8DD0 /* Frameworks */,
 				98CBE8A3FF644D858AC1F1DA /* Embed Frameworks */,
 				F0A700000000000000000009 /* Embed Runtime Helper */,
+				E2F50000000000000000004B /* Embed Manager CLI */,
 				E2F500000000000000000023 /* Embed Filesystem Daemon */,
 				E2F500000000000000000024 /* Embed Filesystem LaunchDaemon Plist */,
 			);
@@ -1149,6 +1179,7 @@
 				7F8369FCE0FB4AF984DF68CB /* PBXTargetDependency */,
 				F0A700000000000000000006 /* PBXTargetDependency */,
 				E2F500000000000000000034 /* PBXTargetDependency */,
+				E2F50000000000000000004C /* PBXTargetDependency */,
 			);
 			name = ForgeConductor;
 			productName = ForgeConductor;
@@ -1237,6 +1268,55 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		E2F500000000000000000045 /* Seal Filesystem Daemon Identity */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/script/seal_filesystem_daemon_identity.sh",
+				"$(BUILT_PRODUCTS_DIR)/forge-filesystem-daemon",
+				"$(SRCROOT)/Sources/ForgeConductorApp/Resources/Info.plist",
+			);
+			name = "Seal Filesystem Daemon Identity";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/ForgeConductorApp-Info.plist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${SRCROOT}/script/seal_filesystem_daemon_identity.sh\" \"${BUILT_PRODUCTS_DIR}/forge-filesystem-daemon\" \"${SRCROOT}/Sources/ForgeConductorApp/Resources/Info.plist\" \"${DERIVED_FILE_DIR}/ForgeConductorApp-Info.plist\"\n";
+			showEnvVarsInLog = 0;
+		};
+		E2F500000000000000000046 /* Seal Filesystem Daemon Identity */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/script/seal_filesystem_daemon_identity.sh",
+				"$(BUILT_PRODUCTS_DIR)/forge-filesystem-daemon",
+				"$(SRCROOT)/Sources/ForgeConductorCLI/Info.plist",
+			);
+			name = "Seal Filesystem Daemon Identity";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/ForgeConductorCLI-Info.plist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${SRCROOT}/script/seal_filesystem_daemon_identity.sh\" \"${BUILT_PRODUCTS_DIR}/forge-filesystem-daemon\" \"${SRCROOT}/Sources/ForgeConductorCLI/Info.plist\" \"${DERIVED_FILE_DIR}/ForgeConductorCLI-Info.plist\"\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		00012A1DBBFF4A2B84B0D26C /* Sources */ = {
@@ -1556,6 +1636,16 @@
 			target = E2F500000000000000000026 /* ForgeFilesystemDaemon */;
 			targetProxy = E2F500000000000000000030 /* PBXContainerItemProxy */;
 		};
+		E2F500000000000000000048 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E2F500000000000000000026 /* ForgeFilesystemDaemon */;
+			targetProxy = E2F500000000000000000047 /* PBXContainerItemProxy */;
+		};
+		E2F50000000000000000004C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 05C234606560407787702A3C /* forge-conductor */;
+			targetProxy = E2F50000000000000000004A /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
@@ -1585,17 +1675,27 @@
 		462BB7BBB61F4979BE23EEDD /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
+				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 2Y25RTLZET;
+				EAGER_COMPILATION_ALLOW_SCRIPTS = NO;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
-				GENERATE_INFOPLIST_FILE = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "$(DERIVED_FILE_DIR)/ForgeConductorCLI-Info.plist";
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
+					"@executable_path/../Frameworks",
 					"@executable_path",
 					"@loader_path",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.9.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.cli";
 				PRODUCT_NAME = "forge-conductor";
 				SWIFT_STRICT_CONCURRENCY = complete;
@@ -1688,11 +1788,12 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
+				EAGER_COMPILATION_ALLOW_SCRIPTS = NO;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				EXTRACT_APP_INTENTS_METADATA = NO;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = Sources/ForgeConductorApp/Resources/Info.plist;
+				INFOPLIST_FILE = "$(DERIVED_FILE_DIR)/ForgeConductorApp-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Forge Conductor";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
@@ -1724,10 +1825,11 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 2Y25RTLZET;
+				EAGER_COMPILATION_ALLOW_SCRIPTS = NO;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = Sources/ForgeConductorApp/Resources/Info.plist;
+				INFOPLIST_FILE = "$(DERIVED_FILE_DIR)/ForgeConductorApp-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Forge Conductor";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
@@ -1850,17 +1952,27 @@
 		D82F296A8E4141ECB3B96E83 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
+				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 9AQ2C2838M;
+				EAGER_COMPILATION_ALLOW_SCRIPTS = NO;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
-				GENERATE_INFOPLIST_FILE = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "$(DERIVED_FILE_DIR)/ForgeConductorCLI-Info.plist";
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
+					"@executable_path/../Frameworks",
 					"@executable_path",
 					"@loader_path",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.9.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.cli";
 				PRODUCT_NAME = "forge-conductor";
 				SWIFT_STRICT_CONCURRENCY = complete;
@@ -1971,6 +2083,7 @@
 			buildSettings = {
 				DEAD_CODE_STRIPPING = YES;
 				DEFINES_MODULE = YES;
+				ENABLE_CODE_COVERAGE = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MACH_O_TYPE = staticlib;
 				PRODUCT_NAME = ForgeFilesystemProtocol;
@@ -1986,6 +2099,7 @@
 			buildSettings = {
 				DEAD_CODE_STRIPPING = YES;
 				DEFINES_MODULE = YES;
+				ENABLE_CODE_COVERAGE = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MACH_O_TYPE = staticlib;
 				PRODUCT_NAME = ForgeFilesystemProtocol;
@@ -2007,6 +2121,7 @@
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
+				ENABLE_CODE_COVERAGE = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
@@ -2031,6 +2146,7 @@
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 2Y25RTLZET;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
+				ENABLE_CODE_COVERAGE = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;

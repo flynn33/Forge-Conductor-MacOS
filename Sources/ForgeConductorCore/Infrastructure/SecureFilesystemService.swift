@@ -129,11 +129,166 @@ protocol SecureFilesystemServiceTransport: Sendable {
     ) -> ForgeFilesystemResponse
 }
 
+struct SecureFilesystemHandshakeStateMachine {
+    enum Phase: Equatable {
+        case awaitingIdentity
+        case dispatchAuthorized
+        case requestSubmitted
+        case finished
+    }
+
+    enum ServiceInfoDisposition: Equatable {
+        case prepareDispatch
+        case finishWithoutDispatch
+        case ignore
+    }
+
+    private(set) var phase: Phase = .awaitingIdentity
+    private(set) var terminalResponse: ForgeFilesystemResponse?
+    private let transactionID: String
+
+    init(request: ForgeFilesystemMutationRequest) {
+        transactionID = request.transactionID
+    }
+
+    mutating func receiveServiceInfo<S: Sequence>(
+        _ information: ForgeFilesystemServiceInfo,
+        allowedCodeDirectoryHashes: S
+    ) -> ServiceInfoDisposition where S.Element == String {
+        guard phase == .awaitingIdentity else { return .ignore }
+        guard information.matchesExpectedService(
+            allowedCodeDirectoryHashes: allowedCodeDirectoryHashes
+        ) else {
+            terminalResponse = ForgeFilesystemResponse(
+                ok: false,
+                code: ForgeFilesystemErrorCode.helperIdentityMismatch,
+                message: "Secure filesystem service version or runtime identity does not match"
+            )
+            phase = .finished
+            return .finishWithoutDispatch
+        }
+        phase = .dispatchAuthorized
+        return .prepareDispatch
+    }
+
+    /// Transitions to submitted and synchronously invokes the supplied dispatch
+    /// operation. The coordinator holds its lifecycle lock across this method,
+    /// so timeout completion cannot interleave between the transition and send.
+    mutating func dispatchIfAuthorized(_ dispatch: () -> Void) -> Bool {
+        guard phase == .dispatchAuthorized else { return false }
+        phase = .requestSubmitted
+        dispatch()
+        return true
+    }
+
+    @discardableResult
+    mutating func completeReply(_ response: ForgeFilesystemResponse) -> Bool {
+        guard phase == .requestSubmitted else { return false }
+        terminalResponse = response
+        phase = .finished
+        return true
+    }
+
+    /// A lost connection or timeout before submission carries no recovery ID.
+    /// Once submission begins, the original transaction ID is retained because
+    /// the daemon may have durably recorded or committed the request.
+    @discardableResult
+    mutating func completeWithoutReply(code: String, message: String) -> Bool {
+        guard phase != .finished else { return false }
+        let recoveryTransactionID = phase == .requestSubmitted ? transactionID : nil
+        terminalResponse = ForgeFilesystemResponse(
+            ok: false,
+            code: code,
+            message: message,
+            recoveryTransactionID: recoveryTransactionID
+        )
+        phase = .finished
+        return true
+    }
+}
+
+private final class SecureFilesystemHandshakeCoordinator: @unchecked Sendable {
+    // The XPC reply is asynchronous, but use a recursive lock so an unusual
+    // synchronous error callback cannot deadlock the lifecycle coordinator.
+    private let lock = NSRecursiveLock()
+    private let completionSignal = DispatchSemaphore(value: 0)
+    private var machine: SecureFilesystemHandshakeStateMachine
+
+    init(request: ForgeFilesystemMutationRequest) {
+        machine = SecureFilesystemHandshakeStateMachine(request: request)
+    }
+
+    func receiveServiceInfo(
+        _ information: ForgeFilesystemServiceInfo,
+        allowedCodeDirectoryHashes: [String]
+    ) -> SecureFilesystemHandshakeStateMachine.ServiceInfoDisposition {
+        lock.lock()
+        let disposition = machine.receiveServiceInfo(
+            information,
+            allowedCodeDirectoryHashes: allowedCodeDirectoryHashes
+        )
+        lock.unlock()
+        if disposition == .finishWithoutDispatch { completionSignal.signal() }
+        return disposition
+    }
+
+    func dispatchIfAuthorized(_ dispatch: () -> Void) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return machine.dispatchIfAuthorized(dispatch)
+    }
+
+    func completeReply(_ response: ForgeFilesystemResponse) {
+        lock.lock()
+        let didFinish = machine.completeReply(response)
+        lock.unlock()
+        if didFinish { completionSignal.signal() }
+    }
+
+    func completeWithoutReply(code: String, message: String) {
+        lock.lock()
+        let didFinish = machine.completeWithoutReply(code: code, message: message)
+        lock.unlock()
+        if didFinish { completionSignal.signal() }
+    }
+
+    func wait(timeout: TimeInterval) -> DispatchTimeoutResult {
+        completionSignal.wait(timeout: .now() + timeout)
+    }
+
+    var terminalResponse: ForgeFilesystemResponse? {
+        lock.lock()
+        defer { lock.unlock() }
+        return machine.terminalResponse
+    }
+}
+
 final class XPCSecureFilesystemServiceTransport: SecureFilesystemServiceTransport,
     @unchecked Sendable
 {
     func serviceStatus() -> SecureFilesystemServiceStatus {
-        SecureFilesystemServiceController.registrationStatus()
+        let reportedStatus = SecureFilesystemServiceController.registrationStatus()
+        return Self.transportStatus(
+            reportedStatus: reportedStatus,
+            securedInfoDictionary: ForgeFilesystemCodeIdentity.currentSecuredInfoDictionary()
+        )
+    }
+
+    static func transportStatus(
+        reportedStatus: SecureFilesystemServiceStatus,
+        securedInfoDictionary: [String: Any]?
+    ) -> SecureFilesystemServiceStatus {
+        guard reportedStatus == .notFound,
+              let securedInfoDictionary,
+              ForgeFilesystemCodeIdentity.daemonCodeDirectoryHashes(
+                  inSecuredInfoDictionary: securedInfoDictionary
+              ) != nil else {
+            return reportedStatus
+        }
+        // A separately signed CLI cannot reliably observe the app-owned
+        // SMAppService registration. Permit an authenticated XPC probe only
+        // when the caller's sealed identity metadata contains a valid hash set.
+        return .enabled
     }
 
     func deleteLeaf(
@@ -141,9 +296,13 @@ final class XPCSecureFilesystemServiceTransport: SecureFilesystemServiceTranspor
         authorizedRoot: FileHandle,
         timeout: TimeInterval
     ) -> ForgeFilesystemResponse {
-        guard let expectedExecutableSHA256 = Self.expectedDaemonExecutableSHA256(
-            in: Bundle.main.bundleURL
-        ) else {
+        guard let securedInfo = ForgeFilesystemCodeIdentity.currentSecuredInfoDictionary(),
+              let allowedCodeDirectoryHashes = ForgeFilesystemCodeIdentity
+                  .daemonCodeDirectoryHashes(inSecuredInfoDictionary: securedInfo),
+              let signingRequirement = ForgeFilesystemProtocolConstants
+                  .requiredDaemonCodeSigningRequirement(
+                      codeDirectoryHashes: allowedCodeDirectoryHashes
+                  ) else {
             return ForgeFilesystemResponse(
                 ok: false,
                 code: ForgeFilesystemErrorCode.helperIdentityMismatch,
@@ -157,26 +316,33 @@ final class XPCSecureFilesystemServiceTransport: SecureFilesystemServiceTranspor
         connection.remoteObjectInterface = NSXPCInterface(
             with: ForgeFilesystemServiceXPC.self
         )
-        connection.setCodeSigningRequirement(
-            ForgeFilesystemProtocolConstants.requiredDaemonCodeSigningRequirement
-        )
-        let lock = NSLock()
-        let semaphore = DispatchSemaphore(value: 0)
-        var response: ForgeFilesystemResponse?
-        var connectionError: Error?
-        var requestSubmitted = false
-        var completed = false
-        connection.interruptionHandler = { semaphore.signal() }
-        connection.invalidationHandler = { semaphore.signal() }
+        connection.setCodeSigningRequirement(signingRequirement)
+        let coordinator = SecureFilesystemHandshakeCoordinator(request: request)
+        connection.interruptionHandler = {
+            coordinator.completeWithoutReply(
+                code: ForgeFilesystemErrorCode.helperUnavailable,
+                message: "Secure filesystem service connection was interrupted"
+            )
+        }
+        connection.invalidationHandler = {
+            coordinator.completeWithoutReply(
+                code: ForgeFilesystemErrorCode.helperUnavailable,
+                message: "Secure filesystem service connection was invalidated"
+            )
+        }
         connection.activate()
         guard let proxy = connection.remoteObjectProxyWithErrorHandler({ error in
-            lock.lock()
-            if !completed {
-                connectionError = error
-                completed = true
-            }
-            lock.unlock()
-            semaphore.signal()
+            let description = error.localizedDescription.lowercased()
+            let identityFailure = description.contains("code sign")
+                || description.contains("requirement")
+            coordinator.completeWithoutReply(
+                code: identityFailure
+                    ? ForgeFilesystemErrorCode.helperIdentityMismatch
+                    : ForgeFilesystemErrorCode.helperUnavailable,
+                message: identityFailure
+                    ? "Secure filesystem service identity validation failed"
+                    : "Secure filesystem service connection failed"
+            )
         }) as? ForgeFilesystemServiceXPC else {
             connection.invalidate()
             return ForgeFilesystemResponse(
@@ -186,86 +352,33 @@ final class XPCSecureFilesystemServiceTransport: SecureFilesystemServiceTranspor
             )
         }
         proxy.serviceInfo { information in
-            lock.lock()
-            guard !completed else {
-                lock.unlock()
-                return
-            }
-            guard information.matchesExpectedService(
-                executableSHA256: expectedExecutableSHA256
-            ) else {
-                response = ForgeFilesystemResponse(
-                    ok: false,
-                    code: ForgeFilesystemErrorCode.helperIdentityMismatch,
-                    message: "Secure filesystem service version or runtime identity does not match"
-                )
-                completed = true
-                lock.unlock()
-                semaphore.signal()
-                return
-            }
-            requestSubmitted = true
-            proxy.deleteLeaf(request, authorizedRoot: authorizedRoot) { value in
-                lock.lock()
-                if !completed {
-                    response = value
-                    completed = true
+            let disposition = coordinator.receiveServiceInfo(
+                information,
+                allowedCodeDirectoryHashes: allowedCodeDirectoryHashes
+            )
+            guard disposition == .prepareDispatch else { return }
+            _ = coordinator.dispatchIfAuthorized {
+                proxy.deleteLeaf(request, authorizedRoot: authorizedRoot) { value in
+                    coordinator.completeReply(value)
                 }
-                lock.unlock()
-                semaphore.signal()
             }
-            lock.unlock()
         }
         let boundedTimeout = max(0.001, min(60, timeout))
-        let waitResult = semaphore.wait(timeout: .now() + boundedTimeout)
-        lock.lock()
-        if !completed { completed = true }
-        let returnedResponse = response
-        let returnedError = connectionError
-        let submitted = requestSubmitted
-        lock.unlock()
-        connection.invalidate()
-        if let returnedResponse { return returnedResponse }
-        if let returnedError {
-            let description = returnedError.localizedDescription.lowercased()
-            let identityFailure = description.contains("code sign")
-                || description.contains("requirement")
-            return Self.failure(
-                request: submitted ? request : nil,
-                code: identityFailure
-                    ? ForgeFilesystemErrorCode.helperIdentityMismatch
-                    : ForgeFilesystemErrorCode.helperUnavailable,
-                message: identityFailure
-                    ? "Secure filesystem service identity validation failed"
-                    : "Secure filesystem service connection failed"
+        let waitResult = coordinator.wait(timeout: boundedTimeout)
+        if waitResult == .timedOut {
+            coordinator.completeWithoutReply(
+                code: ForgeFilesystemErrorCode.helperUnavailable,
+                message: "Secure filesystem service request timed out"
             )
         }
-        return Self.failure(
-            request: submitted ? request : nil,
+        let returnedResponse = coordinator.terminalResponse
+        connection.invalidate()
+        if let returnedResponse { return returnedResponse }
+        return ForgeFilesystemResponse(
+            ok: false,
             code: ForgeFilesystemErrorCode.helperUnavailable,
-            message: waitResult == .timedOut
-                ? "Secure filesystem service request timed out"
-                : "Secure filesystem service did not return a result"
+            message: "Secure filesystem service did not return a result"
         )
-    }
-
-    private static func failure(
-        request: ForgeFilesystemMutationRequest?,
-        code: String,
-        message: String
-    ) -> ForgeFilesystemResponse {
-        guard let request else {
-            return ForgeFilesystemResponse(ok: false, code: code, message: message)
-        }
-        return uncertainFailure(for: request, code: code, message: message)
-    }
-
-    static func expectedDaemonExecutableSHA256(in bundleURL: URL) -> String? {
-        let executable = bundleURL
-            .appendingPathComponent("Contents", isDirectory: true)
-            .appendingPathComponent("MacOS", isDirectory: true)
-            .appendingPathComponent(ForgeFilesystemProtocolConstants.daemonExecutableName)
-        return ForgeFilesystemExecutableIdentity.sha256(ofRegularFileAt: executable)
     }
 
     /// Once a request has been submitted to XPC, losing the reply does not prove

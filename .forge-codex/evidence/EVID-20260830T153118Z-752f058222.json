@@ -1,0 +1,55 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 500808,
+      "path": ".forge-codex/evidence/EVID-20260830T153118Z-752f058222.stdout.txt",
+      "sha256": "3f18ed1c44018cec3a7c0bc19b7be78e7c8274e57bc7a5c638abc9bea3263f82",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 3989,
+      "path": ".forge-codex/evidence/EVID-20260830T153118Z-752f058222.stderr.txt",
+      "sha256": "df5e839e9560e60ba7b391db3bf865477c5b0d6da1dc1aca61987fdb2094eb50",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "command": "xcodebuild test -project ForgeConductor.xcodeproj -scheme ForgeConductor -configuration Debug -destination platform=macOS -derivedDataPath /tmp/forge-p10-signed-settings-current-20260830-1031 -resultBundlePath /tmp/forge-p10-signed-settings-current-20260830-1031.xcresult -parallel-testing-enabled NO -only-testing:ForgeConductorUITests/ForgeConductorUITests/testManagerShowsProjectShellPolicyControls -only-testing:ForgeConductorUITests/ForgeConductorUITests/testManagerShowsProtectedFilesystemServiceControls -only-testing:ForgeConductorUITests/ForgeConductorUITests/testManagerSettingsControlsAndPersistsProjectShellPolicy -only-testing:ForgeConductorUITests/ForgeConductorUITests/testManagerSettingsStagesCanonicalAllowedRootAndRemoval -only-testing:ForgeConductorUITests/ForgeConductorUITests/testManagerSettingsRejectsFilesystemRootSelection -only-testing:ForgeConductorUITests/ForgeConductorUITests/testOperatorStateReconnectsAfterGUIRelaunch",
+  "ended_at": "2026-08-30T15:32:51.292403+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260830T153118Z-752f058222",
+  "kind": "p10-signed-settings-ui-current",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [
+    "FC-SHELL-COMPAT-QUALIFICATION-001"
+  ],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 9395649,
+    "file_count": 251,
+    "schema_version": 1,
+    "sha256": "28707961c294df84dcb27f8074a98924e9f2d4fcc2ade0cb95ca42ba0d46e995"
+  },
+  "source_manifest_after": {
+    "bytes": 9395649,
+    "file_count": 251,
+    "schema_version": 1,
+    "sha256": "28707961c294df84dcb27f8074a98924e9f2d4fcc2ade0cb95ca42ba0d46e995"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-30T15:31:18.989973+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}
