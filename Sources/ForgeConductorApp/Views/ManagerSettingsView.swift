@@ -15,6 +15,61 @@ struct ManagerSettingsView: View {
 
     var body: some View {
         Form {
+            Section("Authorized project folders") {
+                Text(
+                    "Forge Conductor denies project filesystem access until a folder is explicitly authorized. Choose folders here, then select Save settings."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+                if model.setAllowedRoots.isEmpty {
+                    Text("No project folders authorized")
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("settings-allowed-roots-empty")
+                } else {
+                    ForEach(Array(model.setAllowedRoots.enumerated()), id: \.element) { index, path in
+                        HStack(spacing: 8) {
+                            Image(systemName: "folder")
+                                .foregroundStyle(.secondary)
+                                .accessibilityHidden(true)
+                            Text(path)
+                                .font(.system(.body, design: .monospaced))
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                                .textSelection(.enabled)
+                                .help(path)
+                                .accessibilityLabel(path)
+                                .accessibilityIdentifier("settings-allowed-root-path-\(index)")
+                            Spacer(minLength: 8)
+                            Button {
+                                model.removeAllowedRoot(path)
+                            } label: {
+                                Label("Remove \(path)", systemImage: "minus.circle")
+                                    .labelStyle(.iconOnly)
+                            }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel("Remove authorized project folder \(path)")
+                            .accessibilityIdentifier("settings-allowed-root-remove-\(index)")
+                        }
+                    }
+                }
+
+                Button {
+                    model.chooseAllowedRoot()
+                } label: {
+                    Label("Add Folder…", systemImage: "plus")
+                }
+                .accessibilityLabel("Add authorized project folder")
+                .accessibilityIdentifier("settings-allowed-root-add")
+
+                if let message = model.allowedRootsMessage {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("settings-allowed-roots-message")
+                }
+            }
+
             Section {
                 LabeledContent("State", value: model.serviceState)
                 LabeledContent("Active", value: model.serviceActive ? "yes" : "no")
@@ -103,6 +158,63 @@ struct ManagerSettingsView: View {
                 .accessibilityIdentifier("shell-policy-migration-status")
             }
 
+            Section("Protected filesystem service") {
+                LabeledContent(
+                    "State",
+                    value: model.secureFilesystemServiceStatusLabel
+                )
+                .accessibilityIdentifier("settings-filesystem-service-status")
+
+                Text(
+                    "Delete and move operations fail closed unless the separately signed service is enabled and the requested operation is qualified. Shell tools remain nonprivileged and are controlled independently above."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+                if let message = model.secureFilesystemServiceMessage {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("settings-filesystem-service-message")
+                }
+
+                HStack(spacing: 10) {
+                    Button("Enable") { model.enableSecureFilesystemService() }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(
+                            model.secureFilesystemServiceStatus == .enabled
+                                || model.isUpdatingSecureFilesystemService
+                        )
+                        .accessibilityIdentifier("settings-filesystem-service-enable")
+                    Button("Update / Reinstall") {
+                        model.reinstallSecureFilesystemService()
+                    }
+                    .disabled(
+                        model.secureFilesystemServiceStatus == .notFound
+                            || model.isUpdatingSecureFilesystemService
+                    )
+                    .accessibilityIdentifier("settings-filesystem-service-reinstall")
+                    Button("Disable") { model.disableSecureFilesystemService() }
+                        .disabled(
+                            model.secureFilesystemServiceStatus == .notRegistered
+                                || model.secureFilesystemServiceStatus == .notFound
+                        )
+                        .accessibilityIdentifier("settings-filesystem-service-disable")
+                    Button("Open System Settings") {
+                        model.openSecureFilesystemApprovalSettings()
+                    }
+                    .accessibilityIdentifier("settings-filesystem-service-approval")
+                    Button("Refresh") { model.refreshSecureFilesystemServiceStatus() }
+                        .accessibilityIdentifier("settings-filesystem-service-refresh")
+                    if model.isUpdatingSecureFilesystemService {
+                        ProgressView()
+                            .controlSize(.small)
+                            .accessibilityLabel("Updating protected filesystem service")
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+
             Section("Maintenance") {
                 Toggle("Auto-refresh telemetry", isOn: $model.autoRefresh)
                 Button("Refresh telemetry now") { model.refresh(force: true) }
@@ -148,7 +260,10 @@ struct ManagerSettingsView: View {
         }
         .formStyle(.grouped)
         .padding(16)
-        .onAppear { model.loadSettingsFromConfig() }
+        .onAppear {
+            model.loadSettingsFromConfig()
+            model.refreshSecureFilesystemServiceStatus()
+        }
     }
 
     @ViewBuilder

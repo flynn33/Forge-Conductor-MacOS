@@ -152,6 +152,7 @@ public struct ManagerSettings: Sendable, Equatable {
     public var shellRuntimeCapabilities: ShellRuntimeCapabilities
     public var shellTimeoutSec: Int
     public var logLevel: String
+    public var allowedRoots: [String]
 
     public init(
         dashboardHost: String,
@@ -169,7 +170,8 @@ public struct ManagerSettings: Sendable, Equatable {
         shellMigrationReceiptValid: Bool,
         shellRuntimeCapabilities: ShellRuntimeCapabilities,
         shellTimeoutSec: Int,
-        logLevel: String
+        logLevel: String,
+        allowedRoots: [String] = []
     ) {
         self.dashboardHost = dashboardHost
         self.dashboardPort = dashboardPort
@@ -187,6 +189,7 @@ public struct ManagerSettings: Sendable, Equatable {
         self.shellRuntimeCapabilities = shellRuntimeCapabilities
         self.shellTimeoutSec = shellTimeoutSec
         self.logLevel = logLevel
+        self.allowedRoots = allowedRoots
     }
 
     public init(dictionary: [String: Any]) throws {
@@ -221,7 +224,8 @@ public struct ManagerSettings: Sendable, Equatable {
                 powershell: Self.runtimePath(runtimes["powershell"])
             ),
             shellTimeoutSec: ManagerJSONValue.int(shell["default_timeout_sec"]) ?? 30,
-            logLevel: (dictionary["log_level"] as? String) ?? "info"
+            logLevel: (dictionary["log_level"] as? String) ?? "info",
+            allowedRoots: dictionary["allowed_roots"] as? [String] ?? []
         )
     }
 
@@ -254,6 +258,7 @@ public struct ManagerSettings: Sendable, Equatable {
                 "runtimes": shellRuntimeCapabilities.asDictionary(),
             ] as [String: Any],
             "log_level": logLevel,
+            "allowed_roots": allowedRoots,
         ]
     }
 
@@ -305,6 +310,7 @@ public struct ManagerSettingsPatch: Sendable, Equatable {
     public var shellEnabled: Bool?
     public var shellTimeoutSec: Int?
     public var logLevel: String?
+    public var allowedRoots: [String]?
 
     public init(
         dashboardHost: String? = nil,
@@ -316,7 +322,8 @@ public struct ManagerSettingsPatch: Sendable, Equatable {
         sessionIdleTTLSec: Int? = nil,
         shellEnabled: Bool? = nil,
         shellTimeoutSec: Int? = nil,
-        logLevel: String? = nil
+        logLevel: String? = nil,
+        allowedRoots: [String]? = nil
     ) {
         self.dashboardHost = dashboardHost
         self.dashboardPort = dashboardPort
@@ -328,6 +335,7 @@ public struct ManagerSettingsPatch: Sendable, Equatable {
         self.shellEnabled = shellEnabled
         self.shellTimeoutSec = shellTimeoutSec
         self.logLevel = logLevel
+        self.allowedRoots = allowedRoots
     }
 
     /// Edge adapter: config store still merges nested dict patches.
@@ -351,6 +359,7 @@ public struct ManagerSettingsPatch: Sendable, Equatable {
         if !sessions.isEmpty { patch["sessions"] = sessions }
         if !shell.isEmpty { patch["shell"] = shell }
         if let logLevel { patch["log_level"] = logLevel }
+        if let allowedRoots { patch["allowed_roots"] = allowedRoots }
         return patch
     }
 }

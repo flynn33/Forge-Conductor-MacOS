@@ -205,6 +205,7 @@ final class ContinuityCoordinatorTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: root) }
         let app = try ForgeApp.bootstrap(home: home)
         defer { app.shutdown() }
+        _ = try app.config.update(["allowed_roots": [root.path]], save: false)
         let initialized = try call(app, "project_memory.initialize", ["project_path": project.path])
         let projectID = try XCTUnwrap(initialized["project_id"] as? String)
 

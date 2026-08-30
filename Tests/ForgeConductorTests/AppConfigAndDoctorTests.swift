@@ -21,16 +21,22 @@ final class AppConfigAndDoctorTests: XCTestCase {
     }
 
     func testAppConfigApplySettingsPatch() {
+        let allowedRoot = FileManager.default.temporaryDirectory
+            .resolvingSymlinksInPath()
+            .standardizedFileURL
+            .path
         let cfg = AppConfig.default.applying(settings: ManagerSettingsPatch(
             dashboardPort: 9001,
             watchdogIntervalSec: 7,
-            shellEnabled: false
+            shellEnabled: false,
+            allowedRoots: [allowedRoot]
         ))
         XCTAssertEqual(cfg.dashboard.port, 9001)
         XCTAssertEqual(cfg.manager.watchdogIntervalSec, 7)
         XCTAssertFalse(cfg.shell.enabled)
         XCTAssertTrue(cfg.shell.userDisabled)
         XCTAssertEqual(cfg.shell.policyOrigin, "user_disabled")
+        XCTAssertEqual(cfg.allowedRoots, [allowedRoot])
     }
 
     func testFreshConfigUsesSchemaV2DefaultEnabledShellPolicy() throws {

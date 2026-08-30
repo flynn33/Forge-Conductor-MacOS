@@ -1,0 +1,55 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 14876,
+      "path": ".forge-codex/evidence/EVID-20260830T112229Z-276bae29ad.stdout.txt",
+      "sha256": "8f0100967c024c8d78c563ce5da74529d271b2833f84f4ad0d896a7576f17113",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 14297,
+      "path": ".forge-codex/evidence/EVID-20260830T112229Z-276bae29ad.stderr.txt",
+      "sha256": "647e230e536e42d0306f9432e43cacd361605104c040eacbb1af385bef13f3e8",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "command": "swift test -Xswiftc -warnings-as-errors --filter FilesystemCancellationTests",
+  "ended_at": "2026-08-30T11:23:10.820754+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260830T112229Z-276bae29ad",
+  "kind": "p10-filesystem-prechange",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [
+    "FC-FILESYSTEM-PATH-TOCTOU-001"
+  ],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 9086943,
+    "file_count": 242,
+    "schema_version": 1,
+    "sha256": "926ba167f692e974b3975acc055b6a4e3e2e766ce1235c2422d0dba22ba2df22"
+  },
+  "source_manifest_after": {
+    "bytes": 9086943,
+    "file_count": 242,
+    "schema_version": 1,
+    "sha256": "926ba167f692e974b3975acc055b6a4e3e2e766ce1235c2422d0dba22ba2df22"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-30T11:22:29.828570+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

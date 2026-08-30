@@ -55,7 +55,35 @@ public enum ManagerSettingsNormalizer {
         if let level = patch["log_level"] as? String {
             normalized["log_level"] = level
         }
+        if let roots = patch["allowed_roots"] as? [String] {
+            normalized["allowed_roots"] = canonicalAllowedRoots(roots)
+        }
         return normalized
+    }
+
+    /// Returns an existing, absolute directory path suitable for project-root authority.
+    /// Filesystem root is never a valid configured project root.
+    public static func canonicalAllowedRoot(_ path: String) -> String? {
+        let expanded = (path as NSString).expandingTildeInPath
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard expanded.hasPrefix("/") else { return nil }
+
+        let canonical = URL(fileURLWithPath: expanded, isDirectory: true)
+            .resolvingSymlinksInPath()
+            .standardizedFileURL
+        guard canonical.path != "/" else { return nil }
+
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(
+            atPath: canonical.path,
+            isDirectory: &isDirectory
+        ), isDirectory.boolValue else { return nil }
+        return canonical.path
+    }
+
+    /// Canonicalizes, de-duplicates, and sorts configured roots for stable persistence and UI.
+    public static func canonicalAllowedRoots(_ roots: [String]) -> [String] {
+        Array(Set(roots.compactMap(canonicalAllowedRoot))).sorted()
     }
 
     public static func intValue(_ any: Any?) -> Int? {

@@ -113,7 +113,8 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             shellMigrationReceiptValid: shell.migration.receiptValid,
             shellRuntimeCapabilities: shell.runtimes,
             shellTimeoutSec: cfg.shell.defaultTimeoutSec,
-            logLevel: cfg.logLevel
+            logLevel: cfg.logLevel,
+            allowedRoots: ManagerSettingsNormalizer.canonicalAllowedRoots(cfg.allowedRoots)
         )
     }
 

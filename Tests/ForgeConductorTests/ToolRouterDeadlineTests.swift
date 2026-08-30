@@ -228,6 +228,10 @@ final class ToolRouterDeadlineTests: XCTestCase {
             .appendingPathComponent("forge-router-deadline-\(label)-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
         let app = try ForgeApp.bootstrap(home: home)
+        _ = try app.config.update(
+            ["allowed_roots": [FileManager.default.temporaryDirectory.path]],
+            save: false
+        )
         defer {
             app.shutdown()
             try? FileManager.default.removeItem(at: home)

@@ -1,0 +1,144 @@
+Test Suite 'Selected tests' started at 2026-08-30 06:52:33.015.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-30 06:52:33.016.
+Test Suite 'FilesystemCancellationTests' started at 2026-08-30 06:52:33.016.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testConcurrentQuarantineReservationsNeverExceedGlobalCapacity]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testConcurrentQuarantineReservationsNeverExceedGlobalCapacity]' passed (0.258 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCorruptQuarantineReceiptRemainsOccupiedAndRecoveryVisible]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCorruptQuarantineReceiptRemainsOccupiedAndRecoveryVisible]' passed (0.120 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeCancellationAfterInstallReportsBothDurableStates]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeCancellationAfterInstallReportsBothDurableStates]' passed (0.156 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeCancellationBeforeInstallPreservesSourceAndReportsStaging]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeCancellationBeforeInstallPreservesSourceAndReportsStaging]' passed (0.158 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeInstallDoesNotPublishStagingLeafSwappedAfterVerification]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeInstallDoesNotPublishStagingLeafSwappedAfterVerification]' passed (0.159 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeInstallFailureAfterCreatingParentsReportsPartialMutation]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeInstallFailureAfterCreatingParentsReportsPartialMutation]' passed (0.160 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeMoveDoesNotOverwriteExistingDestination]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeMoveDoesNotOverwriteExistingDestination]' passed (0.120 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeMovePreservesMetadataChangedSourceEntryAfterDeletionStarts]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeMovePreservesMetadataChangedSourceEntryAfterDeletionStarts]' passed (0.166 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeMovePreservesSourceReplacedAfterDestinationInstall]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeMovePreservesSourceReplacedAfterDestinationInstall]' passed (0.156 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeMovePublishesExactTargetAndRemovesSource]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeMovePublishesExactTargetAndRemovesSource]' passed (0.163 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeMoveReconcilesMetadataChangedByRemovingSiblingHardLink]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeMoveReconcilesMetadataChangedByRemovingSiblingHardLink]' passed (0.165 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeMoveRejectsReboundDestinationParentAndCleansPinnedStaging]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeMoveRejectsReboundDestinationParentAndCleansPinnedStaging]' passed (0.148 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeMoveRejectsSourceReplacedBeforeFenceCapture]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeMoveRejectsSourceReplacedBeforeFenceCapture]' passed (0.116 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeNamespaceInstabilityMergesInstallAndStagingRecoveryReceipts]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeNamespaceInstabilityMergesInstallAndStagingRecoveryReceipts]' passed (0.149 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeNamespaceInstabilityWithUnconfirmedDurabilityRetainsRecoveryReceipt]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeNamespaceInstabilityWithUnconfirmedDurabilityRetainsRecoveryReceipt]' passed (0.148 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeRemovalPinsIntermediateSourceParent]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeRemovalPinsIntermediateSourceParent]' passed (0.160 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeSourceParentSyncFailureReturnsCommittedMove]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeSourceParentSyncFailureReturnsCommittedMove]' passed (0.160 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeSourceRemovalPreservesLeafSwappedAfterVerification]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeSourceRemovalPreservesLeafSwappedAfterVerification]' passed (0.154 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeStagingDeadlineStopsSynchronizationAndRequiresCleanup]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testCrossVolumeStagingDeadlineStopsSynchronizationAndRequiresCleanup]' passed (0.172 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testDeleteQuarantineIsGloballyBoundedAndRecoveredAcrossRestart]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testDeleteQuarantineIsGloballyBoundedAndRecoveredAcrossRestart]' passed (0.186 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testDeleteReportsUnknownPresenceWithoutFalseExistenceClaim]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testDeleteReportsUnknownPresenceWithoutFalseExistenceClaim]' passed (0.118 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testDestinationHierarchySyncFailureReportsCreatedDirectory]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testDestinationHierarchySyncFailureReportsCreatedDirectory]' passed (0.118 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testInitialQuarantineSyncFailureReportsRetainedTransitionWithoutRollback]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testInitialQuarantineSyncFailureReportsRetainedTransitionWithoutRollback]' passed (0.117 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testMissingMoveSourceDoesNotCreateDestinationHierarchy]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testMissingMoveSourceDoesNotCreateDestinationHierarchy]' passed (0.116 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testMoveRenameFailureAfterCreatingParentsReportsPartialMutation]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testMoveRenameFailureAfterCreatingParentsReportsPartialMutation]' passed (0.113 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testMoveSynchronizesEveryCreatedParentAndBothRenameParents]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testMoveSynchronizesEveryCreatedParentAndBothRenameParents]' passed (0.118 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testPostPublicationStagingFailurePreservesRecoveryAndUnknownPresence]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testPostPublicationStagingFailurePreservesRecoveryAndUnknownPresence]' passed (0.152 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testPostRemovalStagingDeadlineDoesNotClaimCleanupIsRequired]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testPostRemovalStagingDeadlineDoesNotClaimCleanupIsRequired]' passed (0.141 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testPostRenameSynchronizationFailureReturnsCommittedMove]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testPostRenameSynchronizationFailureReturnsCommittedMove]' passed (0.116 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testPostUnlinkReceiptSyncFailureDoesNotClaimMissingRecoveryPath]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testPostUnlinkReceiptSyncFailureDoesNotClaimMissingRecoveryPath]' passed (0.119 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testPreCancelledRecursiveDeleteLeavesTreeUntouched]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testPreCancelledRecursiveDeleteLeavesTreeUntouched]' passed (0.111 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testPreexistingDeterministicQuarantineNameIsNotClaimed]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testPreexistingDeterministicQuarantineNameIsNotClaimed]' passed (0.116 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testReceiptRemovalFailureRetainsTerminalRecoveryPath]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testReceiptRemovalFailureRetainsTerminalRecoveryPath]' passed (0.115 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testRecursiveDeleteDoesNotFollowChildSymlink]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testRecursiveDeleteDoesNotFollowChildSymlink]' passed (0.116 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testRecursiveDeletePinsIntermediateParentBeforeUnlink]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testRecursiveDeletePinsIntermediateParentBeforeUnlink]' passed (0.116 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testRecursiveDeletePreservesLeafSwappedAfterVerification]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testRecursiveDeletePreservesLeafSwappedAfterVerification]' passed (0.118 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testRecursiveDeleteReportsPartialMutationAfterCancellation]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testRecursiveDeleteReportsPartialMutationAfterCancellation]' passed (0.119 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testRestartDoesNotTreatMissingNamesAsTerminalProof]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testRestartDoesNotTreatMissingNamesAsTerminalProof]' passed (0.120 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testRetainedStagingRecoveryDoesNotClaimAbsentStagingPathNeedsCleanup]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testRetainedStagingRecoveryDoesNotClaimAbsentStagingPathNeedsCleanup]' passed (0.119 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testRollbackRefusesSubstitutedQuarantineOccupant]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testRollbackRefusesSubstitutedQuarantineOccupant]' passed (0.114 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testSameParentMoveSynchronizesParentOnce]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testSameParentMoveSynchronizesParentOnce]' passed (0.116 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testSameVolumeCancellationBeforeRenamePreservesSource]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testSameVolumeCancellationBeforeRenamePreservesSource]' passed (0.115 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testSameVolumeMoveDoesNotOverwriteExistingDestination]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testSameVolumeMoveDoesNotOverwriteExistingDestination]' passed (0.121 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testSameVolumeMoveDoesNotPublishLeafSwappedAfterVerification]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testSameVolumeMoveDoesNotPublishLeafSwappedAfterVerification]' passed (0.114 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testSameVolumeMoveRejectsReboundDestinationParent]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testSameVolumeMoveRejectsReboundDestinationParent]' passed (0.115 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testSameVolumeMoveRejectsReboundSourceParent]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testSameVolumeMoveRejectsReboundSourceParent]' passed (0.114 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testSameVolumeNamespaceInstabilityWithUnconfirmedDurabilityRetainsRecoveryReceipt]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testSameVolumeNamespaceInstabilityWithUnconfirmedDurabilityRetainsRecoveryReceipt]' passed (0.115 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testStaleQuarantineReservationCannotReleaseReusedSlot]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testStaleQuarantineReservationCannotReleaseReusedSlot]' passed (0.116 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testUnavailableQuarantineLedgerFailsClosedBeforeNamespaceMutation]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testUnavailableQuarantineLedgerFailsClosedBeforeNamespaceMutation]' passed (0.115 seconds).
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testUniqueFileMoveBypassesHardLinkReconciliation]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testUniqueFileMoveBypassesHardLinkReconciliation]' passed (2.139 seconds).
+Test Suite 'FilesystemCancellationTests' passed at 2026-08-30 06:52:41.766.
+	 Executed 50 tests, with 0 failures (0 unexpected) in 8.746 (8.750) seconds
+Test Suite 'ForgeFilesystemProtocolTests' started at 2026-08-30 06:52:41.766.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testMutationRequestRejectsExactContentContractUntilCapabilityExists]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testMutationRequestRejectsExactContentContractUntilCapabilityExists]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testMutationRequestRejectsUnknownProtocolAndUnboundedOrUnsafeComponents]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testMutationRequestRejectsUnknownProtocolAndUnboundedOrUnsafeComponents]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testMutationRequestSecureCodingRoundTripPreservesBoundedEnvelope]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testMutationRequestSecureCodingRoundTripPreservesBoundedEnvelope]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testPeerRequirementsBindExactIdentifiersTeamsAndCertificateClass]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testPeerRequirementsBindExactIdentifiersTeamsAndCertificateClass]' passed (0.000 seconds).
+Test Suite 'ForgeFilesystemProtocolTests' passed at 2026-08-30 06:52:41.767.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.001 (0.001) seconds
+Test Suite 'RuntimeExecutionJobTests' started at 2026-08-30 06:52:41.767.
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeLaunchGateUsesExactBuildConfigurationTeam]' started.
+Test Case '-[ForgeConductorTests.RuntimeExecutionJobTests testRuntimeLaunchGateUsesExactBuildConfigurationTeam]' passed (0.000 seconds).
+Test Suite 'RuntimeExecutionJobTests' passed at 2026-08-30 06:52:41.767.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'SecureFilesystemMutationTests' started at 2026-08-30 06:52:41.767.
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testProductionPackDisablesMoveWithoutSameUserFallback]' started.
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testProductionPackDisablesMoveWithoutSameUserFallback]' passed (0.195 seconds).
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testProductionPackRejectsDeleteWithoutDurableContextAndPreservesLeaf]' started.
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testProductionPackRejectsDeleteWithoutDurableContextAndPreservesLeaf]' passed (0.191 seconds).
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testSecureClientCanonicalizesVarAliasBeforeOpeningAuthorizedRoot]' started.
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testSecureClientCanonicalizesVarAliasBeforeOpeningAuthorizedRoot]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testSecureClientMapsApprovalRequirementWithoutDispatchingMutation]' started.
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testSecureClientMapsApprovalRequirementWithoutDispatchingMutation]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testSecureClientMapsUnavailableStatusesWithoutDispatchingMutation]' started.
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testSecureClientMapsUnavailableStatusesWithoutDispatchingMutation]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testSecureClientPreservesLeafWhenHelperIdentityDoesNotMatch]' started.
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testSecureClientPreservesLeafWhenHelperIdentityDoesNotMatch]' passed (0.000 seconds).
+Test Suite 'SecureFilesystemMutationTests' passed at 2026-08-30 06:52:42.156.
+	 Executed 6 tests, with 0 failures (0 unexpected) in 0.389 (0.389) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-08-30 06:52:42.156.
+	 Executed 61 tests, with 0 failures (0 unexpected) in 9.136 (9.140) seconds
+Test Suite 'Selected tests' passed at 2026-08-30 06:52:42.156.
+	 Executed 61 tests, with 0 failures (0 unexpected) in 9.136 (9.141) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

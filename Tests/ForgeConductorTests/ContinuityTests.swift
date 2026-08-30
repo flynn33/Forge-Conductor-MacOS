@@ -35,6 +35,16 @@ final class ContinuityTests: XCTestCase {
         )
     }
 
+    private func configureAllowedProjectRoot(
+        _ app: ForgeApp,
+        root: URL? = nil
+    ) throws {
+        _ = try app.config.update(
+            ["allowed_roots": [(root ?? tempHome).path]],
+            save: false
+        )
+    }
+
     func testMemoryLayoutCreatedOnBootstrap() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
@@ -79,6 +89,7 @@ final class ContinuityTests: XCTestCase {
     func testHandoffMarksResumeReadyAndSnapshotsAgents() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
+        try configureAllowedProjectRoot(app)
         let client = ClientID("continuity-agents")
 
         let start = try app.tools.call(
@@ -124,6 +135,7 @@ final class ContinuityTests: XCTestCase {
     func testNewClientCheckpointPreservesAgentsUntilTheyReattach() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
+        try configureAllowedProjectRoot(app)
         let originalClient = ClientID("checkpoint-agent-original")
         let resumedClient = ClientID("checkpoint-agent-resumed")
 
@@ -627,6 +639,7 @@ final class ContinuityTests: XCTestCase {
     func testHandoffSnapshotsOnlyCallingClientsOpenAgents() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
+        try configureAllowedProjectRoot(app)
         let firstClient = ClientID("agent-owner-a")
         let secondClient = ClientID("agent-owner-b")
 
@@ -662,6 +675,7 @@ final class ContinuityTests: XCTestCase {
         do {
             let app = try ForgeApp.bootstrap(home: tempHome)
             defer { app.shutdown() }
+            try configureAllowedProjectRoot(app)
             let started = try app.tools.call(
                 name: "agent_run_start",
                 arguments: [
@@ -699,6 +713,7 @@ final class ContinuityTests: XCTestCase {
 
     func testConcurrentAgentReattachUsesAtomicOwnershipCompareAndSwap() throws {
         let primary = try ForgeApp.bootstrap(home: tempHome)
+        try configureAllowedProjectRoot(primary)
         let originalClient = ClientID("reattach-original")
         let started = try primary.tools.call(
             name: "agent_run_start",
@@ -834,6 +849,7 @@ final class ContinuityTests: XCTestCase {
         do {
             let app = try ForgeApp.bootstrap(home: tempHome)
             defer { app.shutdown() }
+            try configureAllowedProjectRoot(app)
             let started = try app.tools.call(
                 name: "agent_run_start",
                 arguments: [
@@ -3825,20 +3841,27 @@ final class ContinuityTests: XCTestCase {
         XCTAssertTrue(after.ok, "\(after.payload)")
     }
 
-    func testReadOnlyHomePathIsAllowedWithoutAgentSession() throws {
+    func testReadOnlyPathRequiresExplicitAllowedRootWithoutAgentSession() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
-        let projects = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("LM Studio Projects", isDirectory: true)
-        guard FileManager.default.fileExists(atPath: projects.path) else {
-            throw XCTSkip("LM Studio Projects folder not present on this Mac")
-        }
-        let result = try app.tools.call(
+        let projects = tempHome.appendingPathComponent("local-projects", isDirectory: true)
+        try FileManager.default.createDirectory(at: projects, withIntermediateDirectories: true)
+
+        let denied = try app.tools.call(
             name: "fs_list",
             arguments: ["path": projects.path],
             clientID: ClientID("home-read")
         )
-        XCTAssertTrue(result.ok, "\(result.payload)")
+        XCTAssertFalse(denied.ok)
+        XCTAssertEqual(denied.payload["code"] as? String, "path_outside_allowed_roots")
+
+        try configureAllowedProjectRoot(app, root: projects)
+        let allowed = try app.tools.call(
+            name: "fs_list",
+            arguments: ["path": projects.path],
+            clientID: ClientID("configured-read")
+        )
+        XCTAssertTrue(allowed.ok, "\(allowed.payload)")
     }
 }
 

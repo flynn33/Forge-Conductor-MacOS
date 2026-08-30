@@ -1,0 +1,56 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 18743,
+      "path": ".forge-codex/evidence/EVID-20260830T115219Z-809dfc16bd.stdout.txt",
+      "sha256": "b22656d376c129832b4bb06af9c741beaa5a119c1a3c6be2a53eea7b036f80fe",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 13862,
+      "path": ".forge-codex/evidence/EVID-20260830T115219Z-809dfc16bd.stderr.txt",
+      "sha256": "6d83b99931422f38395c04ab9b21ebf4871fcc9f32dcac0e3211483d25089059",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "command": "swift test -Xswiftc -warnings-as-errors --filter 'SecureFilesystemMutationTests|ForgeFilesystemProtocolTests|FilesystemCancellationTests|RuntimeExecutionJobTests.testRuntimeLaunchGateUsesExactBuildConfigurationTeam'",
+  "ended_at": "2026-08-30T11:52:42.190793+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260830T115219Z-809dfc16bd",
+  "kind": "p10-privileged-filesystem-focused",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [
+    "FC-FILESYSTEM-PATH-TOCTOU-001"
+  ],
+  "related_gates": [
+    "G10",
+    "G12"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 9216606,
+    "file_count": 249,
+    "schema_version": 1,
+    "sha256": "1456f10a50248332de7c5f87f0b6b44345ae4c17a11351ddbe6205f04f5b49d6"
+  },
+  "source_manifest_after": {
+    "bytes": 9216606,
+    "file_count": 249,
+    "schema_version": 1,
+    "sha256": "1456f10a50248332de7c5f87f0b6b44345ae4c17a11351ddbe6205f04f5b49d6"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-30T11:52:19.782332+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

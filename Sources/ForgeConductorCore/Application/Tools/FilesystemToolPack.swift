@@ -20,6 +20,7 @@ public struct FilesystemToolPack: ToolPackHandling {
     private let forceCrossVolumeMove: Bool
     private let directorySynchronizer: @Sendable (URL) throws -> Void
     private let quarantineDirectorySynchronizer: @Sendable (Int32, URL) throws -> Void
+    private let secureMutationClient: SecureFilesystemMutationClient?
 
     enum MoveStep: Sendable, Equatable {
         case preparedDestinationDirectories
@@ -55,6 +56,7 @@ public struct FilesystemToolPack: ToolPackHandling {
         quarantineDirectorySynchronizer = {
             try Self.synchronizeDirectoryDescriptor($0, path: $1)
         }
+        secureMutationClient = SecureFilesystemMutationClient()
     }
 
     init(deletionStepObserver: (@Sendable (Int) -> Void)?) {
@@ -66,6 +68,7 @@ public struct FilesystemToolPack: ToolPackHandling {
         quarantineDirectorySynchronizer = {
             try Self.synchronizeDirectoryDescriptor($0, path: $1)
         }
+        secureMutationClient = nil
     }
 
     init(
@@ -81,6 +84,7 @@ public struct FilesystemToolPack: ToolPackHandling {
         quarantineDirectorySynchronizer = {
             try Self.synchronizeDirectoryDescriptor($0, path: $1)
         }
+        secureMutationClient = nil
     }
 
     init(
@@ -98,6 +102,7 @@ public struct FilesystemToolPack: ToolPackHandling {
         self.forceCrossVolumeMove = forceCrossVolumeMove
         self.directorySynchronizer = directorySynchronizer
         self.quarantineDirectorySynchronizer = quarantineDirectorySynchronizer
+        secureMutationClient = nil
     }
 
     init(
@@ -112,6 +117,7 @@ public struct FilesystemToolPack: ToolPackHandling {
         forceCrossVolumeMove = false
         directorySynchronizer = { try Self.synchronizeDirectory($0) }
         self.quarantineDirectorySynchronizer = quarantineDirectorySynchronizer
+        secureMutationClient = nil
     }
 
     public var toolNames: [String] {
@@ -136,12 +142,28 @@ public struct FilesystemToolPack: ToolPackHandling {
         case "fs_glob": return try fsGlob(arguments, runner: ProcessRunner(), cancellation: cancellation)
         case "fs_mkdir": return try fsMkdir(arguments, cancellation: cancellation)
         case "fs_delete":
+            if let secureMutationClient {
+                guard let path = ToolArgHelpers.string(arguments, "path") else {
+                    return .failure(code: "missing_path", message: "path required")
+                }
+                return try secureMutationClient.deleteLeaf(
+                    at: ToolArgHelpers.resolvePath(path),
+                    context: context,
+                    cancellation: cancellation
+                )
+            }
             return try fsDelete(
                 arguments,
                 quarantineLedger: FilesystemQuarantineLedger(paths: app.paths),
                 cancellation: cancellation
             )
         case "fs_move":
+            if secureMutationClient != nil {
+                return .failure(
+                    code: "filesystem_capability_unavailable",
+                    message: "Filesystem move is disabled until privileged move recovery is qualified"
+                )
+            }
             return try fsMove(
                 arguments,
                 quarantineLedger: FilesystemQuarantineLedger(paths: app.paths),

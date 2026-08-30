@@ -1101,6 +1101,7 @@ final class ContinuityV2Tests: XCTestCase {
 
         let app = try ForgeApp.bootstrap(home: home)
         defer { app.shutdown() }
+        _ = try app.config.update(["allowed_roots": [root.path]], save: false)
         let managedClient = ClientID("managed-continuity-client")
         let initialized = try app.tools.call(
             name: "project_memory.initialize",

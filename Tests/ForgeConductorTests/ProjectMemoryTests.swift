@@ -50,7 +50,7 @@ final class ProjectMemoryTests: XCTestCase {
     }
 
     func testToolConformanceIsAdditiveAndInitializeAdvertisesCapabilities() throws {
-        let app = try ForgeApp.bootstrap(home: home)
+        let app = try bootstrapApplication()
         defer { app.shutdown() }
         let names = Set(app.tools.toolNames)
         XCTAssertTrue(Set(ProjectMemoryToolPack.names).isSubset(of: names))
@@ -84,7 +84,7 @@ final class ProjectMemoryTests: XCTestCase {
     }
 
     func testProjectIsolationRedactionDeduplicationAndRestartDurability() throws {
-        var app: ForgeApp? = try ForgeApp.bootstrap(home: home)
+        var app: ForgeApp? = try bootstrapApplication()
         let idA = try initialize(app!, project: projectA)
         let clientB = ClientID("project-memory-test-b")
         let idB = try initialize(app!, project: projectB, clientID: clientB)
@@ -118,7 +118,7 @@ final class ProjectMemoryTests: XCTestCase {
 
         app?.shutdown()
         app = nil
-        app = try ForgeApp.bootstrap(home: home)
+        app = try bootstrapApplication()
         defer { app?.shutdown() }
         let reopenedA = try initialize(app!, project: projectA)
         XCTAssertEqual(reopenedA, idA)
@@ -127,7 +127,7 @@ final class ProjectMemoryTests: XCTestCase {
     }
 
     func testBatchPaginationUpdateConflictLinkAndTombstone() throws {
-        let app = try ForgeApp.bootstrap(home: home)
+        let app = try bootstrapApplication()
         defer { app.shutdown() }
         let projectID = try initialize(app, project: projectA)
         let items: [[String: Any]] = (0..<6).map { index in
@@ -189,7 +189,7 @@ final class ProjectMemoryTests: XCTestCase {
     }
 
     func testPrivateKeyRejectedPayloadBoundsAndCacheBound() throws {
-        let app = try ForgeApp.bootstrap(home: home)
+        let app = try bootstrapApplication()
         defer { app.shutdown() }
         let projectID = try initialize(app, project: projectA)
         let rejected = try app.tools.call(
@@ -225,7 +225,7 @@ final class ProjectMemoryTests: XCTestCase {
     }
 
     func testIntegrityVersionFailurePreservesDatabaseAndExportChecksumIsVerified() throws {
-        var app: ForgeApp? = try ForgeApp.bootstrap(home: home)
+        var app: ForgeApp? = try bootstrapApplication()
         let projectID = try initialize(app!, project: projectA)
         _ = try call(app!, "project_memory.remember", [
             "project_id": projectID, "kind": "constraint", "title": "Preserve", "summary": "Never delete on migration failure",
@@ -251,7 +251,7 @@ final class ProjectMemoryTests: XCTestCase {
         let before = try Data(contentsOf: database)
         try setUserVersion(database, version: 99)
         let modified = try Data(contentsOf: database)
-        app = try ForgeApp.bootstrap(home: home)
+        app = try bootstrapApplication()
         let failed = try app!.tools.call(
             name: "project_memory.initialize",
             arguments: ["project_path": projectA.path],
@@ -265,7 +265,7 @@ final class ProjectMemoryTests: XCTestCase {
     }
 
     func testImportRejectsSpecialFileWithoutBlockingPastDeadline() throws {
-        let app = try ForgeApp.bootstrap(home: home)
+        let app = try bootstrapApplication()
         defer { app.shutdown() }
         let projectID = try initialize(app, project: projectA)
         let exports = home.appendingPathComponent(
@@ -885,7 +885,7 @@ final class ProjectMemoryTests: XCTestCase {
             query: "matching", kinds: [], tags: [], sessionID: nil, limit: 10, offset: 0
         ).count, 1)
 
-        var app: ForgeApp? = try ForgeApp.bootstrap(home: home)
+        var app: ForgeApp? = try bootstrapApplication()
         let projectID = try initialize(app!, project: projectA)
         _ = try call(app!, "project_memory.remember", [
             "project_id": projectID, "kind": "fact", "title": "Before corruption", "summary": "preserve the artifact",
@@ -900,7 +900,7 @@ final class ProjectMemoryTests: XCTestCase {
             ? try Data(contentsOf: sourceWriteAheadLog)
             : nil
 
-        app = try ForgeApp.bootstrap(home: home)
+        app = try bootstrapApplication()
         let failed = try app!.tools.call(
             name: "project_memory.initialize", arguments: ["project_path": projectA.path],
             clientID: ClientID("project-memory-corruption")
@@ -931,7 +931,7 @@ final class ProjectMemoryTests: XCTestCase {
         }
         app?.shutdown(); app = nil
 
-        app = try ForgeApp.bootstrap(home: home)
+        app = try bootstrapApplication()
         let repeated = try app!.tools.call(
             name: "project_memory.initialize", arguments: ["project_path": projectA.path],
             clientID: ClientID("project-memory-corruption-repeat")
@@ -954,7 +954,7 @@ final class ProjectMemoryTests: XCTestCase {
     }
 
     func testDatabaseLockReturnsTypedBusyWithoutPartialWrite() throws {
-        let app = try ForgeApp.bootstrap(home: home)
+        let app = try bootstrapApplication()
         defer { app.shutdown() }
         let projectID = try initialize(app, project: projectA)
         let databaseURL = home.appendingPathComponent("Projects/\(projectID)/memory.sqlite3")
@@ -978,7 +978,7 @@ final class ProjectMemoryTests: XCTestCase {
     }
 
     func testDeadlinePreemptsDatabaseLockWithoutPartialWrite() throws {
-        let app = try ForgeApp.bootstrap(home: home)
+        let app = try bootstrapApplication()
         defer { app.shutdown() }
         let projectID = try initialize(app, project: projectA)
         let databaseURL = home.appendingPathComponent("Projects/\(projectID)/memory.sqlite3")
@@ -1219,6 +1219,15 @@ final class ProjectMemoryTests: XCTestCase {
             clientID: clientID
         )
         return try XCTUnwrap(payload["project_id"] as? String)
+    }
+
+    private func bootstrapApplication() throws -> ForgeApp {
+        let app = try ForgeApp.bootstrap(home: home)
+        _ = try app.config.update(
+            ["allowed_roots": [home.deletingLastPathComponent().path]],
+            save: false
+        )
+        return app
     }
 
     private func call(

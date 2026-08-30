@@ -150,6 +150,107 @@ API interpretation is based on the installed macOS `open(2)`, `stat(2)`,
 [`namei.h`](https://raw.githubusercontent.com/apple-oss-distributions/xnu/main/bsd/sys/namei.h)
 and [`renameatx_np` implementation](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/vfs/vfs_syscalls.c).
 
+### Privileged filesystem service boundary (qualification in progress)
+
+The approved E2 policy requires a different-identity mutation boundary rather
+than a narrower same-UID threat model. The selected architecture is an
+app-bundled LaunchDaemon registered explicitly by the user through
+`SMAppService.daemon(plistName:)`. The daemon is separately signed, runs as
+root, has no shell, process-launch, network, or arbitrary-absolute-path
+surface, and receives authorized root directory descriptors plus bounded
+relative components. A root-owned mode-0700 transaction namespace on the same
+qualified volume becomes the only location from which a terminal unlink may
+occur. The manager has no same-UID production fallback: unavailable,
+unapproved, identity-mismatched, unqualified-volume, or unavailable-namespace
+states return their required typed errors.
+
+Root execution is not authority to exceed the authenticated caller's ordinary
+filesystem power. The current daemon binds each accepted NSXPC connection to
+its non-root effective UID, persists that UID in both the project binding and
+transaction record, and requires an exact match on rebind and recovery. The
+authorized root and every traversed directory must be requester-owned,
+ACL-free, and owner-searchable; the final parent must also be owner-writable.
+The source leaf is descriptor-opened and rejected if it has an extended ACL or
+any immutable, append-only, restricted, or no-unlink BSD flag. Those leaf
+checks run before intent, immediately before capture, after capture, during
+recovery, and immediately before terminal unlink. This deliberately excludes
+shared, delegated-ACL, root-owned, and group-authorized trees until an
+equivalent caller-permission decision can be proved.
+
+The first implementation scope is non-directory leaf deletion on a local,
+writable, ownership-enforced APFS volume. Directory deletion, same-volume move,
+cross-volume move, and exact-content guarantees remain disabled until their
+own recovery and adversarial matrices pass. This is an additive security
+boundary; it does not grant privileges to `shell_exec`, `bash.run`, or any
+runtime tool.
+
+| API or facility | What it provides | Why it is or is not sufficient |
+| --- | --- | --- |
+| `SMAppService.daemon(plistName:)` | Signed app-contained LaunchDaemon registration, admin approval state, launchd lifecycle, and explicit unregister/re-register update behavior. Apple documents that a changed LaunchDaemon plist or executable must be re-registered and recommends unregister-before-register for an executable change; the asynchronous unregister completion is the safe point at which the old process is known to be killed before replacement registration. | Selected for lifecycle only, with an explicit reinstall operation using that completion boundary. It does not authorize a filesystem request or make a namespace mutation identity-conditional. Release use also requires the signed/notarized app and helper upgrade lifecycle to be qualified. |
+| `NSXPCConnection(machServiceName:options:.privileged)` and `NSXPCListener(machServiceName:)` | A launchd-managed privileged transport. The current `setCodeSigningRequirement` and `setConnectionCodeSigningRequirement` expressions reject peers outside the enumerated app or manager/CLI client identifiers and daemon identifier, active team, and certificate class. Before sending a mutation on that same connection, the client also checks the reported protocol version, product version, service identifier, root effective UID, and a path-derived helper SHA-256 against the regular non-symlink helper under the current GUI bundle. | Selected as the partial connection boundary, not an exact live-code boundary. The reported digest is computed from mutable paths by both processes and is not kernel-attested mapped-code identity. A same-team, same-identifier, same-version older daemon can remain admissible if the expected user-writable helper path is rolled back to matching bytes. The maximum impact is that daemon's full bounded root mutation authority and vulnerabilities. The installed manager and raw CLI also lack a caller-relative plist/helper in the current package and fail closed before useful XPC. Closure requires caller-sealed per-architecture CodeDirectory hashes composed into the peer requirement, full app/manager/CLI packaging, and signed process evidence. Public `NSXPCConnection` exposes PID, effective UID/GID, and audit-session identifiers, but not the received message's full audit token, so connection checking still does not satisfy per-message audit identity. |
+| Low-level XPC `xpc_peer_requirement_match_received_message` and Security.framework `SecCodeCreateWithXPCMessage` | macOS 26 can bind a check to the audit token attached to the particular received XPC dictionary. | Required for final per-message identity qualification through a narrow C interoperability layer. Until this is integrated and tested against differently signed and unauthorized clients, E2 remains open. PID-only lookup is not accepted because PID reuse breaks message identity. |
+| Root directory descriptors plus `openat`, `fstatat`, `renameatx_np`, `unlinkat`, directory `fsync`, and `fcntl(F_FULLFSYNC)` | Descriptor-relative confinement, independent root/source identity checks, exclusive capture, protected terminal deletion, and stronger local-media phase flushes. | Selected inside the daemon. Plain `fsync` alone does not promise power-loss ordering on macOS, so each durability boundary also requires `F_FULLFSYNC`; the signed crash and power-loss qualification is still open. None of these calls alone accepts an expected inode as a mutation precondition; the security property comes from exclusive capture into the protected namespace followed by verification there, not from treating any one syscall as identity-conditional. |
+| `connection.effectiveUserIdentifier`, descriptor ownership/mode checks, `acl_get_fd_np`, and `st_flags` | Conservatively approximate whether the authenticated user could traverse the source hierarchy and remove the leaf without root assistance. | Selected to prevent privilege amplification. Connection UID is never accepted from request data; root, invalid, and non-account UIDs fail closed. This policy is intentionally narrower than all valid macOS permission arrangements and does not replace the still-required per-message audit-token check. |
+| `renameatx_np(..., RENAME_EXCL)` | Atomically captures whichever entry occupies the authorized source name while refusing destination overwrite. | Selected for capture. It is not an expected-identity rename. The daemon must verify the captured entry inside the protected namespace before any terminal unlink and retain or exclusively roll it back on mismatch. |
+| `renameatx_np(..., RENAME_SWAP)` | Atomically substitutes namespace entries and drives the hostile-process test matrix. | Test primitive only. It proves the pre-capture substitution remains possible and is not a mitigation. |
+
+The remaining race is between the last observation of the authorized source
+name and the exclusive capture syscall. A winning same-UID swap can cause the
+daemon to capture one substituted namespace entry. The maximum possible impact
+of that race is temporary or recovery-required unavailability of that one
+entry; because the substituted entry can be a directory, it can represent an
+unbounded subtree. The protected-namespace recheck is intended to prevent that
+substituted entry from being unlinked, but that protection is not release
+authority until the signed hostile-process and crash matrices pass. A writable
+file descriptor or hard link can also change or preserve the captured inode's
+content independently of its pathname. Therefore the design can qualify the
+captured namespace identity, not immutable content, and exact-content requests
+fail closed.
+
+A second authorization-metadata race remains after the final protected-leaf
+ACL/BSD-flag observation and before `unlinkat`. The inspection descriptor is
+closed before the name-based mutation. Another actor retaining a writable
+descriptor, hard link, or independent metadata authority can change the
+captured inode's ACL or flags in that interval. A newly added restrictive flag
+may make unlink fail, but root execution can bypass a newly added ACL denial.
+The maximum terminal impact of that race is deletion of the one already
+captured expected regular file or symbolic link even though its permission
+metadata changed after Forge's last observation; a regular file can contain
+unbounded bytes. The protected namespace prevents that interval from being
+used to substitute a different pathname occupant. This is an explicit residual
+and must be exercised in the signed attacker matrix; the current checks
+mitigate it but do not eliminate it.
+
+The current checkpoint is partial. The exact live-helper identity expectation
+must be bound into each main caller's signed mapped code or a kernel-attested
+caller entitlement, not inferred only from a replaceable helper path or dynamic
+framework. `NSXPCConnection` must then require the expected CodeDirectory hash
+set before activation. Static outer-bundle validation is useful supplemental
+evidence, but Apple's Security framework documents that static validation is
+only valid while the filesystem object remains unmodified. Code signing also
+does not establish freshness: preventing rollback of the entire validly signed
+caller, expectation, and helper requires a monotonic root-owned version receipt.
+The normal login-manager package is currently an ad-hoc minimal app without the
+daemon or plist, and raw CLI status lookup is caller-relative, so those clients
+fail closed. These availability and identity gaps are tracked by
+`FC-PRIVILEGED-CALLER-IDENTITY-001`.
+
+Per-message audit identity, signed
+adversarial and crash recovery, full volume behavior, approval/denial,
+upgrade/unregister/re-register and stale-helper rejection, signature rejection,
+source-leaf/hard-link/writable-FD
+behavior, and notarized Release lifecycle evidence are still required. An
+ambiguous submitted XPC call now returns its original transaction ID, but the
+public filesystem tool does not yet expose a recovery/resume operation that can
+consume that ID after the source pathname is absent. Durable recovery therefore
+remains an explicit open requirement. The
+canonical finding `FC-FILESYSTEM-PATH-TOCTOU-001` (policy alias `FCA-007`), E2,
+P10, G10, and G12 remain open. The privileged design mitigates the prior race;
+it is not described as eliminating it.
+
+The complete signed-host case inventory and pass predicates are maintained in
+[`PRIVILEGED_FILESYSTEM_QUALIFICATION.md`](../docs/PRIVILEGED_FILESYSTEM_QUALIFICATION.md).
+
 ## Managed runtime execution
 
 Managed shell and interpreter jobs execute only through the native runtime launcher. Production app and CLI builds require an exact, signed product identity, enclosing application seal where applicable, and a matching staged-helper code-directory hash. Exact-path, ad-hoc SwiftPM pairings are accepted only for local development products with allowlisted identifiers; they are not distribution authority.

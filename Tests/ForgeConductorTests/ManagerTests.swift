@@ -381,11 +381,21 @@ final class ManagerTests: XCTestCase {
         XCTAssertEqual(settings.dashboardPort, port)
         XCTAssertEqual(settings.dashboardHost, "127.0.0.1")
 
+        let allowedRoot = home.appendingPathComponent("client-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: allowedRoot, withIntermediateDirectories: true)
+        let canonicalAllowedRoot = try XCTUnwrap(
+            ManagerSettingsNormalizer.canonicalAllowedRoot(allowedRoot.path)
+        )
         let updated = try await client.updateSettings(
-            ManagerSettingsPatch(dashboardRefreshSec: 11),
+            ManagerSettingsPatch(
+                dashboardRefreshSec: 11,
+                allowedRoots: [allowedRoot.path]
+            ),
             apply: false
         )
         XCTAssertEqual(updated.dashboardRefreshSec, 11)
+        XCTAssertEqual(updated.allowedRoots, [canonicalAllowedRoot])
+        XCTAssertEqual(app.config.model.allowedRoots, [canonicalAllowedRoot])
     }
 
     func testPIDFileHelpers() throws {
@@ -399,7 +409,22 @@ final class ManagerTests: XCTestCase {
         XCTAssertNil(ManagerPIDFile.runningPID(paths: paths))
     }
 
-    func testNormalizeSettingsPatch() {
+    func testNormalizeSettingsPatch() throws {
+        let first = home.appendingPathComponent("a-project", isDirectory: true)
+        let second = home.appendingPathComponent("b-project", isDirectory: true)
+        let alias = home.appendingPathComponent("project-alias", isDirectory: true)
+        let regularFile = home.appendingPathComponent("not-a-directory")
+        try FileManager.default.createDirectory(at: first, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: second, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: second)
+        try Data("fixture".utf8).write(to: regularFile)
+        let canonicalFirst = try XCTUnwrap(
+            ManagerSettingsNormalizer.canonicalAllowedRoot(first.path)
+        )
+        let canonicalSecond = try XCTUnwrap(
+            ManagerSettingsNormalizer.canonicalAllowedRoot(second.path)
+        )
+
         let patch = ManagerNode.normalizeSettingsPatch([
             "dashboard": [
                 "host": " 127.0.0.1 ",
@@ -407,6 +432,16 @@ final class ManagerTests: XCTestCase {
                 "refresh_interval_sec": 1,
             ] as [String: Any],
             "manager": ["watchdog_interval_sec": 100] as [String: Any],
+            "allowed_roots": [
+                second.path,
+                first.path,
+                alias.path,
+                first.appendingPathComponent(".").path,
+                "/",
+                "relative/project",
+                regularFile.path,
+                home.appendingPathComponent("missing").path,
+            ],
         ])
         let dash = patch["dashboard"] as? [String: Any]
         XCTAssertEqual(dash?["host"] as? String, "127.0.0.1")
@@ -414,11 +449,46 @@ final class ManagerTests: XCTestCase {
         XCTAssertEqual(dash?["refresh_interval_sec"] as? Int, 2)
         let mgr = patch["manager"] as? [String: Any]
         XCTAssertEqual(mgr?["watchdog_interval_sec"] as? Int, 60)
+        XCTAssertEqual(
+            patch["allowed_roots"] as? [String],
+            [canonicalFirst, canonicalSecond].sorted()
+        )
 
         let rejected = ManagerNode.normalizeSettingsPatch([
             "dashboard": ["host": "0.0.0.0"] as [String: Any],
         ])
         XCTAssertNil((rejected["dashboard"] as? [String: Any])?["host"])
+
+        let clear = ManagerNode.normalizeSettingsPatch(["allowed_roots": [] as [String]])
+        XCTAssertEqual(clear["allowed_roots"] as? [String], [])
+    }
+
+    func testAllowedRootsPersistAcrossManagerAndAppRestart() throws {
+        let project = home.appendingPathComponent("restart-project", isDirectory: true)
+        let alias = home.appendingPathComponent("restart-project-alias", isDirectory: true)
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: project)
+        let canonicalProject = try XCTUnwrap(
+            ManagerSettingsNormalizer.canonicalAllowedRoot(project.path)
+        )
+
+        var firstApp: ForgeApp? = try ForgeApp.bootstrap(home: home)
+        var firstManager: ManagerNode? = ManagerNode(app: try XCTUnwrap(firstApp))
+        let firstSettings = try XCTUnwrap(firstManager).updateSettings(
+            ManagerSettingsPatch(allowedRoots: [alias.path, "/"]),
+            apply: false
+        )
+        XCTAssertEqual(firstSettings.allowedRoots, [canonicalProject])
+        XCTAssertEqual(try XCTUnwrap(firstApp).config.model.allowedRoots, [canonicalProject])
+        try XCTUnwrap(firstApp).shutdown()
+        firstManager = nil
+        firstApp = nil
+
+        let secondApp = try ForgeApp.bootstrap(home: home)
+        defer { secondApp.shutdown() }
+        let secondManager = ManagerNode(app: secondApp)
+        XCTAssertEqual(secondManager.settingsModel().allowedRoots, [canonicalProject])
+        XCTAssertEqual(secondApp.config.model.allowedRoots, [canonicalProject])
     }
 
     func testDashboardHTMLHasManagerControls() throws {

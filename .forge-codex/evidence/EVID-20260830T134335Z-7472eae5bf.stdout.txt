@@ -1,0 +1,1 @@
+/tmp/forge-p10-signed-settings-derived-final-20260830/Build/Products/Debug/Forge Conductor.app/Contents/Library/LaunchDaemons/com.forge-conductor.filesystem-daemon.plist: OK

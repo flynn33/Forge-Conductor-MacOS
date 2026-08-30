@@ -62,7 +62,8 @@ public struct ProjectMemoryToolPack: ToolPackHandling {
 
     public static func description(for name: String) -> String? {
         let descriptions = [
-            "project_memory.initialize": "Create or open a durable project-scoped memory store.",
+            "project_memory.initialize":
+                "Create or open a durable project-scoped memory store within an authorized bootstrap root.",
             "project_memory.remember": "Store one redacted, deduplicated project memory record.",
             "project_memory.remember_batch": "Store a bounded batch transactionally.",
             "project_memory.search": "Search one project with deterministic bounded pagination.",
@@ -88,7 +89,11 @@ public struct ProjectMemoryToolPack: ToolPackHandling {
         switch name {
         case "project_memory.initialize":
             return object([
-                "project_path": string, "project_id": string, "display_name": string,
+                "project_path": [
+                    "type": "string",
+                    "description": "Existing directory within a trusted local bootstrap root.",
+                ],
+                "project_id": string, "display_name": string,
                 "repository_identity": string, "idempotency_key": string,
                 "deadline_ms": ["type": "integer"],
             ], required: ["project_path"])

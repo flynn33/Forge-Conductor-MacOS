@@ -10,15 +10,22 @@ let package = Package(
     name: "ForgeConductor",
     platforms: [.macOS(.v26)],
     products: [
+        .library(name: "ForgeFilesystemProtocol", targets: ["ForgeFilesystemProtocol"]),
         .library(name: "ForgeConductorCore", targets: ["ForgeConductorCore"]),
         .library(name: "ForgeNativeSessionHostPlugin", targets: ["ForgeNativeSessionHostPlugin"]),
         .executable(name: "forge-conductor", targets: ["ForgeConductorCLI"]),
         .executable(name: "forge-runtime-launcher", targets: ["ForgeRuntimeLauncher"]),
+        .executable(name: "forge-filesystem-daemon", targets: ["ForgeFilesystemDaemon"]),
         .executable(name: "forge-conductor-app", targets: ["ForgeConductorApp"]),
     ],
     targets: [
         .target(
+            name: "ForgeFilesystemProtocol",
+            path: "Sources/ForgeFilesystemProtocol"
+        ),
+        .target(
             name: "ForgeConductorCore",
+            dependencies: ["ForgeFilesystemProtocol"],
             path: "Sources/ForgeConductorCore",
             resources: [
                 .process("Resources"),
@@ -37,6 +44,11 @@ let package = Package(
             name: "ForgeRuntimeLauncher",
             path: "Sources/ForgeRuntimeLauncher"
         ),
+        .executableTarget(
+            name: "ForgeFilesystemDaemon",
+            dependencies: ["ForgeFilesystemProtocol"],
+            path: "Sources/ForgeFilesystemDaemon"
+        ),
         .target(
             name: "ForgeNativeSessionHostPlugin",
             dependencies: ["ForgeConductorCore"],
@@ -54,7 +66,13 @@ let package = Package(
         ),
         .testTarget(
             name: "ForgeConductorTests",
-            dependencies: ["ForgeConductorCore", "ForgeConductorCLI", "ForgeNativeSessionHostPlugin", "ForgeRuntimeLauncher"],
+            dependencies: [
+                "ForgeFilesystemProtocol",
+                "ForgeConductorCore",
+                "ForgeConductorCLI",
+                "ForgeNativeSessionHostPlugin",
+                "ForgeRuntimeLauncher",
+            ],
             path: "Tests/ForgeConductorTests",
             resources: [
                 .process("Fixtures"),

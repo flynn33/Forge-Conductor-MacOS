@@ -198,16 +198,23 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
             )
         }
 
-        let roots = try authorizedRoots(
+        let readRoots = try authorizedRoots(
             binding: binding,
             context: context,
             clientID: clientID,
+            excludeFilesystemRoot: tool == "project_memory.initialize",
             cancellation: cancellation
         )
-        let base = binding.flatMap(\.cwd).map(ToolArgHelpers.resolvePath) ?? roots.first ?? paths.home
+        let writeRoots = try authorizedWriteRoots(
+            readRoots: readRoots,
+            context: context,
+            cancellation: cancellation
+        )
+        let base = binding.flatMap(\.cwd).map(ToolArgHelpers.resolvePath)
+            ?? readRoots.first
+            ?? paths.home
         var normalized = arguments
 
-        let readOnly = Self.readOnlyPathTools.contains(tool)
         for access in pathAccesses(tool: tool, arguments: arguments, base: base) {
             try cancellation?.checkCancellation()
             guard access.url.path.utf8.count <= Int(PATH_MAX) else {
@@ -217,17 +224,32 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
                 )
             }
             let candidate = try canonicalURL(access.url, cancellation: cancellation)
-            var containingRoot = roots.first(where: { contains(candidate, root: $0) })
-            if containingRoot == nil, readOnly, isPermittedHomeRead(candidate) {
-                containingRoot = homeReadRoot(for: candidate)
+            if tool == "project_memory.initialize", candidate.path == "/" {
+                return .denied(
+                    code: "project_bootstrap_root_forbidden",
+                    message: "The filesystem root cannot become a project authorization root"
+                )
             }
-            guard let containingRoot else {
+            let containingReadRoot = readRoots.first(where: { contains(candidate, root: $0) })
+            guard containingReadRoot != nil else {
                 return .denied(
                     code: "path_outside_allowed_roots",
                     message: "Path is outside the active workspace roots: \(candidate.path)"
                 )
             }
-            if access.protectRoot && candidate == containingRoot {
+            let containingRoot: URL?
+            if access.requiresWrite {
+                containingRoot = writeRoots.first(where: { contains(candidate, root: $0) })
+            } else {
+                containingRoot = containingReadRoot
+            }
+            if containingRoot == nil, access.requiresWrite {
+                return .denied(
+                    code: "path_outside_writable_roots",
+                    message: "Path is outside the active writable workspace roots: \(candidate.path)"
+                )
+            }
+            if access.protectRoot, let containingRoot, candidate == containingRoot {
                 return .denied(
                     code: "workspace_root_protected",
                     message: "The workspace root itself cannot be deleted or moved: \(candidate.path)"
@@ -251,6 +273,7 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
         var key: String
         var url: URL
         var protectRoot: Bool
+        var requiresWrite: Bool
     }
 
     private func pathAccesses(
@@ -258,20 +281,45 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
         arguments: [String: Any],
         base: URL
     ) -> [PathAccess] {
-        func access(_ key: String, protectRoot: Bool = false) -> PathAccess? {
+        func access(
+            _ key: String,
+            protectRoot: Bool = false,
+            requiresWrite: Bool = false
+        ) -> PathAccess? {
             guard let raw = ToolArgHelpers.string(arguments, key), !raw.isEmpty else { return nil }
-            return PathAccess(key: key, url: resolve(raw, relativeTo: base), protectRoot: protectRoot)
+            return PathAccess(
+                key: key,
+                url: resolve(raw, relativeTo: base),
+                protectRoot: protectRoot,
+                requiresWrite: requiresWrite
+            )
         }
 
         switch tool {
         case "agent_run_start":
             return [access("cwd")].compactMap { $0 }
-        case "fs_read", "fs_write", "fs_edit", "fs_mkdir":
+        case "project_memory.initialize":
+            let projectPathKey = ["project_path", "path"].first {
+                ToolArgHelpers.string(arguments, $0) != nil
+            }
+            return [
+                projectPathKey.flatMap { access($0, requiresWrite: true) },
+            ].compactMap { $0 }
+        case "fs_read":
             return [access("path")].compactMap { $0 }
+        case "fs_write", "fs_edit", "fs_mkdir":
+            return [access("path", requiresWrite: true)].compactMap { $0 }
         case "fs_list", "fs_glob", "search_text":
-            return [access("path") ?? PathAccess(key: "path", url: base, protectRoot: false)]
+            return [
+                access("path") ?? PathAccess(
+                    key: "path",
+                    url: base,
+                    protectRoot: false,
+                    requiresWrite: false
+                ),
+            ]
         case "fs_delete":
-            return [access("path", protectRoot: true)].compactMap { $0 }
+            return [access("path", protectRoot: true, requiresWrite: true)].compactMap { $0 }
         case "fs_move":
             let sourceKey = ["path", "src", "source"].first {
                 ToolArgHelpers.string(arguments, $0) != nil
@@ -280,27 +328,42 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
                 ToolArgHelpers.string(arguments, $0) != nil
             }
             return [
-                sourceKey.flatMap { access($0, protectRoot: true) },
-                destinationKey.flatMap { access($0) },
+                sourceKey.flatMap { access($0, protectRoot: true, requiresWrite: true) },
+                destinationKey.flatMap { access($0, requiresWrite: true) },
             ].compactMap { $0 }
         case "pdf_write":
-            return [access("path")].compactMap { $0 }
+            return [access("path", requiresWrite: true)].compactMap { $0 }
         case "pdf_from_file":
             var accesses = [access("source_path")].compactMap { $0 }
-            if let destination = access("dest_path") {
+            if let destination = access("dest_path", requiresWrite: true) {
                 accesses.append(destination)
             } else if let source = accesses.first {
                 accesses.append(PathAccess(
                     key: "dest_path",
                     url: source.url.deletingPathExtension().appendingPathExtension("pdf"),
-                    protectRoot: false
+                    protectRoot: false,
+                    requiresWrite: true
                 ))
             }
             return accesses
-        case "git_status", "git_diff", "git_log", "git_add", "git_commit", "shell_exec",
-             "process.run", "shell.run", "bash.run", "python.run", "powershell.run":
+        case "git_status", "git_diff", "git_log":
             return [
-                access("cwd") ?? PathAccess(key: "cwd", url: base, protectRoot: false),
+                access("cwd") ?? PathAccess(
+                    key: "cwd",
+                    url: base,
+                    protectRoot: false,
+                    requiresWrite: false
+                ),
+            ]
+        case "git_add", "git_commit", "shell_exec", "process.run", "shell.run", "bash.run",
+             "python.run", "powershell.run":
+            return [
+                access("cwd", requiresWrite: true) ?? PathAccess(
+                    key: "cwd",
+                    url: base,
+                    protectRoot: false,
+                    requiresWrite: true
+                ),
             ]
         default:
             return []
@@ -311,19 +374,26 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
         binding: ActiveBinding?,
         context: ToolInvocationContext?,
         clientID: ClientID,
+        excludeFilesystemRoot: Bool = false,
         cancellation: ToolCallCancellation?
     ) throws -> [URL] {
         try cancellation?.checkCancellation()
         if let context {
-            return try canonicalizedUnique(
+            let contextualRoots = try canonicalizedUnique(
                 context.authorizationScope.canonicalRoots,
                 cancellation: cancellation
             )
+            return excludeFilesystemRoot
+                ? contextualRoots.filter { $0.path != "/" }
+                : contextualRoots
         }
-        let trusted = try canonicalizedUnique(
-            [paths.home] + config.model.allowedRoots.map(ToolArgHelpers.resolvePath),
+        var trusted = try canonicalizedUnique(
+            config.model.allowedRoots.map(ToolArgHelpers.resolvePath),
             cancellation: cancellation
         )
+        if excludeFilesystemRoot {
+            trusted.removeAll { $0.path == "/" }
+        }
         let claimed = [binding.flatMap(\.cwd).map(ToolArgHelpers.resolvePath)].compactMap { $0 }
             + (try workspace?.additionalRoots(for: clientID, cancellation: cancellation) ?? [])
         guard !claimed.isEmpty else { return trusted }
@@ -340,22 +410,19 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
         }
     }
 
-    /// Read-only access under the interactive user's home, excluding secret/system trees.
-    private func isPermittedHomeRead(_ url: URL) -> Bool {
-        let home = fileManager.homeDirectoryForCurrentUser.resolvingSymlinksInPath().standardizedFileURL
-        guard contains(url, root: home) else { return false }
-        let relative = url.pathComponents.dropFirst(home.pathComponents.count).map { $0.lowercased() }
-        guard let first = relative.first else { return false }
-        return !Self.deniedHomePrefixes.contains(first)
-    }
-
-    private func homeReadRoot(for url: URL) -> URL {
-        let home = fileManager.homeDirectoryForCurrentUser.resolvingSymlinksInPath().standardizedFileURL
-        let extras = url.pathComponents.dropFirst(home.pathComponents.count)
-        if let first = extras.first {
-            return home.appendingPathComponent(first).standardizedFileURL
+    private func authorizedWriteRoots(
+        readRoots: [URL],
+        context: ToolInvocationContext?,
+        cancellation: ToolCallCancellation?
+    ) throws -> [URL] {
+        guard let context else { return readRoots }
+        let requested = try canonicalizedUnique(
+            context.authorizationScope.writableRoots,
+            cancellation: cancellation
+        )
+        return requested.filter { candidate in
+            readRoots.contains { contains(candidate, root: $0) }
         }
-        return home
     }
 
     private func resolve(_ raw: String, relativeTo base: URL) -> URL {
@@ -439,14 +506,6 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
         "shell_exec", "process.run", "shell.run", "bash.run", "python.run", "powershell.run",
     ]
 
-    private static let readOnlyPathTools: Set<String> = [
-        "fs_read", "fs_list", "fs_glob", "search_text",
-    ]
-
-    private static let deniedHomePrefixes: Set<String> = [
-        "library", ".ssh", ".gnupg", ".aws", ".config", ".trash",
-        "applications",
-    ]
 }
 
 public enum ToolAuditSanitizer {

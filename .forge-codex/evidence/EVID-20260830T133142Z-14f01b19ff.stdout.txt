@@ -1,0 +1,64 @@
+Test Suite 'Selected tests' started at 2026-08-30 08:32:12.183.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-30 08:32:12.183.
+Test Suite 'ForgeFilesystemProtocolTests' started at 2026-08-30 08:32:12.183.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testMutationRequestRejectsExactContentContractUntilCapabilityExists]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testMutationRequestRejectsExactContentContractUntilCapabilityExists]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testMutationRequestRejectsGenerationOutsideSignedCodingRange]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testMutationRequestRejectsGenerationOutsideSignedCodingRange]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testMutationRequestRejectsSpecialExpectedLeafTypes]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testMutationRequestRejectsSpecialExpectedLeafTypes]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testMutationRequestRejectsUnknownProtocolAndUnboundedOrUnsafeComponents]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testMutationRequestRejectsUnknownProtocolAndUnboundedOrUnsafeComponents]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testMutationRequestSecureCodingRoundTripPreservesBoundedEnvelope]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testMutationRequestSecureCodingRoundTripPreservesBoundedEnvelope]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testPeerRequirementsBindExactIdentifiersTeamsAndCertificateClass]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testPeerRequirementsBindExactIdentifiersTeamsAndCertificateClass]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testProjectBindingProbeOrderResolvesInitialHashCollisionsWithinBound]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testProjectBindingProbeOrderResolvesInitialHashCollisionsWithinBound]' passed (0.006 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testRequesterPolicyRejectsLeafExtendedACLAndEveryProtectedBSDFlag]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testRequesterPolicyRejectsLeafExtendedACLAndEveryProtectedBSDFlag]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testRequesterPolicyRejectsRootAndInvalidUIDs]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testRequesterPolicyRejectsRootAndInvalidUIDs]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testRequesterPolicyRequiresExactPersistedUIDForRetryAndRebind]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testRequesterPolicyRequiresExactPersistedUIDForRetryAndRebind]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testRequesterPolicyRequiresOwnerWriteOnFinalParent]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testRequesterPolicyRequiresOwnerWriteOnFinalParent]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testRequesterPolicyRequiresRequesterOwnershipSearchAndNoACL]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testRequesterPolicyRequiresRequesterOwnershipSearchAndNoACL]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testServiceInfoSecureCodingAndExactRuntimeMatch]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testServiceInfoSecureCodingAndExactRuntimeMatch]' passed (0.000 seconds).
+Test Suite 'ForgeFilesystemProtocolTests' passed at 2026-08-30 08:32:12.192.
+	 Executed 13 tests, with 0 failures (0 unexpected) in 0.008 (0.009) seconds
+Test Suite 'SecureFilesystemMutationTests' started at 2026-08-30 08:32:12.192.
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testConcurrentDisableSupersedesPendingServiceReinstall]' started.
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testConcurrentDisableSupersedesPendingServiceReinstall]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testPackagedDaemonDigestIsExactAndRejectsMissingOrLinkedExecutables]' started.
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testPackagedDaemonDigestIsExactAndRejectsMissingOrLinkedExecutables]' passed (0.002 seconds).
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testProductionPackDisablesMoveWithoutSameUserFallback]' started.
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testProductionPackDisablesMoveWithoutSameUserFallback]' passed (0.230 seconds).
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testProductionPackRejectsDeleteWithoutDurableContextAndPreservesLeaf]' started.
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testProductionPackRejectsDeleteWithoutDurableContextAndPreservesLeaf]' passed (0.190 seconds).
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testSecureClientCanonicalizesVarAliasBeforeOpeningAuthorizedRoot]' started.
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testSecureClientCanonicalizesVarAliasBeforeOpeningAuthorizedRoot]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testSecureClientMapsApprovalRequirementWithoutDispatchingMutation]' started.
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testSecureClientMapsApprovalRequirementWithoutDispatchingMutation]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testSecureClientMapsUnavailableStatusesWithoutDispatchingMutation]' started.
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testSecureClientMapsUnavailableStatusesWithoutDispatchingMutation]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testSecureClientPreservesLeafWhenHelperIdentityDoesNotMatch]' started.
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testSecureClientPreservesLeafWhenHelperIdentityDoesNotMatch]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testServiceReinstallFailureDoesNotRegisterReplacement]' started.
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testServiceReinstallFailureDoesNotRegisterReplacement]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testServiceReinstallWaitsForReapBeforeRegisteringReplacement]' started.
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testServiceReinstallWaitsForReapBeforeRegisteringReplacement]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testSubmittedRequestWithoutReplyRetainsOriginalRecoveryTransactionID]' started.
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testSubmittedRequestWithoutReplyRetainsOriginalRecoveryTransactionID]' passed (0.000 seconds).
+Test Suite 'SecureFilesystemMutationTests' passed at 2026-08-30 08:32:12.617.
+	 Executed 11 tests, with 0 failures (0 unexpected) in 0.425 (0.425) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-08-30 08:32:12.617.
+	 Executed 24 tests, with 0 failures (0 unexpected) in 0.433 (0.434) seconds
+Test Suite 'Selected tests' passed at 2026-08-30 08:32:12.617.
+	 Executed 24 tests, with 0 failures (0 unexpected) in 0.433 (0.435) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

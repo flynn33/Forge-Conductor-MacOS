@@ -299,7 +299,11 @@ enum RuntimeProcessSandbox {
 enum RuntimeLaunchGate {
     static let executableName = "forge-runtime-launcher"
     static let productIdentifier = "com.forge-conductor.runtime-launcher"
+    #if DEBUG
+    static let productTeamIdentifier = "9AQ2C2838M"
+    #else
     static let productTeamIdentifier = "2Y25RTLZET"
+    #endif
     static let inheritedDescriptor: Int32 = 3
     static let releaseByte: UInt8 = 0xA5
     static let maximumExecutableBytes = 8 * 1_024 * 1_024

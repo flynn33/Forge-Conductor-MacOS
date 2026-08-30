@@ -131,6 +131,53 @@ REQUIRED_SHELL_UI_TESTS = (
     "testManagerShowsProjectShellPolicyControls",
     "testManagerSettingsControlsAndPersistsProjectShellPolicy",
 )
+REQUIRED_PRIVILEGED_FILESYSTEM_MATRIX = {
+    "signed_debug_bundle",
+    "signed_release_bundle",
+    "unauthorized_same_uid_client",
+    "unauthorized_same_uid_namespace_access",
+    "unauthorized_same_uid_ledger_mutation",
+    "differently_signed_client",
+    "unknown_protocol_and_malformed_messages",
+    "outside_root_sentinel_preservation",
+    "wrong_project_id",
+    "stale_project_generation",
+    "negative_project_generation_wire_rejected",
+    "project_binding_hash_collision_resolution",
+    "project_binding_lifecycle_exhaustion_and_revoke",
+    "case_normalized_transaction_replay",
+    "root_descriptor_identity_mismatch",
+    "atomic_swap_source_leaf_before_capture",
+    "atomic_swap_source_leaf_during_capture",
+    "atomic_swap_source_leaf_after_capture",
+    "atomic_swap_parent_before_capture",
+    "atomic_swap_parent_after_capture",
+    "atomic_swap_rollback_destination_occupied",
+    "atomic_swap_special_leaf_before_descriptor_open",
+    "authorization_metadata_change_after_final_check",
+    "crash_at_every_durable_phase",
+    "daemon_restart_and_idempotent_recovery",
+    "manager_restart_and_idempotent_recovery",
+    "local_ownership_enforced_apfs",
+    "external_volume_rejected",
+    "removable_volume_rejected",
+    "network_volume_rejected",
+    "ignore_ownership_volume_rejected",
+    "cross_volume_destination_durable_before_source_destruction",
+    "approval_and_denial",
+    "upgrade_unregister_reregister",
+    "same_connection_service_version_handshake",
+    "caller_sealed_helper_code_identity",
+    "app_manager_cli_helper_packaging",
+    "settings_status_and_control",
+    "tampered_or_wrong_signature",
+    "authorized_app_and_manager_cli_identities",
+    "source_leaf_substitution",
+    "hard_link_behavior",
+    "writable_file_descriptor_behavior",
+    "no_same_uid_fallback",
+    "shell_nonregression",
+}
 RESTORED_PATH_OBSERVATION_PREFIX = "FORGE_SQLITE_RESTORED_PATH_OBSERVATION="
 RESTORED_PATH_OBSERVATION_VALUES = {
     "accepted_after_restore",
@@ -215,6 +262,15 @@ def artifact_path(artifact: dict[str, Any], label: str) -> pathlib.Path | None:
 
 CURRENT_MANIFEST = source_manifest(ROOT)
 RUN_STATE = load(".forge-codex/state/run-state.json")
+E2_ISSUE = next(
+    (
+        issue
+        for issue in RUN_STATE.get("issues", [])
+        if isinstance(issue, dict)
+        and issue.get("id") == "FC-FILESYSTEM-PATH-TOCTOU-001"
+    ),
+    {},
+)
 LEDGER_EVIDENCE_IDS = {
     item for item in RUN_STATE.get("evidence", []) if isinstance(item, str)
 }
@@ -314,6 +370,11 @@ for source in (
     "RuntimeJobRepository.swift",
     "VerifiedMigrationBackup.swift",
     "FilesystemQuarantineLedger.swift",
+    "ForgeFilesystemProtocol.swift",
+    "SecureFilesystemService.swift",
+    "PrivilegedLeafDeleteEngine.swift",
+    "ForgeFilesystemProtocolTests.swift",
+    "SecureFilesystemMutationTests.swift",
     "ContinuityTests.swift",
     "NativeSessionHostPluginTests.swift",
     "ProjectMemoryTests.swift",
@@ -325,6 +386,57 @@ parity = load(".forge-codex/evidence/P10-parity-report.json")
 migration = load(".forge-codex/evidence/P10-migration-report.json")
 protocol = load(".forge-codex/evidence/P10-protocol-compatibility-report.json")
 cli = load(".forge-codex/evidence/P10-cli-compatibility-report.json")
+privileged_filesystem = load(
+    ".forge-codex/evidence/P10-privileged-filesystem-qualification-report.json"
+)
+
+check(
+    privileged_filesystem.get("status") == "passed"
+    and privileged_filesystem.get("ok") is True,
+    "privileged filesystem qualification is not passed",
+)
+check(
+    privileged_filesystem.get("source_manifest") == CURRENT_MANIFEST,
+    "privileged filesystem qualification is stale for the current source manifest",
+)
+matrix = privileged_filesystem.get("matrix", {})
+check(isinstance(matrix, dict), "privileged filesystem qualification has no matrix")
+if isinstance(matrix, dict):
+    passing_matrix = {name for name, value in matrix.items() if value is True}
+    check(
+        passing_matrix == REQUIRED_PRIVILEGED_FILESYSTEM_MATRIX,
+        "privileged filesystem signed adversarial/crash/volume/lifecycle matrix is incomplete",
+    )
+check(
+    privileged_filesystem.get("test_processes", {}).get("separately_signed") is True,
+    "privileged filesystem adversarial tests are not separately signed processes",
+)
+check(
+    privileged_filesystem.get("test_processes", {}).get("helper_effective_uid") == 0,
+    "privileged filesystem helper did not run under its required identity",
+)
+check(
+    privileged_filesystem.get("same_uid_fallback") == "absent",
+    "privileged filesystem qualification permits a same-UID fallback",
+)
+check(
+    privileged_filesystem.get("same_uid_threat_model") == "in_scope",
+    "privileged filesystem qualification narrows the same-UID threat model",
+)
+residual = privileged_filesystem.get("residual_risk", {})
+check(
+    residual.get("disposition") == "eliminated"
+    and residual.get("maximum_race_impact") == "none",
+    "privileged filesystem identity-conditional mutation is not proven; mitigation does not close E2",
+)
+check(
+    privileged_filesystem.get("remaining_requirements") == [],
+    "privileged filesystem qualification has remaining requirements",
+)
+check(
+    E2_ISSUE.get("status") == "resolved",
+    "FC-FILESYSTEM-PATH-TOCTOU-001 remains open and prevents P10 completion",
+)
 
 check(parity.get("status") == "passed", "parity report is not passed")
 check(parity.get("removed") == [], "parity report records removed features")

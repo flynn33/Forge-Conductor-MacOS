@@ -1,0 +1,58 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 21130,
+      "path": ".forge-codex/evidence/EVID-20260830T134751Z-09fe2f9e7a.stdout.txt",
+      "sha256": "da4afbb87eb81a30d6bfdaeec11d9aebfffa91eaa9967325093b8cadeafb0a08",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260830T134751Z-09fe2f9e7a.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "command": ".forge-codex/scripts/doctor.sh",
+  "ended_at": "2026-08-30T13:47:51.799575+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260830T134751Z-09fe2f9e7a",
+  "kind": "p10-checkpoint-doctor",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [
+    "FC-FILESYSTEM-PATH-TOCTOU-001",
+    "FC-PRIVILEGED-CALLER-IDENTITY-001",
+    "FC-UI-QUALIFICATION-001",
+    "FC-SHELL-COMPAT-QUALIFICATION-001"
+  ],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 9289759,
+    "file_count": 250,
+    "schema_version": 1,
+    "sha256": "8935956c67e00f63c9ad5f4e35d5f481c27d3a2d4bee97640f16d2550fa2a100"
+  },
+  "source_manifest_after": {
+    "bytes": 9289759,
+    "file_count": 250,
+    "schema_version": 1,
+    "sha256": "8935956c67e00f63c9ad5f4e35d5f481c27d3a2d4bee97640f16d2550fa2a100"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-30T13:47:51.103200+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}
