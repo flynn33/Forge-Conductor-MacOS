@@ -1,0 +1,16 @@
+Executable=/private/tmp/forge-conductor-swift6-final-20260830-0117/Build/Products/Debug/forge-conductor
+Identifier=com.forge-conductor.cli
+Format=Mach-O thin (arm64)
+CodeDirectory v=20400 size=816 flags=0x2(adhoc) hashes=15+7 location=embedded
+Hash type=sha256 size=32
+CandidateCDHash sha256=1ed60bf3fd0bc0b978b3a4d9fc6e2ddcd7c99ca0
+CandidateCDHashFull sha256=1ed60bf3fd0bc0b978b3a4d9fc6e2ddcd7c99ca0372c0684042ead5823a91082
+Hash choices=sha256
+CMSDigest=1ed60bf3fd0bc0b978b3a4d9fc6e2ddcd7c99ca0372c0684042ead5823a91082
+CMSDigestType=2
+CDHash=1ed60bf3fd0bc0b978b3a4d9fc6e2ddcd7c99ca0
+Signature=adhoc
+Info.plist entries=16
+TeamIdentifier=not set
+Sealed Resources=none
+Internal requirements count=0 size=12

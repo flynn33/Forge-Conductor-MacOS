@@ -388,6 +388,10 @@
     "EVID-20260830T005415Z-42e93a9bb7",
     "EVID-20260830T005653Z-8a3be2d1dc",
     "EVID-20260830T010043Z-292c7bb81f",
+    "EVID-20260830T011740Z-a225442a3c",
+    "EVID-20260830T011758Z-d7de739a37",
+    "EVID-20260830T011806Z-3f2f284d24",
+    "EVID-20260830T012030Z-fd5784b88e",
     "a5466d4e5b4d7a10f87df64ddfdb58b6b8ca5159a57c20527e98802a822245d7",
     "a5d4276cbf14db3a91baa7f6b79fb8cdb3fb042a2eaf663d3219ff36b5451667",
     "b3dc11a8dc286fa33b6567ff62089692e64787b23a66718cfe1766dc27195724",
@@ -854,15 +858,15 @@
       "created_at": "2026-08-30T01:07:00.124722+00:00",
       "evidence_class": "E0",
       "id": "FC-XCODE-PRODUCT-IDENTITY-001",
-      "notes": "EVID-20260830T010043Z-292c7bb81f records a strict Xcode unit run with 627 passed, 2 skipped, and 4 failed. Two process-level tests report that the runtime launch gate does not match the command-line product. The Xcode CLI declares com.forge-conductor.cli but did not embed its generated Info.plist, so ad-hoc signing assigned a hash-suffixed identifier while the helper retained com.forge-conductor.runtime-launcher. Two nested migration-process tests timed out before writing ready markers and remain under separate triage. The production launch gate must not be weakened.",
+      "notes": "Resolved without weakening RuntimeLaunchGate. The Xcode CLI target now embeds its generated Info.plist, so ad-hoc signing preserves the declared com.forge-conductor.cli identifier; EVID-20260830T011758Z-d7de739a37 records that identity. Nested migration xctest children remove only XCTestSessionIdentifier and XCTestConfigurationFilePath so the explicit -XCTest selector runs outside the parent managed session. EVID-20260830T011740Z-a225442a3c records a strict Swift 6 build-for-testing against the clean committed source manifest. EVID-20260830T011806Z-3f2f284d24 records the full Xcode unit target exiting zero, and EVID-20260830T012030Z-fd5784b88e preserves the result summary: 633 total, 631 passed, 0 failed, 2 skipped. The earlier EVID-20260830T010043Z-292c7bb81f remains the 4-failure regression baseline. UI-target execution, native signing qualification, shell compatibility, filesystem E2, real-provider autonomous continuity, P10, and G10 remain open.",
       "path": "ForgeConductor.xcodeproj/project.pbxproj",
       "severity": "High",
-      "status": "validating",
+      "status": "resolved",
       "title": "Xcode CLI product identity breaks process-level tests",
-      "updated_at": "2026-08-30T01:07:00.124490+00:00"
+      "updated_at": "2026-08-30T01:20:50.653231+00:00"
     }
   ],
-  "last_event_sequence": 519,
+  "last_event_sequence": 524,
   "phases": {
     "P00": {
       "attempts": 1,
@@ -945,12 +949,12 @@
   },
   "repository": {
     "branch": "repair/swift6-test-targets",
-    "commit": "df03c5d16ee90b6d1698d92801fb7fb2d3016f35",
+    "commit": "62604e1f0f8abba649998679f22e55b0ecb89014",
     "dirty": true,
     "root": "/Users/jimdaley/GitHub/Forge-Conductor"
   },
   "run_id": "aba90ab1-be80-4cc5-aa0b-23dd54d4a24d",
   "schema_version": 1,
   "status": "active",
-  "updated_at": "2026-08-30T01:07:00.124723+00:00"
+  "updated_at": "2026-08-30T01:20:50.653441+00:00"
 }
