@@ -4,8 +4,9 @@
 
 The active repair line is `security/privileged-filesystem-boundary`, based on
 `main` at `8bcc039a2f0d4d17b871d5e968b3b37a663c5ccb` (the pull request #14
-squash merge). This working checkpoint is not yet published and has no pull
-request number. No current claim is made that P10, the filesystem E2 finding,
+squash merge). The source checkpoint is published as draft pull request #15 at
+`bde3005dfc0488a0e0573eadba04c7166b9a503a`. No current claim is made that
+P10, the filesystem E2 finding,
 shell compatibility, native UI validation, autonomous continuity, representative
 hardware qualification, or final release qualification is complete. Earlier
 green suites remain exact-revision evidence only and do not confer release
@@ -138,12 +139,16 @@ Debug build and bundle inspection evidence are
 `EVID-20260830T134353Z-1b0e67f46b` and
 `EVID-20260830T134413Z-3e92a26ea0`. Full strict evidence
 `EVID-20260830T134451Z-b1aa8b64c6` passed 689 tests with two declared
-environment skips and no failures. Latest doctor evidence
-`EVID-20260830T135159Z-ef01c9a862` remained fail closed. The next-work record
-`EVID-20260830T135021Z-2d1453403d` selects P10 and reports
-`release_authorized=false`; expected-negative completion evidence
+environment skips and no failures. Post-publication doctor evidence
+`EVID-20260830T135849Z-3b6e86e949` verifies the exact branch, source HEAD,
+base, and draft PR #15, reports the checkpoint reviewable, and keeps
+`merge_authorized=false` and `release_authorized=false`. The post-publication
+next-work record `EVID-20260830T135855Z-cc75e24f63` selects P10 with the same
+fail-closed policy; expected-negative completion evidence
 `EVID-20260830T135034Z-b9664b7a9f` exits nonzero because the privileged matrix,
-fresh compatibility reports, and native qualification are incomplete. Earlier
+fresh compatibility reports, and native qualification are incomplete.
+Post-publication state validation `EVID-20260830T135923Z-332abf829f` and
+package validation `EVID-20260830T135929Z-5d2e427633` pass. Earlier
 P10, CLI, MCP, manager, UI-build, and app-smoke records belong to their recorded
 source manifests. They may be used as regression baselines but are not evidence
 for the privileged boundary. Doctor and the next-work selector must continue to
@@ -153,12 +158,17 @@ nonpassing G09-G12 gates.
 ## Current branch and pull-request lineage
 
 - Active branch: `security/privileged-filesystem-boundary`.
-- Current committed HEAD and base SHA before this unpublished slice:
+- Published source checkpoint HEAD:
+  `bde3005dfc0488a0e0573eadba04c7166b9a503a`.
+- Base branch and SHA: `main` at
   `8bcc039a2f0d4d17b871d5e968b3b37a663c5ccb`.
-- Base branch: `main`.
-- Current pull request: none until the partial-security checkpoint is committed
-  and published. The PR description and GitHub readback must record its exact
-  final head SHA and current `main` base SHA before review.
+- Current pull request: draft #15,
+  `https://github.com/flynn33/Forge-Conductor-MacOS/pull/15`.
+- GitHub readback recorded #15 open and draft from
+  `security/privileged-filesystem-boundary@bde3005dfc0488a0e0573eadba04c7166b9a503a`
+  into `main@8bcc039a2f0d4d17b871d5e968b3b37a663c5ccb`. The pull request is
+  reviewable as a partial checkpoint but has neither merge nor release
+  authority.
 - Pull request #9 (`repair/autonomous-continuity` at
   `6321bd98012e5f60b2779bbb401cc2827f372b16`) was based on
   `ae0ceace702274857afce3097ac7cde18b7a6c63` and closed without merge.

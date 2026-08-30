@@ -116,6 +116,16 @@ open_issues=[i for i in state["issues"] if i.get("status")!="resolved"]
 mandatory_release_blockers=[
     i for i in open_issues if i.get("id") in mandatory_release_issue_ids
 ]
+issue_status_by_id={
+    issue.get("id"):issue.get("status")
+    for issue in state.get("issues",[])
+    if issue.get("id")
+}
+required_open_disclosure_ids={
+    issue_id
+    for issue_id in mandatory_release_issue_ids
+    if issue_status_by_id.get(issue_id)!="resolved"
+}
 nonpassing_hard_gates=[
     {
         "id": gate_id,
@@ -129,7 +139,7 @@ nonpassing_hard_gates=[
 identity=checkpoint_identity()
 disclosures_aligned=all(
     required_id in {issue.get("id") for issue in mandatory_release_blockers}
-    for required_id in mandatory_release_issue_ids
+    for required_id in required_open_disclosure_ids
 ) and all(
     required_gate in {gate.get("id") for gate in nonpassing_hard_gates}
     for required_gate in {"G09", "G10", "G11", "G12"}
