@@ -1560,7 +1560,10 @@ public struct FilesystemToolPack: ToolPackHandling {
         guard resolvedPointer != nil else {
             throw posixError(errno, path: requestedDirectory.path)
         }
-        let resolvedPath = String(cString: resolvedBuffer)
+        let resolvedPath = String(
+            decoding: resolvedBuffer.prefix(while: { $0 != 0 }).map { UInt8(bitPattern: $0) },
+            as: UTF8.self
+        )
         guard resolvedPath.hasPrefix("/") else {
             throw posixError(EINVAL, path: resolvedPath)
         }

@@ -4996,7 +4996,9 @@ private func controlPlaneSQLiteProgressHandler(_ context: UnsafeMutableRawPointe
         .shouldInterrupt() ? 1 : 0
 }
 
-private final class ControlPlaneSQLiteConnection {
+/// This connection is confined to `ProjectControlPlaneRepository`'s actor.
+/// Its synchronous transaction closures never suspend or escape that actor.
+private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
     private static let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
     private var database: OpaquePointer?

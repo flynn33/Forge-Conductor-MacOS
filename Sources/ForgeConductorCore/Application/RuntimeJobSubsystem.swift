@@ -133,13 +133,18 @@ public struct RuntimeJobSynchronousToolPack: ToolPackHandling, Sendable {
                 }
             )
         } ?? subsystem.toolPack
+        let serializedArguments = try SerializedToolArguments(arguments)
         return try Self.wait(
             timeoutSeconds: Self.controlTimeoutSeconds,
             cancellation: cancellation,
             committedResultWins: Self.mutatingControlTools.contains(name),
             committedReceipt: committedReceipt
         ) {
-            try await toolPack.handle(name: name, arguments: arguments, context: context)
+            try await toolPack.handle(
+                name: name,
+                arguments: try serializedArguments.decoded(),
+                context: context
+            )
                 ?? .failure(code: "unknown_tool", message: "Unknown tool '\(name)'", retryable: false)
         }
     }
@@ -170,6 +175,7 @@ public struct RuntimeJobSynchronousToolPack: ToolPackHandling, Sendable {
         let replayClass = ToolArgHelpers.string(arguments, "replay_class")
             .flatMap(RuntimeReplayClass.init(rawValue:))
             ?? .nonReplayable
+        let idempotencyKey = ToolArgHelpers.string(arguments, "idempotency_key")
         // `shell_exec` is the legacy synchronous compatibility surface. Its
         // cancellation and deadline responses are part of the existing MCP
         // contract, even though the durable runtime records the submitted job
@@ -186,7 +192,7 @@ public struct RuntimeJobSynchronousToolPack: ToolPackHandling, Sendable {
                 timeoutSeconds: Int(timeout.rounded(.up)),
                 context: context,
                 replayClass: replayClass,
-                idempotencyKey: ToolArgHelpers.string(arguments, "idempotency_key")
+                idempotencyKey: idempotencyKey
             )
         }
     }

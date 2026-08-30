@@ -381,6 +381,7 @@
     "EVID-20260828T130522Z-a830cc844e",
     "EVID-20260828T130523Z-73516c6e94",
     "EVID-20260828T131739Z-66596e8e37",
+    "EVID-20260830T004252Z-13ece08ad7",
     "a5466d4e5b4d7a10f87df64ddfdb58b6b8ca5159a57c20527e98802a822245d7",
     "a5d4276cbf14db3a91baa7f6b79fb8cdb3fb042a2eaf663d3219ff36b5451667",
     "b3dc11a8dc286fa33b6567ff62089692e64787b23a66718cfe1766dc27195724",
@@ -820,9 +821,20 @@
       "status": "deferred",
       "title": "Autonomous continuity lacks full real-provider forced-rollover authority",
       "updated_at": "2026-08-28T12:52:15.126800+00:00"
+    },
+    {
+      "created_at": "2026-08-30T00:42:52.021288+00:00",
+      "evidence_class": "E0",
+      "id": "FC-XCODE-SWIFT6-BUILD-001",
+      "notes": "Resolved by immutable JSON argument transport across executor boundaries, explicit actor-confined SQLite connection ownership, idempotent locked database teardown, Sendable decode boundaries, isolated shared migration registration state, explicit SwiftUI setter closure, and Swift 6-safe C-buffer decoding. EVID-20260830T004252Z-13ece08ad7 records an exit-zero Xcode Debug build with SWIFT_VERSION=6 and signing disabled. P10, G10, native UI validation, shell compatibility, filesystem E2, and autonomous continuity remain open.",
+      "path": "Sources/ForgeConductorCore/Application/RuntimeJobSubsystem.swift",
+      "severity": "High",
+      "status": "resolved",
+      "title": "Xcode Swift 6 integration does not compile autonomy sources",
+      "updated_at": "2026-08-30T00:43:10.037730+00:00"
     }
   ],
-  "last_event_sequence": 504,
+  "last_event_sequence": 507,
   "phases": {
     "P00": {
       "attempts": 1,
@@ -904,13 +916,13 @@
     }
   },
   "repository": {
-    "branch": "repair/filesystem-race-mitigation",
-    "commit": "5bb563f2cad717ce192272648ff15da034ace830",
+    "branch": "repair/swift6-xcode-integration",
+    "commit": "f0d1e873977b10f03c1830452063e385d11a1fc9",
     "dirty": true,
-    "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation"
+    "root": "/Users/jimdaley/GitHub/Forge-Conductor"
   },
   "run_id": "aba90ab1-be80-4cc5-aa0b-23dd54d4a24d",
   "schema_version": 1,
   "status": "active",
-  "updated_at": "2026-08-28T13:18:41.500673+00:00"
+  "updated_at": "2026-08-30T00:43:10.037865+00:00"
 }

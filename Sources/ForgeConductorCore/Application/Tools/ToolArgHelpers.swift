@@ -206,6 +206,21 @@ public enum ToolArgHelpers {
     }
 }
 
+/// Immutable argument transport for work that crosses an executor boundary.
+/// MCP arguments are JSON objects; serializing them before capture prevents a
+/// mutable Foundation object graph from being shared with a `@Sendable` closure.
+struct SerializedToolArguments: Sendable {
+    private let data: Data
+
+    init(_ arguments: [String: Any]) throws {
+        data = try JSONSupport.data(from: arguments)
+    }
+
+    func decoded() throws -> [String: Any] {
+        try JSONSupport.object(from: data)
+    }
+}
+
 public protocol ToolPackHandling: Sendable {
     /// Tool names this pack owns.
     var toolNames: [String] { get }

@@ -1404,7 +1404,10 @@ public enum SelfExecutable {
             _NSGetExecutablePath(pointer.baseAddress, &size)
         }
         if result == 0 {
-            let path = String(cString: buf)
+            let path = String(
+                decoding: buf.prefix(while: { $0 != 0 }).map { UInt8(bitPattern: $0) },
+                as: UTF8.self
+            )
             return URL(fileURLWithPath: path).resolvingSymlinksInPath()
         }
         let arg0 = CommandLine.arguments[0]

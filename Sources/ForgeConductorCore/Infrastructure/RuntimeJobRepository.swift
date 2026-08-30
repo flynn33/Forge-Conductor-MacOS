@@ -4,6 +4,30 @@
 import Foundation
 import SQLite3
 
+/// Owns the raw SQLite handle for the repository's nonisolated teardown path.
+/// All mutations are serialized by the repository actor; this lock makes the
+/// final close idempotent if teardown follows an explicit actor-owned close.
+private final class RuntimeJobDatabaseCleanup: @unchecked Sendable {
+    private let lock = NSLock()
+    private var database: OpaquePointer?
+
+    func install(_ database: OpaquePointer) {
+        lock.lock()
+        self.database = database
+        lock.unlock()
+    }
+
+    func close() {
+        lock.lock()
+        let database = self.database
+        self.database = nil
+        lock.unlock()
+        if let database {
+            sqlite3_close(database)
+        }
+    }
+}
+
 struct RuntimeArtifactRetentionCandidate: Sendable, Equatable {
     let jobID: UUID
     let projectID: ProjectID
@@ -183,6 +207,7 @@ public actor RuntimeJobRepository {
 
     private let clock: any Clock
     private let afterMutationCommitObserver: (@Sendable (RuntimeJobCommitKind) -> Void)?
+    private let databaseCleanup = RuntimeJobDatabaseCleanup()
     private var database: OpaquePointer?
     private var openRegistration: SQLiteOpenRegistration?
 
@@ -233,6 +258,7 @@ public actor RuntimeJobRepository {
                 at: standardizedDatabaseURL
             )
             database = opened
+            databaseCleanup.install(opened)
         } catch {
             sqlite3_close(opened)
             throw RuntimeJobError.storageFailure(error.localizedDescription)
@@ -240,13 +266,13 @@ public actor RuntimeJobRepository {
     }
 
     deinit {
-        if let database { sqlite3_close(database) }
+        databaseCleanup.close()
         VerifiedMigrationBackup.unregisterOpenDatabase(openRegistration)
     }
 
     public func close() {
-        guard let database else { return }
-        sqlite3_close(database)
+        guard database != nil else { return }
+        databaseCleanup.close()
         self.database = nil
         VerifiedMigrationBackup.unregisterOpenDatabase(openRegistration)
         openRegistration = nil
@@ -274,7 +300,7 @@ public actor RuntimeJobRepository {
                 .int64(try Self.sqliteGeneration(generation)),
                 .text(key),
             ],
-            decode: Self.decodeRecord
+            decode: Self.sendableDecodeRecord
         ) {
             return record
         }
@@ -375,7 +401,7 @@ public actor RuntimeJobRepository {
         return try queryAll(
             Self.selectRecord + " ORDER BY j.created_at DESC,j.job_id DESC LIMIT ?",
             bindings: [.int64(Int64(limit))],
-            decode: Self.decodeRecord
+            decode: Self.sendableDecodeRecord
         )
     }
 
@@ -821,14 +847,14 @@ public actor RuntimeJobRepository {
         }
         sql += " ORDER BY j.created_at DESC,j.job_id DESC LIMIT ?"
         bindings.append(.int64(Int64(boundedLimit)))
-        return try queryAll(sql, bindings: bindings, decode: Self.decodeRecord)
+        return try queryAll(sql, bindings: bindings, decode: Self.sendableDecodeRecord)
     }
 
     public func nonterminalJobs() throws -> [RuntimeJobRecord] {
         try queryAll(
             Self.selectRecord + " WHERE j.state IN ('queued','running','cancelling') ORDER BY j.created_at ASC LIMIT 256",
             bindings: [],
-            decode: Self.decodeRecord
+            decode: Self.sendableDecodeRecord
         )
     }
 
@@ -1147,7 +1173,7 @@ public actor RuntimeJobRepository {
                 .text(projectID.description), .int64(try Self.sqliteGeneration(generation)),
                 .text(idempotencyKey),
             ],
-            decode: Self.decodeRecord
+            decode: Self.sendableDecodeRecord
         ) {
             return record
         }
@@ -1162,14 +1188,14 @@ public actor RuntimeJobRepository {
         if let record = try queryOne(
             Self.selectRecord + " WHERE j.job_id=? LIMIT 1",
             bindings: [.text(Self.uuid(jobID))],
-            decode: Self.decodeRecord
+            decode: Self.sendableDecodeRecord
         ) {
             return record
         }
         return try queryOne(
             Self.selectReceiptRecord + " WHERE r.job_id=? LIMIT 1",
             bindings: [.text(Self.uuid(jobID))],
-            decode: Self.decodeRecord
+            decode: Self.sendableDecodeRecord
         )
     }
 
@@ -1186,7 +1212,7 @@ public actor RuntimeJobRepository {
                 .int64(try Self.sqliteGeneration(generation)),
                 .text(idempotencyKey),
             ],
-            decode: Self.decodeRecord
+            decode: Self.sendableDecodeRecord
         )
     }
 
@@ -1294,10 +1320,10 @@ public actor RuntimeJobRepository {
         }
     }
 
-    private func queryOne<Value>(
+    private func queryOne<Value: Sendable>(
         _ sql: String,
         bindings: [SQLiteBinding],
-        decode: (OpaquePointer) throws -> Value
+        decode: @Sendable (OpaquePointer) throws -> Value
     ) throws -> Value? {
         try withStatement(sql) { statement in
             try Self.bind(bindings, to: statement)
@@ -1308,10 +1334,10 @@ public actor RuntimeJobRepository {
         }
     }
 
-    private func queryAll<Value>(
+    private func queryAll<Value: Sendable>(
         _ sql: String,
         bindings: [SQLiteBinding],
-        decode: (OpaquePointer) throws -> Value
+        decode: @Sendable (OpaquePointer) throws -> Value
     ) throws -> [Value] {
         try withStatement(sql) { statement in
             try Self.bind(bindings, to: statement)
@@ -2006,6 +2032,10 @@ public actor RuntimeJobRepository {
             completedAt: optionalText(statement, column: 19),
             updatedAt: updated
         )
+    }
+
+    private static let sendableDecodeRecord: @Sendable (OpaquePointer) throws -> RuntimeJobRecord = { statement in
+        try RuntimeJobRepository.decodeRecord(statement)
     }
 
     private static func decodeOutput(_ statement: OpaquePointer) throws -> RuntimeJobOutputMetadata {
