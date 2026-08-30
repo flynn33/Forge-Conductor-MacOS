@@ -1,0 +1,51 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 124,
+      "path": ".forge-codex/evidence/EVID-20260830T010043Z-292c7bb81f.stdout.txt",
+      "sha256": "cdf00812c1b58a4d0a9f363488345927accd285e9b8ad379bb24bd07cf12dc38",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 746,
+      "path": ".forge-codex/evidence/EVID-20260830T010043Z-292c7bb81f.stderr.txt",
+      "sha256": "54d8ab74d3aa4db3cad4724d2750a16119875db9aed3f849a8e13a379c8a159f",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "command": "xcodebuild test-without-building -quiet -project ForgeConductor.xcodeproj -scheme ForgeConductor -configuration Debug -destination platform=macOS,arch=arm64 -derivedDataPath /private/tmp/forge-conductor-swift6-test-evidence.vCnQqo -resultBundlePath /private/tmp/forge-conductor-swift6-test-evidence.vCnQqo/FullUnit.xcresult CODE_SIGNING_ALLOWED=YES CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= SWIFT_VERSION=6 SWIFT_TREAT_WARNINGS_AS_ERRORS=YES -only-testing:ForgeConductorTests",
+  "ended_at": "2026-08-30T01:03:11.855647+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 65,
+  "id": "EVID-20260830T010043Z-292c7bb81f",
+  "kind": "xcode-swift6-unit-tests",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [],
+  "related_gates": [],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 9086756,
+    "file_count": 242,
+    "schema_version": 1,
+    "sha256": "0b08073d37d39411c3a054ba7f00f1f9d0e4ddf2ea391de6526e368067e7d85a"
+  },
+  "source_manifest_after": {
+    "bytes": 9086756,
+    "file_count": 242,
+    "schema_version": 1,
+    "sha256": "0b08073d37d39411c3a054ba7f00f1f9d0e4ddf2ea391de6526e368067e7d85a"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-30T01:00:43.821490+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}
