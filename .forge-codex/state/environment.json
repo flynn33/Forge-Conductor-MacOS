@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-30T19:01:38.842482+00:00",
+  "captured_at": "2026-08-30T19:05:44.644167+00:00",
   "environment_keys_present": [
     "CODEX_APP_TOOLS_PIPE_PATH",
     "CODEX_CI",
@@ -17,17 +17,17 @@
       "base_branch": "main",
       "base_sha": "8bcc039a2f0d4d17b871d5e968b3b37a663c5ccb",
       "github_readback_verified": true,
-      "head_sha": "3c0b0af0969af8161582285dd53d98a779b2cf5b",
+      "head_sha": "7480dc4c78ecbf16686397e787b569cfdf26205c",
       "pull_request": {
         "baseRefName": "main",
         "headRefName": "security/privileged-filesystem-boundary",
-        "headRefOid": "3c0b0af0969af8161582285dd53d98a779b2cf5b",
+        "headRefOid": "7480dc4c78ecbf16686397e787b569cfdf26205c",
         "isDraft": true,
         "number": 15,
         "state": "OPEN",
         "url": "https://github.com/flynn33/Forge-Conductor-MacOS/pull/15"
       },
-      "remote_head_sha": "3c0b0af0969af8161582285dd53d98a779b2cf5b"
+      "remote_head_sha": "7480dc4c78ecbf16686397e787b569cfdf26205c"
     },
     "current_work": "P10",
     "mandatory_release_blockers": [
@@ -50,7 +50,7 @@
       {
         "evidence_class": "E0",
         "id": "FC-SHELL-COMPAT-QUALIFICATION-001",
-        "notes": "The established shell_exec surface remains synchronous /bin/bash -lc and clean-profile bash.run remains additive. Source tests prove clean-install default enablement, accidental legacy-disabled migration, explicit user opt-out, continued MCP tools/list registration, successful execution, the established result fields and timeout clamp, app rebootstrap, and manager-service restart. Current-source Debug and Release suites EVID-20260830T184228Z-1bb02068b2 and EVID-20260830T184522Z-d43b1586b6 each passed 755 tests with 2 skips and 0 failures. Exact-revision signed Debug XCUI EVID-20260830T153118Z-752f058222 passed shell Settings visibility, control, persistence, and GUI relaunch within the six-case bounded Settings matrix. The guarded installed-artifact harness validates ordinary signed identities, rejects pre-existing manager state and user-controlled symlink aliases, and passes 14 focused tests in EVID-20260830T185902Z-ce0de2b7cb. Live run EVID-20260830T185444Z-7878ff2abf was denied at launchctl bootstrap by the Codex/ChatGPT process tree; the legacy launchctl load fallback returned without a running manager job, so the harness failed closed, made no shell_exec pass claim, and restored the canonical job, plist, command link, and disabled-state entry. A foreground Terminal run outside this host restriction and correction of the false-success fallback remain required. Shell compatibility remains open and release-blocking.",
+        "notes": "The established shell_exec surface remains synchronous /bin/bash -lc and clean-profile bash.run remains additive. Source tests prove clean-install default enablement, accidental legacy-disabled migration, explicit user opt-out, continued MCP tools/list registration, successful execution, the established result fields and timeout clamp, app rebootstrap, and manager-service restart. Current-source Debug and Release suites EVID-20260830T184228Z-1bb02068b2 and EVID-20260830T184522Z-d43b1586b6 each passed 755 tests with 2 skips and 0 failures. Exact-revision signed Debug XCUI EVID-20260830T153118Z-752f058222 passed shell Settings visibility, control, persistence, and GUI relaunch within the six-case bounded Settings matrix. The guarded installed-artifact harness validates ordinary signed identities, rejects pre-existing manager state and user-controlled symlink aliases, and passes 14 focused tests in EVID-20260830T185902Z-ce0de2b7cb. Live run EVID-20260830T185444Z-7878ff2abf was denied at launchctl bootstrap by the current automation-host process tree; the legacy launchctl load fallback returned without a running manager job, so the harness failed closed, made no shell_exec pass claim, and restored the canonical job, plist, command link, and disabled-state entry. A foreground Terminal run outside this host restriction and correction of the false-success fallback remain required. Shell compatibility remains open and release-blocking.",
         "severity": "High",
         "status": "validating",
         "title": "Shell compatibility qualification requires current-source native execution"
@@ -142,7 +142,7 @@
       {
         "evidence_class": "E0",
         "id": "FC-SHELL-COMPAT-QUALIFICATION-001",
-        "notes": "The established shell_exec surface remains synchronous /bin/bash -lc and clean-profile bash.run remains additive. Source tests prove clean-install default enablement, accidental legacy-disabled migration, explicit user opt-out, continued MCP tools/list registration, successful execution, the established result fields and timeout clamp, app rebootstrap, and manager-service restart. Current-source Debug and Release suites EVID-20260830T184228Z-1bb02068b2 and EVID-20260830T184522Z-d43b1586b6 each passed 755 tests with 2 skips and 0 failures. Exact-revision signed Debug XCUI EVID-20260830T153118Z-752f058222 passed shell Settings visibility, control, persistence, and GUI relaunch within the six-case bounded Settings matrix. The guarded installed-artifact harness validates ordinary signed identities, rejects pre-existing manager state and user-controlled symlink aliases, and passes 14 focused tests in EVID-20260830T185902Z-ce0de2b7cb. Live run EVID-20260830T185444Z-7878ff2abf was denied at launchctl bootstrap by the Codex/ChatGPT process tree; the legacy launchctl load fallback returned without a running manager job, so the harness failed closed, made no shell_exec pass claim, and restored the canonical job, plist, command link, and disabled-state entry. A foreground Terminal run outside this host restriction and correction of the false-success fallback remain required. Shell compatibility remains open and release-blocking.",
+        "notes": "The established shell_exec surface remains synchronous /bin/bash -lc and clean-profile bash.run remains additive. Source tests prove clean-install default enablement, accidental legacy-disabled migration, explicit user opt-out, continued MCP tools/list registration, successful execution, the established result fields and timeout clamp, app rebootstrap, and manager-service restart. Current-source Debug and Release suites EVID-20260830T184228Z-1bb02068b2 and EVID-20260830T184522Z-d43b1586b6 each passed 755 tests with 2 skips and 0 failures. Exact-revision signed Debug XCUI EVID-20260830T153118Z-752f058222 passed shell Settings visibility, control, persistence, and GUI relaunch within the six-case bounded Settings matrix. The guarded installed-artifact harness validates ordinary signed identities, rejects pre-existing manager state and user-controlled symlink aliases, and passes 14 focused tests in EVID-20260830T185902Z-ce0de2b7cb. Live run EVID-20260830T185444Z-7878ff2abf was denied at launchctl bootstrap by the current automation-host process tree; the legacy launchctl load fallback returned without a running manager job, so the harness failed closed, made no shell_exec pass claim, and restored the canonical job, plist, command link, and disabled-state entry. A foreground Terminal run outside this host restriction and correction of the false-success fallback remain required. Shell compatibility remains open and release-blocking.",
         "severity": "High",
         "status": "validating",
         "title": "Shell compatibility qualification requires current-source native execution"

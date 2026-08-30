@@ -214,15 +214,16 @@ environment skips and no failures. Signed Debug build evidence is
 `EVID-20260830T185004Z-e546c8ccf3`. Signed Debug UI evidence
 `EVID-20260830T153118Z-752f058222` passed all six bounded cases.
 
-Post-implementation-push doctor evidence
-`EVID-20260830T153545Z-5b607da24f` verifies branch and remote at the
-implementation checkpoint, the base, and draft PR #15; it reports the partial
-checkpoint reviewable while retaining `merge_authorized=false` and
-`release_authorized=false`. The corresponding next-work record
-`EVID-20260830T153546Z-2cd9cd91c7` selects P10 with the same policy. State
-validation `EVID-20260830T153736Z-e4c023a103`, package validation
-`EVID-20260830T154516Z-2aec49083f`, and attribution scan
-`EVID-20260830T154511Z-2c25f0686e` pass. The earlier failed strict record
+Post-push doctor evidence `EVID-20260830T190543Z-2aafffbf28` verifies the
+active branch and remote at `7480dc4c78ecbf16686397e787b569cfdf26205c`, the
+base, and open draft PR #15; it reports the partial checkpoint reviewable while
+retaining `merge_authorized=false` and `release_authorized=false`. The
+corresponding next-work record `EVID-20260830T190704Z-70c1100604` resumes P10
+with the same policy and preserves every mandatory blocker. State validation
+`EVID-20260830T190756Z-e957e7be61`, package validation
+`EVID-20260830T190724Z-d442305927`, attribution scan
+`EVID-20260830T190724Z-6408537e09`, and secret scan
+`EVID-20260830T190725Z-6f59acc593` pass. The earlier failed strict record
 `EVID-20260830T151425Z-09e2526950` is retained as a superseded negative
 baseline, not pass evidence. Doctor and the next-work selector must continue to
 emit `release_authorized=false`, all open mandatory findings, and the
@@ -240,8 +241,8 @@ nonpassing G09-G12 gates.
   `8bcc039a2f0d4d17b871d5e968b3b37a663c5ccb`.
 - Current pull request: draft #15,
   `https://github.com/flynn33/Forge-Conductor-MacOS/pull/15`.
-- The last pre-publication GitHub readback recorded #15 open and draft from
-  `security/privileged-filesystem-boundary@3c0b0af0969af8161582285dd53d98a779b2cf5b`
+- The post-push GitHub readback recorded #15 open and draft from
+  `security/privileged-filesystem-boundary@7480dc4c78ecbf16686397e787b569cfdf26205c`
   into `main@8bcc039a2f0d4d17b871d5e968b3b37a663c5ccb`. The pull request is
   reviewable as a partial checkpoint but has neither merge nor release
   authority.
