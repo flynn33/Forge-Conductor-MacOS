@@ -1,0 +1,55 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260830T004252Z-13ece08ad7.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260830T004252Z-13ece08ad7.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "command": "xcodebuild build -quiet -project ForgeConductor.xcodeproj -scheme ForgeConductor -configuration Debug -destination platform=macOS,arch=arm64 -derivedDataPath /private/tmp/forge-conductor-swift6-checkpoint.yb9EOi CODE_SIGNING_ALLOWED=NO SWIFT_VERSION=6",
+  "ended_at": "2026-08-30T00:43:03.958833+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260830T004252Z-13ece08ad7",
+  "kind": "xcode-swift6-build",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [
+    "FC-XCODE-SWIFT6-BUILD-001"
+  ],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 9086032,
+    "file_count": 242,
+    "schema_version": 1,
+    "sha256": "51f15397b4112feda3024c5995701ca12bc12aff98ae9af9779248bdf3234b96"
+  },
+  "source_manifest_after": {
+    "bytes": 9086032,
+    "file_count": 242,
+    "schema_version": 1,
+    "sha256": "51f15397b4112feda3024c5995701ca12bc12aff98ae9af9779248bdf3234b96"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-30T00:42:52.117690+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

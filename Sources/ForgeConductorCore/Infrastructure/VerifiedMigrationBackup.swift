@@ -142,7 +142,7 @@ struct SQLitePreflightDatabase {
     }
 }
 
-struct SQLiteOpenRegistration {
+struct SQLiteOpenRegistration: Sendable {
     fileprivate let identity: VerifiedMigrationBackup.SQLiteFileIdentity
 }
 
@@ -153,13 +153,16 @@ public enum VerifiedMigrationBackup {
     private static let maximumSQLiteBackupBytes: UInt64 = 4 * 1024 * 1024 * 1024
     private static let processMigrationLock = NSLock()
     private static let openRegistrationLock = NSLock()
-    private static var openRegistrationCounts: [SQLiteFileIdentity: Int] = [:]
+    // Access is serialized by `openRegistrationLock` at every read and write.
+    // The table is process-wide rather than actor-owned because repositories can
+    // be created on independent executors while protecting the same SQLite file.
+    private nonisolated(unsafe) static var openRegistrationCounts: [SQLiteFileIdentity: Int] = [:]
     private static let preflightAttemptLimit = 3
     private static let manifestSchemaVersion = 1
     private static let maximumManifestBytes = 64 * 1024
     private static let maximumSQLiteBackupLineagesPerSourceVersion = 4
 
-    fileprivate struct SQLiteFileIdentity: Hashable {
+    fileprivate struct SQLiteFileIdentity: Hashable, Sendable {
         let device: UInt64
         let inode: UInt64
     }

@@ -249,7 +249,10 @@ enum RuntimeProcessSandbox {
         if Darwin.realpath(url.path, &buffer) != nil {
             // Do not call standardizedFileURL here: Foundation rewrites the
             // physical `/private/var` path back to the `/var` convenience alias.
-            return URL(fileURLWithPath: String(cString: buffer))
+            return URL(fileURLWithPath: String(
+                decoding: buffer.prefix(while: { $0 != 0 }).map { UInt8(bitPattern: $0) },
+                as: UTF8.self
+            ))
         }
         return url.resolvingSymlinksInPath().standardizedFileURL
     }
@@ -435,7 +438,10 @@ enum RuntimeLaunchGate {
             _NSGetExecutablePath(pointer.baseAddress, &capacity)
         }
         guard result == 0 else { return nil }
-        return URL(fileURLWithPath: String(cString: buffer))
+        return URL(fileURLWithPath: String(
+            decoding: buffer.prefix(while: { $0 != 0 }).map { UInt8(bitPattern: $0) },
+            as: UTF8.self
+        ))
     }
 
     struct CodeIdentity: Equatable {

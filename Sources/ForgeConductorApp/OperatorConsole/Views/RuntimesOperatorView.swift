@@ -79,7 +79,9 @@ struct RuntimesOperatorView: View {
                     "Shell enabled",
                     isOn: Binding(
                         get: { viewModel.settings?.shellEnabled ?? false },
-                        set: viewModel.setShellEnabled
+                        set: { enabled in
+                            viewModel.setShellEnabled(enabled)
+                        }
                     )
                 )
                 .disabled(viewModel.settings == nil || viewModel.isSavingShellPolicy)

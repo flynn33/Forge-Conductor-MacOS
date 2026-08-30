@@ -554,6 +554,7 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
             try cancellation.checkCancellation()
             let dispatched: ToolResult
             if let context, Self.projectMemoryMutatingTools.contains(name) {
+                let serializedArguments = try SerializedToolArguments(routedArguments)
                 dispatched = try app.projectContexts.commitIfCurrent(
                     context: context,
                     resultKind: name,
@@ -561,7 +562,7 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
                 ) { mutationControl in
                     try self.dispatch(
                         name: name,
-                        arguments: routedArguments,
+                        arguments: try serializedArguments.decoded(),
                         context: context,
                         clientID: clientID,
                         cancellation: mutationControl
