@@ -1,0 +1,55 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 210529,
+      "path": ".forge-codex/evidence/EVID-20260830T181007Z-cf5b2b2910.stdout.txt",
+      "sha256": "3787f3d92a110ebda440af4c59158c9af370ec309cc1f8a324ab2a02f47fe817",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 12954,
+      "path": ".forge-codex/evidence/EVID-20260830T181007Z-cf5b2b2910.stderr.txt",
+      "sha256": "c37a03665effb5b6dbe4baf4c1819784555c6279313c1f69641e4a531696a890",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "command": "swift test --scratch-path /tmp/forge-p10-recovery-final-debug-20260830-1309 --jobs 4 -Xswiftc -strict-concurrency=complete -Xswiftc -warnings-as-errors",
+  "ended_at": "2026-08-30T18:12:51.130848+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260830T181007Z-cf5b2b2910",
+  "kind": "p10-post-preflight-full-debug",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [
+    "FC-FILESYSTEM-PATH-TOCTOU-001"
+  ],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 9543736,
+    "file_count": 252,
+    "schema_version": 1,
+    "sha256": "2b4040f93b325293457e68d12c9179108b61afbd55c3e91f63bd6df55d08e029"
+  },
+  "source_manifest_after": {
+    "bytes": 9543736,
+    "file_count": 252,
+    "schema_version": 1,
+    "sha256": "2b4040f93b325293457e68d12c9179108b61afbd55c3e91f63bd6df55d08e029"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-30T18:10:07.225703+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

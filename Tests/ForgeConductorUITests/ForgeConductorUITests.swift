@@ -122,7 +122,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(managerTab.waitForExistence(timeout: 8))
         managerTab.click()
 
-        let shellToggle = app.checkBoxes["settings-shell-enabled"]
+        let shellToggle = app.descendants(matching: .any)["settings-shell-enabled"]
         XCTAssertTrue(
             shellToggle.waitForExistence(timeout: 5),
             "Manager settings must expose the project shell preference"
@@ -136,17 +136,36 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         }
     }
 
+    func testManagerShowsProtectedFilesystemServiceControls() throws {
+        app.typeKey(",", modifierFlags: .command)
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["settings-filesystem-service-status"]
+                .waitForExistence(timeout: 5),
+            "The macOS Settings scene must expose protected filesystem service status"
+        )
+        XCTAssertTrue(app.buttons["settings-filesystem-service-enable"].exists)
+        XCTAssertTrue(app.buttons["settings-filesystem-service-reinstall"].exists)
+        XCTAssertTrue(app.buttons["settings-filesystem-service-disable"].exists)
+        XCTAssertTrue(app.buttons["settings-filesystem-service-approval"].exists)
+        XCTAssertTrue(app.buttons["settings-filesystem-service-refresh"].exists)
+        XCTAssertTrue(app.buttons["settings-allowed-root-add"].exists)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["settings-allowed-roots-empty"].exists
+        )
+    }
+
     func testManagerSettingsControlsAndPersistsProjectShellPolicy() throws {
         let fixture = try OperatorManagerUITestFixture()
         relaunch(with: fixture)
 
         app.typeKey(",", modifierFlags: .command)
-        var shellToggle = app.checkBoxes["settings-shell-enabled"]
+        var shellToggle = app.descendants(matching: .any)["settings-shell-enabled"]
         XCTAssertTrue(
             shellToggle.waitForExistence(timeout: 5),
             "The macOS Settings scene must expose the project shell policy"
         )
-        XCTAssertTrue(waitForValue("1", on: shellToggle))
+        XCTAssertTrue(waitForToggleState(true, on: shellToggle))
 
         shellToggle.click()
         let save = app.buttons["settings-save"]
@@ -159,18 +178,18 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         let reload = app.buttons["settings-reload"]
         makeHittable(reload)
         reload.click()
-        shellToggle = app.checkBoxes["settings-shell-enabled"]
-        XCTAssertTrue(waitForValue("0", on: shellToggle))
+        shellToggle = app.descendants(matching: .any)["settings-shell-enabled"]
+        XCTAssertTrue(waitForToggleState(false, on: shellToggle))
 
         app.terminate()
         app.launch()
         app.typeKey(",", modifierFlags: .command)
-        shellToggle = app.checkBoxes["settings-shell-enabled"]
+        shellToggle = app.descendants(matching: .any)["settings-shell-enabled"]
         XCTAssertTrue(
             shellToggle.waitForExistence(timeout: 5),
             "The macOS Settings scene must remain available after relaunch"
         )
-        XCTAssertTrue(waitForValue("0", on: shellToggle))
+        XCTAssertTrue(waitForToggleState(false, on: shellToggle))
 
         shellToggle.click()
         let relaunchedSave = app.buttons["settings-save"]
@@ -179,7 +198,67 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(waitUntil(timeout: 5) {
             fixture.settingsUpdateCount == 2 && fixture.shellEnabled
         })
-        XCTAssertTrue(waitForValue("1", on: shellToggle))
+        XCTAssertTrue(waitForToggleState(true, on: shellToggle))
+    }
+
+    func testManagerSettingsStagesCanonicalAllowedRootAndRemoval() throws {
+        let selectedRoot = testHome
+            .appendingPathComponent("projects", isDirectory: true)
+            .appendingPathComponent("selected-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: selectedRoot, withIntermediateDirectories: true)
+        let canonicalRoot = selectedRoot
+            .resolvingSymlinksInPath()
+            .standardizedFileURL
+            .path
+        app.terminate()
+        app.launchEnvironment["FORGE_ALLOWED_ROOT_UI_TEST_SELECTION"] = selectedRoot.path
+        app.launch()
+
+        let manager = app.buttons["tab-manager"]
+        XCTAssertTrue(manager.waitForExistence(timeout: 8))
+        manager.click()
+        let add = app.buttons["settings-allowed-root-add"]
+        XCTAssertTrue(add.waitForExistence(timeout: 5))
+        makeHittable(add)
+        add.click()
+
+        let path = app.descendants(matching: .any)["settings-allowed-root-path-0"]
+        XCTAssertTrue(path.waitForExistence(timeout: 5))
+        let exposedPathValues = [path.label, path.title, path.value as? String]
+            .compactMap { $0 }
+        XCTAssertTrue(
+            exposedPathValues.contains(canonicalRoot),
+            "The canonical authorized-root path must be visible; observed \(path.debugDescription)"
+        )
+
+        let remove = app.buttons["settings-allowed-root-remove-0"]
+        makeHittable(remove)
+        remove.click()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["settings-allowed-roots-empty"]
+                .waitForExistence(timeout: 5)
+        )
+    }
+
+    func testManagerSettingsRejectsFilesystemRootSelection() throws {
+        app.terminate()
+        app.launchEnvironment["FORGE_ALLOWED_ROOT_UI_TEST_SELECTION"] = "/"
+        app.launch()
+
+        let manager = app.buttons["tab-manager"]
+        XCTAssertTrue(manager.waitForExistence(timeout: 8))
+        manager.click()
+        let add = app.buttons["settings-allowed-root-add"]
+        XCTAssertTrue(add.waitForExistence(timeout: 5))
+        makeHittable(add)
+        add.click()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["settings-allowed-roots-empty"]
+                .waitForExistence(timeout: 5)
+        )
+        let message = app.descendants(matching: .any)["settings-allowed-roots-message"]
+        XCTAssertTrue(message.waitForExistence(timeout: 5))
     }
 
     func testOperatorSurfacesReportUnavailableManagerHonestly() throws {
@@ -338,6 +417,27 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
     }
 
+    private func waitForToggleState(
+        _ expected: Bool,
+        on element: XCUIElement,
+        timeout: TimeInterval = 5
+    ) -> Bool {
+        waitUntil(timeout: timeout) {
+            if let number = element.value as? NSNumber {
+                return number.boolValue == expected
+            }
+            guard let raw = element.value as? String else { return false }
+            let normalized = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let observed: Bool?
+            switch normalized {
+            case "1", "true", "on", "yes": observed = true
+            case "0", "false", "off", "no": observed = false
+            default: observed = nil
+            }
+            return observed == expected
+        }
+    }
+
     private func waitForEnabled(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
         guard element.waitForExistence(timeout: timeout) else { return false }
         let expectation = XCTNSPredicateExpectation(
@@ -348,8 +448,15 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
     }
 
     private func makeHittable(_ element: XCUIElement) {
+        let containingScrollViews = app.scrollViews
+            .containing(.any, identifier: element.identifier)
+            .allElementsBoundByIndex
+        let scrollView = containingScrollViews.last ?? app.scrollViews.firstMatch
         for _ in 0..<6 where !element.isHittable {
-            app.scrollViews.firstMatch.swipeUp()
+            scrollView.swipeUp()
+        }
+        for _ in 0..<6 where !element.isHittable {
+            scrollView.swipeDown()
         }
         XCTAssertTrue(element.isHittable)
     }
@@ -386,6 +493,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     private var mutableAcceptedStart = false
     private var mutableAcceptedStartRunID: String?
     private var mutableShellEnabled = true
+    private var mutableAllowedRoots: [String] = []
     private var mutableSettingsUpdateCount = 0
     private(set) var port: UInt16 = 0
 
@@ -396,6 +504,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     var startRequestBodies: [Data] { locked { mutableStartRequestBodies } }
     var acceptedStartRunID: String { locked { mutableAcceptedStartRunID ?? "" } }
     var shellEnabled: Bool { locked { mutableShellEnabled } }
+    var allowedRoots: [String] { locked { mutableAllowedRoots } }
     var settingsUpdateCount: Int { locked { mutableSettingsUpdateCount } }
 
     init(failStartResponse: Bool = false) throws {
@@ -512,12 +621,14 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
                       let object = try? JSONSerialization.jsonObject(with: request.body) as? [String: Any],
                       let patch = object["settings"] as? [String: Any],
                       let shell = patch["shell"] as? [String: Any],
-                      let enabled = shell["enabled"] as? Bool else {
+                      let enabled = shell["enabled"] as? Bool,
+                      let allowedRoots = patch["allowed_roots"] as? [String] else {
                     respond(status: 401, object: ["message": "missing settings authorization or shell policy"], to: connection)
                     return
                 }
                 locked {
                     mutableShellEnabled = enabled
+                    mutableAllowedRoots = allowedRoots
                     mutableSettingsUpdateCount += 1
                 }
             }
@@ -665,7 +776,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     }
 
     private func managerSettings() -> [String: Any] {
-        let enabled = locked { mutableShellEnabled }
+        let settings = locked { (mutableShellEnabled, mutableAllowedRoots) }
         return [
             "ok": true,
             "dashboard": [
@@ -680,10 +791,10 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             ] as [String: Any],
             "sessions": ["idle_ttl_sec": 14_400] as [String: Any],
             "shell": [
-                "enabled": enabled,
-                "user_disabled": !enabled,
+                "enabled": settings.0,
+                "user_disabled": !settings.0,
                 "policy_version": 2,
-                "policy_origin": enabled ? "user_enabled" : "user_disabled",
+                "policy_origin": settings.0 ? "user_enabled" : "user_disabled",
                 "default_timeout_sec": 30,
                 "migration": [
                     "state": "not_required",
@@ -697,6 +808,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
                 ] as [String: Any],
             ] as [String: Any],
             "log_level": "info",
+            "allowed_roots": settings.1,
         ]
     }
 

@@ -7,6 +7,7 @@
 import Foundation
 import Darwin
 import CryptoKit
+import ForgeFilesystemProtocol
 
 /// Filesystem tool pack: read/write/edit/list/glob/mkdir/delete/move.
 public struct FilesystemToolPack: ToolPackHandling {
@@ -20,6 +21,7 @@ public struct FilesystemToolPack: ToolPackHandling {
     private let forceCrossVolumeMove: Bool
     private let directorySynchronizer: @Sendable (URL) throws -> Void
     private let quarantineDirectorySynchronizer: @Sendable (Int32, URL) throws -> Void
+    private let secureMutationClient: SecureFilesystemMutationClient?
 
     enum MoveStep: Sendable, Equatable {
         case preparedDestinationDirectories
@@ -55,6 +57,7 @@ public struct FilesystemToolPack: ToolPackHandling {
         quarantineDirectorySynchronizer = {
             try Self.synchronizeDirectoryDescriptor($0, path: $1)
         }
+        secureMutationClient = SecureFilesystemMutationClient()
     }
 
     init(deletionStepObserver: (@Sendable (Int) -> Void)?) {
@@ -66,6 +69,7 @@ public struct FilesystemToolPack: ToolPackHandling {
         quarantineDirectorySynchronizer = {
             try Self.synchronizeDirectoryDescriptor($0, path: $1)
         }
+        secureMutationClient = nil
     }
 
     init(
@@ -81,6 +85,7 @@ public struct FilesystemToolPack: ToolPackHandling {
         quarantineDirectorySynchronizer = {
             try Self.synchronizeDirectoryDescriptor($0, path: $1)
         }
+        secureMutationClient = nil
     }
 
     init(
@@ -98,6 +103,7 @@ public struct FilesystemToolPack: ToolPackHandling {
         self.forceCrossVolumeMove = forceCrossVolumeMove
         self.directorySynchronizer = directorySynchronizer
         self.quarantineDirectorySynchronizer = quarantineDirectorySynchronizer
+        secureMutationClient = nil
     }
 
     init(
@@ -112,10 +118,11 @@ public struct FilesystemToolPack: ToolPackHandling {
         forceCrossVolumeMove = false
         directorySynchronizer = { try Self.synchronizeDirectory($0) }
         self.quarantineDirectorySynchronizer = quarantineDirectorySynchronizer
+        secureMutationClient = nil
     }
 
     public var toolNames: [String] {
-        ["fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "fs_delete", "fs_move"]
+        ["fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "fs_delete", "fs_delete_recovery", "fs_move"]
     }
 
     public func handle(
@@ -136,12 +143,56 @@ public struct FilesystemToolPack: ToolPackHandling {
         case "fs_glob": return try fsGlob(arguments, runner: ProcessRunner(), cancellation: cancellation)
         case "fs_mkdir": return try fsMkdir(arguments, cancellation: cancellation)
         case "fs_delete":
+            if let secureMutationClient {
+                guard let path = ToolArgHelpers.string(arguments, "path") else {
+                    return .failure(code: "missing_path", message: "path required")
+                }
+                return try secureMutationClient.deleteLeaf(
+                    at: ToolArgHelpers.resolvePath(path),
+                    context: context,
+                    cancellation: cancellation,
+                    recoveryLedger: SecureFilesystemRecoveryLedger(paths: app.paths),
+                    authorityValidator: { currentContext in
+                        try app.projectContexts.validate(
+                            currentContext,
+                            cancellation: cancellation
+                        )
+                    }
+                )
+            }
             return try fsDelete(
                 arguments,
                 quarantineLedger: FilesystemQuarantineLedger(paths: app.paths),
                 cancellation: cancellation
             )
+        case "fs_delete_recovery":
+            guard let secureMutationClient else {
+                return .failure(
+                    code: ForgeFilesystemErrorCode.capabilityUnavailable,
+                    message: "Protected filesystem recovery is unavailable"
+                )
+            }
+            guard let transactionID = ToolArgHelpers.string(arguments, "transaction_id"),
+                  let action = ToolArgHelpers.string(arguments, "action") else {
+                return .failure(
+                    code: ForgeFilesystemErrorCode.invalidRequest,
+                    message: "transaction_id and action are required"
+                )
+            }
+            return try secureMutationClient.recoverDelete(
+                transactionID: transactionID,
+                action: action,
+                context: context,
+                cancellation: cancellation,
+                recoveryLedger: SecureFilesystemRecoveryLedger(paths: app.paths)
+            )
         case "fs_move":
+            if secureMutationClient != nil {
+                return .failure(
+                    code: "filesystem_capability_unavailable",
+                    message: "Filesystem move is disabled until privileged move recovery is qualified"
+                )
+            }
             return try fsMove(
                 arguments,
                 quarantineLedger: FilesystemQuarantineLedger(paths: app.paths),

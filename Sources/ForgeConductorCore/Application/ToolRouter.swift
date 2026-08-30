@@ -896,7 +896,7 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
     }
 
     private static let mutatingTools: Set<String> = [
-        "fs_write", "fs_edit", "fs_mkdir", "fs_delete", "fs_move",
+        "fs_write", "fs_edit", "fs_mkdir", "fs_delete", "fs_delete_recovery", "fs_move",
         "git_add", "git_commit", "pdf_write", "pdf_from_file",
         "agent_run_start", "agent_run_status", "agent_run_complete", "shell_exec",
         "memory_set", "memory_delete",
@@ -911,7 +911,7 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
     ]
 
     private static let contextRequiredTools: Set<String> = [
-        "fs_write", "fs_edit", "fs_mkdir", "fs_delete", "fs_move",
+        "fs_write", "fs_edit", "fs_mkdir", "fs_delete", "fs_delete_recovery", "fs_move",
         "git_status", "git_diff", "git_log", "git_add", "git_commit",
         "shell_exec", "pdf_write", "pdf_from_file",
         "project_memory.remember", "project_memory.remember_batch",

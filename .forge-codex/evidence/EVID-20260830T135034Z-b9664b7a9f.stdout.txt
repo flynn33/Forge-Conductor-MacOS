@@ -1,0 +1,43 @@
+{
+  "baseline_features": 66,
+  "failures": [
+    "cannot read P10 input .forge-codex/evidence/P10-privileged-filesystem-qualification-report.json: [Errno 2] No such file or directory: '/Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex/evidence/P10-privileged-filesystem-qualification-report.json'",
+    "privileged filesystem qualification is not passed",
+    "privileged filesystem qualification is stale for the current source manifest",
+    "privileged filesystem signed adversarial/crash/volume/lifecycle matrix is incomplete",
+    "privileged filesystem adversarial tests are not separately signed processes",
+    "privileged filesystem helper did not run under its required identity",
+    "privileged filesystem qualification permits a same-UID fallback",
+    "privileged filesystem qualification narrows the same-UID threat model",
+    "privileged filesystem identity-conditional mutation is not proven; mitigation does not close E2",
+    "privileged filesystem qualification has remaining requirements",
+    "FC-FILESYSTEM-PATH-TOCTOU-001 remains open and prevents P10 completion",
+    "parity report is not passed",
+    "parity report records untested features",
+    "parity report has remaining requirements",
+    "debug strict suite evidence is stale for the current source manifest",
+    "debug strict suite ending source manifest is stale",
+    "release strict suite evidence is stale for the current source manifest",
+    "release strict suite ending source manifest is stale",
+    "migration report is stale for the current source manifest",
+    "CLI compatibility evidence is stale for the current source manifest",
+    "CLI compatibility ending source manifest is stale",
+    "CLI compatibility report is stale for the current source manifest",
+    "MCP compatibility evidence is stale for the current source manifest",
+    "MCP compatibility ending source manifest is stale",
+    "MCP compatibility report is stale for the current source manifest",
+    "manager HTTP compatibility evidence is stale for the current source manifest",
+    "manager HTTP compatibility ending source manifest is stale",
+    "manager HTTP compatibility report is stale for the current source manifest",
+    "native UI qualification is not passed"
+  ],
+  "migration_fixtures": 8,
+  "ok": false,
+  "phase": "P10",
+  "source_manifest": {
+    "bytes": 9289759,
+    "file_count": 250,
+    "schema_version": 1,
+    "sha256": "8935956c67e00f63c9ad5f4e35d5f481c27d3a2d4bee97640f16d2550fa2a100"
+  }
+}

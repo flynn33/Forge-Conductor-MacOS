@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-28T13:15:37.960080+00:00",
+  "captured_at": "2026-08-30T22:15:53.636504+00:00",
   "environment_keys_present": [
     "CODEX_APP_TOOLS_PIPE_PATH",
     "CODEX_CI",
@@ -12,22 +12,113 @@
   ],
   "execution_state": {
     "available": true,
+    "checkpoint_identity": {
+      "active_branch": "security/privileged-filesystem-boundary",
+      "base_branch": "main",
+      "base_sha": "8bcc039a2f0d4d17b871d5e968b3b37a663c5ccb",
+      "github_readback_verified": true,
+      "head_sha": "61c3a00f3d0289cf4086182f0e8217567915b763",
+      "pull_request": {
+        "baseRefName": "main",
+        "headRefName": "security/privileged-filesystem-boundary",
+        "headRefOid": "61c3a00f3d0289cf4086182f0e8217567915b763",
+        "isDraft": true,
+        "number": 15,
+        "state": "OPEN",
+        "url": "https://github.com/flynn33/Forge-Conductor-MacOS/pull/15"
+      },
+      "remote_head_sha": "61c3a00f3d0289cf4086182f0e8217567915b763"
+    },
     "current_work": "P10",
+    "mandatory_release_blockers": [
+      {
+        "evidence_class": "E0",
+        "id": "FC-UI-QUALIFICATION-001",
+        "notes": "Developer Mode is enabled and Apple Development signing with James Daley on team 9AQ2C2838M is available. Earlier exact-revision signed Debug XCUI EVID-20260830T153118Z-752f058222 passed six bounded Settings and relaunch cases. Prior-manifest signed Debug build EVID-20260830T211007Z-760c293557 and exact app, daemon, and CLI bundle check EVID-20260830T211029Z-ae82e789b1 passed as supporting evidence only. Identity inventory EVID-20260830T211040Z-5f8b21e6d9 confirms no usable Developer ID identity, while Release settings EVID-20260830T211040Z-a8619d99c2 confirm shipped Release configurations request Developer ID Application. Build and static bundle evidence do not prove the production NSOpenPanel path, shell execution across app and installed-manager restart, real SMAppService approval, update, or disable behavior, installed-manager or running-helper identity, Release signing, archive, notarization, staple, or Gatekeeper. Native qualification remains deferred and release-blocking and is never passed by build-only, unit, simulator, synthetic-host, or partial XCUI evidence.",
+        "severity": "High",
+        "status": "deferred",
+        "title": "Native signed UI qualification is deferred and release-blocking"
+      },
+      {
+        "evidence_class": "E2",
+        "id": "FC-FILESYSTEM-PATH-TOCTOU-001",
+        "notes": "E2 and FCA-007 remain mandatory release blockers under the same-UID threat model. Protocol v5 uses capture-first quarantine-and-verify semantics, a canonical SHA-256 authority-envelope digest, schema-3 receipts, and exact-only legacy handling. Successful renameatx_np with RENAME_EXCL is the capture linearization point. Namespace-exact mismatch and post-capture metadata change retain the object in root-owned quarantine; content-exact fails closed. This is mitigation, not elimination. Public macOS descriptor-relative and rename APIs do not provide identity-conditional terminal mutation. Source-parent authorization and capture are not atomic: same-UID parent relocation can move the pinned parent outside the allowed root before capture, allowing deletion of one eligible outside-root regular file or symlink with unbounded bytes, or quarantine of one ineligible directory with an unbounded subtree. The final ACL or BSD-metadata-to-unlinkat race can delete one captured expected regular file or symlink, with regular-file bytes unbounded. Quarantine has no authorized restore, release, or purge disposition, so 32 conflicts can exhaust the volume ledger. Startup recovery fencing, terminal physical-state repair, caller-ledger and generation fencing, daemon-owned discovery and revoke, binding lifecycle, qualified volume behavior, whole-product freshness, direct daemon execution, and the signed 57-row distinct-process crash, adversarial, lifecycle, and Release matrix remain open. Debug EVID-20260830T220320Z-4cccc31cce and Release EVID-20260830T220539Z-eac42f2a8c each pass 771 source tests with two declared skips and zero failures on source manifest 89e94937e86eb617eb7c6b2138f1584d3ecc7b32ce524919734fee39766a63a0. The evidence controls pass 23 focused tests and verify provenance structure, but a completed 34-item security diff review confirmed that one generic aggregate artifact can still be reused across cases and that one arbitrary formal-kind artifact can support all formal predicates without semantic case, role, iteration, barrier, mount, crash-phase, fixture, signing, process, or formal-claim binding. The schema and unexecuted template are controls only and cannot prove E2. E2, P10, G10, and G12 remain open.",
+        "severity": "High",
+        "status": "patching",
+        "title": "Privileged filesystem boundary remains mitigated but not identity-conditionally closed"
+      },
+      {
+        "evidence_class": "E0",
+        "id": "FC-SHELL-COMPAT-QUALIFICATION-001",
+        "notes": "The established shell_exec surface remains synchronous /bin/bash -lc and clean-profile bash.run remains additive. Source tests prove clean-install default enablement, accidental legacy-disabled migration, explicit user opt-out, MCP tools/list registration, successful execution, the established result contract and timeout clamp, app rebootstrap, manager-service restart, and Settings visibility and control. Current Debug EVID-20260830T220320Z-4cccc31cce and Release EVID-20260830T220539Z-eac42f2a8c each pass 771 tests with two declared skips and zero failures. Earlier signed Debug XCUI EVID-20260830T153118Z-752f058222 proves bounded Settings visibility, control, persistence, and GUI relaunch at its exact revision. Prior-manifest signed build EVID-20260830T211007Z-760c293557 and bundle check EVID-20260830T211029Z-ae82e789b1 are supporting evidence only. Live installed-artifact run EVID-20260830T185444Z-7878ff2abf was denied at launchctl bootstrap by the automation-host process tree and made no shell_exec pass claim. Successful shell_exec through the signed real app and installed manager across both process restarts remains required. Shell compatibility remains open and release-blocking.",
+        "severity": "High",
+        "status": "validating",
+        "title": "Shell compatibility qualification requires current-source native execution"
+      },
+      {
+        "evidence_class": "E0",
+        "id": "FC-AUTONOMOUS-CONTINUITY-E2E-001",
+        "notes": "Foreground use, Forge app closure and restart, LM Studio qwen/qwen3.8-27b@4bit loading, and substantial memory use are authorized. Unit and synthetic-host tests are supporting evidence only and cannot close this issue. Closure requires one manager-owned threshold-forced rollover against the real provider with exact successor acknowledgment, predecessor fencing and idempotent sealing, automatic linked continuation, GUI-closed operation, and recovery without duplicate provider work from every distinct durable crash state. Current source still lacks complete durable ordinary-response receipt and continuation-side-effect crash evidence. Autonomous continuity remains release-blocking.",
+        "severity": "High",
+        "status": "patching",
+        "title": "Autonomous continuity lacks full real-provider forced-rollover authority"
+      },
+      {
+        "evidence_class": "E0",
+        "id": "FC-HARDWARE-QUALIFICATION-001",
+        "notes": "The owner deferred real physical-hardware testing and authorized simulator or current-host work. Simulator, synthetic-host, and current-machine evidence cannot pass G11. Representative memory-tier, resource, performance, restart, and release behavior must be exercised on the owner-selected physical hardware matrix before shipment. G11 remains blocked_dependency and release-blocking.",
+        "severity": "High",
+        "status": "deferred",
+        "title": "Representative physical-hardware qualification is owner-deferred and release-blocking"
+      },
+      {
+        "evidence_class": "E0",
+        "id": "FC-PROJECT-ROOT-SETTINGS-001",
+        "notes": "Native Settings exposes operator-visible add and remove folder controls backed by NSOpenPanel, canonical symlink-resolved display, stable sorting and deduplication, filesystem-root, relative, missing, and file rejection, typed manager settings, persistence, live application, accessibility identifiers, and restart survival. Debug and Release strict suites EVID-20260830T151948Z-6df8d3afa9 and EVID-20260830T152225Z-43cd73ae1c passed source coverage. Earlier exact-revision signed Debug XCUI EVID-20260830T153118Z-752f058222 passed all six selected Settings and relaunch cases, including the two bounded root-control cases. The chooser cases use a deterministic test-only selection hook instead of the system-owned production panel. Production panel observation and the broader signed native gate remain required before resolution.",
+        "severity": "High",
+        "status": "validating",
+        "title": "Clean-install project root authority lacks a native Settings control"
+      },
+      {
+        "evidence_class": "E2",
+        "id": "FC-PRIVILEGED-SERVICE-LIFECYCLE-001",
+        "notes": "Protocol v5 retains unregister-before-register replacement and generation fencing, installs the exact caller-sealed daemon CodeDirectory requirement before NSXPC activation, and checks protocol, product, service identifier, root EUID, and running daemon hash on the same connection. Pathless transaction query, resume, and acknowledgement retain terminal outcomes until exact acknowledgement. Prior-manifest signed Debug build EVID-20260830T211007Z-760c293557 and bundle check EVID-20260830T211029Z-ae82e789b1 are static support only. Tests do not execute real SMAppService approval, denial, update, disable, unregister and re-register, daemon restart, startup recovery fencing, or capture recovery. Release settings EVID-20260830T211040Z-a8619d99c2 request Developer ID Application, but identity inventory EVID-20260830T211040Z-5f8b21e6d9 shows no usable Developer ID identity. Signed process lifecycle, Release signing, and notarization remain required. E2, P10, G10, and G12 remain open.",
+        "severity": "High",
+        "status": "patching",
+        "title": "Privileged service updates must not retain a stale registered daemon"
+      },
+      {
+        "evidence_class": "E2",
+        "id": "FC-PRIVILEGED-CALLER-IDENTITY-001",
+        "notes": "Protocol v5 obtains expected per-architecture daemon CodeDirectory hashes from each caller validated running signature, composes them into the NSXPC requirement before activation, and repeats the exact running-hash and protocol handshake before every mutation or transaction-control message. The canonical app graph builds one app, embedded CLI, and daemon artifact set. Prior-manifest signed Debug build EVID-20260830T211007Z-760c293557 and bundle check EVID-20260830T211029Z-ae82e789b1 verify static same-build identities only. They do not execute signed app, installed manager, raw CLI, or standalone CLI calls or stale-helper, wrong-team, wrong-identifier, timeout, upgrade, restart, Release, and notarization cases. Whole-product rollback still lacks a monotonic root-owned receipt; an older allowlisted daemon retains its bounded root mutation authority and vulnerabilities. This is mitigation, not elimination. Caller identity, service lifecycle, E2, P10, G10, and G12 remain open.",
+        "severity": "High",
+        "status": "patching",
+        "title": "Caller-sealed helper identity requires signed-process and freshness qualification"
+      }
+    ],
     "nonpassing_hard_gates": [
       {
+        "deferral": "real_provider_manager_owned_rollover_evidence_required",
         "id": "G09",
+        "release_blocking": true,
         "status": "blocked_dependency"
       },
       {
+        "deferral": "p10_e2_native_and_shell_evidence_required",
         "id": "G10",
+        "release_blocking": true,
         "status": "blocked_dependency"
       },
       {
+        "deferral": "owner_deferred_representative_physical_hardware_release_blocker",
         "id": "G11",
+        "release_blocking": true,
         "status": "blocked_dependency"
       },
       {
+        "deferral": "all_prior_hard_gates_and_final_release_evidence_required",
         "id": "G12",
+        "release_blocking": true,
         "status": "blocked_dependency"
       }
     ],
@@ -35,41 +126,81 @@
       {
         "evidence_class": "E0",
         "id": "FC-UI-QUALIFICATION-001",
-        "notes": "EVID-20260828T124634Z-c6c0c861da proves the current native Settings shell-control XCUITest target compiles with CODE_SIGNING_ALLOWED=NO; it is build-only evidence and executed zero tests. Developer Mode remains disabled and the available Apple Development identity team does not match the project configuration. Native UI validation remains deferred and release-blocking until an authorized host and matching signing configuration execute the recorded XCUITest matrix.",
+        "notes": "Developer Mode is enabled and Apple Development signing with James Daley on team 9AQ2C2838M is available. Earlier exact-revision signed Debug XCUI EVID-20260830T153118Z-752f058222 passed six bounded Settings and relaunch cases. Prior-manifest signed Debug build EVID-20260830T211007Z-760c293557 and exact app, daemon, and CLI bundle check EVID-20260830T211029Z-ae82e789b1 passed as supporting evidence only. Identity inventory EVID-20260830T211040Z-5f8b21e6d9 confirms no usable Developer ID identity, while Release settings EVID-20260830T211040Z-a8619d99c2 confirm shipped Release configurations request Developer ID Application. Build and static bundle evidence do not prove the production NSOpenPanel path, shell execution across app and installed-manager restart, real SMAppService approval, update, or disable behavior, installed-manager or running-helper identity, Release signing, archive, notarization, staple, or Gatekeeper. Native qualification remains deferred and release-blocking and is never passed by build-only, unit, simulator, synthetic-host, or partial XCUI evidence.",
         "severity": "High",
         "status": "deferred",
-        "title": "Native UI qualification prerequisites are unavailable"
+        "title": "Native signed UI qualification is deferred and release-blocking"
       },
       {
         "evidence_class": "E2",
         "id": "FC-FILESYSTEM-PATH-TOCTOU-001",
-        "notes": "Current-source Debug EVID-20260828T124332Z-1e2a050c0e and Release EVID-20260828T124624Z-00a3dd27c2 each pass 657 warnings-as-errors tests with four expected host-dependent skips. The full four-path atomic RENAME_SWAP matrix, fixed 32-slot receipt ledger, unsafe-rollback refusal, combined namespace-instability and durability failures, and two-receipt recovery merge are covered. Descriptor-relative operations and renameatx_np mitigate but do not eliminate the final verifier-to-terminal-syscall race because public macOS APIs have no expected-identity conditional mutation. One winning race can mutate one entry under the pinned parent; a final-link unlink can lose unbounded bytes and a directory rename can relocate an unbounded subtree. One recursive request can expose up to 100000 separate opportunities; 32 bounds simultaneous cooperative recovery state only. Terminal namespace syscalls and fsync already executing under the ledger lock have no independent wall-time deadline. Initial path anchoring, destination hierarchy creation, and hard-link ctime ambiguity remain E2.",
+        "notes": "E2 and FCA-007 remain mandatory release blockers under the same-UID threat model. Protocol v5 uses capture-first quarantine-and-verify semantics, a canonical SHA-256 authority-envelope digest, schema-3 receipts, and exact-only legacy handling. Successful renameatx_np with RENAME_EXCL is the capture linearization point. Namespace-exact mismatch and post-capture metadata change retain the object in root-owned quarantine; content-exact fails closed. This is mitigation, not elimination. Public macOS descriptor-relative and rename APIs do not provide identity-conditional terminal mutation. Source-parent authorization and capture are not atomic: same-UID parent relocation can move the pinned parent outside the allowed root before capture, allowing deletion of one eligible outside-root regular file or symlink with unbounded bytes, or quarantine of one ineligible directory with an unbounded subtree. The final ACL or BSD-metadata-to-unlinkat race can delete one captured expected regular file or symlink, with regular-file bytes unbounded. Quarantine has no authorized restore, release, or purge disposition, so 32 conflicts can exhaust the volume ledger. Startup recovery fencing, terminal physical-state repair, caller-ledger and generation fencing, daemon-owned discovery and revoke, binding lifecycle, qualified volume behavior, whole-product freshness, direct daemon execution, and the signed 57-row distinct-process crash, adversarial, lifecycle, and Release matrix remain open. Debug EVID-20260830T220320Z-4cccc31cce and Release EVID-20260830T220539Z-eac42f2a8c each pass 771 source tests with two declared skips and zero failures on source manifest 89e94937e86eb617eb7c6b2138f1584d3ecc7b32ce524919734fee39766a63a0. The evidence controls pass 23 focused tests and verify provenance structure, but a completed 34-item security diff review confirmed that one generic aggregate artifact can still be reused across cases and that one arbitrary formal-kind artifact can support all formal predicates without semantic case, role, iteration, barrier, mount, crash-phase, fixture, signing, process, or formal-claim binding. The schema and unexecuted template are controls only and cannot prove E2. E2, P10, G10, and G12 remain open.",
         "severity": "High",
-        "status": "deferred",
-        "title": "Filesystem mutation paths retain descriptor-relative race windows"
+        "status": "patching",
+        "title": "Privileged filesystem boundary remains mitigated but not identity-conditionally closed"
       },
       {
         "evidence_class": "E0",
         "id": "FC-SHELL-COMPAT-QUALIFICATION-001",
-        "notes": "Current-source Debug EVID-20260828T124332Z-1e2a050c0e and Release EVID-20260828T124624Z-00a3dd27c2 each pass 657 warnings-as-errors tests with four expected host-dependent skips. EVID-20260828T125651Z-ad5ebff94c proves current MCP tools/list compatibility with all declared protocol artifacts preserved, and EVID-20260828T125046Z-c15d53c9c9 proves current manager Settings routes. Tests cover clean-install enablement, accidental legacy-disabled migration, explicit opt-out, execution, manager and application restart, and the established shell_exec synchronous /bin/bash -lc result contract. Clean-profile bash.run remains additive. EVID-20260828T124634Z-c6c0c861da compiles the native Settings visibility, control, and relaunch XCUITest with signing disabled but executes no test. Shell compatibility remains open and release-blocking.",
+        "notes": "The established shell_exec surface remains synchronous /bin/bash -lc and clean-profile bash.run remains additive. Source tests prove clean-install default enablement, accidental legacy-disabled migration, explicit user opt-out, MCP tools/list registration, successful execution, the established result contract and timeout clamp, app rebootstrap, manager-service restart, and Settings visibility and control. Current Debug EVID-20260830T220320Z-4cccc31cce and Release EVID-20260830T220539Z-eac42f2a8c each pass 771 tests with two declared skips and zero failures. Earlier signed Debug XCUI EVID-20260830T153118Z-752f058222 proves bounded Settings visibility, control, persistence, and GUI relaunch at its exact revision. Prior-manifest signed build EVID-20260830T211007Z-760c293557 and bundle check EVID-20260830T211029Z-ae82e789b1 are supporting evidence only. Live installed-artifact run EVID-20260830T185444Z-7878ff2abf was denied at launchctl bootstrap by the automation-host process tree and made no shell_exec pass claim. Successful shell_exec through the signed real app and installed manager across both process restarts remains required. Shell compatibility remains open and release-blocking.",
         "severity": "High",
-        "status": "deferred",
-        "title": "Shell compatibility qualification requires native Settings execution"
+        "status": "validating",
+        "title": "Shell compatibility qualification requires current-source native execution"
       },
       {
         "evidence_class": "E0",
         "id": "FC-AUTONOMOUS-CONTINUITY-E2E-001",
-        "notes": "The prior live provider proof directly invoked an adapter and does not prove one manager-owned threshold-forced real-provider rollover. Release authority still requires exact successor acknowledgment, predecessor fencing and idempotent sealing, automatic continuation, GUI-closed operation, and recovery from every durable crash state in that scenario. Unit and synthetic-host tests are supporting evidence only. Autonomous continuity remains open and release-blocking.",
+        "notes": "Foreground use, Forge app closure and restart, LM Studio qwen/qwen3.8-27b@4bit loading, and substantial memory use are authorized. Unit and synthetic-host tests are supporting evidence only and cannot close this issue. Closure requires one manager-owned threshold-forced rollover against the real provider with exact successor acknowledgment, predecessor fencing and idempotent sealing, automatic linked continuation, GUI-closed operation, and recovery without duplicate provider work from every distinct durable crash state. Current source still lacks complete durable ordinary-response receipt and continuation-side-effect crash evidence. Autonomous continuity remains release-blocking.",
+        "severity": "High",
+        "status": "patching",
+        "title": "Autonomous continuity lacks full real-provider forced-rollover authority"
+      },
+      {
+        "evidence_class": "E0",
+        "id": "FC-HARDWARE-QUALIFICATION-001",
+        "notes": "The owner deferred real physical-hardware testing and authorized simulator or current-host work. Simulator, synthetic-host, and current-machine evidence cannot pass G11. Representative memory-tier, resource, performance, restart, and release behavior must be exercised on the owner-selected physical hardware matrix before shipment. G11 remains blocked_dependency and release-blocking.",
         "severity": "High",
         "status": "deferred",
-        "title": "Autonomous continuity lacks full real-provider forced-rollover authority"
+        "title": "Representative physical-hardware qualification is owner-deferred and release-blocking"
+      },
+      {
+        "evidence_class": "E0",
+        "id": "FC-PROJECT-ROOT-SETTINGS-001",
+        "notes": "Native Settings exposes operator-visible add and remove folder controls backed by NSOpenPanel, canonical symlink-resolved display, stable sorting and deduplication, filesystem-root, relative, missing, and file rejection, typed manager settings, persistence, live application, accessibility identifiers, and restart survival. Debug and Release strict suites EVID-20260830T151948Z-6df8d3afa9 and EVID-20260830T152225Z-43cd73ae1c passed source coverage. Earlier exact-revision signed Debug XCUI EVID-20260830T153118Z-752f058222 passed all six selected Settings and relaunch cases, including the two bounded root-control cases. The chooser cases use a deterministic test-only selection hook instead of the system-owned production panel. Production panel observation and the broader signed native gate remain required before resolution.",
+        "severity": "High",
+        "status": "validating",
+        "title": "Clean-install project root authority lacks a native Settings control"
+      },
+      {
+        "evidence_class": "E2",
+        "id": "FC-PRIVILEGED-SERVICE-LIFECYCLE-001",
+        "notes": "Protocol v5 retains unregister-before-register replacement and generation fencing, installs the exact caller-sealed daemon CodeDirectory requirement before NSXPC activation, and checks protocol, product, service identifier, root EUID, and running daemon hash on the same connection. Pathless transaction query, resume, and acknowledgement retain terminal outcomes until exact acknowledgement. Prior-manifest signed Debug build EVID-20260830T211007Z-760c293557 and bundle check EVID-20260830T211029Z-ae82e789b1 are static support only. Tests do not execute real SMAppService approval, denial, update, disable, unregister and re-register, daemon restart, startup recovery fencing, or capture recovery. Release settings EVID-20260830T211040Z-a8619d99c2 request Developer ID Application, but identity inventory EVID-20260830T211040Z-5f8b21e6d9 shows no usable Developer ID identity. Signed process lifecycle, Release signing, and notarization remain required. E2, P10, G10, and G12 remain open.",
+        "severity": "High",
+        "status": "patching",
+        "title": "Privileged service updates must not retain a stale registered daemon"
+      },
+      {
+        "evidence_class": "E2",
+        "id": "FC-PRIVILEGED-CALLER-IDENTITY-001",
+        "notes": "Protocol v5 obtains expected per-architecture daemon CodeDirectory hashes from each caller validated running signature, composes them into the NSXPC requirement before activation, and repeats the exact running-hash and protocol handshake before every mutation or transaction-control message. The canonical app graph builds one app, embedded CLI, and daemon artifact set. Prior-manifest signed Debug build EVID-20260830T211007Z-760c293557 and bundle check EVID-20260830T211029Z-ae82e789b1 verify static same-build identities only. They do not execute signed app, installed manager, raw CLI, or standalone CLI calls or stale-helper, wrong-team, wrong-identifier, timeout, upgrade, restart, Release, and notarization cases. Whole-product rollback still lacks a monotonic root-owned receipt; an older allowlisted daemon retains its bounded root mutation authority and vulnerabilities. This is mitigation, not elimination. Caller identity, service lifecycle, E2, P10, G10, and G12 remain open.",
+        "severity": "High",
+        "status": "patching",
+        "title": "Caller-sealed helper identity requires signed-process and freshness qualification"
       }
     ],
+    "partial_security_pr_policy": {
+      "does_not_close_p10_e2_native_shell_continuity_or_hardware": true,
+      "merge_authorized": false,
+      "merge_requires_residuals_in_pr_state_doctor_and_selector": true,
+      "reviewable": true,
+      "simulator_or_current_host_results_do_not_pass_owner_deferred_g11": true
+    },
+    "release_authorized": false,
     "repository": {
-      "branch": "repair/filesystem-race-mitigation",
-      "commit": "f721ce063104817e9f08013350ab855bac708c77",
+      "branch": "security/privileged-filesystem-boundary",
+      "commit": "61c3a00f3d0289cf4086182f0e8217567915b763",
       "dirty": true,
-      "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation"
+      "root": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security"
     },
     "run_status": "active"
   },
@@ -77,7 +208,7 @@
   "macos_runtime_capable": true,
   "platform": "macOS-26.6.2-arm64-arm-64bit",
   "project_markers": {
-    "package_swift": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation/Package.swift",
+    "package_swift": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security/Package.swift",
     "projects": [
       "ForgeConductor.xcodeproj"
     ],
@@ -85,7 +216,7 @@
       "ForgeConductor.xcworkspace"
     ]
   },
-  "repository_root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Race-Mitigation",
+  "repository_root": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security",
   "schema_version": 1,
   "tools": {
     "bash": {
@@ -115,13 +246,13 @@
     "swift": {
       "available": true,
       "exit_code": 0,
-      "output": "swift-driver version: 1.127.14.1 Apple Swift version 6.2.3 (swiftlang-6.2.3.3.21 clang-1700.6.3.2)\nTarget: arm64-apple-macosx26.0\n",
+      "output": "swift-driver version: 1.148.6 Apple Swift version 6.3.3 (swiftlang-6.3.3.1.3 clang-2100.1.1.101)\nTarget: arm64-apple-macosx26.0\n",
       "path": "/usr/bin/swift"
     },
     "xcodebuild": {
       "available": true,
       "exit_code": 0,
-      "output": "Xcode 26.2\nBuild version 17C52\n",
+      "output": "Xcode 26.6\nBuild version 17F113\n",
       "path": "/usr/bin/xcodebuild"
     },
     "xcrun": {
@@ -133,7 +264,7 @@
     "xctrace": {
       "available": true,
       "exit_code": 0,
-      "output": "xctrace version 26.0 (17C52)\n",
+      "output": "xctrace version 16.0 (17F113)\n",
       "path": "/usr/bin/xcrun"
     }
   }

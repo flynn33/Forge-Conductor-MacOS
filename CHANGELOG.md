@@ -10,7 +10,8 @@ for marketing versions (`MAJOR.MINOR.PATCH`).
 
 This is an in-progress P10 checkpoint, not a qualified release. P10,
 filesystem E2, shell compatibility, native UI validation, autonomous continuity,
-and the final release gates remain open.
+owner-deferred representative physical-hardware qualification, and the final
+release gates remain open.
 
 ### Changed
 
@@ -33,23 +34,122 @@ and the final release gates remain open.
   whose requested namespace becomes unstable while durability is unconfirmed
   returns its live receipt as required ledger recovery, merging any additional
   retained staging-cleanup receipt into the same result.
+- The partial privileged leaf-delete boundary now uses protocol v5 and binds
+  the daemon requirement to exact per-architecture CodeDirectory hashes sealed
+  into each signed caller. The app-scheme build produces one matching
+  app/embedded-CLI/standalone-CLI/daemon artifact set, and app-origin manager
+  installation stages only the embedded CLI plus its signed framework. Missing,
+  symlinked, mismatched, or independently cross-paired artifacts fail closed.
+- Protocol v5 makes successful `renameatx_np(..., RENAME_EXCL)` capture the
+  mutation linearization point and records a canonical request digest plus an
+  explicit `currentEntry`, `namespaceVersionExact`, or `contentVersionExact`
+  contract. Production `fs_delete` uses `currentEntry`; namespace-exact recovery
+  disposes only a matching captured identity; and content-exact requests fail
+  closed because an existing writable descriptor, mapping, or hard link prevents
+  an exclusive-writer proof. Capture mismatch and post-capture metadata changes
+  enter durable protected quarantine instead of being described as eliminated.
+- Protocol v5 retains terminal committed, restored, rejected, and conflicted transactions in
+  32 fixed root-owned slots until durable exact acknowledgement. The additive,
+  pathless `fs_delete_recovery` tool queries, resumes, or acknowledges the
+  original transaction under its requester/project/generation/root authority;
+  a bounded owner-only caller ledger is durable before XPC submission. Existing
+  `fs_delete` and `shell_exec` contracts are unchanged.
+- Privileged rollback no longer restores a captured leaf through a source-parent
+  descriptor because a same-UID process can relocate that directory after it is
+  validated. The daemon durably enters rollback and retains the leaf in its
+  protected slot for explicit recovery. Project-generation reset now holds the
+  caller-ledger lock across checks before and after entering the resetting state
+  and through generation advance, failing closed when old-generation authority
+  is visible. Delete retention revalidates the current project generation while
+  holding that same lock, so a request delayed behind reset fails before caller
+  record publication or XPC dispatch. A failed reset cancellation is surfaced
+  as a distinct operator recovery error instead of being suppressed.
+- Crash recovery no longer depends on reopening a user-controlled source parent
+  after a protected capture exists. Persisted v5 records must recompute to their
+  canonical request digest from an explicit schema-3 protocol and digest-
+  canonicalization version; mixed legacy/v5 record shapes fail closed. A valid
+  transaction-bound pending capture-identity receipt is published on recovery
+  instead of discarded. Documented atomic-capture errors that leave both names
+  unchanged, including immutable/no-unlink denial and an unrenameable mount,
+  become durable rejected outcomes instead of indefinitely occupying a slot.
+  A legacy
+  rollback reports restored only when the source still has the exact recorded
+  identity, while an absent v5 protected capture or unprovable legacy restore
+  becomes a durable conflict.
 
 ### Open qualification and security boundaries
 
-- A same-user writer can still swap a quarantine name between final verification
-  and the terminal mutation. One successful race can affect one entry under the
-  pinned authorized parent; final-link deletion can lose an unbounded number of
-  bytes and a directory rename can relocate an unbounded subtree. A recursive
-  request can reuse the 32 slots across up to 100,000 entries, so the slot bound
-  limits simultaneous cooperative recovery state rather than cumulative
-  adversarial wrong-object mutations. Initial path
-  anchoring, destination hierarchy creation, and hard-link ctime ambiguity also
-  remain E2.
+- A same-user writer can still substitute the source before exclusive capture
+  or relocate the validated source parent outside the authorized root before
+  capture. The latter race can make one eligible regular file or symbolic link
+  outside the configured root be deleted; that file can contain unbounded
+  bytes. An ineligible captured directory can quarantine an unbounded subtree.
+  A same-user writer can also alter ACL/BSD authorization metadata between
+  final verification and root `unlinkat`. A winning terminal race can delete
+  the one captured expected regular file or symbolic link after its metadata
+  changed; a regular file can
+  contain an unbounded number of bytes. A pre-capture substitution can make one
+  entry temporarily unavailable or recovery-required; an unsupported directory
+  can represent an unbounded subtree but is not eligible for terminal deletion.
+  Writable descriptors and hard links retain content residuals. The full signed
+  distinct-process atomic-swap, every-durable-phase crash, recovery, volume,
+  lifecycle, hard-link, and writable-descriptor matrix remains unexecuted, so
+  E2 remains mandatory and release-blocking. This is mitigation, not elimination.
+- Terminal-outcome receipts are not yet reconciled against every possible
+  crash/corruption mismatch in the physical protected leaf. A committed,
+  restored, rejected, or conflicted receipt paired with a retained leaf, or a
+  quarantined receipt whose leaf is absent or has the wrong identity, must not
+  be treated as truthful closure. Defining and qualifying those repair
+  transitions remains release-blocking.
+- Disabling automatic privileged restore prevents the known out-of-root write
+  path, but it increases bounded slot availability impact: one captured entry per
+  affected transaction can remain unavailable, up to the 32 protected slots per
+  volume. A captured entry can be a directory substituted immediately before
+  capture, so one occupied slot can isolate an unbounded subtree; the 32-slot
+  limit is not a byte or descendant bound. There is not yet an independently
+  authorized restore/release/purge disposition, so repeated conflicts can
+  exhaust the slots and disable later protected deletes. The reset fence and
+  in-lock generation check reject normal delayed
+  retainers, but the caller ledger remains same-UID-owned. Hostile removal or
+  relocation of an already-retained caller record can hide the sole handle from
+  reset while its daemon transaction remains, allowing generation advance while
+  old authority can still complete. A same-UID process can also replace the
+  locked inode after a retainer validates but before slot publication, splitting
+  retention from reset and permitting stale dispatch. Maximum post-reset impact
+  is up to 32
+  captured or terminally deleted expected leaves per protected volume; each
+  regular file can contain unbounded bytes. Both rows require signed adversarial
+  execution and remain part of open E2.
 - The shell policy, migration, MCP registration, execution, compatibility
-  contract, and restart paths have non-native regressions. The native Settings
-  test has build-only evidence. Developer Mode is disabled and the available
-  signing identity does not match the configured team, so native UI and shell
-  compatibility qualification remain deferred and release-blocking.
+  contract, and restart paths pass current-source Debug and Release regressions.
+  Developer Mode is enabled, Apple Development signing uses James Daley on team
+  `9AQ2C2838M`, and the bounded signed Settings/relaunch matrix passes. Native
+  shell qualification still lacks one scenario that executes `shell_exec`
+  successfully after app closure/reopen and an actual installed-manager process
+  restart. The guarded installed-artifact harness has 14 passing self-tests, but
+  its current-host live run was denied at `launchctl bootstrap`; the legacy
+  `launchctl load` fallback returned without a running job, and the harness
+  failed closed and restored the prior manager state. A foreground Terminal run
+  and correction of that false-success fallback remain required. Production
+  folder-panel observation, privileged-service lifecycle,
+  release signing, and notarization also remain deferred and release-blocking.
+- Exact caller-sealed helper identity prevents helper-only substitution against
+  a current caller, but it does not establish whole-product rollback freshness.
+  A monotonic root-owned receipt is not implemented; a rolled-back allowlisted
+  daemon retains its full bounded root mutation authority and its vulnerabilities.
+  Distinct installed signed app/manager/CLI XPC, stale-helper, wrong-signer,
+  approval/update/restart, and crash-recovery matrices remain unexecuted.
+- An interrupted managed query/resume/acknowledge call is left ambiguous and
+  blocked from replay if its exact result cannot be reconciled. Explicit
+  transaction recovery remains available. An interrupted `fs_delete` whose
+  previously existing path is now absent also remains ambiguous; pathname
+  absence is not converted into synthetic success and the mutation is not
+  redispatched. Automatic post-broker durable acknowledgement and discovery are
+  not implemented. The caller recovery ledger remains under same-UID-owned
+  application storage, so another same-UID process can rename or remove the
+  only caller handle without gaining daemon authority. Up to 32 lost handles per
+  protected volume can strand normal recovery and then make later mutations
+  fail closed on capacity. This availability risk remains part of open E2.
 - Historical G09 evidence covers an exact-revision, directly invoked live
   provider adapter. Current autonomous-continuity authority still requires one
   manager-owned, threshold-forced real-provider rollover proving exact successor

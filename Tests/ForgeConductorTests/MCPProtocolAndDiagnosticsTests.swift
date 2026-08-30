@@ -184,6 +184,7 @@ final class MCPProtocolAndDiagnosticsTests: XCTestCase {
         let projectRoot = root.appendingPathComponent("project", isDirectory: true)
         try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
         let app = try ForgeApp.bootstrap(home: home)
+        _ = try app.config.update(["allowed_roots": [root.path]], save: false)
         let clientID = ClientID("mcp-closed-delivery")
         let initialized = try app.tools.call(
             name: "project_memory.initialize",
@@ -1098,6 +1099,7 @@ private final class MCPWireFixture {
         try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
         do {
             app = try ForgeApp.bootstrap(home: home)
+            _ = try app.config.update(["allowed_roots": [root.path]], save: false)
             let clientID = ClientID("mcp-wire-\(UUID().uuidString)")
             let initialized = try app.tools.call(
                 name: "project_memory.initialize",

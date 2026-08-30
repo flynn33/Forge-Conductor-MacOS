@@ -1,0 +1,60 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 7349,
+      "path": ".forge-codex/evidence/EVID-20260830T185444Z-7878ff2abf.artifact-000-P10-signed-shell-manager-qualification.json",
+      "sha256": "fd1a12ae4ffd06e09bcd9b5eff9287e33d9e92e1212de730a63251e1abc82720",
+      "source_path": ".forge-codex/evidence/P10-signed-shell-manager-qualification.json",
+      "storage": "evidence-id-specific-copy"
+    },
+    {
+      "bytes": 7349,
+      "path": ".forge-codex/evidence/EVID-20260830T185444Z-7878ff2abf.stdout.txt",
+      "sha256": "fd1a12ae4ffd06e09bcd9b5eff9287e33d9e92e1212de730a63251e1abc82720",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260830T185444Z-7878ff2abf.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "command": "python3 .forge-codex/scripts/qualify_signed_shell_manager.py --execute --app '/tmp/forge-p10-recovery-final-xcode-20260830-1450/Build/Products/Debug/Forge Conductor.app' --qualification-home /tmp/forge-p10-signed-shell-manager-20260830-1455 --output .forge-codex/evidence/P10-signed-shell-manager-qualification.json",
+  "ended_at": "2026-08-30T18:55:17.521696+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 2,
+  "id": "EVID-20260830T185444Z-7878ff2abf",
+  "kind": "p10-signed-shell-installed-manager-qualification",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 33554432,
+  "related_findings": [],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 9555398,
+    "file_count": 252,
+    "schema_version": 1,
+    "sha256": "62361115e3af17e340f56c656b2731bd720e98b3cddceb7d848a040cb6e0a21c"
+  },
+  "source_manifest_after": {
+    "bytes": 9555398,
+    "file_count": 252,
+    "schema_version": 1,
+    "sha256": "62361115e3af17e340f56c656b2731bd720e98b3cddceb7d848a040cb6e0a21c"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-30T18:54:44.683900+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

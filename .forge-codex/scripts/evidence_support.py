@@ -28,6 +28,10 @@ MANIFEST_TARGETS = (
     ".forge-codex/scripts/check_p10_manager_http_compatibility.py",
     ".forge-codex/scripts/check_p10_protocol_compatibility.py",
     ".forge-codex/scripts/test_evidence_controls.py",
+    ".forge-codex/schemas/p10-privileged-filesystem-qualification-report.schema.json",
+    ".forge-codex/templates/p10-privileged-filesystem-qualification-report.json",
+    ".forge-codex/docs/PRIVILEGED_FILESYSTEM_QUALIFICATION.md",
+    ".forge-codex/architecture/SECURITY_AND_PRIVACY.md",
     ".forge-codex/state/baseline",
 )
 IGNORED_MANIFEST_NAMES = {".DS_Store", "__pycache__"}

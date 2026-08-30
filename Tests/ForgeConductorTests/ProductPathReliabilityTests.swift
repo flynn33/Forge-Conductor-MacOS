@@ -8,6 +8,55 @@ import Darwin
 
 /// G1/G7: product reliability — MCP negotiate + tools surface without LM Studio UI.
 final class ProductPathReliabilityTests: XCTestCase {
+    func testPrivilegedDaemonUsesDistinctCaptureIdentityAndPhaseReceipts() throws {
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: repository.appendingPathComponent(
+                "Sources/ForgeFilesystemDaemon/PrivilegedLeafDeleteEngine.swift"
+            ),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(source.contains(
+            #"capturedIdentityName = "captured-identity.json""#
+        ))
+        XCTAssertTrue(source.contains(
+            #"capturedIdentityPendingName = "captured-identity.json.pending""#
+        ))
+        XCTAssertTrue(source.contains(#"case .captured: "captured.json""#))
+        XCTAssertFalse(source.contains(#"capturedIdentityName = "captured.json""#))
+    }
+
+    func testPrivilegedDaemonBindsPersistedDigestAndLegacyRollbackIdentity() throws {
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: repository.appendingPathComponent(
+                "Sources/ForgeFilesystemDaemon/PrivilegedLeafDeleteEngine.swift"
+            ),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(source.contains("hasValidPersistedRequestShape"))
+        XCTAssertTrue(source.contains("reconstructed.requestDigestSHA256 == requestDigestSHA256"))
+        XCTAssertTrue(source.contains("isLegacyProtocolFourRecord"))
+        XCTAssertTrue(source.contains("expectedLeafIdentity?.matches"))
+        XCTAssertTrue(source.contains("restoration cannot be proven"))
+        XCTAssertTrue(source.contains("static let legacyProtocolFourSchema = 2"))
+        XCTAssertTrue(source.contains("static let currentSchema = 3"))
+        XCTAssertTrue(source.contains("requestProtocolVersion = request.protocolVersion"))
+        XCTAssertTrue(source.contains("requestDigestCanonicalizationVersion"))
+        XCTAssertTrue(source.contains("reconcileCapturedIdentityPublication"))
+        XCTAssertTrue(source.contains(
+            "A pending captured filesystem identity receipt is invalid"
+        ))
+    }
+
     func testXcodeRuntimeLauncherEmbedsDeclaredProductIdentity() throws {
         let repository = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -40,6 +89,298 @@ final class ProductPathReliabilityTests: XCTestCase {
                 "runtime helper must retain its exact product identity"
             )
         }
+    }
+
+    func testXcodeFilesystemIdentityBuildGraphRetainsSigningBeforeSealingControls() throws {
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let project = try String(
+            contentsOf: repository.appendingPathComponent(
+                "ForgeConductor.xcodeproj/project.pbxproj"
+            ),
+            encoding: .utf8
+        )
+
+        func object(_ identifier: String) throws -> Substring {
+            let start = try XCTUnwrap(project.range(of: "\n\t\t\(identifier) /*"))
+            let end = try XCTUnwrap(
+                project.range(of: "\n\t\t};", range: start.lowerBound..<project.endIndex)
+            )
+            return project[start.lowerBound..<end.upperBound]
+        }
+
+        for configurationID in [
+            "89F432F3B43F4B81ADBFD41A", // app Debug
+            "949B044302214128BBAA3EE8", // app Release
+            "D82F296A8E4141ECB3B96E83", // CLI Debug
+            "462BB7BBB61F4979BE23EEDD", // CLI Release
+        ] {
+            XCTAssertTrue(
+                try object(configurationID).contains(
+                    "EAGER_COMPILATION_ALLOW_SCRIPTS = NO;"
+                ),
+                "caller configuration \(configurationID) must wait for dependency signing"
+            )
+        }
+
+        for configurationID in [
+            "D82F296A8E4141ECB3B96E83", // CLI Debug
+            "462BB7BBB61F4979BE23EEDD", // CLI Release
+        ] {
+            let configuration = try object(configurationID)
+            XCTAssertTrue(
+                configuration.contains(#""@executable_path/../Frameworks","#),
+                "embedded CLI must resolve the app framework from Contents/Helpers"
+            )
+            XCTAssertTrue(
+                configuration.contains(#""@executable_path","#),
+                "standalone and installed CLI must resolve a sibling framework"
+            )
+        }
+
+        for configurationID in [
+            "E2F500000000000000000035", // protocol Debug
+            "E2F500000000000000000036", // protocol Release
+            "E2F500000000000000000037", // daemon Debug
+            "E2F500000000000000000038", // daemon Release
+        ] {
+            XCTAssertTrue(
+                try object(configurationID).contains("ENABLE_CODE_COVERAGE = NO;"),
+                "filesystem configuration \(configurationID) must retain scheme-consistent output"
+            )
+        }
+
+        let appTarget = try object("D574F9BCA1204936B158984B")
+        XCTAssertTrue(
+            appTarget.contains(
+                "E2F500000000000000000045 /* Seal Filesystem Daemon Identity */"
+            )
+        )
+        XCTAssertTrue(
+            appTarget.contains("E2F50000000000000000004B /* Embed Manager CLI */")
+        )
+        XCTAssertTrue(
+            appTarget.contains("E2F500000000000000000034 /* PBXTargetDependency */")
+        )
+        XCTAssertTrue(
+            appTarget.contains("E2F50000000000000000004C /* PBXTargetDependency */")
+        )
+        XCTAssertTrue(
+            try object("E2F500000000000000000034").contains(
+                "target = E2F500000000000000000026 /* ForgeFilesystemDaemon */;"
+            ),
+            "app must depend directly on the daemon before sealing and embedding it"
+        )
+        XCTAssertTrue(
+            try object("E2F50000000000000000004C").contains(
+                "target = 05C234606560407787702A3C /* forge-conductor */;"
+            ),
+            "app must depend directly on the signed manager CLI before embedding it"
+        )
+
+        let cliTarget = try object("05C234606560407787702A3C")
+        XCTAssertTrue(
+            cliTarget.contains(
+                "E2F500000000000000000046 /* Seal Filesystem Daemon Identity */"
+            )
+        )
+        XCTAssertTrue(
+            cliTarget.contains("E2F500000000000000000048 /* PBXTargetDependency */")
+        )
+        XCTAssertTrue(
+            try object("E2F500000000000000000048").contains(
+                "target = E2F500000000000000000026 /* ForgeFilesystemDaemon */;"
+            ),
+            "CLI must depend directly on the daemon before sealing its identity"
+        )
+
+        let cliSealPhase = try object("E2F500000000000000000046")
+        XCTAssertTrue(
+            cliSealPhase.contains("$(BUILT_PRODUCTS_DIR)/forge-filesystem-daemon")
+        )
+        XCTAssertTrue(
+            cliSealPhase.contains("${BUILT_PRODUCTS_DIR}/forge-filesystem-daemon"),
+            "CLI seal command must read its signed daemon dependency"
+        )
+        XCTAssertFalse(
+            cliSealPhase.contains(
+                "$(BUILT_PRODUCTS_DIR)/Forge Conductor.app/Contents/MacOS/"
+                    + "forge-filesystem-daemon"
+            ),
+            "CLI seal must not introduce an app dependency cycle"
+        )
+
+        let embedManagerCLI = try object("E2F50000000000000000004B")
+        XCTAssertTrue(embedManagerCLI.contains("dstPath = Contents/Helpers;"))
+        XCTAssertTrue(
+            embedManagerCLI.contains(
+                "E2F500000000000000000049 /* forge-conductor in Embed Manager CLI */"
+            )
+        )
+        let embeddedCLIBuildFile = try XCTUnwrap(
+            project.split(separator: "\n").first(where: {
+                $0.contains(
+                    "E2F500000000000000000049 /* forge-conductor in Embed Manager CLI */"
+                )
+            })
+        )
+        XCTAssertTrue(
+            embeddedCLIBuildFile.contains(
+                "fileRef = FAD7DC3FA3A1480E9B4955B1 /* forge-conductor */;"
+            )
+        )
+        XCTAssertTrue(
+            embeddedCLIBuildFile.contains("ATTRIBUTES = (CodeSignOnCopy, );"),
+            "embedded manager CLI must be re-signed as nested app code"
+        )
+    }
+
+    func testXcodeShippedTargetsKeepDebugAndReleaseSigningClassesDistinct() throws {
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let project = try String(
+            contentsOf: repository.appendingPathComponent(
+                "ForgeConductor.xcodeproj/project.pbxproj"
+            ),
+            encoding: .utf8
+        )
+
+        func configuration(_ identifier: String) throws -> Substring {
+            let start = try XCTUnwrap(project.range(of: "\n\t\t\(identifier) /*"))
+            let end = try XCTUnwrap(
+                project.range(of: "\n\t\t};", range: start.lowerBound..<project.endIndex)
+            )
+            return project[start.lowerBound..<end.upperBound]
+        }
+
+        let debugConfigurations = [
+            "89F432F3B43F4B81ADBFD41A", // app
+            "D82F296A8E4141ECB3B96E83", // manager CLI
+            "E27D3E6391AA4ECF80942FF0", // core framework
+            "F0A700000000000000000010", // runtime launcher
+            "E2F500000000000000000037", // filesystem daemon
+        ]
+        let releaseConfigurations = [
+            "949B044302214128BBAA3EE8", // app
+            "462BB7BBB61F4979BE23EEDD", // manager CLI
+            "A3DBA24BE10849FEB69442E8", // core framework
+            "F0A700000000000000000011", // runtime launcher
+            "E2F500000000000000000038", // filesystem daemon
+        ]
+
+        for identifier in debugConfigurations {
+            let settings = try configuration(identifier)
+            XCTAssertTrue(
+                settings.contains(#"CODE_SIGN_IDENTITY = "Apple Development";"#),
+                "Debug shipped target \(identifier) must use development signing"
+            )
+            XCTAssertFalse(
+                settings.contains(#"CODE_SIGN_IDENTITY = "Developer ID Application";"#)
+            )
+        }
+
+        for identifier in releaseConfigurations {
+            let settings = try configuration(identifier)
+            XCTAssertTrue(
+                settings.contains(#"CODE_SIGN_IDENTITY = "Developer ID Application";"#),
+                "Release shipped target \(identifier) must require Developer ID signing"
+            )
+            XCTAssertFalse(
+                settings.contains(#"CODE_SIGN_IDENTITY = "Apple Development";"#)
+            )
+        }
+    }
+
+    func testPrivilegedFilesystemBundleCheckerRetainsExactOptionalCLISealContract() throws {
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let checker = try String(
+            contentsOf: repository.appendingPathComponent(
+                ".forge-codex/scripts/check_privileged_filesystem_bundle.sh"
+            ),
+            encoding: .utf8
+        )
+
+        for requiredFragment in [
+            #"CLI_EXECUTABLE="${3:-}""#,
+            #"APP_EXECUTABLE="$APP_BUNDLE/Contents/MacOS/Forge Conductor""#,
+            #"EMBEDDED_CLI="$APP_BUNDLE/Contents/Helpers/forge-conductor""#,
+            #"identifier \"com.forge-conductor.cli\""#,
+            #"certificate leaf[subject.OU] = \"$TEAM_IDENTIFIER\""#,
+            #"--strict --all-architectures"#,
+            #"[[ -f "$executable" ]]"#,
+            #"[[ ! -L "$executable" ]]"#,
+            #"[[ -x "$executable" ]]"#,
+            #"[[ -f "$APP_EXECUTABLE" ]]"#,
+            #"[[ ! -L "$APP_EXECUTABLE" ]]"#,
+            #"[[ -x "$APP_EXECUTABLE" ]]"#,
+            #"supported_architectures "app main executable" "$APP_EXECUTABLE""#,
+            #"--deep --strict --all-architectures"#,
+            #""-R=$APP_REQUIREMENT" "$APP_BUNDLE""#,
+            #"supported_architectures "$role" "$executable""#,
+            #"supported_architectures "embedded filesystem daemon" "$DAEMON""#,
+            #"require_cli_runpaths "$role" "$executable""#,
+            #"/usr/bin/otool -l "$executable""#,
+            #""@executable_path/../Frameworks""#,
+            #""@executable_path""#,
+            #"/usr/bin/plutil -p "$APP_INFO_PLIST""#,
+            #"/usr/bin/plutil -p "$executable""#,
+            #"CFBundleShortVersionString"#,
+            #"/usr/bin/env -i PATH=/usr/bin:/bin"#,
+            #""$executable" version"#,
+            #""standalone manager CLI" "$CLI_EXECUTABLE""#,
+            #""embedded manager CLI" "$EMBEDDED_CLI""#,
+            #"--arch "$architecture" "$DAEMON""#,
+            #"ForgeFilesystemDaemonCDHashArm64"#,
+            #"ForgeFilesystemDaemonCDHashX86_64"#,
+            #"reject_unknown_daemon_seal_keys"#,
+            #"require_matching_daemon_seal"#,
+            #"require_absent_daemon_seal"#,
+            #"[[ "$actual_hash" == "$expected_hash" ]]"#,
+        ] {
+            XCTAssertTrue(
+                checker.contains(requiredFragment),
+                "bundle checker is missing the exact-pair contract: \(requiredFragment)"
+            )
+        }
+
+        XCTAssertTrue(
+            checker.contains(
+                "/usr/bin/codesign --verify --strict --all-architectures --verbose=4 \\\n"
+                    + "  \"-R=$APP_REQUIREMENT\" \"$APP_BUNDLE\""
+            ),
+            "app explicit-requirement verification must cover every architecture"
+        )
+
+        let cliSignatureCheck = try XCTUnwrap(
+            checker.range(of: #""-R=$CLI_REQUIREMENT" "$executable""#)
+        )
+        let cliInfoInspection = try XCTUnwrap(
+            checker.range(of: #"/usr/bin/plutil -p "$executable""#)
+        )
+        XCTAssertLessThan(
+            cliSignatureCheck.lowerBound,
+            cliInfoInspection.lowerBound,
+            "CLI signature and exact identity must be accepted before trusting its embedded plist"
+        )
+
+        let embeddedCLIValidation = try XCTUnwrap(
+            checker.range(of: #""embedded manager CLI" "$EMBEDDED_CLI""#)
+        )
+        let optionalStandaloneCLIValidation = try XCTUnwrap(
+            checker.range(of: #"[[ -n "$CLI_EXECUTABLE" ]]"#)
+        )
+        XCTAssertLessThan(
+            embeddedCLIValidation.lowerBound,
+            optionalStandaloneCLIValidation.lowerBound,
+            "the app-embedded manager CLI must be validated even without an external CLI argument"
+        )
     }
 
     func testProjectBuildEntrypointStagesRuntimeLauncherBeforeBundleSigning() throws {

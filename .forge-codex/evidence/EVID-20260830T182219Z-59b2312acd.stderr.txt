@@ -1,0 +1,43 @@
+Building for production...
+[0/39] /tmp/forge-p10-recovery-final-release-20260830-1322/arm64-apple-macosx/release/ForgeConductorPackageTests.derived/runner.swift
+[1/39] Write sources
+[5/39] Copying telemetry_contract_keys.json
+[5/39] Copying responses-root.sse
+[5/39] Copying responses-continuation.sse
+[8/39] Copying models-loaded.json
+[9/39] Copying test.md
+[9/39] Copying tools-catalog.js
+[11/39] Copying style.css
+[12/39] Copying security.md
+[12/39] Copying review.md
+[14/39] Copying research.md
+[15/39] Copying precommit-audit.md
+[15/39] Copying plan.md
+[17/39] Copying index.html
+[18/39] Copying implement.md
+[18/39] Copying explore.md
+[20/39] Copying docs.md
+[21/39] Copying debug.md
+[21/39] Copying app.js
+[23/39] Write sources
+[28/39] Write swift-version--58304C5D6DBC2206.txt
+[30/41] Compiling ForgeRuntimeLauncher main.swift
+[30/41] Write Objects.LinkFileList
+[31/41] Linking forge-runtime-launcher
+[33/41] Compiling ForgeFilesystemProtocol ForgeFilesystemProtocol.swift
+[34/43] Compiling ForgeFilesystemDaemon PrivilegedLeafDeleteEngine.swift
+[34/43] Write Objects.LinkFileList
+[35/43] Linking forge-filesystem-daemon
+[37/43] Compiling ForgeConductorCore AgentCatalog.swift
+[38/44] Compiling ForgeNativeSessionHostPlugin ForgeNativeSessionHostPlugin.swift
+[39/46] Compiling ForgeConductorCLI ForgeConductorMain.swift
+[39/46] Write Objects.LinkFileList
+[40/46] Linking forge-conductor
+[42/47] Compiling ForgeConductorApp AppDeployController.swift
+[42/47] Write Objects.LinkFileList
+[43/47] Linking forge-conductor-app
+[45/47] Compiling ForgeConductorTests AppConfigAndDoctorTests.swift
+[46/48] Compiling ForgeConductorPackageTests runner.swift
+[46/48] Write Objects.LinkFileList
+[47/48] Linking ForgeConductorPackageTests
+Build complete! (109.43s)

@@ -112,6 +112,11 @@ completion={
     "errors":errors,
     "run_id":state.get("run_id"),
     "commit":state.get("repository",{}).get("commit"),
+    "finalization_gate":{
+        "gate_id":"G12",
+        "status":"blocked_open" if errors else ("not_finalized" if args.no_finalize else "eligible_for_finalization"),
+        "reason":"G12 is written as passed only after every prerequisite and final integrity check passes and finalization is authorized.",
+    },
 }
 report_json=pkg/"state/completion-report.json"
 tmp=report_json.with_suffix(".tmp")
@@ -120,6 +125,7 @@ os.replace(tmp,report_json)
 
 report_md=pkg/"state/completion-report.md"
 lines=["# Forge Conductor completion verification","",f"- Evaluated: `{completion['evaluated_at']}`",f"- Passed: **{completion['passed']}**","",
+       "## Finalization gate","",f"- G12 status: **{completion['finalization_gate']['status']}**",f"- {completion['finalization_gate']['reason']}","",
        "## Checks",""]
 for c in checks:
     lines.append(f"- [{'x' if c['passed'] else ' '}] `{c['name']}` — {c['detail']}")

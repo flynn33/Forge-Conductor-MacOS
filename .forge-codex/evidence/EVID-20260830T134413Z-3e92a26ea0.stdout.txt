@@ -1,0 +1,58 @@
+/tmp/forge-p10-normal-signed-final-20260830/Build/Products/Debug/Forge Conductor.app/Contents/Library/LaunchDaemons/com.forge-conductor.filesystem-daemon.plist: OK
+Executable=/private/tmp/forge-p10-normal-signed-final-20260830/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/Forge Conductor
+Identifier=com.forge-conductor.app
+Format=app bundle with Mach-O thin (arm64)
+CodeDirectory v=20500 size=451 flags=0x10000(runtime) hashes=3+7 location=embedded
+VersionPlatform=1
+VersionMin=1703936
+VersionSDK=1705216
+Hash type=sha256 size=32
+CandidateCDHash sha256=eb46449320f215814c56583244c09d363bf4c23c
+CandidateCDHashFull sha256=eb46449320f215814c56583244c09d363bf4c23cf1e0b7ac48540872c573a000
+Hash choices=sha256
+CMSDigest=eb46449320f215814c56583244c09d363bf4c23cf1e0b7ac48540872c573a000
+CMSDigestType=2
+Executable Segment base=0
+Executable Segment limit=16384
+Executable Segment flags=0x1
+Page size=16384
+CDHash=eb46449320f215814c56583244c09d363bf4c23c
+Signature size=4779
+Authority=Apple Development: James Daley (FW94K6ZY57)
+Authority=Apple Worldwide Developer Relations Certification Authority
+Authority=Apple Root CA
+Signed Time=Aug 30, 2026 at 8:44:05 AM
+Info.plist entries=25
+TeamIdentifier=9AQ2C2838M
+Runtime Version=26.5.0
+Sealed Resources version=2 rules=13 files=9
+designated => identifier "com.forge-conductor.app" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: James Daley (FW94K6ZY57)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */
+Executable=/private/tmp/forge-p10-normal-signed-final-20260830/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon
+Identifier=com.forge-conductor.filesystem-daemon
+Format=Mach-O thin (arm64)
+CodeDirectory v=20500 size=1457 flags=0x10000(runtime) hashes=34+7 location=embedded
+VersionPlatform=1
+VersionMin=1703936
+VersionSDK=1705216
+Hash type=sha256 size=32
+CandidateCDHash sha256=b3f0fd1ab1c2bf6c4f50d42f313b80a542255418
+CandidateCDHashFull sha256=b3f0fd1ab1c2bf6c4f50d42f313b80a542255418ae11ec20ba82efe137a41971
+Hash choices=sha256
+CMSDigest=b3f0fd1ab1c2bf6c4f50d42f313b80a542255418ae11ec20ba82efe137a41971
+CMSDigestType=2
+Executable Segment base=0
+Executable Segment limit=245760
+Executable Segment flags=0x1
+Page size=16384
+CDHash=b3f0fd1ab1c2bf6c4f50d42f313b80a542255418
+Signature size=4779
+Authority=Apple Development: James Daley (FW94K6ZY57)
+Authority=Apple Worldwide Developer Relations Certification Authority
+Authority=Apple Root CA
+Signed Time=Aug 30, 2026 at 8:44:05 AM
+Info.plist entries=18
+TeamIdentifier=9AQ2C2838M
+Runtime Version=26.5.0
+Sealed Resources=none
+designated => identifier "com.forge-conductor.filesystem-daemon" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: James Daley (FW94K6ZY57)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */
+privileged filesystem bundle inspection passed for Debug

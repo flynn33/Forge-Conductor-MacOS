@@ -1,0 +1,55 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 91,
+      "path": ".forge-codex/evidence/EVID-20260830T221614Z-a83cfa3e4a.stdout.txt",
+      "sha256": "27e908cc10f40050f072937aa716c9b39a6dfde977f0524d1c6a03619697a87b",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260830T221614Z-a83cfa3e4a.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "command": "python3 .forge-codex/scripts/scan_attribution.py --root .",
+  "ended_at": "2026-08-30T22:16:15.258385+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260830T221614Z-a83cfa3e4a",
+  "kind": "p10-post-push-attribution-scan",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 16777216,
+  "related_findings": [
+    "FC-FILESYSTEM-PATH-TOCTOU-001"
+  ],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 9828118,
+    "file_count": 256,
+    "schema_version": 1,
+    "sha256": "89e94937e86eb617eb7c6b2138f1584d3ecc7b32ce524919734fee39766a63a0"
+  },
+  "source_manifest_after": {
+    "bytes": 9828118,
+    "file_count": 256,
+    "schema_version": 1,
+    "sha256": "89e94937e86eb617eb7c6b2138f1584d3ecc7b32ce524919734fee39766a63a0"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-30T22:16:14.765233+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

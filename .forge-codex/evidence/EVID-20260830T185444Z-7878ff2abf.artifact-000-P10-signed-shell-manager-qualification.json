@@ -1,0 +1,167 @@
+{
+  "blocking_reasons": [
+    "manager LaunchAgent did not reach a running PID",
+    "macOS Background Task Management may retain display history until logout even after scoped bootout and plist removal"
+  ],
+  "claims": {
+    "autonomous_continuity_complete": false,
+    "filesystem_e2_complete": false,
+    "g10_complete": false,
+    "native_ui_signing_complete": false,
+    "p10_complete": false
+  },
+  "cleanup": {
+    "command_link": {
+      "action": "recreated_original",
+      "status": "restored",
+      "target": "/Users/jimdaley/.forge-conductor/bin/forge-conductor"
+    },
+    "final_canonical_job": "absent",
+    "final_canonical_plist": "absent",
+    "launchd_disabled": {
+      "after": null,
+      "before": null,
+      "exact_relevant_entry_restored": true
+    },
+    "qualification_home_retained": "/private/tmp/forge-p10-signed-shell-manager-20260830-1455",
+    "residuals": [
+      "macOS Background Task Management may retain display history until logout even after scoped bootout and plist removal"
+    ],
+    "status": "partial",
+    "steps": [
+      "removed_qualification_launchagent_plist"
+    ]
+  },
+  "generated_at": "2026-08-30T18:54:44.737935Z",
+  "kind": "signed-shell-installed-manager-qualification",
+  "mode": "execute",
+  "open_release_gates": [
+    "P10/G10 product qualification",
+    "filesystem E2 residual race",
+    "native UI and signing qualification",
+    "real-provider autonomous continuity",
+    "whole-product rollback freshness"
+  ],
+  "overall_status": "blocked",
+  "repository": {
+    "branch": "security/privileged-filesystem-boundary",
+    "head": "3c0b0af0969af8161582285dd53d98a779b2cf5b",
+    "path": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security"
+  },
+  "scenario": {
+    "reason": "manager LaunchAgent did not reach a running PID",
+    "status": "blocked"
+  },
+  "schema_version": 1,
+  "shared_state_preflight": {
+    "canonical_job": {
+      "state": "absent",
+      "target": "gui/501/com.forge-conductor.manager"
+    },
+    "canonical_plist": {
+      "path": "/Users/jimdaley/Library/LaunchAgents/com.forge-conductor.manager.plist",
+      "state": "absent"
+    },
+    "command_link": {
+      "path": "/Users/jimdaley/.local/bin/forge-conductor-swift",
+      "state": "symlink",
+      "target": "/Users/jimdaley/.forge-conductor/bin/forge-conductor"
+    },
+    "dashboard_port_7788": "free",
+    "launchd_disabled": {
+      "output_sha256": "956f713fb1900d048533506cb526feea0fe74a3da429ea52052d8e8f0641c81d",
+      "value": null
+    },
+    "product_processes": []
+  },
+  "source_application": {
+    "build": "1",
+    "embedded_cli_rpaths": [
+      "@executable_path/../Frameworks",
+      "@executable_path",
+      "@loader_path"
+    ],
+    "path": "/private/tmp/forge-p10-recovery-final-xcode-20260830-1450/Build/Products/Debug/Forge Conductor.app",
+    "paths": {
+      "embedded_cli": "/private/tmp/forge-p10-recovery-final-xcode-20260830-1450/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-conductor",
+      "filesystem_daemon": "/private/tmp/forge-p10-recovery-final-xcode-20260830-1450/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon",
+      "framework": "/private/tmp/forge-p10-recovery-final-xcode-20260830-1450/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework",
+      "launchdaemon_plist": "/private/tmp/forge-p10-recovery-final-xcode-20260830-1450/Build/Products/Debug/Forge Conductor.app/Contents/Library/LaunchDaemons/com.forge-conductor.filesystem-daemon.plist",
+      "main": "/private/tmp/forge-p10-recovery-final-xcode-20260830-1450/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/Forge Conductor",
+      "runtime_launcher": "/private/tmp/forge-p10-recovery-final-xcode-20260830-1450/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher"
+    },
+    "sealed_daemon_hashes": {
+      "ForgeFilesystemDaemonCDHashArm64": "8e9b719bf156fed6a4f30dd1e1ac4ba941faa5bd"
+    },
+    "signatures": {
+      "application": {
+        "authorities": [
+          "Apple Development: James Daley (FW94K6ZY57)",
+          "Apple Worldwide Developer Relations Certification Authority",
+          "Apple Root CA"
+        ],
+        "cdhash": "da4c8e63141da5c245312813ddea39f86dce0f3e",
+        "identifier": "com.forge-conductor.app",
+        "path": "/private/tmp/forge-p10-recovery-final-xcode-20260830-1450/Build/Products/Debug/Forge Conductor.app",
+        "runtime_version": "26.5.0",
+        "sha256": null,
+        "team_identifier": "9AQ2C2838M"
+      },
+      "embedded_cli": {
+        "authorities": [
+          "Apple Development: James Daley (FW94K6ZY57)",
+          "Apple Worldwide Developer Relations Certification Authority",
+          "Apple Root CA"
+        ],
+        "cdhash": "2a95645b4afef39c011b90acce23589bd4d6299f",
+        "identifier": "com.forge-conductor.cli",
+        "path": "/private/tmp/forge-p10-recovery-final-xcode-20260830-1450/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-conductor",
+        "runtime_version": "26.5.0",
+        "sha256": "f64c81c9eaf5eecbd4765001d41dfe6b0328fae80a281e88c7f4f31bc4fe38b9",
+        "team_identifier": "9AQ2C2838M"
+      },
+      "filesystem_daemon": {
+        "authorities": [
+          "Apple Development: James Daley (FW94K6ZY57)",
+          "Apple Worldwide Developer Relations Certification Authority",
+          "Apple Root CA"
+        ],
+        "cdhash": "8e9b719bf156fed6a4f30dd1e1ac4ba941faa5bd",
+        "identifier": "com.forge-conductor.filesystem-daemon",
+        "path": "/private/tmp/forge-p10-recovery-final-xcode-20260830-1450/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon",
+        "runtime_version": "26.5.0",
+        "sha256": "ad8e8f59e0df18ca50b365fbf98a473a74a434718d7f7d42d2e4c3d9e9598b46",
+        "team_identifier": "9AQ2C2838M"
+      },
+      "framework": {
+        "authorities": [
+          "Apple Development: James Daley (FW94K6ZY57)",
+          "Apple Worldwide Developer Relations Certification Authority",
+          "Apple Root CA"
+        ],
+        "cdhash": "d9599832962c52a8f1b319ecb8065448926f3826",
+        "identifier": "com.forge-conductor.core",
+        "path": "/private/tmp/forge-p10-recovery-final-xcode-20260830-1450/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework",
+        "runtime_version": "26.5.0",
+        "sha256": null,
+        "team_identifier": "9AQ2C2838M"
+      },
+      "runtime_launcher": {
+        "authorities": [
+          "Apple Development: James Daley (FW94K6ZY57)",
+          "Apple Worldwide Developer Relations Certification Authority",
+          "Apple Root CA"
+        ],
+        "cdhash": "8332021208c5d134385ac5215535c0cbf7a772ee",
+        "identifier": "com.forge-conductor.runtime-launcher",
+        "path": "/private/tmp/forge-p10-recovery-final-xcode-20260830-1450/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher",
+        "runtime_version": "26.5.0",
+        "sha256": "dd62e28791453790e5be8e74cce1276a8a455b5dbaf194c0d410f65de235a3e5",
+        "team_identifier": "9AQ2C2838M"
+      }
+    },
+    "team_identifier": "9AQ2C2838M",
+    "version": "0.9.0"
+  },
+  "source_application_argument": "/tmp/forge-p10-recovery-final-xcode-20260830-1450/Build/Products/Debug/Forge Conductor.app"
+}

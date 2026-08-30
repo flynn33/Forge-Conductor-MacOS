@@ -58,7 +58,7 @@ final class FilesystemCancellationTests: XCTestCase {
         let cancellation = ToolCallCancellation()
         cancellation.cancel()
 
-        XCTAssertThrowsError(try FilesystemToolPack().handle(
+        XCTAssertThrowsError(try FilesystemToolPack(deletionStepObserver: nil).handle(
             name: "fs_delete",
             arguments: ["path": root.path],
             context: nil,
@@ -79,7 +79,7 @@ final class FilesystemCancellationTests: XCTestCase {
         try Data("preserve".utf8).write(to: outside)
         try FileManager.default.createSymbolicLink(at: link, withDestinationURL: outside)
 
-        let result = try XCTUnwrap(try FilesystemToolPack().handle(
+        let result = try XCTUnwrap(try FilesystemToolPack(deletionStepObserver: nil).handle(
             name: "fs_delete",
             arguments: ["path": root.path],
             context: nil,
@@ -297,7 +297,7 @@ final class FilesystemCancellationTests: XCTestCase {
         try FileManager.default.removeItem(at: ledgerRoot)
         try Data("not-a-directory".utf8).write(to: ledgerRoot)
 
-        let result = try XCTUnwrap(try FilesystemToolPack().handle(
+        let result = try XCTUnwrap(try FilesystemToolPack(deletionStepObserver: nil).handle(
             name: "fs_delete",
             arguments: ["path": victim.path],
             context: nil,
@@ -436,7 +436,7 @@ final class FilesystemCancellationTests: XCTestCase {
         try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
         try Data("preserve".utf8).write(to: victim)
 
-        let result = try XCTUnwrap(try FilesystemToolPack().handle(
+        let result = try XCTUnwrap(try FilesystemToolPack(deletionStepObserver: nil).handle(
             name: "fs_delete",
             arguments: ["path": victim.path],
             context: nil,
@@ -462,7 +462,7 @@ final class FilesystemCancellationTests: XCTestCase {
         let recovered = interrupted[0]
         try FileManager.default.moveItem(at: recovered.quarantineURL, to: recovered.originalURL)
         XCTAssertEqual(try restartedLedger.reconcile().count, expectedRecoveryPaths.count - 1)
-        let retry = try XCTUnwrap(try FilesystemToolPack().handle(
+        let retry = try XCTUnwrap(try FilesystemToolPack(deletionStepObserver: nil).handle(
             name: "fs_delete",
             arguments: ["path": victim.path],
             context: nil,
@@ -756,7 +756,7 @@ final class FilesystemCancellationTests: XCTestCase {
         try Data("source".utf8).write(to: source)
         try Data("destination".utf8).write(to: destination)
 
-        XCTAssertThrowsError(try FilesystemToolPack().handle(
+        XCTAssertThrowsError(try FilesystemToolPack(deletionStepObserver: nil).handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
             context: nil,
@@ -971,7 +971,7 @@ final class FilesystemCancellationTests: XCTestCase {
             .appendingPathComponent("nested", isDirectory: true)
             .appendingPathComponent("destination.txt")
 
-        XCTAssertThrowsError(try FilesystemToolPack().handle(
+        XCTAssertThrowsError(try FilesystemToolPack(deletionStepObserver: nil).handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
             context: nil,

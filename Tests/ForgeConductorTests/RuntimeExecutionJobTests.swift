@@ -1917,6 +1917,14 @@ final class RuntimeExecutionJobTests: XCTestCase {
         }
     }
 
+    func testRuntimeLaunchGateUsesExactBuildConfigurationTeam() {
+        #if DEBUG
+        XCTAssertEqual(RuntimeLaunchGate.productTeamIdentifier, "9AQ2C2838M")
+        #else
+        XCTAssertEqual(RuntimeLaunchGate.productTeamIdentifier, "2Y25RTLZET")
+        #endif
+    }
+
     func testRuntimeLaunchGateAcceptsExactAdHocApplicationPair() throws {
         let appBundle = URL(fileURLWithPath: "/tmp/Forge Conductor.app", isDirectory: true)
         let executable = appBundle.appendingPathComponent("Contents/MacOS/Forge Conductor")
@@ -4753,10 +4761,12 @@ final class RuntimeExecutionJobTests: XCTestCase {
             try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
             try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
             do {
-                return try ProductionFixture(
+                let app = try ForgeApp.bootstrap(home: home)
+                _ = try app.config.update(["allowed_roots": [root.path]], save: false)
+                return ProductionFixture(
                     root: root,
                     projectRoot: project,
-                    app: ForgeApp.bootstrap(home: home),
+                    app: app,
                     clientID: ClientID(clientName)
                 )
             } catch {

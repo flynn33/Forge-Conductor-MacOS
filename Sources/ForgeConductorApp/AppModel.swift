@@ -49,10 +49,15 @@ public final class AppModel: ObservableObject {
     @Published public var setShellEnabled: Bool = true
     @Published public var setShellTimeout: Int = 30
     @Published public var setAutoRestart: Bool = true
+    @Published public var setAllowedRoots: [String] = []
+    @Published public private(set) var allowedRootsMessage: String?
     @Published public private(set) var shellPolicyOrigin: String = "default_enabled"
     @Published public private(set) var shellMigrationState: String = "not_required"
     @Published public private(set) var shellMigrationReceiptValid: Bool = false
     @Published public private(set) var shellRuntimeCapabilities = ShellRuntimeCapabilities.detect()
+    @Published public private(set) var secureFilesystemServiceStatus: SecureFilesystemServiceStatus = .notFound
+    @Published public private(set) var secureFilesystemServiceMessage: String?
+    @Published public private(set) var isUpdatingSecureFilesystemService = false
 
     public private(set) var app: ForgeApp?
     public private(set) var manager: ManagerNode?
@@ -67,6 +72,7 @@ public final class AppModel: ObservableObject {
     private var telemetryBag: AnyCancellable?
     private var managerPollInFlight = false
     private var remoteManagerLastError: String?
+    private let secureFilesystemService = SecureFilesystemServiceController()
 
     public enum AppTab: String, CaseIterable, Identifiable {
         case rig = "FORGE RIG"
@@ -156,6 +162,7 @@ public final class AppModel: ObservableObject {
                 attachToOrStartManager(app: forgeApp)
             }
             loadSettingsFromConfig()
+            refreshSecureFilesystemServiceStatus()
             refreshLMStudioPluginStatus()
             refreshDiagnosticsPreview()
             forgeApp.diagnostics.info("gui_bootstrap", [
@@ -571,6 +578,9 @@ public final class AppModel: ObservableObject {
         setShellEnabled = app.config.bool("shell", "enabled", default: true)
         setShellTimeout = app.config.int("shell", "default_timeout_sec", default: 30)
         setAutoRestart = app.config.bool("manager", "auto_restart", default: true)
+        setAllowedRoots = ManagerSettingsNormalizer.canonicalAllowedRoots(
+            app.config.model.allowedRoots
+        )
         let shell = app.config.shellPolicyStatus
         shellPolicyOrigin = shell.policyOrigin
         shellMigrationState = shell.migration.state
@@ -601,7 +611,8 @@ public final class AppModel: ObservableObject {
             watchdogIntervalSec: setWatchdog,
             sessionIdleTTLSec: setIdleTTL,
             shellEnabled: setShellEnabled,
-            shellTimeoutSec: setShellTimeout
+            shellTimeoutSec: setShellTimeout,
+            allowedRoots: setAllowedRoots
         )
         if let client = remoteManager {
             managerMessage = "Saving settings…"
@@ -651,6 +662,134 @@ public final class AppModel: ObservableObject {
         }
     }
 
+    public var secureFilesystemServiceStatusLabel: String {
+        switch secureFilesystemServiceStatus {
+        case .enabled: "Enabled"
+        case .requiresApproval: "Approval required"
+        case .notRegistered: "Not enabled"
+        case .notFound: "Not packaged in this build"
+        }
+    }
+
+    public func refreshSecureFilesystemServiceStatus() {
+        secureFilesystemServiceStatus = secureFilesystemService.status()
+    }
+
+    public func enableSecureFilesystemService() {
+        do {
+            secureFilesystemServiceStatus = try secureFilesystemService.register()
+            switch secureFilesystemServiceStatus {
+            case .enabled:
+                secureFilesystemServiceMessage = "Protected filesystem service enabled"
+            case .requiresApproval:
+                secureFilesystemServiceMessage = "Approve Forge Conductor in System Settings to enable protected filesystem mutations"
+            case .notRegistered:
+                secureFilesystemServiceMessage = "Protected filesystem service was not enabled"
+            case .notFound:
+                secureFilesystemServiceMessage = "This build does not contain the protected filesystem service"
+            }
+        } catch {
+            refreshSecureFilesystemServiceStatus()
+            secureFilesystemServiceMessage = "Enable failed: \(error.localizedDescription)"
+        }
+    }
+
+    public func disableSecureFilesystemService() {
+        do {
+            secureFilesystemServiceStatus = try secureFilesystemService.unregister()
+            secureFilesystemServiceMessage = "Protected filesystem service disabled"
+        } catch {
+            refreshSecureFilesystemServiceStatus()
+            secureFilesystemServiceMessage = "Disable failed: \(error.localizedDescription)"
+        }
+    }
+
+    public func reinstallSecureFilesystemService() {
+        guard !isUpdatingSecureFilesystemService else { return }
+        isUpdatingSecureFilesystemService = true
+        secureFilesystemServiceMessage = "Replacing the protected filesystem service…"
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer { isUpdatingSecureFilesystemService = false }
+            do {
+                secureFilesystemServiceStatus = try await secureFilesystemService.reinstall()
+                switch secureFilesystemServiceStatus {
+                case .enabled:
+                    secureFilesystemServiceMessage = "Protected filesystem service replacement registered"
+                case .requiresApproval:
+                    secureFilesystemServiceMessage = "Replacement registered; approve Forge Conductor in System Settings"
+                case .notRegistered:
+                    secureFilesystemServiceMessage = "Protected filesystem service replacement was not registered"
+                case .notFound:
+                    secureFilesystemServiceMessage = "This build does not contain the protected filesystem service"
+                }
+            } catch {
+                refreshSecureFilesystemServiceStatus()
+                secureFilesystemServiceMessage = "Update failed: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    public func openSecureFilesystemApprovalSettings() {
+        secureFilesystemService.openApprovalSettings()
+    }
+
+    /// Presents the native directory picker in production. UI tests may provide an
+    /// explicit path so the resulting controls can be exercised without automating a
+    /// process-owned system panel.
+    public func chooseAllowedRoot() {
+        let environment = ProcessInfo.processInfo.environment
+        if CommandLine.arguments.contains("--uitesting"),
+           let path = environment["FORGE_ALLOWED_ROOT_UI_TEST_SELECTION"] {
+            _ = addAllowedRoot(URL(fileURLWithPath: path, isDirectory: true))
+            return
+        }
+
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Authorize Folder"
+        panel.message = "Choose one project folder Forge Conductor may access."
+        guard panel.runModal() == .OK, let selected = panel.url else {
+            allowedRootsMessage = "No project folder was added"
+            return
+        }
+        _ = addAllowedRoot(selected)
+    }
+
+    /// Stages one canonical project root for the next settings save.
+    @discardableResult
+    public func addAllowedRoot(_ url: URL) -> Bool {
+        guard url.isFileURL,
+              let canonical = ManagerSettingsNormalizer.canonicalAllowedRoot(url.path) else {
+            allowedRootsMessage = url.standardizedFileURL.path == "/"
+                ? "The filesystem root cannot be authorized"
+                : "Choose an existing folder"
+            return false
+        }
+        guard !setAllowedRoots.contains(canonical) else {
+            allowedRootsMessage = "That project folder is already authorized"
+            return true
+        }
+        setAllowedRoots = ManagerSettingsNormalizer.canonicalAllowedRoots(
+            setAllowedRoots + [canonical]
+        )
+        allowedRootsMessage = "Project folder staged; choose Save settings to apply it"
+        return true
+    }
+
+    /// Stages removal of one project root for the next settings save.
+    public func removeAllowedRoot(_ path: String) {
+        let canonical = URL(fileURLWithPath: path, isDirectory: true)
+            .resolvingSymlinksInPath()
+            .standardizedFileURL
+            .path
+        setAllowedRoots.removeAll { $0 == canonical }
+        allowedRootsMessage = "Project folder removal staged; choose Save settings to apply it"
+    }
+
     private func apply(settings: ManagerSettings) {
         setHost = settings.dashboardHost
         setPort = settings.dashboardPort
@@ -664,6 +803,7 @@ public final class AppModel: ObservableObject {
         shellMigrationState = settings.shellMigrationState
         shellMigrationReceiptValid = settings.shellMigrationReceiptValid
         shellRuntimeCapabilities = settings.shellRuntimeCapabilities
+        setAllowedRoots = ManagerSettingsNormalizer.canonicalAllowedRoots(settings.allowedRoots)
     }
 
     private func recordRemoteManagerFailure(action: String, error: Error) {
