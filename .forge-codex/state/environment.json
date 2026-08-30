@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-30T15:33:23.021880+00:00",
+  "captured_at": "2026-08-30T15:35:46.113279+00:00",
   "environment_keys_present": [
     "CODEX_APP_TOOLS_PIPE_PATH",
     "CODEX_CI",
@@ -17,17 +17,17 @@
       "base_branch": "main",
       "base_sha": "8bcc039a2f0d4d17b871d5e968b3b37a663c5ccb",
       "github_readback_verified": true,
-      "head_sha": "0c268bf6369f5ad3cd36fb7d598749dc209051b3",
+      "head_sha": "bc2cf006d7d87edaf24affdc06a86d7518bc0c2f",
       "pull_request": {
         "baseRefName": "main",
         "headRefName": "security/privileged-filesystem-boundary",
-        "headRefOid": "0c268bf6369f5ad3cd36fb7d598749dc209051b3",
+        "headRefOid": "bc2cf006d7d87edaf24affdc06a86d7518bc0c2f",
         "isDraft": true,
         "number": 15,
         "state": "OPEN",
         "url": "https://github.com/flynn33/Forge-Conductor-MacOS/pull/15"
       },
-      "remote_head_sha": "0c268bf6369f5ad3cd36fb7d598749dc209051b3"
+      "remote_head_sha": "bc2cf006d7d87edaf24affdc06a86d7518bc0c2f"
     },
     "current_work": "P10",
     "mandatory_release_blockers": [
@@ -198,8 +198,8 @@
     "release_authorized": false,
     "repository": {
       "branch": "security/privileged-filesystem-boundary",
-      "commit": "0c268bf6369f5ad3cd36fb7d598749dc209051b3",
-      "dirty": true,
+      "commit": "bc2cf006d7d87edaf24affdc06a86d7518bc0c2f",
+      "dirty": false,
       "root": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security"
     },
     "run_status": "active"

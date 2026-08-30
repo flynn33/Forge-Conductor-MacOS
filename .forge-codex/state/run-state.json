@@ -437,6 +437,11 @@
     "EVID-20260830T153323Z-9c26be91bf",
     "EVID-20260830T153331Z-0e52e53532",
     "EVID-20260830T153332Z-023f8bda19",
+    "EVID-20260830T153545Z-5b607da24f",
+    "EVID-20260830T153546Z-2cd9cd91c7",
+    "EVID-20260830T153736Z-e4c023a103",
+    "EVID-20260830T153741Z-e571380c9b",
+    "EVID-20260830T153746Z-92f227377f",
     "a5466d4e5b4d7a10f87df64ddfdb58b6b8ca5159a57c20527e98802a822245d7",
     "a5d4276cbf14db3a91baa7f6b79fb8cdb3fb042a2eaf663d3219ff36b5451667",
     "b3dc11a8dc286fa33b6567ff62089692e64787b23a66718cfe1766dc27195724",
@@ -977,7 +982,7 @@
       "updated_at": "2026-08-30T15:28:20.163209+00:00"
     }
   ],
-  "last_event_sequence": 613,
+  "last_event_sequence": 619,
   "phases": {
     "P00": {
       "attempts": 1,
@@ -1060,12 +1065,12 @@
   },
   "repository": {
     "branch": "security/privileged-filesystem-boundary",
-    "commit": "0c268bf6369f5ad3cd36fb7d598749dc209051b3",
+    "commit": "bc2cf006d7d87edaf24affdc06a86d7518bc0c2f",
     "dirty": true,
     "root": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security"
   },
   "run_id": "aba90ab1-be80-4cc5-aa0b-23dd54d4a24d",
   "schema_version": 1,
   "status": "active",
-  "updated_at": "2026-08-30T15:33:32.576189+00:00"
+  "updated_at": "2026-08-30T15:37:46.657062+00:00"
 }
