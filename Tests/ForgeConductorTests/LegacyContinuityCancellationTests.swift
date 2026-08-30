@@ -211,13 +211,15 @@ final class LegacyContinuityCancellationTests: XCTestCase {
 
         let outcomes = LifecycleStartOutcomes()
         let clientID = ClientID("concurrent-start-client")
+        let concurrentServices = services
+        let workingDirectory = tempHome.path
         DispatchQueue.concurrentPerform(iterations: count) { index in
             do {
-                let result = try services[index].start(
+                let result = try concurrentServices[index].start(
                     agentID: "debug",
                     goal: "Concurrent goal \(index)",
                     clientID: clientID,
-                    cwd: tempHome.path
+                    cwd: workingDirectory
                 )
                 outcomes.appendSuccess(try XCTUnwrap(result["session_id"] as? String))
             } catch {
@@ -1002,10 +1004,11 @@ final class LegacyContinuityCancellationTests: XCTestCase {
         trigger.arm()
 
         let first = Task.detached {
-            try continuity.checkpoint(
+            let result = try continuity.checkpoint(
                 arguments: ["goal": "First serialized checkpoint"],
                 clientID: ClientID("continuity-lock-first")
             )
+            return result["handoff_id"] as? String
         }
         XCTAssertEqual(mutationReached.wait(timeout: .now() + 1), .success)
 
@@ -1017,9 +1020,9 @@ final class LegacyContinuityCancellationTests: XCTestCase {
             )
         }
         releaseMutation.signal()
-        let firstResult = try await first.value
+        let firstHandoffID = try await first.value
 
-        XCTAssertNotNil(firstResult["handoff_id"] as? String)
+        XCTAssertNotNil(firstHandoffID)
         let packets = try store.handoffList()
         XCTAssertEqual(packets.count, 1)
         XCTAssertEqual(packets.first?.goal, "First serialized checkpoint")

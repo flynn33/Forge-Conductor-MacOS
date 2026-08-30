@@ -1,0 +1,10 @@
+2026-08-29 20:03:09.257 xcodebuild[42834:19403242] [MT] IDETestOperationsObserverDebug: 144.603 elapsed -- Testing started completed.
+2026-08-29 20:03:09.257 xcodebuild[42834:19403242] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-08-29 20:03:09.257 xcodebuild[42834:19403242] [MT] IDETestOperationsObserverDebug: 144.603 sec, +144.603 sec -- end
+Failing tests:
+	ContinuityTests.testPrimaryAndFallbackMCPProcessesShareContinuitySafely()
+	ContinuityTests.testSQLiteCommittedMigrationRecoversAfterSIGKILLBeforeManifestCompletion()
+	ContinuityTests.testSQLitePreparedMigrationRecoversAfterSIGKILLAndReleasesInterprocessLock()
+	G1G10AcceptanceTests.testG1G2G7_DeployPrimaryFailoverAndMCPSmoke()
+
+** TEST EXECUTE FAILED **

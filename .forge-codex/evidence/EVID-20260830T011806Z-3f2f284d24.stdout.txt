@@ -1,0 +1,4 @@
+Writing result bundle at path:
+	/private/tmp/forge-conductor-swift6-final-20260830-0117/FullUnit.xcresult
+
+Testing started

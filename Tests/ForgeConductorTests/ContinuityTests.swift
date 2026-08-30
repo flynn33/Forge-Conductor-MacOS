@@ -4043,6 +4043,11 @@ private func launchMigrationXCTestFixture(
         Bundle(for: ContinuityTests.self).bundleURL.path,
     ]
     var environment = ProcessInfo.processInfo.environment
+    // A nested xctest must not inherit the parent runner's managed session or
+    // configuration; those override the explicit -XCTest selector above.
+    for key in ["XCTestSessionIdentifier", "XCTestConfigurationFilePath"] {
+        environment.removeValue(forKey: key)
+    }
     for (key, value) in additions { environment[key] = value }
     process.environment = environment
     process.standardInput = FileHandle.nullDevice

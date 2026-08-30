@@ -1122,11 +1122,16 @@ private final class MCPWireFixture {
     }
 
     func start() {
-        DispatchQueue(label: "forge.test.mcp-wire").async { [self] in
+        let server = server
+        let inputHandle = input.fileHandleForReading
+        let outputHandle = output.fileHandleForWriting
+        let errorBox = errorBox
+        let finished = finished
+        DispatchQueue(label: "forge.test.mcp-wire").async {
             do {
                 try server.run(
-                    input: input.fileHandleForReading,
-                    output: output.fileHandleForWriting
+                    input: inputHandle,
+                    output: outputHandle
                 )
             } catch {
                 errorBox.store(error)
