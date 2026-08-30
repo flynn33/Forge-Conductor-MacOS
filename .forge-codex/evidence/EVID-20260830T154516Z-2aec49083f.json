@@ -1,0 +1,60 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 86559,
+      "path": ".forge-codex/evidence/EVID-20260830T154516Z-2aec49083f.artifact-000-PACKAGE_VALIDATION.json",
+      "sha256": "f90be8b51a34289593205fe01be4569398dbdfea6077e0a710be1ec369eace7a",
+      "source_path": ".forge-codex/PACKAGE_VALIDATION.json",
+      "storage": "evidence-id-specific-copy"
+    },
+    {
+      "bytes": 157,
+      "path": ".forge-codex/evidence/EVID-20260830T154516Z-2aec49083f.stdout.txt",
+      "sha256": "7fcdfe004a37127c0c542122ec137a77dc8aaa421ddda6d464dabe10cd82837c",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260830T154516Z-2aec49083f.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "command": "python3 .forge-codex/scripts/validate_package.py --root .forge-codex",
+  "ended_at": "2026-08-30T15:45:16.927027+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260830T154516Z-2aec49083f",
+  "kind": "package-validation",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 9395649,
+    "file_count": 251,
+    "schema_version": 1,
+    "sha256": "28707961c294df84dcb27f8074a98924e9f2d4fcc2ade0cb95ca42ba0d46e995"
+  },
+  "source_manifest_after": {
+    "bytes": 9395649,
+    "file_count": 251,
+    "schema_version": 1,
+    "sha256": "28707961c294df84dcb27f8074a98924e9f2d4fcc2ade0cb95ca42ba0d46e995"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-30T15:45:16.540768+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

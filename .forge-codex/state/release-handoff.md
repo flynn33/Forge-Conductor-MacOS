@@ -4,84 +4,99 @@
 
 The active repair line is `security/privileged-filesystem-boundary`, based on
 `main` at `8bcc039a2f0d4d17b871d5e968b3b37a663c5ccb` (the pull request #14
-squash merge). The source checkpoint is published as draft pull request #15 at
-`bde3005dfc0488a0e0573eadba04c7166b9a503a`. No current claim is made that
-P10, the filesystem E2 finding,
-shell compatibility, native UI validation, autonomous continuity, representative
-hardware qualification, or final release qualification is complete. Earlier
-green suites remain exact-revision evidence only and do not confer release
-authority on this source tree.
+squash merge). The implementation/source checkpoint is
+`bc2cf006d7d87edaf24affdc06a86d7518bc0c2f`; the evidence-only checkpoint is
+`0ce461885a47075ff730b43133793804be37a5ab`. Both are published in draft pull
+request #15. No current claim is made that P10, the filesystem E2 finding,
+shell compatibility, native UI validation, autonomous continuity,
+representative hardware qualification, or final release qualification is
+complete. Earlier green suites remain exact-revision evidence only and do not
+confer release authority on this source tree.
 
 Current release blockers are:
 
 - **Filesystem mutation E2 remains open.** The canonical finding is
   `FC-FILESYSTEM-PATH-TOCTOU-001`; the approved policy alias is `FCA-007`.
   The selected partial implementation adds a separately signed root
-  LaunchDaemon, an enumerated designated-requirement NSXPC connection boundary,
-  a root-owned
-  mode-0700 same-volume namespace, bounded project bindings and transaction
-  slots, descriptor-relative exclusive capture, post-capture identity
-  verification, durable phases, and fail-closed production routing with no
-  same-UID fallback. Each accepted connection is bound to its non-root effective
-  UID; the binding and transaction persist that UID, requester-owned ACL-free
-  traversal and an owner-writable final parent are required, and ACL-protected
-  or immutable/append/restricted/no-unlink leaves are rejected before and after
-  capture. This is mitigation, not elimination. A same-UID attacker
-  can still substitute the source immediately before exclusive capture. One
-  substituted entry can become temporarily or recovery-required unavailable;
-  if it is a directory, that one entry can represent an unbounded subtree.
-  Writable descriptors and hard links also prevent an immutable-content
-  guarantee. They also leave an authorization-metadata race between the final
-  protected-leaf ACL/flag check and root `unlinkat`; at most the one captured
-  expected non-directory leaf can be deleted after its permission metadata
-  changes, and a regular file can contain unbounded bytes. The current NSXPC implementation checks identity at the connection
-  boundary, not against the audit token of every received message. Project
-  binding authority is not yet composed with an independently verified manager
-  authorization record. Bindings also have no manager-authorized revoke or
-  garbage-collection lifecycle; after 256 distinct lifetime project bindings,
-  another project is denied until that residual is implemented and qualified.
-  Ambiguous submitted calls preserve their original
-  transaction ID, but `fs_delete` cannot yet consume that ID to resume after
-  pathname loss. Signed hostile-process, crash, volume, lifecycle,
-  source-leaf, hard-link, writable-FD, and per-message identity evidence remain
-  absent. Directory deletion and move remain disabled in the production route.
-  E2, P10, G10, and G12 stay open.
-- **Caller-sealed helper identity and non-GUI packaging are open.**
-  `FC-PRIVILEGED-CALLER-IDENTITY-001` records two fail-closed availability
-  defects and one identity residual. The normal login-manager install currently
-  synthesizes an ad-hoc app without the LaunchDaemon plist or helper. A raw
-  installed or standalone CLI also evaluates `SMAppService` and `Bundle.main`
-  relative to a process that does not contain those artifacts, so it can return
-  `not_found` before authenticated XPC. The current SHA-256 handshake hashes
-  mutable filesystem paths and is self-reported by the daemon; it is not a
-  kernel-attested identity for the mapped root process. An older
-  same-team/same-identifier/same-version daemon can therefore remain admissible
-  if the user-writable expected helper path is rolled back to matching bytes.
-  The maximum possible impact is that older daemon's full bounded root mutation
-  authority and any vulnerabilities it contains. The next implementation must
-  bind the allowed per-architecture helper CodeDirectory hashes into each main
-  caller's signed mapped code or kernel-attested entitlement, compose those
-  hashes into the NSXPC peer requirement, package one verified app/helper/plist
-  relationship for the app, installed manager, and standalone CLI, and run all
-  three as signed processes. Code signing alone has no freshness property;
-  preventing rollback of the entire validly signed product still requires a
-  monotonic root-owned receipt. This is mitigation, not elimination.
+  LaunchDaemon, a root-owned mode-0700 same-volume namespace, 32 durable
+  transaction slots, bounded project bindings, descriptor-relative exclusive
+  capture, post-capture identity verification, durable phases, rollback, and
+  fail-closed production routing with no same-UID fallback. Accepted messages
+  must satisfy the NSXPC signing requirement, and each transaction persists the
+  non-root requester UID. Requester-owned ACL-free traversal, an owner-writable
+  final parent, a supported leaf type, and pre- and post-capture ACL/BSD-flag
+  checks are required. This is mitigation, not elimination.
+
+  The descriptor-relative APIs were evaluated explicitly. `openat` with
+  no-follow flags pins traversal but does not mutate; `fstatat` observes an
+  identity but cannot make a later syscall conditional on that identity;
+  `renameatx_np(RENAME_EXCL)` atomically refuses destination replacement but
+  does not require the source to match a previously observed vnode; and
+  `unlinkat` removes a name relative to a pinned directory but has no
+  expected-device/inode/generation predicate. Public macOS APIs therefore do
+  not provide the required identity-conditional terminal mutation.
+
+  A same-UID attacker can still substitute the source immediately before
+  exclusive capture. One substituted entry can become temporarily or
+  recovery-required unavailable; if it is a directory, that entry can represent
+  an unbounded subtree. A separate authorization-metadata race remains between
+  the final ACL/BSD-flag check and root `unlinkat`: at most the one already
+  captured expected regular file or symbolic link can be deleted after its
+  metadata changes, and a regular file can contain unbounded bytes. Writable
+  descriptors and hard links prevent an immutable-content guarantee. The
+  source-level adversarial swap, namespace-instability, durability, retained
+  receipt, hard-link, and writable-descriptor regressions are supporting
+  evidence. The full signed distinct-process atomic-swap,
+  crash-at-every-durable-phase and recovery, volume, wrong-signature,
+  hard-link, and writable-descriptor matrices have not run.
+
+  Initial project bindings are not yet composed with an independently verified
+  manager authorization record. Bindings also have no manager-authorized revoke
+  or garbage-collection lifecycle; after 256 distinct lifetime project
+  bindings, another project fails closed.
+  Ambiguous submitted calls preserve the original transaction ID, but the
+  public `fs_delete` surface cannot query or resume that transaction after
+  pathname loss. Directory deletion, move, and cross-volume mutation remain
+  disabled in the privileged production route. E2, P10, G10, and G12 stay open.
+- **Caller-sealed helper identity and packaging remain qualifying.** Protocol v3
+  reads the running caller's validated sealed per-architecture daemon
+  CodeDirectory hashes, conjoins the exact hash with the daemon designated
+  requirement before XPC activation, and repeats protocol version, product
+  version, daemon identifier, root effective UID, and running daemon hash on the
+  same connection before serialized mutation dispatch. A mismatch, timeout, or
+  late reply before submission cannot dispatch; a lost reply after submission
+  preserves the original transaction ID. Static bundle checks are valid only
+  while the checked object remains unmodified.
+
+  The canonical app build produces one app/embedded-CLI/daemon artifact set;
+  the app and CLI seal the same daemon hashes. App-origin manager installation
+  validates the exact app main and embedded CLI, stages only the embedded CLI
+  plus its adjacent signed framework, and rejects incomplete, symlinked, or
+  mismatched payloads before mutation. The implementation and bundle checks do
+  not replace signed process evidence. App, installed manager, raw CLI, and
+  standalone CLI service execution; hostile caller, stale helper, wrong team,
+  wrong identifier, upgrade, and restart cases remain unexecuted.
+
+  Code signing has no freshness property. Whole-product rollback can restore an
+  older otherwise allowlisted caller, expectation, and daemon; the maximum
+  impact is that older daemon's full bounded root mutation authority and any
+  vulnerabilities it contains. A monotonic root-owned receipt is absent. This
+  is mitigation, not elimination.
 - **Privileged service update lifecycle is still qualifying.**
   `FC-PRIVILEGED-SERVICE-LIFECYCLE-001` tracks the explicit asynchronous
-  unregister/re-register replacement flow and the same-connection
-  protocol, product-version, daemon-identifier, root-UID, and running-helper
-  path-SHA-256 handshake against the current GUI bundle. These changes fail
-  closed against an incompatible stale daemon, but they are not exact live-code
-  identity and do not yet work from the installed manager or standalone CLI.
-  Focused source tests prove lifecycle ordering and fencing, but do not yet drive
-  the asynchronous XPC transport state machine itself. Signed Debug and
-  notarized Release upgrade, approval, denial, relocation, crash, and restart
-  evidence remains absent.
+  unregister/re-register replacement flow, generation fencing, exact live-code
+  requirement, and protocol-v3 handshake. Source tests cover mismatch, timeout,
+  late reply, single dispatch, lost mutation reply, reinstall ordering, and a
+  concurrent Disable superseding reinstall. They do not exercise those paths
+  through the real signed asynchronous XPC service. Actual `SMAppService`
+  approval, denial, update, disable, unregister/re-register, daemon restart,
+  transaction recovery, signed Debug lifecycle, Release signing, and notarized
+  Release lifecycle evidence remains absent.
 - **Clean-install project-root onboarding is validating.**
   `FC-PROJECT-ROOT-SETTINGS-001` now has native persisted add/remove controls,
-  canonicalization, root rejection, accessibility identifiers, 39 focused
-  strict source passes, and signed Debug XCUI evidence
-  `EVID-20260830T134146Z-a2848e6490`. That record passed all six selected
+  canonicalization, root rejection, accessibility identifiers, strict source
+  coverage, and signed Debug XCUI evidence
+  `EVID-20260830T153118Z-752f058222`. That record passed all six selected
   Settings/relaunch cases, including bounded add/remove and root rejection. The
   XCUI path used a deterministic test-only folder-selection hook rather than
   automating the system-owned `NSOpenPanel`; production-panel observation and
@@ -92,18 +107,23 @@ Current release blockers are:
   clean-profile `bash.run` as a separate durable runtime tool. Non-native restart
   coverage is limited to manager-service restart and `ForgeApp`
   teardown/rebootstrap. Signed Debug XCUI
-  `EVID-20260830T134146Z-a2848e6490` proves shell Settings visibility, control,
-  persistence, and GUI relaunch. It does not prove a successful native
+  `EVID-20260830T153118Z-752f058222` proves shell Settings visibility, control,
+  persistence, and GUI relaunch. Source regressions additionally prove clean
+  default enablement, accidental legacy-disabled migration, preservation of an
+  explicit opt-out, MCP `tools/list` registration, successful execution, the
+  established synchronous result contract, app rebootstrap, and manager-service
+  restart. They do not prove a successful signed native
   `shell_exec` after both app restart and an actual manager-process restart as
   one qualification scenario, so shell qualification remains open.
 - **Native UI validation remains deferred and release-blocking.** Developer
   Mode is enabled and the valid Apple Development James Daley identity for team
   `9AQ2C2838M` is available. The six bounded signed Debug cases in
-  `EVID-20260830T134146Z-a2848e6490` cover root controls, shell controls,
+  `EVID-20260830T153118Z-752f058222` cover root controls, shell controls,
   protected-service control visibility, and GUI relaunch. A separate normal
   signed Debug build and nested-bundle inspection passed as
-  `EVID-20260830T134353Z-1b0e67f46b` and
-  `EVID-20260830T134413Z-3e92a26ea0`. These records do not cover the production
+  `EVID-20260830T152637Z-91832b005d`,
+  `EVID-20260830T152700Z-00ccac71b7`, and
+  `EVID-20260830T152706Z-1780b97dbf`. These records do not cover the production
   panel, successful shell execution across app and manager-process restart,
   actual service approval/update/disable behavior, installed-manager identity,
   exact running-helper identity, Release signing, or notarization.
@@ -131,41 +151,46 @@ may be reviewed only with these residual risks and deferred gates visible in its
 description, the state ledger, doctor output, and next-work selection.
 
 The current source manifest is
-`8935956c67e00f63c9ad5f4e35d5f481c27d3a2d4bee97640f16d2550fa2a100`
-over 250 source-controlled inputs. Focused privileged/lifecycle evidence
-`EVID-20260830T133142Z-14f01b19ff` passed 24 tests. Signed Debug UI evidence
-`EVID-20260830T134146Z-a2848e6490` passed six bounded cases; normal signed
-Debug build and bundle inspection evidence are
-`EVID-20260830T134353Z-1b0e67f46b` and
-`EVID-20260830T134413Z-3e92a26ea0`. Full strict evidence
-`EVID-20260830T134451Z-b1aa8b64c6` passed 689 tests with two declared
-environment skips and no failures. Post-publication doctor evidence
-`EVID-20260830T135849Z-3b6e86e949` verifies the exact branch, source HEAD,
-base, and draft PR #15, reports the checkpoint reviewable, and keeps
-`merge_authorized=false` and `release_authorized=false`. The post-publication
-next-work record `EVID-20260830T135855Z-cc75e24f63` selects P10 with the same
-fail-closed policy; expected-negative completion evidence
-`EVID-20260830T135034Z-b9664b7a9f` exits nonzero because the privileged matrix,
-fresh compatibility reports, and native qualification are incomplete.
-Post-publication state validation `EVID-20260830T135923Z-332abf829f` and
-package validation `EVID-20260830T135929Z-5d2e427633` pass. Earlier
-P10, CLI, MCP, manager, UI-build, and app-smoke records belong to their recorded
-source manifests. They may be used as regression baselines but are not evidence
-for the privileged boundary. Doctor and the next-work selector must continue to
+`28707961c294df84dcb27f8074a98924e9f2d4fcc2ade0cb95ca42ba0d46e995`
+over 251 inputs. Debug strict evidence
+`EVID-20260830T151948Z-6df8d3afa9` and Release strict evidence
+`EVID-20260830T152225Z-43cd73ae1c` each passed 719 tests with two declared
+environment skips and no failures. Signed Debug build evidence is
+`EVID-20260830T152637Z-91832b005d`; exact embedded and paired-CLI checks are
+`EVID-20260830T152700Z-00ccac71b7` and
+`EVID-20260830T152706Z-1780b97dbf`. Signed Debug UI evidence
+`EVID-20260830T153118Z-752f058222` passed all six bounded cases.
+
+Post-implementation-push doctor evidence
+`EVID-20260830T153545Z-5b607da24f` verifies branch and remote at the
+implementation checkpoint, the base, and draft PR #15; it reports the partial
+checkpoint reviewable while retaining `merge_authorized=false` and
+`release_authorized=false`. The corresponding next-work record
+`EVID-20260830T153546Z-2cd9cd91c7` selects P10 with the same policy. State
+validation `EVID-20260830T153736Z-e4c023a103`, package validation
+`EVID-20260830T154516Z-2aec49083f`, and attribution scan
+`EVID-20260830T154511Z-2c25f0686e` pass. The earlier failed strict record
+`EVID-20260830T151425Z-09e2526950` is retained as a superseded negative
+baseline, not pass evidence. Doctor and the next-work selector must continue to
 emit `release_authorized=false`, all open mandatory findings, and the
 nonpassing G09-G12 gates.
 
 ## Current branch and pull-request lineage
 
 - Active branch: `security/privileged-filesystem-boundary`.
-- Published source checkpoint HEAD:
-  `bde3005dfc0488a0e0573eadba04c7166b9a503a`.
+- Implementation/source checkpoint:
+  `bc2cf006d7d87edaf24affdc06a86d7518bc0c2f`.
+- Evidence-only checkpoint:
+  `0ce461885a47075ff730b43133793804be37a5ab`.
+- A later commit containing only this handoff correction does not change either
+  manifest-bound checkpoint; the pull request readback is authoritative for its
+  transport HEAD.
 - Base branch and SHA: `main` at
   `8bcc039a2f0d4d17b871d5e968b3b37a663c5ccb`.
 - Current pull request: draft #15,
   `https://github.com/flynn33/Forge-Conductor-MacOS/pull/15`.
-- GitHub readback recorded #15 open and draft from
-  `security/privileged-filesystem-boundary@bde3005dfc0488a0e0573eadba04c7166b9a503a`
+- The last pre-handoff-correction GitHub readback recorded #15 open and draft from
+  `security/privileged-filesystem-boundary@0ce461885a47075ff730b43133793804be37a5ab`
   into `main@8bcc039a2f0d4d17b871d5e968b3b37a663c5ccb`. The pull request is
   reviewable as a partial checkpoint but has neither merge nor release
   authority.

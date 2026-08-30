@@ -2257,16 +2257,6 @@
     },
     {
       "detail": "valid",
-      "name": "json:evidence/EVID-20260830T154516Z-2aec49083f.artifact-000-PACKAGE_VALIDATION.json",
-      "passed": true
-    },
-    {
-      "detail": "valid",
-      "name": "json:evidence/EVID-20260830T154516Z-2aec49083f.json",
-      "passed": true
-    },
-    {
-      "detail": "valid",
       "name": "json:evidence/P02-telemetry-baseline.json",
       "passed": true
     },
@@ -3435,6 +3425,6 @@
   "root": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex",
   "schema_version": 1,
   "valid": true,
-  "validated_at": "2026-08-30T15:46:49.816224+00:00",
+  "validated_at": "2026-08-30T15:45:16.910967+00:00",
   "warnings": []
 }
