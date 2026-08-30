@@ -606,6 +606,40 @@ final class ManagerTests: XCTestCase {
         XCTAssertNotNil(allow?["macos_login_items"])
     }
 
+    func testMinimalManagerAppBundleUsesCanonicalMarketingAndBuildVersions() throws {
+        let paths = AppPaths(home: home)
+        try paths.ensureLayout()
+        let installer = ManagerInstaller(
+            paths: paths,
+            config: ConfigStore(paths: paths),
+            artifactValidator: TestManagerArtifactValidator(),
+            artifactCopier: TestManagerArtifactCopier(),
+            artifactReplacer: TestManagerArtifactReplacer(),
+            privilegedApplicationIdentityValidator:
+                TestManagerPrivilegedApplicationIdentityValidator()
+        )
+        try FileManager.default.createDirectory(
+            at: installer.installedBinaryURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try "#!/bin/sh\nexit 0\n".write(
+            to: installer.installedBinaryURL,
+            atomically: true,
+            encoding: .utf8
+        )
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755],
+            ofItemAtPath: installer.installedBinaryURL.path
+        )
+
+        let bundle = try installer.installAppBundle(from: installer.installedBinaryURL)
+        let infoURL = bundle.appendingPathComponent("Contents/Info.plist")
+        let info = try XCTUnwrap(NSDictionary(contentsOf: infoURL) as? [String: Any])
+
+        XCTAssertEqual(info["CFBundleShortVersionString"] as? String, ForgeApp.version)
+        XCTAssertEqual(info["CFBundleVersion"] as? String, ForgeApp.buildVersion)
+    }
+
     func testManagerArtifactStagingReplacesStaleBinaryFrameworkAndAppBundle() throws {
         let validator = TestManagerArtifactValidator()
         let fixture = try makeArtifactFixture(validator: validator)

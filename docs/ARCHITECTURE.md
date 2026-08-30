@@ -15,10 +15,13 @@ Forge Conductor is a native macOS orchestration server for local models hosted b
 
 | Product / target | Responsibility |
 |---|---|
+| `ForgeFilesystemProtocol` | Shared protocol-v5 request, identity, recovery, and receipt contracts for the privileged filesystem boundary |
 | `ForgeConductorCore` | Domain, application services, infrastructure, MCP, manager, dashboard, telemetry |
+| `ForgeNativeSessionHostPlugin` | Native provider adapter and session-host integration used by continuity workflows |
 | `forge-conductor` / `ForgeConductorCLI` | CLI, installer, manager commands, and MCP stdio executable |
 | `forge-conductor-app` / `ForgeConductorApp` | SwiftUI/AppKit/Metal operator application |
 | `forge-runtime-launcher` / `ForgeRuntimeLauncher` | Signed, resource-bounded native process launcher for managed jobs |
+| `forge-filesystem-daemon` / `ForgeFilesystemDaemon` | Privileged leaf capture, protected quarantine, and request recovery; authorized quarantine disposition and E2 qualification remain open |
 | `ForgeConductorTests` | Unit, integration, security, connector, and process acceptance tests |
 
 The Xcode project mirrors these boundaries. SwiftPM provides a second reproducible Apple-native build path and stages the GUI through `script/build_and_run.sh`.
@@ -91,7 +94,9 @@ resolve executable
 - Browser mutations require same-origin JSON. Wildcard CORS is not emitted.
 - Privileged tool invocation is not exposed over HTTP; it is available over the LM Studio MCP stdio boundary.
 - Agent grant/deny lists and configured workspace roots are enforced before tool dispatch.
-- Filesystem paths are canonicalized to prevent traversal and symlink escapes.
+- Ordinary filesystem authorization canonicalizes paths and rejects traversal or
+  symlink escape before dispatch. Privileged destructive mutation has additional
+  protocol-v5 capture and quarantine controls, but its documented E2 races remain.
 - HTTP bodies, MCP frames, file reads, subprocess capture, and returned shell output are bounded.
 - Audit records redact commands and file contents.
 - Session and handoff paths may narrow existing authority but cannot create new
@@ -103,6 +108,23 @@ native opt-out. Every call still requires an authorized workspace and has a
 120-second maximum. The legacy compatibility profile remains `/bin/bash -lc`.
 It is not an operating-system sandbox and should be granted only to trusted local
 agents. Pre-v2 configuration is backed up and migrated once with a verified receipt.
+
+## Qualification boundary
+
+This architecture describes implemented surfaces, not a release pass. P10 and
+filesystem E2 remain open: bounded capture and quarantine mitigate substitution
+races but do not eliminate them, and the signed distinct-process 57-case matrix
+plus formal closure are still required. Live shell qualification must execute
+the established `shell_exec` contract after both app and installed-manager
+restart. Developer ID Release signing, production native UI execution, archive,
+notarization, and staple/Gatekeeper evidence remain release-blocking.
+
+Autonomous continuity requires the manager-owned, threshold-forced real-provider
+rollover with exact successor acknowledgment, predecessor fencing and idempotent
+sealing, automatic continuation, GUI-closed operation, and every durable
+crash-state recovery. Unit and synthetic-host tests are insufficient. Current
+G09-G12 and owner-deferred representative physical-hardware qualification also
+remain open.
 
 ## Persistence
 
@@ -127,3 +149,4 @@ swift test                           # full Core/CLI acceptance suite
 ```
 
 Version: `0.9.0`
+Build: `1`

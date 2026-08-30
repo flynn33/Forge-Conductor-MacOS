@@ -1085,6 +1085,7 @@ public final class ManagerInstaller: @unchecked Sendable {
         try fm.createDirectory(at: resources, withIntermediateDirectories: true)
 
         let version = ForgeApp.version
+        let buildVersion = ForgeApp.buildVersion
         let infoPlist = """
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -1107,7 +1108,7 @@ public final class ManagerInstaller: @unchecked Sendable {
           <key>CFBundleShortVersionString</key>
           <string>\(escapeXML(version))</string>
           <key>CFBundleVersion</key>
-          <string>\(escapeXML(version))</string>
+          <string>\(escapeXML(buildVersion))</string>
           <key>LSMinimumSystemVersion</key>
           <string>26.0</string>
           <key>LSUIElement</key>
