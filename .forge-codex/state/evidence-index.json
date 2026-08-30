@@ -1,5 +1,5 @@
 {
-  "artifact_count": 1352,
+  "artifact_count": 1376,
   "artifacts": [
     {
       "bytes": 1030,
@@ -6557,6 +6557,126 @@
       "sha256": "23e076473e690b8070fd4d1589d42be84cb679f2efb35dd2c2b6eabd33dcf031"
     },
     {
+      "bytes": 1647,
+      "path": ".forge-codex/evidence/EVID-20260830T221505Z-02858db962.json",
+      "sha256": "3e6105ba8da3eae76ecf92cc37fd254749d3500741255175da73c12211602aee"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260830T221505Z-02858db962.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 21850,
+      "path": ".forge-codex/evidence/EVID-20260830T221505Z-02858db962.stdout.txt",
+      "sha256": "d68487682396f176d749f0c7d63ffb20ee03a3443b611cd0c8085b4d7935a95b"
+    },
+    {
+      "bytes": 1677,
+      "path": ".forge-codex/evidence/EVID-20260830T221512Z-76aa1df459.json",
+      "sha256": "8d336b2c109953239e8bbd87539f55f509fb33b58ca6b012a06d5226f9a8d659"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260830T221512Z-76aa1df459.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 26376,
+      "path": ".forge-codex/evidence/EVID-20260830T221512Z-76aa1df459.stdout.txt",
+      "sha256": "a895bdc5954378ff4a8edfc1be823f2125928054f25c77d51a62467629c129f0"
+    },
+    {
+      "bytes": 1647,
+      "path": ".forge-codex/evidence/EVID-20260830T221552Z-23fccf23e2.json",
+      "sha256": "6e6b8e79c6b09f7ad619d1bf60d9e553ed19ec3541cc550b6f4120735a7ea9b1"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260830T221552Z-23fccf23e2.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 21876,
+      "path": ".forge-codex/evidence/EVID-20260830T221552Z-23fccf23e2.stdout.txt",
+      "sha256": "17c8351b2070e3cabbc0b49626ecd8564504377b9c2138871949331644e4ab51"
+    },
+    {
+      "bytes": 1677,
+      "path": ".forge-codex/evidence/EVID-20260830T221558Z-70e4c016b7.json",
+      "sha256": "36e5573f51f080ed1401f38c5afcf3960534bcb86b0256ce4717e2e2ffffaeea"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260830T221558Z-70e4c016b7.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 26402,
+      "path": ".forge-codex/evidence/EVID-20260830T221558Z-70e4c016b7.stdout.txt",
+      "sha256": "8588f1b98957335b77e2b0f214428b386a07da26713e975e340ff1f04f8aa97d"
+    },
+    {
+      "bytes": 1683,
+      "path": ".forge-codex/evidence/EVID-20260830T221613Z-ea0d244fa9.json",
+      "sha256": "0851812007f4f265eb65f1dd3c9dd427791711c0f482ab455e0e8e10739bc595"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260830T221613Z-ea0d244fa9.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 136,
+      "path": ".forge-codex/evidence/EVID-20260830T221613Z-ea0d244fa9.stdout.txt",
+      "sha256": "ecbd4a874b1f354793fed3b979dad526ed90cfa64f315d1708a0ab88678eb922"
+    },
+    {
+      "bytes": 1695,
+      "path": ".forge-codex/evidence/EVID-20260830T221614Z-188ad8b638.json",
+      "sha256": "9561c04b5c9cd34ffe967b8d8a7c48997ca2f25fb1ebed3a30a391cd8a3d90a7"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260830T221614Z-188ad8b638.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 157,
+      "path": ".forge-codex/evidence/EVID-20260830T221614Z-188ad8b638.stdout.txt",
+      "sha256": "9160aa9ea0ecd75e7ccc93716f4e07ad56aa1460c7e44d19d999a1c0f2587cba"
+    },
+    {
+      "bytes": 1681,
+      "path": ".forge-codex/evidence/EVID-20260830T221614Z-a83cfa3e4a.json",
+      "sha256": "2c0fe0a71caf8891a3cbe33e3ad2ab6f8c88437d6d0fe85e53e1706cd0f04cd1"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260830T221614Z-a83cfa3e4a.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 91,
+      "path": ".forge-codex/evidence/EVID-20260830T221614Z-a83cfa3e4a.stdout.txt",
+      "sha256": "27e908cc10f40050f072937aa716c9b39a6dfde977f0524d1c6a03619697a87b"
+    },
+    {
+      "bytes": 1672,
+      "path": ".forge-codex/evidence/EVID-20260830T221615Z-e08156083e.json",
+      "sha256": "a2db0ea348c91e41e682350b9d49ae834e83a2ab3211d2fe821fe8cf2d639f98"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260830T221615Z-e08156083e.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 75,
+      "path": ".forge-codex/evidence/EVID-20260830T221615Z-e08156083e.stdout.txt",
+      "sha256": "65831b8dd44464513f36929dee9c4869a07f904a69567f2307575fc5d97c4e18"
+    },
+    {
       "bytes": 57,
       "path": ".forge-codex/evidence/HANDOFF-INTEGRITY-PASS.txt",
       "sha256": "1489959da865738002cf1bc075169ffbf0fbf2bd11bbceb2e5c3ac12d36fb538"
@@ -6762,7 +6882,7 @@
       "sha256": "cdc4f84750dca05cb0186e6032b4bce580697b7b2ae6c3357164cea8e3b0e59a"
     }
   ],
-  "generated_at": "2026-08-30T22:13:07.040268+00:00",
+  "generated_at": "2026-08-30T22:16:57.959588+00:00",
   "repository": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security",
   "schema_version": 1
 }

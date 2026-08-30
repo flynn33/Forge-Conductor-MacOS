@@ -2457,6 +2457,46 @@
     },
     {
       "detail": "valid",
+      "name": "json:evidence/EVID-20260830T221505Z-02858db962.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260830T221512Z-76aa1df459.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260830T221552Z-23fccf23e2.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260830T221558Z-70e4c016b7.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260830T221613Z-ea0d244fa9.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260830T221614Z-188ad8b638.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260830T221614Z-a83cfa3e4a.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260830T221615Z-e08156083e.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
       "name": "json:evidence/P02-telemetry-baseline.json",
       "passed": true
     },
@@ -3650,6 +3690,6 @@
   "root": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex",
   "schema_version": 1,
   "valid": true,
-  "validated_at": "2026-08-30T22:13:52.957443+00:00",
+  "validated_at": "2026-08-30T22:16:59.764877+00:00",
   "warnings": []
 }

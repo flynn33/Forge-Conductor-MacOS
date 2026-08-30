@@ -257,16 +257,16 @@ is installed, and Release build-settings evidence
 request Developer ID Application. Signed Debug UI evidence
 `EVID-20260830T153118Z-752f058222` passed all six bounded cases.
 
-Post-push doctor evidence `EVID-20260830T190543Z-2aafffbf28` verifies the
-active branch and remote at `7480dc4c78ecbf16686397e787b569cfdf26205c`, the
+Post-push doctor evidence `EVID-20260830T221552Z-23fccf23e2` verifies the
+active branch and remote at `61c3a00f3d0289cf4086182f0e8217567915b763`, the
 base, and open draft PR #15; it reports the partial checkpoint reviewable while
 retaining `merge_authorized=false` and `release_authorized=false`. The
-corresponding next-work record `EVID-20260830T190704Z-70c1100604` resumes P10
+corresponding next-work record `EVID-20260830T221558Z-70e4c016b7` resumes P10
 with the same policy and preserves every mandatory blocker. State validation
-`EVID-20260830T190756Z-e957e7be61`, package validation
-`EVID-20260830T190724Z-d442305927`, attribution scan
-`EVID-20260830T190724Z-6408537e09`, and secret scan
-`EVID-20260830T190725Z-6f59acc593` pass. The earlier failed strict record
+`EVID-20260830T221613Z-ea0d244fa9`, package validation
+`EVID-20260830T221614Z-188ad8b638`, attribution scan
+`EVID-20260830T221614Z-a83cfa3e4a`, and secret scan
+`EVID-20260830T221615Z-e08156083e` pass. The earlier failed strict record
 `EVID-20260830T151425Z-09e2526950` is retained as a superseded negative
 baseline, not pass evidence. Doctor and the next-work selector must continue to
 emit `release_authorized=false`, all open mandatory findings, and the
@@ -285,7 +285,7 @@ nonpassing G09-G12 gates.
 - Current pull request: draft #15,
   `https://github.com/flynn33/Forge-Conductor-MacOS/pull/15`.
 - The post-push GitHub readback recorded #15 open and draft from
-  `security/privileged-filesystem-boundary@7480dc4c78ecbf16686397e787b569cfdf26205c`
+  `security/privileged-filesystem-boundary@61c3a00f3d0289cf4086182f0e8217567915b763`
   into `main@8bcc039a2f0d4d17b871d5e968b3b37a663c5ccb`. The pull request is
   reviewable as a partial checkpoint but has neither merge nor release
   authority.

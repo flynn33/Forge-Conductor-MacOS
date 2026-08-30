@@ -526,7 +526,7 @@
       "passed": true
     }
   ],
-  "commit": "8f251a5ec79263a70776f800df6403aca9345c3d",
+  "commit": "61c3a00f3d0289cf4086182f0e8217567915b763",
   "errors": [
     "gate-artifact-exists:G00:G00.stdout.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.stdout.txt",
     "gate-artifact-exists:G00:G00.stderr.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.stderr.txt",
@@ -574,7 +574,7 @@
     "critical-high-findings-resolved: ['FC-FILESYSTEM-PATH-TOCTOU-001', 'FC-PRIVILEGED-SERVICE-LIFECYCLE-001', 'FC-PRIVILEGED-CALLER-IDENTITY-001', 'FC-SHELL-COMPAT-QUALIFICATION-001', 'FC-UI-QUALIFICATION-001', 'FC-AUTONOMOUS-CONTINUITY-E2E-001']",
     "autonomous-rollover-mode-proven: forge.native-session-host"
   ],
-  "evaluated_at": "2026-08-30T22:13:52.553337+00:00",
+  "evaluated_at": "2026-08-30T22:16:59.357291+00:00",
   "finalization_gate": {
     "gate_id": "G12",
     "reason": "G12 is written as passed only after every prerequisite and final integrity check passes and finalization is authorized.",

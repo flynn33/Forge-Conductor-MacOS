@@ -480,6 +480,14 @@
     "EVID-20260830T211935Z-fecf3ddfd6",
     "EVID-20260830T220320Z-4cccc31cce",
     "EVID-20260830T220539Z-eac42f2a8c",
+    "EVID-20260830T221505Z-02858db962",
+    "EVID-20260830T221512Z-76aa1df459",
+    "EVID-20260830T221552Z-23fccf23e2",
+    "EVID-20260830T221558Z-70e4c016b7",
+    "EVID-20260830T221613Z-ea0d244fa9",
+    "EVID-20260830T221614Z-188ad8b638",
+    "EVID-20260830T221614Z-a83cfa3e4a",
+    "EVID-20260830T221615Z-e08156083e",
     "a5466d4e5b4d7a10f87df64ddfdb58b6b8ca5159a57c20527e98802a822245d7",
     "a5d4276cbf14db3a91baa7f6b79fb8cdb3fb042a2eaf663d3219ff36b5451667",
     "b3dc11a8dc286fa33b6567ff62089692e64787b23a66718cfe1766dc27195724",
@@ -672,6 +680,7 @@
   },
   "handoffs": [
     "00d75d8d-ee0a-41ca-aedf-0b2fa1496ab8",
+    "647aac53-0d73-43bf-b1c7-860e35112a0f",
     "810010d7-b872-41ff-8d51-414b7270ca9d",
     "82441ec1-a7ed-4137-8ec5-3d2dd99739bb",
     "ee862f4a-ebcc-466f-9817-1881ff1a6172",
@@ -1002,26 +1011,26 @@
       "created_at": "2026-08-30T12:54:56.398010+00:00",
       "evidence_class": "E2",
       "id": "FC-PRIVILEGED-SERVICE-LIFECYCLE-001",
-      "notes": "Protocol v5 retains unregister-before-register replacement and generation fencing, installs the exact caller-sealed daemon CodeDirectory requirement before NSXPC activation, and checks protocol, product, service identifier, root EUID, and running daemon hash on the same connection. Pathless transaction query, resume, and acknowledgement retain terminal outcomes until exact acknowledgement. Current signed Debug build EVID-20260830T211007Z-760c293557 and bundle check EVID-20260830T211029Z-ae82e789b1 are static support only. Tests do not execute real SMAppService approval, denial, update, disable, unregister and re-register, daemon restart, startup recovery fencing, or capture recovery. Release settings EVID-20260830T211040Z-a8619d99c2 request Developer ID Application, but identity inventory EVID-20260830T211040Z-5f8b21e6d9 shows no usable Developer ID identity. Signed process lifecycle, Release signing, and notarization remain required. E2, P10, G10, and G12 remain open.",
+      "notes": "Protocol v5 retains unregister-before-register replacement and generation fencing, installs the exact caller-sealed daemon CodeDirectory requirement before NSXPC activation, and checks protocol, product, service identifier, root EUID, and running daemon hash on the same connection. Pathless transaction query, resume, and acknowledgement retain terminal outcomes until exact acknowledgement. Prior-manifest signed Debug build EVID-20260830T211007Z-760c293557 and bundle check EVID-20260830T211029Z-ae82e789b1 are static support only. Tests do not execute real SMAppService approval, denial, update, disable, unregister and re-register, daemon restart, startup recovery fencing, or capture recovery. Release settings EVID-20260830T211040Z-a8619d99c2 request Developer ID Application, but identity inventory EVID-20260830T211040Z-5f8b21e6d9 shows no usable Developer ID identity. Signed process lifecycle, Release signing, and notarization remain required. E2, P10, G10, and G12 remain open.",
       "path": "Sources/ForgeConductorCore/Infrastructure/SecureFilesystemService.swift",
       "severity": "High",
       "status": "patching",
       "title": "Privileged service updates must not retain a stale registered daemon",
-      "updated_at": "2026-08-30T21:13:27.380763+00:00"
+      "updated_at": "2026-08-30T22:15:41.445163+00:00"
     },
     {
       "created_at": "2026-08-30T13:28:47.621560+00:00",
       "evidence_class": "E2",
       "id": "FC-PRIVILEGED-CALLER-IDENTITY-001",
-      "notes": "Protocol v5 obtains expected per-architecture daemon CodeDirectory hashes from each caller validated running signature, composes them into the NSXPC requirement before activation, and repeats the exact running-hash and protocol handshake before every mutation or transaction-control message. The canonical app graph builds one app, embedded CLI, and daemon artifact set. Current signed Debug build EVID-20260830T211007Z-760c293557 and bundle check EVID-20260830T211029Z-ae82e789b1 verify static same-build identities only. They do not execute signed app, installed manager, raw CLI, and standalone CLI calls or stale-helper, wrong-team, wrong-identifier, timeout, upgrade, restart, Release, and notarization cases. Whole-product rollback still lacks a monotonic root-owned receipt; an older allowlisted daemon retains its bounded root mutation authority and vulnerabilities. This is mitigation, not elimination. Caller identity, service lifecycle, E2, P10, G10, and G12 remain open.",
+      "notes": "Protocol v5 obtains expected per-architecture daemon CodeDirectory hashes from each caller validated running signature, composes them into the NSXPC requirement before activation, and repeats the exact running-hash and protocol handshake before every mutation or transaction-control message. The canonical app graph builds one app, embedded CLI, and daemon artifact set. Prior-manifest signed Debug build EVID-20260830T211007Z-760c293557 and bundle check EVID-20260830T211029Z-ae82e789b1 verify static same-build identities only. They do not execute signed app, installed manager, raw CLI, or standalone CLI calls or stale-helper, wrong-team, wrong-identifier, timeout, upgrade, restart, Release, and notarization cases. Whole-product rollback still lacks a monotonic root-owned receipt; an older allowlisted daemon retains its bounded root mutation authority and vulnerabilities. This is mitigation, not elimination. Caller identity, service lifecycle, E2, P10, G10, and G12 remain open.",
       "path": "Sources/ForgeConductorCore/Infrastructure/SecureFilesystemService.swift",
       "severity": "High",
       "status": "patching",
       "title": "Caller-sealed helper identity requires signed-process and freshness qualification",
-      "updated_at": "2026-08-30T21:13:27.556007+00:00"
+      "updated_at": "2026-08-30T22:15:41.618707+00:00"
     }
   ],
-  "last_event_sequence": 680,
+  "last_event_sequence": 691,
   "phases": {
     "P00": {
       "attempts": 1,
@@ -1104,12 +1113,12 @@
   },
   "repository": {
     "branch": "security/privileged-filesystem-boundary",
-    "commit": "8f251a5ec79263a70776f800df6403aca9345c3d",
+    "commit": "61c3a00f3d0289cf4086182f0e8217567915b763",
     "dirty": true,
     "root": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security"
   },
   "run_id": "aba90ab1-be80-4cc5-aa0b-23dd54d4a24d",
   "schema_version": 1,
   "status": "active",
-  "updated_at": "2026-08-30T22:13:00.077121+00:00"
+  "updated_at": "2026-08-30T22:16:48.897094+00:00"
 }
