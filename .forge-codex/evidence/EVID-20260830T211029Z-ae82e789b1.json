@@ -1,0 +1,57 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 5570,
+      "path": ".forge-codex/evidence/EVID-20260830T211029Z-ae82e789b1.stdout.txt",
+      "sha256": "b31a2eb6f303e2845ef97121d8a7b034a340238baf69360ee20cb99742e7318f",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 6588,
+      "path": ".forge-codex/evidence/EVID-20260830T211029Z-ae82e789b1.stderr.txt",
+      "sha256": "fbde11aff4b5199a3d8d3b2b340e538c9e8aa399a94327eb176af847da556cf4",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "command": ".forge-codex/scripts/check_privileged_filesystem_bundle.sh '/tmp/forge-p10-capture-v5-xcode-debug-checkpoint-final-20260830/Build/Products/Debug/Forge Conductor.app' Debug /tmp/forge-p10-capture-v5-xcode-debug-checkpoint-final-20260830/Build/Products/Debug/forge-conductor",
+  "ended_at": "2026-08-30T21:10:30.931772+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260830T211029Z-ae82e789b1",
+  "kind": "p10-capture-v5-signed-debug-bundle-checkpoint-final",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 100000,
+  "related_findings": [
+    "FC-UI-QUALIFICATION-001",
+    "FC-PRIVILEGED-CALLER-IDENTITY-001",
+    "FC-PRIVILEGED-SERVICE-LIFECYCLE-001"
+  ],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 9827855,
+    "file_count": 256,
+    "schema_version": 1,
+    "sha256": "6ec296c27eb476effdeb7d044b73741db554f5200fa2879262ea8cffd580b3e9"
+  },
+  "source_manifest_after": {
+    "bytes": 9827855,
+    "file_count": 256,
+    "schema_version": 1,
+    "sha256": "6ec296c27eb476effdeb7d044b73741db554f5200fa2879262ea8cffd580b3e9"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-30T21:10:29.793483+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

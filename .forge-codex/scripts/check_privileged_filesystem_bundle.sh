@@ -214,7 +214,7 @@ case "$CONFIGURATION" in
     ;;
   Release)
     TEAM_IDENTIFIER="2Y25RTLZET"
-    CERTIFICATE_REQUIREMENT='(certificate leaf[field.1.2.840.113635.100.6.1.13] exists or certificate leaf[field.1.2.840.113635.100.6.1.12] exists)'
+    CERTIFICATE_REQUIREMENT='certificate leaf[field.1.2.840.113635.100.6.1.13] exists'
     ;;
   *)
     echo "unsupported build configuration: $CONFIGURATION" >&2

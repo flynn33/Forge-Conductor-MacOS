@@ -3,10 +3,12 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import hashlib
 import os
 import pathlib
+import re
 import stat
 import subprocess
 import sys
@@ -27,6 +29,15 @@ RECORDER = SCRIPT_ROOT / "record_command.py"
 COMPLETION_CHECKER = SCRIPT_ROOT / "check_p10_completion.py"
 DOCTOR = SCRIPT_ROOT / "doctor.sh"
 STATECTL = SCRIPT_ROOT / "statectl.py"
+PRIVILEGED_FILESYSTEM_QUALIFICATION = (
+    SCRIPT_ROOT.parent / "docs/PRIVILEGED_FILESYSTEM_QUALIFICATION.md"
+)
+PRIVILEGED_FILESYSTEM_SCHEMA = (
+    SCRIPT_ROOT.parent / "schemas/p10-privileged-filesystem-qualification-report.schema.json"
+)
+PRIVILEGED_FILESYSTEM_TEMPLATE = (
+    SCRIPT_ROOT.parent / "templates/p10-privileged-filesystem-qualification-report.json"
+)
 
 
 class EvidenceControlTests(unittest.TestCase):
@@ -34,9 +45,277 @@ class EvidenceControlTests(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
+    def install_fixture_evidence(
+        self,
+        root: pathlib.Path,
+        *,
+        evidence_id: str = "EVID-fixture-qualification",
+        evidence_kind: str = "p10-privileged-filesystem-qualification",
+    ) -> dict[str, str]:
+        schema_path = (
+            root
+            / ".forge-codex/schemas/p10-privileged-filesystem-qualification-report.schema.json"
+        )
+        schema_path.parent.mkdir(parents=True, exist_ok=True)
+        schema_path.write_bytes(PRIVILEGED_FILESYSTEM_SCHEMA.read_bytes())
+        artifact_path = root / f".forge-codex/evidence/{evidence_id}.txt"
+        artifact_path.parent.mkdir(parents=True, exist_ok=True)
+        artifact_data = f"signed qualification fixture: {evidence_id}\n".encode()
+        artifact_path.write_bytes(artifact_data)
+        artifact_hash = hashlib.sha256(artifact_data).hexdigest()
+        manifest = source_manifest(root)
+        relative_path = artifact_path.relative_to(root).as_posix()
+        self.write_json(
+            root / f".forge-codex/evidence/{evidence_id}.json",
+            {
+                "schema_version": 2,
+                "id": evidence_id,
+                "kind": evidence_kind,
+                "command": "python3 signed_privileged_filesystem_qualification.py",
+                "related_gates": ["G10"],
+                "related_findings": ["FC-FILESYSTEM-PATH-TOCTOU-001"],
+                "exit_code": 0,
+                "timed_out": False,
+                "stream_limit_exceeded": False,
+                "artifact_capture_errors": [],
+                "source_manifest": manifest,
+                "source_manifest_after": manifest,
+                "source_manifest_changed": False,
+                "ledger_reference": {"status": "recorded", "exit_code": 0},
+                "artifacts": [
+                    {
+                        "path": relative_path,
+                        "bytes": len(artifact_data),
+                        "sha256": artifact_hash,
+                        "storage": "evidence-id-specific-copy",
+                    }
+                ],
+            },
+        )
+        run_state_path = root / ".forge-codex/state/run-state.json"
+        run_state = json.loads(run_state_path.read_text(encoding="utf-8"))
+        run_state["evidence"] = [
+            *run_state.get("evidence", []),
+            evidence_id,
+        ]
+        run_state["issues"] = [
+            {
+                "id": "FC-FILESYSTEM-PATH-TOCTOU-001",
+                "status": "resolved",
+            }
+        ]
+        self.write_json(run_state_path, run_state)
+        return {
+            "evidence_id": evidence_id,
+            "path": relative_path,
+            "sha256": artifact_hash,
+        }
+
+    def populate_passing_filesystem_case(
+        self,
+        name: str,
+        case: dict[str, object],
+        artifact_reference: dict[str, str],
+    ) -> None:
+        mount_cases = {
+            "outside_root_sentinel_preservation",
+            "root_descriptor_identity_mismatch",
+            "atomic_swap_source_leaf_before_capture",
+            "atomic_swap_source_leaf_during_capture",
+            "atomic_swap_source_leaf_after_capture",
+            "atomic_swap_parent_before_capture",
+            "atomic_swap_parent_after_capture",
+            "parent_relocation_during_rollback",
+            "atomic_swap_rollback_destination_occupied",
+            "atomic_swap_special_leaf_before_descriptor_open",
+            "authorization_metadata_change_after_final_check",
+            "crash_at_every_durable_phase",
+            "daemon_restart_and_idempotent_recovery",
+            "manager_restart_and_idempotent_recovery",
+            "local_ownership_enforced_apfs",
+            "external_volume_rejected",
+            "removable_volume_rejected",
+            "network_volume_rejected",
+            "ignore_ownership_volume_rejected",
+            "cross_volume_destination_durable_before_source_destruction",
+            "source_leaf_substitution",
+            "hard_link_behavior",
+            "writable_file_descriptor_behavior",
+        }
+        crash_cases = {
+            "crash_at_every_durable_phase",
+            "daemon_restart_and_idempotent_recovery",
+            "manager_restart_and_idempotent_recovery",
+            "terminal_outcome_retained_until_acknowledged",
+            "acknowledgement_crash_cleanup_matrix",
+            "caller_ledger_restart_and_scope_fencing",
+            "broker_interruption_requires_transaction_recovery",
+            "upgrade_unregister_reregister",
+        }
+        case["status"] = "passed"
+        case["raw_artifact_references"] = [artifact_reference]
+        case["iterations"] = {
+            "planned": 1,
+            "executed": 1,
+            "conclusive": 1,
+            "barrier_hits": 1,
+            "barrier_misses": 0,
+        }
+        case["barrier_evidence"] = [
+            {
+                "name": "fixture-barrier",
+                "status": "reached",
+                "iteration": 1,
+                "monotonic_timestamp_ns": 1,
+                "raw_artifact_reference": artifact_reference,
+            }
+        ]
+        case["process_identities"] = [
+            {
+                "role": "helper",
+                "pid": 123,
+                "effective_uid": 0,
+                "executable_path": str(pathlib.Path(sys.executable).resolve()),
+            }
+        ]
+        case["signing_identities"] = [
+            {
+                "role": "helper",
+                "certificate_common_name": "Developer ID Application: Example Corp",
+                "team_identifier": "ABCDE12345",
+                "signing_identifier": "com.example.signed-helper",
+                "code_directory_hash": hashlib.sha256(b"signed-helper").hexdigest(),
+                "designated_requirement": "identifier com.example.signed-helper",
+            }
+        ]
+        fixture = {
+            "label": "outside-root-sentinel",
+            "present": True,
+            "device": 1,
+            "inode": 2,
+            "entry_type": "regular",
+            "sha256": hashlib.sha256(b"outside-root-sentinel").hexdigest(),
+            "acl_sha256": hashlib.sha256(b"owner-only-acl").hexdigest(),
+            "bsd_flags": 0,
+        }
+        case["fixture_digests"] = {
+            "before": [fixture],
+            "after": [dict(fixture)],
+        }
+        if name in mount_cases:
+            case["mount_facts"] = {
+                "applicable": True,
+                "filesystem_type": "apfs",
+                "mount_path": "/",
+                "device_identifier": "disk9s1",
+                "volume_uuid": "00000000-1111-2222-3333-444444444444",
+                "mount_flags": ["local", "writable", "ownership-enabled"],
+                "local": True,
+                "removable": False,
+                "network": False,
+                "ownership_enabled": True,
+                "raw_artifact_reference": artifact_reference,
+            }
+            if name == "network_volume_rejected":
+                case["mount_facts"]["local"] = False
+                case["mount_facts"]["network"] = True
+            elif name == "removable_volume_rejected":
+                case["mount_facts"]["removable"] = True
+            elif name == "ignore_ownership_volume_rejected":
+                case["mount_facts"]["ownership_enabled"] = False
+        if name in crash_cases:
+            case["crash_point"] = {
+                "applicable": True,
+                "phase": "durable-quarantine-receipt",
+                "timing": "after",
+                "signal": "SIGKILL",
+                "restart_observed": True,
+                "raw_artifact_reference": artifact_reference,
+            }
+        case["observed_result"] = "Signed qualification completed conclusively."
+
+    def privileged_filesystem_report(
+        self,
+        root: pathlib.Path,
+        matrix: dict[str, object],
+        formal_artifact_reference: dict[str, str],
+    ) -> dict[str, object]:
+        report = json.loads(PRIVILEGED_FILESYSTEM_TEMPLATE.read_text(encoding="utf-8"))
+        report.update(
+            {
+                "status": "passed",
+                "ok": True,
+                "source_manifest": source_manifest(root),
+                "captured_at": "2026-08-30T00:00:00Z",
+                "repository": {
+                    "branch": "fixture",
+                    "head_sha": "a" * 40,
+                    "base_branch": "origin/main",
+                },
+                "test_environment": {
+                    "macos_build": "fixture-build",
+                    "machine_identifier": "fixture-machine",
+                },
+                "test_processes": {
+                    "separately_signed": True,
+                    "helper_effective_uid": 0,
+                },
+                "matrix": matrix,
+                "same_uid_fallback": "absent",
+                "same_uid_threat_model": "in_scope",
+                "residual_risk": {
+                    "disposition": "qualified_boundary_with_explicit_nonclaims",
+                    "remaining_race": "Fixture residual nonclaim.",
+                    "maximum_race_impact": "Fixture maximum impact.",
+                },
+                "remaining_requirements": [],
+            }
+        )
+        formal_closure = report["formal_closure"]
+        self.assertIsInstance(formal_closure, dict)
+        for key in formal_closure:
+            if key != "formal_argument_artifact_references":
+                formal_closure[key] = True
+        formal_closure["formal_argument_artifact_references"] = [
+            formal_artifact_reference
+        ]
+        return report
+
+    def run_completion_checker(
+        self,
+        root: pathlib.Path,
+        report: dict[str, object],
+    ) -> subprocess.CompletedProcess[str]:
+        self.write_json(
+            root
+            / ".forge-codex/evidence/P10-privileged-filesystem-qualification-report.json",
+            report,
+        )
+        return subprocess.run(
+            [sys.executable, str(COMPLETION_CHECKER)],
+            env={**os.environ, "FORGE_P10_REPOSITORY": str(root)},
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
     def test_completion_requires_full_filesystem_security_matrix(self) -> None:
         checker = COMPLETION_CHECKER.read_text(encoding="utf-8")
         required = (
+            "testCaptureFirstCoordinatorCommitsOnlyAfterCapturedVerification",
+            "testCaptureFirstCoordinatorQuarantinesMismatchWithoutCommit",
+            "testCaptureFirstCoordinatorDoesNotVerifyOrCommitAfterCaptureFailure",
+            "testMutationRequestRequiresContractSpecificExpectedIdentity",
+            "testMutationRequestDigestCanonicalizesUUIDCaseAndBindsContract",
+            "testMutationRequestSecureDecodingRejectsDigestBoundFieldTamper",
+            "testQuarantinedTransactionStatusIsDurableTerminalAndNotAcknowledgable",
+            "testQuarantinedTransactionStatusRejectsContradictoryFlagsAndSuccessCode",
+            "testProductionDeleteDispatchUsesCurrentEntryContractAndCanonicalDigest",
+            "testDurableQuarantineFailurePreservesTypedFailureAndRecoveryAuthority",
+            "testQuarantinedQuerySurfacesTerminalRecoveryStateAndRetainsAuthority",
+            "testPrivilegedDaemonUsesDistinctCaptureIdentityAndPhaseReceipts",
+            "testPrivilegedDaemonBindsPersistedDigestAndLegacyRollbackIdentity",
+            "testConflictedTransactionStatusIsDurableTerminalAndAcknowledgable",
             "testRecursiveDeletePreservesLeafSwappedAfterVerification",
             "testSameVolumeMoveDoesNotPublishLeafSwappedAfterVerification",
             "testSameVolumeNamespaceInstabilityWithUnconfirmedDurabilityRetainsRecoveryReceipt",
@@ -55,6 +334,473 @@ class EvidenceControlTests(unittest.TestCase):
         self.assertIn("for test_name in REQUIRED_FILESYSTEM_SECURITY_TESTS", checker)
         for test_name in required:
             self.assertIn(f'"{test_name}"', checker)
+
+    def test_privileged_filesystem_matrix_keys_match_all_authorities(self) -> None:
+        document = PRIVILEGED_FILESYSTEM_QUALIFICATION.read_text(encoding="utf-8")
+        required_cases = document.split("## Required cases", 1)[1].split(
+            "## macOS filesystem API capability analysis", 1
+        )[0]
+        document_keys = set(re.findall(r"^\| `([^`]+)` \|", required_cases, re.MULTILINE))
+
+        checker_tree = ast.parse(COMPLETION_CHECKER.read_text(encoding="utf-8"))
+        checker_keys: set[str] | None = None
+        for node in checker_tree.body:
+            if not isinstance(node, ast.Assign):
+                continue
+            if any(
+                isinstance(target, ast.Name)
+                and target.id == "REQUIRED_PRIVILEGED_FILESYSTEM_MATRIX"
+                for target in node.targets
+            ):
+                checker_keys = set(ast.literal_eval(node.value))
+                break
+
+        schema = json.loads(PRIVILEGED_FILESYSTEM_SCHEMA.read_text(encoding="utf-8"))
+        template = json.loads(PRIVILEGED_FILESYSTEM_TEMPLATE.read_text(encoding="utf-8"))
+        schema_matrix = schema["properties"]["matrix"]
+        schema_keys = set(schema_matrix["properties"])
+        schema_required_keys = set(schema_matrix["required"])
+        template_keys = set(template["matrix"])
+
+        self.assertIsNotNone(checker_keys)
+        self.assertEqual(len(document_keys), 57)
+        self.assertEqual(document_keys, checker_keys)
+        self.assertEqual(document_keys, schema_keys)
+        self.assertEqual(document_keys, schema_required_keys)
+        self.assertEqual(document_keys, template_keys)
+
+    def test_privileged_filesystem_schema_rejects_boolean_only_matrix(self) -> None:
+        from jsonschema import Draft202012Validator
+
+        schema = json.loads(PRIVILEGED_FILESYSTEM_SCHEMA.read_text(encoding="utf-8"))
+        template = json.loads(PRIVILEGED_FILESYSTEM_TEMPLATE.read_text(encoding="utf-8"))
+        Draft202012Validator.check_schema(schema)
+        validator = Draft202012Validator(schema)
+        self.assertEqual(list(validator.iter_errors(template)), [])
+
+        boolean_only_report = dict(template)
+        boolean_only_report["matrix"] = {key: True for key in template["matrix"]}
+        errors = list(validator.iter_errors(boolean_only_report))
+        self.assertTrue(errors)
+        self.assertTrue(
+            all(list(error.absolute_path)[:1] == ["matrix"] for error in errors),
+            errors,
+        )
+
+    def test_completion_checker_rejects_boolean_only_filesystem_matrix(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.make_repository(root)
+            template = json.loads(
+                PRIVILEGED_FILESYSTEM_TEMPLATE.read_text(encoding="utf-8")
+            )
+            self.write_json(
+                root
+                / ".forge-codex/evidence/P10-privileged-filesystem-qualification-report.json",
+                {
+                    "status": "passed",
+                    "ok": True,
+                    "source_manifest": source_manifest(root),
+                    "matrix": {key: True for key in template["matrix"]},
+                    "test_processes": {
+                        "separately_signed": True,
+                        "helper_effective_uid": 0,
+                    },
+                    "same_uid_fallback": "absent",
+                    "same_uid_threat_model": "in_scope",
+                    "residual_risk": {
+                        "disposition": "qualified_boundary_with_explicit_nonclaims",
+                        "remaining_race": "fixture residual",
+                        "maximum_race_impact": "fixture impact",
+                    },
+                    "remaining_requirements": [],
+                },
+            )
+            result = subprocess.run(
+                [sys.executable, str(COMPLETION_CHECKER)],
+                env={**os.environ, "FORGE_P10_REPOSITORY": str(root)},
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(
+                "privileged filesystem signed adversarial/crash/volume/lifecycle matrix is incomplete",
+                result.stdout,
+            )
+
+    def test_privileged_filesystem_case_schema_requires_raw_execution_facts(self) -> None:
+        from jsonschema import Draft202012Validator
+
+        schema = json.loads(PRIVILEGED_FILESYSTEM_SCHEMA.read_text(encoding="utf-8"))
+        template = json.loads(PRIVILEGED_FILESYSTEM_TEMPLATE.read_text(encoding="utf-8"))
+        case_schema = schema["$defs"]["qualificationCase"]
+        self.assertEqual(
+            set(case_schema["required"]),
+            {
+                "contracts_exercised",
+                "status",
+                "raw_artifact_references",
+                "iterations",
+                "barrier_evidence",
+                "process_identities",
+                "signing_identities",
+                "fixture_digests",
+                "mount_facts",
+                "crash_point",
+                "observed_result",
+            },
+        )
+        self.assertIn("inconclusive", case_schema["properties"]["status"]["enum"])
+        contracts = case_schema["properties"]["contracts_exercised"]
+        self.assertEqual(contracts["type"], "array")
+        self.assertEqual(contracts["minItems"], 1)
+        self.assertTrue(contracts["uniqueItems"])
+        self.assertEqual(
+            contracts["items"]["enum"],
+            ["currentEntry", "namespaceVersionExact", "contentVersionExact"],
+        )
+
+        required_contracts = {
+            "atomic_swap_source_leaf_before_capture": {
+                "currentEntry",
+                "namespaceVersionExact",
+            },
+            "atomic_swap_source_leaf_during_capture": {
+                "currentEntry",
+                "namespaceVersionExact",
+            },
+            "source_leaf_substitution": {
+                "currentEntry",
+                "namespaceVersionExact",
+            },
+            "hard_link_behavior": {
+                "namespaceVersionExact",
+                "contentVersionExact",
+            },
+            "writable_file_descriptor_behavior": {
+                "currentEntry",
+                "contentVersionExact",
+            },
+        }
+        for key, expected in required_contracts.items():
+            self.assertTrue(expected <= set(template["matrix"][key]["contracts_exercised"]))
+
+        insufficient = json.loads(json.dumps(template))
+        insufficient["matrix"]["atomic_swap_source_leaf_before_capture"][
+            "contracts_exercised"
+        ] = ["currentEntry"]
+        self.assertTrue(list(Draft202012Validator(schema).iter_errors(insufficient)))
+
+    def test_completion_checker_enforces_required_contract_subsets(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.make_repository(root)
+            artifact_reference = self.install_fixture_evidence(root)
+            formal_artifact_reference = self.install_fixture_evidence(
+                root,
+                evidence_id="EVID-fixture-formal-argument",
+                evidence_kind="p10-privileged-filesystem-formal-argument",
+            )
+            template = json.loads(
+                PRIVILEGED_FILESYSTEM_TEMPLATE.read_text(encoding="utf-8")
+            )
+            matrix = json.loads(json.dumps(template["matrix"]))
+            for name, case in matrix.items():
+                self.populate_passing_filesystem_case(name, case, artifact_reference)
+
+            report = self.privileged_filesystem_report(
+                root,
+                matrix,
+                formal_artifact_reference,
+            )
+            complete_contracts = self.run_completion_checker(root, report)
+            self.assertNotIn(
+                "privileged filesystem signed adversarial/crash/volume/lifecycle matrix is incomplete",
+                complete_contracts.stdout,
+            )
+
+            matrix["hard_link_behavior"]["contracts_exercised"] = [
+                "contentVersionExact"
+            ]
+            missing_namespace_contract = self.run_completion_checker(root, report)
+            self.assertIn(
+                "privileged filesystem signed adversarial/crash/volume/lifecycle matrix is incomplete",
+                missing_namespace_contract.stdout,
+            )
+
+    def test_completion_checker_rejects_placeholder_artifact_facts(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.make_repository(root)
+            artifact_reference = self.install_fixture_evidence(root)
+            formal_artifact_reference = self.install_fixture_evidence(
+                root,
+                evidence_id="EVID-fixture-formal-argument",
+                evidence_kind="p10-privileged-filesystem-formal-argument",
+            )
+            template = json.loads(
+                PRIVILEGED_FILESYSTEM_TEMPLATE.read_text(encoding="utf-8")
+            )
+            matrix = json.loads(json.dumps(template["matrix"]))
+            for name, case in matrix.items():
+                self.populate_passing_filesystem_case(name, case, artifact_reference)
+            matrix["signed_debug_bundle"]["raw_artifact_references"] = [{}]
+            report = self.privileged_filesystem_report(
+                root,
+                matrix,
+                formal_artifact_reference,
+            )
+
+            result = self.run_completion_checker(root, report)
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(
+                "privileged filesystem qualification schema error at "
+                "matrix.signed_debug_bundle.raw_artifact_references.0",
+                result.stdout,
+            )
+            self.assertIn(
+                "privileged filesystem signed adversarial/crash/volume/lifecycle matrix is incomplete",
+                result.stdout,
+            )
+
+    def test_completion_checker_rejects_missing_and_hash_mismatched_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.make_repository(root)
+            artifact_reference = self.install_fixture_evidence(root)
+            formal_artifact_reference = self.install_fixture_evidence(
+                root,
+                evidence_id="EVID-fixture-formal-argument",
+                evidence_kind="p10-privileged-filesystem-formal-argument",
+            )
+            template = json.loads(
+                PRIVILEGED_FILESYSTEM_TEMPLATE.read_text(encoding="utf-8")
+            )
+            matrix = json.loads(json.dumps(template["matrix"]))
+            for name, case in matrix.items():
+                self.populate_passing_filesystem_case(name, case, artifact_reference)
+            report = self.privileged_filesystem_report(
+                root,
+                matrix,
+                formal_artifact_reference,
+            )
+
+            matrix["signed_release_bundle"]["raw_artifact_references"] = [
+                {
+                    "evidence_id": "EVID-missing-qualification",
+                    "path": ".forge-codex/evidence/missing-qualification.txt",
+                    "sha256": "d" * 64,
+                }
+            ]
+            missing = self.run_completion_checker(root, report)
+            self.assertIn(
+                "privileged filesystem case signed_release_bundle raw artifact 0 "
+                "evidence record is unavailable: EVID-missing-qualification",
+                missing.stdout,
+            )
+            self.assertIn(
+                "privileged filesystem signed adversarial/crash/volume/lifecycle matrix is incomplete",
+                missing.stdout,
+            )
+
+            mismatched_reference = dict(artifact_reference)
+            mismatched_reference["sha256"] = "e" * 64
+            matrix["signed_release_bundle"]["raw_artifact_references"] = [
+                mismatched_reference
+            ]
+            mismatched = self.run_completion_checker(root, report)
+            self.assertIn(
+                "privileged filesystem case signed_release_bundle raw artifact 0 "
+                "does not identify exactly one artifact in its evidence record",
+                mismatched.stdout,
+            )
+            self.assertIn(
+                "privileged filesystem signed adversarial/crash/volume/lifecycle matrix is incomplete",
+                mismatched.stdout,
+            )
+
+    def test_completion_checker_rejects_required_mount_and_crash_nonapplicability(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.make_repository(root)
+            artifact_reference = self.install_fixture_evidence(root)
+            formal_artifact_reference = self.install_fixture_evidence(
+                root,
+                evidence_id="EVID-fixture-formal-argument",
+                evidence_kind="p10-privileged-filesystem-formal-argument",
+            )
+            template = json.loads(
+                PRIVILEGED_FILESYSTEM_TEMPLATE.read_text(encoding="utf-8")
+            )
+            matrix = json.loads(json.dumps(template["matrix"]))
+            for name, case in matrix.items():
+                self.populate_passing_filesystem_case(name, case, artifact_reference)
+            matrix["network_volume_rejected"]["mount_facts"] = json.loads(
+                json.dumps(template["matrix"]["network_volume_rejected"]["mount_facts"])
+            )
+            matrix["crash_at_every_durable_phase"]["crash_point"] = json.loads(
+                json.dumps(
+                    template["matrix"]["crash_at_every_durable_phase"]["crash_point"]
+                )
+            )
+            report = self.privileged_filesystem_report(
+                root,
+                matrix,
+                formal_artifact_reference,
+            )
+
+            result = self.run_completion_checker(root, report)
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(
+                "privileged filesystem case network_volume_rejected requires applicable mount facts",
+                result.stdout,
+            )
+            self.assertIn(
+                "privileged filesystem case crash_at_every_durable_phase requires applicable crash facts",
+                result.stdout,
+            )
+            self.assertIn(
+                "privileged filesystem signed adversarial/crash/volume/lifecycle matrix is incomplete",
+                result.stdout,
+            )
+
+    def test_formal_closure_schema_keeps_residual_nonclaims_explicit(self) -> None:
+        from jsonschema import Draft202012Validator
+
+        schema = json.loads(PRIVILEGED_FILESYSTEM_SCHEMA.read_text(encoding="utf-8"))
+        template = json.loads(PRIVILEGED_FILESYSTEM_TEMPLATE.read_text(encoding="utf-8"))
+        checker = COMPLETION_CHECKER.read_text(encoding="utf-8")
+        formal_boolean_keys = {
+            "capture_linearization",
+            "source_parent_containment_and_authority",
+            "protected_namespace_denial",
+            "current_entry_contract",
+            "namespace_exact_no_mismatch_disposal",
+            "content_exact_fail_closed",
+            "final_authorization_metadata_race_closure",
+            "quarantine_disposition_qualification",
+            "startup_recovery_fence",
+            "caller_generation_fence",
+            "volume_behavior_qualification",
+            "equivalent_identity_conditional_boundary_proof",
+        }
+        residual_dispositions = schema["properties"]["residual_risk"]["properties"][
+            "disposition"
+        ]["enum"]
+        self.assertEqual(
+            residual_dispositions,
+            [
+                "open_release_blocker",
+                "mitigated_open",
+                "qualified_boundary_with_explicit_nonclaims",
+            ],
+        )
+        self.assertNotIn("eliminated", residual_dispositions)
+        self.assertNotIn('disposition") == "eliminated"', checker)
+        self.assertIn("formal_closure", schema["required"])
+        self.assertEqual(template["residual_risk"]["disposition"], "open_release_blocker")
+        self.assertEqual(
+            set(template["formal_closure"]),
+            formal_boolean_keys | {"formal_argument_artifact_references"},
+        )
+        self.assertTrue(
+            all(template["formal_closure"][key] is False for key in formal_boolean_keys)
+        )
+        self.assertEqual(
+            template["formal_closure"]["formal_argument_artifact_references"], []
+        )
+
+        candidate = json.loads(json.dumps(template))
+        candidate["status"] = "passed"
+        candidate["ok"] = True
+        candidate["source_manifest"] = "0" * 64
+        candidate["captured_at"] = "2026-08-30T00:00:00Z"
+        candidate["same_uid_fallback"] = "absent"
+        candidate["residual_risk"] = {
+            "disposition": "qualified_boundary_with_explicit_nonclaims",
+            "remaining_race": "A bounded authorization-metadata race remains.",
+            "maximum_race_impact": "One captured eligible entry per operation.",
+        }
+        candidate["remaining_requirements"] = []
+        candidate["formal_closure"]["formal_argument_artifact_references"] = [
+            {"evidence_id": "EVID-fixture", "path": "fixture.json", "sha256": "0" * 64}
+        ]
+        errors = list(Draft202012Validator(schema).iter_errors(candidate))
+        self.assertTrue(errors)
+        self.assertTrue(
+            any(list(error.absolute_path)[:1] == ["formal_closure"] for error in errors),
+            errors,
+        )
+
+    def test_completion_checker_rejects_missing_and_false_formal_closure(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.make_repository(root)
+            report_path = (
+                root
+                / ".forge-codex/evidence/P10-privileged-filesystem-qualification-report.json"
+            )
+            report = {
+                "status": "partial",
+                "ok": False,
+                "source_manifest": source_manifest(root),
+                "matrix": {},
+                "test_processes": {
+                    "separately_signed": False,
+                    "helper_effective_uid": None,
+                },
+                "same_uid_fallback": "unverified",
+                "same_uid_threat_model": "in_scope",
+                "residual_risk": {
+                    "disposition": "open_release_blocker",
+                    "remaining_race": "fixture residual",
+                    "maximum_race_impact": "fixture impact",
+                },
+                "remaining_requirements": ["fixture requirement"],
+            }
+            self.write_json(report_path, report)
+
+            def run_checker() -> subprocess.CompletedProcess[str]:
+                return subprocess.run(
+                    [sys.executable, str(COMPLETION_CHECKER)],
+                    env={**os.environ, "FORGE_P10_REPOSITORY": str(root)},
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+
+            missing = run_checker()
+            self.assertIn(
+                "privileged filesystem formal boundary closure is incomplete",
+                missing.stdout,
+            )
+
+            report["formal_closure"] = {
+                "capture_linearization": False,
+                "source_parent_containment_and_authority": False,
+                "protected_namespace_denial": False,
+                "current_entry_contract": False,
+                "namespace_exact_no_mismatch_disposal": False,
+                "content_exact_fail_closed": False,
+                "final_authorization_metadata_race_closure": False,
+                "quarantine_disposition_qualification": False,
+                "startup_recovery_fence": False,
+                "caller_generation_fence": False,
+                "volume_behavior_qualification": False,
+                "equivalent_identity_conditional_boundary_proof": False,
+                "formal_argument_artifact_references": [],
+            }
+            self.write_json(report_path, report)
+            false_closure = run_checker()
+            self.assertIn(
+                "privileged filesystem formal boundary closure is incomplete",
+                false_closure.stdout,
+            )
 
     def test_doctor_reports_open_issues_and_nonpassing_hard_gates(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -229,6 +975,16 @@ path.write_text(json.dumps(value) + "\\n", encoding="utf-8")
             self.assertEqual(initial, source_manifest(root))
             (root / "Sources/App.swift").write_text("struct Changed {}\n", encoding="utf-8")
             self.assertNotEqual(initial, source_manifest(root))
+
+            schema = (
+                root
+                / ".forge-codex/schemas/p10-privileged-filesystem-qualification-report.schema.json"
+            )
+            schema.parent.mkdir(parents=True)
+            schema.write_text('{"schema":"qualification-v1"}\n', encoding="utf-8")
+            schema_manifest = source_manifest(root)
+            schema.write_text('{"schema":"qualification-v2"}\n', encoding="utf-8")
+            self.assertNotEqual(schema_manifest, source_manifest(root))
 
     def test_recorder_preserves_bounded_repository_artifact_and_external_reference(self) -> None:
         with tempfile.TemporaryDirectory() as temporary, tempfile.TemporaryDirectory() as external_root:

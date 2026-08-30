@@ -74,7 +74,10 @@ rename a final component.
 | `RENAME_SECLUDE` | The current SDK exposes the flag, while the installed `rename(2)` manual does not document its user contract. Public XNU describes its internal condition as refusing rename when the selected source is hard-linked, open, or memory mapped. | Not selected. The condition applies to the source object resolved at syscall time, has no expected-identity argument, is not a portable documented contract for supported filesystems, and would reject the evaluated open-leaf-descriptor strategy. Closing that descriptor restores the substitution window. |
 | `fsync` on pinned parent descriptors | Makes completed namespace changes durable according to the filesystem contract. | Selected for crash durability. It cannot make the preceding verification and mutation atomic or validate which leaf was mutated. |
 
-The selected mitigation is bounded quarantine-and-verify. Before the initial
+The legacy same-UID filesystem implementation uses bounded quarantine-and-
+verify. It remains relevant to nonprivileged compatibility paths and historical
+evidence, but it is not the production protocol-v5 protected-delete boundary.
+Before the initial
 rename, Forge durably creates one immutable owner-only receipt in a global
 32-slot ledger under the active `AppPaths.home`. After a two-second-bounded
 thread/process lock acquisition, it uses a pinned parent and
@@ -106,7 +109,7 @@ fails, no live recovery path is claimed: the terminal namespace durability is
 reported independently, and a stale receipt may conservatively reappear and
 occupy its bounded slot after a crash.
 
-This is mitigation, not elimination. A same-user adversary can alter the
+For that legacy boundary, this is mitigation, not elimination. A same-user adversary can alter the
 owner-controlled ledger, move a quarantined parent, or discover the quarantine
 name and exchange its occupant after the final quarantine
 verification but before `unlinkat` or the final `renameatx_np`. Each winning
@@ -164,18 +167,46 @@ occur. The manager has no same-UID production fallback: unavailable,
 unapproved, identity-mismatched, unqualified-volume, or unavailable-namespace
 states return their required typed errors.
 
+The qualification-report checker is not itself boundary proof. It fails closed
+on schema errors, stale or missing evidence, hash mismatch, placeholder facts,
+and required mount/crash facts marked inapplicable. It still requires
+case-scoped and role-scoped machine-readable harness results before a generic
+aggregate artifact can be treated as semantic proof for every matrix row. That
+evidence-binding work remains release-blocking with E2.
+
+Protocol v5 binds the request, transaction, project generation, authorized
+root, relative components, operation, explicit exactness contract, and expected
+identity where applicable into one canonical SHA-256 digest. Successful
+`renameatx_np(..., RENAME_EXCL)` capture is the mutation linearization point.
+`currentEntry` acts on the eligible occupant captured at that point;
+`namespaceVersionExact` disposes only a captured identity matching the request
+token; and `contentVersionExact` fails closed without an exclusive-writer proof.
+Persisted v5 recovery records use schema 3, persist the request protocol and
+digest-canonicalization versions, and must recompute to the accepted digest.
+Legacy protocol-v4 records remain recognizable only as schema 2 with nil
+protocol, nil canonicalization version, nil contract, nil digest, and a present
+expected identity; all mixed shapes fail closed. Recovery publishes a valid
+transaction/digest-bound pending capture-identity receipt before general
+pending-file cleanup so the first durable post-capture identity is not replaced
+by a later mutable-metadata observation.
+
 Root execution is not authority to exceed the authenticated caller's ordinary
 filesystem power. The current daemon binds each accepted NSXPC connection to
 its non-root effective UID, persists that UID in both the project binding and
 transaction record, and requires an exact match on rebind and recovery. The
 authorized root and every traversed directory must be requester-owned,
 ACL-free, and owner-searchable; the final parent must also be owner-writable.
-The source leaf is descriptor-opened and rejected if it has an extended ACL or
-any immutable, append-only, restricted, or no-unlink BSD flag. Those leaf
-checks run before intent, immediately before capture, after capture, during
-recovery, and immediately before terminal unlink. This deliberately excludes
-shared, delegated-ACL, root-owned, and group-authorized trees until an
-equivalent caller-permission decision can be proved.
+The production caller's preflight rejects an observed directory only as an
+availability check; it is not an identity authority. The daemon deliberately
+does not compare an observed source identity before capture. Instead it
+descriptor-opens the protected captured entry and rejects terminal disposal if
+the captured object is not a regular file or symlink, has an extended ACL, or
+has any immutable, append-only, restricted, or no-unlink BSD flag. Those checks
+run after capture, during recovery, and immediately before terminal unlink.
+This deliberately excludes shared, delegated-ACL, root-owned, and
+group-authorized trees until an equivalent caller-permission decision can be
+proved. A source substituted with an ineligible directory can therefore be
+captured but is quarantined rather than deleted.
 
 The first implementation scope is non-directory leaf deletion on a local,
 writable, ownership-enforced APFS volume. Directory deletion, same-volume move,
@@ -191,21 +222,52 @@ runtime tool.
 | Low-level XPC `xpc_peer_requirement_match_received_message`, Swift XPC `XPCReceivedMessage.senderSatisfies`, and Security.framework `SecCodeCreateWithXPCMessage` | macOS 26 can explicitly match a requirement or create a live `SecCode` from the audit token attached to a particular received XPC dictionary. | Evaluated but not selected for this NSXPC protocol. NSXPC does not expose its internal dictionary to the exported-object method, while its documented signing-requirement API already applies the requirement to new messages and the underlying XPC implementation checks all received messages. A PID-only reconstruction would be weaker because of PID reuse and is not used. These APIs remain appropriate if the transport later moves to low-level or Swift XPC and needs message-specific inspection beyond the enforced peer requirement. |
 | Root directory descriptors plus `openat`, `fstatat`, `renameatx_np`, `unlinkat`, directory `fsync`, and `fcntl(F_FULLFSYNC)` | Descriptor-relative confinement, independent root/source identity checks, exclusive capture, protected terminal deletion, and stronger local-media phase flushes. | Selected inside the daemon. Plain `fsync` alone does not promise power-loss ordering on macOS, so each durability boundary also requires `F_FULLFSYNC`; the signed crash and power-loss qualification is still open. None of these calls alone accepts an expected inode as a mutation precondition; the security property comes from exclusive capture into the protected namespace followed by verification there, not from treating any one syscall as identity-conditional. |
 | `connection.effectiveUserIdentifier`, descriptor ownership/mode checks, `acl_get_fd_np`, and `st_flags` | Conservatively approximate whether the authenticated user could traverse the source hierarchy and remove the leaf without root assistance. | Selected to prevent privilege amplification. Connection UID is never accepted from request data; root, invalid, and non-account UIDs fail closed. This policy is intentionally narrower than all valid macOS permission arrangements. Its distinct signed-process and UID-binding evidence remains open even though the NSXPC signing requirement applies to every received message. |
-| `renameatx_np(..., RENAME_EXCL)` | Atomically captures whichever entry occupies the authorized source name while refusing destination overwrite. | Selected for capture. It is not an expected-identity rename. The daemon must verify the captured entry inside the protected namespace before any terminal unlink and retain or exclusively roll it back on mismatch. |
+| `renameatx_np(..., RENAME_EXCL)` | Atomically captures whichever entry occupies the source name supplied to the syscall while refusing destination overwrite. | Selected for capture and protected metadata publication. It is not an expected-identity rename, and a pinned source parent can be relocated outside the authorized root. Automatic privileged rollback is disabled; mismatch is retained in protected quarantine. |
 | `renameatx_np(..., RENAME_SWAP)` | Atomically substitutes namespace entries and drives the hostile-process test matrix. | Test primitive only. It proves the pre-capture substitution remains possible and is not a mitigation. |
 
-The remaining race is between the last observation of the authorized source
-name and the exclusive capture syscall. A winning same-UID swap can cause the
-daemon to capture one substituted namespace entry. The maximum possible impact
-of that race is temporary or recovery-required unavailability of that one
-entry; because the substituted entry can be a directory, it can represent an
-unbounded subtree. The protected-namespace recheck is intended to prevent that
-substituted entry from being unlinked, but that protection is not release
-authority until the signed hostile-process and crash matrices pass. A writable
-file descriptor or hard link can also change or preserve the captured inode's
-content independently of its pathname. Therefore the design can qualify the
-captured namespace identity, not immutable content, and exact-content requests
-fail closed.
+The pre-capture race remains, but its meaning is contract-specific. A winning
+same-UID swap can cause the daemon to capture one different namespace entry.
+For `currentEntry`, the successful capture defines the requested entry, so an
+eligible captured regular file or symlink may be deleted; the daemon must not
+claim that it deleted an earlier observation. For `namespaceVersionExact`, a
+token mismatch must never be disposed and instead becomes an exclusive restore
+or durable protected quarantine. An ineligible captured directory is
+quarantined under either contract. The maximum availability impact per winning
+race is the one captured entry; a directory can represent an unbounded subtree.
+This boundary is not release authority until the signed hostile-process and
+crash matrices pass. A writable file descriptor or hard link can also change or
+preserve the captured inode's content independently of its pathname. Therefore
+the design can qualify captured namespace identity, not immutable content, and
+exact-content requests fail closed.
+
+Source-parent containment and requester authority are not yet atomic with
+capture. The daemon descriptor-walks and validates a requester-owned,
+ACL-free, owner-writable parent, but `renameatx_np` later consumes that pinned
+parent descriptor. A same-UID process can relocate the parent outside the
+authorized root after validation and before capture. A winning race can make
+`currentEntry`, or namespace-exact with a matching token, terminally delete one
+eligible regular file or symbolic link outside the configured root. That one
+file can contain an unbounded number of bytes. An ineligible captured directory
+is retained in quarantine and can contain an unbounded subtree. Descriptor
+pinning prevents substitution of the descriptor itself, but it does not prove
+that the directory still descends from the authorized root.
+
+Root-relative `RENAME_RESOLVE_BENEATH` was evaluated as a containment control,
+but it would not by itself atomically bind the parent selected by the rename to
+the separately observed requester-ownership, ACL, and write authorization or
+provide the pinned source-parent durability handle. No such replacement is
+implemented or qualified. Outside-root sentinel preservation therefore cannot
+pass and E2 remains release-blocking.
+
+If exclusive capture fails with a documented error that guarantees neither
+namespace argument changed, the transaction can durably reject and later be
+acknowledged. The current classification covers permission/flag denial,
+unrenameable busy entries, unsupported/read-only filesystems, quota/space
+denial, and other deterministic no-mutation argument/type failures. `EEXIST`,
+I/O ambiguity, invalid descriptors/pointers, and unknown errors retain recovery
+or corruption handling. The signed matrix must exercise at least immutable or
+no-unlink denial and a substituted unrenameable mountpoint so 32 repeatable
+pre-capture failures cannot strand all protected slots.
 
 A second authorization-metadata race remains after the final protected-leaf
 ACL/BSD-flag observation and before `unlinkat`. The inspection descriptor is
@@ -220,6 +282,22 @@ unbounded bytes. The protected namespace prevents that interval from being
 used to substitute a different pathname occupant. This is an explicit residual
 and must be exercised in the signed attacker matrix; the current checks
 mitigate it but do not eliminate it.
+
+Durable quarantine is fail closed but not yet operationally reclaimable. A
+quarantined leaf is terminal, queryable, durable, and deliberately not
+acknowledgeable while the protected entry exists. No separately authorized
+restore, release, or purge action is implemented. Each conflict permanently
+occupies one of 32 slots until that disposition exists; 32 repeated conflicts
+can disable later protected deletion on the volume. The slot count bounds
+entries, not bytes or descendants, and a captured directory can hold an
+unbounded subtree. This liveness and capacity risk is release-blocking, as are
+the missing startup recovery barrier, manager-authoritative binding revoke and
+garbage collection, daemon-owned caller discovery/generation revoke, and
+behavior-qualified external/removable volume policy. Terminal receipts also
+need a qualified physical-state reconciliation rule: committed/restored/
+rejected/conflicted with a retained protected leaf, or quarantined with a
+missing or identity-mismatched leaf, cannot yet be repaired safely and remains
+a release blocker rather than a truthful terminal claim.
 
 The current checkpoint is partial. The source now binds the exact live-helper
 identity expectation into each Xcode-built main caller's code-signature-secured
@@ -255,10 +333,14 @@ volume behavior, approval/denial,
 upgrade/unregister/re-register and stale-helper rejection, signature rejection,
 source-leaf/hard-link/writable-FD
 behavior, and notarized Release lifecycle evidence are still required. An
-ambiguous submitted XPC call now returns its original transaction ID, but the
-public filesystem tool does not yet expose a recovery/resume operation that can
-consume that ID after the source pathname is absent. Durable recovery therefore
-remains an explicit open requirement. The
+ambiguous submitted XPC call now returns its original transaction ID. The
+additive, pathless `fs_delete_recovery` tool can consume that ID to query,
+resume, or acknowledge the exact transaction under its original requester,
+project, generation, and root authority. It does not discover transactions
+whose same-UID caller-ledger handle was removed, automatically acknowledge a
+broker result, or restore, release, or purge a retained quarantine. Those
+durable recovery and disposition boundaries therefore remain explicit open
+requirements. The
 canonical finding `FC-FILESYSTEM-PATH-TOCTOU-001` (policy alias `FCA-007`), E2,
 P10, G10, and G12 remain open. The privileged design mitigates the prior race;
 it is not described as eliminating it.

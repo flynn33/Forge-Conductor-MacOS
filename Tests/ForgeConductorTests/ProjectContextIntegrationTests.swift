@@ -430,6 +430,7 @@ final class ProjectContextIntegrationTests: XCTestCase {
             ),
             relativePathComponents: ["leaf.txt"],
             access: .deleteLeaf,
+            contract: .namespaceVersionExact,
             expectedLeafIdentity: ForgeFilesystemIdentity(
                 device: 1,
                 inode: 3,

@@ -10,7 +10,8 @@ for marketing versions (`MAJOR.MINOR.PATCH`).
 
 This is an in-progress P10 checkpoint, not a qualified release. P10,
 filesystem E2, shell compatibility, native UI validation, autonomous continuity,
-and the final release gates remain open.
+owner-deferred representative physical-hardware qualification, and the final
+release gates remain open.
 
 ### Changed
 
@@ -33,13 +34,21 @@ and the final release gates remain open.
   whose requested namespace becomes unstable while durability is unconfirmed
   returns its live receipt as required ledger recovery, merging any additional
   retained staging-cleanup receipt into the same result.
-- The partial privileged leaf-delete boundary now uses protocol v4 and binds
+- The partial privileged leaf-delete boundary now uses protocol v5 and binds
   the daemon requirement to exact per-architecture CodeDirectory hashes sealed
   into each signed caller. The app-scheme build produces one matching
   app/embedded-CLI/standalone-CLI/daemon artifact set, and app-origin manager
   installation stages only the embedded CLI plus its signed framework. Missing,
   symlinked, mismatched, or independently cross-paired artifacts fail closed.
-- Protocol v4 retains terminal committed, restored, and rejected transactions in
+- Protocol v5 makes successful `renameatx_np(..., RENAME_EXCL)` capture the
+  mutation linearization point and records a canonical request digest plus an
+  explicit `currentEntry`, `namespaceVersionExact`, or `contentVersionExact`
+  contract. Production `fs_delete` uses `currentEntry`; namespace-exact recovery
+  disposes only a matching captured identity; and content-exact requests fail
+  closed because an existing writable descriptor, mapping, or hard link prevents
+  an exclusive-writer proof. Capture mismatch and post-capture metadata changes
+  enter durable protected quarantine instead of being described as eliminated.
+- Protocol v5 retains terminal committed, restored, rejected, and conflicted transactions in
   32 fixed root-owned slots until durable exact acknowledgement. The additive,
   pathless `fs_delete_recovery` tool queries, resumes, or acknowledges the
   original transaction under its requester/project/generation/root authority;
@@ -55,13 +64,30 @@ and the final release gates remain open.
   holding that same lock, so a request delayed behind reset fails before caller
   record publication or XPC dispatch. A failed reset cancellation is surfaced
   as a distinct operator recovery error instead of being suppressed.
+- Crash recovery no longer depends on reopening a user-controlled source parent
+  after a protected capture exists. Persisted v5 records must recompute to their
+  canonical request digest from an explicit schema-3 protocol and digest-
+  canonicalization version; mixed legacy/v5 record shapes fail closed. A valid
+  transaction-bound pending capture-identity receipt is published on recovery
+  instead of discarded. Documented atomic-capture errors that leave both names
+  unchanged, including immutable/no-unlink denial and an unrenameable mount,
+  become durable rejected outcomes instead of indefinitely occupying a slot.
+  A legacy
+  rollback reports restored only when the source still has the exact recorded
+  identity, while an absent v5 protected capture or unprovable legacy restore
+  becomes a durable conflict.
 
 ### Open qualification and security boundaries
 
 - A same-user writer can still substitute the source before exclusive capture
-  or alter ACL/BSD authorization metadata between final verification and root
-  `unlinkat`. A winning terminal race can delete the one captured expected
-  regular file or symbolic link after its metadata changed; a regular file can
+  or relocate the validated source parent outside the authorized root before
+  capture. The latter race can make one eligible regular file or symbolic link
+  outside the configured root be deleted; that file can contain unbounded
+  bytes. An ineligible captured directory can quarantine an unbounded subtree.
+  A same-user writer can also alter ACL/BSD authorization metadata between
+  final verification and root `unlinkat`. A winning terminal race can delete
+  the one captured expected regular file or symbolic link after its metadata
+  changed; a regular file can
   contain an unbounded number of bytes. A pre-capture substitution can make one
   entry temporarily unavailable or recovery-required; an unsupported directory
   can represent an unbounded subtree but is not eligible for terminal deletion.
@@ -69,10 +95,21 @@ and the final release gates remain open.
   distinct-process atomic-swap, every-durable-phase crash, recovery, volume,
   lifecycle, hard-link, and writable-descriptor matrix remains unexecuted, so
   E2 remains mandatory and release-blocking. This is mitigation, not elimination.
+- Terminal-outcome receipts are not yet reconciled against every possible
+  crash/corruption mismatch in the physical protected leaf. A committed,
+  restored, rejected, or conflicted receipt paired with a retained leaf, or a
+  quarantined receipt whose leaf is absent or has the wrong identity, must not
+  be treated as truthful closure. Defining and qualifying those repair
+  transitions remains release-blocking.
 - Disabling automatic privileged restore prevents the known out-of-root write
-  path, but it increases bounded availability impact: one captured leaf per
+  path, but it increases bounded slot availability impact: one captured entry per
   affected transaction can remain unavailable, up to the 32 protected slots per
-  volume. The reset fence and in-lock generation check reject normal delayed
+  volume. A captured entry can be a directory substituted immediately before
+  capture, so one occupied slot can isolate an unbounded subtree; the 32-slot
+  limit is not a byte or descendant bound. There is not yet an independently
+  authorized restore/release/purge disposition, so repeated conflicts can
+  exhaust the slots and disable later protected deletes. The reset fence and
+  in-lock generation check reject normal delayed
   retainers, but the caller ledger remains same-UID-owned. Hostile removal or
   relocation of an already-retained caller record can hide the sole handle from
   reset while its daemon transaction remains, allowing generation advance while

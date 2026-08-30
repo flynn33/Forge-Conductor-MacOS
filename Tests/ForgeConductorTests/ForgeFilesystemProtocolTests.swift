@@ -4,6 +4,131 @@ import XCTest
 import ForgeFilesystemProtocol
 
 final class ForgeFilesystemProtocolTests: XCTestCase {
+    func testAtomicCaptureFailurePolicyRejectsOnlyDocumentedNoMutationErrors() {
+        for code in [
+            EACCES,
+            EBUSY,
+            EDEADLK,
+            EDQUOT,
+            EINVAL,
+            EISDIR,
+            ELOOP,
+            ENAMETOOLONG,
+            ENOSPC,
+            ENOTCAPABLE,
+            ENOTDIR,
+            ENOTEMPTY,
+            ENOTSUP,
+            EPERM,
+            EROFS,
+        ] {
+            XCTAssertTrue(
+                ForgeFilesystemAtomicCaptureFailurePolicy
+                    .isDeterministicNoMutationFailure(code),
+                "errno \(code) should durably reject without retaining recovery"
+            )
+        }
+
+        for code in [EEXIST, EIO, EBADF, EFAULT] {
+            XCTAssertFalse(
+                ForgeFilesystemAtomicCaptureFailurePolicy
+                    .isDeterministicNoMutationFailure(code),
+                "errno \(code) requires protected recovery or corruption handling"
+            )
+        }
+    }
+
+    func testCaptureFirstCoordinatorCommitsOnlyAfterCapturedVerification() throws {
+        var events: [String] = []
+
+        let output = ForgeFilesystemCaptureFirstCoordinator.perform(
+            capture: {
+                events.append("capture")
+                return "captured-entry"
+            },
+            verify: { captured in
+                events.append("verify:\(captured)")
+                return .commit("verified-entry")
+            },
+            commit: { verified in
+                events.append("commit:\(verified)")
+                return "committed"
+            },
+            quarantine: { _, _, _ in
+                XCTFail("a verified capture must not be quarantined")
+                return "quarantined"
+            }
+        )
+
+        XCTAssertEqual(output, "committed")
+        XCTAssertEqual(events, [
+            "capture",
+            "verify:captured-entry",
+            "commit:verified-entry",
+        ])
+    }
+
+    func testCaptureFirstCoordinatorQuarantinesMismatchWithoutCommit() throws {
+        var events: [String] = []
+
+        let output = ForgeFilesystemCaptureFirstCoordinator.perform(
+            capture: {
+                events.append("capture")
+                return "substituted-entry"
+            },
+            verify: { captured in
+                events.append("verify:\(captured)")
+                return .quarantine(
+                    "protected-entry",
+                    code: ForgeFilesystemErrorCode.versionConflict,
+                    message: "namespace version mismatch"
+                )
+            },
+            commit: { _ in
+                XCTFail("a mismatched capture must not reach commit")
+                return "committed"
+            },
+            quarantine: { captured, code, _ in
+                events.append("quarantine:\(captured):\(code)")
+                return "quarantined"
+            }
+        )
+
+        XCTAssertEqual(output, "quarantined")
+        XCTAssertEqual(events, [
+            "capture",
+            "verify:substituted-entry",
+            "quarantine:protected-entry:\(ForgeFilesystemErrorCode.versionConflict)",
+        ])
+    }
+
+    func testCaptureFirstCoordinatorDoesNotVerifyOrCommitAfterCaptureFailure() {
+        enum CaptureFailure: Error { case expected }
+        var events: [String] = []
+
+        XCTAssertThrowsError(try ForgeFilesystemCaptureFirstCoordinator.perform(
+            capture: { () throws -> String in
+                events.append("capture")
+                throw CaptureFailure.expected
+            },
+            verify: { captured in
+                events.append("verify:\(captured)")
+                return .commit(captured)
+            },
+            commit: { verified in
+                events.append("commit:\(verified)")
+                return "committed"
+            },
+            quarantine: { captured, _, _ in
+                events.append("quarantine:\(captured)")
+                return "quarantined"
+            }
+        )) { error in
+            XCTAssertNotNil(error as? CaptureFailure)
+        }
+        XCTAssertEqual(events, ["capture"])
+    }
+
     func testCapturedLeafRollbackPolicyNeverRestoresThroughRelocatableParent() {
         XCTAssertEqual(
             ForgeFilesystemCapturedLeafRollbackPolicy.disposition,
@@ -152,7 +277,95 @@ final class ForgeFilesystemProtocolTests: XCTestCase {
         XCTAssertEqual(decoded.protocolVersion, ForgeFilesystemProtocolConstants.version)
         XCTAssertEqual(decoded.relativePathComponents, ["folder", "leaf.txt"])
         XCTAssertEqual(decoded.access, .deleteLeaf)
-        XCTAssertEqual(decoded.expectedLeafIdentity.inode, 41)
+        XCTAssertEqual(decoded.contract, .namespaceVersionExact)
+        XCTAssertEqual(decoded.expectedLeafIdentity?.inode, 41)
+        XCTAssertEqual(decoded.requestDigestSHA256, request.requestDigestSHA256)
+    }
+
+    func testMutationRequestRequiresContractSpecificExpectedIdentity() {
+        let currentEntry = makeRequest(
+            contract: .currentEntry,
+            includeExpectedLeafIdentity: false
+        )
+        XCTAssertNil(currentEntry.validationError())
+        XCTAssertEqual(currentEntry.contract, .currentEntry)
+        XCTAssertNil(currentEntry.expectedLeafIdentity)
+
+        XCTAssertEqual(
+            makeRequest(
+                contract: .currentEntry,
+                includeExpectedLeafIdentity: true
+            ).validationError(),
+            ForgeFilesystemErrorCode.invalidRequest
+        )
+        XCTAssertEqual(
+            makeRequest(
+                contract: .namespaceVersionExact,
+                includeExpectedLeafIdentity: false
+            ).validationError(),
+            ForgeFilesystemErrorCode.invalidRequest
+        )
+    }
+
+    func testMutationRequestDigestCanonicalizesUUIDCaseAndBindsContract() {
+        let requestID = UUID().uuidString
+        let transactionID = UUID().uuidString
+        let projectID = UUID().uuidString
+        let uppercase = makeRequest(
+            requestID: requestID.uppercased(),
+            transactionID: transactionID.uppercased(),
+            projectID: projectID.uppercased()
+        )
+        let lowercase = makeRequest(
+            requestID: requestID.lowercased(),
+            transactionID: transactionID.lowercased(),
+            projectID: projectID.lowercased()
+        )
+        let currentEntry = makeRequest(
+            requestID: requestID.lowercased(),
+            transactionID: transactionID.lowercased(),
+            projectID: projectID.lowercased(),
+            contract: .currentEntry,
+            includeExpectedLeafIdentity: false
+        )
+
+        XCTAssertEqual(uppercase.requestDigestSHA256, lowercase.requestDigestSHA256)
+        XCTAssertEqual(uppercase.requestDigestSHA256.count, 64)
+        XCTAssertNotEqual(lowercase.requestDigestSHA256, currentEntry.requestDigestSHA256)
+        XCTAssertNil(uppercase.validationError())
+        XCTAssertNil(lowercase.validationError())
+        XCTAssertNil(currentEntry.validationError())
+    }
+
+    func testMutationRequestSecureDecodingRejectsDigestBoundFieldTamper() throws {
+        let request = makeRequest(components: ["digest-bound-a"])
+        let data = try NSKeyedArchiver.archivedData(
+            withRootObject: request,
+            requiringSecureCoding: true
+        )
+        var archive = try XCTUnwrap(
+            PropertyListSerialization.propertyList(
+                from: data,
+                options: [],
+                format: nil
+            ) as? [String: Any]
+        )
+        var objects = try XCTUnwrap(archive["$objects"] as? [Any])
+        let componentIndex = try XCTUnwrap(objects.firstIndex(where: {
+            ($0 as? String) == "digest-bound-a"
+        }))
+        objects[componentIndex] = "digest-bound-b"
+        archive["$objects"] = objects
+        let tampered = try PropertyListSerialization.data(
+            fromPropertyList: archive,
+            format: .binary,
+            options: 0
+        )
+
+        XCTAssertNil(try? NSKeyedUnarchiver.unarchivedObject(
+            ofClass: ForgeFilesystemMutationRequest.self,
+            from: tampered
+        ))
     }
 
     func testMutationRequestRejectsUnknownProtocolAndUnboundedOrUnsafeComponents() {
@@ -179,11 +392,11 @@ final class ForgeFilesystemProtocolTests: XCTestCase {
         )
     }
 
-    func testMutationRequestRejectsExactContentContractUntilCapabilityExists() {
-        XCTAssertEqual(
-            makeRequest(exactContentRequired: true).validationError(),
-            ForgeFilesystemErrorCode.invalidRequest
-        )
+    func testMutationRequestEncodesExactContentContractForTypedDaemonRejection() {
+        let request = makeRequest(contract: .contentVersionExact)
+
+        XCTAssertNil(request.validationError())
+        XCTAssertEqual(request.contract, .contentVersionExact)
     }
 
     func testMutationRequestRejectsSpecialExpectedLeafTypes() {
@@ -482,6 +695,122 @@ final class ForgeFilesystemProtocolTests: XCTestCase {
         }
     }
 
+    func testConflictedTransactionStatusIsDurableTerminalAndAcknowledgable() throws {
+        let transactionID = UUID().uuidString.lowercased()
+        let status = ForgeFilesystemTransactionStatus(
+            transactionID: transactionID,
+            disposition: .conflicted,
+            code: ForgeFilesystemErrorCode.restoreConflict,
+            message: "The protected capture is absent and restoration cannot be proven",
+            terminal: true,
+            committed: false,
+            durabilityConfirmed: true,
+            recoveryRequired: false,
+            acknowledgementRequired: true
+        )
+        let data = try NSKeyedArchiver.archivedData(
+            withRootObject: status,
+            requiringSecureCoding: true
+        )
+        let decoded = try XCTUnwrap(
+            NSKeyedUnarchiver.unarchivedObject(
+                ofClass: ForgeFilesystemTransactionStatus.self,
+                from: data
+            )
+        )
+
+        XCTAssertNil(decoded.validationError())
+        XCTAssertEqual(decoded.transactionID, transactionID)
+        XCTAssertEqual(decoded.disposition, .conflicted)
+        XCTAssertTrue(decoded.terminal)
+        XCTAssertFalse(decoded.committed)
+        XCTAssertTrue(decoded.durabilityConfirmed)
+        XCTAssertFalse(decoded.recoveryRequired)
+        XCTAssertTrue(decoded.acknowledgementRequired)
+    }
+
+    func testQuarantinedTransactionStatusIsDurableTerminalAndNotAcknowledgable() throws {
+        let transactionID = UUID().uuidString.lowercased()
+        let status = ForgeFilesystemTransactionStatus(
+            transactionID: transactionID,
+            disposition: .quarantined,
+            code: ForgeFilesystemErrorCode.versionConflict,
+            message: "The captured entry remains in protected quarantine",
+            terminal: true,
+            committed: false,
+            durabilityConfirmed: true,
+            recoveryRequired: true,
+            acknowledgementRequired: false
+        )
+        let data = try NSKeyedArchiver.archivedData(
+            withRootObject: status,
+            requiringSecureCoding: true
+        )
+        let decoded = try XCTUnwrap(
+            NSKeyedUnarchiver.unarchivedObject(
+                ofClass: ForgeFilesystemTransactionStatus.self,
+                from: data
+            )
+        )
+
+        XCTAssertNil(decoded.validationError())
+        XCTAssertEqual(decoded.transactionID, transactionID)
+        XCTAssertEqual(decoded.disposition, .quarantined)
+        XCTAssertTrue(decoded.terminal)
+        XCTAssertFalse(decoded.committed)
+        XCTAssertTrue(decoded.durabilityConfirmed)
+        XCTAssertTrue(decoded.recoveryRequired)
+        XCTAssertFalse(decoded.acknowledgementRequired)
+
+        let response = ForgeFilesystemResponse(
+            ok: false,
+            code: ForgeFilesystemErrorCode.versionConflict,
+            message: "The captured entry remains in protected quarantine",
+            committed: false,
+            durabilityConfirmed: true,
+            recoveryTransactionID: transactionID,
+            acknowledgementRequired: false
+        )
+        XCTAssertNil(response.validationError())
+    }
+
+    func testQuarantinedTransactionStatusRejectsContradictoryFlagsAndSuccessCode() {
+        let transactionID = UUID().uuidString.lowercased()
+        let makeStatus: (
+            String,
+            Bool,
+            Bool,
+            Bool,
+            Bool,
+            Bool
+        ) -> ForgeFilesystemTransactionStatus = {
+            code, terminal, committed, durable, recovery, acknowledgement in
+            ForgeFilesystemTransactionStatus(
+                transactionID: transactionID,
+                disposition: .quarantined,
+                code: code,
+                message: "quarantine status",
+                terminal: terminal,
+                committed: committed,
+                durabilityConfirmed: durable,
+                recoveryRequired: recovery,
+                acknowledgementRequired: acknowledgement
+            )
+        }
+        let invalid = [
+            makeStatus("ok", true, false, true, true, false),
+            makeStatus(ForgeFilesystemErrorCode.versionConflict, false, false, true, true, false),
+            makeStatus(ForgeFilesystemErrorCode.versionConflict, true, true, true, true, false),
+            makeStatus(ForgeFilesystemErrorCode.versionConflict, true, false, false, true, false),
+            makeStatus(ForgeFilesystemErrorCode.versionConflict, true, false, true, false, false),
+            makeStatus(ForgeFilesystemErrorCode.versionConflict, true, false, true, true, true),
+        ]
+
+        for status in invalid {
+            XCTAssertEqual(status.validationError(), ForgeFilesystemErrorCode.invalidRequest)
+        }
+    }
+
     func testTerminalResponseSecureCodingPreservesAcknowledgementRequirement() throws {
         let transactionID = UUID().uuidString.lowercased()
         let response = ForgeFilesystemResponse(
@@ -563,6 +892,17 @@ final class ForgeFilesystemProtocolTests: XCTestCase {
         XCTAssertTrue(daemon.contains("anchor apple generic"))
         XCTAssertTrue(app.contains("1.2.840.113635.100.6.1"))
         XCTAssertTrue(daemon.contains("1.2.840.113635.100.6.1"))
+        #if DEBUG
+        XCTAssertTrue(app.contains("1.2.840.113635.100.6.1.12"))
+        XCTAssertFalse(app.contains("1.2.840.113635.100.6.1.13"))
+        XCTAssertTrue(daemon.contains("1.2.840.113635.100.6.1.12"))
+        XCTAssertFalse(daemon.contains("1.2.840.113635.100.6.1.13"))
+        #else
+        XCTAssertTrue(app.contains("1.2.840.113635.100.6.1.13"))
+        XCTAssertFalse(app.contains("1.2.840.113635.100.6.1.12"))
+        XCTAssertTrue(daemon.contains("1.2.840.113635.100.6.1.13"))
+        XCTAssertFalse(daemon.contains("1.2.840.113635.100.6.1.12"))
+        #endif
         XCTAssertTrue(daemon.contains("cdhash H\"\(firstHash)\""))
         XCTAssertTrue(daemon.contains("cdhash H\"\(secondHash.lowercased())\""))
         XCTAssertEqual(daemon.components(separatedBy: "cdhash H\"").count, 3)
@@ -737,13 +1077,19 @@ final class ForgeFilesystemProtocolTests: XCTestCase {
         components: [String] = ["leaf.txt"],
         projectGeneration: UInt64 = 1,
         expectedLeafMode: UInt32 = 0o100644,
-        exactContentRequired: Bool = false
+        requestID: String = UUID().uuidString.lowercased(),
+        transactionID: String = UUID().uuidString.lowercased(),
+        projectID: String = UUID().uuidString.lowercased(),
+        contract: ForgeFilesystemOperationContract = .namespaceVersionExact,
+        includeExpectedLeafIdentity: Bool? = nil
     ) -> ForgeFilesystemMutationRequest {
-        ForgeFilesystemMutationRequest(
+        let shouldIncludeExpectedIdentity = includeExpectedLeafIdentity
+            ?? (contract != .currentEntry)
+        return ForgeFilesystemMutationRequest(
             protocolVersion: protocolVersion,
-            requestID: UUID().uuidString.lowercased(),
-            transactionID: UUID().uuidString.lowercased(),
-            projectID: UUID().uuidString.lowercased(),
+            requestID: requestID,
+            transactionID: transactionID,
+            projectID: projectID,
             projectGeneration: projectGeneration,
             rootID: "1:2",
             rootIdentity: ForgeFilesystemIdentity(
@@ -756,15 +1102,17 @@ final class ForgeFilesystemProtocolTests: XCTestCase {
             ),
             relativePathComponents: components,
             access: .deleteLeaf,
-            expectedLeafIdentity: ForgeFilesystemIdentity(
-                device: 1,
-                inode: 41,
-                mode: expectedLeafMode,
-                owner: 501,
-                group: 20,
-                linkCount: 1
-            ),
-            exactContentRequired: exactContentRequired
+            contract: contract,
+            expectedLeafIdentity: shouldIncludeExpectedIdentity
+                ? ForgeFilesystemIdentity(
+                    device: 1,
+                    inode: 41,
+                    mode: expectedLeafMode,
+                    owner: 501,
+                    group: 20,
+                    linkCount: 1
+                )
+                : nil
         )
     }
 

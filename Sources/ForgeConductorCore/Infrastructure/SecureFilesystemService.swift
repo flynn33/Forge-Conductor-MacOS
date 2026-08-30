@@ -847,7 +847,7 @@ final class SecureFilesystemMutationClient: @unchecked Sendable {
             rootIdentity: Self.identity(rootInformation),
             relativePathComponents: relativeComponents,
             access: .deleteLeaf,
-            expectedLeafIdentity: Self.identity(leafInformation)
+            contract: .currentEntry
         )
         if let errorCode = request.validationError() {
             return .failure(
@@ -1161,9 +1161,11 @@ final class SecureFilesystemMutationClient: @unchecked Sendable {
         if terminalRequiresAcknowledgement,
            response.ok || response.committed || response.durabilityConfirmed {
             guard response.durabilityConfirmed,
-                  response.acknowledgementRequired,
                   response.recoveryTransactionID != nil else {
                 return false
+            }
+            if !response.acknowledgementRequired {
+                guard !response.ok, !response.committed else { return false }
             }
         }
         return true
@@ -1180,6 +1182,8 @@ final class SecureFilesystemMutationClient: @unchecked Sendable {
         case .committed: disposition = "committed"
         case .restored: disposition = "restored"
         case .rejected: disposition = "rejected"
+        case .quarantined: disposition = "quarantined"
+        case .conflicted: disposition = "conflicted"
         case nil: disposition = "invalid"
         }
         return [

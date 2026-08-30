@@ -8,6 +8,55 @@ import Darwin
 
 /// G1/G7: product reliability — MCP negotiate + tools surface without LM Studio UI.
 final class ProductPathReliabilityTests: XCTestCase {
+    func testPrivilegedDaemonUsesDistinctCaptureIdentityAndPhaseReceipts() throws {
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: repository.appendingPathComponent(
+                "Sources/ForgeFilesystemDaemon/PrivilegedLeafDeleteEngine.swift"
+            ),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(source.contains(
+            #"capturedIdentityName = "captured-identity.json""#
+        ))
+        XCTAssertTrue(source.contains(
+            #"capturedIdentityPendingName = "captured-identity.json.pending""#
+        ))
+        XCTAssertTrue(source.contains(#"case .captured: "captured.json""#))
+        XCTAssertFalse(source.contains(#"capturedIdentityName = "captured.json""#))
+    }
+
+    func testPrivilegedDaemonBindsPersistedDigestAndLegacyRollbackIdentity() throws {
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: repository.appendingPathComponent(
+                "Sources/ForgeFilesystemDaemon/PrivilegedLeafDeleteEngine.swift"
+            ),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(source.contains("hasValidPersistedRequestShape"))
+        XCTAssertTrue(source.contains("reconstructed.requestDigestSHA256 == requestDigestSHA256"))
+        XCTAssertTrue(source.contains("isLegacyProtocolFourRecord"))
+        XCTAssertTrue(source.contains("expectedLeafIdentity?.matches"))
+        XCTAssertTrue(source.contains("restoration cannot be proven"))
+        XCTAssertTrue(source.contains("static let legacyProtocolFourSchema = 2"))
+        XCTAssertTrue(source.contains("static let currentSchema = 3"))
+        XCTAssertTrue(source.contains("requestProtocolVersion = request.protocolVersion"))
+        XCTAssertTrue(source.contains("requestDigestCanonicalizationVersion"))
+        XCTAssertTrue(source.contains("reconcileCapturedIdentityPublication"))
+        XCTAssertTrue(source.contains(
+            "A pending captured filesystem identity receipt is invalid"
+        ))
+    }
+
     func testXcodeRuntimeLauncherEmbedsDeclaredProductIdentity() throws {
         let repository = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -186,6 +235,64 @@ final class ProductPathReliabilityTests: XCTestCase {
             embeddedCLIBuildFile.contains("ATTRIBUTES = (CodeSignOnCopy, );"),
             "embedded manager CLI must be re-signed as nested app code"
         )
+    }
+
+    func testXcodeShippedTargetsKeepDebugAndReleaseSigningClassesDistinct() throws {
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let project = try String(
+            contentsOf: repository.appendingPathComponent(
+                "ForgeConductor.xcodeproj/project.pbxproj"
+            ),
+            encoding: .utf8
+        )
+
+        func configuration(_ identifier: String) throws -> Substring {
+            let start = try XCTUnwrap(project.range(of: "\n\t\t\(identifier) /*"))
+            let end = try XCTUnwrap(
+                project.range(of: "\n\t\t};", range: start.lowerBound..<project.endIndex)
+            )
+            return project[start.lowerBound..<end.upperBound]
+        }
+
+        let debugConfigurations = [
+            "89F432F3B43F4B81ADBFD41A", // app
+            "D82F296A8E4141ECB3B96E83", // manager CLI
+            "E27D3E6391AA4ECF80942FF0", // core framework
+            "F0A700000000000000000010", // runtime launcher
+            "E2F500000000000000000037", // filesystem daemon
+        ]
+        let releaseConfigurations = [
+            "949B044302214128BBAA3EE8", // app
+            "462BB7BBB61F4979BE23EEDD", // manager CLI
+            "A3DBA24BE10849FEB69442E8", // core framework
+            "F0A700000000000000000011", // runtime launcher
+            "E2F500000000000000000038", // filesystem daemon
+        ]
+
+        for identifier in debugConfigurations {
+            let settings = try configuration(identifier)
+            XCTAssertTrue(
+                settings.contains(#"CODE_SIGN_IDENTITY = "Apple Development";"#),
+                "Debug shipped target \(identifier) must use development signing"
+            )
+            XCTAssertFalse(
+                settings.contains(#"CODE_SIGN_IDENTITY = "Developer ID Application";"#)
+            )
+        }
+
+        for identifier in releaseConfigurations {
+            let settings = try configuration(identifier)
+            XCTAssertTrue(
+                settings.contains(#"CODE_SIGN_IDENTITY = "Developer ID Application";"#),
+                "Release shipped target \(identifier) must require Developer ID signing"
+            )
+            XCTAssertFalse(
+                settings.contains(#"CODE_SIGN_IDENTITY = "Apple Development";"#)
+            )
+        }
     }
 
     func testPrivilegedFilesystemBundleCheckerRetainsExactOptionalCLISealContract() throws {

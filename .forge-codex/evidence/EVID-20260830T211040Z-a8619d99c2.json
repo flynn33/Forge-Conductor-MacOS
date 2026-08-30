@@ -1,0 +1,56 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 38930,
+      "path": ".forge-codex/evidence/EVID-20260830T211040Z-a8619d99c2.stdout.txt",
+      "sha256": "d454eb46347cb64748cd745a7543940e70da60634a929c2afe2416bcc9d88237",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 258,
+      "path": ".forge-codex/evidence/EVID-20260830T211040Z-a8619d99c2.stderr.txt",
+      "sha256": "12346bd8b84cb14aa8db5786b51211c82256dcd16b874c357c65888a16a354f2",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "command": "xcodebuild -project ForgeConductor.xcodeproj -scheme ForgeConductor -configuration Release -showBuildSettings",
+  "ended_at": "2026-08-30T21:10:41.277144+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260830T211040Z-a8619d99c2",
+  "kind": "p10-release-build-settings-checkpoint-final",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 200000,
+  "related_findings": [
+    "FC-UI-QUALIFICATION-001",
+    "FC-PRIVILEGED-CALLER-IDENTITY-001"
+  ],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 9827855,
+    "file_count": 256,
+    "schema_version": 1,
+    "sha256": "6ec296c27eb476effdeb7d044b73741db554f5200fa2879262ea8cffd580b3e9"
+  },
+  "source_manifest_after": {
+    "bytes": 9827855,
+    "file_count": 256,
+    "schema_version": 1,
+    "sha256": "6ec296c27eb476effdeb7d044b73741db554f5200fa2879262ea8cffd580b3e9"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-30T21:10:40.603767+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

@@ -1,9 +1,11 @@
 import Darwin
+import CryptoKit
 import Foundation
 import Security
 
 public enum ForgeFilesystemProtocolConstants {
-    public static let version = 4
+    public static let version = 5
+    public static let requestDigestCanonicalizationVersion = 1
     public static let productVersion = "0.9.0"
     public static let serviceName = "com.forge-conductor.filesystem-daemon"
     public static let daemonPlistName = "com.forge-conductor.filesystem-daemon.plist"
@@ -80,8 +82,8 @@ public enum ForgeFilesystemProtocolConstants {
             certificateRequirement =
                 "certificate leaf[field.1.2.840.113635.100.6.1.12] exists"
         } else {
-            certificateRequirement = "(certificate leaf[field.1.2.840.113635.100.6.1.13] exists or "
-                + "certificate leaf[field.1.2.840.113635.100.6.1.12] exists)"
+            certificateRequirement =
+                "certificate leaf[field.1.2.840.113635.100.6.1.13] exists"
         }
         return "anchor apple generic and identifier \"\(identifier)\" "
             + "and certificate leaf[subject.OU] = \"\(teamIdentifier)\" "
@@ -202,6 +204,31 @@ public enum ForgeFilesystemCodeIdentity {
     }
 }
 
+/// Classifies documented atomic-rename failures that leave both namespace
+/// arguments unchanged. These failures can terminate a reserved transaction as
+/// rejected instead of indefinitely consuming a protected recovery slot.
+public enum ForgeFilesystemAtomicCaptureFailurePolicy {
+    public static func isDeterministicNoMutationFailure(_ code: Int32) -> Bool {
+        [
+            EACCES,
+            EBUSY,
+            EDEADLK,
+            EDQUOT,
+            EINVAL,
+            EISDIR,
+            ELOOP,
+            ENAMETOOLONG,
+            ENOSPC,
+            ENOTCAPABLE,
+            ENOTDIR,
+            ENOTEMPTY,
+            ENOTSUP,
+            EPERM,
+            EROFS,
+        ].contains(code)
+    }
+}
+
 @objc(ForgeFilesystemServiceInfo)
 public final class ForgeFilesystemServiceInfo: NSObject, NSSecureCoding, @unchecked Sendable {
     public static let supportsSecureCoding = true
@@ -296,10 +323,49 @@ public enum ForgeFilesystemErrorCode {
     public static let protocolMismatch = "filesystem_protocol_mismatch"
     public static let projectGenerationStale = "filesystem_project_generation_stale"
     public static let sourceIdentityMismatch = "filesystem_source_identity_mismatch"
+    public static let versionConflict = "filesystem_version_conflict"
+    public static let versionUnprovable = "filesystem_version_unprovable"
+    public static let contentExclusivityUnavailable =
+        "filesystem_content_exclusivity_unavailable"
+    public static let restoreConflict = "filesystem_restore_conflict"
+    public static let requestReplayMismatch = "filesystem_request_replay_mismatch"
     public static let transactionConflict = "filesystem_transaction_conflict"
     public static let durabilityUnconfirmed = "filesystem_durability_unconfirmed"
     public static let transactionUnavailable = "filesystem_transaction_unavailable"
     public static let transactionNotTerminal = "filesystem_transaction_not_terminal"
+}
+
+@objc(ForgeFilesystemOperationContract)
+public enum ForgeFilesystemOperationContract: Int, Codable, Sendable {
+    case currentEntry = 1
+    case namespaceVersionExact = 2
+    case contentVersionExact = 3
+}
+
+public enum ForgeFilesystemCapturedMutationDecision<Value> {
+    case commit(Value)
+    case quarantine(Value, code: String, message: String)
+}
+
+public enum ForgeFilesystemCaptureFirstCoordinator {
+    /// Makes successful atomic capture the sole linearization point. No
+    /// authorization decision or terminal mutation runs when capture fails,
+    /// and commit can consume only the value returned by post-capture
+    /// verification.
+    public static func perform<Capture, Verified, Output>(
+        capture: () throws -> Capture,
+        verify: (Capture) throws -> ForgeFilesystemCapturedMutationDecision<Verified>,
+        commit: (Verified) throws -> Output,
+        quarantine: (Verified, String, String) throws -> Output
+    ) rethrows -> Output {
+        let captured = try capture()
+        switch try verify(captured) {
+        case .commit(let verified):
+            return try commit(verified)
+        case .quarantine(let verified, let code, let message):
+            return try quarantine(verified, code, message)
+        }
+    }
 }
 
 /// Shared, deterministic policy for deciding whether the privileged service may
@@ -447,8 +513,9 @@ public final class ForgeFilesystemMutationRequest: NSObject, NSSecureCoding, @un
     public let rootIdentity: ForgeFilesystemIdentity
     public let relativePathComponents: [String]
     public let accessRawValue: Int
-    public let expectedLeafIdentity: ForgeFilesystemIdentity
-    public let exactContentRequired: Bool
+    public let contractRawValue: Int
+    public let expectedLeafIdentity: ForgeFilesystemIdentity?
+    public let requestDigestSHA256: String
 
     public init(
         protocolVersion: Int = ForgeFilesystemProtocolConstants.version,
@@ -460,8 +527,8 @@ public final class ForgeFilesystemMutationRequest: NSObject, NSSecureCoding, @un
         rootIdentity: ForgeFilesystemIdentity,
         relativePathComponents: [String],
         access: ForgeFilesystemAccess,
-        expectedLeafIdentity: ForgeFilesystemIdentity,
-        exactContentRequired: Bool = false
+        contract: ForgeFilesystemOperationContract,
+        expectedLeafIdentity: ForgeFilesystemIdentity? = nil
     ) {
         self.protocolVersion = protocolVersion
         self.requestID = requestID
@@ -472,8 +539,21 @@ public final class ForgeFilesystemMutationRequest: NSObject, NSSecureCoding, @un
         self.rootIdentity = rootIdentity
         self.relativePathComponents = relativePathComponents
         accessRawValue = access.rawValue
+        contractRawValue = contract.rawValue
         self.expectedLeafIdentity = expectedLeafIdentity
-        self.exactContentRequired = exactContentRequired
+        requestDigestSHA256 = Self.calculateRequestDigest(
+            protocolVersion: protocolVersion,
+            requestID: requestID,
+            transactionID: transactionID,
+            projectID: projectID,
+            projectGeneration: projectGeneration,
+            rootID: rootID,
+            rootIdentity: rootIdentity,
+            relativePathComponents: relativePathComponents,
+            accessRawValue: access.rawValue,
+            contractRawValue: contract.rawValue,
+            expectedLeafIdentity: expectedLeafIdentity
+        )
         super.init()
     }
 
@@ -487,13 +567,13 @@ public final class ForgeFilesystemMutationRequest: NSObject, NSSecureCoding, @un
                 forKey: "root_identity"
               ),
               let components = coder.decodeObject(
-                of: [NSArray.self, NSString.self],
-                forKey: "relative_components"
+                  of: [NSArray.self, NSString.self],
+                  forKey: "relative_components"
               ) as? [String],
-              let expectedLeafIdentity = coder.decodeObject(
-                of: ForgeFilesystemIdentity.self,
-                forKey: "expected_leaf_identity"
-              ) else {
+              let requestDigestSHA256 = coder.decodeObject(
+                  of: NSString.self,
+                  forKey: "request_digest_sha256"
+              ) as String? else {
             return nil
         }
         let decodedProjectGeneration = coder.decodeInt64(forKey: "project_generation")
@@ -507,9 +587,14 @@ public final class ForgeFilesystemMutationRequest: NSObject, NSSecureCoding, @un
         self.rootIdentity = rootIdentity
         relativePathComponents = components
         accessRawValue = coder.decodeInteger(forKey: "access")
-        self.expectedLeafIdentity = expectedLeafIdentity
-        exactContentRequired = coder.decodeBool(forKey: "exact_content_required")
+        contractRawValue = coder.decodeInteger(forKey: "operation_contract")
+        expectedLeafIdentity = coder.decodeObject(
+            of: ForgeFilesystemIdentity.self,
+            forKey: "expected_leaf_identity"
+        )
+        self.requestDigestSHA256 = requestDigestSHA256
         super.init()
+        guard validationError() == nil else { return nil }
     }
 
     public func encode(with coder: NSCoder) {
@@ -522,12 +607,17 @@ public final class ForgeFilesystemMutationRequest: NSObject, NSSecureCoding, @un
         coder.encode(rootIdentity, forKey: "root_identity")
         coder.encode(relativePathComponents, forKey: "relative_components")
         coder.encode(accessRawValue, forKey: "access")
+        coder.encode(contractRawValue, forKey: "operation_contract")
         coder.encode(expectedLeafIdentity, forKey: "expected_leaf_identity")
-        coder.encode(exactContentRequired, forKey: "exact_content_required")
+        coder.encode(requestDigestSHA256, forKey: "request_digest_sha256")
     }
 
     public var access: ForgeFilesystemAccess? {
         ForgeFilesystemAccess(rawValue: accessRawValue)
+    }
+
+    public var contract: ForgeFilesystemOperationContract? {
+        ForgeFilesystemOperationContract(rawValue: contractRawValue)
     }
 
     public func validationError() -> String? {
@@ -540,10 +630,24 @@ public final class ForgeFilesystemMutationRequest: NSObject, NSSecureCoding, @un
               projectGeneration > 0,
               projectGeneration <= UInt64(Int64.max),
               access == .deleteLeaf,
-              ForgeFilesystemRequesterPolicy.permitsLeafType(mode: expectedLeafIdentity.mode),
+              contract != nil,
               !rootID.isEmpty,
-              rootID.utf8.count <= 128,
-              !exactContentRequired else {
+              rootID.utf8.count <= 128 else {
+            return ForgeFilesystemErrorCode.invalidRequest
+        }
+        switch contract {
+        case .currentEntry:
+            guard expectedLeafIdentity == nil else {
+                return ForgeFilesystemErrorCode.invalidRequest
+            }
+        case .namespaceVersionExact, .contentVersionExact:
+            guard let expectedLeafIdentity,
+                  ForgeFilesystemRequesterPolicy.permitsLeafType(
+                      mode: expectedLeafIdentity.mode
+                  ) else {
+                return ForgeFilesystemErrorCode.invalidRequest
+            }
+        case nil:
             return ForgeFilesystemErrorCode.invalidRequest
         }
         guard !relativePathComponents.isEmpty,
@@ -551,7 +655,89 @@ public final class ForgeFilesystemMutationRequest: NSObject, NSSecureCoding, @un
               relativePathComponents.allSatisfy(Self.validRelativeComponent) else {
             return ForgeFilesystemErrorCode.invalidRequest
         }
+        guard requestDigestSHA256 == Self.calculateRequestDigest(
+            protocolVersion: protocolVersion,
+            requestID: requestID,
+            transactionID: transactionID,
+            projectID: projectID,
+            projectGeneration: projectGeneration,
+            rootID: rootID,
+            rootIdentity: rootIdentity,
+            relativePathComponents: relativePathComponents,
+            accessRawValue: accessRawValue,
+            contractRawValue: contractRawValue,
+            expectedLeafIdentity: expectedLeafIdentity
+        ) else {
+            return ForgeFilesystemErrorCode.requestReplayMismatch
+        }
         return nil
+    }
+
+    private struct DigestIdentity: Codable {
+        let device: UInt64
+        let inode: UInt64
+        let mode: UInt32
+        let owner: UInt32
+        let group: UInt32
+        let linkCount: UInt64
+
+        init(_ identity: ForgeFilesystemIdentity) {
+            device = identity.device
+            inode = identity.inode
+            mode = identity.mode
+            owner = identity.owner
+            group = identity.group
+            linkCount = identity.linkCount
+        }
+    }
+
+    private struct DigestEnvelope: Codable {
+        let canonicalizationVersion: Int
+        let protocolVersion: Int
+        let requestID: String
+        let transactionID: String
+        let projectID: String
+        let projectGeneration: UInt64
+        let rootID: String
+        let rootIdentity: DigestIdentity
+        let relativePathComponents: [String]
+        let accessRawValue: Int
+        let contractRawValue: Int
+        let expectedLeafIdentity: DigestIdentity?
+    }
+
+    private static func calculateRequestDigest(
+        protocolVersion: Int,
+        requestID: String,
+        transactionID: String,
+        projectID: String,
+        projectGeneration: UInt64,
+        rootID: String,
+        rootIdentity: ForgeFilesystemIdentity,
+        relativePathComponents: [String],
+        accessRawValue: Int,
+        contractRawValue: Int,
+        expectedLeafIdentity: ForgeFilesystemIdentity?
+    ) -> String {
+        let envelope = DigestEnvelope(
+            canonicalizationVersion:
+                ForgeFilesystemProtocolConstants.requestDigestCanonicalizationVersion,
+            protocolVersion: protocolVersion,
+            requestID: requestID.lowercased(),
+            transactionID: transactionID.lowercased(),
+            projectID: projectID.lowercased(),
+            projectGeneration: projectGeneration,
+            rootID: rootID,
+            rootIdentity: DigestIdentity(rootIdentity),
+            relativePathComponents: relativePathComponents,
+            accessRawValue: accessRawValue,
+            contractRawValue: contractRawValue,
+            expectedLeafIdentity: expectedLeafIdentity.map(DigestIdentity.init)
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        guard let data = try? encoder.encode(envelope) else { return "" }
+        return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
     private static func validRelativeComponent(_ component: String) -> Bool {
@@ -571,6 +757,8 @@ public enum ForgeFilesystemTransactionDisposition: Int, Codable, Sendable {
     case committed = 2
     case restored = 3
     case rejected = 4
+    case quarantined = 5
+    case conflicted = 6
 }
 
 @objc(ForgeFilesystemTransactionControlRequest)
@@ -852,13 +1040,24 @@ public final class ForgeFilesystemTransactionStatus: NSObject, NSSecureCoding, @
                   !acknowledgementRequired else {
                 return ForgeFilesystemErrorCode.invalidRequest
             }
-        case .committed, .restored, .rejected:
+        case .committed, .restored, .rejected, .conflicted:
             guard transactionID.flatMap(UUID.init(uuidString:)) != nil,
+                  (disposition == .committed ? code == "ok" : code != "ok"),
                   terminal,
                   durabilityConfirmed,
                   !recoveryRequired,
                   acknowledgementRequired,
                   committed == (disposition == .committed) else {
+                return ForgeFilesystemErrorCode.invalidRequest
+            }
+        case .quarantined:
+            guard transactionID.flatMap(UUID.init(uuidString:)) != nil,
+                  code != "ok",
+                  terminal,
+                  !committed,
+                  durabilityConfirmed,
+                  recoveryRequired,
+                  !acknowledgementRequired else {
                 return ForgeFilesystemErrorCode.invalidRequest
             }
         case nil:

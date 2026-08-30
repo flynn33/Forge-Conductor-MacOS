@@ -174,6 +174,88 @@ final class SecureFilesystemMutationTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: leaf), Data("preserve".utf8))
     }
 
+    func testProductionDeleteDispatchUsesCurrentEntryContractAndCanonicalDigest() throws {
+        let leaf = try makeLeaf(named: "current-entry-contract.txt")
+        let ledger = makeRecoveryLedger(label: "current-entry-contract")
+        let transport = SecureFilesystemTransportStub(
+            status: .enabled,
+            deleteResponseProvider: { request in
+                XCTAssertEqual(request.contract, .currentEntry)
+                XCTAssertNil(request.expectedLeafIdentity)
+                XCTAssertNil(request.validationError())
+                XCTAssertNotNil(
+                    request.requestDigestSHA256.range(
+                        of: #"^[0-9a-f]{64}$"#,
+                        options: .regularExpression
+                    ),
+                    request.requestDigestSHA256
+                )
+                return ForgeFilesystemResponse(
+                    ok: false,
+                    code: ForgeFilesystemErrorCode.helperUnavailable,
+                    message: "unavailable"
+                )
+            }
+        )
+
+        _ = try SecureFilesystemMutationClient(transport: transport).deleteLeaf(
+            at: leaf,
+            context: makeContext(),
+            cancellation: ToolCallCancellation(timeoutSeconds: 5),
+            recoveryLedger: ledger
+        )
+
+        XCTAssertEqual(transport.deleteCallCount, 1)
+        XCTAssertEqual(try ledger.retainedCount(), 0)
+    }
+
+    func testDurableQuarantineFailurePreservesTypedFailureAndRecoveryAuthority() throws {
+        let leaf = try makeLeaf(named: "durable-quarantine-failure.txt")
+        let ledger = makeRecoveryLedger(label: "durable-quarantine-failure")
+        let transport = SecureFilesystemTransportStub(
+            status: .enabled,
+            deleteResponseProvider: { request in
+                ForgeFilesystemResponse(
+                    ok: false,
+                    code: ForgeFilesystemErrorCode.versionConflict,
+                    message: "Captured entry retained in protected quarantine",
+                    committed: false,
+                    durabilityConfirmed: true,
+                    recoveryTransactionID: request.transactionID,
+                    acknowledgementRequired: false
+                )
+            }
+        )
+
+        let result = try SecureFilesystemMutationClient(transport: transport).deleteLeaf(
+            at: leaf,
+            context: makeContext(),
+            cancellation: ToolCallCancellation(timeoutSeconds: 5),
+            recoveryLedger: ledger
+        )
+
+        XCTAssertFalse(result.ok)
+        XCTAssertEqual(
+            result.payload["code"] as? String,
+            ForgeFilesystemErrorCode.versionConflict,
+            "\(result.payload)"
+        )
+        XCTAssertNotEqual(
+            result.payload["code"] as? String,
+            ForgeFilesystemErrorCode.protocolMismatch
+        )
+        XCTAssertEqual(result.payload["recovery_required"] as? Bool, true)
+        XCTAssertEqual(result.payload["acknowledgement_required"] as? Bool, false)
+        XCTAssertEqual(result.payload["committed"] as? Bool, false)
+        XCTAssertEqual(result.payload["durability_confirmed"] as? Bool, true)
+        let transactionID = try XCTUnwrap(
+            result.payload["filesystem_transaction_id"] as? String
+        )
+        XCTAssertEqual(transport.deleteCallCount, 1)
+        XCTAssertNotNil(try ledger.record(transactionID: transactionID))
+        XCTAssertEqual(try ledger.retainedCount(), 1)
+    }
+
     func testSubmittedRequestWithoutReplyRetainsOriginalRecoveryTransactionID() throws {
         let request = makeMutationRequest()
 
@@ -457,6 +539,77 @@ final class SecureFilesystemMutationTests: XCTestCase {
         XCTAssertTrue(acknowledged.ok, "\(acknowledged.payload)")
         XCTAssertEqual(recoveryTransport.acknowledgeCallCount, 1)
         XCTAssertNil(try ledger.record(transactionID: transactionID))
+    }
+
+    func testQuarantinedQuerySurfacesTerminalRecoveryStateAndRetainsAuthority() throws {
+        let leaf = try makeLeaf(named: "quarantined-query.txt")
+        let context = makeContext()
+        let ledger = makeRecoveryLedger(label: "quarantined-query")
+        let deleteTransport = SecureFilesystemTransportStub(
+            status: .enabled,
+            deleteResponseProvider: { request in
+                ForgeFilesystemResponse(
+                    ok: true,
+                    code: "ok",
+                    message: "deleted",
+                    committed: true,
+                    durabilityConfirmed: true,
+                    recoveryTransactionID: request.transactionID,
+                    acknowledgementRequired: true
+                )
+            }
+        )
+        let deleted = try SecureFilesystemMutationClient(
+            transport: deleteTransport
+        ).deleteLeaf(
+            at: leaf,
+            context: context,
+            cancellation: ToolCallCancellation(timeoutSeconds: 5),
+            recoveryLedger: ledger
+        )
+        let transactionID = try XCTUnwrap(
+            deleted.payload["filesystem_transaction_id"] as? String
+        )
+        let recoveryTransport = SecureFilesystemTransportStub(
+            status: .enabled,
+            transactionStatus: ForgeFilesystemTransactionStatus(
+                transactionID: transactionID,
+                disposition: .quarantined,
+                code: ForgeFilesystemErrorCode.versionConflict,
+                message: "Captured entry retained in protected quarantine",
+                terminal: true,
+                committed: false,
+                durabilityConfirmed: true,
+                recoveryRequired: true,
+                acknowledgementRequired: false
+            )
+        )
+
+        let queried = try SecureFilesystemMutationClient(
+            transport: recoveryTransport
+        ).recoverDelete(
+            transactionID: transactionID,
+            action: "query",
+            context: context,
+            cancellation: ToolCallCancellation(timeoutSeconds: 5),
+            recoveryLedger: ledger
+        )
+
+        XCTAssertTrue(queried.ok, "\(queried.payload)")
+        XCTAssertEqual(queried.payload["transaction_id"] as? String, transactionID)
+        XCTAssertEqual(queried.payload["disposition"] as? String, "quarantined")
+        XCTAssertEqual(
+            queried.payload["code"] as? String,
+            ForgeFilesystemErrorCode.versionConflict
+        )
+        XCTAssertEqual(queried.payload["terminal"] as? Bool, true)
+        XCTAssertEqual(queried.payload["committed"] as? Bool, false)
+        XCTAssertEqual(queried.payload["durability_confirmed"] as? Bool, true)
+        XCTAssertEqual(queried.payload["recovery_required"] as? Bool, true)
+        XCTAssertEqual(queried.payload["acknowledgement_required"] as? Bool, false)
+        XCTAssertEqual(recoveryTransport.queryCallCount, 1)
+        XCTAssertNotNil(try ledger.record(transactionID: transactionID))
+        XCTAssertEqual(try ledger.retainedCount(), 1)
     }
 
     func testFullCallerRecoveryLedgerPreventsDeleteDispatch() throws {
@@ -1193,6 +1346,7 @@ final class SecureFilesystemMutationTests: XCTestCase {
             ),
             relativePathComponents: ["leaf.txt"],
             access: .deleteLeaf,
+            contract: .namespaceVersionExact,
             expectedLeafIdentity: ForgeFilesystemIdentity(
                 device: 1,
                 inode: 3,

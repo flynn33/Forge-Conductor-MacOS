@@ -21,7 +21,9 @@ Current release blockers are:
   The selected partial implementation adds a separately signed root
   LaunchDaemon, a root-owned mode-0700 same-volume namespace, 32 durable
   transaction slots, bounded project bindings, descriptor-relative exclusive
-  capture, post-capture identity verification, durable phases, retained
+  capture as the protocol-v5 linearization point, explicit current-entry,
+  namespace-exact, and content-exact contracts, canonical request digests,
+  post-capture identity verification, durable phases, retained
   rollback recovery, and fail-closed production routing with no same-UID
   fallback. Accepted messages
   must satisfy the NSXPC signing requirement, and each transaction persists the
@@ -44,7 +46,10 @@ Current release blockers are:
   therefore do not provide the required identity-conditional terminal mutation.
 
   A same-UID attacker can still substitute the source immediately before
-  exclusive capture. One substituted entry can become temporarily or
+  exclusive capture. Under `currentEntry`, the successful capture defines the
+  selected entry and an eligible captured occupant may be deleted; under
+  `namespaceVersionExact`, a mismatching captured occupant must be restored
+  exclusively or retained without disposal. One captured entry can become
   recovery-required unavailable; if it is a directory, that entry can represent
   an unbounded subtree. A separate authorization-metadata race remains between
   the final ACL/BSD-flag check and root `unlinkat`: at most the one already
@@ -55,18 +60,44 @@ Current release blockers are:
   reopened parent descriptor because that directory can be relocated after
   validation. It durably retains the captured leaf for recovery instead. This
   prevents the identified root restore outside the authorized root, but the
-  maximum availability impact is one retained leaf per affected transaction,
-  up to the 32 protected slots per volume. The
-  source-level adversarial swap, namespace-instability, durability, retained
+  maximum availability impact is one retained entry per affected transaction,
+  up to the 32 protected slots per volume, with no byte or descendant bound.
+  Quarantine currently has no separately authorized restore, release, or purge
+  action and is not acknowledgeable while the protected entry exists. Repeated
+  conflicts can therefore exhaust all 32 slots and disable later protected
+  deletes. Startup recovery before accepting new mutations is also not yet a
+  proved barrier. Protocol-v5 disk records now use an explicit schema-3
+  protocol/canonicalization boundary, valid pending capture-identity receipts
+  are adopted before cleanup, and deterministic no-mutation capture denials
+  become acknowledgeable rejected outcomes. Terminal-outcome receipts still
+  lack a qualified repair transition when the physical protected leaf
+  contradicts the recorded terminal disposition; that crash/corruption case is
+  release-blocking. Source-parent authorization and capture are also not
+  atomic: a same-UID relocation can move the validated pinned parent outside
+  the authorized root before capture. One winning race can delete one eligible
+  outside-root regular file or symlink with unbounded bytes, or quarantine an
+  ineligible directory with an unbounded subtree. Outside-root sentinel
+  preservation therefore cannot pass. The source-level adversarial swap,
+  namespace-instability, durability, retained
   receipt, hard-link, and writable-descriptor regressions are supporting
-  evidence. The full signed distinct-process atomic-swap,
+  evidence. The 57-row qualification report now has an exact schema and an
+  explicitly unexecuted template requiring per-case contract coverage, raw
+  artifacts, barrier hits, iterations, process/signing identities, fixture
+  digests, mount facts, crash points, and observed outcomes. Boolean-only rows
+  are rejected. The current verifier establishes artifact provenance, hashes,
+  ledger membership, schema conformance, and broad structural consistency, but
+  it does not yet bind a generic aggregate artifact semantically to every case,
+  role, iteration, barrier, mount observation, crash phase, fixture assertion,
+  or formal argument. Case-scoped and role-scoped machine-readable harness
+  results plus corresponding checker enforcement remain required before any
+  passing report is authorized. The full signed distinct-process atomic-swap,
   crash-at-every-durable-phase and recovery, volume, wrong-signature,
   hard-link, and writable-descriptor matrices have not run.
 
   Initial project bindings are not yet composed with an independently verified
   manager authorization record. Bindings also have no manager-authorized revoke
   or garbage-collection lifecycle; after 256 distinct lifetime project
-  bindings, another project fails closed. Protocol v4 now preserves the exact
+  bindings, another project fails closed. Protocol v5 now preserves the exact
   transaction ID across post-intent and existing-transaction failures, retains
   terminal committed/restored/rejected outcomes until durable exact
   acknowledgement, and adds pathless `fs_delete_recovery` query, resume, and
@@ -99,7 +130,7 @@ Current release blockers are:
   This mitigation does not eliminate the hostile authorization/recovery race.
   Directory deletion, move, and cross-volume mutation remain disabled in the
   privileged production route. E2, P10, G10, and G12 stay open.
-- **Caller-sealed helper identity and packaging remain qualifying.** Protocol v4
+- **Caller-sealed helper identity and packaging remain qualifying.** Protocol v5
   reads the running caller's validated sealed per-architecture daemon
   CodeDirectory hashes, conjoins the exact hash with the daemon designated
   requirement before XPC activation, and repeats protocol version, product
@@ -126,14 +157,18 @@ Current release blockers are:
 - **Privileged service update lifecycle is still qualifying.**
   `FC-PRIVILEGED-SERVICE-LIFECYCLE-001` tracks the explicit asynchronous
   unregister/re-register replacement flow, generation fencing, exact live-code
-  requirement, and protocol-v4 handshake. Source tests cover mismatch, timeout,
+  requirement, and protocol-v5 handshake. Source tests cover mismatch, timeout,
   late reply, single dispatch, lost mutation reply, retained transaction
   identity, pathless query/resume/acknowledgement, reinstall ordering, and a
   concurrent Disable superseding reinstall. They do not exercise those paths
   through the real signed asynchronous XPC service. Actual `SMAppService`
   approval, denial, update, disable, unregister/re-register, daemon restart,
   transaction recovery, signed Debug lifecycle, Release signing, and notarized
-  Release lifecycle evidence remains absent.
+  Release lifecycle evidence remains absent. Shipped Release targets now request
+  a Developer ID Application certificate class, but this host has only the valid
+  James Daley Apple Development identity. No Developer ID build, archive,
+  notarization, staple, or Gatekeeper pass exists, so the native Release gate
+  remains deferred and release-blocking.
 - **Clean-install project-root onboarding is validating.**
   `FC-PROJECT-ROOT-SETTINGS-001` now has native persisted add/remove controls,
   canonicalization, root rejection, accessibility identifiers, strict source
@@ -176,8 +211,12 @@ Current release blockers are:
   `EVID-20260830T153118Z-752f058222` cover root controls, shell controls,
   protected-service control visibility, and GUI relaunch. A current-source
   normal signed Debug build and paired app/daemon/CLI inspection passed as
-  `EVID-20260830T184940Z-e93d7373f7` and
-  `EVID-20260830T185004Z-e546c8ccf3`. These records do not cover the production
+  `EVID-20260830T211007Z-760c293557` and
+  `EVID-20260830T211029Z-ae82e789b1`. Signing inventory
+  `EVID-20260830T211040Z-5f8b21e6d9` confirms that no usable Developer ID
+  identity is installed, while `EVID-20260830T211040Z-a8619d99c2` confirms
+  that shipped Release configurations request Developer ID Application.
+  These records do not cover the production
   panel, successful shell execution across app and manager-process restart,
   actual service approval/update/disable behavior, installed-manager identity,
   exact running-helper identity, Release signing, or notarization.
@@ -205,13 +244,17 @@ may be reviewed only with these residual risks and deferred gates visible in its
 description, the state ledger, doctor output, and next-work selection.
 
 The current source manifest is
-`62361115e3af17e340f56c656b2731bd720e98b3cddceb7d848a040cb6e0a21c`
-over 252 inputs. Debug strict evidence
-`EVID-20260830T184228Z-1bb02068b2` and Release strict evidence
-`EVID-20260830T184522Z-d43b1586b6` each passed 755 tests with two declared
-environment skips and no failures. Signed Debug build evidence is
-`EVID-20260830T184940Z-e93d7373f7`; the exact paired app/daemon/CLI check is
-`EVID-20260830T185004Z-e546c8ccf3`. Signed Debug UI evidence
+`89e94937e86eb617eb7c6b2138f1584d3ecc7b32ce524919734fee39766a63a0`
+over 256 inputs. Debug strict evidence
+`EVID-20260830T220320Z-4cccc31cce` and Release strict evidence
+`EVID-20260830T220539Z-eac42f2a8c` each passed 771 tests with two declared
+environment skips and no failures. Prior-manifest signed Debug build evidence is
+`EVID-20260830T211007Z-760c293557`; the exact paired app/daemon/CLI check is
+`EVID-20260830T211029Z-ae82e789b1`. Signing inventory
+`EVID-20260830T211040Z-5f8b21e6d9` confirms that no usable Developer ID identity
+is installed, and Release build-settings evidence
+`EVID-20260830T211040Z-a8619d99c2` confirms that the shipped configurations
+request Developer ID Application. Signed Debug UI evidence
 `EVID-20260830T153118Z-752f058222` passed all six bounded cases.
 
 Post-push doctor evidence `EVID-20260830T190543Z-2aafffbf28` verifies the

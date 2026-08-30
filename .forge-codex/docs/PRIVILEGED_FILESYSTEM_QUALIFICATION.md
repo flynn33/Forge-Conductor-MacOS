@@ -14,6 +14,23 @@ sentinel hashes must be preserved by the immutable evidence recorder.
 The current implementation checkpoint has not executed this matrix. A row in
 this document defines required evidence; it is not a pass result.
 
+The report contract is
+`.forge-codex/schemas/p10-privileged-filesystem-qualification-report.schema.json`.
+The companion template is intentionally `partial`, `ok=false`, and `not_run`.
+Every row records the contracts exercised and raw per-case artifacts; a Boolean
+matrix is invalid and cannot close a gate. The formal closure object separately
+requires source-parent containment and requester authority to be atomic with
+capture; its template value is false because the current implementation does
+not meet that predicate.
+
+The current completion checker validates schema, provenance, hashes, ledger
+membership, source-manifest freshness, and structural consistency. It does not
+yet interpret a generic aggregate transcript well enough to bind every case,
+role, iteration, barrier, mount observation, crash phase, fixture assertion,
+and formal argument to distinct machine-readable harness facts. Until the
+harness emits those bindings and the checker enforces them, this limitation is
+an open release requirement and no passing qualification report is authorized.
+
 ## Process and fixture rules
 
 - Record active branch, exact HEAD, `origin/main`, app/helper CDHashes,
@@ -54,16 +71,16 @@ this document defines required evidence; it is not a pass result.
 | `project_binding_lifecycle_exhaustion_and_revoke` | Fill all 256 binding slots, prove the 257th project fails closed, then exercise an independently manager-authorized revoke/garbage-collection operation. It cannot remove an active transaction binding, cross UID/project authority, or leave a stale slot reusable without durability. This lifecycle is not implemented yet. |
 | `case_normalized_transaction_replay` | Replay request, transaction, and project UUIDs with valid upper/lowercase spellings. One logical transaction is recognized; no duplicate capture occurs. |
 | `root_descriptor_identity_mismatch` | Replace, rebind, or pass a descriptor whose device/inode/type/owner/mode/root ID differs. Reject before intent/capture. |
-| `atomic_swap_source_leaf_before_capture` | Swap the expected leaf immediately after the last source observation but before capture. At most one current entry is temporarily captured; no substituted entry is terminally deleted, and disposition is truthful. |
-| `atomic_swap_source_leaf_during_capture` | Continuously swap two regular leaves around the capture syscall. Each iteration deletes only the identity that satisfies the recorded contract or returns conflict/recovery; outside sentinels survive. |
+| `atomic_swap_source_leaf_before_capture` | Exercise both `currentEntry` and `namespaceVersionExact`. Swap the leaf immediately before capture. `currentEntry` may delete the eligible entry captured at the successful rename linearization point; it must not claim an earlier observed identity. Namespace-exact may dispose only the captured identity matching its token; a mismatch is restored exclusively or durably quarantined without disposal. Also substitute an immutable/no-unlink entry and an unrenameable mountpoint; documented no-mutation `EPERM`/`EBUSY` capture failures become durable rejected outcomes and do not strand a slot after acknowledgement. |
+| `atomic_swap_source_leaf_during_capture` | Continuously swap two regular leaves around the capture syscall under both `currentEntry` and `namespaceVersionExact`. Each iteration must report the entry captured at the successful rename linearization point. Namespace-exact disposes only a token match; current-entry disposes only the eligible captured occupant; absent/conflict/inconclusive outcomes are truthful and outside sentinels survive. |
 | `atomic_swap_source_leaf_after_capture` | Attempt source-name swaps after capture. The protected captured occupant cannot be opened or substituted and terminal disposition remains bound to its recorded identity. |
-| `atomic_swap_parent_before_capture` | Swap or rename an intermediate/final parent before capture. Descriptor and recorded-parent checks reject or operate only under the pinned authorized parent; no outside tree changes. |
+| `atomic_swap_parent_before_capture` | Swap or rename an intermediate/final parent before capture. The required result is rejection or operation only beneath the still-authorized root with no outside-tree change. The current pinned-parent capture does not meet this requirement: a same-UID relocation can move that descriptor outside the root before capture, so this row and E2 remain open. |
 | `atomic_swap_parent_after_capture` | Move/replace the source parent after capture and before recovery/rollback. Commit, exclusive restore, or retained recovery is truthful; nothing restores into a substituted parent. |
 | `parent_relocation_during_rollback` | Relocate the pinned or freshly reopened source parent after capture and during rollback. The privileged daemon must not restore through any relocatable parent descriptor; the captured leaf remains in the protected slot with recovery required, and no outside-root namespace is changed. The current implementation intentionally disables automatic privileged restore and requires this distinct-process signed test before the row can pass. |
 | `atomic_swap_rollback_destination_occupied` | Occupy the original name before rollback. `RENAME_EXCL` preserves both occupants and retains the protected entry with a queryable receipt. |
 | `atomic_swap_special_leaf_before_descriptor_open` | Swap a FIFO, socket, device, or directory between precheck and descriptor open while supplying crafted expected identities. Only regular files/symlinks are accepted; no special entry is deleted. Record that metadata-only/event descriptors mitigate but do not establish an identity-conditional syscall. |
 | `authorization_metadata_change_after_final_check` | From a retained descriptor or hard link, change ACL/BSD flags after the final helper check and before unlink. The observed outcome and maximum impact are recorded; any deletion after newly restrictive ACL metadata keeps E2 open. |
-| `crash_at_every_durable_phase` | Kill the daemon before/after intent write+fsync, capture, source/slot fsync, captured phase, unlink, slot fsync, committed phase, rollback phase, restore, and receipt cleanup. Each restart reaches commit, exclusive restore, retained recovery, or truthful conflict without silent loss. |
+| `crash_at_every_durable_phase` | Kill the daemon before/after intent write+fsync, capture, capture-identity pending-file fsync/publication, source/slot fsync, captured phase, unlink, slot fsync, committed phase, rollback phase, restore, and receipt cleanup. A valid pending capture-identity receipt is adopted rather than replaced by a later metadata observation. Inject terminal receipt/physical-leaf mismatches as well. Each restart reaches commit, exclusive restore, retained recovery, truthful conflict, or an explicit unrepaired release blocker without silent loss. |
 | `daemon_restart_and_idempotent_recovery` | Repeatedly restart the daemon and resubmit/query the same transaction. Exactly one mutation occurs and the same terminal result is returned. |
 | `manager_restart_and_idempotent_recovery` | Kill/restart manager and app after submission and after reply loss. The original transaction ID remains usable; no duplicate mutation occurs. |
 | `query_is_strictly_nonmutating` | For intent, captured, rollback, committed, restored, rejected, acknowledging, malformed, missing, and wrong-authority records, query performs no cleanup, phase transition, receipt rewrite, slot reuse, or leaf mutation. It returns only the exact authorized disposition or the same generic unavailable result used for an unknown transaction. |
@@ -90,9 +107,9 @@ this document defines required evidence; it is not a pass result.
 | `app_manager_cli_helper_packaging` | The signed GUI app, installed login-manager app, installed raw CLI, and standalone CLI all originate from one canonical build artifact set and resolve the same signed expectation/helper relationship without environment/config/argument path authority. The full app contains the daemon, LaunchDaemon plist, embedded raw CLI, and manager framework; app-origin installation stages that CLI and framework and never substitutes the app main executable. The manager is not silently synthesized as an ad-hoc privileged-service owner. Caller-relative `SMAppService.notFound` does not prevent an otherwise authenticated raw client from probing the registered service, and independently built cross-pairs or missing/tampered/symlinked artifacts fail closed. |
 | `settings_status_and_control` | Signed native Settings shows actual service state and registration controls; observed changes survive app and manager restart. |
 | `tampered_or_wrong_signature` | Tampered nested code, wrong helper identifier/team/certificate, wrong client identity, and broken enclosing seal are rejected. |
-| `source_leaf_substitution` | Repeated hostile source substitutions cover regular file, symlink, directory, missing name, metadata change, and identity reuse attempts with truthful bounded outcomes. |
-| `hard_link_behavior` | Preexisting hard links and newly created hard links cannot silently satisfy an exact-content contract. Namespace-only behavior and surviving aliases are reported explicitly or rejected. |
-| `writable_file_descriptor_behavior` | A writable descriptor retained before capture mutates content/metadata at every barrier. Exact-content requests fail unsupported/conflict; no immutable-content claim is made. |
+| `source_leaf_substitution` | Exercise `currentEntry` and `namespaceVersionExact` across repeated hostile substitutions of regular file, symlink, directory, missing name, metadata change, and identity reuse. Current-entry behavior is bound to the captured occupant; namespace-exact never disposes a mismatch. A captured ineligible directory is retained, can represent an unbounded subtree, and consumes one protected slot. |
+| `hard_link_behavior` | Exercise namespace-only and `contentVersionExact` behavior. Preexisting and newly created hard links cannot silently satisfy an exact-content contract. Content-exact fails closed without qualified writer/link exclusivity; namespace-only behavior and surviving aliases are reported explicitly. |
+| `writable_file_descriptor_behavior` | Exercise namespace-only and `contentVersionExact` behavior with a writable descriptor retained before capture and mutations at every barrier. Content-exact returns exclusivity unavailable/unprovable; no immutable-content claim is made. The signed case also measures the remaining final metadata-check-to-unlink race. |
 | `no_same_uid_fallback` | Disable, kill, deny, mismatch, and corrupt the helper/namespace. Every protected mutation returns its typed error and the legacy same-UID mutation path is never called. |
 | `shell_nonregression` | The established synchronous `/bin/bash -lc` `shell_exec` contract remains enabled by default and functional; clean-profile `bash.run` remains additive and nonprivileged through install, denial, helper restart, app restart, and manager restart. |
 
@@ -100,9 +117,12 @@ this document defines required evidence; it is not a pass result.
 
 The implementation uses descriptor-relative operations wherever macOS exposes
 them, but none of the evaluated public interfaces combines a terminal namespace
-mutation with an expected source device/inode/vnode-generation predicate. The
-absence of that predicate is why quarantine and post-capture verification are a
-mitigation rather than elimination of E2.
+mutation with an expected source device/inode/vnode-generation predicate.
+Successful exclusive capture followed by verification inside a root-owned
+namespace is the selected equivalent boundary for namespace contracts. That
+architecture is still only a mitigation checkpoint until its signed matrix and
+formal closure pass; it must not be described as eliminating the underlying API
+limitation or the remaining authorization-metadata race.
 
 | API or primitive | What it establishes | Why it does or does not meet the required identity-conditional mutation |
 | --- | --- | --- |
@@ -111,7 +131,7 @@ mitigation rather than elimination of E2.
 | `openat_authenticated_np` | Optionally verifies that an opened file resides on the same authenticated volume as an authentication descriptor. | It authenticates volume placement, is an open rather than a namespace mutation, and accepts no expected file identity. It therefore cannot condition `unlinkat` or `renameatx_np` on the previously observed source vnode. |
 | `unlinkat` | Removes the current name relative to a pinned directory descriptor. | It accepts a directory descriptor, name, and flags only. It has no expected device/inode/generation argument, so it removes whichever eligible object occupies that name when the syscall executes. |
 | `renameat` | Moves the current source name between pinned directory descriptors. | It provides descriptor-relative resolution but neither destination exclusivity nor an expected-source-identity predicate. |
-| `renameatx_np(..., RENAME_EXCL)` | Atomically refuses to replace an existing destination; this is used for exclusive capture and rollback. `RENAME_NOFOLLOW_ANY` and `RENAME_RESOLVE_BENEATH` constrain resolution where supported. | The exclusivity condition applies to destination existence, not to equality between the current source and a previously observed vnode. A source-name swap can still win before capture. |
+| `renameatx_np(..., RENAME_EXCL)` | Atomically refuses to replace an existing destination; the privileged daemon uses it for capture and protected metadata publication. Automatic privileged rollback is disabled. `RENAME_NOFOLLOW_ANY` and `RENAME_RESOLVE_BENEATH` can constrain resolution where supported. | The exclusivity condition applies to destination existence, not to equality between the current source and a previously observed vnode. With the current pinned-parent capture, it also does not prove that the already-open source parent remains below the authorized root. Root-relative resolution would not atomically reproduce the separately observed requester-permission decision. |
 | `renameatx_np(..., RENAME_SWAP)` | Atomically exchanges the two current name bindings and is therefore the correct adversarial test primitive. | It proves that source substitution can be atomic; it does not accept an expected identity and cannot be used as an identity guard. |
 | `fcntl`/file descriptors and APFS durability syncs | Keep opened objects stable for inspection and establish ordered durability for directories and receipts. | macOS does not expose a supported descriptor-only unlink/rename that consumes the inspected file descriptor as the source identity. Durability orders an outcome but does not select which source binding a later namespace syscall mutates. |
 | `SMAppService` plus authenticated NSXPC | Moves the mutation and receipt ledger behind an approved root process and authenticates the permitted caller and exact running daemon. | This removes same-UID write access to the protected namespace and bounds recovery authority, but lifecycle and peer identity do not add a vnode-identity predicate to the terminal filesystem syscall. |
@@ -120,7 +140,12 @@ mitigation rather than elimination of E2.
 
 Even a fully executed matrix cannot close E2 while an identity-conditional
 terminal mutation or equivalent formal boundary is unproved. The qualification
-report must state whether residual risk is eliminated or merely mitigated and
-must give the maximum possible impact. If any residual remains, the report must
-remain nonpassing, `FC-FILESYSTEM-PATH-TOCTOU-001` must remain open, and P10,
-G10, and G12 must not pass.
+report must distinguish API limitation, mitigated risk, unsupported contract,
+and any open release blocker; it must record the remaining race and maximum
+possible impact. It may not label mitigation as elimination. While the final
+authorization-metadata race, permanent quarantine-slot exhaustion, caller-ledger
+tamper/generation race, startup recovery barrier, binding lifecycle, volume
+behavior qualification, terminal-receipt/physical-leaf reconciliation, or any
+source-parent-containment/authority race, or any required signed row remains
+open, the report is
+nonpassing and `FC-FILESYSTEM-PATH-TOCTOU-001`, P10, G10, and G12 remain open.
