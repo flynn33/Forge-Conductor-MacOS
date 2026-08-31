@@ -21,7 +21,7 @@
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G00.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next/.forge-codex/state/gate-results/G00.json",
       "name": "gate-result-exists:G00",
       "passed": true
     },
@@ -71,7 +71,7 @@
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G01.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next/.forge-codex/state/gate-results/G01.json",
       "name": "gate-result-exists:G01",
       "passed": true
     },
@@ -121,7 +121,7 @@
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G02.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next/.forge-codex/state/gate-results/G02.json",
       "name": "gate-result-exists:G02",
       "passed": true
     },
@@ -171,7 +171,7 @@
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G03.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next/.forge-codex/state/gate-results/G03.json",
       "name": "gate-result-exists:G03",
       "passed": true
     },
@@ -221,7 +221,7 @@
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G04.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next/.forge-codex/state/gate-results/G04.json",
       "name": "gate-result-exists:G04",
       "passed": true
     },
@@ -271,7 +271,7 @@
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G05.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next/.forge-codex/state/gate-results/G05.json",
       "name": "gate-result-exists:G05",
       "passed": true
     },
@@ -321,7 +321,7 @@
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G06.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next/.forge-codex/state/gate-results/G06.json",
       "name": "gate-result-exists:G06",
       "passed": true
     },
@@ -371,7 +371,7 @@
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G07.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next/.forge-codex/state/gate-results/G07.json",
       "name": "gate-result-exists:G07",
       "passed": true
     },
@@ -421,7 +421,7 @@
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G08.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next/.forge-codex/state/gate-results/G08.json",
       "name": "gate-result-exists:G08",
       "passed": true
     },
@@ -471,7 +471,7 @@
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G09.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next/.forge-codex/state/gate-results/G09.json",
       "name": "gate-result-exists:G09",
       "passed": true
     },
@@ -506,7 +506,7 @@
       "passed": false
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G10.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next/.forge-codex/state/gate-results/G10.json",
       "name": "gate-result-exists:G10",
       "passed": true
     },
@@ -541,7 +541,7 @@
       "passed": false
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G11.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next/.forge-codex/state/gate-results/G11.json",
       "name": "gate-result-exists:G11",
       "passed": true
     },
@@ -576,7 +576,7 @@
       "passed": false
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/feature-baseline.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next/.forge-codex/state/feature-baseline.json",
       "name": "feature-baseline-exists",
       "passed": true
     },
@@ -629,7 +629,7 @@
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/findings-resolution.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next/.forge-codex/state/findings-resolution.json",
       "name": "findings-resolution-exists",
       "passed": true
     },
@@ -638,7 +638,6 @@
         "FC-FILESYSTEM-PATH-TOCTOU-001",
         "FC-PRIVILEGED-SERVICE-LIFECYCLE-001",
         "FC-PRIVILEGED-CALLER-IDENTITY-001",
-        "FC-SHELL-COMPAT-QUALIFICATION-001",
         "FC-UI-QUALIFICATION-001",
         "FC-AUTONOMOUS-CONTINUITY-E2E-001"
       ],
@@ -646,7 +645,7 @@
       "passed": false
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/host-capability-report.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next/.forge-codex/state/host-capability-report.json",
       "name": "host-capability-report-exists",
       "passed": true
     },
@@ -661,7 +660,7 @@
       "passed": true
     }
   ],
-  "commit": "2dd504e53a5a09837cd289a99eee48ab7f4547eb",
+  "commit": "9e695f514caa7894903f54a92139c33eb43eb46d",
   "errors": [
     "gate-passed:G09: passed; This record preserves the exact-revision adapter qualification. The live scenario invoked the adapter directly and does not establish current manager-owned threshold-forced rollover authority. Current release qualification requires exact successor acknowledgement, predecessor fencing and idempotent sealing, automatic continuation, GUI-closed operation, and recovery from every durable crash state in one real-provider forced-rollover scenario.",
     "gate-ledger-passed:G09: blocked_dependency",
@@ -679,17 +678,17 @@
     "gate-artifact-exists:G11:G11.stdout.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.stdout.txt",
     "gate-artifact-exists:G11:G11.stderr.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.stderr.txt",
     "gate-artifact-exists:G11:G11.criteria.json: /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.criteria.json",
-    "critical-high-findings-resolved: ['FC-FILESYSTEM-PATH-TOCTOU-001', 'FC-PRIVILEGED-SERVICE-LIFECYCLE-001', 'FC-PRIVILEGED-CALLER-IDENTITY-001', 'FC-SHELL-COMPAT-QUALIFICATION-001', 'FC-UI-QUALIFICATION-001', 'FC-AUTONOMOUS-CONTINUITY-E2E-001']",
+    "critical-high-findings-resolved: ['FC-FILESYSTEM-PATH-TOCTOU-001', 'FC-PRIVILEGED-SERVICE-LIFECYCLE-001', 'FC-PRIVILEGED-CALLER-IDENTITY-001', 'FC-UI-QUALIFICATION-001', 'FC-AUTONOMOUS-CONTINUITY-E2E-001']",
     "autonomous-rollover-mode-proven: forge.native-session-host"
   ],
-  "evaluated_at": "2026-08-31T02:16:37.071701+00:00",
+  "evaluated_at": "2026-08-31T13:41:10.322274+00:00",
   "finalization_gate": {
     "gate_id": "G12",
     "reason": "G12 is written as passed only after every prerequisite and final integrity check passes and finalization is authorized.",
     "status": "blocked_open"
   },
   "passed": false,
-  "repository": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence",
+  "repository": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next",
   "run_id": "aba90ab1-be80-4cc5-aa0b-23dd54d4a24d",
   "schema_version": 1
 }

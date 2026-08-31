@@ -98,7 +98,7 @@
     "Do not request operator decisions.",
     "Do not add automated authorship credits."
   ],
-  "created_at": "2026-08-31T10:51:30.506763+00:00",
+  "created_at": "2026-08-31T13:42:17.473610+00:00",
   "current_work": {
     "active_files": [],
     "phase_id": "P10",
@@ -617,6 +617,11 @@
     "EVID-20260831T041652Z-4ca0740c74",
     "EVID-20260831T041659Z-99d5d9f661",
     "EVID-20260831T060522Z-03c32cb838",
+    "EVID-20260831T132827Z-ce9b22a5e0",
+    "EVID-20260831T133202Z-1388f87b63",
+    "EVID-20260831T133213Z-d4178c34a2",
+    "EVID-20260831T133355Z-7f9c698548",
+    "EVID-20260831T133355Z-948e5bec13",
     "a5466d4e5b4d7a10f87df64ddfdb58b6b8ca5159a57c20527e98802a822245d7",
     "a5d4276cbf14db3a91baa7f6b79fb8cdb3fb042a2eaf663d3219ff36b5451667",
     "b3dc11a8dc286fa33b6567ff62089692e64787b23a66718cfe1766dc27195724",
@@ -637,7 +642,7 @@
     "f1d06d7dd23bf3bd71f138fc1a9a5799dc4aa0e474e9a60552dfcecb68f41dc2",
     "fa52a67ada4051cdaf064cb6fc52cdd72cd7957006924443b4e414e2f5abda61"
   ],
-  "handoff_id": "81f5a5ad-75ac-487f-917f-fd8ac21037e6",
+  "handoff_id": "67acb7fe-8c48-47fb-abc3-fa041129d402",
   "host_state": {
     "adapter_id": null,
     "context_budget_source": null,
@@ -646,22 +651,28 @@
     "retry": null
   },
   "integrity": {
-    "content_sha256": "2b1e2b89e58df41f1a271c8620631d3c370f348eeafb609448fc5d6cbe83f3d1",
+    "content_sha256": "fa5d795eb54b25ab9414f2e8447fc458a8d41bab08c82205455fa04ca1723fea",
     "redaction_complete": true
   },
   "memory_references": [],
   "mission": "# Execution directive\n\nExecute the Forge Conductor repair and extension package end to end.\n\n1. Read the repository root `AGENTS.md` and every document it marks as required.\n2. Load `.forge-codex/state/run-state.json`; initialize it only if absent.\n3. Use the included audit evidence as the starting hypothesis set, then prove runtime reachability before labeling source-level lifecycle risks as live leaks.\n4. Preserve every current capability and compatibility surface. Build a feature baseline and executable parity tests before behavior-changing refactors.\n5. Repair the known telemetry, gauge, lifecycle, concurrency, and performance defects.\n6. implement the project-scoped memory MCP and autonomous continuity system described by the contracts.\n7. Build a supported host adapter as an internal plugin target when automatic session creation is not already supplied by the host. Never use private UI scripting as a substitute for a supported session API.\n8. Build, test, profile, debug, repair, and repeat until every hard gate passes.\n9. Persist progress, evidence, decisions, and handoffs after every material step. Resume automatically after interruption.\n10. Do not ask the operator for decisions. Follow the fail-forward and decision policies.\n11. Do not add generator credits, automated-author notices, watermarks, or authorship trailers to source, documentation, commits, assets, or metadata.\n12. Do not declare completion until `.forge-codex/scripts/verify_completion.py` exits successfully and the resulting completion report points to the underlying evidence.\n\nBegin with phase P00 and continue through P12 in dependency order, while executing independent ready work whenever a non-global gate is blocked.\n",
   "next_actions": [
     {
-      "action": "Resume the selected P10 slice from current main after PR #19 conflict resolution.",
+      "action": "Publish the bounded PR #19 checkpoint and verify exact GitHub head/base/readback without merging.",
       "command": null,
       "order": 1,
       "success_condition": null
     },
     {
-      "action": "Keep E2, P10, G09-G12, native UI and signing, shell native qualification, autonomous continuity, and physical-hardware qualification open until their required evidence exists.",
+      "action": "Build and development-sign the exact committed source in a dedicated DerivedData path, verify the bundle, and attempt the read-only signed admission observation through the native SMAppService lane.",
       "command": null,
       "order": 2,
+      "success_condition": null
+    },
+    {
+      "action": "Keep E2, P10, G09-G12, native UI/signing, real-provider continuity, and owner-deferred hardware open unless their required evidence is produced.",
+      "command": null,
+      "order": 3,
       "success_condition": null
     }
   ],
@@ -709,23 +720,44 @@
       "summary": "Caller-sealed helper identity requires signed-process and freshness qualification"
     }
   ],
-  "operation_id": "e32cf224-530a-4d26-8fb6-5f3348a67ddf",
+  "operation_id": "cd316910-d341-45a4-88b6-b0355623581b",
   "predecessor_session": {
     "model": null,
     "provider_session_id": null,
-    "session_id": "codex-current"
+    "session_id": "codex-p10-admission-checkpoint"
   },
   "project": {
-    "branch": "security/e2-harness-controls",
-    "commit": "57c0366b82b992853ddd967d46d726b56abf233e",
+    "branch": "repair/e2-qualification-next",
+    "commit": "9e695f514caa7894903f54a92139c33eb43eb46d",
     "dirty_summary": [
-      "M .forge-codex/state/events.jsonl",
+      "M .forge-codex/PACKAGE_VALIDATION.json",
+      " M .forge-codex/state/completion-report.json",
+      " M .forge-codex/state/completion-report.md",
+      " M .forge-codex/state/current-handoff.json",
+      " M .forge-codex/state/environment.json",
+      " M .forge-codex/state/events.jsonl",
+      " M .forge-codex/state/evidence-index.json",
       " M .forge-codex/state/release-handoff.md",
-      " M .forge-codex/state/run-state.json"
+      " M .forge-codex/state/run-state.json",
+      "?? .forge-codex/evidence/EVID-20260831T132827Z-ce9b22a5e0.json",
+      "?? .forge-codex/evidence/EVID-20260831T132827Z-ce9b22a5e0.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260831T132827Z-ce9b22a5e0.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260831T133202Z-1388f87b63.json",
+      "?? .forge-codex/evidence/EVID-20260831T133202Z-1388f87b63.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260831T133202Z-1388f87b63.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260831T133213Z-d4178c34a2.json",
+      "?? .forge-codex/evidence/EVID-20260831T133213Z-d4178c34a2.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260831T133213Z-d4178c34a2.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260831T133355Z-7f9c698548.json",
+      "?? .forge-codex/evidence/EVID-20260831T133355Z-7f9c698548.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260831T133355Z-7f9c698548.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260831T133355Z-948e5bec13.json",
+      "?? .forge-codex/evidence/EVID-20260831T133355Z-948e5bec13.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260831T133355Z-948e5bec13.stdout.txt"
     ],
-    "display_name": "Forge-Conductor-E2-Harness",
-    "project_id": "1a66296d-5d47-5b13-889e-db25daa166aa",
-    "repository_root": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Harness"
+    "display_name": "Forge-Conductor-E2-Next",
+    "project_id": "0ece4408-5617-5b9a-87cb-ae1d75a5c8a8",
+    "repository_root": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next"
   },
   "schema_version": 1,
   "successor_session": null,

@@ -1,0 +1,96 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 231344,
+      "path": ".forge-codex/evidence/EVID-20260831T132827Z-ce9b22a5e0.stdout.txt",
+      "sha256": "62ba07749a354d503da2096e6f88ac8bdc37af8d760bf57e086dc62249f1977e",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 13238,
+      "path": ".forge-codex/evidence/EVID-20260831T132827Z-ce9b22a5e0.stderr.txt",
+      "sha256": "94dd6cc256005c252b093ab6fecf9c717461f2d52782410e65e78aa9c35e840f",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "child_evidence_context": {
+    "binding_schema_version": 1,
+    "evidence_id": "EVID-20260831T132827Z-ce9b22a5e0",
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "3e4fe44b3d96938c30d6b83f7d92d417489a97be",
+      "branch": "repair/e2-qualification-next",
+      "head_sha": "9e695f514caa7894903f54a92139c33eb43eb46d",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next"
+    },
+    "schema_version": 1,
+    "source_manifest": {
+      "bytes": 10399125,
+      "file_count": 275,
+      "schema_version": 1,
+      "sha256": "777855cbc51a2d58713f28d943e1e4cde6642445a5aed50ac41fc718b32e5012"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "command": "swift test --no-parallel --jobs 4",
+  "ended_at": "2026-08-31T13:31:32.021883+00:00",
+  "environment": {
+    "architecture": "arm64",
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next",
+    "machine_identifier": "Mac16,7",
+    "macos_build": "25G83",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "execution_provenance": {
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "3e4fe44b3d96938c30d6b83f7d92d417489a97be",
+      "branch": "repair/e2-qualification-next",
+      "head_sha": "9e695f514caa7894903f54a92139c33eb43eb46d",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "exit_code": 0,
+  "id": "EVID-20260831T132827Z-ce9b22a5e0",
+  "kind": "swift-test-debug",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [
+    "FC-FILESYSTEM-PATH-TOCTOU-001"
+  ],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 10399125,
+    "file_count": 275,
+    "schema_version": 1,
+    "sha256": "777855cbc51a2d58713f28d943e1e4cde6642445a5aed50ac41fc718b32e5012"
+  },
+  "source_manifest_after": {
+    "bytes": 10399125,
+    "file_count": 275,
+    "schema_version": 1,
+    "sha256": "777855cbc51a2d58713f28d943e1e4cde6642445a5aed50ac41fc718b32e5012"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-31T13:28:27.273428+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

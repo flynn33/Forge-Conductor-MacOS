@@ -31,6 +31,14 @@
       "signature": "EVID-20260831T035638Z-5798086c52",
       "timestamp": "2026-08-31T04:09:39.752326+00:00",
       "work_id": "P10"
+    },
+    {
+      "attempt": 2,
+      "operation_id": "p10-admission-observation-9e695f5",
+      "outcome": "progress",
+      "signature": "EVID-20260831T132827Z-ce9b22a5e0",
+      "timestamp": "2026-08-31T13:36:24.840652+00:00",
+      "work_id": "P10"
     }
   ],
   "created_at": "2026-08-23T18:32:04.449808+00:00",
@@ -547,6 +555,11 @@
     "EVID-20260831T041652Z-4ca0740c74",
     "EVID-20260831T041659Z-99d5d9f661",
     "EVID-20260831T060522Z-03c32cb838",
+    "EVID-20260831T132827Z-ce9b22a5e0",
+    "EVID-20260831T133202Z-1388f87b63",
+    "EVID-20260831T133213Z-d4178c34a2",
+    "EVID-20260831T133355Z-7f9c698548",
+    "EVID-20260831T133355Z-948e5bec13",
     "a5466d4e5b4d7a10f87df64ddfdb58b6b8ca5159a57c20527e98802a822245d7",
     "a5d4276cbf14db3a91baa7f6b79fb8cdb3fb042a2eaf663d3219ff36b5451667",
     "b3dc11a8dc286fa33b6567ff62089692e64787b23a66718cfe1766dc27195724",
@@ -740,6 +753,8 @@
   "handoffs": [
     "00d75d8d-ee0a-41ca-aedf-0b2fa1496ab8",
     "647aac53-0d73-43bf-b1c7-860e35112a0f",
+    "6535e347-a9bb-4eae-af9a-34f4a4e0b42e",
+    "67acb7fe-8c48-47fb-abc3-fa041129d402",
     "810010d7-b872-41ff-8d51-414b7270ca9d",
     "81f5a5ad-75ac-487f-917f-fd8ac21037e6",
     "82441ec1-a7ed-4137-8ec5-3d2dd99739bb",
@@ -964,12 +979,12 @@
       "created_at": "2026-08-27T23:39:59.864993+00:00",
       "evidence_class": "E2",
       "id": "FC-FILESYSTEM-PATH-TOCTOU-001",
-      "notes": "E2 and FCA-007 remain mandatory release blockers under the same-UID threat model. Protocol v5 uses capture-first quarantine-and-verify semantics, a canonical SHA-256 authority-envelope digest, schema-3 receipts, and exact-only legacy handling. Successful renameatx_np with RENAME_EXCL is the capture linearization point. Namespace-exact mismatch and post-capture metadata change retain the object in root-owned quarantine; content-exact fails closed. This is mitigation, not elimination. Public macOS descriptor-relative open, stat, unlink, rename, renameatx_np, descriptor, fcntl, fsync, and F_FULLFSYNC interfaces do not combine terminal namespace mutation with an expected device, inode, vnode generation, or content token. Source-parent authorization and capture are not atomic: same-UID relocation can move the validated pinned parent outside the authorized root before capture. One winning race can delete one eligible outside-root regular file or symlink whose bytes are unbounded, or quarantine one ineligible directory whose subtree is unbounded. The final ACL/BSD-metadata-check-to-unlinkat race can delete one already captured expected regular file or symlink after its authorization metadata changes; regular-file bytes are unbounded. Terminal quarantine has no authorized restore, release, or purge disposition and cannot be acknowledged while the protected leaf exists; 32 conflicts can exhaust every protected slot on one volume. Caller-ledger removal, relocation, or lock-inode replacement and project-generation races can strand or allow up to 32 captured or terminal transactions per protected volume; each affected regular file can contain unbounded bytes. Writable descriptors and hard links prevent an exact immutable-content guarantee. Startup recovery fencing, terminal physical-state repair, caller-ledger and generation fencing, daemon-owned discovery and revoke, project-binding revoke and garbage collection, qualified external/removable volume behavior, whole-product freshness, direct daemon execution, and the full signed distinct-process 57-row crash, adversarial, lifecycle, volume, hard-link, writable-descriptor, Release, and notarization matrix remain open. Source checkpoint 2dd504e53a5a09837cd289a99eee48ab7f4547eb adds evidence-control schema v2 and artifact-binding schema v1, recorder-owned evidence-specific copies, exact case/role/iteration/subject/predicate/fact and qualification-context binding, current-manifest and Git execution identity checks, bounded descriptor reads, and pathname replacement/rewrite negative tests. The evidence-control suite passed 57 of 57 tests in the final repeated validation. The template remains partial with all 57 rows not_run, all 12 formal predicates false, zero formal references, and a null qualification-context reference. These are controls only: they do not execute a signed distinct-process case, prove a claim true, provide an identity-conditional macOS mutation, or close any formal predicate. Qualification still assumes a trusted quiescent workspace against same-UID transient source-manifest replacement; an arbitrary caller-selected harness is not authenticated; aggregate report and evidence input reads remain unbounded fail-closed denial-of-service surfaces; and the G10 handler does not yet invoke this checker. Post-verification mutation also remains outside immutable-content proof. E2, P10, G10, and G12 remain open; G09 continuity, G11 hardware, native signing/UI, and final release qualification also remain release-blocking; bounded shell compatibility is resolved only under FC-SHELL-COMPAT-QUALIFICATION-001. Nonshipping H0 source checkpoint 399e6a84c4760ddf6c13e02319dc120b4b8998c4 is published in draft PR #19, stacked on PR #18. Recorder evidence EVID-20260831T060522Z-03c32cb838 binds that exact branch, HEAD, main base, source manifest, host, signed harness and adversary identities, live CDHashes, and the exact four-command describe/self-check inventory. Focused Python tests passed 21 of 21, focused Swift isolation/readiness tests passed 17 of 17, and the evidence-control suite passed 57 of 57. H0 executed no production mutation; the semantic qualification context is absent, all 57 E2 rows remain not_run, all 12 formal predicates remain false, and every P10, E2, G10, G12, and release claim remains false. Inode/ctime replacement detection is qualified only on local APFS and is a same-UID mitigation, not elimination. Native UI/signing, real-provider continuity, owner-deferred hardware, and final release qualification remain open and release-blocking.",
+      "notes": "E2 and FCA-007 remain mandatory release blockers under the same-UID threat model. Protocol v5 uses capture-first quarantine-and-verify semantics, a canonical SHA-256 authority-envelope digest, schema-3 receipts, and exact-only legacy handling. Successful renameatx_np with RENAME_EXCL is the capture linearization point. Namespace-exact mismatch and post-capture metadata change retain the object in root-owned quarantine; content-exact fails closed. This is mitigation, not elimination. Public macOS descriptor-relative open, stat, unlink, rename, renameatx_np, descriptor, fcntl, fsync, and F_FULLFSYNC interfaces do not combine terminal namespace mutation with an expected device, inode, vnode generation, or content token. Source-parent authorization and capture are not atomic: same-UID relocation can move the validated pinned parent outside the authorized root before capture. One winning race can delete one eligible outside-root regular file or symlink whose bytes are unbounded, or quarantine one ineligible directory whose subtree is unbounded. The final ACL/BSD-metadata-check-to-unlinkat race can delete one already captured expected regular file or symlink after its authorization metadata changes; regular-file bytes are unbounded. Terminal quarantine has no authorized restore, release, or purge disposition and cannot be acknowledged while the protected leaf exists; 32 conflicts can exhaust every protected slot on one volume. Caller-ledger removal, relocation, or lock-inode replacement and project-generation races can strand or allow up to 32 captured or terminal transactions per protected volume; each affected regular file can contain unbounded bytes. Writable descriptors and hard links prevent an exact immutable-content guarantee. Startup recovery fencing, terminal physical-state repair, caller-ledger and generation fencing, daemon-owned discovery and revoke, project-binding revoke and garbage collection, qualified external/removable volume behavior, whole-product freshness, direct daemon execution, and the full signed distinct-process 57-row crash, adversarial, lifecycle, volume, hard-link, writable-descriptor, Release, and notarization matrix remain open. Source checkpoint 2dd504e53a5a09837cd289a99eee48ab7f4547eb adds evidence-control schema v2 and artifact-binding schema v1, recorder-owned evidence-specific copies, exact case/role/iteration/subject/predicate/fact and qualification-context binding, current-manifest and Git execution identity checks, bounded descriptor reads, and pathname replacement/rewrite negative tests. The evidence-control suite passed 57 of 57 tests in the final repeated validation. The template remains partial with all 57 rows not_run, all 12 formal predicates false, zero formal references, and a null qualification-context reference. These are controls only: they do not execute a signed distinct-process case, prove a claim true, provide an identity-conditional macOS mutation, or close any formal predicate. Qualification still assumes a trusted quiescent workspace against same-UID transient source-manifest replacement; an arbitrary caller-selected harness is not authenticated; aggregate report and evidence input reads remain unbounded fail-closed denial-of-service surfaces; and the G10 handler does not yet invoke this checker. Post-verification mutation also remains outside immutable-content proof. E2, P10, G10, and G12 remain open; G09 continuity, G11 hardware, native signing/UI, and final release qualification also remain release-blocking; bounded shell compatibility is resolved only under FC-SHELL-COMPAT-QUALIFICATION-001. Nonshipping H0 source checkpoint 399e6a84c4760ddf6c13e02319dc120b4b8998c4 is published in draft PR #19, stacked on PR #18. Recorder evidence EVID-20260831T060522Z-03c32cb838 binds that exact branch, HEAD, main base, source manifest, host, signed harness and adversary identities, live CDHashes, and the exact four-command describe/self-check inventory. Focused Python tests passed 21 of 21, focused Swift isolation/readiness tests passed 17 of 17, and the evidence-control suite passed 57 of 57. H0 executed no production mutation; the semantic qualification context is absent, all 57 E2 rows remain not_run, all 12 formal predicates remain false, and every P10, E2, G10, G12, and release claim remains false. Inode/ctime replacement detection is qualified only on local APFS and is a same-UID mitigation, not elimination. Native UI/signing, real-provider continuity, owner-deferred hardware, and final release qualification remain open and release-blocking. Source checkpoint 9e695f514caa7894903f54a92139c33eb43eb46d adds a bounded, non-mutating signed-client admission observation: an authorized CLI holds one identity-checked serviceInfo/status connection across a wrong-identifier adversary probe, while a fail-closed recorder binds static and live CDHashes, PID, EUID, exact daemon hash set, signing-requirement digest, repository, source manifest, and command output. Only a nonzero-exit explicit pre-reply connection_invalidated event plus healthy same-session post-health can be labeled candidate_invalidation_observed. Even that label is candidate-only: it executes zero of 57 matrix rows, proves zero of 12 predicates, exercises no production mutation, and leaves every E2, P10, G10, G12, and release claim false. Exact-commit evidence EVID-20260831T132827Z-ce9b22a5e0 passed 820 Swift tests with two declared skips; EVID-20260831T133202Z-1388f87b63 passed 13 admission-runner tests; EVID-20260831T133213Z-d4178c34a2 passed 57 evidence-control tests; EVID-20260831T133355Z-948e5bec13 passed five checkpoint-identity tests; EVID-20260831T133355Z-7f9c698548 passed the attribution scan. No live signed daemon admission observation has run. Invalid out-of-range runner hold/deadline inputs can fail closed without a structured report; focused hung/oversized/process-group injection coverage is inherited from H0 rather than repeated here; and the candidate report does not cryptographically prove that the signed executable bytes were built from its bound source manifest. Those evidence-control gaps cannot promote qualification. All previously documented filesystem races, unbounded maximum impacts, recovery/lifecycle gaps, full signed 57-row matrix, native UI/signing, real-provider continuity, hardware, and final release blockers remain open.",
       "path": "Sources/ForgeFilesystemDaemon/PrivilegedLeafDeleteEngine.swift",
       "severity": "High",
       "status": "patching",
       "title": "Privileged filesystem boundary remains mitigated but not identity-conditionally closed",
-      "updated_at": "2026-08-31T06:10:59.482760+00:00"
+      "updated_at": "2026-08-31T13:36:24.636419+00:00"
     },
     {
       "created_at": "2026-08-28T10:20:34.631148+00:00",
@@ -1074,26 +1089,26 @@
       "created_at": "2026-08-30T12:54:56.398010+00:00",
       "evidence_class": "E2",
       "id": "FC-PRIVILEGED-SERVICE-LIFECYCLE-001",
-      "notes": "Protocol v5 retains unregister-before-register replacement and generation fencing, installs the exact caller-sealed daemon CodeDirectory requirement before NSXPC activation, and checks protocol, product, service identifier, root EUID, and running daemon hash on the same connection. Pathless transaction query, resume, and acknowledgement retain terminal outcomes until exact acknowledgement. Prior-manifest signed Debug build EVID-20260830T211007Z-760c293557 and bundle check EVID-20260830T211029Z-ae82e789b1 are static support only. Tests do not execute real SMAppService approval, denial, update, disable, unregister and re-register, daemon restart, startup recovery fencing, or capture recovery. Release settings EVID-20260830T211040Z-a8619d99c2 request Developer ID Application, but identity inventory EVID-20260830T211040Z-5f8b21e6d9 shows no usable Developer ID identity. Signed process lifecycle, Release signing, and notarization remain required. E2, P10, G10, and G12 remain open.",
+      "notes": "Protocol v5 retains unregister-before-register replacement and generation fencing, installs the exact caller-sealed daemon CodeDirectory requirement before NSXPC activation, and checks protocol, product, service identifier, root EUID, and running daemon hash on the same connection. Pathless transaction query, resume, and acknowledgement retain terminal outcomes until exact acknowledgement. Prior-manifest signed Debug build EVID-20260830T211007Z-760c293557 and bundle check EVID-20260830T211029Z-ae82e789b1 are static support only. Tests do not execute real SMAppService approval, denial, update, disable, unregister and re-register, daemon restart, startup recovery fencing, or capture recovery. Release settings EVID-20260830T211040Z-a8619d99c2 request Developer ID Application, but identity inventory EVID-20260830T211040Z-5f8b21e6d9 shows no usable Developer ID identity. Signed process lifecycle, Release signing, and notarization remain required. E2, P10, G10, and G12 remain open. Source checkpoint 9e695f514caa7894903f54a92139c33eb43eb46d adds a bounded authorized pre/post health control that must reuse one live XPC connection and retain stable root service identity across the adversary window. It has not been exercised against an installed SMAppService daemon. Approval, denial, enable, update, disable, unregister/re-register, restart, stale-helper replacement, recovery, Release signing, notarization, and native Settings control therefore remain unproven and release-blocking.",
       "path": "Sources/ForgeConductorCore/Infrastructure/SecureFilesystemService.swift",
       "severity": "High",
       "status": "patching",
       "title": "Privileged service updates must not retain a stale registered daemon",
-      "updated_at": "2026-08-30T22:15:41.445163+00:00"
+      "updated_at": "2026-08-31T13:36:24.771170+00:00"
     },
     {
       "created_at": "2026-08-30T13:28:47.621560+00:00",
       "evidence_class": "E2",
       "id": "FC-PRIVILEGED-CALLER-IDENTITY-001",
-      "notes": "Protocol v5 obtains expected per-architecture daemon CodeDirectory hashes from each caller validated running signature, composes them into the NSXPC requirement before activation, and repeats the exact running-hash and protocol handshake before every mutation or transaction-control message. The canonical app graph builds one app, embedded CLI, and daemon artifact set. Prior-manifest signed Debug build EVID-20260830T211007Z-760c293557 and bundle check EVID-20260830T211029Z-ae82e789b1 verify static same-build identities only. They do not execute signed app, installed manager, raw CLI, or standalone CLI calls or stale-helper, wrong-team, wrong-identifier, timeout, upgrade, restart, Release, and notarization cases. Whole-product rollback still lacks a monotonic root-owned receipt; an older allowlisted daemon retains its bounded root mutation authority and vulnerabilities. This is mitigation, not elimination. Caller identity, service lifecycle, E2, P10, G10, and G12 remain open.",
+      "notes": "Protocol v5 obtains expected per-architecture daemon CodeDirectory hashes from each caller validated running signature, composes them into the NSXPC requirement before activation, and repeats the exact running-hash and protocol handshake before every mutation or transaction-control message. The canonical app graph builds one app, embedded CLI, and daemon artifact set. Prior-manifest signed Debug build EVID-20260830T211007Z-760c293557 and bundle check EVID-20260830T211029Z-ae82e789b1 verify static same-build identities only. They do not execute signed app, installed manager, raw CLI, or standalone CLI calls or stale-helper, wrong-team, wrong-identifier, timeout, upgrade, restart, Release, and notarization cases. Whole-product rollback still lacks a monotonic root-owned receipt; an older allowlisted daemon retains its bounded root mutation authority and vulnerabilities. This is mitigation, not elimination. Caller identity, service lifecycle, E2, P10, G10, and G12 remain open. Source checkpoint 9e695f514caa7894903f54a92139c33eb43eb46d adds a private read-only serviceInfo/status health interface, caller-sealed exact daemon CDHash reporting, an exact wrong-identifier admission probe, absolute two-second deadline arbitration, and a fail-closed paired-control recorder. Unit, source, and recorder tests pass, but no live signed daemon observation has executed. A future explicit invalidation remains candidate evidence only and cannot establish caller rejection, freshness, whole-product provenance, Release identity, or close E2/P10/G10/G12. The runner also lacks a cryptographic source-manifest-to-built-binary attestation and retains the documented fail-closed invalid-input report gap.",
       "path": "Sources/ForgeConductorCore/Infrastructure/SecureFilesystemService.swift",
       "severity": "High",
       "status": "patching",
       "title": "Caller-sealed helper identity requires signed-process and freshness qualification",
-      "updated_at": "2026-08-30T22:15:41.618707+00:00"
+      "updated_at": "2026-08-31T13:36:24.702972+00:00"
     }
   ],
-  "last_event_sequence": 758,
+  "last_event_sequence": 770,
   "phases": {
     "P00": {
       "attempts": 1,
@@ -1175,13 +1190,13 @@
     }
   },
   "repository": {
-    "branch": "security/e2-harness-controls",
-    "commit": "57c0366b82b992853ddd967d46d726b56abf233e",
+    "branch": "repair/e2-qualification-next",
+    "commit": "9e695f514caa7894903f54a92139c33eb43eb46d",
     "dirty": true,
-    "root": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Harness"
+    "root": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next"
   },
   "run_id": "aba90ab1-be80-4cc5-aa0b-23dd54d4a24d",
   "schema_version": 1,
   "status": "active",
-  "updated_at": "2026-08-31T10:51:30.561777+00:00"
+  "updated_at": "2026-08-31T13:42:17.543401+00:00"
 }

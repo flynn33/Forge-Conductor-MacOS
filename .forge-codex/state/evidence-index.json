@@ -1,5 +1,5 @@
 {
-  "artifact_count": 1531,
+  "artifact_count": 1546,
   "artifacts": [
     {
       "bytes": 1030,
@@ -7447,6 +7447,81 @@
       "sha256": "61815028d1c2a05a107d108fc8c044ab00a665b6a11801e930620228a2ab96a8"
     },
     {
+      "bytes": 3057,
+      "path": ".forge-codex/evidence/EVID-20260831T132827Z-ce9b22a5e0.json",
+      "sha256": "c0b2ad9daa5f2eace0c358b71293cae801e4bf9af41d86a8d4292a70fcab4043"
+    },
+    {
+      "bytes": 13238,
+      "path": ".forge-codex/evidence/EVID-20260831T132827Z-ce9b22a5e0.stderr.txt",
+      "sha256": "94dd6cc256005c252b093ab6fecf9c717461f2d52782410e65e78aa9c35e840f"
+    },
+    {
+      "bytes": 231344,
+      "path": ".forge-codex/evidence/EVID-20260831T132827Z-ce9b22a5e0.stdout.txt",
+      "sha256": "62ba07749a354d503da2096e6f88ac8bdc37af8d760bf57e086dc62249f1977e"
+    },
+    {
+      "bytes": 3127,
+      "path": ".forge-codex/evidence/EVID-20260831T133202Z-1388f87b63.json",
+      "sha256": "444268c8f18d1155cdf1edf79ea447049b793e682e8b5e4934a7fcc39f7f80dc"
+    },
+    {
+      "bytes": 112,
+      "path": ".forge-codex/evidence/EVID-20260831T133202Z-1388f87b63.stderr.txt",
+      "sha256": "5823bfeb86eaae4de267a6b50a8c678915776664291db17680146c77a91b8545"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260831T133202Z-1388f87b63.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 3077,
+      "path": ".forge-codex/evidence/EVID-20260831T133213Z-d4178c34a2.json",
+      "sha256": "07ab60561d5d9887e30d36f04e1ac06fbf87e655b209a952ee70878f4d2153a3"
+    },
+    {
+      "bytes": 157,
+      "path": ".forge-codex/evidence/EVID-20260831T133213Z-d4178c34a2.stderr.txt",
+      "sha256": "a8ba94871dabb397024b74a39aa59d117931f2ae32f3c8cc3b8d57ff46f984ab"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260831T133213Z-d4178c34a2.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 3034,
+      "path": ".forge-codex/evidence/EVID-20260831T133355Z-7f9c698548.json",
+      "sha256": "75feb384f889f290e108f7373bc379df2e29428491c0c6caf407081a29b87db6"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260831T133355Z-7f9c698548.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 86,
+      "path": ".forge-codex/evidence/EVID-20260831T133355Z-7f9c698548.stdout.txt",
+      "sha256": "d1b19d4204256953911932c3a7c35e009a2e422f0ac0c8f331443614d1d8e786"
+    },
+    {
+      "bytes": 3043,
+      "path": ".forge-codex/evidence/EVID-20260831T133355Z-948e5bec13.json",
+      "sha256": "50fc0416516d6e05aa90fd746ca0e3bb7bd14a42d18575ff11bc2837e690882c"
+    },
+    {
+      "bytes": 103,
+      "path": ".forge-codex/evidence/EVID-20260831T133355Z-948e5bec13.stderr.txt",
+      "sha256": "888a0c0ed615e57d32cf72be501b0c355f33b8613c81dfdaa99db33d7959487e"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260831T133355Z-948e5bec13.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
       "bytes": 57,
       "path": ".forge-codex/evidence/HANDOFF-INTEGRITY-PASS.txt",
       "sha256": "1489959da865738002cf1bc075169ffbf0fbf2bd11bbceb2e5c3ac12d36fb538"
@@ -7657,7 +7732,7 @@
       "sha256": "cdc4f84750dca05cb0186e6032b4bce580697b7b2ae6c3357164cea8e3b0e59a"
     }
   ],
-  "generated_at": "2026-08-31T06:14:05.733180+00:00",
-  "repository": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Harness",
+  "generated_at": "2026-08-31T13:41:06.979554+00:00",
+  "repository": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next",
   "schema_version": 1
 }

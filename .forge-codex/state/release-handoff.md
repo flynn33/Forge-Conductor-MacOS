@@ -302,26 +302,65 @@ required signed matrix and all other hard gates remain open. The earlier failed
 strict record `EVID-20260830T151425Z-09e2526950` remains a superseded negative
 baseline, not pass evidence.
 
+## Signed admission-observation control checkpoint
+
+Source checkpoint `9e695f514caa7894903f54a92139c33eb43eb46d`
+adds a bounded, non-mutating signed-client admission observation. An authorized
+CLI health command holds one private `serviceInfo`/`status` XPC connection
+across a wrong-identifier adversary probe. The recorder binds the repository,
+source manifest, static and live CodeDirectory hashes, process identifiers,
+effective user identifier, exact daemon hash set, daemon signing-requirement
+digest, and canonical command output. Only a nonzero-exit explicit pre-reply
+`connection_invalidated` event followed by healthy same-session post-health on
+the reused connection can receive the label
+`candidate_invalidation_observed`.
+
+That label is deliberately nonqualifying. No live signed daemon observation
+has run, no production mutation was exercised, zero of 57 matrix rows were
+executed, zero of 12 formal predicates were proven, and every E2, P10, G10,
+G12, and release claim remains false. Exact-source evidence
+`EVID-20260831T132827Z-ce9b22a5e0` passed 820 Swift tests with two declared
+environment skips and no failures. Evidence
+`EVID-20260831T133202Z-1388f87b63` passed 13 admission-runner tests,
+`EVID-20260831T133213Z-d4178c34a2` passed all 57 evidence-control tests,
+`EVID-20260831T133355Z-948e5bec13` passed five checkpoint-identity tests, and
+`EVID-20260831T133355Z-7f9c698548` passed the prohibited-attribution scan.
+
+The observation tooling retains three explicit residuals. Invalid out-of-range
+hold or total-deadline values can fail closed without emitting a structured
+blocked report. Focused hung-child, oversized-output, and process-group cleanup
+fault injection is inherited from the H0 runner rather than repeated in the
+admission runner. The report binds source-manifest context and signed/live
+binary identities independently, but does not cryptographically attest that
+the signed executable bytes were built from that manifest. These gaps cannot
+promote candidate evidence. The full signed 57-row matrix, the documented E2
+races and maximum impacts, service lifecycle, native UI and signing, real-
+provider autonomous continuity, owner-deferred hardware, and final release
+qualification remain open and release-blocking.
+
 ## Current branch and pull-request lineage
 
-- Active branch: `security/e2-harness-controls`.
-- H0 source checkpoint:
-  `399e6a84c4760ddf6c13e02319dc120b4b8998c4`.
+- Active isolated working branch: `repair/e2-qualification-next`.
+- Publication branch: `security/e2-harness-controls`.
+- Signed admission-observation source checkpoint:
+  `9e695f514caa7894903f54a92139c33eb43eb46d`.
 - A later commit containing only handoff, doctor, selector, or publication
   readback does not change that source checkpoint; it is a distinct state-only
   transport HEAD. Pull-request readback is authoritative for the transport HEAD.
-- Pull-request base branch and SHA: `security/e2-evidence-binding` at
-  `dfebd8e4b0fe4aea6c6ff33717b9dfce717617d4`; the release base is `main` at
-  `67181bc5f420203099dc827018587034f2c09d95`.
+- Pull-request base branch and SHA: `main` at
+  `3e4fe44b3d96938c30d6b83f7d92d417489a97be`.
 - Current pull request: open draft #19,
-  `https://github.com/flynn33/Forge-Conductor-MacOS/pull/19`, from H0 source
-  checkpoint `399e6a84c4760ddf6c13e02319dc120b4b8998c4` into the #17 branch. It is
-  a nonshipping readiness checkpoint with neither merge nor release authority.
+  `https://github.com/flynn33/Forge-Conductor-MacOS/pull/19`, from publication
+  branch `security/e2-harness-controls` into `main`. Before this checkpoint is
+  pushed, its remote head is `ac7724b090d67490794b48bfdda72add751e2ec0`;
+  post-push readback must match the new state-only transport HEAD. It remains a
+  nonshipping readiness checkpoint with neither merge nor release authority.
 - Pull request #18 was squash-merged into #17 as
-  `6ae3ca2b6abf4d67ce6b5ceb70bc5980794466a1`. Pull request #17 is open and
-  non-draft against current `main`.
+  `6ae3ca2b6abf4d67ce6b5ceb70bc5980794466a1`. Pull request #17 was then
+  squash-merged into `main` as
+  `3e4fe44b3d96938c30d6b83f7d92d417489a97be`.
 - Pull request #16 was merged into `main` as
-  `67181bc5f420203099dc827018587034f2c09d95`; it is now in the ancestry of
+  `67181bc934216e28e005fe28d90c791bef07f9ff`; it is now in the ancestry of
   both #17 and #19.
 - Pull request #9 (`repair/autonomous-continuity` at
   `6321bd98012e5f60b2779bbb401cc2827f372b16`) was based on
@@ -342,7 +381,7 @@ baseline, not pass evidence.
 - Pull request #14 was squash-merged as
   `8bcc039a2f0d4d17b871d5e968b3b37a663c5ccb`. Pull request #15 was then
   squash-merged as `cd7e84fed8ed0fe0a8ec90793e83388c8a451f09`, and pull
-  request #16 was merged as `67181bc5f420203099dc827018587034f2c09d95`.
+  request #16 was merged as `67181bc934216e28e005fe28d90c791bef07f9ff`.
 - Those commits are ancestors of this branch. None of these relationships
   closes P10, E2, shell compatibility, native validation,
   autonomous continuity, representative hardware qualification, or G09-G12.
