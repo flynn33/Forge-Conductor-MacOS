@@ -15,13 +15,22 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 
-from evidence_support import source_manifest
+from evidence_support import (
+    EVIDENCE_CONTEXT_SCHEMA_VERSION,
+    EvidenceSupportError,
+    QUALIFICATION_ARTIFACT_BINDING_SCHEMA_VERSION,
+    canonical_json_sha256,
+    load_qualification_artifact,
+    source_manifest,
+)
 from check_p10_protocol_compatibility import (
     CompatibilityError,
     MAXIMUM_MCP_MESSAGE_BYTES,
     MCPProcess,
 )
+from record_command import execution_provenance
 
 
 SCRIPT_ROOT = pathlib.Path(__file__).resolve().parent
@@ -35,6 +44,10 @@ PRIVILEGED_FILESYSTEM_QUALIFICATION = (
 PRIVILEGED_FILESYSTEM_SCHEMA = (
     SCRIPT_ROOT.parent / "schemas/p10-privileged-filesystem-qualification-report.schema.json"
 )
+PRIVILEGED_FILESYSTEM_ARTIFACT_SCHEMA = (
+    SCRIPT_ROOT.parent
+    / "schemas/p10-privileged-filesystem-artifact-binding.schema.json"
+)
 PRIVILEGED_FILESYSTEM_TEMPLATE = (
     SCRIPT_ROOT.parent / "templates/p10-privileged-filesystem-qualification-report.json"
 )
@@ -45,26 +58,67 @@ class EvidenceControlTests(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
-    def install_fixture_evidence(
+    def install_scoped_evidence(
         self,
         root: pathlib.Path,
         *,
-        evidence_id: str = "EVID-fixture-qualification",
+        evidence_id: str,
         evidence_kind: str = "p10-privileged-filesystem-qualification",
-    ) -> dict[str, str]:
+        bindings: dict[str, tuple[dict[str, object], object]],
+    ) -> dict[str, dict[str, str]]:
         schema_path = (
             root
             / ".forge-codex/schemas/p10-privileged-filesystem-qualification-report.schema.json"
         )
         schema_path.parent.mkdir(parents=True, exist_ok=True)
         schema_path.write_bytes(PRIVILEGED_FILESYSTEM_SCHEMA.read_bytes())
-        artifact_path = root / f".forge-codex/evidence/{evidence_id}.txt"
-        artifact_path.parent.mkdir(parents=True, exist_ok=True)
-        artifact_data = f"signed qualification fixture: {evidence_id}\n".encode()
-        artifact_path.write_bytes(artifact_data)
-        artifact_hash = hashlib.sha256(artifact_data).hexdigest()
+        artifact_schema_path = (
+            root
+            / ".forge-codex/schemas/p10-privileged-filesystem-artifact-binding.schema.json"
+        )
+        artifact_schema_path.write_bytes(PRIVILEGED_FILESYSTEM_ARTIFACT_SCHEMA.read_bytes())
         manifest = source_manifest(root)
-        relative_path = artifact_path.relative_to(root).as_posix()
+        provenance = execution_provenance(root.resolve())
+        evidence_directory = root / ".forge-codex/evidence"
+        evidence_directory.mkdir(parents=True, exist_ok=True)
+        artifact_records: list[dict[str, object]] = []
+        references: dict[str, dict[str, str]] = {}
+        for index, (token, (scope, fact)) in enumerate(bindings.items()):
+            self.assertRegex(token, r"^[a-z0-9-]+$")
+            artifact_path = (
+                evidence_directory
+                / f"{evidence_id}.artifact-{index:03d}-{token}.json"
+            )
+            self.write_json(
+                artifact_path,
+                {
+                    "schema_version": QUALIFICATION_ARTIFACT_BINDING_SCHEMA_VERSION,
+                    "qualification": "p10-privileged-filesystem",
+                    "evidence_id": evidence_id,
+                    "source_manifest": manifest,
+                    "scope": scope,
+                    "fact_sha256": canonical_json_sha256(fact),
+                    "claim": "Signed qualification fact binding.",
+                },
+            )
+            artifact_path.chmod(0o444)
+            artifact_data = artifact_path.read_bytes()
+            artifact_hash = hashlib.sha256(artifact_data).hexdigest()
+            relative_path = artifact_path.relative_to(root).as_posix()
+            artifact_records.append(
+                {
+                    "path": relative_path,
+                    "source_path": f"qualification-artifacts/{token}.json",
+                    "bytes": len(artifact_data),
+                    "sha256": artifact_hash,
+                    "storage": "evidence-id-specific-copy",
+                }
+            )
+            references[token] = {
+                "evidence_id": evidence_id,
+                "path": relative_path,
+                "sha256": artifact_hash,
+            }
         self.write_json(
             root / f".forge-codex/evidence/{evidence_id}.json",
             {
@@ -78,26 +132,39 @@ class EvidenceControlTests(unittest.TestCase):
                 "timed_out": False,
                 "stream_limit_exceeded": False,
                 "artifact_capture_errors": [],
+                "started_at": "2026-08-29T23:59:59+00:00",
+                "ended_at": "2026-08-30T00:00:01+00:00",
+                "environment": {
+                    "platform": provenance["test_environment"]["platform"],
+                    "architecture": provenance["test_environment"]["architecture"],
+                    "macos_build": provenance["test_environment"]["macos_build"],
+                    "machine_identifier": provenance["test_environment"][
+                        "machine_identifier"
+                    ],
+                    "cwd": provenance["repository"]["repository_path"],
+                },
+                "execution_provenance": provenance,
                 "source_manifest": manifest,
                 "source_manifest_after": manifest,
                 "source_manifest_changed": False,
+                "child_evidence_context": {
+                    "schema_version": EVIDENCE_CONTEXT_SCHEMA_VERSION,
+                    "binding_schema_version": QUALIFICATION_ARTIFACT_BINDING_SCHEMA_VERSION,
+                    "evidence_id": evidence_id,
+                    "source_manifest": manifest,
+                    "repository": provenance["repository"],
+                    "test_environment": provenance["test_environment"],
+                    "qualification": "p10-privileged-filesystem",
+                },
                 "ledger_reference": {"status": "recorded", "exit_code": 0},
-                "artifacts": [
-                    {
-                        "path": relative_path,
-                        "bytes": len(artifact_data),
-                        "sha256": artifact_hash,
-                        "storage": "evidence-id-specific-copy",
-                    }
-                ],
+                "artifacts": artifact_records,
             },
         )
         run_state_path = root / ".forge-codex/state/run-state.json"
         run_state = json.loads(run_state_path.read_text(encoding="utf-8"))
-        run_state["evidence"] = [
-            *run_state.get("evidence", []),
-            evidence_id,
-        ]
+        run_state["evidence"] = list(
+            dict.fromkeys([*run_state.get("evidence", []), evidence_id])
+        )
         run_state["issues"] = [
             {
                 "id": "FC-FILESYSTEM-PATH-TOCTOU-001",
@@ -105,17 +172,46 @@ class EvidenceControlTests(unittest.TestCase):
             }
         ]
         self.write_json(run_state_path, run_state)
+        return references
+
+    def replace_scoped_artifact(
+        self,
+        root: pathlib.Path,
+        reference: dict[str, str],
+        value: dict[str, object],
+    ) -> dict[str, str]:
+        artifact_path = root / reference["path"]
+        artifact_path.chmod(0o644)
+        self.write_json(artifact_path, value)
+        artifact_path.chmod(0o444)
+        artifact_data = artifact_path.read_bytes()
+        artifact_hash = hashlib.sha256(artifact_data).hexdigest()
+        evidence_record_path = (
+            root / f".forge-codex/evidence/{reference['evidence_id']}.json"
+        )
+        evidence_record = json.loads(
+            evidence_record_path.read_text(encoding="utf-8")
+        )
+        matches = [
+            artifact
+            for artifact in evidence_record["artifacts"]
+            if artifact["path"] == reference["path"]
+        ]
+        self.assertEqual(len(matches), 1)
+        matches[0]["bytes"] = len(artifact_data)
+        matches[0]["sha256"] = artifact_hash
+        self.write_json(evidence_record_path, evidence_record)
         return {
-            "evidence_id": evidence_id,
-            "path": relative_path,
+            "evidence_id": reference["evidence_id"],
+            "path": reference["path"],
             "sha256": artifact_hash,
         }
 
     def populate_passing_filesystem_case(
         self,
+        root: pathlib.Path,
         name: str,
         case: dict[str, object],
-        artifact_reference: dict[str, str],
     ) -> None:
         mount_cases = {
             "outside_root_sentinel_preservation",
@@ -153,7 +249,7 @@ class EvidenceControlTests(unittest.TestCase):
             "upgrade_unregister_reregister",
         }
         case["status"] = "passed"
-        case["raw_artifact_references"] = [artifact_reference]
+        case["raw_artifact_references"] = []
         case["iterations"] = {
             "planned": 1,
             "executed": 1,
@@ -167,7 +263,7 @@ class EvidenceControlTests(unittest.TestCase):
                 "status": "reached",
                 "iteration": 1,
                 "monotonic_timestamp_ns": 1,
-                "raw_artifact_reference": artifact_reference,
+                "raw_artifact_reference": None,
             }
         ]
         case["process_identities"] = [
@@ -176,6 +272,7 @@ class EvidenceControlTests(unittest.TestCase):
                 "pid": 123,
                 "effective_uid": 0,
                 "executable_path": str(pathlib.Path(sys.executable).resolve()),
+                "raw_artifact_reference": None,
             }
         ]
         case["signing_identities"] = [
@@ -186,6 +283,7 @@ class EvidenceControlTests(unittest.TestCase):
                 "signing_identifier": "com.example.signed-helper",
                 "code_directory_hash": hashlib.sha256(b"signed-helper").hexdigest(),
                 "designated_requirement": "identifier com.example.signed-helper",
+                "raw_artifact_reference": None,
             }
         ]
         fixture = {
@@ -197,6 +295,7 @@ class EvidenceControlTests(unittest.TestCase):
             "sha256": hashlib.sha256(b"outside-root-sentinel").hexdigest(),
             "acl_sha256": hashlib.sha256(b"owner-only-acl").hexdigest(),
             "bsd_flags": 0,
+            "raw_artifact_reference": None,
         }
         case["fixture_digests"] = {
             "before": [fixture],
@@ -214,7 +313,7 @@ class EvidenceControlTests(unittest.TestCase):
                 "removable": False,
                 "network": False,
                 "ownership_enabled": True,
-                "raw_artifact_reference": artifact_reference,
+                "raw_artifact_reference": None,
             }
             if name == "network_volume_rejected":
                 case["mount_facts"]["local"] = False
@@ -230,32 +329,143 @@ class EvidenceControlTests(unittest.TestCase):
                 "timing": "after",
                 "signal": "SIGKILL",
                 "restart_observed": True,
-                "raw_artifact_reference": artifact_reference,
+                "raw_artifact_reference": None,
             }
         case["observed_result"] = "Signed qualification completed conclusively."
+
+        barrier = case["barrier_evidence"][0]
+        process = case["process_identities"][0]
+        signing = case["signing_identities"][0]
+        before_fixture = case["fixture_digests"]["before"][0]
+        after_fixture = case["fixture_digests"]["after"][0]
+
+        def fact_without_reference(value: dict[str, object]) -> dict[str, object]:
+            return {
+                key: item
+                for key, item in value.items()
+                if key != "raw_artifact_reference"
+            }
+
+        bindings: dict[str, tuple[dict[str, object], object]] = {
+            "case-result-1": (
+                {
+                    "case_id": name,
+                    "role": "case_result",
+                    "iteration": 1,
+                    "subject": None,
+                    "predicate": None,
+                },
+                {
+                    "contracts_exercised": case["contracts_exercised"],
+                    "status": case["status"],
+                    "iterations": case["iterations"],
+                    "observed_result": case["observed_result"],
+                },
+            ),
+            "barrier-1": (
+                {
+                    "case_id": name,
+                    "role": "barrier",
+                    "iteration": 1,
+                    "subject": barrier["name"],
+                    "predicate": None,
+                },
+                fact_without_reference(barrier),
+            ),
+            "process-helper": (
+                {
+                    "case_id": name,
+                    "role": "process_identity",
+                    "iteration": None,
+                    "subject": process["role"],
+                    "predicate": None,
+                },
+                fact_without_reference(process),
+            ),
+            "signing-helper": (
+                {
+                    "case_id": name,
+                    "role": "signing_identity",
+                    "iteration": None,
+                    "subject": signing["role"],
+                    "predicate": None,
+                },
+                fact_without_reference(signing),
+            ),
+            "fixture-before": (
+                {
+                    "case_id": name,
+                    "role": "fixture_before",
+                    "iteration": None,
+                    "subject": before_fixture["label"],
+                    "predicate": None,
+                },
+                fact_without_reference(before_fixture),
+            ),
+            "fixture-after": (
+                {
+                    "case_id": name,
+                    "role": "fixture_after",
+                    "iteration": None,
+                    "subject": after_fixture["label"],
+                    "predicate": None,
+                },
+                fact_without_reference(after_fixture),
+            ),
+        }
+        if case["mount_facts"]["applicable"] is True:
+            bindings["mount"] = (
+                {
+                    "case_id": name,
+                    "role": "mount",
+                    "iteration": None,
+                    "subject": None,
+                    "predicate": None,
+                },
+                fact_without_reference(case["mount_facts"]),
+            )
+        if case["crash_point"]["applicable"] is True:
+            bindings["crash"] = (
+                {
+                    "case_id": name,
+                    "role": "crash",
+                    "iteration": None,
+                    "subject": None,
+                    "predicate": None,
+                },
+                fact_without_reference(case["crash_point"]),
+            )
+        references = self.install_scoped_evidence(
+            root,
+            evidence_id=f"EVID-fixture-case-{name}",
+            bindings=bindings,
+        )
+        case["raw_artifact_references"] = [references["case-result-1"]]
+        barrier["raw_artifact_reference"] = references["barrier-1"]
+        process["raw_artifact_reference"] = references["process-helper"]
+        signing["raw_artifact_reference"] = references["signing-helper"]
+        before_fixture["raw_artifact_reference"] = references["fixture-before"]
+        after_fixture["raw_artifact_reference"] = references["fixture-after"]
+        if "mount" in references:
+            case["mount_facts"]["raw_artifact_reference"] = references["mount"]
+        if "crash" in references:
+            case["crash_point"]["raw_artifact_reference"] = references["crash"]
 
     def privileged_filesystem_report(
         self,
         root: pathlib.Path,
         matrix: dict[str, object],
-        formal_artifact_reference: dict[str, str],
     ) -> dict[str, object]:
         report = json.loads(PRIVILEGED_FILESYSTEM_TEMPLATE.read_text(encoding="utf-8"))
+        provenance = execution_provenance(root.resolve())
         report.update(
             {
                 "status": "passed",
                 "ok": True,
                 "source_manifest": source_manifest(root),
                 "captured_at": "2026-08-30T00:00:00Z",
-                "repository": {
-                    "branch": "fixture",
-                    "head_sha": "a" * 40,
-                    "base_branch": "origin/main",
-                },
-                "test_environment": {
-                    "macos_build": "fixture-build",
-                    "machine_identifier": "fixture-machine",
-                },
+                "repository": provenance["repository"],
+                "test_environment": provenance["test_environment"],
                 "test_processes": {
                     "separately_signed": True,
                     "helper_effective_uid": 0,
@@ -271,15 +481,78 @@ class EvidenceControlTests(unittest.TestCase):
                 "remaining_requirements": [],
             }
         )
+        qualification_context = {
+            "captured_at": report["captured_at"],
+            "repository": report["repository"],
+            "test_environment": report["test_environment"],
+            "test_processes": report["test_processes"],
+            "same_uid_fallback": report["same_uid_fallback"],
+            "same_uid_threat_model": report["same_uid_threat_model"],
+        }
+        context_references = self.install_scoped_evidence(
+            root,
+            evidence_id="EVID-fixture-qualification-context",
+            bindings={
+                "qualification-context": (
+                    {
+                        "case_id": None,
+                        "role": "qualification_context",
+                        "iteration": None,
+                        "subject": None,
+                        "predicate": None,
+                    },
+                    qualification_context,
+                )
+            },
+        )
+        report["qualification_context_artifact_reference"] = context_references[
+            "qualification-context"
+        ]
         formal_closure = report["formal_closure"]
         self.assertIsInstance(formal_closure, dict)
-        for key in formal_closure:
-            if key != "formal_argument_artifact_references":
-                formal_closure[key] = True
+        predicates = sorted(
+            key
+            for key in formal_closure
+            if key != "formal_argument_artifact_references"
+        )
+        formal_bindings: dict[str, tuple[dict[str, object], object]] = {}
+        for index, predicate in enumerate(predicates):
+            formal_closure[predicate] = True
+            formal_bindings[f"formal-{index:02d}"] = (
+                {
+                    "case_id": None,
+                    "role": "formal_argument",
+                    "iteration": None,
+                    "subject": None,
+                    "predicate": predicate,
+                },
+                {"predicate": predicate, "value": True},
+            )
+        formal_references = self.install_scoped_evidence(
+            root,
+            evidence_id="EVID-fixture-formal-arguments",
+            evidence_kind="p10-privileged-filesystem-formal-argument",
+            bindings=formal_bindings,
+        )
         formal_closure["formal_argument_artifact_references"] = [
-            formal_artifact_reference
+            formal_references[f"formal-{index:02d}"]
+            for index in range(len(predicates))
         ]
         return report
+
+    def filesystem_fixture(
+        self,
+        root: pathlib.Path,
+        case_names: tuple[str, ...] | None = None,
+    ) -> tuple[dict[str, object], dict[str, object]]:
+        template = json.loads(
+            PRIVILEGED_FILESYSTEM_TEMPLATE.read_text(encoding="utf-8")
+        )
+        matrix = json.loads(json.dumps(template["matrix"]))
+        selected = set(matrix) if case_names is None else set(case_names)
+        for name in selected:
+            self.populate_passing_filesystem_case(root, name, matrix[name])
+        return matrix, self.privileged_filesystem_report(root, matrix)
 
     def run_completion_checker(
         self,
@@ -386,6 +659,92 @@ class EvidenceControlTests(unittest.TestCase):
             all(list(error.absolute_path)[:1] == ["matrix"] for error in errors),
             errors,
         )
+
+    def test_privileged_filesystem_artifact_binding_schema_is_role_scoped(self) -> None:
+        from jsonschema import Draft202012Validator
+
+        schema = json.loads(
+            PRIVILEGED_FILESYSTEM_ARTIFACT_SCHEMA.read_text(encoding="utf-8")
+        )
+        Draft202012Validator.check_schema(schema)
+        validator = Draft202012Validator(schema)
+        artifact = {
+            "schema_version": QUALIFICATION_ARTIFACT_BINDING_SCHEMA_VERSION,
+            "qualification": "p10-privileged-filesystem",
+            "evidence_id": "EVID-schema-fixture",
+            "source_manifest": {
+                "schema_version": 1,
+                "sha256": hashlib.sha256(b"manifest").hexdigest(),
+                "file_count": 1,
+                "bytes": 1,
+            },
+            "scope": {
+                "case_id": "signed_debug_bundle",
+                "role": "barrier",
+                "iteration": 1,
+                "subject": "capture-complete",
+                "predicate": None,
+            },
+            "fact_sha256": hashlib.sha256(b"fact").hexdigest(),
+            "claim": "The signed barrier was reached.",
+        }
+        self.assertEqual(list(validator.iter_errors(artifact)), [])
+
+        qualification_context = json.loads(json.dumps(artifact))
+        qualification_context["scope"] = {
+            "case_id": None,
+            "role": "qualification_context",
+            "iteration": None,
+            "subject": None,
+            "predicate": None,
+        }
+        self.assertEqual(list(validator.iter_errors(qualification_context)), [])
+
+        invalid_roles = []
+        missing_barrier_subject = json.loads(json.dumps(artifact))
+        missing_barrier_subject["scope"]["subject"] = None
+        invalid_roles.append(missing_barrier_subject)
+        process_with_iteration = json.loads(json.dumps(artifact))
+        process_with_iteration["scope"].update({
+            "role": "process_identity",
+            "iteration": 1,
+            "subject": "helper",
+        })
+        invalid_roles.append(process_with_iteration)
+        formal_with_case_scope = json.loads(json.dumps(artifact))
+        formal_with_case_scope["scope"].update({
+            "role": "formal_argument",
+            "iteration": None,
+            "subject": None,
+            "predicate": "capture_linearization",
+        })
+        invalid_roles.append(formal_with_case_scope)
+        context_with_case_scope = json.loads(json.dumps(qualification_context))
+        context_with_case_scope["scope"]["case_id"] = "signed_debug_bundle"
+        invalid_roles.append(context_with_case_scope)
+        for candidate in invalid_roles:
+            self.assertTrue(list(validator.iter_errors(candidate)), candidate)
+
+    def test_partial_template_keeps_all_release_authority_unclaimed(self) -> None:
+        template = json.loads(
+            PRIVILEGED_FILESYSTEM_TEMPLATE.read_text(encoding="utf-8")
+        )
+        self.assertEqual(template["status"], "partial")
+        self.assertFalse(template["ok"])
+        self.assertIsNone(template["qualification_context_artifact_reference"])
+        self.assertEqual(len(template["matrix"]), 57)
+        self.assertTrue(
+            all(case["status"] == "not_run" for case in template["matrix"].values())
+        )
+        formal = template["formal_closure"]
+        formal_values = [
+            value
+            for key, value in formal.items()
+            if key != "formal_argument_artifact_references"
+        ]
+        self.assertEqual(len(formal_values), 12)
+        self.assertTrue(all(value is False for value in formal_values))
+        self.assertEqual(formal["formal_argument_artifact_references"], [])
 
     def test_completion_checker_rejects_boolean_only_filesystem_matrix(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -496,24 +855,14 @@ class EvidenceControlTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = pathlib.Path(temporary)
             self.make_repository(root)
-            artifact_reference = self.install_fixture_evidence(root)
-            formal_artifact_reference = self.install_fixture_evidence(
-                root,
-                evidence_id="EVID-fixture-formal-argument",
-                evidence_kind="p10-privileged-filesystem-formal-argument",
-            )
             template = json.loads(
                 PRIVILEGED_FILESYSTEM_TEMPLATE.read_text(encoding="utf-8")
             )
             matrix = json.loads(json.dumps(template["matrix"]))
             for name, case in matrix.items():
-                self.populate_passing_filesystem_case(name, case, artifact_reference)
+                self.populate_passing_filesystem_case(root, name, case)
 
-            report = self.privileged_filesystem_report(
-                root,
-                matrix,
-                formal_artifact_reference,
-            )
+            report = self.privileged_filesystem_report(root, matrix)
             complete_contracts = self.run_completion_checker(root, report)
             self.assertNotIn(
                 "privileged filesystem signed adversarial/crash/volume/lifecycle matrix is incomplete",
@@ -533,24 +882,14 @@ class EvidenceControlTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = pathlib.Path(temporary)
             self.make_repository(root)
-            artifact_reference = self.install_fixture_evidence(root)
-            formal_artifact_reference = self.install_fixture_evidence(
-                root,
-                evidence_id="EVID-fixture-formal-argument",
-                evidence_kind="p10-privileged-filesystem-formal-argument",
-            )
             template = json.loads(
                 PRIVILEGED_FILESYSTEM_TEMPLATE.read_text(encoding="utf-8")
             )
             matrix = json.loads(json.dumps(template["matrix"]))
             for name, case in matrix.items():
-                self.populate_passing_filesystem_case(name, case, artifact_reference)
+                self.populate_passing_filesystem_case(root, name, case)
             matrix["signed_debug_bundle"]["raw_artifact_references"] = [{}]
-            report = self.privileged_filesystem_report(
-                root,
-                matrix,
-                formal_artifact_reference,
-            )
+            report = self.privileged_filesystem_report(root, matrix)
 
             result = self.run_completion_checker(root, report)
 
@@ -569,22 +908,15 @@ class EvidenceControlTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = pathlib.Path(temporary)
             self.make_repository(root)
-            artifact_reference = self.install_fixture_evidence(root)
-            formal_artifact_reference = self.install_fixture_evidence(
-                root,
-                evidence_id="EVID-fixture-formal-argument",
-                evidence_kind="p10-privileged-filesystem-formal-argument",
-            )
             template = json.loads(
                 PRIVILEGED_FILESYSTEM_TEMPLATE.read_text(encoding="utf-8")
             )
             matrix = json.loads(json.dumps(template["matrix"]))
             for name, case in matrix.items():
-                self.populate_passing_filesystem_case(name, case, artifact_reference)
-            report = self.privileged_filesystem_report(
-                root,
-                matrix,
-                formal_artifact_reference,
+                self.populate_passing_filesystem_case(root, name, case)
+            report = self.privileged_filesystem_report(root, matrix)
+            artifact_reference = dict(
+                matrix["signed_release_bundle"]["raw_artifact_references"][0]
             )
 
             matrix["signed_release_bundle"]["raw_artifact_references"] = [
@@ -621,24 +953,1207 @@ class EvidenceControlTests(unittest.TestCase):
                 mismatched.stdout,
             )
 
+    def test_completion_checker_rejects_cross_case_artifact_reuse(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.make_repository(root)
+            matrix, report = self.filesystem_fixture(
+                root,
+                case_names=("signed_debug_bundle", "signed_release_bundle"),
+            )
+            debug_reference = dict(
+                matrix["signed_debug_bundle"]["raw_artifact_references"][0]
+            )
+            matrix["signed_release_bundle"]["raw_artifact_references"] = [
+                debug_reference
+            ]
+
+            result = self.run_completion_checker(root, report)
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(
+                "privileged filesystem case signed_release_bundle raw artifact 0 "
+                "semantic artifact does not bind case_id='signed_release_bundle'",
+                result.stdout,
+            )
+            self.assertIn(
+                "artifact is reused across case or role scopes",
+                result.stdout,
+            )
+
+    def test_completion_checker_rejects_case_result_artifact_across_roles(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.make_repository(root)
+            case_name = "crash_at_every_durable_phase"
+            matrix, report = self.filesystem_fixture(root, case_names=(case_name,))
+            case = matrix[case_name]
+            case_result_reference = dict(case["raw_artifact_references"][0])
+            case["barrier_evidence"][0]["raw_artifact_reference"] = dict(
+                case_result_reference
+            )
+            case["process_identities"][0]["raw_artifact_reference"] = dict(
+                case_result_reference
+            )
+            case["signing_identities"][0]["raw_artifact_reference"] = dict(
+                case_result_reference
+            )
+            case["fixture_digests"]["before"][0]["raw_artifact_reference"] = dict(
+                case_result_reference
+            )
+            case["fixture_digests"]["after"][0]["raw_artifact_reference"] = dict(
+                case_result_reference
+            )
+            case["mount_facts"]["raw_artifact_reference"] = dict(
+                case_result_reference
+            )
+            case["crash_point"]["raw_artifact_reference"] = dict(
+                case_result_reference
+            )
+
+            result = self.run_completion_checker(root, report)
+
+            self.assertEqual(result.returncode, 1)
+            for role in (
+                "barrier",
+                "process_identity",
+                "signing_identity",
+                "fixture_before",
+                "fixture_after",
+                "mount",
+                "crash",
+            ):
+                self.assertIn(
+                    f"semantic artifact does not bind role='{role}'",
+                    result.stdout,
+                )
+            self.assertIn(
+                "artifact is reused across case or role scopes",
+                result.stdout,
+            )
+
+    def test_completion_checker_rejects_formal_artifact_reused_for_two_predicates(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.make_repository(root)
+            _, report = self.filesystem_fixture(root, case_names=())
+            formal_references = report["formal_closure"][
+                "formal_argument_artifact_references"
+            ]
+            reused_predicate = json.loads(
+                (root / formal_references[0]["path"]).read_text(encoding="utf-8")
+            )["scope"]["predicate"]
+            formal_references[1] = dict(formal_references[0])
+
+            result = self.run_completion_checker(root, report)
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(
+                f"privileged filesystem formal predicate {reused_predicate} reuses evidence",
+                result.stdout,
+            )
+            self.assertIn(
+                "privileged filesystem formal boundary closure is incomplete",
+                result.stdout,
+            )
+
+    def test_completion_checker_rejects_stale_scoped_source_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.make_repository(root)
+            matrix, report = self.filesystem_fixture(
+                root,
+                case_names=("signed_debug_bundle",),
+            )
+            reference = dict(
+                matrix["signed_debug_bundle"]["raw_artifact_references"][0]
+            )
+            artifact = json.loads(
+                (root / reference["path"]).read_text(encoding="utf-8")
+            )
+            artifact["source_manifest"]["sha256"] = hashlib.sha256(
+                b"stale manifest"
+            ).hexdigest()
+            matrix["signed_debug_bundle"]["raw_artifact_references"] = [
+                self.replace_scoped_artifact(root, reference, artifact)
+            ]
+
+            result = self.run_completion_checker(root, report)
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(
+                "privileged filesystem case signed_debug_bundle raw artifact 0 "
+                "semantic artifact is stale for the current source manifest",
+                result.stdout,
+            )
+
+    def test_completion_checker_rejects_mismatched_recorder_child_context(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.make_repository(root)
+            matrix, report = self.filesystem_fixture(
+                root,
+                case_names=("signed_debug_bundle",),
+            )
+            reference = matrix["signed_debug_bundle"]["raw_artifact_references"][0]
+            record_path = (
+                root / f".forge-codex/evidence/{reference['evidence_id']}.json"
+            )
+            record = json.loads(record_path.read_text(encoding="utf-8"))
+            record["child_evidence_context"]["evidence_id"] = "EVID-wrong-context"
+            self.write_json(record_path, record)
+
+            result = self.run_completion_checker(root, report)
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(
+                "privileged filesystem case signed_debug_bundle raw artifact 0 "
+                "evidence record has no exact recorder-owned child context",
+                result.stdout,
+            )
+
+    def test_completion_checker_rejects_mismatched_recorder_base_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.make_repository(root)
+            _, report = self.filesystem_fixture(root, case_names=())
+            reference = report["qualification_context_artifact_reference"]
+            record_path = (
+                root / f".forge-codex/evidence/{reference['evidence_id']}.json"
+            )
+            record = json.loads(record_path.read_text(encoding="utf-8"))
+            record["child_evidence_context"]["repository"]["base_sha"] = "f" * 40
+            record["execution_provenance"]["repository"]["base_sha"] = "e" * 40
+            self.write_json(record_path, record)
+
+            result = self.run_completion_checker(root, report)
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(
+                "evidence record has no exact recorder-owned child context",
+                result.stdout,
+            )
+            self.assertIn(
+                "evidence record has no exact recorder-owned execution provenance",
+                result.stdout,
+            )
+
+    def test_passed_report_rejects_null_qualification_identity_fields(self) -> None:
+        cases = (
+            (("repository", "branch"), "repository branch is empty"),
+            (("repository", "head_sha"), "repository HEAD is invalid"),
+            (("repository", "base_branch"), "repository base branch is empty"),
+            (("repository", "base_sha"), "repository base SHA is invalid"),
+            (("repository", "repository_path"), "repository path is empty"),
+            (("test_environment", "macos_build"), "macOS build is empty"),
+            (
+                ("test_environment", "machine_identifier"),
+                "machine identifier is empty",
+            ),
+            (("test_environment", "platform"), "platform is empty"),
+            (("test_environment", "architecture"), "architecture is empty"),
+        )
+        for path, expected in cases:
+            with self.subTest(path=path), tempfile.TemporaryDirectory() as temporary:
+                root = pathlib.Path(temporary)
+                self.make_repository(root)
+                _, report = self.filesystem_fixture(root, case_names=())
+                report[path[0]][path[1]] = None
+
+                result = self.run_completion_checker(root, report)
+
+                self.assertEqual(result.returncode, 1)
+                self.assertIn(expected, result.stdout)
+
+    def test_passed_report_rejects_git_identity_and_base_mismatch(self) -> None:
+        cases = (
+            (
+                ("repository", "branch"),
+                "different-branch",
+                "repository branch does not match current Git",
+            ),
+            (
+                ("repository", "head_sha"),
+                "b" * 40,
+                "reported execution HEAD does not resolve",
+            ),
+            (
+                ("repository", "base_branch"),
+                "origin/main",
+                "base branch is not canonical main",
+            ),
+            (
+                ("repository", "base_sha"),
+                None,
+                "base SHA does not match refs/remotes/origin/main",
+            ),
+            (
+                ("repository", "repository_path"),
+                "/private/tmp/not-the-evaluator-repository",
+                "repository path does not match the evaluator repository",
+            ),
+        )
+        for path, value, expected in cases:
+            with self.subTest(path=path), tempfile.TemporaryDirectory() as temporary:
+                root = pathlib.Path(temporary)
+                self.make_repository(root)
+                _, report = self.filesystem_fixture(root, case_names=())
+                if path == ("repository", "base_sha"):
+                    value = report["repository"]["head_sha"]
+                report[path[0]][path[1]] = value
+
+                result = self.run_completion_checker(root, report)
+
+                self.assertEqual(result.returncode, 1)
+                self.assertIn(expected, result.stdout)
+
+    def test_passed_report_rejects_live_host_identity_mismatch(self) -> None:
+        cases = (
+            ("macos_build", "bogus-build"),
+            ("machine_identifier", "bogus-machine"),
+            ("platform", "bogus-platform"),
+            ("architecture", "bogus-architecture"),
+        )
+        for field, value in cases:
+            with self.subTest(field=field), tempfile.TemporaryDirectory() as temporary:
+                root = pathlib.Path(temporary)
+                self.make_repository(root)
+                _, report = self.filesystem_fixture(root, case_names=())
+                report["test_environment"][field] = value
+
+                result = self.run_completion_checker(root, report)
+
+                self.assertEqual(result.returncode, 1)
+                self.assertIn(
+                    "qualification test environment does not match the evaluator host",
+                    result.stdout,
+                )
+
+    def test_passed_report_rejects_missing_origin_main_base_ref(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.make_repository(root)
+            _, report = self.filesystem_fixture(root, case_names=())
+            result = subprocess.run(
+                ["git", "update-ref", "-d", "refs/remotes/origin/main"],
+                cwd=root,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+            checked = self.run_completion_checker(root, report)
+
+            self.assertEqual(checked.returncode, 1)
+            self.assertIn(
+                "evaluator provenance is unavailable: origin main Git commit command failed",
+                checked.stdout,
+            )
+
+    def test_passed_report_rejects_same_manifest_unrelated_execution_head(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.make_repository(root)
+            _, report = self.filesystem_fixture(root, case_names=())
+            tree = subprocess.run(
+                ["git", "rev-parse", "HEAD^{tree}"],
+                cwd=root,
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.strip()
+            unrelated_head = subprocess.run(
+                ["git", "commit-tree", tree, "-m", "Unrelated same-tree execution"],
+                cwd=root,
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.strip()
+            self.assertRegex(unrelated_head, r"^[0-9a-f]{40}$")
+            self.assertEqual(report["source_manifest"], source_manifest(root))
+            report["repository"]["head_sha"] = unrelated_head
+            reference = dict(report["qualification_context_artifact_reference"])
+            artifact = json.loads(
+                (root / reference["path"]).read_text(encoding="utf-8")
+            )
+            context_fact = {
+                "captured_at": report["captured_at"],
+                "repository": report["repository"],
+                "test_environment": report["test_environment"],
+                "test_processes": report["test_processes"],
+                "same_uid_fallback": report["same_uid_fallback"],
+                "same_uid_threat_model": report["same_uid_threat_model"],
+            }
+            artifact["fact_sha256"] = canonical_json_sha256(context_fact)
+            report["qualification_context_artifact_reference"] = (
+                self.replace_scoped_artifact(root, reference, artifact)
+            )
+
+            checked = self.run_completion_checker(root, report)
+
+            self.assertEqual(checked.returncode, 1)
+            self.assertIn(
+                "origin main is not an ancestor of the reported execution HEAD",
+                checked.stdout,
+            )
+            self.assertIn(
+                "reported execution HEAD is not an ancestor of current Git HEAD",
+                checked.stdout,
+            )
+
+    def test_passed_report_rejects_same_manifest_older_ancestor_without_recorder_binding(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.make_repository(root)
+            _, report = self.filesystem_fixture(root, case_names=())
+            report["repository"]["head_sha"] = report["repository"]["base_sha"]
+            self.assertEqual(report["source_manifest"], source_manifest(root))
+            reference = dict(report["qualification_context_artifact_reference"])
+            artifact = json.loads(
+                (root / reference["path"]).read_text(encoding="utf-8")
+            )
+            context_fact = {
+                "captured_at": report["captured_at"],
+                "repository": report["repository"],
+                "test_environment": report["test_environment"],
+                "test_processes": report["test_processes"],
+                "same_uid_fallback": report["same_uid_fallback"],
+                "same_uid_threat_model": report["same_uid_threat_model"],
+            }
+            artifact["fact_sha256"] = canonical_json_sha256(context_fact)
+            report["qualification_context_artifact_reference"] = (
+                self.replace_scoped_artifact(root, reference, artifact)
+            )
+
+            checked = self.run_completion_checker(root, report)
+
+            self.assertEqual(checked.returncode, 1)
+            self.assertNotIn(
+                "origin main is not an ancestor of the reported execution HEAD",
+                checked.stdout,
+            )
+            self.assertNotIn(
+                "reported execution HEAD is not an ancestor of current Git HEAD",
+                checked.stdout,
+            )
+            self.assertNotIn(
+                "committed transport changed a non-state/non-evidence path",
+                checked.stdout,
+            )
+            self.assertIn(
+                "evidence record has no exact recorder-owned child context",
+                checked.stdout,
+            )
+            self.assertIn(
+                "evidence record has no exact recorder-owned execution provenance",
+                checked.stdout,
+            )
+
+    def test_passed_report_accepts_state_and_evidence_only_transport_commit(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.make_repository(root)
+            _, report = self.filesystem_fixture(root, case_names=())
+            execution_head = report["repository"]["head_sha"]
+            marker = root / ".forge-codex/state/transport-marker.json"
+            self.write_json(marker, {"execution_head": execution_head})
+            evidence_marker = root / ".forge-codex/evidence/transport-marker.json"
+            self.write_json(evidence_marker, {"execution_head": execution_head})
+            for index in range(96):
+                self.write_json(
+                    root
+                    / ".forge-codex/evidence/"
+                    f"transport-marker-{index:03d}-bounded-qualification-copy.json",
+                    {"index": index},
+                )
+            for command in (
+                [
+                    "git",
+                    "add",
+                    ".forge-codex/state/transport-marker.json",
+                    ".forge-codex/evidence",
+                ],
+                ["git", "commit", "-m", "Record transport marker"],
+            ):
+                result = subprocess.run(
+                    command,
+                    cwd=root,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+            checked = self.run_completion_checker(root, report)
+
+            self.assertNotIn("reported execution HEAD does not resolve", checked.stdout)
+            self.assertNotIn(
+                "reported execution HEAD is not an ancestor of current Git HEAD",
+                checked.stdout,
+            )
+            self.assertNotIn(
+                "committed transport changed a non-state/non-evidence path",
+                checked.stdout,
+            )
+            self.assertNotIn("exceeds its read bound", checked.stdout)
+
+    def test_passed_report_rejects_source_change_after_execution_head(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.make_repository(root)
+            _, report = self.filesystem_fixture(root, case_names=())
+            (root / "Sources/App.swift").write_text(
+                "struct ChangedAfterQualification {}\n",
+                encoding="utf-8",
+            )
+            for command in (
+                ["git", "add", "Sources/App.swift"],
+                ["git", "commit", "-m", "Change qualification source"],
+            ):
+                result = subprocess.run(
+                    command,
+                    cwd=root,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+            checked = self.run_completion_checker(root, report)
+
+            self.assertEqual(checked.returncode, 1)
+            self.assertIn(
+                "privileged filesystem qualification committed transport changed "
+                "a non-state/non-evidence path: Sources/App.swift",
+                checked.stdout,
+            )
+
+    def test_passed_report_rejects_seal_script_change_after_execution_head(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.make_repository(root)
+            _, report = self.filesystem_fixture(root, case_names=())
+            seal_script = root / "script/seal_filesystem_daemon_identity.sh"
+            seal_script.write_text("#!/bin/sh\nexit 7\n", encoding="utf-8")
+            for command in (
+                ["git", "add", "script/seal_filesystem_daemon_identity.sh"],
+                ["git", "commit", "-m", "Change identity seal script"],
+            ):
+                result = subprocess.run(
+                    command,
+                    cwd=root,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+            checked = self.run_completion_checker(root, report)
+
+            self.assertEqual(checked.returncode, 1)
+            self.assertIn(
+                "committed transport changed a non-state/non-evidence path: "
+                "script/seal_filesystem_daemon_identity.sh",
+                checked.stdout,
+            )
+
+    def test_passed_report_rejects_seal_script_change_then_revert_history(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.make_repository(root)
+            _, report = self.filesystem_fixture(root, case_names=())
+            seal_script = root / "script/seal_filesystem_daemon_identity.sh"
+            original = seal_script.read_bytes()
+            seal_script.write_text("#!/bin/sh\nexit 9\n", encoding="utf-8")
+            commands = (
+                ["git", "add", "script/seal_filesystem_daemon_identity.sh"],
+                ["git", "commit", "-m", "Temporarily change identity seal script"],
+            )
+            for command in commands:
+                result = subprocess.run(
+                    command,
+                    cwd=root,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            seal_script.write_bytes(original)
+            for command in (
+                ["git", "add", "script/seal_filesystem_daemon_identity.sh"],
+                ["git", "commit", "-m", "Restore identity seal script"],
+            ):
+                result = subprocess.run(
+                    command,
+                    cwd=root,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(report["source_manifest"], source_manifest(root))
+
+            checked = self.run_completion_checker(root, report)
+
+            self.assertEqual(checked.returncode, 1)
+            self.assertIn(
+                "committed transport changed a non-state/non-evidence path: "
+                "script/seal_filesystem_daemon_identity.sh",
+                checked.stdout,
+            )
+
+    def test_passed_report_rejects_arbitrary_committed_transport_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.make_repository(root)
+            _, report = self.filesystem_fixture(root, case_names=())
+            (root / "README.md").write_text("post-execution source\n", encoding="utf-8")
+            for command in (
+                ["git", "add", "README.md"],
+                ["git", "commit", "-m", "Add unrelated post-execution file"],
+            ):
+                result = subprocess.run(
+                    command,
+                    cwd=root,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+            checked = self.run_completion_checker(root, report)
+
+            self.assertEqual(checked.returncode, 1)
+            self.assertIn(
+                "committed transport changed a non-state/non-evidence path: README.md",
+                checked.stdout,
+            )
+
+    def test_passed_report_rejects_dirty_manifest_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.make_repository(root)
+            _, report = self.filesystem_fixture(root, case_names=())
+            (root / "script/seal_filesystem_daemon_identity.sh").write_text(
+                "#!/bin/sh\nexit 5\n",
+                encoding="utf-8",
+            )
+
+            checked = self.run_completion_checker(root, report)
+
+            self.assertEqual(checked.returncode, 1)
+            self.assertIn(
+                "privileged filesystem manifest targets have uncommitted changes",
+                checked.stdout,
+            )
+
+    def test_passed_report_rejects_missing_and_mismatched_context_binding(self) -> None:
+        for mode in ("missing", "mismatched"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as temporary:
+                root = pathlib.Path(temporary)
+                self.make_repository(root)
+                _, report = self.filesystem_fixture(root, case_names=())
+                if mode == "missing":
+                    report["qualification_context_artifact_reference"] = None
+                    expected = "qualification context artifact is not an exact artifact reference"
+                else:
+                    report["captured_at"] = "2026-08-30T00:00:00.500000Z"
+                    expected = (
+                        "qualification context artifact semantic artifact does not "
+                        "bind the exact report fact"
+                    )
+
+                result = self.run_completion_checker(root, report)
+
+                self.assertEqual(result.returncode, 1)
+                self.assertIn(expected, result.stdout)
+
+    def test_context_binding_rejects_captured_at_outside_evidence_interval(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.make_repository(root)
+            _, report = self.filesystem_fixture(root, case_names=())
+            report["captured_at"] = "2026-08-30T00:00:02Z"
+            reference = dict(report["qualification_context_artifact_reference"])
+            artifact = json.loads(
+                (root / reference["path"]).read_text(encoding="utf-8")
+            )
+            context_fact = {
+                "captured_at": report["captured_at"],
+                "repository": report["repository"],
+                "test_environment": report["test_environment"],
+                "test_processes": report["test_processes"],
+                "same_uid_fallback": report["same_uid_fallback"],
+                "same_uid_threat_model": report["same_uid_threat_model"],
+            }
+            artifact["fact_sha256"] = canonical_json_sha256(context_fact)
+            report["qualification_context_artifact_reference"] = (
+                self.replace_scoped_artifact(root, reference, artifact)
+            )
+
+            result = self.run_completion_checker(root, report)
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(
+                "qualification context artifact does not contain the report "
+                "captured_at timestamp",
+                result.stdout,
+            )
+
+    def test_semantic_evidence_rejects_incomplete_timing_and_environment(self) -> None:
+        cases = (
+            "missing-start",
+            "invalid-ended",
+            "reversed-time",
+            "missing-environment",
+            "wrong-cwd",
+        )
+        for mode in cases:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as temporary:
+                root = pathlib.Path(temporary)
+                self.make_repository(root)
+                _, report = self.filesystem_fixture(root, case_names=())
+                reference = report["qualification_context_artifact_reference"]
+                record_path = (
+                    root
+                    / f".forge-codex/evidence/{reference['evidence_id']}.json"
+                )
+                record = json.loads(record_path.read_text(encoding="utf-8"))
+                if mode == "missing-start":
+                    record.pop("started_at")
+                    expected = "evidence started_at is empty"
+                elif mode == "invalid-ended":
+                    record["ended_at"] = "not-a-timestamp"
+                    expected = "evidence ended_at is not a valid ISO-8601 timestamp"
+                elif mode == "reversed-time":
+                    record["started_at"] = "2026-08-30T00:00:02Z"
+                    expected = "evidence timestamps are reversed"
+                elif mode == "missing-environment":
+                    record["environment"].pop("architecture")
+                    expected = "evidence environment field set is not exact"
+                else:
+                    record["environment"]["cwd"] = "/private/tmp/not-the-repository"
+                    expected = (
+                        "evidence environment does not match the evaluator host "
+                        "and repository"
+                    )
+                self.write_json(record_path, record)
+
+                result = self.run_completion_checker(root, report)
+
+                self.assertEqual(result.returncode, 1)
+                self.assertIn(expected, result.stdout)
+
+    def test_semantic_binding_rejects_external_and_stream_storage(self) -> None:
+        for storage in ("external-hash-only", "evidence-id-specific-stream"):
+            with self.subTest(storage=storage), tempfile.TemporaryDirectory() as temporary, tempfile.TemporaryDirectory() as external_temporary:
+                root = pathlib.Path(temporary)
+                self.make_repository(root)
+                _, report = self.filesystem_fixture(root, case_names=())
+                reference = dict(report["qualification_context_artifact_reference"])
+                record_path = (
+                    root
+                    / f".forge-codex/evidence/{reference['evidence_id']}.json"
+                )
+                record = json.loads(record_path.read_text(encoding="utf-8"))
+                matches = [
+                    artifact
+                    for artifact in record["artifacts"]
+                    if artifact["path"] == reference["path"]
+                ]
+                self.assertEqual(len(matches), 1)
+                artifact = matches[0]
+                artifact["storage"] = storage
+                if storage == "external-hash-only":
+                    external_path = pathlib.Path(external_temporary) / "context.json"
+                    external_path.write_bytes((root / reference["path"]).read_bytes())
+                    artifact["path"] = str(external_path)
+                    artifact["portability"] = "origin-host-required"
+                    artifact.pop("source_path", None)
+                    reference["path"] = str(external_path)
+                self.write_json(record_path, record)
+                report["qualification_context_artifact_reference"] = reference
+
+                result = self.run_completion_checker(root, report)
+
+                self.assertEqual(result.returncode, 1)
+                self.assertIn(
+                    "semantic artifact is not a recorder-preserved "
+                    "evidence-id-specific copy inside the repository",
+                    result.stdout,
+                )
+
+    def test_semantic_binding_rejects_noncanonical_source_path(self) -> None:
+        cases = (
+            "/tmp/context.json",
+            "qualification-artifacts/../context.json",
+            "qualification-artifacts//context.json",
+            "qualification-artifacts\\context.json",
+            "a" * 4097,
+        )
+        for source_path in cases:
+            with self.subTest(source_path=source_path[:80]), tempfile.TemporaryDirectory() as temporary:
+                root = pathlib.Path(temporary)
+                self.make_repository(root)
+                _, report = self.filesystem_fixture(root, case_names=())
+                reference = report["qualification_context_artifact_reference"]
+                record_path = (
+                    root / f".forge-codex/evidence/{reference['evidence_id']}.json"
+                )
+                record = json.loads(record_path.read_text(encoding="utf-8"))
+                match = next(
+                    artifact
+                    for artifact in record["artifacts"]
+                    if artifact["path"] == reference["path"]
+                )
+                match["source_path"] = source_path
+                self.write_json(record_path, record)
+
+                result = self.run_completion_checker(root, report)
+
+                self.assertEqual(result.returncode, 1)
+                self.assertIn(
+                    "semantic artifact is not a recorder-preserved "
+                    "evidence-id-specific copy inside the repository",
+                    result.stdout,
+                )
+
+    def test_completion_checker_rejects_placeholder_claim_and_scope(self) -> None:
+        for field in ("claim", "scope"):
+            with self.subTest(field=field), tempfile.TemporaryDirectory() as temporary:
+                root = pathlib.Path(temporary)
+                self.make_repository(root)
+                matrix, report = self.filesystem_fixture(
+                    root,
+                    case_names=("signed_debug_bundle",),
+                )
+                case = matrix["signed_debug_bundle"]
+                if field == "claim":
+                    reference = dict(case["raw_artifact_references"][0])
+                    artifact = json.loads(
+                        (root / reference["path"]).read_text(encoding="utf-8")
+                    )
+                    artifact["claim"] = "placeholder"
+                    case["raw_artifact_references"] = [
+                        self.replace_scoped_artifact(root, reference, artifact)
+                    ]
+                    expected = "qualification artifact schema error at claim"
+                else:
+                    process = case["process_identities"][0]
+                    reference = dict(process["raw_artifact_reference"])
+                    artifact = json.loads(
+                        (root / reference["path"]).read_text(encoding="utf-8")
+                    )
+                    artifact["scope"]["subject"] = "placeholder"
+                    process["raw_artifact_reference"] = self.replace_scoped_artifact(
+                        root,
+                        reference,
+                        artifact,
+                    )
+                    expected = "qualification artifact schema error at scope.subject"
+
+                result = self.run_completion_checker(root, report)
+
+                self.assertEqual(result.returncode, 1)
+                self.assertIn(expected, result.stdout)
+
+    def test_completion_checker_rejects_mismatched_scoped_fact_digest(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.make_repository(root)
+            matrix, report = self.filesystem_fixture(
+                root,
+                case_names=("signed_debug_bundle",),
+            )
+            reference = dict(
+                matrix["signed_debug_bundle"]["raw_artifact_references"][0]
+            )
+            artifact = json.loads(
+                (root / reference["path"]).read_text(encoding="utf-8")
+            )
+            artifact["fact_sha256"] = canonical_json_sha256({"different": True})
+            matrix["signed_debug_bundle"]["raw_artifact_references"] = [
+                self.replace_scoped_artifact(root, reference, artifact)
+            ]
+
+            result = self.run_completion_checker(root, report)
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(
+                "privileged filesystem case signed_debug_bundle raw artifact 0 "
+                "semantic artifact does not bind the exact report fact",
+                result.stdout,
+            )
+
+    def test_completion_checker_rejects_binding_changed_after_reference_hash(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.make_repository(root)
+            matrix, report = self.filesystem_fixture(
+                root,
+                case_names=("signed_debug_bundle",),
+            )
+            reference = dict(
+                matrix["signed_debug_bundle"]["raw_artifact_references"][0]
+            )
+            artifact_path = root / reference["path"]
+            artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+            original_claim = artifact["claim"]
+            artifact["claim"] = "X" + original_claim[1:]
+            artifact_path.chmod(0o644)
+            self.write_json(artifact_path, artifact)
+            artifact_path.chmod(0o444)
+
+            result = self.run_completion_checker(root, report)
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(
+                "qualification artifact bytes do not match the referenced SHA-256",
+                result.stdout,
+            )
+
+    def test_qualification_artifact_loader_rejects_read_time_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.make_repository(root)
+            references = self.install_scoped_evidence(
+                root,
+                evidence_id="EVID-read-time-mutation",
+                bindings={
+                    "case-result-1": (
+                        {
+                            "case_id": "signed_debug_bundle",
+                            "role": "case_result",
+                            "iteration": 1,
+                            "subject": None,
+                            "predicate": None,
+                        },
+                        {"status": "passed"},
+                    )
+                },
+            )
+            reference = references["case-result-1"]
+            artifact_path = root.resolve() / reference["path"]
+            schema_path = (
+                root
+                / ".forge-codex/schemas/p10-privileged-filesystem-artifact-binding.schema.json"
+            )
+            real_read = os.read
+            mutated = False
+
+            def mutate_after_first_read(descriptor: int, byte_count: int) -> bytes:
+                nonlocal mutated
+                block = real_read(descriptor, byte_count)
+                if not mutated:
+                    mutated = True
+                    artifact_path.chmod(0o644)
+                    with artifact_path.open("ab") as stream:
+                        stream.write(b" ")
+                        stream.flush()
+                        os.fsync(stream.fileno())
+                return block
+
+            with mock.patch(
+                "evidence_support.os.read",
+                side_effect=mutate_after_first_read,
+            ):
+                with self.assertRaisesRegex(
+                    EvidenceSupportError,
+                    "changed during its bounded read",
+                ):
+                    load_qualification_artifact(
+                        artifact_path,
+                        expected_sha256=reference["sha256"],
+                        expected_bytes=artifact_path.stat().st_size,
+                        repository_root=root.resolve(),
+                        schema_path=schema_path,
+                    )
+            self.assertTrue(mutated)
+
+    def test_qualification_artifact_loader_rejects_same_inode_rewrite_before_path_verification(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.make_repository(root)
+            references = self.install_scoped_evidence(
+                root,
+                evidence_id="EVID-same-inode-rewrite",
+                bindings={
+                    "case-result-1": (
+                        {
+                            "case_id": "signed_debug_bundle",
+                            "role": "case_result",
+                            "iteration": 1,
+                            "subject": None,
+                            "predicate": None,
+                        },
+                        {"status": "passed"},
+                    )
+                },
+            )
+            reference = references["case-result-1"]
+            artifact_path = root.resolve() / reference["path"]
+            original_bytes = artifact_path.read_bytes()
+            original = json.loads(original_bytes)
+            replacement = dict(original)
+            claim = replacement["claim"]
+            replacement["claim"] = ("X" if claim[0] != "X" else "Y") + claim[1:]
+            replacement_bytes = (
+                json.dumps(replacement, indent=2, sort_keys=True) + "\n"
+            ).encode("utf-8")
+            self.assertEqual(len(replacement_bytes), len(original_bytes))
+            schema_path = (
+                root
+                / ".forge-codex/schemas/"
+                "p10-privileged-filesystem-artifact-binding.schema.json"
+            )
+            original_stat = artifact_path.stat()
+            original_inode = original_stat.st_ino
+            real_fstat = os.fstat
+            descriptor_fstats = 0
+            mutated = False
+
+            def rewrite_after_post_read_fstat(descriptor: int) -> os.stat_result:
+                nonlocal descriptor_fstats, mutated
+                metadata = real_fstat(descriptor)
+                descriptor_fstats += 1
+                if descriptor_fstats == 2:
+                    artifact_path.chmod(0o644)
+                    with artifact_path.open("r+b") as stream:
+                        stream.seek(0)
+                        stream.write(replacement_bytes)
+                        stream.truncate()
+                        stream.flush()
+                        os.fsync(stream.fileno())
+                    os.utime(
+                        artifact_path,
+                        ns=(
+                            original_stat.st_atime_ns,
+                            original_stat.st_mtime_ns + 2_000_000_000,
+                        ),
+                    )
+                    artifact_path.chmod(0o444)
+                    rewritten_stat = artifact_path.stat()
+                    self.assertEqual(rewritten_stat.st_ino, original_inode)
+                    self.assertEqual(rewritten_stat.st_size, len(original_bytes))
+                    self.assertEqual(stat.S_IMODE(rewritten_stat.st_mode), 0o444)
+                    mutated = True
+                return metadata
+
+            with mock.patch(
+                "evidence_support.os.fstat",
+                side_effect=rewrite_after_post_read_fstat,
+            ):
+                with self.assertRaisesRegex(
+                    EvidenceSupportError,
+                    "pathname no longer names the opened file",
+                ):
+                    load_qualification_artifact(
+                        artifact_path,
+                        expected_sha256=reference["sha256"],
+                        expected_bytes=len(original_bytes),
+                        repository_root=root.resolve(),
+                        schema_path=schema_path,
+                    )
+            self.assertTrue(mutated)
+            self.assertEqual(artifact_path.stat().st_ino, original_inode)
+            self.assertEqual(stat.S_IMODE(artifact_path.stat().st_mode), 0o444)
+            self.assertEqual(artifact_path.read_bytes(), replacement_bytes)
+            self.assertNotEqual(artifact_path.read_bytes(), original_bytes)
+
+    def test_qualification_artifact_loader_rejects_unsafe_copy_postconditions(
+        self,
+    ) -> None:
+        cases = (
+            ("mode", "mode is not exactly 0444"),
+            ("owner", "not owned by the current effective user"),
+            ("hard-link", "does not have exactly one hard link"),
+            ("final-symlink", "unavailable or contains a symlink"),
+            ("intermediate-symlink", "unavailable or contains a symlink"),
+            ("oversized", "recorded byte count is invalid or exceeds"),
+        )
+        for mode, expected in cases:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as temporary:
+                root = pathlib.Path(temporary)
+                self.make_repository(root)
+                references = self.install_scoped_evidence(
+                    root,
+                    evidence_id=f"EVID-unsafe-{mode}",
+                    bindings={
+                        "case-result-1": (
+                            {
+                                "case_id": "signed_debug_bundle",
+                                "role": "case_result",
+                                "iteration": 1,
+                                "subject": None,
+                                "predicate": None,
+                            },
+                            {"status": "passed"},
+                        )
+                    },
+                )
+                reference = references["case-result-1"]
+                artifact_path = root.resolve() / reference["path"]
+                expected_bytes = artifact_path.stat().st_size
+                expected_sha256 = reference["sha256"]
+                fstat_patch = None
+                if mode == "mode":
+                    artifact_path.chmod(0o644)
+                elif mode == "owner":
+                    actual = os.stat(artifact_path)
+                    forged = mock.Mock(
+                        st_mode=actual.st_mode,
+                        st_uid=os.geteuid() + 1,
+                    )
+                    fstat_patch = mock.patch(
+                        "evidence_support.os.fstat",
+                        return_value=forged,
+                    )
+                elif mode == "hard-link":
+                    os.link(artifact_path, artifact_path.with_name("second-link.json"))
+                elif mode == "final-symlink":
+                    target = artifact_path.with_name("binding-target.json")
+                    artifact_path.rename(target)
+                    artifact_path.symlink_to(target.name)
+                elif mode == "intermediate-symlink":
+                    evidence_directory = artifact_path.parent
+                    target_directory = evidence_directory.with_name("captured-evidence")
+                    evidence_directory.rename(target_directory)
+                    evidence_directory.symlink_to(target_directory.name)
+                else:
+                    artifact_path.chmod(0o644)
+                    with artifact_path.open("ab") as stream:
+                        stream.write(b"x" * (1024 * 1024 + 1 - expected_bytes))
+                    artifact_path.chmod(0o444)
+                    raw = artifact_path.read_bytes()
+                    expected_bytes = len(raw)
+                    expected_sha256 = hashlib.sha256(raw).hexdigest()
+
+                context = fstat_patch if fstat_patch is not None else mock.patch.object(
+                    os,
+                    "fstat",
+                    wraps=os.fstat,
+                )
+                with context:
+                    with self.assertRaisesRegex(EvidenceSupportError, expected):
+                        load_qualification_artifact(
+                            artifact_path,
+                            expected_sha256=expected_sha256,
+                            expected_bytes=expected_bytes,
+                            repository_root=root.resolve(),
+                            schema_path=(
+                                root
+                                / ".forge-codex/schemas/"
+                                "p10-privileged-filesystem-artifact-binding.schema.json"
+                            ),
+                        )
+
+    def test_qualification_artifact_loader_cannot_be_redirected_after_open(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.make_repository(root)
+            references = self.install_scoped_evidence(
+                root,
+                evidence_id="EVID-opened-inode-substitution",
+                bindings={
+                    "case-result-1": (
+                        {
+                            "case_id": "signed_debug_bundle",
+                            "role": "case_result",
+                            "iteration": 1,
+                            "subject": None,
+                            "predicate": None,
+                        },
+                        {"status": "passed"},
+                    )
+                },
+            )
+            reference = references["case-result-1"]
+            artifact_path = root.resolve() / reference["path"]
+            original = json.loads(artifact_path.read_text(encoding="utf-8"))
+            replacement = dict(original)
+            replacement["claim"] = "Replacement content must never redirect the opened descriptor."
+            replacement_path = artifact_path.with_name("replacement-binding.json")
+            self.write_json(replacement_path, replacement)
+            replacement_path.chmod(0o444)
+            schema_path = (
+                root
+                / ".forge-codex/schemas/p10-privileged-filesystem-artifact-binding.schema.json"
+            )
+            real_open = os.open
+            real_fstat = os.fstat
+            opened = False
+            substituted = False
+            descriptor_fstats = 0
+
+            def substitute_after_open(
+                raw_path: os.PathLike[str] | str,
+                flags: int,
+                mode: int = 0o777,
+                *,
+                dir_fd: int | None = None,
+            ) -> int:
+                nonlocal opened
+                if dir_fd is None:
+                    descriptor = real_open(raw_path, flags, mode)
+                else:
+                    descriptor = real_open(raw_path, flags, mode, dir_fd=dir_fd)
+                if pathlib.Path(raw_path).name == artifact_path.name:
+                    opened = True
+                return descriptor
+
+            def substitute_after_stable_descriptor_read(descriptor: int) -> os.stat_result:
+                nonlocal descriptor_fstats, substituted
+                metadata = real_fstat(descriptor)
+                if opened:
+                    descriptor_fstats += 1
+                if descriptor_fstats == 2 and not substituted:
+                    substituted = True
+                    os.replace(replacement_path, artifact_path)
+                return metadata
+
+            with mock.patch(
+                "evidence_support.os.open",
+                side_effect=substitute_after_open,
+            ), mock.patch(
+                "evidence_support.os.fstat",
+                side_effect=substitute_after_stable_descriptor_read,
+            ):
+                with self.assertRaisesRegex(
+                    EvidenceSupportError,
+                    "pathname no longer names the opened file",
+                ):
+                    load_qualification_artifact(
+                        artifact_path,
+                        expected_sha256=reference["sha256"],
+                        expected_bytes=artifact_path.stat().st_size,
+                        repository_root=root.resolve(),
+                        schema_path=schema_path,
+                    )
+            self.assertTrue(substituted)
+            self.assertEqual(
+                json.loads(artifact_path.read_text(encoding="utf-8"))["claim"],
+                replacement["claim"],
+            )
+
     def test_completion_checker_rejects_required_mount_and_crash_nonapplicability(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = pathlib.Path(temporary)
             self.make_repository(root)
-            artifact_reference = self.install_fixture_evidence(root)
-            formal_artifact_reference = self.install_fixture_evidence(
-                root,
-                evidence_id="EVID-fixture-formal-argument",
-                evidence_kind="p10-privileged-filesystem-formal-argument",
-            )
             template = json.loads(
                 PRIVILEGED_FILESYSTEM_TEMPLATE.read_text(encoding="utf-8")
             )
             matrix = json.loads(json.dumps(template["matrix"]))
             for name, case in matrix.items():
-                self.populate_passing_filesystem_case(name, case, artifact_reference)
+                self.populate_passing_filesystem_case(root, name, case)
             matrix["network_volume_rejected"]["mount_facts"] = json.loads(
                 json.dumps(template["matrix"]["network_volume_rejected"]["mount_facts"])
             )
@@ -647,11 +2162,7 @@ class EvidenceControlTests(unittest.TestCase):
                     template["matrix"]["crash_at_every_durable_phase"]["crash_point"]
                 )
             )
-            report = self.privileged_filesystem_report(
-                root,
-                matrix,
-                formal_artifact_reference,
-            )
+            report = self.privileged_filesystem_report(root, matrix)
 
             result = self.run_completion_checker(root, report)
 
@@ -930,10 +2441,25 @@ class EvidenceControlTests(unittest.TestCase):
     def make_repository(self, root: pathlib.Path, *, ledger_exit: int = 0) -> None:
         (root / "Sources").mkdir(parents=True)
         (root / "Tests").mkdir()
+        (root / "script").mkdir()
         (root / ".forge-codex/scripts").mkdir(parents=True)
+        schema_directory = root / ".forge-codex/schemas"
+        schema_directory.mkdir(parents=True)
+        (
+            schema_directory
+            / "p10-privileged-filesystem-qualification-report.schema.json"
+        ).write_bytes(PRIVILEGED_FILESYSTEM_SCHEMA.read_bytes())
+        (
+            schema_directory
+            / "p10-privileged-filesystem-artifact-binding.schema.json"
+        ).write_bytes(PRIVILEGED_FILESYSTEM_ARTIFACT_SCHEMA.read_bytes())
         (root / "Package.swift").write_text("// fixture\n", encoding="utf-8")
         (root / "Sources/App.swift").write_text("struct App {}\n", encoding="utf-8")
         (root / "Tests/AppTests.swift").write_text("struct AppTests {}\n", encoding="utf-8")
+        (root / "script/seal_filesystem_daemon_identity.sh").write_text(
+            "#!/bin/sh\nexit 0\n",
+            encoding="utf-8",
+        )
         state_directory = root / ".forge-codex/state"
         state_directory.mkdir()
         (state_directory / "run-state.json").write_text(
@@ -957,6 +2483,32 @@ path.write_text(json.dumps(value) + "\\n", encoding="utf-8")
 """
         statectl.write_text(program, encoding="utf-8")
         statectl.chmod(0o755)
+        for command in (
+            ["git", "init", "-b", "main"],
+            ["git", "config", "user.name", "Fixture User"],
+            ["git", "config", "user.email", "fixture@example.invalid"],
+            [
+                "git",
+                "add",
+                "Package.swift",
+                "Sources",
+                "Tests",
+                "script",
+                ".forge-codex",
+            ],
+            ["git", "commit", "-m", "Create fixture baseline"],
+            ["git", "update-ref", "refs/remotes/origin/main", "HEAD"],
+            ["git", "switch", "-c", "security-validation"],
+            ["git", "commit", "--allow-empty", "-m", "Create validation branch"],
+        ):
+            result = subprocess.run(
+                command,
+                cwd=root,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def records(self, root: pathlib.Path) -> list[pathlib.Path]:
         return sorted(
@@ -980,11 +2532,31 @@ path.write_text(json.dumps(value) + "\\n", encoding="utf-8")
                 root
                 / ".forge-codex/schemas/p10-privileged-filesystem-qualification-report.schema.json"
             )
-            schema.parent.mkdir(parents=True)
+            schema.parent.mkdir(parents=True, exist_ok=True)
             schema.write_text('{"schema":"qualification-v1"}\n', encoding="utf-8")
             schema_manifest = source_manifest(root)
             schema.write_text('{"schema":"qualification-v2"}\n', encoding="utf-8")
             self.assertNotEqual(schema_manifest, source_manifest(root))
+
+            binding_schema = (
+                root
+                / ".forge-codex/schemas/p10-privileged-filesystem-artifact-binding.schema.json"
+            )
+            binding_schema.write_text(
+                '{"schema":"binding-v1"}\n',
+                encoding="utf-8",
+            )
+            binding_manifest = source_manifest(root)
+            binding_schema.write_text(
+                '{"schema":"binding-v2"}\n',
+                encoding="utf-8",
+            )
+            self.assertNotEqual(binding_manifest, source_manifest(root))
+
+            seal_script = root / "script/seal_filesystem_daemon_identity.sh"
+            seal_manifest = source_manifest(root)
+            seal_script.write_text("#!/bin/sh\nexit 4\n", encoding="utf-8")
+            self.assertNotEqual(seal_manifest, source_manifest(root))
 
     def test_recorder_preserves_bounded_repository_artifact_and_external_reference(self) -> None:
         with tempfile.TemporaryDirectory() as temporary, tempfile.TemporaryDirectory() as external_root:
@@ -1034,6 +2606,182 @@ path.write_text(json.dumps(value) + "\\n", encoding="utf-8")
             copy_path = root / copies[0]["path"]
             self.assertEqual(stat.S_IMODE(copy_path.stat().st_mode), 0o444)
             self.assertEqual(stat.S_IMODE(self.records(root)[0].stat().st_mode), 0o444)
+
+    def test_recorder_refuses_to_launch_without_origin_main_base_ref(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.make_repository(root)
+            result = subprocess.run(
+                ["git", "update-ref", "-d", "refs/remotes/origin/main"],
+                cwd=root,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            marker = root / "child-launched.txt"
+            child_program = (
+                "import pathlib; "
+                f"pathlib.Path({str(marker)!r}).write_text('launched', encoding='utf-8')"
+            )
+
+            recorded = subprocess.run(
+                [
+                    sys.executable,
+                    str(RECORDER),
+                    "--repo",
+                    str(root),
+                    "--kind",
+                    "fixture",
+                    "--",
+                    sys.executable,
+                    "-c",
+                    child_program,
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertNotEqual(recorded.returncode, 0)
+            self.assertIn("origin main Git commit command failed", recorded.stderr)
+            self.assertFalse(marker.exists())
+            self.assertEqual(self.records(root), [])
+
+    def test_recorder_child_emits_checker_valid_scoped_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.make_repository(root)
+            matrix, report = self.filesystem_fixture(
+                root,
+                case_names=("signed_debug_bundle",),
+            )
+            case = matrix["signed_debug_bundle"]
+            fact = {
+                "contracts_exercised": case["contracts_exercised"],
+                "status": case["status"],
+                "iterations": case["iterations"],
+                "observed_result": case["observed_result"],
+            }
+            expected_child_provenance = {
+                "repository": report["repository"],
+                "test_environment": report["test_environment"],
+            }
+            child_program = "\n".join((
+                "import json, os, pathlib",
+                "manifest = json.loads(os.environ['FORGE_EVIDENCE_SOURCE_MANIFEST_JSON'])",
+                f"expected_repository = {report['repository']!r}",
+                f"expected_environment = {report['test_environment']!r}",
+                "actual_repository = {",
+                "  'branch': os.environ['FORGE_EVIDENCE_REPOSITORY_BRANCH'],",
+                "  'head_sha': os.environ['FORGE_EVIDENCE_REPOSITORY_HEAD_SHA'],",
+                "  'base_branch': os.environ['FORGE_EVIDENCE_BASE_BRANCH'],",
+                "  'base_sha': os.environ['FORGE_EVIDENCE_BASE_SHA'],",
+                "  'repository_path': os.environ['FORGE_EVIDENCE_REPOSITORY_PATH'],",
+                "}",
+                "actual_environment = {",
+                "  'macos_build': os.environ['FORGE_EVIDENCE_MACOS_BUILD'],",
+                "  'machine_identifier': os.environ['FORGE_EVIDENCE_MACHINE_IDENTIFIER'],",
+                "  'platform': os.environ['FORGE_EVIDENCE_PLATFORM'],",
+                "  'architecture': os.environ['FORGE_EVIDENCE_ARCHITECTURE'],",
+                "}",
+                "assert actual_repository == expected_repository",
+                "assert actual_environment == expected_environment",
+                "payload = {",
+                "  'schema_version': int(os.environ['FORGE_EVIDENCE_BINDING_SCHEMA_VERSION']),",
+                "  'qualification': os.environ['FORGE_EVIDENCE_QUALIFICATION'],",
+                "  'evidence_id': os.environ['FORGE_EVIDENCE_ID'],",
+                "  'source_manifest': manifest,",
+                "  'scope': {'case_id': 'signed_debug_bundle', 'role': 'case_result', 'iteration': 1, 'subject': None, 'predicate': None},",
+                f"  'fact_sha256': {canonical_json_sha256(fact)!r},",
+                "  'claim': 'The signed debug qualification case completed conclusively.',",
+                "}",
+                "pathlib.Path('scoped.json').write_text(json.dumps(payload, sort_keys=True) + '\\n', encoding='utf-8')",
+            ))
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(RECORDER),
+                    "--repo",
+                    str(root),
+                    "--kind",
+                    "p10-privileged-filesystem-qualification",
+                    "--related-gate",
+                    "G10",
+                    "--related-finding",
+                    "FC-FILESYSTEM-PATH-TOCTOU-001",
+                    "--artifact",
+                    "scoped.json",
+                    "--",
+                    sys.executable,
+                    "-c",
+                    child_program,
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            record = json.loads(result.stdout)
+            self.assertEqual(
+                record["kind"],
+                "p10-privileged-filesystem-qualification",
+            )
+            preserved = next(
+                artifact
+                for artifact in record["artifacts"]
+                if artifact.get("source_path") == "scoped.json"
+            )
+            reference = {
+                "evidence_id": record["id"],
+                "path": preserved["path"],
+                "sha256": preserved["sha256"],
+            }
+            envelope = load_qualification_artifact(
+                root.resolve() / preserved["path"],
+                expected_sha256=preserved["sha256"],
+                expected_bytes=preserved["bytes"],
+                repository_root=root.resolve(),
+                schema_path=(
+                    root
+                    / ".forge-codex/schemas/p10-privileged-filesystem-artifact-binding.schema.json"
+                ),
+            )
+            self.assertEqual(envelope["evidence_id"], record["id"])
+            self.assertEqual(envelope["source_manifest"], record["source_manifest"])
+            self.assertEqual(
+                record["child_evidence_context"],
+                {
+                    "schema_version": 1,
+                    "binding_schema_version": 1,
+                    "evidence_id": record["id"],
+                    "source_manifest": record["source_manifest"],
+                    "repository": report["repository"],
+                    "test_environment": report["test_environment"],
+                    "qualification": "p10-privileged-filesystem",
+                },
+            )
+            self.assertEqual(record["execution_provenance"], expected_child_provenance)
+            self.assertEqual(
+                record["environment"],
+                {
+                    "platform": report["test_environment"]["platform"],
+                    "architecture": report["test_environment"]["architecture"],
+                    "macos_build": report["test_environment"]["macos_build"],
+                    "machine_identifier": report["test_environment"][
+                        "machine_identifier"
+                    ],
+                    "cwd": report["repository"]["repository_path"],
+                },
+            )
+
+            case["raw_artifact_references"] = [reference]
+            checked = self.run_completion_checker(root, report)
+            self.assertEqual(checked.returncode, 1)
+            self.assertNotIn(
+                "privileged filesystem case signed_debug_bundle raw artifact 0 ",
+                checked.stdout,
+            )
 
     def test_recorder_rejects_outside_copy_and_ledger_failure(self) -> None:
         with tempfile.TemporaryDirectory() as temporary, tempfile.TemporaryDirectory() as outside_root:
@@ -1431,15 +3179,21 @@ class ProtocolReaderTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = pathlib.Path(temporary)
             partial = b'{"jsonrpc":"2.0","id":1'
+            ready = root / "partial-ready"
             server = self.make_server(
                 root,
-                "import os, time\n"
+                "import os, pathlib, time\n"
                 f"os.write(1, {partial!r})\n"
+                f"pathlib.Path({str(ready)!r}).write_text('ready', encoding='utf-8')\n"
                 "time.sleep(10)\n",
             )
             process = MCPProcess(server, root, "partial-line")
-            started = time.monotonic()
             try:
+                ready_deadline = time.monotonic() + 2.0
+                while not ready.exists() and time.monotonic() < ready_deadline:
+                    time.sleep(0.005)
+                self.assertTrue(ready.exists(), "fixture did not publish readiness")
+                started = time.monotonic()
                 with self.assertRaisesRegex(CompatibilityError, "timed out waiting"):
                     process.receive(1, "partial response", 0.2)
                 self.assertEqual(bytes(process._stdout_buffer), partial)

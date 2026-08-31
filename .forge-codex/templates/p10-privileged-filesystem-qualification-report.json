@@ -1,5 +1,6 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
+  "artifact_binding_schema_version": 1,
   "status": "partial",
   "ok": false,
   "source_manifest": null,
@@ -7,16 +8,21 @@
   "repository": {
     "branch": null,
     "head_sha": null,
-    "base_branch": null
+    "base_branch": null,
+    "base_sha": null,
+    "repository_path": null
   },
   "test_environment": {
     "macos_build": null,
-    "machine_identifier": null
+    "machine_identifier": null,
+    "platform": null,
+    "architecture": null
   },
   "test_processes": {
     "separately_signed": false,
     "helper_effective_uid": null
   },
+  "qualification_context_artifact_reference": null,
   "matrix": {
     "signed_debug_bundle": {
       "contracts_exercised": [
@@ -2495,11 +2501,11 @@
   "residual_risk": {
     "disposition": "open_release_blocker",
     "remaining_race": "Known current residuals, not qualification results: a same-UID attacker can relocate the validated source parent outside the authorized root before capture, substitute the final source entry before exclusive capture, or change ACL or BSD metadata after the last check and before unlinkat.",
-    "maximum_race_impact": "Known current upper bound, not a measured pass: one winning source-parent race can delete one eligible outside-root regular file or symbolic link containing unbounded bytes, or quarantine one ineligible directory containing an unbounded subtree. The final metadata race can delete the one already captured expected regular file or symbolic link, with unbounded file bytes. Retained quarantine can consume one slot per conflict and all 32 slots per protected volume. E2 remains open."
+    "maximum_race_impact": "Known current upper bound, not a measured pass: one winning source-parent race can delete one eligible outside-root regular file or symbolic link containing unbounded bytes, or quarantine one ineligible directory containing an unbounded subtree. The final metadata race can delete the one already captured expected regular file or symbolic link, with unbounded file bytes. Retained quarantine can consume one slot per conflict and all 32 slots per protected volume. Caller-ledger tamper or generation fencing loss can strand or allow stale-authority completion of up to 32 captured or terminally deleted expected leaves per protected volume; each regular file can contain unbounded bytes. Writable descriptors and hard links prevent an exact-content guarantee. E2 remains open."
   },
   "remaining_requirements": [
-    "Execute every case through the signed-host qualification harness and preserve immutable raw artifacts.",
-    "Emit case-scoped and role-scoped machine-readable evidence so the completion checker can bind every row, barrier, iteration, mount observation, crash point, process identity, signing identity, fixture digest, and formal argument to its actual harness result instead of relying on generic artifact provenance.",
+    "Execute every case through the signed-host qualification harness and preserve bounded recorder-captured read-only raw snapshots.",
+    "Execute the harness with schema-v1 case-scoped, role-scoped, iteration-scoped, fact-digest-bound, and predicate-scoped artifacts for every row, barrier, mount observation, crash point, process identity, signing identity, fixture digest, and formal argument.",
     "Implement and qualify an authorized quarantine disposition so repeated conflicts cannot permanently exhaust all 32 slots.",
     "Fence startup on complete recovery of every nonterminal transaction.",
     "Define and qualify repair transitions for terminal receipts whose protected-leaf physical state contradicts the recorded disposition.",
