@@ -2497,6 +2497,426 @@
     },
     {
       "detail": "valid",
+      "name": "json:evidence/EVID-20260831T030740Z-380bafda41.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T030740Z-8fa6d190a2.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T031230Z-106eaea0df.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T031815Z-60354310b5.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T031953Z-d77d27cb68.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T032026Z-5909ba468f.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T032027Z-c12bd3f885.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T032123Z-2eae99b5de.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T032359Z-1f60d8dc6d.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T032828Z-d0d49a5c6c.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T032837Z-96875d84d2.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T032904Z-1a53a4522c.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T032904Z-58f8a398c1.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T032914Z-b6ca8a16df.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T032946Z-38ab494f31.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T033848Z-142f880271.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T033856Z-e749ddeea1.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T033921Z-dbebcf2388.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T033921Z-e572b3e8af.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T033930Z-287353abb9.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T034025Z-03d0170fda.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T034026Z-88ab7f4d4d.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T034056Z-ad0f220b4c.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T034056Z-ffe95368bf.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T034057Z-e06afc85ee.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T034133Z-6efb06e134.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T034509Z-3e84063e17.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T034509Z-93c9600864.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T034706Z-7cc0aaa868.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T034706Z-a7f349eaba.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T034721Z-a6f0ee5482.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T034721Z-ceb193bb6b.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T034722Z-fab169d5a3.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T034937Z-132cb424d7.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T034937Z-97c4f8ee15.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T034952Z-389c0bb892.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T034953Z-7c3a4dc4d5.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T034954Z-d219a9f60d.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T035019Z-0b8235c3a1.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T035518Z-35aa081b6f.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T035531Z-84cae78f36.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T035553Z-f911396f21.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T035559Z-99588acd84.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T035618Z-6d590acbe8.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T035638Z-5798086c52.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T035742Z-50132edfb8.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T040038Z-09ae71112e.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T041104Z-2c01dbc820.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T041652Z-4ca0740c74.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T041659Z-99d5d9f661.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T060522Z-03c32cb838.artifact-000-P10-privileged-filesystem-h0-readiness.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T060522Z-03c32cb838.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T132827Z-ce9b22a5e0.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T133202Z-1388f87b63.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T133213Z-d4178c34a2.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T133355Z-7f9c698548.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T133355Z-948e5bec13.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T134706Z-9265df95e8.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T140104Z-247cf42f16.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T140414Z-989cb74463.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T140455Z-ad06149f25.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T141114Z-f11c3d17c1.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T145706Z-1b8412d80c.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T145956Z-647f827104.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T150026Z-f31348bd2e.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T150550Z-7d7a228973.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T150635Z-9d7e337de0.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T150645Z-b55e2eccac.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T151044Z-a080589d58.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T152355Z-ba848a2a2e.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T152426Z-4b004d7d5b.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T154350Z-41f3c8367a.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T155144Z-a97d2c3875.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T155337Z-1bbc2b1864.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T155337Z-39194939c9.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T155337Z-d1e8c01f4a.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T155338Z-9bfd542c3d.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T155354Z-f3d44bd3b4.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T225842Z-84f4ddc36e.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T230149Z-add6ee03da.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T230151Z-ab3c8296d0.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T230151Z-d9aa9c73d8.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T230202Z-06c8a0f1fe.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:evidence/EVID-20260831T230236Z-ddf311b066.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
       "name": "json:evidence/P02-telemetry-baseline.json",
       "passed": true
     },
@@ -2617,6 +3037,11 @@
     },
     {
       "detail": "valid",
+      "name": "json:evidence/P10-privileged-filesystem-h0-readiness.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
       "name": "json:evidence/P10-protocol-compatibility-report.json",
       "passed": true
     },
@@ -2707,7 +3132,17 @@
     },
     {
       "detail": "valid",
+      "name": "json:schemas/p10-privileged-filesystem-admission-observation.schema.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
       "name": "json:schemas/p10-privileged-filesystem-artifact-binding.schema.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
+      "name": "json:schemas/p10-privileged-filesystem-h0-readiness.schema.json",
       "passed": true
     },
     {
@@ -2928,11 +3363,6 @@
     {
       "detail": "valid",
       "name": "json:state/gate-results/G09.json",
-      "passed": true
-    },
-    {
-      "detail": "valid",
-      "name": "json:state/gate-results/G10.criteria.json",
       "passed": true
     },
     {
@@ -3407,6 +3837,11 @@
     },
     {
       "detail": "compiled",
+      "name": "python:scripts/checkpoint_identity.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
       "name": "python:scripts/evidence_support.py",
       "passed": true
     },
@@ -3437,6 +3872,16 @@
     },
     {
       "detail": "compiled",
+      "name": "python:scripts/run_privileged_filesystem_admission_observation.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/run_privileged_filesystem_h0.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
       "name": "python:scripts/scan_attribution.py",
       "passed": true
     },
@@ -3462,12 +3907,52 @@
     },
     {
       "detail": "compiled",
+      "name": "python:scripts/test_acceptance_compatibility.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/test_checkpoint_identity.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
       "name": "python:scripts/test_evidence_controls.py",
       "passed": true
     },
     {
       "detail": "compiled",
+      "name": "python:scripts/test_gate_runner_hardening.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
       "name": "python:scripts/test_qualify_signed_shell_manager.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/test_release_scanners_hardening.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/test_run_privileged_filesystem_admission_observation.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/test_run_privileged_filesystem_h0.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/test_statectl_transactions.py",
+      "passed": true
+    },
+    {
+      "detail": "compiled",
+      "name": "python:scripts/test_verify_completion_hardening.py",
       "passed": true
     },
     {
@@ -3612,6 +4097,11 @@
     },
     {
       "detail": "syntax valid",
+      "name": "shell:state/gate-handlers/G12.sh",
+      "passed": true
+    },
+    {
+      "detail": "syntax valid",
       "name": "shell:templates/build_and_run.sh",
       "passed": true
     },
@@ -3681,20 +4171,25 @@
       "passed": true
     },
     {
-      "detail": "Authorship-attribution scan passed for /Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex",
+      "detail": "syntax valid",
+      "name": "shell:templates/gate-handlers/G12.sh",
+      "passed": true
+    },
+    {
+      "detail": "Authorship-attribution scan passed for /Users/jimdaley/GitHub/Forge-Conductor-E2-Next/.forge-codex",
       "name": "authorship-attribution-scan",
       "passed": true
     },
     {
-      "detail": "Secret scan passed for /Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex",
+      "detail": "Secret scan passed for /Users/jimdaley/GitHub/Forge-Conductor-E2-Next/.forge-codex",
       "name": "secret-scan",
       "passed": true
     }
   ],
   "errors": [],
-  "root": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex",
+  "root": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next/.forge-codex",
   "schema_version": 1,
   "valid": true,
-  "validated_at": "2026-08-31T02:16:36.299577+00:00",
+  "validated_at": "2026-08-31T23:04:32.212443+00:00",
   "warnings": []
 }

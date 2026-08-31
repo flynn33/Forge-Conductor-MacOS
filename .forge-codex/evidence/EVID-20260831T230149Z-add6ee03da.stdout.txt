@@ -1,0 +1,6 @@
+{
+  "valid": true,
+  "checks": 832,
+  "errors": [],
+  "report": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next/.forge-codex/PACKAGE_VALIDATION.json"
+}

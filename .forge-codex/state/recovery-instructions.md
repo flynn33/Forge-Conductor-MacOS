@@ -1,12 +1,14 @@
 # Recovery instructions
 
-The active preparation branch is `security/e2-evidence-binding`, based on
-`main` at `cd7e84fed8ed0fe0a8ec90793e83388c8a451f09` and published through
-open draft pull request #17. The source and evidence-control checkpoint is
-`2dd504e53a5a09837cd289a99eee48ab7f4547eb`. A later state-only commit can
-advance the pull-request transport HEAD without changing that source checkpoint;
-record and verify both identities independently in `environment.json` and
-`release-handoff.md`. Also verify the dirty state and
+The active preparation branch is `security/e2-harness-controls`, stacked on
+`fix/launchagent-readiness` at
+`96d5cfa3dba30df3e3137120b47357a4eaa9d4da` and published through open draft
+pull request #19. The H0 source checkpoint is
+`399e6a84c4760ddf6c13e02319dc120b4b8998c4`; the release base remains `main`
+at `cd7e84fed8ed0fe0a8ec90793e83388c8a451f09`. A later state-only commit can
+advance the pull-request transport HEAD without changing the H0 source
+checkpoint; record and verify both identities independently in
+`environment.json` and `release-handoff.md`. Also verify the dirty state and
 `.forge-codex/state/run-state.json`; do not infer readiness from the package
 directory alone.
 
@@ -28,7 +30,7 @@ authority scenario recorded in `FC-AUTONOMOUS-CONTINUITY-E2E-001`.
 ## Rollback boundaries
 
 - Do not broadly reset or clean the repository. Preserve user-owned work and inspect intended paths before staging.
-- The current rollback base is `main` at `cd7e84fed8ed0fe0a8ec90793e83388c8a451f09`; draft pull request #17 carries the active branch and source checkpoint `2dd504e53a5a09837cd289a99eee48ab7f4547eb`. Read the exact publication transport HEAD back from GitHub before relying on it. The autonomy baseline `b72d6e8dc00681477224fb1b79859f553bc02558` and bounded-continuation checkpoint `52f8aca47463f88fa94276115fb5c2070ca683ef` are historical reference points, not current authority.
+- The current rollback base is `main` at `cd7e84fed8ed0fe0a8ec90793e83388c8a451f09`; draft pull request #19 carries the active branch and H0 source checkpoint `399e6a84c4760ddf6c13e02319dc120b4b8998c4`, stacked on #18 and #17. Read the exact publication transport HEAD back from GitHub before relying on it. The autonomy baseline `b72d6e8dc00681477224fb1b79859f553bc02558` and bounded-continuation checkpoint `52f8aca47463f88fa94276115fb5c2070ca683ef` are historical reference points, not current authority.
 - External profile traces are under `/Users/jimdaley/Documents/RavenForge/Forge-Conductor-MacOS/Forge-Conductor-Repair-Evidence/aba90ab1-be80-4cc5-aa0b-23dd54d4a24d`.
 - Developer ID signing, notarization, and distribution remain outside this checkpoint. Repository publication is authorized only for verified checkpoints on the current branch.
 
@@ -55,6 +57,14 @@ authority scenario recorded in `FC-AUTONOMOUS-CONTINUITY-E2E-001`.
 
 ## Evidence-control recovery boundary
 
+- H0 recorder evidence `EVID-20260831T060522Z-03c32cb838` binds the source
+  checkpoint, source manifest, signed distinct harness and adversary identities,
+  local-APFS precondition, live CodeDirectory hashes, and the exact four-command
+  inventory. It performed no production mutation and cannot satisfy semantic E2
+  qualification. All 57 rows remain `not_run`, all 12 formal predicates remain
+  false, and every completion claim remains false. Inode/change-time replacement
+  detection is mitigation under the recorded local-APFS precondition, not
+  elimination of same-UID interference.
 - Source checkpoint `2dd504e53a5a09837cd289a99eee48ab7f4547eb`
   adds semantic artifact binding and passed 57 of 57 evidence-control tests.
   This is control evidence only. It does not execute any signed distinct-process

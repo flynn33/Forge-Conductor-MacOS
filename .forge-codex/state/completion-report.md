@@ -1,12 +1,12 @@
 # Forge Conductor completion verification
 
-- Evaluated: `2026-08-31T02:16:37.071701+00:00`
+- Evaluated: `2026-08-31T23:02:38.139038+00:00`
 - Passed: **False**
 
 ## Finalization gate
 
 - G12 status: **blocked_open**
-- G12 is written as passed only after every prerequisite and final integrity check passes and finalization is authorized.
+- G12 and the run status remain nonpassing until the bounded gate runner publishes a finalized matching operation and the completion command confirms it.
 
 ## Checks
 
@@ -14,146 +14,197 @@
 - [x] `package-valid` — package validation
 - [x] `attribution-clean` — repository scan
 - [x] `secret-scan-clean` — repository scan
-- [x] `gate-result-exists:G00` — /Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G00.json
-- [x] `gate-passed:G00` — passed
-- [x] `gate-ledger-passed:G00` — passed
-- [x] `gate-current-release-authority:G00` — current or unspecified
-- [x] `gate-artifact-exists:G00:G00.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.stdout.txt
-- [x] `gate-artifact-hash:G00:G00.stdout.txt` — e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-- [x] `gate-artifact-exists:G00:G00.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.stderr.txt
-- [x] `gate-artifact-hash:G00:G00.stderr.txt` — e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-- [x] `gate-artifact-exists:G00:G00.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.criteria.json
-- [x] `gate-artifact-hash:G00:G00.criteria.json` — 1aa97c749b734a48dd19dfca93d250d454f0ee25c9496b2227c0ab6f8f7d842b
-- [x] `gate-result-exists:G01` — /Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G01.json
-- [x] `gate-passed:G01` — passed
-- [x] `gate-ledger-passed:G01` — passed
-- [x] `gate-current-release-authority:G01` — current or unspecified
-- [x] `gate-artifact-exists:G01:G01.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G01.stdout.txt
-- [x] `gate-artifact-hash:G01:G01.stdout.txt` — e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-- [x] `gate-artifact-exists:G01:G01.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G01.stderr.txt
-- [x] `gate-artifact-hash:G01:G01.stderr.txt` — e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-- [x] `gate-artifact-exists:G01:G01.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G01.criteria.json
-- [x] `gate-artifact-hash:G01:G01.criteria.json` — db06fee93b77af7b76208f85e3c0c53c49c5be48c2f61047199f2120f2325daf
-- [x] `gate-result-exists:G02` — /Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G02.json
-- [x] `gate-passed:G02` — passed
-- [x] `gate-ledger-passed:G02` — passed
-- [x] `gate-current-release-authority:G02` — current or unspecified
-- [x] `gate-artifact-exists:G02:G02.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G02.stdout.txt
-- [x] `gate-artifact-hash:G02:G02.stdout.txt` — 72c77100be1e99a6acecdfc985ebf529458708b5de41a8ccb49fbbbbe48b0b3e
-- [x] `gate-artifact-exists:G02:G02.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G02.stderr.txt
-- [x] `gate-artifact-hash:G02:G02.stderr.txt` — e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-- [x] `gate-artifact-exists:G02:G02.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G02.criteria.json
-- [x] `gate-artifact-hash:G02:G02.criteria.json` — 1f33267dc6f77f755f5c8a2b537d600ba9f0b4218d3854af1f24263003af0b49
-- [x] `gate-result-exists:G03` — /Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G03.json
-- [x] `gate-passed:G03` — passed
-- [x] `gate-ledger-passed:G03` — passed
-- [x] `gate-current-release-authority:G03` — current or unspecified
-- [x] `gate-artifact-exists:G03:G03.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G03.stdout.txt
-- [x] `gate-artifact-hash:G03:G03.stdout.txt` — 47d39d678a1d5b15134be9e4a45880a184adb5541942e6ffb2bcaecbfa8362be
-- [x] `gate-artifact-exists:G03:G03.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G03.stderr.txt
-- [x] `gate-artifact-hash:G03:G03.stderr.txt` — e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-- [x] `gate-artifact-exists:G03:G03.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G03.criteria.json
-- [x] `gate-artifact-hash:G03:G03.criteria.json` — 7560820c0530d52b1a97f265cecd284c99a0a416b670919d11204e48eb6b367c
-- [x] `gate-result-exists:G04` — /Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G04.json
-- [x] `gate-passed:G04` — passed
-- [x] `gate-ledger-passed:G04` — passed
-- [x] `gate-current-release-authority:G04` — current or unspecified
-- [x] `gate-artifact-exists:G04:G04.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G04.stdout.txt
-- [x] `gate-artifact-hash:G04:G04.stdout.txt` — fa52a67ada4051cdaf064cb6fc52cdd72cd7957006924443b4e414e2f5abda61
-- [x] `gate-artifact-exists:G04:G04.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G04.stderr.txt
-- [x] `gate-artifact-hash:G04:G04.stderr.txt` — e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-- [x] `gate-artifact-exists:G04:G04.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G04.criteria.json
-- [x] `gate-artifact-hash:G04:G04.criteria.json` — 04fb03812290bdb7b43b973bde31d4399d351e29587f17096a419afd0c824b77
-- [x] `gate-result-exists:G05` — /Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G05.json
-- [x] `gate-passed:G05` — passed
-- [x] `gate-ledger-passed:G05` — passed
-- [x] `gate-current-release-authority:G05` — current or unspecified
-- [x] `gate-artifact-exists:G05:G05.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G05.stdout.txt
-- [x] `gate-artifact-hash:G05:G05.stdout.txt` — cceda1d1209095847a386a86f9048b1de62691c7e7d8ef6a1954b151b7ad759d
-- [x] `gate-artifact-exists:G05:G05.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G05.stderr.txt
-- [x] `gate-artifact-hash:G05:G05.stderr.txt` — e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-- [x] `gate-artifact-exists:G05:G05.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G05.criteria.json
-- [x] `gate-artifact-hash:G05:G05.criteria.json` — 88711d133c06c28d1c6344846856bfac0c409fb3d2627616faa5a8da2d14af39
-- [x] `gate-result-exists:G06` — /Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G06.json
-- [x] `gate-passed:G06` — passed
-- [x] `gate-ledger-passed:G06` — passed
-- [x] `gate-current-release-authority:G06` — current or unspecified
-- [x] `gate-artifact-exists:G06:G06.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G06.stdout.txt
-- [x] `gate-artifact-hash:G06:G06.stdout.txt` — b73cca38f82eb1e02a02cd37a504653a7561c5ed02bdcdfffe9f3891eacddc88
-- [x] `gate-artifact-exists:G06:G06.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G06.stderr.txt
-- [x] `gate-artifact-hash:G06:G06.stderr.txt` — e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-- [x] `gate-artifact-exists:G06:G06.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G06.criteria.json
-- [x] `gate-artifact-hash:G06:G06.criteria.json` — ded439d6b183d7f8074fa2a4bb9d28d6eca6b31d03160a650085360b877dca5a
-- [x] `gate-result-exists:G07` — /Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G07.json
-- [x] `gate-passed:G07` — passed
-- [x] `gate-ledger-passed:G07` — passed
-- [x] `gate-current-release-authority:G07` — current or unspecified
-- [x] `gate-artifact-exists:G07:G07.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G07.stdout.txt
-- [x] `gate-artifact-hash:G07:G07.stdout.txt` — d35955092f94076cf65a68f7ac24f677303902ca70b1a7a7b65fa12524d948a6
-- [x] `gate-artifact-exists:G07:G07.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G07.stderr.txt
-- [x] `gate-artifact-hash:G07:G07.stderr.txt` — e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-- [x] `gate-artifact-exists:G07:G07.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G07.criteria.json
-- [x] `gate-artifact-hash:G07:G07.criteria.json` — 0f5ff5eaffd84882273c49eebfd3e378246b67d2dafdf327735ec4e0a73806b2
-- [x] `gate-result-exists:G08` — /Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G08.json
-- [x] `gate-passed:G08` — passed
-- [x] `gate-ledger-passed:G08` — passed
-- [x] `gate-current-release-authority:G08` — current or unspecified
-- [x] `gate-artifact-exists:G08:G08.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G08.stdout.txt
-- [x] `gate-artifact-hash:G08:G08.stdout.txt` — 456c68fd77f436c47987b7dd6b71d21c2b8a43790b473444e99a331b877da09b
-- [x] `gate-artifact-exists:G08:G08.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G08.stderr.txt
-- [x] `gate-artifact-hash:G08:G08.stderr.txt` — e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-- [x] `gate-artifact-exists:G08:G08.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G08.criteria.json
-- [x] `gate-artifact-hash:G08:G08.criteria.json` — 9400af9cca98362000bcd1426c6557108e041511a348c24617d1ad85f3d6fce1
-- [x] `gate-result-exists:G09` — /Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G09.json
-- [ ] `gate-passed:G09` — passed; This record preserves the exact-revision adapter qualification. The live scenario invoked the adapter directly and does not establish current manager-owned threshold-forced rollover authority. Current release qualification requires exact successor acknowledgement, predecessor fencing and idempotent sealing, automatic continuation, GUI-closed operation, and recovery from every durable crash state in one real-provider forced-rollover scenario.
-- [ ] `gate-ledger-passed:G09` — blocked_dependency
-- [ ] `gate-current-release-authority:G09` — This record preserves the exact-revision adapter qualification. The live scenario invoked the adapter directly and does not establish current manager-owned threshold-forced rollover authority. Current release qualification requires exact successor acknowledgement, predecessor fencing and idempotent sealing, automatic continuation, GUI-closed operation, and recovery from every durable crash state in one real-provider forced-rollover scenario.
-- [ ] `gate-artifact-exists:G09:G09.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.stdout.txt
-- [ ] `gate-artifact-exists:G09:G09.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.stderr.txt
-- [ ] `gate-artifact-exists:G09:G09.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.criteria.json
-- [x] `gate-result-exists:G10` — /Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G10.json
-- [ ] `gate-passed:G10` — blocked
-- [ ] `gate-ledger-passed:G10` — blocked_dependency
-- [x] `gate-current-release-authority:G10` — current or unspecified
-- [ ] `gate-artifact-exists:G10:G10.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G10.stdout.txt
-- [ ] `gate-artifact-exists:G10:G10.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G10.stderr.txt
-- [ ] `gate-artifact-exists:G10:G10.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G10.criteria.json
-- [x] `gate-result-exists:G11` — /Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G11.json
-- [ ] `gate-passed:G11` — blocked
-- [ ] `gate-ledger-passed:G11` — blocked_dependency
-- [x] `gate-current-release-authority:G11` — current or unspecified
-- [ ] `gate-artifact-exists:G11:G11.stdout.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.stdout.txt
-- [ ] `gate-artifact-exists:G11:G11.stderr.txt` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.stderr.txt
-- [ ] `gate-artifact-exists:G11:G11.criteria.json` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.criteria.json
-- [x] `feature-baseline-exists` — /Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/feature-baseline.json
-- [x] `feature-runtime-inventory-complete` — False
-- [x] `feature-unknown-zero` — {'preserved': 66, 'additive': 0, 'migrated': 0, 'unknown': 0, 'removed': 0, 'untested': 0}
-- [x] `feature-untested-zero` — {'preserved': 66, 'additive': 0, 'migrated': 0, 'unknown': 0, 'removed': 0, 'untested': 0}
-- [x] `feature-removed-zero` — {'preserved': 66, 'additive': 0, 'migrated': 0, 'unknown': 0, 'removed': 0, 'untested': 0}
-- [x] `all-feature-statuses-valid` — ['preserved']
-- [x] `findings-resolution-exists` — /Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/findings-resolution.json
-- [ ] `critical-high-findings-resolved` — ['FC-FILESYSTEM-PATH-TOCTOU-001', 'FC-PRIVILEGED-SERVICE-LIFECYCLE-001', 'FC-PRIVILEGED-CALLER-IDENTITY-001', 'FC-SHELL-COMPAT-QUALIFICATION-001', 'FC-UI-QUALIFICATION-001', 'FC-AUTONOMOUS-CONTINUITY-E2E-001']
-- [x] `host-capability-report-exists` — /Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/host-capability-report.json
+- [x] `current-git-head-valid` — 44022da950e75362dfe5120bfd2d92d474ea0ce6
+- [x] `current-source-manifest-valid` — {"bytes": 11353041, "file_count": 360, "schema_version": 1, "sha256": "75e2f5ae4d967cce9f9b73e88ca7628ecaea0b90b7d61741706c42c0fd20f854"}
+- [ ] `relevant-source-clean` — relevant source is dirty: M .forge-codex/PACKAGE_VALIDATION.json; relevant source is dirty: M .forge-codex/PACKAGE_VALIDATION.json
+- [ ] `current-source-identity-stable` — ["relevant source is dirty: M .forge-codex/PACKAGE_VALIDATION.json", "relevant source is dirty: M .forge-codex/PACKAGE_VALIDATION.json"]
+- [x] `completion-gate-plan-valid` — 13 completion gate identifiers
+- [x] `gate-result-binding:G00` — {"bytes": 3671, "sha256": "ac3dd5f1a39806ffd829b7be1ea84c45b57dd221f296f3ed8a65218b477c07fe"}
+- [ ] `gate-finalized-result:G00` — {"finalized": null, "operation_id": null, "status": "passed"}
+- [ ] `gate-operation-pair:G00` — {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
+- [ ] `gate-current-source-binding:G00` — {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
+- [x] `gate-command-contract:G00` — all recorded commands exited zero within their deadline
+- [x] `gate-criteria-contract:G00` — exact ordered criteria with literal Boolean passes
+- [ ] `gate-result-envelope:G00` — schema, timing, environment, and evaluator metadata
+- [x] `gate-artifacts:G00` — 3 bounded artifact(s) verified
+- [x] `gate-result-binding:G01` — {"bytes": 3020, "sha256": "98b2db86d9cdf182cafee274b2ec75a59604d6260f8bf5333519dfd668317a99"}
+- [ ] `gate-finalized-result:G01` — {"finalized": null, "operation_id": null, "status": "passed"}
+- [ ] `gate-operation-pair:G01` — {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
+- [ ] `gate-current-source-binding:G01` — {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
+- [x] `gate-command-contract:G01` — all recorded commands exited zero within their deadline
+- [x] `gate-criteria-contract:G01` — exact ordered criteria with literal Boolean passes
+- [ ] `gate-result-envelope:G01` — schema, timing, environment, and evaluator metadata
+- [x] `gate-artifacts:G01` — 3 bounded artifact(s) verified
+- [x] `gate-result-binding:G02` — {"bytes": 3774, "sha256": "253c6a73ca2b063c3e886623b09c039e030d956bfd5f021c287db7d345719f92"}
+- [ ] `gate-finalized-result:G02` — {"finalized": null, "operation_id": null, "status": "passed"}
+- [ ] `gate-operation-pair:G02` — {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
+- [ ] `gate-current-source-binding:G02` — {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
+- [x] `gate-command-contract:G02` — all recorded commands exited zero within their deadline
+- [x] `gate-criteria-contract:G02` — exact ordered criteria with literal Boolean passes
+- [ ] `gate-result-envelope:G02` — schema, timing, environment, and evaluator metadata
+- [x] `gate-artifacts:G02` — 3 bounded artifact(s) verified
+- [ ] `gate-current-release-authority:G02` — {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G02"}
+- [x] `gate-result-binding:G03` — {"bytes": 4254, "sha256": "0e06e05d9c781b506d87f9c1276fd8b9399250d7b4034ccb61b0c3ae66d019ae"}
+- [ ] `gate-finalized-result:G03` — {"finalized": null, "operation_id": null, "status": "passed"}
+- [ ] `gate-operation-pair:G03` — {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
+- [ ] `gate-current-source-binding:G03` — {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
+- [x] `gate-command-contract:G03` — all recorded commands exited zero within their deadline
+- [x] `gate-criteria-contract:G03` — exact ordered criteria with literal Boolean passes
+- [ ] `gate-result-envelope:G03` — schema, timing, environment, and evaluator metadata
+- [x] `gate-artifacts:G03` — 3 bounded artifact(s) verified
+- [ ] `gate-current-release-authority:G03` — {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G03"}
+- [x] `gate-result-binding:G04` — {"bytes": 4741, "sha256": "482910b281a00aef3a2d85b635f26b589c41003fb8ee96db8fdc1cec6e90c3a0"}
+- [ ] `gate-finalized-result:G04` — {"finalized": null, "operation_id": null, "status": "passed"}
+- [ ] `gate-operation-pair:G04` — {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
+- [ ] `gate-current-source-binding:G04` — {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
+- [x] `gate-command-contract:G04` — all recorded commands exited zero within their deadline
+- [x] `gate-criteria-contract:G04` — exact ordered criteria with literal Boolean passes
+- [ ] `gate-result-envelope:G04` — schema, timing, environment, and evaluator metadata
+- [x] `gate-artifacts:G04` — 3 bounded artifact(s) verified
+- [ ] `gate-current-release-authority:G04` — {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G04"}
+- [x] `gate-result-binding:G05` — {"bytes": 5030, "sha256": "3ce3a61542f4839b41916b5606f9828affaec8be4bf9c30b555731aac2dfc665"}
+- [ ] `gate-finalized-result:G05` — {"finalized": null, "operation_id": null, "status": "passed"}
+- [ ] `gate-operation-pair:G05` — {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
+- [ ] `gate-current-source-binding:G05` — {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
+- [x] `gate-command-contract:G05` — all recorded commands exited zero within their deadline
+- [x] `gate-criteria-contract:G05` — exact ordered criteria with literal Boolean passes
+- [ ] `gate-result-envelope:G05` — schema, timing, environment, and evaluator metadata
+- [x] `gate-artifacts:G05` — 3 bounded artifact(s) verified
+- [ ] `gate-current-release-authority:G05` — {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G05"}
+- [x] `gate-result-binding:G06` — {"bytes": 5057, "sha256": "4381c5498a76e8aec69fda351610305cb594e80abd40136beb854f91bc93d51d"}
+- [ ] `gate-finalized-result:G06` — {"finalized": null, "operation_id": null, "status": "passed"}
+- [ ] `gate-operation-pair:G06` — {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
+- [ ] `gate-current-source-binding:G06` — {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
+- [x] `gate-command-contract:G06` — all recorded commands exited zero within their deadline
+- [x] `gate-criteria-contract:G06` — exact ordered criteria with literal Boolean passes
+- [ ] `gate-result-envelope:G06` — schema, timing, environment, and evaluator metadata
+- [x] `gate-artifacts:G06` — 3 bounded artifact(s) verified
+- [ ] `gate-current-release-authority:G06` — {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G06"}
+- [x] `gate-result-binding:G07` — {"bytes": 5711, "sha256": "e82ed5ae8e1d19c767f32fcc509388d3dabcd89f32eb24795ef7d2754d6dc16c"}
+- [ ] `gate-finalized-result:G07` — {"finalized": null, "operation_id": null, "status": "passed"}
+- [ ] `gate-operation-pair:G07` — {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
+- [ ] `gate-current-source-binding:G07` — {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
+- [x] `gate-command-contract:G07` — all recorded commands exited zero within their deadline
+- [x] `gate-criteria-contract:G07` — exact ordered criteria with literal Boolean passes
+- [ ] `gate-result-envelope:G07` — schema, timing, environment, and evaluator metadata
+- [x] `gate-artifacts:G07` — 3 bounded artifact(s) verified
+- [ ] `gate-current-release-authority:G07` — {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G07"}
+- [x] `gate-result-binding:G08` — {"bytes": 3809, "sha256": "f38cca037a3943b88d1055380b2c566075a69739b75def6b07c27aa3f6e4d944"}
+- [ ] `gate-finalized-result:G08` — {"finalized": null, "operation_id": null, "status": "passed"}
+- [ ] `gate-operation-pair:G08` — {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
+- [ ] `gate-current-source-binding:G08` — {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
+- [x] `gate-command-contract:G08` — all recorded commands exited zero within their deadline
+- [x] `gate-criteria-contract:G08` — exact ordered criteria with literal Boolean passes
+- [ ] `gate-result-envelope:G08` — schema, timing, environment, and evaluator metadata
+- [x] `gate-artifacts:G08` — 3 bounded artifact(s) verified
+- [ ] `gate-current-release-authority:G08` — {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G08"}
+- [x] `gate-result-binding:G09` — {"bytes": 5243, "sha256": "a9864d48d350c53e088dfacf69714f24f18cca1920b3be8d638e5b89df17ec60"}
+- [ ] `gate-finalized-result:G09` — {"finalized": null, "operation_id": null, "status": "passed"}
+- [ ] `gate-operation-pair:G09` — {"result_operation_id": null, "state_operation_id": null, "state_status": "blocked_dependency"}
+- [ ] `gate-current-source-binding:G09` — {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
+- [x] `gate-command-contract:G09` — all recorded commands exited zero within their deadline
+- [x] `gate-criteria-contract:G09` — exact ordered criteria with literal Boolean passes
+- [ ] `gate-result-envelope:G09` — schema, timing, environment, and evaluator metadata
+- [ ] `gate-artifacts:G09` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.stdout.txt: G09 completion artifact is unavailable: [Errno 2] No such file or directory: '/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.stdout.txt'; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.stderr.txt: G09 completion artifact is unavailable: [Errno 2] No such file or directory: '/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.stderr.txt'; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.criteria.json: G09 completion artifact is unavailable: [Errno 2] No such file or directory: '/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.criteria.json'
+- [ ] `gate-current-release-authority:G09` — {"authority_scope": "historical_exact_revision", "current_release_authority": false, "record_gate_id": "G09"}
+- [x] `gate-result-binding:G10` — {"bytes": 2549, "sha256": "4525c4685175e758e438f712502be96f15dc526dc0a454b0879954b1d0553b95"}
+- [ ] `gate-finalized-result:G10` — {"finalized": true, "operation_id": "a2f65346-b22b-4e18-aa87-fdac8a805676", "status": "failed"}
+- [ ] `gate-operation-pair:G10` — {"result_operation_id": "a2f65346-b22b-4e18-aa87-fdac8a805676", "state_operation_id": "a2f65346-b22b-4e18-aa87-fdac8a805676", "state_status": "failed"}
+- [ ] `gate-current-source-binding:G10` — {"expected_head": null, "expected_manifest": null, "result_head": "44022da950e75362dfe5120bfd2d92d474ea0ce6", "result_manifest": {"bytes": 11353041, "file_count": 360, "schema_version": 1, "sha256": "75e2f5ae4d967cce9f9b73e88ca7628ecaea0b90b7d61741706c42c0fd20f854"}}
+- [ ] `gate-command-contract:G10` — all recorded commands exited zero within their deadline
+- [ ] `gate-criteria-contract:G10` — exact ordered criteria with literal Boolean passes
+- [x] `gate-result-envelope:G10` — schema, timing, environment, and evaluator metadata
+- [x] `gate-artifacts:G10` — 2 bounded artifact(s) verified
+- [ ] `gate-current-release-authority:G10` — {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G10"}
+- [x] `gate-result-binding:G11` — {"bytes": 4425, "sha256": "a08168447d0ec3c73683784e904273cb3d49dbb5201af45ee37d73afcbe4daca"}
+- [ ] `gate-finalized-result:G11` — {"finalized": null, "operation_id": null, "status": "blocked"}
+- [ ] `gate-operation-pair:G11` — {"result_operation_id": null, "state_operation_id": null, "state_status": "blocked_dependency"}
+- [ ] `gate-current-source-binding:G11` — {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
+- [ ] `gate-command-contract:G11` — all recorded commands exited zero within their deadline
+- [ ] `gate-criteria-contract:G11` — exact ordered criteria with literal Boolean passes
+- [ ] `gate-result-envelope:G11` — schema, timing, environment, and evaluator metadata
+- [ ] `gate-artifacts:G11` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.stdout.txt: G11 completion artifact is unavailable: [Errno 2] No such file or directory: '/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.stdout.txt'; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.stderr.txt: G11 completion artifact is unavailable: [Errno 2] No such file or directory: '/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.stderr.txt'; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.criteria.json: G11 completion artifact is unavailable: [Errno 2] No such file or directory: '/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.criteria.json'
+- [ ] `gate-current-release-authority:G11` — {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G11"}
+- [x] `feature-runtime-inventory-complete` — false
+- [x] `feature-parity-counters-zero` — {"additive": 0, "migrated": 0, "preserved": 66, "removed": 0, "unknown": 0, "untested": 0}
+- [x] `all-feature-statuses-valid` — 66 feature records
+- [ ] `findings-resolution-structure` — 41 unique, typed finding record(s)
+- [x] `run-state-issues-structure` — 31 unique, typed issue record(s)
+- [ ] `critical-high-findings-resolved` — ["FC-FILESYSTEM-PATH-TOCTOU-001", "FC-PRIVILEGED-SERVICE-LIFECYCLE-001", "FC-PRIVILEGED-CALLER-IDENTITY-001", "FC-UI-QUALIFICATION-001", "FC-AUTONOMOUS-CONTINUITY-E2E-001"]
+- [ ] `critical-high-run-state-issues-resolved` — ["FC-UI-QUALIFICATION-001", "FC-FILESYSTEM-PATH-TOCTOU-001", "FC-AUTONOMOUS-CONTINUITY-E2E-001", "FC-HARDWARE-QUALIFICATION-001", "FC-PROJECT-ROOT-SETTINGS-001", "FC-PRIVILEGED-SERVICE-LIFECYCLE-001", "FC-PRIVILEGED-CALLER-IDENTITY-001"]
 - [ ] `autonomous-rollover-mode-proven` — forge.native-session-host
-- [x] `supported-api-only` — False
+- [x] `supported-api-only` — false
+- [ ] `source-identity-unchanged-through-evaluation` — ["relevant source is dirty: M .forge-codex/PACKAGE_VALIDATION.json"]
 
 ## Blocking errors
 
-- gate-passed:G09: passed; This record preserves the exact-revision adapter qualification. The live scenario invoked the adapter directly and does not establish current manager-owned threshold-forced rollover authority. Current release qualification requires exact successor acknowledgement, predecessor fencing and idempotent sealing, automatic continuation, GUI-closed operation, and recovery from every durable crash state in one real-provider forced-rollover scenario.
-- gate-ledger-passed:G09: blocked_dependency
-- gate-current-release-authority:G09: This record preserves the exact-revision adapter qualification. The live scenario invoked the adapter directly and does not establish current manager-owned threshold-forced rollover authority. Current release qualification requires exact successor acknowledgement, predecessor fencing and idempotent sealing, automatic continuation, GUI-closed operation, and recovery from every durable crash state in one real-provider forced-rollover scenario.
-- gate-artifact-exists:G09:G09.stdout.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.stdout.txt
-- gate-artifact-exists:G09:G09.stderr.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.stderr.txt
-- gate-artifact-exists:G09:G09.criteria.json: /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.criteria.json
-- gate-passed:G10: blocked
-- gate-ledger-passed:G10: blocked_dependency
-- gate-artifact-exists:G10:G10.stdout.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G10.stdout.txt
-- gate-artifact-exists:G10:G10.stderr.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G10.stderr.txt
-- gate-artifact-exists:G10:G10.criteria.json: /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G10.criteria.json
-- gate-passed:G11: blocked
-- gate-ledger-passed:G11: blocked_dependency
-- gate-artifact-exists:G11:G11.stdout.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.stdout.txt
-- gate-artifact-exists:G11:G11.stderr.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.stderr.txt
-- gate-artifact-exists:G11:G11.criteria.json: /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.criteria.json
-- critical-high-findings-resolved: ['FC-FILESYSTEM-PATH-TOCTOU-001', 'FC-PRIVILEGED-SERVICE-LIFECYCLE-001', 'FC-PRIVILEGED-CALLER-IDENTITY-001', 'FC-SHELL-COMPAT-QUALIFICATION-001', 'FC-UI-QUALIFICATION-001', 'FC-AUTONOMOUS-CONTINUITY-E2E-001']
+- relevant-source-clean: relevant source is dirty: M .forge-codex/PACKAGE_VALIDATION.json; relevant source is dirty: M .forge-codex/PACKAGE_VALIDATION.json
+- current-source-identity-stable: ["relevant source is dirty: M .forge-codex/PACKAGE_VALIDATION.json", "relevant source is dirty: M .forge-codex/PACKAGE_VALIDATION.json"]
+- gate-finalized-result:G00: {"finalized": null, "operation_id": null, "status": "passed"}
+- gate-operation-pair:G00: {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
+- gate-current-source-binding:G00: {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
+- gate-result-envelope:G00: schema, timing, environment, and evaluator metadata
+- gate-finalized-result:G01: {"finalized": null, "operation_id": null, "status": "passed"}
+- gate-operation-pair:G01: {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
+- gate-current-source-binding:G01: {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
+- gate-result-envelope:G01: schema, timing, environment, and evaluator metadata
+- gate-finalized-result:G02: {"finalized": null, "operation_id": null, "status": "passed"}
+- gate-operation-pair:G02: {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
+- gate-current-source-binding:G02: {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
+- gate-result-envelope:G02: schema, timing, environment, and evaluator metadata
+- gate-current-release-authority:G02: {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G02"}
+- gate-finalized-result:G03: {"finalized": null, "operation_id": null, "status": "passed"}
+- gate-operation-pair:G03: {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
+- gate-current-source-binding:G03: {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
+- gate-result-envelope:G03: schema, timing, environment, and evaluator metadata
+- gate-current-release-authority:G03: {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G03"}
+- gate-finalized-result:G04: {"finalized": null, "operation_id": null, "status": "passed"}
+- gate-operation-pair:G04: {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
+- gate-current-source-binding:G04: {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
+- gate-result-envelope:G04: schema, timing, environment, and evaluator metadata
+- gate-current-release-authority:G04: {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G04"}
+- gate-finalized-result:G05: {"finalized": null, "operation_id": null, "status": "passed"}
+- gate-operation-pair:G05: {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
+- gate-current-source-binding:G05: {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
+- gate-result-envelope:G05: schema, timing, environment, and evaluator metadata
+- gate-current-release-authority:G05: {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G05"}
+- gate-finalized-result:G06: {"finalized": null, "operation_id": null, "status": "passed"}
+- gate-operation-pair:G06: {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
+- gate-current-source-binding:G06: {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
+- gate-result-envelope:G06: schema, timing, environment, and evaluator metadata
+- gate-current-release-authority:G06: {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G06"}
+- gate-finalized-result:G07: {"finalized": null, "operation_id": null, "status": "passed"}
+- gate-operation-pair:G07: {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
+- gate-current-source-binding:G07: {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
+- gate-result-envelope:G07: schema, timing, environment, and evaluator metadata
+- gate-current-release-authority:G07: {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G07"}
+- gate-finalized-result:G08: {"finalized": null, "operation_id": null, "status": "passed"}
+- gate-operation-pair:G08: {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
+- gate-current-source-binding:G08: {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
+- gate-result-envelope:G08: schema, timing, environment, and evaluator metadata
+- gate-current-release-authority:G08: {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G08"}
+- gate-finalized-result:G09: {"finalized": null, "operation_id": null, "status": "passed"}
+- gate-operation-pair:G09: {"result_operation_id": null, "state_operation_id": null, "state_status": "blocked_dependency"}
+- gate-current-source-binding:G09: {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
+- gate-result-envelope:G09: schema, timing, environment, and evaluator metadata
+- gate-artifacts:G09: /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.stdout.txt: G09 completion artifact is unavailable: [Errno 2] No such file or directory: '/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.stdout.txt'; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.stderr.txt: G09 completion artifact is unavailable: [Errno 2] No such file or directory: '/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.stderr.txt'; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.criteria.json: G09 completion artifact is unavailable: [Errno 2] No such file or directory: '/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.criteria.json'
+- gate-current-release-authority:G09: {"authority_scope": "historical_exact_revision", "current_release_authority": false, "record_gate_id": "G09"}
+- gate-finalized-result:G10: {"finalized": true, "operation_id": "a2f65346-b22b-4e18-aa87-fdac8a805676", "status": "failed"}
+- gate-operation-pair:G10: {"result_operation_id": "a2f65346-b22b-4e18-aa87-fdac8a805676", "state_operation_id": "a2f65346-b22b-4e18-aa87-fdac8a805676", "state_status": "failed"}
+- gate-current-source-binding:G10: {"expected_head": null, "expected_manifest": null, "result_head": "44022da950e75362dfe5120bfd2d92d474ea0ce6", "result_manifest": {"bytes": 11353041, "file_count": 360, "schema_version": 1, "sha256": "75e2f5ae4d967cce9f9b73e88ca7628ecaea0b90b7d61741706c42c0fd20f854"}}
+- gate-command-contract:G10: all recorded commands exited zero within their deadline
+- gate-criteria-contract:G10: exact ordered criteria with literal Boolean passes
+- gate-current-release-authority:G10: {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G10"}
+- gate-finalized-result:G11: {"finalized": null, "operation_id": null, "status": "blocked"}
+- gate-operation-pair:G11: {"result_operation_id": null, "state_operation_id": null, "state_status": "blocked_dependency"}
+- gate-current-source-binding:G11: {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
+- gate-command-contract:G11: all recorded commands exited zero within their deadline
+- gate-criteria-contract:G11: exact ordered criteria with literal Boolean passes
+- gate-result-envelope:G11: schema, timing, environment, and evaluator metadata
+- gate-artifacts:G11: /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.stdout.txt: G11 completion artifact is unavailable: [Errno 2] No such file or directory: '/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.stdout.txt'; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.stderr.txt: G11 completion artifact is unavailable: [Errno 2] No such file or directory: '/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.stderr.txt'; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.criteria.json: G11 completion artifact is unavailable: [Errno 2] No such file or directory: '/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.criteria.json'
+- gate-current-release-authority:G11: {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G11"}
+- findings-resolution-structure: 41 unique, typed finding record(s)
+- critical-high-findings-resolved: ["FC-FILESYSTEM-PATH-TOCTOU-001", "FC-PRIVILEGED-SERVICE-LIFECYCLE-001", "FC-PRIVILEGED-CALLER-IDENTITY-001", "FC-UI-QUALIFICATION-001", "FC-AUTONOMOUS-CONTINUITY-E2E-001"]
+- critical-high-run-state-issues-resolved: ["FC-UI-QUALIFICATION-001", "FC-FILESYSTEM-PATH-TOCTOU-001", "FC-AUTONOMOUS-CONTINUITY-E2E-001", "FC-HARDWARE-QUALIFICATION-001", "FC-PROJECT-ROOT-SETTINGS-001", "FC-PRIVILEGED-SERVICE-LIFECYCLE-001", "FC-PRIVILEGED-CALLER-IDENTITY-001"]
 - autonomous-rollover-mode-proven: forge.native-session-host
+- source-identity-unchanged-through-evaluation: ["relevant source is dirty: M .forge-codex/PACKAGE_VALIDATION.json"]

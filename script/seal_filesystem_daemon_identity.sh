@@ -54,7 +54,20 @@ for architecture in $architectures; do
 done
 
 /bin/mkdir -p "$(/usr/bin/dirname "$sealed_plist")"
-temporary_plist="${sealed_plist}.tmp.$$"
+sealed_directory=$(/usr/bin/dirname "$sealed_plist")
+temporary_directory=${TEMP_DIR:-$sealed_directory}
+if [[ ! -d "$temporary_directory" || -L "$temporary_directory" ]]; then
+    echo "identity seal temporary directory is missing or linked: $temporary_directory" >&2
+    exit 73
+fi
+sealed_device=$(/usr/bin/stat -f '%d' "$sealed_directory")
+temporary_device=$(/usr/bin/stat -f '%d' "$temporary_directory")
+if [[ "$sealed_device" != "$temporary_device" ]]; then
+    echo "identity seal temporary and output directories are on different filesystems" >&2
+    exit 73
+fi
+temporary_plist=$(/usr/bin/mktemp \
+    "${temporary_directory}/$(/usr/bin/basename "$sealed_plist").XXXXXX")
 trap '/bin/rm -f "$temporary_plist"' EXIT
 /bin/cp "$source_plist" "$temporary_plist"
 /usr/bin/plutil -remove ForgeFilesystemDaemonCDHashArm64 "$temporary_plist" 2>/dev/null || true

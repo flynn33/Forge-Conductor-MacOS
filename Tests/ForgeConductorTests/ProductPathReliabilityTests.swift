@@ -8,6 +8,35 @@ import Darwin
 
 /// G1/G7: product reliability — MCP negotiate + tools surface without LM Studio UI.
 final class ProductPathReliabilityTests: XCTestCase {
+    func testProtectedServiceSettingsUsePresentationStatusWithoutChangingRawStatus() throws {
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let appModel = try String(
+            contentsOf: repository.appendingPathComponent(
+                "Sources/ForgeConductorApp/AppModel.swift"
+            ),
+            encoding: .utf8
+        )
+        let service = try String(
+            contentsOf: repository.appendingPathComponent(
+                "Sources/ForgeConductorCore/Infrastructure/SecureFilesystemService.swift"
+            ),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(appModel.contains("await service.presentedStatus()"))
+        XCTAssertTrue(appModel.contains("guard secureFilesystemStatusTask == nil"))
+        XCTAssertTrue(appModel.contains(#"case .notRegistered: "Not enabled""#))
+        XCTAssertTrue(appModel.contains(#"case .notFound: "Not packaged or invalid""#))
+        XCTAssertFalse(appModel.contains("Not packaged in this build"))
+        XCTAssertTrue(service.contains("public func status()"))
+        XCTAssertTrue(service.contains("public func presentedStatus() async"))
+        XCTAssertTrue(service.contains("packageObservation == .present"))
+        XCTAssertTrue(service.contains("static func registrationStatus()"))
+    }
+
     func testPrivilegedDaemonUsesDistinctCaptureIdentityAndPhaseReceipts() throws {
         let repository = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -234,6 +263,59 @@ final class ProductPathReliabilityTests: XCTestCase {
         XCTAssertTrue(
             embeddedCLIBuildFile.contains("ATTRIBUTES = (CodeSignOnCopy, );"),
             "embedded manager CLI must be re-signed as nested app code"
+        )
+    }
+
+    func testFilesystemIdentitySealUsesSandboxWritableAtomicStaging() throws {
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let script = try String(
+            contentsOf: repository.appendingPathComponent(
+                "script/seal_filesystem_daemon_identity.sh"
+            ),
+            encoding: .utf8
+        )
+        let project = try String(
+            contentsOf: repository.appendingPathComponent(
+                "ForgeConductor.xcodeproj/project.pbxproj"
+            ),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(
+            script.contains(#"temporary_directory=${TEMP_DIR:-$sealed_directory}"#),
+            "Xcode user-script sandboxing only grants temporary writes beneath TEMP_DIR"
+        )
+        XCTAssertTrue(
+            script.contains(
+                #""${temporary_directory}/$(/usr/bin/basename "$sealed_plist").XXXXXX""#
+            ),
+            "the identity seal must not create an undeclared sibling of the final plist"
+        )
+        XCTAssertTrue(
+            script.contains(#"sealed_device=$(/usr/bin/stat -f '%d' "$sealed_directory")"#)
+        )
+        XCTAssertTrue(
+            script.contains(#"temporary_device=$(/usr/bin/stat -f '%d' "$temporary_directory")"#)
+        )
+        XCTAssertTrue(
+            script.contains(#"if [[ "$sealed_device" != "$temporary_device" ]]"#),
+            "the final move must fail closed rather than degrade to a cross-filesystem copy"
+        )
+        XCTAssertTrue(
+            script.contains(#"/bin/mv -f "$temporary_plist" "$sealed_plist""#),
+            "the fully validated plist must replace the declared output atomically"
+        )
+        XCTAssertFalse(
+            script.contains(#"temporary_plist="${sealed_plist}.tmp.$$""#),
+            "an undeclared DerivedSources sibling is denied by Xcode's script sandbox"
+        )
+        XCTAssertTrue(project.contains("ENABLE_USER_SCRIPT_SANDBOXING = YES;"))
+        XCTAssertFalse(
+            project.contains("ENABLE_USER_SCRIPT_SANDBOXING = NO;"),
+            "the identity seal fix must not weaken Xcode user-script sandboxing"
         )
     }
 

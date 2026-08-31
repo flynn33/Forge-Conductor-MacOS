@@ -51,6 +51,21 @@ let package = Package(
             path: "Sources/ForgeFilesystemDaemon"
         ),
         .target(
+            name: "ForgeFilesystemQualificationSupport",
+            dependencies: ["ForgeFilesystemProtocol"],
+            path: "Sources/ForgeFilesystemQualificationSupport"
+        ),
+        .executableTarget(
+            name: "ForgeFilesystemQualificationHarness",
+            dependencies: ["ForgeFilesystemQualificationSupport"],
+            path: "Sources/ForgeFilesystemQualificationHarness"
+        ),
+        .executableTarget(
+            name: "ForgeFilesystemAdversary",
+            dependencies: ["ForgeFilesystemQualificationSupport"],
+            path: "Sources/ForgeFilesystemAdversary"
+        ),
+        .target(
             name: "ForgeNativeSessionHostPlugin",
             dependencies: ["ForgeConductorCore"],
             path: "Sources/ForgeNativeSessionHostPlugin"
@@ -78,6 +93,11 @@ let package = Package(
             resources: [
                 .process("Fixtures"),
             ]
+        ),
+        .testTarget(
+            name: "ForgeFilesystemQualificationSupportTests",
+            dependencies: ["ForgeFilesystemQualificationSupport"],
+            path: "Tests/ForgeFilesystemQualificationSupportTests"
         ),
     ],
     swiftLanguageModes: [.v5]

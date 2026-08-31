@@ -1,0 +1,381 @@
+{
+  "blocking_reasons": [],
+  "canonical_qualification_template": {
+    "after_sha256": "630f65120eda7cc2fbaea646c9df4772564d1ef9fad1d8aac2577f8e095eb7b3",
+    "before_sha256": "630f65120eda7cc2fbaea646c9df4772564d1ef9fad1d8aac2577f8e095eb7b3",
+    "byte_stable": true,
+    "nonpassing_contract": {
+      "formal_predicates_proven": 0,
+      "formal_predicates_required": 12,
+      "matrix_rows_executed": 0,
+      "matrix_rows_required": 57,
+      "ok": false,
+      "residual_disposition": "open_release_blocker",
+      "status": "partial"
+    },
+    "path": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Harness/.forge-codex/templates/p10-privileged-filesystem-qualification-report.json"
+  },
+  "commands": [
+    {
+      "command": "describe",
+      "executable_snapshot_sha256": "51c03d02a32df400c0a7f5264f82a44f15afe22b02a4e8cb53aea6ebcd996f81",
+      "live_process_identity": {
+        "code_directory_hash": "7e22c00a6dc82e7dd3367a937a559a3f6addad0f",
+        "matches_inspected_executable": true,
+        "process_id": 15848,
+        "stop_signal": 17
+      },
+      "process_group_cleanup": "already_empty",
+      "result": {
+        "bundle_identifier": "com.forge-conductor.qualification-harness",
+        "code_directory_hash": "7e22c00a6dc82e7dd3367a937a559a3f6addad0f",
+        "command": "describe",
+        "completion_claims": {
+          "e2": false,
+          "g10": false,
+          "g12": false,
+          "p10": false,
+          "release": false
+        },
+        "daemon_client_requirement_satisfied": false,
+        "daemon_client_requirement_sha256": "1c3ab0ee788f0a5af004819ff10b80b65b623670927a20e582da917461d83b34",
+        "effective_user_id": 501,
+        "executable_path": "/tmp/forge-e2-h0-derived/Build/Products/Debug/forge-filesystem-qualification-harness",
+        "formal_predicates_updated": 0,
+        "hardened_runtime": true,
+        "parent_process_id": 15830,
+        "process_id": 15848,
+        "production_mutation_exercised": false,
+        "qualification_status": "not_run",
+        "recorder_context_present": false,
+        "role": "harness",
+        "rows_updated": 0,
+        "schema_version": 1,
+        "self_identity_requirement_satisfied": true,
+        "signing_entitlements": {
+          "com.apple.application-identifier": "9AQ2C2838M.com.forge-conductor.qualification-harness"
+        },
+        "signing_team_identifier": "9AQ2C2838M",
+        "supported_commands": [
+          "describe",
+          "self-check"
+        ],
+        "team_only_admission_probe_satisfied": true
+      },
+      "return_code": 0,
+      "role": "harness",
+      "stderr_bytes": 0,
+      "stdout_sha256": "d59fda0a3e2c90f4e935db401977f703eb34aff27cfa21582fe655c4cc5fe207",
+      "timed_out": false
+    },
+    {
+      "command": "self-check",
+      "executable_snapshot_sha256": "51c03d02a32df400c0a7f5264f82a44f15afe22b02a4e8cb53aea6ebcd996f81",
+      "live_process_identity": {
+        "code_directory_hash": "7e22c00a6dc82e7dd3367a937a559a3f6addad0f",
+        "matches_inspected_executable": true,
+        "process_id": 15849,
+        "stop_signal": 17
+      },
+      "process_group_cleanup": "already_empty",
+      "result": {
+        "bundle_identifier": "com.forge-conductor.qualification-harness",
+        "code_directory_hash": "7e22c00a6dc82e7dd3367a937a559a3f6addad0f",
+        "command": "self-check",
+        "completion_claims": {
+          "e2": false,
+          "g10": false,
+          "g12": false,
+          "p10": false,
+          "release": false
+        },
+        "daemon_client_requirement_satisfied": false,
+        "daemon_client_requirement_sha256": "1c3ab0ee788f0a5af004819ff10b80b65b623670927a20e582da917461d83b34",
+        "effective_user_id": 501,
+        "executable_path": "/tmp/forge-e2-h0-derived/Build/Products/Debug/forge-filesystem-qualification-harness",
+        "formal_predicates_updated": 0,
+        "hardened_runtime": true,
+        "parent_process_id": 15830,
+        "process_id": 15849,
+        "production_mutation_exercised": false,
+        "qualification_status": "not_run",
+        "recorder_context_present": true,
+        "role": "harness",
+        "rows_updated": 0,
+        "schema_version": 1,
+        "self_identity_requirement_satisfied": true,
+        "signing_entitlements": {
+          "com.apple.application-identifier": "9AQ2C2838M.com.forge-conductor.qualification-harness"
+        },
+        "signing_team_identifier": "9AQ2C2838M",
+        "supported_commands": [
+          "describe",
+          "self-check"
+        ],
+        "team_only_admission_probe_satisfied": true
+      },
+      "return_code": 0,
+      "role": "harness",
+      "stderr_bytes": 0,
+      "stdout_sha256": "0bbe96bdd78b0517ada1ef2fcf53e54d0ad50fee3f7f84a001f26145a70d5c4c",
+      "timed_out": false
+    },
+    {
+      "command": "describe",
+      "executable_snapshot_sha256": "1bcbb50ea8b3a407f2e57d66050fd6d1e08d0e59ba803af1a69bae04a58ea92e",
+      "live_process_identity": {
+        "code_directory_hash": "dbbfa0b193b8f64ac0c21de95dc29b1cc989dff9",
+        "matches_inspected_executable": true,
+        "process_id": 15850,
+        "stop_signal": 17
+      },
+      "process_group_cleanup": "already_empty",
+      "result": {
+        "bundle_identifier": "com.forge-conductor.qualification-adversary",
+        "code_directory_hash": "dbbfa0b193b8f64ac0c21de95dc29b1cc989dff9",
+        "command": "describe",
+        "completion_claims": {
+          "e2": false,
+          "g10": false,
+          "g12": false,
+          "p10": false,
+          "release": false
+        },
+        "daemon_client_requirement_satisfied": false,
+        "daemon_client_requirement_sha256": "1c3ab0ee788f0a5af004819ff10b80b65b623670927a20e582da917461d83b34",
+        "effective_user_id": 501,
+        "executable_path": "/tmp/forge-e2-h0-derived/Build/Products/Debug/forge-filesystem-qualification-adversary",
+        "formal_predicates_updated": 0,
+        "hardened_runtime": true,
+        "parent_process_id": 15830,
+        "process_id": 15850,
+        "production_mutation_exercised": false,
+        "qualification_status": "not_run",
+        "recorder_context_present": false,
+        "role": "adversary",
+        "rows_updated": 0,
+        "schema_version": 1,
+        "self_identity_requirement_satisfied": true,
+        "signing_entitlements": {
+          "com.apple.application-identifier": "9AQ2C2838M.com.forge-conductor.qualification-adversary"
+        },
+        "signing_team_identifier": "9AQ2C2838M",
+        "supported_commands": [
+          "describe",
+          "self-check"
+        ],
+        "team_only_admission_probe_satisfied": true
+      },
+      "return_code": 0,
+      "role": "adversary",
+      "stderr_bytes": 0,
+      "stdout_sha256": "97a19a9b68c1610c1e0f443de11d2ed28de344b2483a91a802e1149722f0361f",
+      "timed_out": false
+    },
+    {
+      "command": "self-check",
+      "executable_snapshot_sha256": "1bcbb50ea8b3a407f2e57d66050fd6d1e08d0e59ba803af1a69bae04a58ea92e",
+      "live_process_identity": {
+        "code_directory_hash": "dbbfa0b193b8f64ac0c21de95dc29b1cc989dff9",
+        "matches_inspected_executable": true,
+        "process_id": 15851,
+        "stop_signal": 17
+      },
+      "process_group_cleanup": "already_empty",
+      "result": {
+        "bundle_identifier": "com.forge-conductor.qualification-adversary",
+        "code_directory_hash": "dbbfa0b193b8f64ac0c21de95dc29b1cc989dff9",
+        "command": "self-check",
+        "completion_claims": {
+          "e2": false,
+          "g10": false,
+          "g12": false,
+          "p10": false,
+          "release": false
+        },
+        "daemon_client_requirement_satisfied": false,
+        "daemon_client_requirement_sha256": "1c3ab0ee788f0a5af004819ff10b80b65b623670927a20e582da917461d83b34",
+        "effective_user_id": 501,
+        "executable_path": "/tmp/forge-e2-h0-derived/Build/Products/Debug/forge-filesystem-qualification-adversary",
+        "formal_predicates_updated": 0,
+        "hardened_runtime": true,
+        "parent_process_id": 15830,
+        "process_id": 15851,
+        "production_mutation_exercised": false,
+        "qualification_status": "not_run",
+        "recorder_context_present": true,
+        "role": "adversary",
+        "rows_updated": 0,
+        "schema_version": 1,
+        "self_identity_requirement_satisfied": true,
+        "signing_entitlements": {
+          "com.apple.application-identifier": "9AQ2C2838M.com.forge-conductor.qualification-adversary"
+        },
+        "signing_team_identifier": "9AQ2C2838M",
+        "supported_commands": [
+          "describe",
+          "self-check"
+        ],
+        "team_only_admission_probe_satisfied": true
+      },
+      "return_code": 0,
+      "role": "adversary",
+      "stderr_bytes": 0,
+      "stdout_sha256": "2a72eacbb5a1eea8a211deabcd25abe6d5227bd11adbd1d6792a62ee9e35745e",
+      "timed_out": false
+    }
+  ],
+  "completion_claims": {
+    "e2": false,
+    "g10": false,
+    "g12": false,
+    "p10": false,
+    "release": false
+  },
+  "context_bound": false,
+  "daemon_client_admission": {
+    "app_identifier": "com.forge-conductor.app",
+    "authority_prefix": "Apple Development:",
+    "certificate_class": "development",
+    "certificate_requirement": "certificate leaf[field.1.2.840.113635.100.6.1.12] exists",
+    "development_team_identifier": "9AQ2C2838M",
+    "manager_identifier": "com.forge-conductor.cli",
+    "production_team_identifier": "2Y25RTLZET",
+    "requirement": "(anchor apple generic and identifier \"com.forge-conductor.app\" and certificate leaf[subject.OU] = \"9AQ2C2838M\" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists) or (anchor apple generic and identifier \"com.forge-conductor.cli\" and certificate leaf[subject.OU] = \"9AQ2C2838M\" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists)",
+    "requirement_sha256": "1c3ab0ee788f0a5af004819ff10b80b65b623670927a20e582da917461d83b34",
+    "source": {
+      "change_time_ns": 1788150457431494587,
+      "device": 16777230,
+      "inode": 125241127,
+      "link_count": 1,
+      "mode": 420,
+      "modification_time_ns": 1788150457431494587,
+      "owner_uid": 501,
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Harness/Sources/ForgeFilesystemProtocol/ForgeFilesystemProtocol.swift",
+      "sha256": "cf5ca30863daae20a4129237573b6c832016e24a94f876e50a87c049f8f9dbd0",
+      "size": 46526
+    }
+  },
+  "formal_closure": {
+    "proven_predicates": 0,
+    "required_predicates": 12
+  },
+  "formal_predicates_updated": 0,
+  "generated_at": "2026-08-31T06:05:22.499681Z",
+  "kind": "p10-privileged-filesystem-h0-readiness",
+  "matrix": {
+    "executed_rows": 0,
+    "required_rows": 57
+  },
+  "mode": "execute",
+  "operator": {
+    "console_user": "jimdaley",
+    "name": "jimdaley",
+    "uid": 501
+  },
+  "overall_status": "ready",
+  "production_mutation_exercised": false,
+  "qualification_status": "not_run",
+  "recorder_context_bound": true,
+  "recorder_evidence_context": {
+    "binding_schema_version": 1,
+    "evidence_id": "EVID-20260831T060522Z-03c32cb838",
+    "qualification_context_present": false,
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "cd7e84fed8ed0fe0a8ec90793e83388c8a451f09",
+      "branch": "security/e2-harness-controls",
+      "head_sha": "399e6a84c4760ddf6c13e02319dc120b4b8998c4",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Harness"
+    },
+    "schema_version": 1,
+    "source_manifest": {
+      "bytes": 10228993,
+      "file_count": 268,
+      "schema_version": 1,
+      "sha256": "a09a11e9c3daccde9507a3668cde9f47349360e08f18b868f4f50df2bcce9400"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "release_blockers": [
+    "E2 remains open: no signed-host matrix row was executed and the documented residual races remain.",
+    "P10, G10, and G12 remain open pending the full product and filesystem qualification.",
+    "Native Developer Mode UI, signing, and lifecycle qualification remains deferred and release-blocking.",
+    "Real-provider autonomous continuity, GUI-closed operation, and crash recovery remain unproven.",
+    "Real-hardware qualification remains deferred to the product owner and release-blocking.",
+    "Executable path-replacement detection is an inode/ctime mitigation qualified only on local APFS; it does not eliminate same-UID interference."
+  ],
+  "repository": {
+    "base_branch": "main",
+    "base_sha": "cd7e84fed8ed0fe0a8ec90793e83388c8a451f09",
+    "branch": "security/e2-harness-controls",
+    "head": "399e6a84c4760ddf6c13e02319dc120b4b8998c4",
+    "path": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Harness"
+  },
+  "rows_updated": 0,
+  "run_id": "455d70ca-026f-4dc7-8285-772d1a7502a2",
+  "schema_version": 1,
+  "signatures": {
+    "adversary": {
+      "authorities": [
+        "Apple Development: James Daley (FW94K6ZY57)",
+        "Apple Worldwide Developer Relations Certification Authority",
+        "Apple Root CA"
+      ],
+      "code_directory_hash": "dbbfa0b193b8f64ac0c21de95dc29b1cc989dff9",
+      "daemon_client_requirement_rejected": true,
+      "designated_requirement": "identifier \"com.forge-conductor.qualification-adversary\" and anchor apple generic and certificate leaf[subject.CN] = \"Apple Development: James Daley (FW94K6ZY57)\" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */",
+      "entitlements": {
+        "com.apple.application-identifier": "9AQ2C2838M.com.forge-conductor.qualification-adversary"
+      },
+      "exact_identity_requirement_satisfied": true,
+      "filesystem": {
+        "identity_replacement_detection": "inode_and_ctime_on_local_apfs",
+        "local": true,
+        "mount_flags": 76583040,
+        "mount_point": "/System/Volumes/Data",
+        "mount_source": "/dev/disk3s5",
+        "type": "apfs"
+      },
+      "hardened_runtime": true,
+      "identifier": "com.forge-conductor.qualification-adversary",
+      "path": "/private/tmp/forge-e2-h0-derived/Build/Products/Debug/forge-filesystem-qualification-adversary",
+      "sha256": "1bcbb50ea8b3a407f2e57d66050fd6d1e08d0e59ba803af1a69bae04a58ea92e",
+      "team_identifier": "9AQ2C2838M"
+    },
+    "harness": {
+      "authorities": [
+        "Apple Development: James Daley (FW94K6ZY57)",
+        "Apple Worldwide Developer Relations Certification Authority",
+        "Apple Root CA"
+      ],
+      "code_directory_hash": "7e22c00a6dc82e7dd3367a937a559a3f6addad0f",
+      "daemon_client_requirement_rejected": true,
+      "designated_requirement": "identifier \"com.forge-conductor.qualification-harness\" and anchor apple generic and certificate leaf[subject.CN] = \"Apple Development: James Daley (FW94K6ZY57)\" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */",
+      "entitlements": {
+        "com.apple.application-identifier": "9AQ2C2838M.com.forge-conductor.qualification-harness"
+      },
+      "exact_identity_requirement_satisfied": true,
+      "filesystem": {
+        "identity_replacement_detection": "inode_and_ctime_on_local_apfs",
+        "local": true,
+        "mount_flags": 76583040,
+        "mount_point": "/System/Volumes/Data",
+        "mount_source": "/dev/disk3s5",
+        "type": "apfs"
+      },
+      "hardened_runtime": true,
+      "identifier": "com.forge-conductor.qualification-harness",
+      "path": "/private/tmp/forge-e2-h0-derived/Build/Products/Debug/forge-filesystem-qualification-harness",
+      "sha256": "51c03d02a32df400c0a7f5264f82a44f15afe22b02a4e8cb53aea6ebcd996f81",
+      "team_identifier": "9AQ2C2838M"
+    }
+  },
+  "smappservice_invoked": false,
+  "smappservice_registered": false
+}

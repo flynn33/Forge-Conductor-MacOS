@@ -19,14 +19,12 @@ release-blocking.
 
 ### Changed
 
-- Aligned the public README, user guide, architecture, connector, telemetry,
-  status documentation, and wiki to marketing version `0.9.0`, build `1`, and
-  the current nonpassing release boundary. Obsolete external-tool comparisons
-  and stale pre-0.9 screenshots no longer appear in the rendered guides.
-- Generated manager app wrappers now take `CFBundleShortVersionString` and
-  `CFBundleVersion` from the canonical product version (`0.9.0`) and build (`1`)
-  constants. Regression coverage reads the generated wrapper Info.plist and
-  verifies all Xcode target version settings.
+- Added nonshipping, non-archived signed qualification-harness and adversary
+  targets plus a fail-closed H0 readiness runner. H0 binds repository, recorder,
+  signing, live-process, command-result, and local-APFS inode/change-time facts,
+  but exercises no production mutation: all 57 E2 rows and all 12 formal
+  predicates remain unexecuted and unproven. The path-replacement check is a
+  local-APFS mitigation, not elimination of same-UID interference.
 - Fresh configurations enable project shell tools by default. Migration enables
   schema-v1 configurations whose disabled value had no provenance; schema-v1
   could not distinguish the shipped default from a user-chosen false value.

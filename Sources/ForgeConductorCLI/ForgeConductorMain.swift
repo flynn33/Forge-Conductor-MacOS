@@ -4,6 +4,7 @@
 // serve, manager, install, diagnostics, and status operations to typed services.
 // Why: A thin CLI preserves the same Core behavior used by the native application.
 
+import Darwin
 import Foundation
 import ForgeConductorCore
 #if SWIFT_PACKAGE
@@ -16,6 +17,9 @@ import ForgeNativeSessionHostPlugin
 /// service so the executable remains an adapter rather than a second application layer.
 @main
 enum ForgeConductorMain {
+    static let qualificationFilesystemHealthStartSuspendedEnvironmentKey =
+        "FORGE_FILESYSTEM_QUALIFICATION_HEALTH_START_SUSPENDED"
+
     private struct ServeShutdownFailure: Error, LocalizedError, CustomStringConvertible {
         let runError: Error?
         let unresolvedJobIDs: [UUID]
@@ -63,6 +67,8 @@ enum ForgeConductorMain {
                 try cmdDoctor(rest)
             case "status":
                 try cmdStatus(rest)
+            case "qualification-filesystem-health":
+                try cmdQualificationFilesystemHealth(rest)
             case "serve":
                 try cmdServe(rest)
             case "dashboard":
@@ -204,6 +210,67 @@ enum ForgeConductorMain {
             snap["manager_running"] = false
         }
         print(try JSONSupport.string(from: snap))
+    }
+
+    /// Internal qualification command. It intentionally stays out of the public
+    /// help surface and exercises only the daemon's read-only health selectors.
+    static func cmdQualificationFilesystemHealth(_ args: [String]) throws {
+        guard args.count == 2,
+              args[0] == "--hold-ms",
+              let holdMilliseconds = Int(args[1]),
+              (500...10_000).contains(holdMilliseconds) else {
+            writeQualificationJSON([
+                "schema_version": 1,
+                "event": "argument_error",
+                "ok": false,
+                "code": "secure_filesystem_health_invalid_arguments",
+                "message": "Expected --hold-ms with an integer from 500 through 10000",
+            ])
+            exit(2)
+        }
+
+        if ProcessInfo.processInfo.environment[
+            qualificationFilesystemHealthStartSuspendedEnvironmentKey
+        ] == "1" {
+            guard Darwin.raise(SIGSTOP) == 0 else {
+                writeQualificationJSON([
+                    "schema_version": 1,
+                    "event": "suspension_error",
+                    "ok": false,
+                    "code": "secure_filesystem_health_suspension_failed",
+                    "message": "Recorder-controlled health suspension failed",
+                ])
+                exit(1)
+            }
+        }
+
+        let session = SecureFilesystemQualificationHealthSession()
+        let preHealth = session.open(timeout: 5)
+        var preHealthObject = preHealth.jsonObject
+        preHealthObject["hold_ms"] = holdMilliseconds
+        writeQualificationJSON(preHealthObject)
+        guard preHealth.ok else {
+            session.close()
+            exit(1)
+        }
+
+        Thread.sleep(forTimeInterval: Double(holdMilliseconds) / 1_000)
+        let postHealth = session.postCheck(timeout: 5)
+        var postHealthObject = postHealth.jsonObject
+        postHealthObject["hold_ms"] = holdMilliseconds
+        writeQualificationJSON(postHealthObject)
+        session.close()
+        if !postHealth.ok { exit(1) }
+    }
+
+    private static func writeQualificationJSON(_ object: [String: Any]) {
+        let line: String
+        do {
+            line = try JSONSupport.string(from: object)
+        } catch {
+            line = "{\"code\":\"secure_filesystem_health_encoding_failed\",\"event\":\"encoding_error\",\"message\":\"Health result could not be encoded\",\"ok\":false,\"schema_version\":1}"
+        }
+        FileHandle.standardOutput.write(Data((line + "\n").utf8))
     }
 
     static func cmdAgents(_ args: [String]) throws {

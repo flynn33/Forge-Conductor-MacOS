@@ -139,20 +139,59 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
     func testManagerShowsProtectedFilesystemServiceControls() throws {
         app.typeKey(",", modifierFlags: .command)
 
+        let status = app.descendants(matching: .any)[
+            "settings-filesystem-service-status"
+        ]
         XCTAssertTrue(
-            app.descendants(matching: .any)["settings-filesystem-service-status"]
-                .waitForExistence(timeout: 5),
+            status.waitForExistence(timeout: 5),
             "The macOS Settings scene must expose protected filesystem service status"
         )
-        XCTAssertTrue(app.buttons["settings-filesystem-service-enable"].exists)
-        XCTAssertTrue(app.buttons["settings-filesystem-service-reinstall"].exists)
-        XCTAssertTrue(app.buttons["settings-filesystem-service-disable"].exists)
+        let enable = app.buttons["settings-filesystem-service-enable"]
+        let reinstall = app.buttons["settings-filesystem-service-reinstall"]
+        let disable = app.buttons["settings-filesystem-service-disable"]
+        XCTAssertTrue(enable.exists)
+        XCTAssertTrue(reinstall.exists)
+        XCTAssertTrue(disable.exists)
+        XCTAssertTrue(
+            enable.isEnabled || reinstall.isEnabled || disable.isEnabled,
+            "The packaged service must expose at least one available lifecycle action"
+        )
+        let validStates = ["Not enabled", "Enabled", "Approval required"]
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                validStates.contains { self.element(status, contains: $0) }
+            },
+            "The exact packaged app must not report a missing or invalid service package"
+        )
+        XCTAssertFalse(element(status, contains: "Not packaged in this build"))
+        XCTAssertFalse(element(status, contains: "Not packaged or invalid"))
+        let displayedState = try XCTUnwrap(
+            validStates.first { element(status, contains: $0) }
+        )
+        if displayedState == "Enabled" {
+            XCTAssertTrue(reinstall.isEnabled)
+            XCTAssertTrue(disable.isEnabled)
+        } else if displayedState == "Approval required" {
+            XCTAssertTrue(enable.isEnabled)
+            XCTAssertTrue(reinstall.isEnabled)
+            XCTAssertTrue(disable.isEnabled)
+        } else {
+            XCTAssertTrue(enable.isEnabled)
+            XCTAssertTrue(reinstall.isEnabled)
+            XCTAssertFalse(disable.isEnabled)
+        }
         XCTAssertTrue(app.buttons["settings-filesystem-service-approval"].exists)
         XCTAssertTrue(app.buttons["settings-filesystem-service-refresh"].exists)
         XCTAssertTrue(app.buttons["settings-allowed-root-add"].exists)
         XCTAssertTrue(
             app.descendants(matching: .any)["settings-allowed-roots-empty"].exists
         )
+    }
+
+    private func element(_ element: XCUIElement, contains text: String) -> Bool {
+        if element.staticTexts[text].exists { return true }
+        if element.label.localizedCaseInsensitiveContains(text) { return true }
+        return (element.value as? String)?.localizedCaseInsensitiveContains(text) == true
     }
 
     func testManagerSettingsControlsAndPersistsProjectShellPolicy() throws {

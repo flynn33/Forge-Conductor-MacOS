@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import ast
+import contextlib
+import io
 import json
 import hashlib
 import os
@@ -17,12 +19,23 @@ import time
 import unittest
 from unittest import mock
 
+import evidence_support
+import validate_acceptance
 from evidence_support import (
+    BoundedCommandError,
+    BoundedReadBudget,
     EVIDENCE_CONTEXT_SCHEMA_VERSION,
     EvidenceSupportError,
+    MANIFEST_TARGETS,
+    MAXIMUM_QUALIFICATION_ARTIFACT_BYTES,
     QUALIFICATION_ARTIFACT_BINDING_SCHEMA_VERSION,
     canonical_json_sha256,
+    load_bounded_repository_json_object,
     load_qualification_artifact,
+    read_bounded_repository_bytes,
+    run_bounded_readonly_command,
+    sha256_bounded_repository_file,
+    sha256_bounded_regular_file,
     source_manifest,
 )
 from check_p10_protocol_compatibility import (
@@ -37,6 +50,7 @@ SCRIPT_ROOT = pathlib.Path(__file__).resolve().parent
 RECORDER = SCRIPT_ROOT / "record_command.py"
 COMPLETION_CHECKER = SCRIPT_ROOT / "check_p10_completion.py"
 DOCTOR = SCRIPT_ROOT / "doctor.sh"
+CHECKPOINT_IDENTITY = SCRIPT_ROOT / "checkpoint_identity.py"
 STATECTL = SCRIPT_ROOT / "statectl.py"
 PRIVILEGED_FILESYSTEM_QUALIFICATION = (
     SCRIPT_ROOT.parent / "docs/PRIVILEGED_FILESYSTEM_QUALIFICATION.md"
@@ -48,15 +62,885 @@ PRIVILEGED_FILESYSTEM_ARTIFACT_SCHEMA = (
     SCRIPT_ROOT.parent
     / "schemas/p10-privileged-filesystem-artifact-binding.schema.json"
 )
+PRIVILEGED_FILESYSTEM_H0_SCHEMA = (
+    SCRIPT_ROOT.parent
+    / "schemas/p10-privileged-filesystem-h0-readiness.schema.json"
+)
+PRIVILEGED_FILESYSTEM_ADMISSION_SCHEMA = (
+    SCRIPT_ROOT.parent
+    / "schemas/p10-privileged-filesystem-admission-observation.schema.json"
+)
 PRIVILEGED_FILESYSTEM_TEMPLATE = (
     SCRIPT_ROOT.parent / "templates/p10-privileged-filesystem-qualification-report.json"
 )
+G10_ACTIVE_HANDLER = SCRIPT_ROOT.parent / "state/gate-handlers/G10.sh"
+G10_TEMPLATE_HANDLER = SCRIPT_ROOT.parent / "templates/gate-handlers/G10.sh"
+GATE_RUNNER = SCRIPT_ROOT / "run_gate.py"
+GATE_BATCH_RUNNER = SCRIPT_ROOT / "run_gates.sh"
 
 
 class EvidenceControlTests(unittest.TestCase):
     def write_json(self, path: pathlib.Path, value: object) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    def initialize_git_fixture(self, root: pathlib.Path) -> None:
+        for command in (
+            ["git", "init", "-q"],
+            ["git", "config", "user.name", "Fixture"],
+            ["git", "config", "user.email", "fixture@example.invalid"],
+            ["git", "add", "."],
+            ["git", "commit", "-qm", "fixture"],
+        ):
+            completed = subprocess.run(
+                command,
+                cwd=root,
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            )
+            self.assertEqual(
+                completed.returncode,
+                0,
+                completed.stdout + completed.stderr,
+            )
+
+    def test_bounded_repository_json_accepts_exact_file_and_aggregate_bounds(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary).resolve()
+            first = b'{"first":true}'
+            second = b'{"second":true}'
+            (root / "first.json").write_bytes(first)
+            (root / "second.json").write_bytes(second)
+            budget = BoundedReadBudget(len(first) + len(second), "fixture")
+
+            first_value = load_bounded_repository_json_object(
+                root,
+                "first.json",
+                label="first fixture",
+                maximum_bytes=len(first),
+                budget=budget,
+            )
+            second_value = load_bounded_repository_json_object(
+                root,
+                "second.json",
+                label="second fixture",
+                maximum_bytes=len(second),
+                budget=budget,
+            )
+
+            self.assertEqual(first_value, {"first": True})
+            self.assertEqual(second_value, {"second": True})
+            self.assertEqual(budget.remaining_bytes, 0)
+
+    def test_bounded_repository_json_rejects_file_and_aggregate_overflow(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary).resolve()
+            data = b'{"value":true}'
+            (root / "value.json").write_bytes(data)
+
+            with self.assertRaisesRegex(
+                EvidenceSupportError,
+                rf"value fixture exceeds its {len(data) - 1}-byte file read bound",
+            ):
+                load_bounded_repository_json_object(
+                    root,
+                    "value.json",
+                    label="value fixture",
+                    maximum_bytes=len(data) - 1,
+                )
+
+            budget = BoundedReadBudget(len(data) - 1, "fixture")
+            with self.assertRaisesRegex(
+                EvidenceSupportError,
+                rf"value fixture exceeds the fixture {len(data) - 1}-byte aggregate read bound",
+            ):
+                load_bounded_repository_json_object(
+                    root,
+                    "value.json",
+                    label="value fixture",
+                    maximum_bytes=len(data),
+                    budget=budget,
+                )
+
+    def test_bounded_repository_json_counts_utf8_bytes_and_rejects_duplicate_keys(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary).resolve()
+            multibyte = '{"value":"é"}'.encode("utf-8")
+            (root / "multibyte.json").write_bytes(multibyte)
+            with self.assertRaisesRegex(EvidenceSupportError, "file read bound"):
+                load_bounded_repository_json_object(
+                    root,
+                    "multibyte.json",
+                    label="multibyte fixture",
+                    maximum_bytes=len(multibyte) - 1,
+                )
+
+            (root / "duplicate.json").write_text(
+                '{"value":1,"value":2}',
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(EvidenceSupportError, "duplicate key: value"):
+                load_bounded_repository_json_object(
+                    root,
+                    "duplicate.json",
+                    label="duplicate fixture",
+                    maximum_bytes=128,
+                )
+
+    def test_bounded_repository_json_rejects_nonfinite_and_unbounded_numbers(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary).resolve()
+            for index, token in enumerate(("NaN", "Infinity", "-Infinity", "1e999")):
+                with self.subTest(token=token):
+                    path = root / f"nonfinite-{index}.json"
+                    path.write_text(f'{{"value":{token}}}', encoding="utf-8")
+                    with self.assertRaisesRegex(
+                        EvidenceSupportError,
+                        "non-finite|not finite",
+                    ):
+                        load_bounded_repository_json_object(
+                            root,
+                            path.name,
+                            label="nonfinite fixture",
+                            maximum_bytes=1024,
+                        )
+
+            path = root / "unbounded-number.json"
+            path.write_text('{"value":' + ("9" * 129) + "}", encoding="utf-8")
+            with self.assertRaisesRegex(EvidenceSupportError, "lexical bound"):
+                load_bounded_repository_json_object(
+                    root,
+                    path.name,
+                    label="numeric fixture",
+                    maximum_bytes=1024,
+                )
+
+    def test_bounded_repository_reader_rejects_noncanonical_and_symlink_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary).resolve()
+            directory = root / "directory"
+            directory.mkdir()
+            (directory / "value.json").write_text("{}", encoding="utf-8")
+            (root / "final-link.json").symlink_to(directory / "value.json")
+            (root / "directory-link").symlink_to(directory, target_is_directory=True)
+
+            for relative in (
+                "../value.json",
+                "/value.json",
+                "directory/./value.json",
+                "directory\\value.json",
+            ):
+                with self.subTest(relative=relative), self.assertRaisesRegex(
+                    EvidenceSupportError,
+                    "path is not strict repository-relative",
+                ):
+                    read_bounded_repository_bytes(
+                        root,
+                        relative,
+                        label="path fixture",
+                        maximum_bytes=128,
+                    )
+
+            for relative in ("final-link.json", "directory-link/value.json"):
+                with self.subTest(relative=relative), self.assertRaisesRegex(
+                    EvidenceSupportError,
+                    "unavailable or contains a symlink",
+                ):
+                    read_bounded_repository_bytes(
+                        root,
+                        relative,
+                        label="symlink fixture",
+                        maximum_bytes=128,
+                    )
+
+    def test_bounded_repository_reader_rejects_directory_and_fifo_without_blocking(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary).resolve()
+            (root / "directory").mkdir()
+            fifo = root / "fixture.fifo"
+            os.mkfifo(fifo)
+
+            with self.assertRaisesRegex(
+                EvidenceSupportError,
+                "is not a regular file",
+            ):
+                read_bounded_repository_bytes(
+                    root,
+                    "directory",
+                    label="type fixture",
+                    maximum_bytes=128,
+                )
+
+            probe = subprocess.run(
+                [
+                    sys.executable,
+                    "-c",
+                    (
+                        "import pathlib, sys; "
+                        "from evidence_support import EvidenceSupportError, read_bounded_repository_bytes; "
+                        "root = pathlib.Path(sys.argv[1]); "
+                        "\ntry:\n read_bounded_repository_bytes(root, 'fixture.fifo', label='fifo fixture', maximum_bytes=128)"
+                        "\nexcept EvidenceSupportError as error:\n print(error); raise SystemExit(0)"
+                        "\nraise SystemExit(1)"
+                    ),
+                    str(root),
+                ],
+                cwd=SCRIPT_ROOT,
+                capture_output=True,
+                text=True,
+                timeout=2,
+                check=False,
+            )
+            self.assertEqual(probe.returncode, 0, probe.stdout + probe.stderr)
+            self.assertIn("is not a regular file", probe.stdout)
+
+    def test_bounded_repository_reader_rejects_read_time_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary).resolve()
+            path = root / "value.json"
+            path.write_bytes(b'{"value":"' + (b"x" * (70 * 1024)) + b'"}')
+            real_read = os.read
+            mutated = False
+
+            def mutate_after_first_read(descriptor: int, byte_count: int) -> bytes:
+                nonlocal mutated
+                block = real_read(descriptor, byte_count)
+                if block and not mutated:
+                    mutated = True
+                    with path.open("ab") as stream:
+                        stream.write(b" ")
+                return block
+
+            with mock.patch(
+                "evidence_support.os.read",
+                side_effect=mutate_after_first_read,
+            ), self.assertRaisesRegex(
+                EvidenceSupportError,
+                "changed during its bounded read",
+            ):
+                read_bounded_repository_bytes(
+                    root,
+                    "value.json",
+                    label="mutation fixture",
+                    maximum_bytes=128 * 1024,
+                )
+
+    def test_bounded_repository_reader_rejects_path_replacement_after_open(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary).resolve()
+            path = root / "value.json"
+            replacement = root / "replacement.json"
+            path.write_text('{"value":"original"}', encoding="utf-8")
+            replacement.write_text('{"value":"changed!"}', encoding="utf-8")
+            real_open = evidence_support._open_repository_relative_file
+            calls = 0
+
+            def replace_before_verification(
+                repository_root: pathlib.Path,
+                relative_path: pathlib.PurePosixPath,
+            ) -> int:
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    os.replace(replacement, path)
+                return real_open(repository_root, relative_path)
+
+            with mock.patch(
+                "evidence_support._open_repository_relative_file",
+                side_effect=replace_before_verification,
+            ), self.assertRaisesRegex(
+                EvidenceSupportError,
+                "pathname no longer names the opened file",
+            ):
+                budget = BoundedReadBudget(path.stat().st_size, "replacement")
+                read_bounded_repository_bytes(
+                    root,
+                    "value.json",
+                    label="replacement fixture",
+                    maximum_bytes=128,
+                    budget=budget,
+                )
+            self.assertEqual(budget.remaining_bytes, 0)
+
+    def test_bounded_regular_hash_enforces_exact_file_and_aggregate_bounds(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary).resolve()
+            path = root / "artifact.bin"
+            data = b"bounded-artifact"
+            path.write_bytes(data)
+            budget = BoundedReadBudget(len(data), "hash fixture")
+
+            digest, byte_count = sha256_bounded_regular_file(
+                path,
+                label="artifact fixture",
+                maximum_bytes=len(data),
+                budget=budget,
+            )
+
+            self.assertEqual(byte_count, len(data))
+            self.assertEqual(digest, hashlib.sha256(data).hexdigest())
+            self.assertEqual(budget.remaining_bytes, 0)
+
+            with self.assertRaisesRegex(EvidenceSupportError, "file read bound"):
+                sha256_bounded_regular_file(
+                    path,
+                    label="artifact fixture",
+                    maximum_bytes=len(data) - 1,
+                )
+            with self.assertRaisesRegex(EvidenceSupportError, "aggregate read bound"):
+                sha256_bounded_regular_file(
+                    path,
+                    label="artifact fixture",
+                    maximum_bytes=len(data),
+                    budget=BoundedReadBudget(len(data) - 1, "hash fixture"),
+                )
+
+    def test_bounded_repository_hash_rejects_path_replacement_and_growth(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary).resolve()
+            path = root / "source.bin"
+            replacement = root / "replacement.bin"
+            path.write_bytes(b"original")
+            replacement.write_bytes(b"changed!")
+            real_open = evidence_support._open_repository_relative_file
+            calls = 0
+
+            def replace_before_verification(
+                repository_root: pathlib.Path,
+                relative_path: pathlib.PurePosixPath,
+            ) -> int:
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    os.replace(replacement, path)
+                return real_open(repository_root, relative_path)
+
+            with mock.patch(
+                "evidence_support._open_repository_relative_file",
+                side_effect=replace_before_verification,
+            ), self.assertRaisesRegex(
+                EvidenceSupportError,
+                "pathname no longer names the opened file",
+            ):
+                sha256_bounded_repository_file(
+                    root,
+                    path.name,
+                    label="replacement source",
+                    maximum_bytes=128,
+                )
+
+            path.write_bytes(b"x")
+            real_read = os.read
+            appended = False
+
+            def grow_after_first_read(descriptor: int, byte_count: int) -> bytes:
+                nonlocal appended
+                block = real_read(descriptor, byte_count)
+                if block and not appended:
+                    appended = True
+                    with path.open("ab") as stream:
+                        stream.write(b"y" * 64)
+                return block
+
+            budget = BoundedReadBudget(1, "growth source")
+            with mock.patch(
+                "evidence_support.os.read",
+                side_effect=grow_after_first_read,
+            ), self.assertRaisesRegex(EvidenceSupportError, "aggregate read bound"):
+                sha256_bounded_repository_file(
+                    root,
+                    path.name,
+                    label="growth source",
+                    maximum_bytes=128,
+                    budget=budget,
+                )
+            self.assertEqual(budget.remaining_bytes, 0)
+
+    def test_bounded_repository_hash_rejects_fifo_without_blocking(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary).resolve()
+            fifo = root / "source.fifo"
+            os.mkfifo(fifo)
+            probe = subprocess.run(
+                [
+                    sys.executable,
+                    "-c",
+                    (
+                        "import pathlib, sys; "
+                        "from evidence_support import EvidenceSupportError, sha256_bounded_repository_file; "
+                        "root = pathlib.Path(sys.argv[1]); "
+                        "\ntry:\n sha256_bounded_repository_file(root, 'source.fifo', label='fifo source', maximum_bytes=128)"
+                        "\nexcept EvidenceSupportError as error:\n print(error); raise SystemExit(0)"
+                        "\nraise SystemExit(1)"
+                    ),
+                    str(root),
+                ],
+                cwd=SCRIPT_ROOT,
+                capture_output=True,
+                text=True,
+                timeout=2,
+                check=False,
+            )
+            self.assertEqual(probe.returncode, 0, probe.stdout + probe.stderr)
+            self.assertIn("is not a regular file", probe.stdout)
+
+    def test_bounded_regular_hash_rejects_fifo_symlink_and_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary).resolve()
+            path = root / "artifact.bin"
+            path.write_bytes(b"x" * (70 * 1024))
+            symlink = root / "artifact-link.bin"
+            symlink.symlink_to(path.name)
+            fifo = root / "artifact.fifo"
+            os.mkfifo(fifo)
+
+            with self.assertRaisesRegex(EvidenceSupportError, "symbolic link"):
+                sha256_bounded_regular_file(
+                    symlink,
+                    label="symlink fixture",
+                    maximum_bytes=128 * 1024,
+                )
+            with self.assertRaisesRegex(EvidenceSupportError, "not a regular file"):
+                sha256_bounded_regular_file(
+                    fifo,
+                    label="fifo fixture",
+                    maximum_bytes=128 * 1024,
+                )
+
+            real_read = os.read
+            mutated = False
+
+            def mutate_after_first_read(descriptor: int, byte_count: int) -> bytes:
+                nonlocal mutated
+                block = real_read(descriptor, byte_count)
+                if block and not mutated:
+                    mutated = True
+                    with path.open("ab") as stream:
+                        stream.write(b" ")
+                return block
+
+            budget = BoundedReadBudget(128 * 1024, "mutation hash fixture")
+            with mock.patch(
+                "evidence_support.os.read",
+                side_effect=mutate_after_first_read,
+            ), self.assertRaisesRegex(
+                EvidenceSupportError,
+                "changed during its bounded read",
+            ):
+                sha256_bounded_regular_file(
+                    path,
+                    label="mutation fixture",
+                    maximum_bytes=128 * 1024,
+                    budget=budget,
+                )
+            self.assertLess(budget.remaining_bytes, budget.maximum_bytes)
+
+    def test_bounded_repository_budget_limits_growth_to_one_over_remaining(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary).resolve()
+            path = root / "growth.bin"
+            path.write_bytes(b"x")
+            real_read = os.read
+            requested: list[int] = []
+            appended = False
+
+            def grow_after_first_read(descriptor: int, byte_count: int) -> bytes:
+                nonlocal appended
+                requested.append(byte_count)
+                block = real_read(descriptor, byte_count)
+                if block and not appended:
+                    appended = True
+                    with path.open("ab") as stream:
+                        stream.write(b"y" * 64)
+                return block
+
+            budget = BoundedReadBudget(1, "growth fixture")
+            with mock.patch(
+                "evidence_support.os.read",
+                side_effect=grow_after_first_read,
+            ), self.assertRaisesRegex(
+                EvidenceSupportError,
+                "aggregate read bound",
+            ):
+                read_bounded_repository_bytes(
+                    root,
+                    "growth.bin",
+                    label="growth fixture",
+                    maximum_bytes=128,
+                    budget=budget,
+                )
+            self.assertEqual(budget.remaining_bytes, 0)
+            self.assertLessEqual(max(requested), 2)
+
+    def test_bounded_command_preserves_limited_output_and_kills_descendants(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary).resolve()
+            sentinel = root / "descendant-survived"
+            program = "\n".join(
+                (
+                    "import os, signal, sys, time",
+                    "pid = os.fork()",
+                    "if pid == 0:",
+                    "    signal.signal(signal.SIGTERM, signal.SIG_IGN)",
+                    "    time.sleep(2)",
+                    f"    open({str(sentinel)!r}, 'w').write('survived')",
+                    "    os._exit(0)",
+                    "sys.stdout.write('bounded-prefix')",
+                    "sys.stdout.flush()",
+                    "time.sleep(10)",
+                )
+            )
+            started = time.monotonic()
+            with self.assertRaises(BoundedCommandError) as captured:
+                run_bounded_readonly_command(
+                    root,
+                    "descendant fixture",
+                    [sys.executable, "-c", program],
+                    timeout_seconds=0.25,
+                    maximum_output_bytes=64,
+                )
+            self.assertLess(time.monotonic() - started, 4)
+            self.assertTrue(captured.exception.timed_out)
+            self.assertEqual(captured.exception.stdout, b"bounded-prefix")
+            time.sleep(2.25)
+            self.assertFalse(sentinel.exists())
+
+    def test_bounded_command_output_overflow_retains_only_the_configured_bytes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary).resolve()
+            with self.assertRaises(BoundedCommandError) as captured:
+                run_bounded_readonly_command(
+                    root,
+                    "output fixture",
+                    [
+                        sys.executable,
+                        "-c",
+                        "import sys; sys.stdout.write('x' * 4096); sys.stdout.flush()",
+                    ],
+                    timeout_seconds=2,
+                    maximum_output_bytes=64,
+                )
+            self.assertFalse(captured.exception.timed_out)
+            self.assertTrue(captured.exception.output_limit_exceeded)
+            self.assertEqual(
+                len(captured.exception.stdout) + len(captured.exception.stderr),
+                64,
+            )
+
+    def test_acceptance_validator_enforces_exact_evidence_aggregate_bound(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary).resolve()
+            plan = root / ".forge-codex/plans/gates.json"
+            self.write_json(
+                plan,
+                {"gates": [{"id": "GX", "criteria": ["exact criterion"]}]},
+            )
+            artifact = root / "proof.txt"
+            artifact.write_bytes(b"proof")
+            acceptance = root / ".forge-codex/state/acceptance/GX.json"
+            self.write_json(
+                acceptance,
+                {
+                    "gate_id": "GX",
+                    "current_release_authority": True,
+                    "criteria_results": [
+                        {
+                            "criterion": "exact criterion",
+                            "passed": True,
+                            "evidence": [
+                                {
+                                    "path": "proof.txt",
+                                    "sha256": hashlib.sha256(b"proof").hexdigest(),
+                                }
+                            ],
+                        }
+                    ],
+                    "commands": [
+                        {
+                            "command": "fixture",
+                            "exit_code": 0,
+                            "evidence": "proof.txt",
+                        }
+                    ],
+                },
+            )
+
+            output = io.StringIO()
+            with mock.patch(
+                "validate_acceptance.MAXIMUM_EVIDENCE_FILE_BYTES",
+                5,
+            ), mock.patch(
+                "validate_acceptance.MAXIMUM_EVIDENCE_TOTAL_BYTES",
+                10,
+            ), contextlib.redirect_stdout(output):
+                exact = validate_acceptance.main(["GX", "--repo", str(root)])
+            self.assertEqual(exact, 0, output.getvalue())
+
+            output = io.StringIO()
+            with mock.patch(
+                "validate_acceptance.MAXIMUM_EVIDENCE_FILE_BYTES",
+                5,
+            ), mock.patch(
+                "validate_acceptance.MAXIMUM_EVIDENCE_TOTAL_BYTES",
+                9,
+            ), contextlib.redirect_stdout(output):
+                oversized = validate_acceptance.main(["GX", "--repo", str(root)])
+            self.assertEqual(oversized, 1)
+            self.assertIn("aggregate read bound", output.getvalue())
+
+    def test_acceptance_validator_rejects_unsafe_or_nonregular_evidence_paths(self) -> None:
+        unsafe_values: list[tuple[str, str]] = []
+        with tempfile.TemporaryDirectory() as outside_temporary:
+            outside = pathlib.Path(outside_temporary) / "outside.txt"
+            outside.write_text("outside", encoding="utf-8")
+            unsafe_values.extend(
+                (
+                    ("../outside.txt", "malformed evidence"),
+                    (str(outside), "malformed evidence"),
+                )
+            )
+            with tempfile.TemporaryDirectory() as temporary:
+                root = pathlib.Path(temporary).resolve()
+                self.write_json(
+                    root / ".forge-codex/plans/gates.json",
+                    {"gates": [{"id": "GX", "criteria": ["exact criterion"]}]},
+                )
+                target = root / "target.txt"
+                target.write_text("target", encoding="utf-8")
+                symlink = root / "proof-link.txt"
+                symlink.symlink_to(target.name)
+                fifo = root / "proof.fifo"
+                os.mkfifo(fifo)
+                unsafe_values.extend(
+                    (
+                        (symlink.name, "invalid artifact"),
+                        (fifo.name, "invalid artifact"),
+                    )
+                )
+
+                for raw_path, expected in unsafe_values:
+                    with self.subTest(raw_path=raw_path):
+                        self.write_json(
+                            root / ".forge-codex/state/acceptance/GX.json",
+                            {
+                                "criteria_results": [
+                                    {
+                                        "criterion": "exact criterion",
+                                        "passed": True,
+                                        "evidence": [
+                                            {"path": raw_path, "sha256": "0" * 64}
+                                        ],
+                                    }
+                                ],
+                                "commands": [
+                                    {
+                                        "command": "fixture",
+                                        "exit_code": 0,
+                                        "evidence": raw_path,
+                                    }
+                                ],
+                            },
+                        )
+                        output = io.StringIO()
+                        with contextlib.redirect_stdout(output):
+                            result = validate_acceptance.main(
+                                ["GX", "--repo", str(root)]
+                            )
+                        self.assertEqual(result, 1)
+                        self.assertIn(expected, output.getvalue())
+
+    def test_acceptance_validator_bounds_control_json_at_exact_and_plus_one(self) -> None:
+        for extra in (0, 1):
+            with self.subTest(extra=extra), tempfile.TemporaryDirectory() as temporary:
+                root = pathlib.Path(temporary).resolve()
+                self.write_json(
+                    root / ".forge-codex/plans/gates.json",
+                    {"gates": [{"id": "GX", "criteria": ["exact criterion"]}]},
+                )
+                artifact = root / "proof.txt"
+                artifact.write_bytes(b"proof")
+                acceptance = root / ".forge-codex/state/acceptance/GX.json"
+                value = {
+                    "gate_id": "GX",
+                    "current_release_authority": True,
+                    "criteria_results": [
+                        {
+                            "criterion": "exact criterion",
+                            "passed": True,
+                            "evidence": [
+                                {
+                                    "path": "proof.txt",
+                                    "sha256": hashlib.sha256(b"proof").hexdigest(),
+                                }
+                            ],
+                        }
+                    ],
+                    "commands": [
+                        {
+                            "command": "fixture",
+                            "exit_code": 0,
+                            "evidence": "proof.txt",
+                        }
+                    ],
+                }
+                raw = (json.dumps(value, sort_keys=True) + "\n").encode("utf-8")
+                maximum = 1024
+                self.assertLess(len(raw), maximum)
+                acceptance.parent.mkdir(parents=True, exist_ok=True)
+                acceptance.write_bytes(raw + (b" " * (maximum + extra - len(raw))))
+
+                output = io.StringIO()
+                with mock.patch(
+                    "validate_acceptance.MAXIMUM_CONTROL_JSON_FILE_BYTES",
+                    maximum,
+                ), contextlib.redirect_stdout(output):
+                    try:
+                        result = validate_acceptance.main(
+                            ["GX", "--repo", str(root)]
+                        )
+                    except SystemExit as error:
+                        result = error.code
+                if extra == 0:
+                    self.assertEqual(result, 0, output.getvalue())
+                else:
+                    self.assertIn("file read bound", str(result))
+
+    def test_completion_checker_bounds_run_state_and_qualification_report(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.make_repository(root)
+            _, report = self.filesystem_fixture(root, case_names=())
+            run_state = root / ".forge-codex/state/run-state.json"
+            run_state_raw = run_state.read_bytes().rstrip() + b"\n"
+            run_state.write_bytes(
+                run_state_raw
+                + (b" " * (MAXIMUM_QUALIFICATION_ARTIFACT_BYTES + 1 - len(run_state_raw)))
+            )
+
+            oversized_state = self.run_completion_checker(root, report)
+
+            self.assertEqual(oversized_state.returncode, 1)
+            self.assertIn(
+                f"exceeds its {MAXIMUM_QUALIFICATION_ARTIFACT_BYTES}-byte file read bound",
+                oversized_state.stdout,
+            )
+            self.assertNotIn("Traceback", oversized_state.stderr)
+
+        for extra_bytes in (0, 1):
+            with self.subTest(extra_bytes=extra_bytes), tempfile.TemporaryDirectory() as temporary:
+                root = pathlib.Path(temporary)
+                self.make_repository(root)
+                _, report = self.filesystem_fixture(root, case_names=())
+                raw = (json.dumps(report, indent=2, sort_keys=True) + "\n").encode("utf-8")
+                target = MAXIMUM_QUALIFICATION_ARTIFACT_BYTES + extra_bytes
+                self.assertLess(len(raw), target)
+                qualification = (
+                    root
+                    / ".forge-codex/evidence/P10-privileged-filesystem-qualification-report.json"
+                )
+                qualification.write_bytes(raw + (b" " * (target - len(raw))))
+                checked = subprocess.run(
+                    [sys.executable, str(COMPLETION_CHECKER)],
+                    env={**os.environ, "FORGE_P10_REPOSITORY": str(root)},
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    check=False,
+                )
+                message = (
+                    "P10-privileged-filesystem-qualification-report.json: "
+                    f"P10 input .forge-codex/evidence/"
+                    "P10-privileged-filesystem-qualification-report.json exceeds its "
+                    f"{MAXIMUM_QUALIFICATION_ARTIFACT_BYTES}-byte file read bound"
+                )
+                if extra_bytes == 0:
+                    self.assertNotIn(message, checked.stdout)
+                else:
+                    self.assertIn(message, checked.stdout)
+                self.assertNotIn("Traceback", checked.stderr)
+
+    def test_completion_checker_rejects_noncanonical_dynamic_report_paths(self) -> None:
+        path_values = (
+            "../outside.json",
+            "/tmp/outside.json",
+            "bad\0path.json",
+            "bad\ud800path.json",
+        )
+        for report_path in path_values:
+            with self.subTest(report_path=repr(report_path)), tempfile.TemporaryDirectory() as temporary:
+                root = pathlib.Path(temporary)
+                self.make_repository(root)
+                _, report = self.filesystem_fixture(root, case_names=())
+                self.write_json(
+                    root / ".forge-codex/evidence/P10-parity-report.json",
+                    {
+                        "current_automated_results": {
+                            "manager_http_compatibility": {
+                                "status": "passed",
+                                "uncovered": [],
+                                "report_path": report_path,
+                                "evidence_id": "EVID-missing-manager",
+                            }
+                        },
+                        "ui": {},
+                    },
+                )
+
+                checked = self.run_completion_checker(root, report)
+
+                self.assertEqual(checked.returncode, 1)
+                self.assertIn(
+                    "path is not strict repository-relative",
+                    checked.stdout,
+                )
+                self.assertNotIn("Traceback", checked.stderr)
+
+    def test_completion_checker_rejects_noncanonical_and_oversized_evidence_records(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.make_repository(root)
+            _, report = self.filesystem_fixture(root, case_names=())
+            self.write_json(
+                root / ".forge-codex/evidence/P10-migration-report.json",
+                {
+                    "strict_suites": {
+                        "debug": {
+                            "evidence_id": "EVID-../../outside",
+                        }
+                    }
+                },
+            )
+            checked = self.run_completion_checker(root, report)
+            self.assertEqual(checked.returncode, 1)
+            self.assertIn("debug strict suite has no evidence id", checked.stdout)
+            self.assertNotIn("Traceback", checked.stderr)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.make_repository(root)
+            _, report = self.filesystem_fixture(root, case_names=())
+            evidence_id = "EVID-oversized-record"
+            self.write_json(
+                root / ".forge-codex/evidence/P10-migration-report.json",
+                {"strict_suites": {"debug": {"evidence_id": evidence_id}}},
+            )
+            record = root / f".forge-codex/evidence/{evidence_id}.json"
+            raw = b'{}\n'
+            record.write_bytes(
+                raw + (b" " * (MAXIMUM_QUALIFICATION_ARTIFACT_BYTES + 1 - len(raw)))
+            )
+
+            checked = self.run_completion_checker(root, report)
+
+            self.assertEqual(checked.returncode, 1)
+            self.assertIn(
+                f"P10 input .forge-codex/evidence/{evidence_id}.json exceeds its "
+                f"{MAXIMUM_QUALIFICATION_ARTIFACT_BYTES}-byte file read bound",
+                checked.stdout,
+            )
+            self.assertNotIn("Traceback", checked.stderr)
 
     def install_scoped_evidence(
         self,
@@ -569,6 +1453,7 @@ class EvidenceControlTests(unittest.TestCase):
             env={**os.environ, "FORGE_P10_REPOSITORY": str(root)},
             capture_output=True,
             text=True,
+            timeout=30,
             check=False,
         )
 
@@ -2319,6 +3204,11 @@ class EvidenceControlTests(unittest.TestCase):
             script = root / ".forge-codex/scripts/doctor.sh"
             script.parent.mkdir(parents=True)
             script.write_text(DOCTOR.read_text(encoding="utf-8"), encoding="utf-8")
+            identity_script = script.parent / "checkpoint_identity.py"
+            identity_script.write_text(
+                CHECKPOINT_IDENTITY.read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
             self.write_json(
                 root / ".forge-codex/state/run-state.json",
                 {
@@ -2383,6 +3273,10 @@ class EvidenceControlTests(unittest.TestCase):
             statectl = scripts / "statectl.py"
             statectl.write_text(STATECTL.read_text(encoding="utf-8"), encoding="utf-8")
             statectl.chmod(0o755)
+            (scripts / "evidence_support.py").write_text(
+                (SCRIPT_ROOT / "evidence_support.py").read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
             self.write_json(root / ".forge-codex/plans/phases.json", {"phases": []})
             self.write_json(root / ".forge-codex/plans/gates.json", {"gates": []})
 
@@ -2437,6 +3331,537 @@ class EvidenceControlTests(unittest.TestCase):
                     "notes": "Mitigation does not eliminate the race.",
                 },
             )
+
+    def test_statectl_bounds_run_state_and_rejects_fifo_event_ledger(self) -> None:
+        for extra in (0, 1):
+            with self.subTest(extra=extra), tempfile.TemporaryDirectory() as temporary:
+                root = pathlib.Path(temporary).resolve()
+                scripts = root / ".forge-codex/scripts"
+                scripts.mkdir(parents=True)
+                statectl = scripts / "statectl.py"
+                statectl.write_bytes(STATECTL.read_bytes())
+                statectl.chmod(0o755)
+                (scripts / "evidence_support.py").write_bytes(
+                    (SCRIPT_ROOT / "evidence_support.py").read_bytes()
+                )
+                state_path = root / ".forge-codex/state/run-state.json"
+                state_path.parent.mkdir(parents=True)
+                raw = b'{"value":true}\n'
+                state_path.write_bytes(
+                    raw
+                    + (
+                        b" "
+                        * (
+                            MAXIMUM_QUALIFICATION_ARTIFACT_BYTES
+                            + extra
+                            - len(raw)
+                        )
+                    )
+                )
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(statectl),
+                        "--repo",
+                        str(root),
+                        "show",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                    check=False,
+                )
+                if extra == 0:
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                else:
+                    self.assertEqual(result.returncode, 1)
+                    self.assertIn("file read bound", result.stderr)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary).resolve()
+            scripts = root / ".forge-codex/scripts"
+            scripts.mkdir(parents=True)
+            statectl = scripts / "statectl.py"
+            statectl.write_bytes(STATECTL.read_bytes())
+            statectl.chmod(0o755)
+            (scripts / "evidence_support.py").write_bytes(
+                (SCRIPT_ROOT / "evidence_support.py").read_bytes()
+            )
+            self.write_json(root / ".forge-codex/plans/phases.json", {"phases": []})
+            self.write_json(root / ".forge-codex/plans/gates.json", {"gates": []})
+            initialized = subprocess.run(
+                [sys.executable, str(statectl), "--repo", str(root), "init"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+            self.assertEqual(
+                initialized.returncode,
+                0,
+                initialized.stdout + initialized.stderr,
+            )
+            event_path = root / ".forge-codex/state/events.jsonl"
+            event_path.unlink()
+            os.mkfifo(event_path)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(statectl),
+                    "--repo",
+                    str(root),
+                    "event",
+                    "fixture",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=2,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("is not a regular file", result.stderr)
+
+    def test_gate_batch_runner_bounds_and_rejects_symlinked_run_state(self) -> None:
+        for extra in (0, 1):
+            with self.subTest(extra=extra), tempfile.TemporaryDirectory() as temporary:
+                root = pathlib.Path(temporary).resolve()
+                scripts = root / ".forge-codex/scripts"
+                scripts.mkdir(parents=True)
+                runner = scripts / "run_gates.sh"
+                runner.write_bytes(GATE_BATCH_RUNNER.read_bytes())
+                runner.chmod(0o755)
+                (scripts / "evidence_support.py").write_bytes(
+                    (SCRIPT_ROOT / "evidence_support.py").read_bytes()
+                )
+                self.write_json(
+                    root / ".forge-codex/plans/phases.json",
+                    {"phases": []},
+                )
+                self.initialize_git_fixture(root)
+                state_path = root / ".forge-codex/state/run-state.json"
+                state_path.parent.mkdir(parents=True)
+                raw = b'{"phases":{},"gates":{}}\n'
+                state_path.write_bytes(
+                    raw
+                    + (
+                        b" "
+                        * (
+                            MAXIMUM_QUALIFICATION_ARTIFACT_BYTES
+                            + extra
+                            - len(raw)
+                        )
+                    )
+                )
+                result = subprocess.run(
+                    ["bash", str(runner)],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, 0 if extra == 0 else 1)
+                if extra:
+                    self.assertIn("file read bound", result.stderr)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary).resolve()
+            scripts = root / ".forge-codex/scripts"
+            scripts.mkdir(parents=True)
+            runner = scripts / "run_gates.sh"
+            runner.write_bytes(GATE_BATCH_RUNNER.read_bytes())
+            runner.chmod(0o755)
+            (scripts / "evidence_support.py").write_bytes(
+                (SCRIPT_ROOT / "evidence_support.py").read_bytes()
+            )
+            self.write_json(root / ".forge-codex/plans/phases.json", {"phases": []})
+            self.initialize_git_fixture(root)
+            state_directory = root / ".forge-codex/state"
+            state_directory.mkdir(parents=True)
+            target = state_directory / "actual-state.json"
+            self.write_json(target, {"phases": {}, "gates": {}})
+            (state_directory / "run-state.json").symlink_to(target.name)
+            result = subprocess.run(
+                ["bash", str(runner)],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("contains a symlink", result.stderr)
+
+    def install_g10_handler_fixture(
+        self,
+        root: pathlib.Path,
+        *,
+        checker_exit: int,
+        acceptance_exit: int,
+    ) -> tuple[pathlib.Path, pathlib.Path]:
+        handler = root / ".forge-codex/state/gate-handlers/G10.sh"
+        handler.parent.mkdir(parents=True, exist_ok=True)
+        handler.write_bytes(G10_ACTIVE_HANDLER.read_bytes())
+        handler.chmod(0o755)
+
+        scripts = root / ".forge-codex/scripts"
+        scripts.mkdir(parents=True, exist_ok=True)
+        marker = root / "g10-invocations.txt"
+        checker = scripts / "check_p10_completion.py"
+        checker.write_text(
+            "#!/usr/bin/env python3\n"
+            "import os, pathlib, sys\n"
+            f"marker = pathlib.Path({str(marker)!r})\n"
+            "with marker.open('a', encoding='utf-8') as stream:\n"
+            "    stream.write('checker:' + os.environ.get('FORGE_P10_REPOSITORY', '<missing>') + '\\n')\n"
+            "reported = os.environ.get('FORGE_P10_REPOSITORY')\n"
+            f"if reported is None or pathlib.Path(reported).resolve() != pathlib.Path({str(root)!r}).resolve():\n"
+            "    raise SystemExit(97)\n"
+            "print('P10 semantic sentinel')\n"
+            f"raise SystemExit({checker_exit})\n",
+            encoding="utf-8",
+        )
+        checker.chmod(0o755)
+
+        acceptance = scripts / "validate_acceptance.py"
+        acceptance.write_text(
+            "#!/usr/bin/env python3\n"
+            "import json, pathlib, sys\n"
+            f"marker = pathlib.Path({str(marker)!r})\n"
+            "with marker.open('a', encoding='utf-8') as stream:\n"
+            "    stream.write('acceptance\\n')\n"
+            "criteria = pathlib.Path(sys.argv[sys.argv.index('--criteria-output') + 1])\n"
+            "criteria.parent.mkdir(parents=True, exist_ok=True)\n"
+            "criteria.write_text(json.dumps({'criteria_results': [{'criterion': 'semantic P10 completion', "
+            f"'passed': {acceptance_exit == 0!r}, 'evidence': 'acceptance fixture'}}]}}) + '\\n', encoding='utf-8')\n"
+            f"raise SystemExit({acceptance_exit})\n",
+            encoding="utf-8",
+        )
+        acceptance.chmod(0o755)
+        return handler, marker
+
+    def test_g10_handlers_run_semantic_checker_first_and_pin_repository(self) -> None:
+        active = G10_ACTIVE_HANDLER.read_text(encoding="utf-8")
+        template = G10_TEMPLATE_HANDLER.read_text(encoding="utf-8")
+        self.assertEqual(active, template)
+        self.assertLess(
+            active.index("check_p10_completion.py"),
+            active.index("validate_acceptance.py"),
+        )
+        self.assertIn('FORGE_P10_REPOSITORY="$ROOT"', active)
+        self.assertIn('/bin/rm -f -- "$CRITERIA_OUTPUT"', active)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            handler, marker = self.install_g10_handler_fixture(
+                root,
+                checker_exit=0,
+                acceptance_exit=0,
+            )
+            result = subprocess.run(
+                ["bash", str(handler)],
+                env={**os.environ, "FORGE_P10_REPOSITORY": "/untrusted/repository"},
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            calls = marker.read_text(encoding="utf-8").splitlines()
+            self.assertEqual(len(calls), 2)
+            self.assertTrue(calls[0].startswith("checker:"))
+            self.assertEqual(
+                pathlib.Path(calls[0].split(":", 1)[1]).resolve(),
+                root.resolve(),
+            )
+            self.assertEqual(calls[1], "acceptance")
+
+    def test_g10_handler_requires_both_semantic_and_acceptance_checks(self) -> None:
+        for checker_exit, acceptance_exit, expected_exit, expected_calls in (
+            (23, 0, 23, 1),
+            (0, 29, 29, 2),
+            (0, 0, 0, 2),
+        ):
+            with self.subTest(
+                checker_exit=checker_exit,
+                acceptance_exit=acceptance_exit,
+            ), tempfile.TemporaryDirectory() as temporary:
+                root = pathlib.Path(temporary)
+                handler, marker = self.install_g10_handler_fixture(
+                    root,
+                    checker_exit=checker_exit,
+                    acceptance_exit=acceptance_exit,
+                )
+                result = subprocess.run(
+                    ["bash", str(handler)],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertEqual(
+                    result.returncode,
+                    expected_exit,
+                    result.stdout + result.stderr,
+                )
+                calls = marker.read_text(encoding="utf-8").splitlines()
+                self.assertEqual(len(calls), expected_calls)
+                self.assertTrue(calls[0].startswith("checker:"))
+                if expected_calls == 1:
+                    self.assertNotIn("acceptance", calls)
+                else:
+                    self.assertEqual(calls[1], "acceptance")
+
+    def test_g10_failure_cannot_reuse_stale_passing_criteria(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.install_g10_handler_fixture(
+                root,
+                checker_exit=23,
+                acceptance_exit=0,
+            )
+            plans = root / ".forge-codex/plans"
+            plans.mkdir(parents=True)
+            self.write_json(
+                plans / "gates.json",
+                {
+                    "gates": [
+                        {
+                            "id": "G10",
+                            "criteria": ["semantic P10 completion"],
+                        }
+                    ]
+                },
+            )
+            results = root / ".forge-codex/state/gate-results"
+            results.mkdir(parents=True)
+            criteria = results / "G10.criteria.json"
+            self.write_json(
+                criteria,
+                {
+                    "criteria_results": [
+                        {
+                            "criterion": "semantic P10 completion",
+                            "passed": True,
+                            "evidence": "stale fixture",
+                        }
+                    ]
+                },
+            )
+            statectl = root / ".forge-codex/scripts/statectl.py"
+            statectl.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            statectl.chmod(0o755)
+            self.initialize_git_fixture(root)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(GATE_RUNNER),
+                    "G10",
+                    "--repo",
+                    str(root),
+                    "--timeout",
+                    "10",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            gate_result = json.loads(result.stdout)
+            self.assertEqual(gate_result["status"], "failed")
+            self.assertEqual(gate_result["commands"][0]["exit_code"], 23)
+            self.assertFalse(
+                gate_result["evaluator"]["criteria_results"][0]["passed"]
+            )
+            self.assertFalse(criteria.exists())
+            self.assertIn(
+                "P10 semantic sentinel",
+                (results / "G10.stdout.txt").read_text(encoding="utf-8"),
+            )
+
+    def test_g10_run_gate_requires_exact_success_criteria(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.install_g10_handler_fixture(
+                root,
+                checker_exit=0,
+                acceptance_exit=0,
+            )
+            plans = root / ".forge-codex/plans"
+            plans.mkdir(parents=True)
+            self.write_json(
+                plans / "gates.json",
+                {
+                    "gates": [
+                        {
+                            "id": "G10",
+                            "criteria": ["semantic P10 completion"],
+                        }
+                    ]
+                },
+            )
+            statectl = root / ".forge-codex/scripts/statectl.py"
+            statectl.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            statectl.chmod(0o755)
+            self.initialize_git_fixture(root)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(GATE_RUNNER),
+                    "G10",
+                    "--repo",
+                    str(root),
+                    "--timeout",
+                    "10",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            gate_result = json.loads(result.stdout)
+            self.assertEqual(gate_result["status"], "passed")
+            self.assertEqual(gate_result["commands"][0]["exit_code"], 0)
+            self.assertEqual(
+                gate_result["evaluator"]["criteria_results"],
+                [
+                    {
+                        "criterion": "semantic P10 completion",
+                        "passed": True,
+                        "evidence": "acceptance fixture",
+                    }
+                ],
+            )
+            criteria = root / ".forge-codex/state/gate-results/G10.criteria.json"
+            self.assertTrue(criteria.is_file())
+            self.assertIn(
+                "P10 semantic sentinel",
+                (criteria.parent / "G10.stdout.txt").read_text(encoding="utf-8"),
+            )
+
+    def test_gate_runner_removes_stale_sidecar_and_requires_new_criteria(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            plans = root / ".forge-codex/plans"
+            plans.mkdir(parents=True)
+            self.write_json(
+                plans / "gates.json",
+                {"gates": [{"id": "GX", "criteria": ["exact criterion"]}]},
+            )
+            handlers = root / ".forge-codex/state/gate-handlers"
+            handlers.mkdir(parents=True)
+            handler = handlers / "GX.sh"
+            handler.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            handler.chmod(0o755)
+            results = root / ".forge-codex/state/gate-results"
+            results.mkdir(parents=True)
+            criteria = results / "GX.criteria.json"
+            self.write_json(
+                criteria,
+                {
+                    "criteria_results": [
+                        {
+                            "criterion": "exact criterion",
+                            "passed": True,
+                            "evidence": "stale fixture",
+                        }
+                    ]
+                },
+            )
+            scripts = root / ".forge-codex/scripts"
+            scripts.mkdir(parents=True)
+            statectl = scripts / "statectl.py"
+            statectl.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            statectl.chmod(0o755)
+            self.initialize_git_fixture(root)
+
+            result = subprocess.run(
+                [sys.executable, str(GATE_RUNNER), "GX", "--repo", str(root)],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["status"], "failed")
+            self.assertFalse(criteria.exists())
+            self.assertEqual(
+                payload["evaluator"]["criteria_results"][0]["evidence"],
+                "criteria sidecar missing after handler execution",
+            )
+
+    def test_gate_runner_requires_exact_criteria_and_boolean_pass_values(self) -> None:
+        cases = (
+            ([{"criterion": "unrelated", "passed": True}], "does not match"),
+            ([{"criterion": "exact criterion", "passed": "false"}], "not boolean"),
+        )
+        for criteria_results, expected_error in cases:
+            with self.subTest(criteria_results=criteria_results), tempfile.TemporaryDirectory() as temporary:
+                root = pathlib.Path(temporary)
+                plans = root / ".forge-codex/plans"
+                plans.mkdir(parents=True)
+                self.write_json(
+                    plans / "gates.json",
+                    {"gates": [{"id": "GX", "criteria": ["exact criterion"]}]},
+                )
+                handlers = root / ".forge-codex/state/gate-handlers"
+                handlers.mkdir(parents=True)
+                handler = handlers / "GX.sh"
+                handler.write_text(
+                    "#!/usr/bin/env python3\n"
+                    "import json, os, pathlib\n"
+                    f"value = {criteria_results!r}\n"
+                    "path = pathlib.Path(os.environ['FORGE_GATE_REPOSITORY_ROOT']) / '.forge-codex/state/gate-results/GX.criteria.json'\n"
+                    "path.parent.mkdir(parents=True, exist_ok=True)\n"
+                    "path.write_text(json.dumps({'criteria_results': value}) + '\\n')\n",
+                    encoding="utf-8",
+                )
+                handler.chmod(0o755)
+                scripts = root / ".forge-codex/scripts"
+                scripts.mkdir(parents=True)
+                statectl = scripts / "statectl.py"
+                statectl.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+                statectl.chmod(0o755)
+                self.initialize_git_fixture(root)
+
+                result = subprocess.run(
+                    [sys.executable, str(GATE_RUNNER), "GX", "--repo", str(root)],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                    check=False,
+                )
+
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                payload = json.loads(result.stdout)
+                self.assertEqual(payload["status"], "failed")
+                self.assertIn(
+                    expected_error,
+                    payload["evaluator"]["criteria_results"][0]["evidence"],
+                )
+                self.assertTrue(
+                    any(item["kind"] == "criteria" for item in payload["artifacts"])
+                )
+
+    def test_g10_gate_chain_is_source_manifest_bound(self) -> None:
+        self.assertTrue(
+            {
+                ".forge-codex/scripts/check_p10_completion.py",
+                ".forge-codex/scripts/run_gate.py",
+                ".forge-codex/scripts/run_gates.sh",
+                ".forge-codex/scripts/statectl.py",
+                ".forge-codex/scripts/verify_completion.py",
+                ".forge-codex/scripts/validate_acceptance.py",
+                ".forge-codex/scripts/test_verify_completion_hardening.py",
+                ".forge-codex/plans/gates.json",
+                ".forge-codex/plans/phases.json",
+                ".forge-codex/state/gate-handlers/G10.sh",
+                ".forge-codex/state/gate-handlers/G12.sh",
+                ".forge-codex/templates/gate-handlers/G10.sh",
+                ".forge-codex/templates/gate-handlers/G12.sh",
+            }
+            <= set(MANIFEST_TARGETS)
+        )
 
     def make_repository(self, root: pathlib.Path, *, ledger_exit: int = 0) -> None:
         (root / "Sources").mkdir(parents=True)
@@ -2557,6 +3982,194 @@ path.write_text(json.dumps(value) + "\\n", encoding="utf-8")
             seal_manifest = source_manifest(root)
             seal_script.write_text("#!/bin/sh\nexit 4\n", encoding="utf-8")
             self.assertNotEqual(seal_manifest, source_manifest(root))
+
+    def test_manifest_enforces_exact_file_entry_and_byte_bounds(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary).resolve()
+            sources = root / "Sources"
+            sources.mkdir()
+            (sources / "one").write_bytes(b"x")
+            (sources / "two").write_bytes(b"")
+            with mock.patch("evidence_support.MAXIMUM_MANIFEST_FILES", 2):
+                manifest = source_manifest(root)
+                self.assertEqual(manifest["file_count"], 2)
+                (sources / "three").write_bytes(b"")
+                with self.assertRaisesRegex(
+                    EvidenceSupportError,
+                    "source manifest exceeds 2 files",
+                ):
+                    source_manifest(root)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary).resolve()
+            sources = root / "Sources"
+            sources.mkdir()
+            (sources / "one").write_bytes(b"abc")
+            with mock.patch(
+                "evidence_support.MAXIMUM_MANIFEST_TOTAL_BYTES",
+                3,
+            ):
+                manifest = source_manifest(root)
+                self.assertEqual(manifest["bytes"], 3)
+                (sources / "one").write_bytes(b"abcd")
+                with self.assertRaisesRegex(
+                    EvidenceSupportError,
+                    "manifest exceeds 3 total bytes|aggregate read bound",
+                ):
+                    source_manifest(root)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary).resolve()
+            sources = root / "Sources"
+            sources.mkdir()
+            first = sources / "first"
+            second = sources / "second"
+            first.write_bytes(b"ab")
+            second.write_bytes(b"cd")
+            second_identity = second.stat()
+            real_read = os.read
+            second_file_reads = 0
+
+            def track_snapshot_reads(descriptor: int, byte_count: int) -> bytes:
+                nonlocal second_file_reads
+                metadata = os.fstat(descriptor)
+                if (
+                    metadata.st_dev,
+                    metadata.st_ino,
+                ) == (
+                    second_identity.st_dev,
+                    second_identity.st_ino,
+                ):
+                    second_file_reads += 1
+                return real_read(descriptor, byte_count)
+
+            with mock.patch(
+                "evidence_support.MAXIMUM_MANIFEST_TOTAL_BYTES",
+                3,
+            ), mock.patch(
+                "evidence_support.os.read",
+                side_effect=track_snapshot_reads,
+            ), self.assertRaisesRegex(
+                EvidenceSupportError,
+                "source manifest snapshot 3-byte aggregate read bound",
+            ):
+                source_manifest(root)
+            self.assertEqual(second_file_reads, 0)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary).resolve()
+            sources = root / "Sources"
+            sources.mkdir()
+            (sources / "first").mkdir()
+            (sources / "second").mkdir()
+            with mock.patch("evidence_support.MAXIMUM_MANIFEST_ENTRIES", 1):
+                with self.assertRaisesRegex(
+                    EvidenceSupportError,
+                    "source manifest traversal exceeds 1 entries",
+                ):
+                    source_manifest(root)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary).resolve()
+            (root / "Package.swift").symlink_to("missing-package.swift")
+            with self.assertRaisesRegex(
+                EvidenceSupportError,
+                "manifest target is a symbolic link: Package.swift",
+            ):
+                source_manifest(root)
+
+    def test_manifest_wide_directory_stops_at_entry_bound(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary).resolve()
+            sources = root / "Sources"
+            sources.mkdir()
+            for index in range(4):
+                (sources / f"entry-{index}").write_bytes(b"x")
+
+            with mock.patch(
+                "evidence_support.MAXIMUM_MANIFEST_ENTRIES",
+                3,
+            ), self.assertRaisesRegex(
+                EvidenceSupportError,
+                "source manifest traversal exceeds 3 entries",
+            ):
+                source_manifest(root)
+
+    def test_manifest_rejects_directory_depth_overflow(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary).resolve()
+            deepest = root / "Sources/level-one/level-two"
+            deepest.mkdir(parents=True)
+            (deepest / "source.swift").write_bytes(b"struct Source {}\n")
+
+            with mock.patch(
+                "evidence_support.MAXIMUM_MANIFEST_DEPTH",
+                2,
+            ), self.assertRaisesRegex(
+                EvidenceSupportError,
+                "source manifest traversal exceeds its directory depth bound",
+            ):
+                source_manifest(root)
+
+    def test_manifest_rejects_unreadable_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary).resolve()
+            sources = root / "Sources"
+            sources.mkdir()
+            (sources / "source.swift").write_bytes(b"struct Source {}\n")
+
+            with mock.patch.object(
+                evidence_support.os,
+                "scandir",
+                side_effect=PermissionError("permission denied"),
+            ), self.assertRaisesRegex(
+                EvidenceSupportError,
+                "source manifest directory cannot be enumerated safely",
+            ):
+                source_manifest(root)
+
+    def test_manifest_rejects_change_between_stability_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary).resolve()
+            sources = root / "Sources"
+            sources.mkdir()
+            path = sources / "App.swift"
+            path.write_text("struct Original {}\n", encoding="utf-8")
+            real_snapshot = evidence_support._source_manifest_snapshot
+            calls = 0
+
+            def mutate_between_passes(
+                repository: pathlib.Path,
+                budget: BoundedReadBudget,
+            ) -> tuple[list[dict[str, object]], int]:
+                nonlocal calls
+                snapshot = real_snapshot(repository, budget)
+                calls += 1
+                if calls == 1:
+                    path.write_text("struct Changed {}\n", encoding="utf-8")
+                return snapshot
+
+            with mock.patch(
+                "evidence_support._source_manifest_snapshot",
+                side_effect=mutate_between_passes,
+            ), self.assertRaisesRegex(
+                EvidenceSupportError,
+                "changed during its two-pass read",
+            ):
+                source_manifest(root)
+
+    def test_source_manifest_schema_bounds_match_runtime_policy(self) -> None:
+        for path in (
+            PRIVILEGED_FILESYSTEM_SCHEMA,
+            PRIVILEGED_FILESYSTEM_ARTIFACT_SCHEMA,
+            PRIVILEGED_FILESYSTEM_H0_SCHEMA,
+            PRIVILEGED_FILESYSTEM_ADMISSION_SCHEMA,
+        ):
+            with self.subTest(path=path.name):
+                schema = json.loads(path.read_text(encoding="utf-8"))
+                source = schema["$defs"]["sourceManifest"]["properties"]
+                self.assertEqual(source["file_count"]["maximum"], 32768)
+                self.assertEqual(source["bytes"]["maximum"], 536870912)
 
     def test_recorder_preserves_bounded_repository_artifact_and_external_reference(self) -> None:
         with tempfile.TemporaryDirectory() as temporary, tempfile.TemporaryDirectory() as external_root:
@@ -3225,6 +4838,32 @@ class ProtocolReaderTests(unittest.TestCase):
                 self.assertLess(time.monotonic() - started, 2.0)
             finally:
                 process.abort()
+
+
+def load_tests(
+    loader: unittest.TestLoader,
+    tests: unittest.TestSuite,
+    pattern: str | None,
+) -> unittest.TestSuite:
+    """Include the focused hardening suites in the canonical evidence command."""
+
+    if pattern is not None:
+        return tests
+    import test_acceptance_compatibility
+    import test_gate_runner_hardening
+    import test_release_scanners_hardening
+    import test_statectl_transactions
+    import test_verify_completion_hardening
+
+    for module in (
+        test_acceptance_compatibility,
+        test_gate_runner_hardening,
+        test_release_scanners_hardening,
+        test_statectl_transactions,
+        test_verify_completion_hardening,
+    ):
+        tests.addTests(loader.loadTestsFromModule(module))
+    return tests
 
 
 if __name__ == "__main__":

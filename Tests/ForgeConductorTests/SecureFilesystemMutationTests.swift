@@ -1208,6 +1208,315 @@ final class SecureFilesystemMutationTests: XCTestCase {
         )
     }
 
+    func testPresentedStatusMapsOnlyPresentNotFoundToNotRegistered() {
+        let rawStatuses: [SecureFilesystemServiceStatus] = [
+            .notRegistered,
+            .enabled,
+            .requiresApproval,
+            .notFound,
+        ]
+        let observations: [SecureFilesystemServicePackageObservation] = [
+            .present,
+            .missing,
+            .invalid,
+        ]
+        for rawStatus in rawStatuses {
+            for observation in observations {
+                let expected: SecureFilesystemServiceStatus =
+                    rawStatus == .notFound && observation == .present
+                        ? .notRegistered
+                        : rawStatus
+                XCTAssertEqual(
+                    SecureFilesystemServiceController.presentedStatus(
+                        reportedStatus: rawStatus,
+                        packageObservation: observation
+                    ),
+                    expected,
+                    "raw=\(rawStatus.rawValue) package=\(observation)"
+                )
+            }
+        }
+    }
+
+    @MainActor
+    func testControllerPreservesRawStatusWhilePresentingPackagedNotFound() async {
+        let service = SecureFilesystemServiceRegistrationStub(status: .notFound)
+        let controller = SecureFilesystemServiceController(
+            service: service,
+            packageInspector: SecureFilesystemServicePackageInspectorStub(
+                observation: .present
+            )
+        )
+
+        XCTAssertEqual(controller.status(), .notFound)
+        let presentedStatus = await controller.presentedStatus()
+        XCTAssertEqual(presentedStatus, .notRegistered)
+        XCTAssertEqual(controller.status(), .notFound)
+    }
+
+    func testBundleInspectorReportsPresentForExactPackage() throws {
+        let fixture = try makeServicePackage(named: "exact")
+        XCTAssertEqual(inspectPackage(fixture), .present)
+    }
+
+    func testBundleInspectorReportsMissingForAbsentPackageAndLeaf() throws {
+        let absentApplication = root.appendingPathComponent(
+            "absent.app",
+            isDirectory: true
+        )
+        XCTAssertEqual(
+            SecureFilesystemServiceBundleInspector(
+                applicationBundle: absentApplication
+            ).inspect(),
+            .missing
+        )
+
+        let fixture = try makeServicePackage(named: "missing-daemon")
+        try FileManager.default.removeItem(at: fixture.daemon)
+        XCTAssertEqual(inspectPackage(fixture), .missing)
+    }
+
+    func testBundleInspectorRejectsEverySymlinkedPackagePosition() throws {
+        let relativePositions = [
+            "",
+            "Contents",
+            "Contents/MacOS",
+            "Contents/Library",
+            "Contents/Library/LaunchDaemons",
+            "Contents/MacOS/\(ForgeFilesystemProtocolConstants.daemonExecutableName)",
+            "Contents/Library/LaunchDaemons/"
+                + ForgeFilesystemProtocolConstants.daemonPlistName,
+        ]
+        for (index, relativePosition) in relativePositions.enumerated() {
+            let fixture = try makeServicePackage(named: "symlink-\(index)")
+            let target = relativePosition.isEmpty
+                ? fixture.application
+                : fixture.application.appendingPathComponent(relativePosition)
+            let relocated = root.appendingPathComponent(
+                "symlink-target-\(index)",
+                isDirectory: target.hasDirectoryPath
+            )
+            try FileManager.default.moveItem(at: target, to: relocated)
+            try FileManager.default.createSymbolicLink(
+                at: target,
+                withDestinationURL: relocated
+            )
+
+            XCTAssertEqual(
+                inspectPackage(fixture),
+                .invalid,
+                "symlink at \(relativePosition.isEmpty ? "application" : relativePosition)"
+            )
+        }
+    }
+
+    func testBundleInspectorRejectsNonExecutableAndMultiplyLinkedDaemon() throws {
+        let nonExecutable = try makeServicePackage(named: "non-executable")
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o644],
+            ofItemAtPath: nonExecutable.daemon.path
+        )
+        XCTAssertEqual(inspectPackage(nonExecutable), .invalid)
+
+        let multiplyLinked = try makeServicePackage(named: "multiply-linked")
+        let secondLink = root.appendingPathComponent("daemon-second-link")
+        XCTAssertEqual(Darwin.link(multiplyLinked.daemon.path, secondLink.path), 0)
+        XCTAssertEqual(inspectPackage(multiplyLinked), .invalid)
+
+        let fifo = try makeServicePackage(named: "daemon-fifo")
+        try FileManager.default.removeItem(at: fifo.daemon)
+        XCTAssertEqual(Darwin.mkfifo(fifo.daemon.path, 0o600), 0)
+        XCTAssertEqual(inspectPackage(fifo), .invalid)
+    }
+
+    func testBundleInspectorRejectsOversizedMalformedAndMultiplyLinkedPlist() throws {
+        let oversized = try makeServicePackage(named: "oversized-plist")
+        try Data(repeating: 0x20, count: 64 * 1_024 + 1).write(
+            to: oversized.propertyList
+        )
+        XCTAssertEqual(inspectPackage(oversized), .invalid)
+
+        let malformed = try makeServicePackage(named: "malformed-plist")
+        try Data("not a property list".utf8).write(to: malformed.propertyList)
+        XCTAssertEqual(inspectPackage(malformed), .invalid)
+
+        let multiplyLinked = try makeServicePackage(named: "linked-plist")
+        let secondLink = root.appendingPathComponent("plist-second-link")
+        XCTAssertEqual(
+            Darwin.link(multiplyLinked.propertyList.path, secondLink.path),
+            0
+        )
+        XCTAssertEqual(inspectPackage(multiplyLinked), .invalid)
+
+        let fifo = try makeServicePackage(named: "plist-fifo")
+        try FileManager.default.removeItem(at: fifo.propertyList)
+        XCTAssertEqual(Darwin.mkfifo(fifo.propertyList.path, 0o600), 0)
+        XCTAssertEqual(inspectPackage(fifo), .invalid)
+    }
+
+    func testBundleInspectorRequiresExactServicePropertyList() throws {
+        let mutations: [(String, (inout [String: Any]) -> Void)] = [
+            ("label", { $0["Label"] = "com.example.wrong" }),
+            ("program", { $0["BundleProgram"] = "Contents/MacOS/wrong" }),
+            ("user", { $0["UserName"] = "nobody" }),
+            ("umask", { $0["Umask"] = 0 }),
+            ("mach-service", {
+                $0["MachServices"] = [
+                    ForgeFilesystemProtocolConstants.serviceName: false,
+                ]
+            }),
+            ("extra-key", { $0["Program"] = "/usr/bin/true" }),
+        ]
+        for (name, mutate) in mutations {
+            let fixture = try makeServicePackage(named: "plist-\(name)")
+            var propertyList = exactServicePropertyList()
+            mutate(&propertyList)
+            try writeServicePropertyList(propertyList, to: fixture.propertyList)
+            XCTAssertEqual(inspectPackage(fixture), .invalid, name)
+        }
+    }
+
+    @MainActor
+    func testConcurrentPresentedStatusCallsShareOneInspection() async {
+        let service = SecureFilesystemServiceRegistrationStub(status: .notFound)
+        let inspector = BlockingSecureFilesystemServicePackageInspector(
+            observation: .present
+        )
+        let controller = SecureFilesystemServiceController(
+            service: service,
+            packageInspector: inspector
+        )
+        let first = Task { await controller.presentedStatus() }
+        let second = Task { await controller.presentedStatus() }
+        await waitForInspectionStart(inspector)
+        XCTAssertEqual(inspector.callCount, 1)
+        inspector.release()
+
+        let firstStatus = await first.value
+        let secondStatus = await second.value
+        XCTAssertEqual(firstStatus, .notRegistered)
+        XCTAssertEqual(secondStatus, .notRegistered)
+        XCTAssertEqual(inspector.callCount, 1)
+        let cachedStatus = await controller.presentedStatus()
+        XCTAssertEqual(cachedStatus, .notRegistered)
+        XCTAssertEqual(inspector.callCount, 1, "present observations must be cached")
+    }
+
+    @MainActor
+    func testNegativePackageObservationIsRetriedWithoutConcurrentDuplication() async {
+        let service = SecureFilesystemServiceRegistrationStub(status: .notFound)
+        let inspector = BlockingSecureFilesystemServicePackageInspector(
+            observation: .invalid
+        )
+        let controller = SecureFilesystemServiceController(
+            service: service,
+            packageInspector: inspector
+        )
+        let first = Task { await controller.presentedStatus() }
+        let second = Task { await controller.presentedStatus() }
+        await waitForInspectionStart(inspector)
+        XCTAssertEqual(inspector.callCount, 1)
+        inspector.release()
+
+        let firstStatus = await first.value
+        let secondStatus = await second.value
+        XCTAssertEqual(firstStatus, .notFound)
+        XCTAssertEqual(secondStatus, .notFound)
+        XCTAssertEqual(inspector.callCount, 1)
+
+        let retriedStatus = await controller.presentedStatus()
+        XCTAssertEqual(retriedStatus, .notFound)
+        XCTAssertEqual(inspector.callCount, 2, "negative observations must be retryable")
+    }
+
+    private struct ServicePackageFixture {
+        let application: URL
+        let daemon: URL
+        let propertyList: URL
+    }
+
+    private func makeServicePackage(named name: String) throws -> ServicePackageFixture {
+        let application = root.appendingPathComponent(
+            "Forge-Conductor-\(name).app",
+            isDirectory: true
+        )
+        let contents = application.appendingPathComponent("Contents", isDirectory: true)
+        let macOS = contents.appendingPathComponent("MacOS", isDirectory: true)
+        let launchDaemons = contents.appendingPathComponent(
+            "Library/LaunchDaemons",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: macOS,
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: launchDaemons,
+            withIntermediateDirectories: true
+        )
+        let daemon = macOS.appendingPathComponent(
+            ForgeFilesystemProtocolConstants.daemonExecutableName
+        )
+        let propertyList = launchDaemons.appendingPathComponent(
+            ForgeFilesystemProtocolConstants.daemonPlistName
+        )
+        try Data("#!/bin/sh\nexit 0\n".utf8).write(to: daemon)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755],
+            ofItemAtPath: daemon.path
+        )
+        try writeServicePropertyList(
+            exactServicePropertyList(),
+            to: propertyList
+        )
+        return ServicePackageFixture(
+            application: application,
+            daemon: daemon,
+            propertyList: propertyList
+        )
+    }
+
+    private func inspectPackage(
+        _ fixture: ServicePackageFixture
+    ) -> SecureFilesystemServicePackageObservation {
+        SecureFilesystemServiceBundleInspector(
+            applicationBundle: fixture.application
+        ).inspect()
+    }
+
+    private func exactServicePropertyList() -> [String: Any] {
+        [
+            "BundleProgram": "Contents/MacOS/"
+                + ForgeFilesystemProtocolConstants.daemonExecutableName,
+            "Label": ForgeFilesystemProtocolConstants.serviceName,
+            "MachServices": [ForgeFilesystemProtocolConstants.serviceName: true],
+            "Umask": 0o077,
+            "UserName": "root",
+        ]
+    }
+
+    private func writeServicePropertyList(
+        _ propertyList: [String: Any],
+        to url: URL
+    ) throws {
+        try PropertyListSerialization.data(
+            fromPropertyList: propertyList,
+            format: .xml,
+            options: 0
+        ).write(to: url)
+    }
+
+    @MainActor
+    private func waitForInspectionStart(
+        _ inspector: BlockingSecureFilesystemServicePackageInspector
+    ) async {
+        for _ in 0..<1_000 {
+            if inspector.callCount > 0 { return }
+            await Task.yield()
+        }
+        XCTFail("service package inspection did not start")
+    }
+
     @MainActor
     func testServiceReinstallWaitsForReapBeforeRegisteringReplacement() async throws {
         let service = SecureFilesystemServiceRegistrationStub(status: .enabled)
@@ -1439,6 +1748,51 @@ private final class SecureFilesystemServiceRegistrationStub:
         let completion = pendingUnregister
         pendingUnregister = nil
         completion?(error)
+    }
+}
+
+private struct SecureFilesystemServicePackageInspectorStub:
+    SecureFilesystemServicePackageInspecting {
+    let observation: SecureFilesystemServicePackageObservation
+
+    func inspect() -> SecureFilesystemServicePackageObservation { observation }
+}
+
+private final class BlockingSecureFilesystemServicePackageInspector:
+    SecureFilesystemServicePackageInspecting,
+    @unchecked Sendable {
+    private let observation: SecureFilesystemServicePackageObservation
+    private let lock = NSLock()
+    private let releaseGate = DispatchSemaphore(value: 0)
+    private var storedCallCount = 0
+    private var shouldBlock = true
+
+    init(observation: SecureFilesystemServicePackageObservation) {
+        self.observation = observation
+    }
+
+    var callCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return storedCallCount
+    }
+
+    func inspect() -> SecureFilesystemServicePackageObservation {
+        lock.lock()
+        storedCallCount += 1
+        let block = shouldBlock
+        lock.unlock()
+        if block {
+            _ = releaseGate.wait(timeout: .now() + 2)
+            lock.lock()
+            shouldBlock = false
+            lock.unlock()
+        }
+        return observation
+    }
+
+    func release() {
+        releaseGate.signal()
     }
 }
 
