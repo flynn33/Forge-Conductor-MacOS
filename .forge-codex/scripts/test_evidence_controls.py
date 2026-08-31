@@ -2482,10 +2482,14 @@ class EvidenceControlTests(unittest.TestCase):
         acceptance = scripts / "validate_acceptance.py"
         acceptance.write_text(
             "#!/usr/bin/env python3\n"
-            "import pathlib\n"
+            "import json, pathlib, sys\n"
             f"marker = pathlib.Path({str(marker)!r})\n"
             "with marker.open('a', encoding='utf-8') as stream:\n"
             "    stream.write('acceptance\\n')\n"
+            "criteria = pathlib.Path(sys.argv[sys.argv.index('--criteria-output') + 1])\n"
+            "criteria.parent.mkdir(parents=True, exist_ok=True)\n"
+            "criteria.write_text(json.dumps({'criteria_results': [{'criterion': 'semantic P10 completion', "
+            f"'passed': {acceptance_exit == 0!r}, 'evidence': 'acceptance fixture'}}]}}) + '\\n', encoding='utf-8')\n"
             f"raise SystemExit({acceptance_exit})\n",
             encoding="utf-8",
         )
@@ -2629,6 +2633,66 @@ class EvidenceControlTests(unittest.TestCase):
                 (results / "G10.stdout.txt").read_text(encoding="utf-8"),
             )
 
+    def test_g10_run_gate_requires_exact_success_criteria(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.install_g10_handler_fixture(
+                root,
+                checker_exit=0,
+                acceptance_exit=0,
+            )
+            plans = root / ".forge-codex/plans"
+            plans.mkdir(parents=True)
+            self.write_json(
+                plans / "gates.json",
+                {
+                    "gates": [
+                        {
+                            "id": "G10",
+                            "criteria": ["semantic P10 completion"],
+                        }
+                    ]
+                },
+            )
+            statectl = root / ".forge-codex/scripts/statectl.py"
+            statectl.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            statectl.chmod(0o755)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(GATE_RUNNER),
+                    "G10",
+                    "--repo",
+                    str(root),
+                    "--timeout",
+                    "10",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            gate_result = json.loads(result.stdout)
+            self.assertEqual(gate_result["status"], "passed")
+            self.assertEqual(gate_result["commands"][0]["exit_code"], 0)
+            self.assertEqual(
+                gate_result["evaluator"]["criteria_results"],
+                [
+                    {
+                        "criterion": "semantic P10 completion",
+                        "passed": True,
+                        "evidence": "acceptance fixture",
+                    }
+                ],
+            )
+            criteria = root / ".forge-codex/state/gate-results/G10.criteria.json"
+            self.assertTrue(criteria.is_file())
+            self.assertIn(
+                "P10 semantic sentinel",
+                (criteria.parent / "G10.stdout.txt").read_text(encoding="utf-8"),
+            )
+
     def test_g10_gate_chain_is_source_manifest_bound(self) -> None:
         self.assertTrue(
             {
@@ -2636,6 +2700,8 @@ class EvidenceControlTests(unittest.TestCase):
                 ".forge-codex/scripts/run_gate.py",
                 ".forge-codex/scripts/run_gates.sh",
                 ".forge-codex/scripts/validate_acceptance.py",
+                ".forge-codex/plans/gates.json",
+                ".forge-codex/plans/phases.json",
                 ".forge-codex/state/gate-handlers/G10.sh",
                 ".forge-codex/templates/gate-handlers/G10.sh",
             }

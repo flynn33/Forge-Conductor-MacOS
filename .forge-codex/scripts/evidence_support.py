@@ -44,6 +44,8 @@ MANIFEST_TARGETS = (
     ".forge-codex/scripts/run_gates.sh",
     ".forge-codex/scripts/test_evidence_controls.py",
     ".forge-codex/scripts/validate_acceptance.py",
+    ".forge-codex/plans/gates.json",
+    ".forge-codex/plans/phases.json",
     ".forge-codex/state/gate-handlers/G10.sh",
     ".forge-codex/templates/gate-handlers/G10.sh",
     ".forge-codex/schemas/p10-privileged-filesystem-artifact-binding.schema.json",
