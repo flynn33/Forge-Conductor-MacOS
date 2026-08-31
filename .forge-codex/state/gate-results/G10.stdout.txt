@@ -1,40 +1,60 @@
 {
-  "criteria_results": [
-    {
-      "criterion": "every baseline feature preserved/additive/migrated",
-      "passed": false,
-      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/P10-parity-report.json#fb4d6a7bcd53de1900a8c0401b252ebaa15b67109de0d4e9c3d65756aecc5b8c; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-autonomy-state/evidence/FC-RELEASE-001/feature-parity-impact.json#c82bd7c1522f5aff3a571d2b4b0dd675a1abd01944c3975db31ad30eec98d99a"
-    },
-    {
-      "criterion": "all old fixtures migrate and reopen",
-      "passed": false,
-      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/P10-migration-report.json#1b339eb9be67f3901d6944a1d19f9f639e25b9dac199b944368e40e80a7dfdfc; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-autonomy-state/evidence/FC-RELEASE-001/test-results.json#9f2a6a473bc09d3f09de9de33936635028a1427960d5ab47317f706fa1034472"
-    },
-    {
-      "criterion": "MCP golden snapshots compatible",
-      "passed": false,
-      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/P10-protocol-compatibility-report.json#81400aa6c112bd96235e7c243ea610a5631d635de883de66e94ba80fe97a5d3c; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-autonomy-state/evidence/FC-E2E-001/test-results.json#6f0db873902dc648733b926985cd9724292bdbccfbca7f0a740173713e789145"
-    },
-    {
-      "criterion": "UI commands/settings/accessibility tests pass",
-      "passed": false,
-      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-autonomy-state/evidence/FC-UI-001/test-results.json#489cdeb6a44f14058cb56cab1b1cde7c7895d0c1b0b73bcad770fac4fb90509b; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-autonomy-state/evidence/FC-UI-001/feature-parity-impact.json#77be4d170024a8c530f83fa4d82f134792b00ad4dfd8f362b3713b0e27732665"
-    },
-    {
-      "criterion": "no unknown or untested affected feature",
-      "passed": false,
-      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/evidence/P10-parity-report.json#fb4d6a7bcd53de1900a8c0401b252ebaa15b67109de0d4e9c3d65756aecc5b8c; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-autonomy-state/evidence/FC-E2E-001/feature-parity-impact.json#8ecc2416d698d6732e17547fb00090ef4006a9df9a42274209b635a04497bf98"
-    }
+  "baseline_features": 66,
+  "failures": [
+    "cannot read P10 input .forge-codex/evidence/P10-privileged-filesystem-qualification-report.json: [Errno 2] No such file or directory: '/Users/jimdaley/GitHub/Forge-Conductor-E2-Next/.forge-codex/evidence/P10-privileged-filesystem-qualification-report.json'",
+    "privileged filesystem qualification does not conform to its exact JSON schema",
+    "privileged filesystem qualification schema error at <root>: 'schema_version' is a required property",
+    "privileged filesystem qualification schema error at <root>: 'artifact_binding_schema_version' is a required property",
+    "privileged filesystem qualification schema error at <root>: 'status' is a required property",
+    "privileged filesystem qualification schema error at <root>: 'ok' is a required property",
+    "privileged filesystem qualification schema error at <root>: 'source_manifest' is a required property",
+    "privileged filesystem qualification schema error at <root>: 'captured_at' is a required property",
+    "privileged filesystem qualification schema error at <root>: 'repository' is a required property",
+    "privileged filesystem qualification schema error at <root>: 'test_environment' is a required property",
+    "privileged filesystem qualification schema error at <root>: 'test_processes' is a required property",
+    "privileged filesystem qualification schema error at <root>: 'qualification_context_artifact_reference' is a required property",
+    "privileged filesystem qualification schema error at <root>: 'matrix' is a required property",
+    "privileged filesystem qualification schema error at <root>: 'same_uid_fallback' is a required property",
+    "privileged filesystem qualification schema has 4 additional validation errors",
+    "privileged filesystem qualification artifact binding schema is unsupported",
+    "privileged filesystem qualification is not passed",
+    "privileged filesystem qualification is stale for the current source manifest",
+    "privileged filesystem qualification matrix key set is not exact",
+    "privileged filesystem signed adversarial/crash/volume/lifecycle matrix is incomplete",
+    "privileged filesystem adversarial tests are not separately signed processes",
+    "privileged filesystem helper did not run under its required identity",
+    "privileged filesystem qualification permits a same-UID fallback",
+    "privileged filesystem qualification narrows the same-UID threat model",
+    "privileged filesystem formal boundary closure is incomplete",
+    "privileged filesystem residual race and maximum impact nonclaims are incomplete",
+    "privileged filesystem qualification has remaining requirements",
+    "FC-FILESYSTEM-PATH-TOCTOU-001 remains open and prevents P10 completion",
+    "parity report is not passed",
+    "parity report records untested features",
+    "parity report has remaining requirements",
+    "debug strict suite evidence is stale for the current source manifest",
+    "debug strict suite ending source manifest is stale",
+    "release strict suite evidence is stale for the current source manifest",
+    "release strict suite ending source manifest is stale",
+    "migration report is stale for the current source manifest",
+    "CLI compatibility evidence is stale for the current source manifest",
+    "CLI compatibility ending source manifest is stale",
+    "CLI compatibility report is stale for the current source manifest",
+    "MCP compatibility evidence is stale for the current source manifest",
+    "MCP compatibility ending source manifest is stale",
+    "MCP compatibility report is stale for the current source manifest",
+    "manager HTTP compatibility evidence is stale for the current source manifest",
+    "manager HTTP compatibility ending source manifest is stale",
+    "manager HTTP compatibility report is stale for the current source manifest",
+    "native UI qualification is not passed"
   ],
-  "valid": false,
-  "errors": [
-    "criterion marked failed: every baseline feature preserved/additive/migrated",
-    "criterion marked failed: all old fixtures migrate and reopen",
-    "criterion marked failed: MCP golden snapshots compatible",
-    "criterion marked failed: UI commands/settings/accessibility tests pass",
-    "criterion marked failed: no unknown or untested affected feature",
-    "command failed: swift test -Xswiftc -warnings-as-errors",
-    "command failed: swift test -c release -Xswiftc -warnings-as-errors",
-    "command failed: xcodebuild test -only-testing:ForgeConductorUITests"
-  ]
+  "migration_fixtures": 8,
+  "ok": false,
+  "phase": "P10",
+  "source_manifest": {
+    "bytes": 10467039,
+    "file_count": 282,
+    "schema_version": 1,
+    "sha256": "e693f85ab49afd4281ef55ecd604609e85caea180309d00f09a2e05e05041a83"
+  }
 }

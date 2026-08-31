@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "gate_id": "G10",
+  "status": "failed",
+  "started_at": "2026-08-31T15:53:54.170236+00:00",
+  "ended_at": "2026-08-31T15:53:54.598607+00:00",
+  "commands": [
+    {
+      "command": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next/.forge-codex/state/gate-handlers/G10.sh",
+      "exit_code": 1,
+      "stdout_sha256": "aae6f19ed3e2d7207dddc80cf4013ce72f7b0898f72f19a10a701d2ece7e7920",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "timed_out": false
+    }
+  ],
+  "environment": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "repository": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next"
+  },
+  "artifacts": [
+    {
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next/.forge-codex/state/gate-results/G10.stdout.txt",
+      "sha256": "aae6f19ed3e2d7207dddc80cf4013ce72f7b0898f72f19a10a701d2ece7e7920",
+      "kind": "stdout"
+    },
+    {
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next/.forge-codex/state/gate-results/G10.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "stderr"
+    }
+  ],
+  "evaluator": {
+    "name": "forge-gate-handler",
+    "version": "1",
+    "criteria_results": [
+      {
+        "criterion": "every baseline feature preserved/additive/migrated",
+        "passed": false,
+        "evidence": "handler exit status; replace with criterion-specific evidence"
+      },
+      {
+        "criterion": "all old fixtures migrate and reopen",
+        "passed": false,
+        "evidence": "handler exit status; replace with criterion-specific evidence"
+      },
+      {
+        "criterion": "MCP golden snapshots compatible",
+        "passed": false,
+        "evidence": "handler exit status; replace with criterion-specific evidence"
+      },
+      {
+        "criterion": "UI commands/settings/accessibility tests pass",
+        "passed": false,
+        "evidence": "handler exit status; replace with criterion-specific evidence"
+      },
+      {
+        "criterion": "no unknown or untested affected feature",
+        "passed": false,
+        "evidence": "handler exit status; replace with criterion-specific evidence"
+      }
+    ]
+  },
+  "notes": ""
+}
