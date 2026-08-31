@@ -30,23 +30,323 @@ protocol SecureFilesystemServiceRegistering: AnyObject {
 
 extension SMAppService: SecureFilesystemServiceRegistering {}
 
+enum SecureFilesystemServicePackageObservation: Error, Sendable, Equatable {
+    case present
+    case missing
+    case invalid
+}
+
+protocol SecureFilesystemServicePackageInspecting: Sendable {
+    func inspect() -> SecureFilesystemServicePackageObservation
+}
+
+struct MissingSecureFilesystemServicePackageInspector:
+    SecureFilesystemServicePackageInspecting {
+    func inspect() -> SecureFilesystemServicePackageObservation { .missing }
+}
+
+struct SecureFilesystemServiceBundleInspector:
+    SecureFilesystemServicePackageInspecting {
+    private static let maximumPropertyListBytes: off_t = 64 * 1_024
+    private let applicationBundlePath: String
+
+    init(applicationBundle: URL) {
+        applicationBundlePath = applicationBundle.path
+    }
+
+    func inspect() -> SecureFilesystemServicePackageObservation {
+        guard applicationBundlePath.hasPrefix("/") else { return .invalid }
+        switch Self.openDirectory(atAbsolutePath: applicationBundlePath) {
+        case .failure(let observation):
+            return observation
+        case .success(let applicationDescriptor):
+            defer { Darwin.close(applicationDescriptor) }
+            return inspectPackage(applicationDescriptor: applicationDescriptor)
+        }
+    }
+
+    private func inspectPackage(
+        applicationDescriptor: Int32
+    ) -> SecureFilesystemServicePackageObservation {
+        let daemonDirectory: Int32
+        switch Self.openDirectory(
+            relativeComponents: ["Contents", "MacOS"],
+            from: applicationDescriptor
+        ) {
+        case .failure(let observation): return observation
+        case .success(let descriptor): daemonDirectory = descriptor
+        }
+        defer { Darwin.close(daemonDirectory) }
+
+        let launchDaemonDirectory: Int32
+        switch Self.openDirectory(
+            relativeComponents: ["Contents", "Library", "LaunchDaemons"],
+            from: applicationDescriptor
+        ) {
+        case .failure(let observation): return observation
+        case .success(let descriptor): launchDaemonDirectory = descriptor
+        }
+        defer { Darwin.close(launchDaemonDirectory) }
+
+        let daemonDescriptor = Self.openRegularFile(
+            ForgeFilesystemProtocolConstants.daemonExecutableName,
+            from: daemonDirectory
+        )
+        guard daemonDescriptor >= 0 else { return Self.failureObservation() }
+        defer { Darwin.close(daemonDescriptor) }
+
+        var daemonInformation = stat()
+        guard Darwin.fstat(daemonDescriptor, &daemonInformation) == 0,
+              daemonInformation.st_mode & S_IFMT == S_IFREG,
+              daemonInformation.st_nlink == 1,
+              daemonInformation.st_size > 0,
+              daemonInformation.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH) != 0 else {
+            return .invalid
+        }
+
+        let propertyListDescriptor = Self.openRegularFile(
+            ForgeFilesystemProtocolConstants.daemonPlistName,
+            from: launchDaemonDirectory
+        )
+        guard propertyListDescriptor >= 0 else { return Self.failureObservation() }
+        defer { Darwin.close(propertyListDescriptor) }
+
+        var propertyListInformation = stat()
+        guard Darwin.fstat(propertyListDescriptor, &propertyListInformation) == 0,
+              propertyListInformation.st_mode & S_IFMT == S_IFREG,
+              propertyListInformation.st_nlink == 1,
+              propertyListInformation.st_size > 0,
+              propertyListInformation.st_size <= Self.maximumPropertyListBytes,
+              let data = Self.readExactFile(
+                  descriptor: propertyListDescriptor,
+                  information: propertyListInformation
+              ),
+              Self.isExactServicePropertyList(data) else {
+            return .invalid
+        }
+        return .present
+    }
+
+    private static func openDirectory(
+        atAbsolutePath path: String
+    ) -> Result<Int32, SecureFilesystemServicePackageObservation> {
+        let rootDescriptor = Darwin.open(
+            "/",
+            O_SEARCH | O_CLOEXEC | O_NOFOLLOW_ANY
+        )
+        guard rootDescriptor >= 0 else { return .failure(.invalid) }
+        let components = path.split(separator: "/").map(String.init)
+        guard !components.isEmpty else {
+            Darwin.close(rootDescriptor)
+            return .failure(.invalid)
+        }
+        return openDirectory(
+            relativeComponents: components,
+            fromOwnedDescriptor: rootDescriptor
+        )
+    }
+
+    private static func openDirectory(
+        relativeComponents components: [String],
+        from descriptor: Int32
+    ) -> Result<Int32, SecureFilesystemServicePackageObservation> {
+        let duplicate = Darwin.dup(descriptor)
+        guard duplicate >= 0 else { return .failure(.invalid) }
+        return openDirectory(
+            relativeComponents: components,
+            fromOwnedDescriptor: duplicate
+        )
+    }
+
+    private static func openDirectory(
+        relativeComponents components: [String],
+        fromOwnedDescriptor descriptor: Int32
+    ) -> Result<Int32, SecureFilesystemServicePackageObservation> {
+        var currentDescriptor = descriptor
+        for component in components {
+            guard !component.isEmpty, component != ".", component != ".." else {
+                Darwin.close(currentDescriptor)
+                return .failure(.invalid)
+            }
+            let nextDescriptor = component.withCString { pointer in
+                Darwin.openat(
+                    currentDescriptor,
+                    pointer,
+                    O_SEARCH | O_CLOEXEC | O_NOFOLLOW_ANY | O_RESOLVE_BENEATH
+                )
+            }
+            guard nextDescriptor >= 0 else {
+                let observation = failureObservation()
+                Darwin.close(currentDescriptor)
+                return .failure(observation)
+            }
+            var information = stat()
+            guard Darwin.fstat(nextDescriptor, &information) == 0,
+                  information.st_mode & S_IFMT == S_IFDIR else {
+                Darwin.close(nextDescriptor)
+                Darwin.close(currentDescriptor)
+                return .failure(.invalid)
+            }
+            Darwin.close(currentDescriptor)
+            currentDescriptor = nextDescriptor
+        }
+        return .success(currentDescriptor)
+    }
+
+    private static func openRegularFile(_ name: String, from descriptor: Int32) -> Int32 {
+        guard !name.isEmpty, name != ".", name != "..", !name.contains("/") else {
+            errno = EINVAL
+            return -1
+        }
+        return name.withCString { pointer in
+            Darwin.openat(
+                descriptor,
+                pointer,
+                O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW | O_RESOLVE_BENEATH
+            )
+        }
+    }
+
+    private static func readExactFile(
+        descriptor: Int32,
+        information: stat
+    ) -> Data? {
+        let expectedSize = Int(information.st_size)
+        var data = Data(count: expectedSize)
+        let bytesRead = data.withUnsafeMutableBytes { bytes -> Int in
+            guard let baseAddress = bytes.baseAddress else { return -1 }
+            var offset = 0
+            while offset < expectedSize {
+                let count = Darwin.read(
+                    descriptor,
+                    baseAddress.advanced(by: offset),
+                    expectedSize - offset
+                )
+                if count < 0, errno == EINTR { continue }
+                guard count > 0 else { return -1 }
+                offset += count
+            }
+            return offset
+        }
+        guard bytesRead == expectedSize else { return nil }
+
+        var extraByte: UInt8 = 0
+        let trailingRead = withUnsafeMutablePointer(to: &extraByte) {
+            Darwin.read(descriptor, $0, 1)
+        }
+        guard trailingRead == 0 else { return nil }
+
+        var finalInformation = stat()
+        guard Darwin.fstat(descriptor, &finalInformation) == 0,
+              finalInformation.st_dev == information.st_dev,
+              finalInformation.st_ino == information.st_ino,
+              finalInformation.st_size == information.st_size,
+              finalInformation.st_mtimespec.tv_sec == information.st_mtimespec.tv_sec,
+              finalInformation.st_mtimespec.tv_nsec == information.st_mtimespec.tv_nsec,
+              finalInformation.st_ctimespec.tv_sec == information.st_ctimespec.tv_sec,
+              finalInformation.st_ctimespec.tv_nsec == information.st_ctimespec.tv_nsec else {
+            return nil
+        }
+        return data
+    }
+
+    private static func isExactServicePropertyList(_ data: Data) -> Bool {
+        guard let value = try? PropertyListSerialization.propertyList(
+            from: data,
+            options: [],
+            format: nil
+        ),
+        let dictionary = value as? [String: Any],
+        Set(dictionary.keys) == Set([
+            "BundleProgram",
+            "Label",
+            "MachServices",
+            "Umask",
+            "UserName",
+        ]),
+        dictionary["Label"] as? String == ForgeFilesystemProtocolConstants.serviceName,
+        dictionary["BundleProgram"] as? String
+            == "Contents/MacOS/"
+                + ForgeFilesystemProtocolConstants.daemonExecutableName,
+        dictionary["UserName"] as? String == "root",
+        dictionary["Umask"] as? Int == 0o077,
+        let machServices = dictionary["MachServices"] as? [String: Any],
+        machServices.count == 1,
+        machServices[ForgeFilesystemProtocolConstants.serviceName] as? Bool == true else {
+            return false
+        }
+        return true
+    }
+
+    private static func failureObservation() -> SecureFilesystemServicePackageObservation {
+        errno == ENOENT ? .missing : .invalid
+    }
+}
+
 @MainActor
 public final class SecureFilesystemServiceController {
     private var lifecycleGeneration: UInt64 = 0
     private let registeredService: any SecureFilesystemServiceRegistering
+    private let packageInspector: any SecureFilesystemServicePackageInspecting
+    private var packageObservation: SecureFilesystemServicePackageObservation?
+    private var packageInspectionTask:
+        Task<SecureFilesystemServicePackageObservation, Never>?
+    private var packageInspectionGeneration: UInt64 = 0
 
     public init() {
         registeredService = SMAppService.daemon(
             plistName: ForgeFilesystemProtocolConstants.daemonPlistName
         )
+        packageInspector = SecureFilesystemServiceBundleInspector(
+            applicationBundle: Bundle.main.bundleURL
+        )
     }
 
-    init(service: any SecureFilesystemServiceRegistering) {
+    init(
+        service: any SecureFilesystemServiceRegistering,
+        packageInspector: any SecureFilesystemServicePackageInspecting =
+            MissingSecureFilesystemServicePackageInspector()
+    ) {
         registeredService = service
+        self.packageInspector = packageInspector
     }
 
     public func status() -> SecureFilesystemServiceStatus {
         Self.status(of: registeredService)
+    }
+
+    public func presentedStatus() async -> SecureFilesystemServiceStatus {
+        guard status() == .notFound else { return status() }
+        let observation: SecureFilesystemServicePackageObservation
+        if let packageObservation {
+            observation = packageObservation
+        } else {
+            let inspectionTask: Task<SecureFilesystemServicePackageObservation, Never>
+            let inspectionGeneration: UInt64
+            if let packageInspectionTask {
+                inspectionTask = packageInspectionTask
+                inspectionGeneration = packageInspectionGeneration
+            } else {
+                let inspector = packageInspector
+                inspectionTask = Task.detached(priority: .utility) {
+                    inspector.inspect()
+                }
+                packageInspectionGeneration &+= 1
+                inspectionGeneration = packageInspectionGeneration
+                packageInspectionTask = inspectionTask
+            }
+            observation = await inspectionTask.value
+            if packageInspectionGeneration == inspectionGeneration {
+                if observation == .present {
+                    packageObservation = observation
+                }
+                packageInspectionTask = nil
+            }
+        }
+        return Self.presentedStatus(
+            reportedStatus: status(),
+            packageObservation: observation
+        )
     }
 
     @discardableResult
@@ -117,6 +417,19 @@ public final class SecureFilesystemServiceController {
         case .notFound: .notFound
         @unknown default: .notFound
         }
+    }
+
+    nonisolated static func presentedStatus(
+        reportedStatus: SecureFilesystemServiceStatus,
+        packageObservation: SecureFilesystemServicePackageObservation
+    ) -> SecureFilesystemServiceStatus {
+        guard reportedStatus == .notFound, packageObservation == .present else {
+            return reportedStatus
+        }
+        // Background Task Management also reports notFound when the package is
+        // valid but has never been registered. This presentation-only mapping
+        // does not affect the raw service or XPC authorization status.
+        return .notRegistered
     }
 }
 

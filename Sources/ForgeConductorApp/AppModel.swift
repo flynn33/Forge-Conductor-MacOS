@@ -73,6 +73,7 @@ public final class AppModel: ObservableObject {
     private var managerPollInFlight = false
     private var remoteManagerLastError: String?
     private let secureFilesystemService = SecureFilesystemServiceController()
+    private var secureFilesystemStatusTask: Task<Void, Never>?
 
     public enum AppTab: String, CaseIterable, Identifiable {
         case rig = "FORGE RIG"
@@ -667,12 +668,20 @@ public final class AppModel: ObservableObject {
         case .enabled: "Enabled"
         case .requiresApproval: "Approval required"
         case .notRegistered: "Not enabled"
-        case .notFound: "Not packaged in this build"
+        case .notFound: "Not packaged or invalid"
         }
     }
 
     public func refreshSecureFilesystemServiceStatus() {
-        secureFilesystemServiceStatus = secureFilesystemService.status()
+        guard secureFilesystemStatusTask == nil else { return }
+        let service = secureFilesystemService
+        secureFilesystemStatusTask = Task { @MainActor [weak self] in
+            let status = await service.presentedStatus()
+            guard let self else { return }
+            secureFilesystemStatusTask = nil
+            guard !Task.isCancelled else { return }
+            secureFilesystemServiceStatus = status
+        }
     }
 
     public func enableSecureFilesystemService() {
@@ -686,8 +695,9 @@ public final class AppModel: ObservableObject {
             case .notRegistered:
                 secureFilesystemServiceMessage = "Protected filesystem service was not enabled"
             case .notFound:
-                secureFilesystemServiceMessage = "This build does not contain the protected filesystem service"
+                secureFilesystemServiceMessage = "Protected filesystem service registration status is unavailable"
             }
+            refreshSecureFilesystemServiceStatus()
         } catch {
             refreshSecureFilesystemServiceStatus()
             secureFilesystemServiceMessage = "Enable failed: \(error.localizedDescription)"
@@ -721,8 +731,9 @@ public final class AppModel: ObservableObject {
                 case .notRegistered:
                     secureFilesystemServiceMessage = "Protected filesystem service replacement was not registered"
                 case .notFound:
-                    secureFilesystemServiceMessage = "This build does not contain the protected filesystem service"
+                    secureFilesystemServiceMessage = "Protected filesystem service registration status is unavailable"
                 }
+                refreshSecureFilesystemServiceStatus()
             } catch {
                 refreshSecureFilesystemServiceStatus()
                 secureFilesystemServiceMessage = "Update failed: \(error.localizedDescription)"

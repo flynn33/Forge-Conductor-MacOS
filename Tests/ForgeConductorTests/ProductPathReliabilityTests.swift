@@ -8,6 +8,35 @@ import Darwin
 
 /// G1/G7: product reliability — MCP negotiate + tools surface without LM Studio UI.
 final class ProductPathReliabilityTests: XCTestCase {
+    func testProtectedServiceSettingsUsePresentationStatusWithoutChangingRawStatus() throws {
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let appModel = try String(
+            contentsOf: repository.appendingPathComponent(
+                "Sources/ForgeConductorApp/AppModel.swift"
+            ),
+            encoding: .utf8
+        )
+        let service = try String(
+            contentsOf: repository.appendingPathComponent(
+                "Sources/ForgeConductorCore/Infrastructure/SecureFilesystemService.swift"
+            ),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(appModel.contains("await service.presentedStatus()"))
+        XCTAssertTrue(appModel.contains("guard secureFilesystemStatusTask == nil"))
+        XCTAssertTrue(appModel.contains(#"case .notRegistered: "Not enabled""#))
+        XCTAssertTrue(appModel.contains(#"case .notFound: "Not packaged or invalid""#))
+        XCTAssertFalse(appModel.contains("Not packaged in this build"))
+        XCTAssertTrue(service.contains("public func status()"))
+        XCTAssertTrue(service.contains("public func presentedStatus() async"))
+        XCTAssertTrue(service.contains("packageObservation == .present"))
+        XCTAssertTrue(service.contains("static func registrationStatus()"))
+    }
+
     func testPrivilegedDaemonUsesDistinctCaptureIdentityAndPhaseReceipts() throws {
         let repository = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
