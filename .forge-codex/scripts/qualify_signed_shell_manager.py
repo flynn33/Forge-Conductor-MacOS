@@ -73,6 +73,7 @@ SANDBOX_EXEC = pathlib.Path("/usr/bin/sandbox-exec")
 FIREWALL_TOOL = "/usr/libexec/ApplicationFirewall/socketfilterfw"
 INSTALL_SANDBOX_PROFILE = (
     '(version 1) (allow default) '
+    '(allow job-creation) '
     f'(deny process-exec (literal "{FIREWALL_TOOL}"))'
 )
 MISSING_SERVICE_MARKERS = (
