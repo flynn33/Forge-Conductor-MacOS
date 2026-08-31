@@ -1,0 +1,66 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -project ForgeConductor.xcodeproj -scheme ForgeConductor -configuration Debug -derivedDataPath /Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-Precommit -destination platform=macOS,arch=arm64 "-only-testing:ForgeConductorUITests/ForgeConductorUITests/testManagerShowsProtectedFilesystemServiceControls" -resultBundlePath /Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-Precommit/Logs/Test/Retry-a70beae.xcresult test-without-building
+
+Writing result bundle at path:
+	/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-Precommit/Logs/Test/Retry-a70beae.xcresult
+
+2026-08-31 10:23:56.987698-0500 ForgeConductorUITests-Runner[61861:22990004] [Default] Running tests...
+Test Suite 'Selected tests' started at 2026-08-31 10:23:57.017.
+Test Suite 'ForgeConductorUITests.xctest' started at 2026-08-31 10:23:57.018.
+Test Suite 'ForgeConductorUITests' started at 2026-08-31 10:23:57.018.
+Test Case '-[ForgeConductorUITests.ForgeConductorUITests testManagerShowsProtectedFilesystemServiceControls]' started.
+    t =     0.00s Start Test at 2026-08-31 10:23:57.018
+    t =     0.26s Set Up
+    t =     0.27s     Open com.forge-conductor.app
+    t =     0.27s         Launch com.forge-conductor.app
+    t =     1.59s             Wait for accessibility to load
+    t =     2.08s             Setting up automation session
+    t =     2.08s             Wait for com.forge-conductor.app to idle
+    t =     2.10s Type ',' key with modifiers '⌘' (0x10)
+    t =     2.10s     Wait for com.forge-conductor.app to idle
+    t =     2.17s     Find the Target Application 'com.forge-conductor.app'
+    t =     2.28s     Check for interrupting elements affecting "Forge Conductor" Application
+    t =     2.29s     Synthesize event
+    t =     2.81s     Wait for com.forge-conductor.app to idle
+    t =     2.82s Waiting 5.0s for "settings-filesystem-service-status" Any to exist
+    t =     3.84s     Checking `Expect predicate `existsNoRetry == 1` for object "settings-filesystem-service-status" Any`
+    t =     3.84s         Checking existence of `"settings-filesystem-service-status" Any`
+    t =     4.19s Checking existence of `"settings-filesystem-service-enable" Button`
+    t =     4.33s Checking existence of `"settings-filesystem-service-reinstall" Button`
+    t =     4.48s Checking existence of `"settings-filesystem-service-disable" Button`
+    t =     4.63s Find the "settings-filesystem-service-enable" Button
+    t =     4.74s Checking existence of `"Not enabled" StaticText`
+    t =     4.89s Find the "settings-filesystem-service-status" Any
+    t =     5.06s Find the "settings-filesystem-service-status" StaticText
+    t =     5.24s Checking existence of `"Not packaged in this build" StaticText`
+    t =     5.50s Find the "settings-filesystem-service-status" StaticText
+    t =     5.86s Find the "settings-filesystem-service-status" StaticText
+    t =     6.06s Checking existence of `"Not packaged or invalid" StaticText`
+    t =     6.39s Find the "settings-filesystem-service-status" StaticText
+    t =     6.62s Find the "settings-filesystem-service-status" StaticText
+    t =     6.83s Checking existence of `"Not enabled" StaticText`
+    t =     7.03s Find the "settings-filesystem-service-status" StaticText
+    t =     7.24s Find the "settings-filesystem-service-status" StaticText
+    t =     7.46s Find the "settings-filesystem-service-enable" Button
+    t =     7.60s Find the "settings-filesystem-service-reinstall" Button
+    t =     7.71s Find the "settings-filesystem-service-disable" Button
+    t =     7.85s Checking existence of `"settings-filesystem-service-approval" Button`
+    t =     7.99s Checking existence of `"settings-filesystem-service-refresh" Button`
+    t =     8.14s Checking existence of `"settings-allowed-root-add" Button`
+    t =     8.29s Checking existence of `"settings-allowed-roots-empty" Any`
+    t =     8.55s Tear Down
+    t =     8.55s     Terminate com.forge-conductor.app:61863
+Test Case '-[ForgeConductorUITests.ForgeConductorUITests testManagerShowsProtectedFilesystemServiceControls]' passed (9.641 seconds).
+Test Suite 'ForgeConductorUITests' passed at 2026-08-31 10:24:06.660.
+	 Executed 1 test, with 0 failures (0 unexpected) in 9.641 (9.642) seconds
+Test Suite 'ForgeConductorUITests.xctest' passed at 2026-08-31 10:24:06.661.
+	 Executed 1 test, with 0 failures (0 unexpected) in 9.641 (9.644) seconds
+Test Suite 'Selected tests' passed at 2026-08-31 10:24:06.662.
+	 Executed 1 test, with 0 failures (0 unexpected) in 9.641 (9.645) seconds
+
+Test session results, code coverage, and logs:
+	/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-Precommit/Logs/Test/Retry-a70beae.xcresult
+
+** TEST EXECUTE SUCCEEDED **
+
+Testing started
