@@ -1,0 +1,103 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 15692,
+      "path": ".forge-codex/evidence/EVID-20260831T060522Z-03c32cb838.artifact-000-P10-privileged-filesystem-h0-readiness.json",
+      "sha256": "61815028d1c2a05a107d108fc8c044ab00a665b6a11801e930620228a2ab96a8",
+      "source_path": ".forge-codex/evidence/P10-privileged-filesystem-h0-readiness.json",
+      "storage": "evidence-id-specific-copy"
+    },
+    {
+      "bytes": 15692,
+      "path": ".forge-codex/evidence/EVID-20260831T060522Z-03c32cb838.stdout.txt",
+      "sha256": "61815028d1c2a05a107d108fc8c044ab00a665b6a11801e930620228a2ab96a8",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260831T060522Z-03c32cb838.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "child_evidence_context": {
+    "binding_schema_version": 1,
+    "evidence_id": "EVID-20260831T060522Z-03c32cb838",
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "cd7e84fed8ed0fe0a8ec90793e83388c8a451f09",
+      "branch": "security/e2-harness-controls",
+      "head_sha": "399e6a84c4760ddf6c13e02319dc120b4b8998c4",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Harness"
+    },
+    "schema_version": 1,
+    "source_manifest": {
+      "bytes": 10228993,
+      "file_count": 268,
+      "schema_version": 1,
+      "sha256": "a09a11e9c3daccde9507a3668cde9f47349360e08f18b868f4f50df2bcce9400"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "command": "/usr/bin/python3 /Users/jimdaley/GitHub/Forge-Conductor-E2-Harness/.forge-codex/scripts/run_privileged_filesystem_h0.py --harness /tmp/forge-e2-h0-derived/Build/Products/Debug/forge-filesystem-qualification-harness --adversary /tmp/forge-e2-h0-derived/Build/Products/Debug/forge-filesystem-qualification-adversary --expected-team 9AQ2C2838M --output /Users/jimdaley/GitHub/Forge-Conductor-E2-Harness/.forge-codex/evidence/P10-privileged-filesystem-h0-readiness.json --execute",
+  "ended_at": "2026-08-31T06:05:22.921683+00:00",
+  "environment": {
+    "architecture": "arm64",
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Harness",
+    "machine_identifier": "Mac16,7",
+    "macos_build": "25G83",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "execution_provenance": {
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "cd7e84fed8ed0fe0a8ec90793e83388c8a451f09",
+      "branch": "security/e2-harness-controls",
+      "head_sha": "399e6a84c4760ddf6c13e02319dc120b4b8998c4",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Harness"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "exit_code": 0,
+  "id": "EVID-20260831T060522Z-03c32cb838",
+  "kind": "p10-privileged-filesystem-h0-readiness",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [],
+  "related_gates": [
+    "P10",
+    "G10",
+    "G12"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 10228993,
+    "file_count": 268,
+    "schema_version": 1,
+    "sha256": "a09a11e9c3daccde9507a3668cde9f47349360e08f18b868f4f50df2bcce9400"
+  },
+  "source_manifest_after": {
+    "bytes": 10228993,
+    "file_count": 268,
+    "schema_version": 1,
+    "sha256": "a09a11e9c3daccde9507a3668cde9f47349360e08f18b868f4f50df2bcce9400"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-31T06:05:22.458238+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

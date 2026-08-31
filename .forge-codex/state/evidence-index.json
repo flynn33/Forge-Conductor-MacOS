@@ -1,5 +1,5 @@
 {
-  "artifact_count": 1526,
+  "artifact_count": 1531,
   "artifacts": [
     {
       "bytes": 1030,
@@ -7427,6 +7427,26 @@
       "sha256": "461ddfdfa22421794cf2174433f4793bb80f096c6809bc7a9999fa73a0c2f728"
     },
     {
+      "bytes": 15692,
+      "path": ".forge-codex/evidence/EVID-20260831T060522Z-03c32cb838.artifact-000-P10-privileged-filesystem-h0-readiness.json",
+      "sha256": "61815028d1c2a05a107d108fc8c044ab00a665b6a11801e930620228a2ab96a8"
+    },
+    {
+      "bytes": 3891,
+      "path": ".forge-codex/evidence/EVID-20260831T060522Z-03c32cb838.json",
+      "sha256": "00e2705544cc4d16ccbb3b8954dbb9b1a06e20a78627e240d58e0242ae7722fa"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260831T060522Z-03c32cb838.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 15692,
+      "path": ".forge-codex/evidence/EVID-20260831T060522Z-03c32cb838.stdout.txt",
+      "sha256": "61815028d1c2a05a107d108fc8c044ab00a665b6a11801e930620228a2ab96a8"
+    },
+    {
       "bytes": 57,
       "path": ".forge-codex/evidence/HANDOFF-INTEGRITY-PASS.txt",
       "sha256": "1489959da865738002cf1bc075169ffbf0fbf2bd11bbceb2e5c3ac12d36fb538"
@@ -7552,6 +7572,11 @@
       "sha256": "70a402285910711ec1c1958044c008cf4193738148a612789ba59fc63fb9be46"
     },
     {
+      "bytes": 15692,
+      "path": ".forge-codex/evidence/P10-privileged-filesystem-h0-readiness.json",
+      "sha256": "61815028d1c2a05a107d108fc8c044ab00a665b6a11801e930620228a2ab96a8"
+    },
+    {
       "bytes": 31603,
       "path": ".forge-codex/evidence/P10-protocol-compatibility-report.json",
       "sha256": "85ae57f9a6916e4289f5da094a2ceb429f1ae22f9ee64b3fa05174bb56ef4c2f"
@@ -7632,7 +7657,7 @@
       "sha256": "cdc4f84750dca05cb0186e6032b4bce580697b7b2ae6c3357164cea8e3b0e59a"
     }
   ],
-  "generated_at": "2026-08-31T04:17:43.062950+00:00",
-  "repository": "/Users/jimdaley/GitHub/Forge-Conductor-LaunchAgent-Readiness",
+  "generated_at": "2026-08-31T06:14:05.733180+00:00",
+  "repository": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Harness",
   "schema_version": 1
 }

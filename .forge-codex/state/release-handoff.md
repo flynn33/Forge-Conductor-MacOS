@@ -2,17 +2,29 @@
 
 ## Current checkpoint status — not release-qualified
 
-The active repair line is `security/e2-evidence-binding`, based on
-`main` at `cd7e84fed8ed0fe0a8ec90793e83388c8a451f09` (the pull request #15
-squash merge). The current source and evidence-control checkpoint is
-`2dd504e53a5a09837cd289a99eee48ab7f4547eb`. A later state-only handoff or
-doctor commit may advance the pull request transport HEAD without changing that
-source checkpoint. It is being published in draft pull request #17. No current
-claim is made that P10, the filesystem E2 finding,
-shell compatibility, native UI validation, autonomous continuity,
+The active repair line is `security/e2-harness-controls`, stacked on
+`fix/launchagent-readiness` at
+`96d5cfa3dba30df3e3137120b47357a4eaa9d4da`. The release base remains `main`
+at `cd7e84fed8ed0fe0a8ec90793e83388c8a451f09` (the pull request #15 squash
+merge). The current H0 source checkpoint is
+`399e6a84c4760ddf6c13e02319dc120b4b8998c4`. A later state-only handoff or
+doctor commit may advance the pull-request transport HEAD without changing that
+source checkpoint. It is published in draft pull request #19, which is stacked
+on #18; #18 is stacked on #17. No current claim is made that P10, the
+filesystem E2 finding, native UI validation, autonomous continuity,
 representative hardware qualification, or final release qualification is
 complete. Earlier green suites remain exact-revision evidence only and do not
 confer release authority on this source tree.
+
+The nonshipping H0 readiness run is
+`EVID-20260831T060522Z-03c32cb838`. It binds the exact source checkpoint,
+source manifest, signed harness and adversary identities, live process
+CodeDirectory hashes, and four bounded describe/self-check commands. It
+performed no production mutation and received no semantic qualification
+context. All 57 E2 rows remain `not_run`, all 12 formal predicates remain false,
+and every P10, E2, G10, G12, and release claim remains false. Its tested
+inode/change-time replacement detection has a local-APFS precondition and is a
+same-UID mitigation, not elimination.
 
 Current release blockers are:
 
@@ -287,18 +299,21 @@ baseline, not pass evidence.
 
 ## Current branch and pull-request lineage
 
-- Active branch: `security/e2-evidence-binding`.
-- Source and evidence-control checkpoint:
-  `2dd504e53a5a09837cd289a99eee48ab7f4547eb`.
+- Active branch: `security/e2-harness-controls`.
+- H0 source checkpoint:
+  `399e6a84c4760ddf6c13e02319dc120b4b8998c4`.
 - A later commit containing only handoff, doctor, selector, or publication
   readback does not change that source checkpoint; it is a distinct state-only
   transport HEAD. Pull-request readback is authoritative for the transport HEAD.
-- Base branch and SHA: `main` at
+- Pull-request base branch and SHA: `fix/launchagent-readiness` at
+  `96d5cfa3dba30df3e3137120b47357a4eaa9d4da`; the release base is `main` at
   `cd7e84fed8ed0fe0a8ec90793e83388c8a451f09`.
-- Current pull request: open draft #17,
-  `https://github.com/flynn33/Forge-Conductor-MacOS/pull/17`, from source
-  checkpoint `2dd504e53a5a09837cd289a99eee48ab7f4547eb` into that base. It is a
-  partial evidence-control checkpoint with neither merge nor release authority.
+- Current pull request: open draft #19,
+  `https://github.com/flynn33/Forge-Conductor-MacOS/pull/19`, from H0 source
+  checkpoint `399e6a84c4760ddf6c13e02319dc120b4b8998c4` into the #18 branch. It is a
+  nonshipping readiness checkpoint with neither merge nor release authority.
+- Pull request #18 is based on #17; #17 is based on `main`. Their open stack
+  remains distinct from #16.
 - Pull request #16 is an independent sibling from the same base, with head
   `727cf858729d3410a09a8eba1e00b8e24410459f`; it is not stacked beneath or
   above #17.
