@@ -718,6 +718,34 @@ def settings_shell(value: dict[str, Any]) -> dict[str, Any]:
     return shell
 
 
+def validate_single_allowed_root(
+    value: dict[str, Any],
+    expected: pathlib.Path,
+) -> dict[str, str]:
+    roots = value.get("allowed_roots")
+    require(
+        isinstance(roots, list)
+        and len(roots) == 1
+        and isinstance(roots[0], str),
+        "manager settings did not expose exactly one allowed project root",
+    )
+    observed = pathlib.Path(roots[0])
+    require(observed.is_absolute(), "manager returned a relative allowed project root")
+    try:
+        observed_resolved = observed.resolve(strict=True)
+        expected_resolved = expected.resolve(strict=True)
+    except (OSError, RuntimeError) as error:
+        raise QualificationError(f"allowed project root cannot be resolved: {error}") from error
+    require(
+        observed_resolved == expected_resolved,
+        "allowed project root resolved to an unexpected directory",
+    )
+    return {
+        "configured": str(observed),
+        "resolved": str(observed_resolved),
+    }
+
+
 def update_settings(home: pathlib.Path, patch: dict[str, Any]) -> dict[str, Any]:
     return manager_request(
         "POST",
@@ -1095,7 +1123,11 @@ class QualificationRun:
         require(default_shell.get("policy_origin") == "default_enabled", "manager clean policy origin changed")
 
         configured = update_settings(self.home, {"allowed_roots": [str(project)]})
-        require(configured.get("allowed_roots") == [str(project.resolve())], "allowed project root was not persisted")
+        configured_root = validate_single_allowed_root(configured, project)
+        persisted_root = validate_single_allowed_root(
+            manager_request("GET", "/api/manager/settings", home=self.home),
+            project,
+        )
         first_success = mcp_shell_probe(
             self.expected_app_main,
             self.home,
@@ -1229,6 +1261,10 @@ class QualificationRun:
                 "opt_out_survived_app_restart": True,
                 "opt_out_survived_manager_restart": True,
                 "reenabled": True,
+                "allowed_project_root": {
+                    "update_response": configured_root,
+                    "persisted_readback": persisted_root,
+                },
             },
             "settings_ui": {
                 "status": "blocked",

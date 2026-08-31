@@ -218,6 +218,28 @@ class SignedShellManagerHarnessTests(unittest.TestCase):
             with self.assertRaisesRegex(subject.QualificationError, "missing keys"):
                 subject.validate_shell_result(payload, cwd)
 
+    def test_allowed_root_validation_uses_resolved_filesystem_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            expected = root / "expected"
+            expected.mkdir()
+            alias = root / "alias"
+            alias.symlink_to(expected, target_is_directory=True)
+            validated = subject.validate_single_allowed_root(
+                {"allowed_roots": [str(alias)]},
+                expected,
+            )
+            self.assertEqual(validated["configured"], str(alias))
+            self.assertEqual(pathlib.Path(validated["resolved"]), expected.resolve())
+
+            wrong = root / "wrong"
+            wrong.mkdir()
+            with self.assertRaisesRegex(subject.QualificationError, "unexpected directory"):
+                subject.validate_single_allowed_root(
+                    {"allowed_roots": [str(wrong)]},
+                    expected,
+                )
+
     def test_shell_denial_validator_requires_explicit_opt_out_code(self) -> None:
         validated = subject.validate_shell_denial(
             {
