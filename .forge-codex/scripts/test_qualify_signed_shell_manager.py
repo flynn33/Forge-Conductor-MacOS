@@ -146,6 +146,15 @@ class SignedShellManagerHarnessTests(unittest.TestCase):
                 with self.assertRaisesRegex(subject.QualificationError, "byte bound"):
                     subject.prime_manager_credential(home, timeout=1)
 
+    def test_manager_credential_rejects_non_ascii_storage(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            home = pathlib.Path(temporary)
+            credential = home / "manager-control.secret"
+            credential.write_bytes(b"\xff" * 64)
+            credential.chmod(0o600)
+            with self.assertRaisesRegex(subject.QualificationError, "readable ASCII"):
+                subject.read_manager_credential(home)
+
     def test_install_command_denies_firewall_and_preserves_stale_agents(self) -> None:
         cli = pathlib.Path("/tmp/Forge Conductor.app/Contents/Helpers/forge-conductor")
         home = pathlib.Path("/tmp/qualification")

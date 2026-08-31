@@ -635,7 +635,10 @@ def read_manager_credential(home: pathlib.Path) -> str:
     require(stat.S_ISREG(metadata.st_mode), "manager credential is not a regular file")
     require(stat.S_IMODE(metadata.st_mode) == 0o600, "manager credential permissions changed")
     require(metadata.st_uid == os.geteuid(), "manager credential owner changed")
-    token = credential.read_text(encoding="ascii")
+    try:
+        token = credential.read_text(encoding="ascii")
+    except (OSError, UnicodeError) as error:
+        raise QualificationError("manager credential is not readable ASCII") from error
     require(re.fullmatch(r"[0-9a-f]{64}", token) is not None, "manager credential format changed")
     return token
 
