@@ -211,9 +211,13 @@ process can author or replace the snapshot or record before evaluation as well
 as replace it afterward. The control assumes a trusted operator and a
 quiescent same-UID writer during manifest capture, recording, and evaluation;
 aggregate report and evidence-record reads are not yet bounded by this semantic
-copy loader; and direct integration of this qualification checker into the G10
-gate runner remains deferred. Those limits, plus same-UID replacement after the
-check completes, keep this checkpoint non-authoritative for release closure.
+copy loader. The active and template G10 handlers now invoke the semantic P10
+checker before acceptance validation, pin its repository root, discard a stale
+criteria sidecar before evaluation, and bind the executable G10 gate chain into
+the source manifest. This prevents an acceptance-record-only G10 pass; it does
+not authenticate the qualification harness or make an incomplete report true.
+Those limits, plus same-UID replacement after the check completes, keep this
+checkpoint non-authoritative for release closure.
 
 Protocol v5 binds the request, transaction, project generation, authorized
 root, relative components, operation, explicit exactness contract, and expected

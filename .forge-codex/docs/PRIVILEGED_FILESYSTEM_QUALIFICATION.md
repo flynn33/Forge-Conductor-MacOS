@@ -78,9 +78,13 @@ process can author or replace a snapshot or record before evaluation, as well
 as replace it afterward. The evidence control therefore assumes a trusted
 operator and a quiescent same-UID writer during manifest capture, recording,
 and evaluation. Aggregate report and evidence-record reads remain outside the
-1 MiB semantic-copy loader bound, and direct integration of this checker into
-the G10 gate runner remains deferred. These limitations are explicit release
-nonclaims, not qualified security properties.
+1 MiB semantic-copy loader bound. The active and template G10 handlers now run
+the semantic P10 checker before acceptance validation with a pinned repository
+root, remove a stale criteria sidecar before evaluation, and include the
+executable gate chain in the source manifest. This closes only the
+acceptance-record bypass in G10; it does not authenticate a harness, execute a
+matrix row, prove a formal predicate, or authorize release. These limitations
+are explicit release nonclaims, not qualified security properties.
 
 ## Process and fixture rules
 

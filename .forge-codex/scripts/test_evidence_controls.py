@@ -20,6 +20,7 @@ from unittest import mock
 from evidence_support import (
     EVIDENCE_CONTEXT_SCHEMA_VERSION,
     EvidenceSupportError,
+    MANIFEST_TARGETS,
     QUALIFICATION_ARTIFACT_BINDING_SCHEMA_VERSION,
     canonical_json_sha256,
     load_qualification_artifact,
@@ -52,6 +53,9 @@ PRIVILEGED_FILESYSTEM_ARTIFACT_SCHEMA = (
 PRIVILEGED_FILESYSTEM_TEMPLATE = (
     SCRIPT_ROOT.parent / "templates/p10-privileged-filesystem-qualification-report.json"
 )
+G10_ACTIVE_HANDLER = SCRIPT_ROOT.parent / "state/gate-handlers/G10.sh"
+G10_TEMPLATE_HANDLER = SCRIPT_ROOT.parent / "templates/gate-handlers/G10.sh"
+GATE_RUNNER = SCRIPT_ROOT / "run_gate.py"
 
 
 class EvidenceControlTests(unittest.TestCase):
@@ -2443,6 +2447,200 @@ class EvidenceControlTests(unittest.TestCase):
                     "notes": "Mitigation does not eliminate the race.",
                 },
             )
+
+    def install_g10_handler_fixture(
+        self,
+        root: pathlib.Path,
+        *,
+        checker_exit: int,
+        acceptance_exit: int,
+    ) -> tuple[pathlib.Path, pathlib.Path]:
+        handler = root / ".forge-codex/state/gate-handlers/G10.sh"
+        handler.parent.mkdir(parents=True, exist_ok=True)
+        handler.write_bytes(G10_ACTIVE_HANDLER.read_bytes())
+        handler.chmod(0o755)
+
+        scripts = root / ".forge-codex/scripts"
+        scripts.mkdir(parents=True, exist_ok=True)
+        marker = root / "g10-invocations.txt"
+        checker = scripts / "check_p10_completion.py"
+        checker.write_text(
+            "#!/usr/bin/env python3\n"
+            "import os, pathlib, sys\n"
+            f"marker = pathlib.Path({str(marker)!r})\n"
+            "with marker.open('a', encoding='utf-8') as stream:\n"
+            "    stream.write('checker:' + os.environ.get('FORGE_P10_REPOSITORY', '<missing>') + '\\n')\n"
+            "reported = os.environ.get('FORGE_P10_REPOSITORY')\n"
+            f"if reported is None or pathlib.Path(reported).resolve() != pathlib.Path({str(root)!r}).resolve():\n"
+            "    raise SystemExit(97)\n"
+            "print('P10 semantic sentinel')\n"
+            f"raise SystemExit({checker_exit})\n",
+            encoding="utf-8",
+        )
+        checker.chmod(0o755)
+
+        acceptance = scripts / "validate_acceptance.py"
+        acceptance.write_text(
+            "#!/usr/bin/env python3\n"
+            "import pathlib\n"
+            f"marker = pathlib.Path({str(marker)!r})\n"
+            "with marker.open('a', encoding='utf-8') as stream:\n"
+            "    stream.write('acceptance\\n')\n"
+            f"raise SystemExit({acceptance_exit})\n",
+            encoding="utf-8",
+        )
+        acceptance.chmod(0o755)
+        return handler, marker
+
+    def test_g10_handlers_run_semantic_checker_first_and_pin_repository(self) -> None:
+        active = G10_ACTIVE_HANDLER.read_text(encoding="utf-8")
+        template = G10_TEMPLATE_HANDLER.read_text(encoding="utf-8")
+        self.assertEqual(active, template)
+        self.assertLess(
+            active.index("check_p10_completion.py"),
+            active.index("validate_acceptance.py"),
+        )
+        self.assertIn('FORGE_P10_REPOSITORY="$ROOT"', active)
+        self.assertIn('/bin/rm -f -- "$CRITERIA_OUTPUT"', active)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            handler, marker = self.install_g10_handler_fixture(
+                root,
+                checker_exit=0,
+                acceptance_exit=0,
+            )
+            result = subprocess.run(
+                ["bash", str(handler)],
+                env={**os.environ, "FORGE_P10_REPOSITORY": "/untrusted/repository"},
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            calls = marker.read_text(encoding="utf-8").splitlines()
+            self.assertEqual(len(calls), 2)
+            self.assertTrue(calls[0].startswith("checker:"))
+            self.assertEqual(
+                pathlib.Path(calls[0].split(":", 1)[1]).resolve(),
+                root.resolve(),
+            )
+            self.assertEqual(calls[1], "acceptance")
+
+    def test_g10_handler_requires_both_semantic_and_acceptance_checks(self) -> None:
+        for checker_exit, acceptance_exit, expected_exit, expected_calls in (
+            (23, 0, 23, 1),
+            (0, 29, 29, 2),
+            (0, 0, 0, 2),
+        ):
+            with self.subTest(
+                checker_exit=checker_exit,
+                acceptance_exit=acceptance_exit,
+            ), tempfile.TemporaryDirectory() as temporary:
+                root = pathlib.Path(temporary)
+                handler, marker = self.install_g10_handler_fixture(
+                    root,
+                    checker_exit=checker_exit,
+                    acceptance_exit=acceptance_exit,
+                )
+                result = subprocess.run(
+                    ["bash", str(handler)],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertEqual(
+                    result.returncode,
+                    expected_exit,
+                    result.stdout + result.stderr,
+                )
+                calls = marker.read_text(encoding="utf-8").splitlines()
+                self.assertEqual(len(calls), expected_calls)
+                self.assertTrue(calls[0].startswith("checker:"))
+                if expected_calls == 1:
+                    self.assertNotIn("acceptance", calls)
+                else:
+                    self.assertEqual(calls[1], "acceptance")
+
+    def test_g10_failure_cannot_reuse_stale_passing_criteria(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self.install_g10_handler_fixture(
+                root,
+                checker_exit=23,
+                acceptance_exit=0,
+            )
+            plans = root / ".forge-codex/plans"
+            plans.mkdir(parents=True)
+            self.write_json(
+                plans / "gates.json",
+                {
+                    "gates": [
+                        {
+                            "id": "G10",
+                            "criteria": ["semantic P10 completion"],
+                        }
+                    ]
+                },
+            )
+            results = root / ".forge-codex/state/gate-results"
+            results.mkdir(parents=True)
+            criteria = results / "G10.criteria.json"
+            self.write_json(
+                criteria,
+                {
+                    "criteria_results": [
+                        {
+                            "criterion": "semantic P10 completion",
+                            "passed": True,
+                            "evidence": "stale fixture",
+                        }
+                    ]
+                },
+            )
+            statectl = root / ".forge-codex/scripts/statectl.py"
+            statectl.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            statectl.chmod(0o755)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(GATE_RUNNER),
+                    "G10",
+                    "--repo",
+                    str(root),
+                    "--timeout",
+                    "10",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            gate_result = json.loads(result.stdout)
+            self.assertEqual(gate_result["status"], "failed")
+            self.assertEqual(gate_result["commands"][0]["exit_code"], 23)
+            self.assertFalse(
+                gate_result["evaluator"]["criteria_results"][0]["passed"]
+            )
+            self.assertFalse(criteria.exists())
+            self.assertIn(
+                "P10 semantic sentinel",
+                (results / "G10.stdout.txt").read_text(encoding="utf-8"),
+            )
+
+    def test_g10_gate_chain_is_source_manifest_bound(self) -> None:
+        self.assertTrue(
+            {
+                ".forge-codex/scripts/check_p10_completion.py",
+                ".forge-codex/scripts/run_gate.py",
+                ".forge-codex/scripts/run_gates.sh",
+                ".forge-codex/scripts/validate_acceptance.py",
+                ".forge-codex/state/gate-handlers/G10.sh",
+                ".forge-codex/templates/gate-handlers/G10.sh",
+            }
+            <= set(MANIFEST_TARGETS)
+        )
 
     def make_repository(self, root: pathlib.Path, *, ledger_exit: int = 0) -> None:
         (root / "Sources").mkdir(parents=True)
