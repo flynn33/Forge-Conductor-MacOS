@@ -114,6 +114,21 @@ try:
         if issue_status_by_id.get(issue_id) != "resolved"
     }
     identity = resolve_checkpoint_identity(root)
+    completion_validation = (
+        command([
+            sys.executable,
+            str(root / ".forge-codex" / "scripts" / "statectl.py"),
+            "--repo",
+            str(root),
+            "validate",
+        ])
+        if state.get("status") == "complete"
+        else {"available": True, "exit_code": 1, "output": "run is not complete"}
+    )
+    completion_authority_current = (
+        state.get("status") == "complete"
+        and completion_validation.get("exit_code") == 0
+    )
     disclosures_aligned = all(
         required_id in {issue.get("id") for issue in mandatory_release_blockers}
         for required_id in required_open_disclosure_ids
@@ -129,8 +144,10 @@ try:
         "open_issues": open_issues,
         "nonpassing_hard_gates": nonpassing_hard_gates,
         "release_authorized": state.get("status") == "complete"
+            and completion_authority_current
             and not mandatory_release_blockers
             and not nonpassing_hard_gates,
+        "completion_authority_current": completion_authority_current,
         "mandatory_release_blockers": mandatory_release_blockers,
         "checkpoint_identity": identity,
         "partial_security_pr_policy": {
@@ -166,6 +183,10 @@ print(json.dumps({
     "open_issues": execution_state.get("open_issues", []),
     "nonpassing_hard_gates": execution_state.get("nonpassing_hard_gates", []),
     "release_authorized": execution_state.get("release_authorized", False),
+    "completion_authority_current": execution_state.get(
+        "completion_authority_current",
+        False,
+    ),
     "mandatory_release_blockers": execution_state.get("mandatory_release_blockers", []),
     "checkpoint_identity": execution_state.get("checkpoint_identity", {}),
     "partial_security_pr_policy": execution_state.get("partial_security_pr_policy", {}),

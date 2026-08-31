@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+ROOT="${FORGE_GATE_REPOSITORY_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)}"
 CRITERIA_OUTPUT="$ROOT/.forge-codex/state/gate-results/G10.criteria.json"
 /bin/rm -f -- "$CRITERIA_OUTPUT"
 FORGE_P10_REPOSITORY="$ROOT" \

@@ -77,14 +77,220 @@ Mode `0444` and current-euid ownership are not authentication. A same-UID
 process can author or replace a snapshot or record before evaluation, as well
 as replace it afterward. The evidence control therefore assumes a trusted
 operator and a quiescent same-UID writer during manifest capture, recording,
-and evaluation. Aggregate report and evidence-record reads remain outside the
-1 MiB semantic-copy loader bound. The active and template G10 handlers now run
-the semantic P10 checker before acceptance validation with a pinned repository
-root, remove a stale criteria sidecar before evaluation, and include the
-executable gate chain in the source manifest. This closes only the
-acceptance-record bypass in G10; it does not authenticate a harness, execute a
-matrix row, prove a formal predicate, or authorize release. These limitations
-are explicit release nonclaims, not qualified security properties.
+and evaluation. The active and template G10 handlers run the semantic P10
+checker before acceptance validation with a pinned repository root. The gate
+runner removes a stale criteria sidecar before launch, requires a freshly
+written exact ordered criterion set with literal Boolean pass values, and binds
+the executable gate and state-control chain into the source manifest. Handler
+source is capped at 1 MiB and captured with stable descriptor metadata and
+bytes. The captured bytes are copied to a temporary file, reopened read-only,
+unlinked before execution, and executed through the inherited descriptor. A
+pinned `FORGE_GATE_REPOSITORY_ROOT` preserves the established active/template
+handler root contract even though `BASH_SOURCE` names `/dev/fd/...`. After the
+handler exits, the retained descriptor's complete metadata and bytes must still
+match the captured source. A same-UID or ACL-authorized writer can nevertheless
+open the briefly named snapshot before unlink and retain a writable descriptor;
+the post-execution checks detect an observed change but do not make execution
+immutable. This is mitigation, not elimination.
+
+These controls close only the acceptance-record, stale-sidecar, and direct
+pathname-execution bypasses in G10. They do not authenticate a harness, execute
+a matrix row, prove a formal predicate, provide an identity-conditional
+mutation, or authorize release. These limitations are explicit release
+nonclaims, not qualified security properties.
+
+## Admission resource bounds and compatibility
+
+P10 admission now applies the following fail-closed bounds to actual bytes
+read, not only to a pathname `stat` result:
+
+- each JSON/control file is at most 1 MiB and all such files consumed by one
+  P10 evaluation share a 64 MiB aggregate budget;
+- duplicate JSON keys, non-finite numbers, and numeric lexemes longer than 128
+  characters are rejected;
+- repository paths are canonical relative paths, opened component by component
+  from the repository descriptor with no symlink following, and must remain the
+  same regular-file identity and metadata through a post-read lookup;
+- each preserved or stream artifact is at most 64 MiB and parsed stdout is at
+  most 16 MiB. One P10 checker process may successfully consume at most 512 MiB
+  cumulatively across referenced evidence reads. Each read is charged, so
+  reading the same artifact again for semantic decoding or through another
+  reference consumes the bytes again; files that exist but are never referenced
+  are neither read nor charged;
+- a source manifest contains at most 32,768 files discovered within at most
+  65,536 traversed entries, at most 64 MiB per file and 512 MiB per logical
+  snapshot. Two independently enumerated snapshots whose files are opened
+  descriptor-relative must agree, so one successful manifest calculation
+  accepts at most 1 GiB across both passes; a rejected overflow may fetch the
+  one additional sentinel byte described below;
+- gate-handler source and a criteria sidecar are each limited to 1 MiB. A gate
+  handler has a configured deadline and a 64 MiB combined stdout/stderr cap.
+  Deadline or output overflow terminates the full child process group, reaps
+  the direct child, preserves only the captured bytes within the cap, and
+  cannot reuse an old criteria sidecar;
+- gate selection and ordinary state-control JSON inputs are limited to 1 MiB
+  per file and 64 MiB in aggregate. Gate-result JSON serialization is capped at
+  1 MiB. The state transaction journal has a separate 4 MiB cap because it
+  carries the pending state transition. The append-only event ledger is limited
+  to 64 MiB, 100,000 events, and 1 MiB per event.
+
+The cumulative limit counts bytes actually accepted from every referenced
+read, not the sum of distinct pathname sizes. A bounded reader may request one
+byte beyond the remaining file or cumulative allowance as an overflow
+sentinel. Receiving that byte fails the read immediately; it is not admitted as
+evidence or included in a successful returned digest. The post-hash metadata
+and pathname-identity lookup reads no file content and therefore consumes no
+additional evidence bytes. A digest computed before that lookup is returned
+only when the lookup still names the verified regular-file identity.
+
+The recorder still permits a hash-only external artifact up to 16 GiB. That is
+a preservation contract, not automatic G10 admission. G10 specifically
+requires canonical repository-contained acceptance evidence, limits each such
+file to 64 MiB, and rejects the invocation after 512 MiB of cumulative
+referenced reads. Existing large or external records remain recorded but cannot
+by themselves close G10; they need a bounded repository-preserved result that
+carries the exact semantic claim and digest references. Other gates retain the
+compatible acceptance path for repository or absolute external regular-file
+evidence, with a 16 GiB per-file limit and a 16 GiB cumulative read budget per
+validation invocation. Repository containment is therefore a G10 admission
+rule, not a global rejection of compatible non-G10 external evidence.
+
+These bounds and stability checks mitigate resource exhaustion and
+mutable-path ambiguity during each read; they do not eliminate either the
+same-UID race or its persistence. A same-UID writer can still replace a report,
+sidecar, handler, state file, or artifact before the initial open or after the
+final lookup and before a later consumer uses the pathname. One winning
+replacement can influence the current bounded evaluation or following state
+transition, and a false criteria sidecar, gate result, or ledger state can then
+persist and be consumed repeatedly until a trusted operator detects it and
+requalifies from trusted inputs. A writer that repeatedly wins the interval can
+influence an unbounded number of later invocations over an unbounded duration;
+the byte limits bound each invocation, not the number of races or the lifetime
+of their result. The maximum harness impact until detection is a sustained
+false G10 pass, incorrect ledger state, and erroneous release-admission
+decision. It grants no direct product filesystem mutation authority. Detection
+of an observed identity or metadata mismatch fails that read closed, but these
+checks are mitigation, not authentication or race elimination.
+Harness authorization and all signed-host predicates remain open release
+requirements.
+
+Gate-result and ledger publication use an operation-paired crash protocol. A
+finalized result and fresh canonical UUID-v4 operation identifier are durably
+published first; the paired ledger event receives its own fresh UUID-v4
+`event_id`. Every fallible gate-result-directory and lock identity check occurs
+before `statectl`; a failed last precommit check therefore cannot publish a
+matching passed state. The state transaction journal is durable before event
+append, the event is durable before state publication, and the marker is
+removed only after publication. Recovery distinguishes an absent append, a
+partial append, a complete append, and an already-published state, and replays
+the identical operation exactly once. Retrying an operation UUID is idempotent
+only for the same request and does not append a duplicate event; reuse for a
+different request fails closed. If a state transition cannot be confirmed, the
+result is rewritten `failed` and `finalized: false`.
+
+The `statectl` commit is the cooperative crash model's success point. Before it,
+a crash leaves the result operation different from the prior state operation;
+after it, no fallible pathname-identity check remains in the success path. Gate
+selection skips work only when state and result are both `passed`, both name the
+same gate and nonempty operation UUID, the result is `finalized: true`, and its
+Git HEAD and bounded source manifest still match the current source identity.
+Missing, oversized, legacy, non-finalized, or mismatched records rerun or fail
+closed. This pairing supplies crash consistency and observed source freshness,
+not authentication or identity-conditional mutation.
+
+A same-UID or ACL-authorized writer can still replace data after the last
+precommit observation and before the state commit, or forge both records before
+a later consumer. One winning race can persist as a false G10 result, incorrect
+ledger state, and erroneous release decision until trusted requalification;
+repeated winning races can sustain that outcome indefinitely. The controls add
+no privileged product-filesystem mutation authority. This remaining interval
+is mitigation, not elimination.
+
+The final completion validator uses the same strict 1 MiB owner-controlled
+JSON inputs and 64 MiB control budget. It accepts only canonical
+repository-contained gate-result and acceptance paths, requires the exact
+finalized state/result operation pair for every prerequisite gate, and rejects
+unresolved Critical or High findings in either findings resolution or the live
+run-state issue ledger. Missing or malformed ledgers fail closed. G02 through
+G11 require matching acceptance records whose `gate_id` exactly matches the
+invoked gate and whose `current_release_authority` is the literal Boolean
+`true`; legacy omission, `null`, numeric, string, or historical authority is
+not current authority. The shared gate-local acceptance handler enforces the
+same rule before it can publish a passed criterion sidecar, so historical G09
+adapter evidence cannot become a current real-provider continuity pass.
+The gate plan must be exactly the ordered canonical `G00` through `G12`
+inventory and definitions. Every gate result must use a canonical UUID-v4
+operation identifier and bind exactly the canonical stdout, stderr, and
+criteria runner artifacts, in that order. The command hashes must equal the
+exact stdout and stderr artifact hashes; the criteria bytes must equal the
+exact ordered evaluator criteria with literal Boolean passes; the state
+evidence IDs and the one paired `gate_status` event must bind those same hashes
+at `state_sequence_before + 1`. These artifact reads are capped at 64 MiB each
+and 512 MiB in aggregate across all 13 gates.
+
+Every prerequisite result must bind the same clean current Git HEAD and bounded
+source manifest. The completion report's `admission_contract` records the
+exact run, repository, HEAD, manifest, pre-G12 sequence, ordered `G00` through
+`G11` prerequisites, and for each prerequisite the gate ID, operation UUID,
+SHA-256 of the exact result JSON, and byte count. Referenced non-G10 artifacts
+retain the compatible
+16 GiB per-file and cumulative bound; G10 remains repository-only at 64 MiB per
+file and 512 MiB cumulatively. Completion JSON and Markdown reports are each
+limited to 1 MiB and published through the locked atomic state-file path. The
+validator, its focused regression suite, and the active/template G12 handlers
+are source-manifest targets.
+
+G12 runs the validator in non-finalizing mode, binds the exact path, SHA-256,
+and byte count of both reports into its criteria sidecar, requires every G12
+criterion to cite both report digests, and delegates result/state publication
+to the hardened gate runner. The reports must be successful and evaluated
+within the G12 runner interval. The outer completion command must then reread
+and confirm the canonical finalized G12 operation pair and current source
+binding before requesting the idempotent `complete` run-status transition.
+Under the state transaction lock, `statectl` rechecks every gate and its exact
+three runner artifacts, the typed issue ledger, both report bindings, the G12
+file bytes and operation, clean current HEAD/manifest, and the exact
+pre-G12-to-post-G12 event-sequence increment. A successful state persists the
+exact G12 operation UUID and final status-operation UUID in
+`completion_authority`. `statectl show` and `statectl validate` revalidate that
+authority and current source whenever complete status is read; stale authority
+or source fails closed. Retrying the same final status operation revalidates the
+precondition and creates no second event. Any intervening cooperative state
+transaction blocks completion, and any later non-idempotent state mutation
+demotes the run to `active` and removes its completion authority. A missing,
+oversized, linked, legacy,
+non-finalized, mismatched, failed, or unconfirmed record cannot finalize the
+run. These controls do not turn prior unit, synthetic-host, simulator, or
+partial UI evidence into any required real-provider, signed native, or physical
+hardware proof.
+
+The release package, attribution, and secret commands traverse at most 65,536
+observed entries and 128 directory levels, read at most 64 MiB per file and
+512 MiB cumulatively, cap scanner findings at 10,000, and bound package child
+commands to 300 seconds and 16 MiB combined output. The package report is
+limited to 16 MiB. Streaming enumeration aborts on the first excess entry;
+symlink, special-file, hard-link, replacement, timeout, and overflow cases fail
+closed.
+
+The final HEAD/manifest, control-file, and G12 rereads are sequential
+observations. A same-UID or ACL-authorized writer can still win after the last
+observation and before the locked status publication, or can forge a coherent
+set before a later consumer. One winning race can persist as one false
+`complete` status and an erroneous release decision until trusted revalidation
+and requalification; repeated wins can sustain that false release state
+indefinitely. The maximum direct product-filesystem authority added by this
+admission race is none. These controls are mitigation, not elimination. E2,
+P10, G10, G12, native signing/UI, real-provider continuity, and owner-deferred
+hardware qualification retain their existing open or blocked conclusions
+until the required evidence exists.
+
+The control's ownership and POSIX-mode checks do not enumerate extended ACL
+entries on the repository or state directories. The trusted-host assumption
+therefore also requires that no other principal has an ACL-based write grant.
+A differently identified process with such a grant has the same replacement
+ability and maximum harness impact described above. This is an explicit host
+and repository trust residual, not evidence that replacement is limited to the
+numeric owner UID on every configured filesystem.
 
 ## Process and fixture rules
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import argparse, json
+import argparse, json, subprocess, sys
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -90,6 +90,26 @@ nonpassing_hard_gates=[
     if state.get("gates", {}).get(gate_id, {}).get("status") != "passed"
 ]
 identity=resolve_checkpoint_identity(repo)
+completion_authority_current=False
+if state.get("status")=="complete":
+    try:
+        validation=subprocess.run(
+            [
+                sys.executable,
+                str(pkg/"scripts/statectl.py"),
+                "--repo",
+                str(repo),
+                "validate",
+            ],
+            cwd=repo,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=30,
+            check=False,
+        )
+        completion_authority_current=validation.returncode==0
+    except (OSError, subprocess.SubprocessError):
+        completion_authority_current=False
 disclosures_aligned=all(
     required_id in {issue.get("id") for issue in mandatory_release_blockers}
     for required_id in required_open_disclosure_ids
@@ -105,7 +125,9 @@ print(json.dumps({
     "nonpassing_hard_gates":nonpassing_hard_gates,
     "release_authorized":not mandatory_release_blockers
         and not nonpassing_hard_gates
-        and state.get("status") == "complete",
+        and state.get("status") == "complete"
+        and completion_authority_current,
+    "completion_authority_current":completion_authority_current,
     "mandatory_release_blockers":mandatory_release_blockers,
     "checkpoint_identity":identity,
     "partial_security_pr_policy":{

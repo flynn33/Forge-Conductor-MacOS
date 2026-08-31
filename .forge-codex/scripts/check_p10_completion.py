@@ -18,17 +18,27 @@ except ImportError:  # pragma: no cover - exercised only on an incomplete gate h
     FormatChecker = None
 
 from evidence_support import (
+    BoundedReadBudget,
     EVIDENCE_CONTEXT_SCHEMA_VERSION,
     EvidenceSupportError,
     MANIFEST_TARGETS,
+    MAXIMUM_MANIFEST_FILE_BYTES,
+    MAXIMUM_QUALIFICATION_ARTIFACT_BYTES,
     QUALIFICATION_ARTIFACT_BINDING_SCHEMA_VERSION,
     canonical_json_sha256,
+    decode_strict_json_object,
     load_qualification_artifact,
     parse_xctest_summaries,
+    read_bounded_repository_bytes,
     run_bounded_readonly_command,
+    sha256_bounded_regular_file,
     source_manifest,
 )
-from record_command import execution_provenance
+from record_command import (
+    MAXIMUM_EXTERNAL_ARTIFACT_BYTES,
+    MAXIMUM_PRESERVED_ARTIFACT_BYTES,
+    execution_provenance,
+)
 
 
 ROOT = pathlib.Path(os.environ.get("FORGE_P10_REPOSITORY", pathlib.Path(__file__).resolve().parents[2])).resolve()
@@ -354,7 +364,20 @@ MAXIMUM_QUALIFICATION_PROVENANCE_BYTES = 4096
 MAXIMUM_QUALIFICATION_TRANSPORT_PATH_BYTES = 1024 * 1024
 MAXIMUM_QUALIFICATION_TRANSPORT_PATHS = 10_000
 MAXIMUM_QUALIFICATION_EVIDENCE_SECONDS = 24 * 60 * 60
+MAXIMUM_P10_JSON_INPUT_BYTES = MAXIMUM_QUALIFICATION_ARTIFACT_BYTES
+MAXIMUM_P10_JSON_AGGREGATE_BYTES = MAXIMUM_PRESERVED_ARTIFACT_BYTES
+MAXIMUM_P10_EVIDENCE_AGGREGATE_BYTES = 512 * 1024 * 1024
+MAXIMUM_P10_PARSED_STDOUT_BYTES = 16 * 1024 * 1024
 failures: list[str] = []
+P10_JSON_READ_BUDGET = BoundedReadBudget(
+    MAXIMUM_P10_JSON_AGGREGATE_BYTES,
+    "P10 JSON/control input",
+)
+P10_EVIDENCE_READ_BUDGET = BoundedReadBudget(
+    MAXIMUM_P10_EVIDENCE_AGGREGATE_BYTES,
+    "P10 evidence input",
+)
+P10_LOADED_INPUT_BYTES: dict[str, bytes] = {}
 
 
 def check(condition: bool, message: str) -> None:
@@ -509,24 +532,23 @@ def git_transport_paths_valid(
 
 
 def load(relative: str) -> dict[str, Any]:
-    path = ROOT / relative
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raw = read_bounded_repository_bytes(
+            ROOT,
+            relative,
+            label=f"P10 input {relative}",
+            maximum_bytes=MAXIMUM_P10_JSON_INPUT_BYTES,
+            budget=P10_JSON_READ_BUDGET,
+        )
+        value = decode_strict_json_object(
+            raw,
+            label=f"P10 input {relative}",
+        )
+    except EvidenceSupportError as error:
         failures.append(f"cannot read P10 input {relative}: {error}")
         return {}
-    if not isinstance(value, dict):
-        failures.append(f"P10 input is not an object: {relative}")
-        return {}
+    P10_LOADED_INPUT_BYTES[relative] = raw
     return value
-
-
-def digest(path: pathlib.Path) -> str:
-    value = hashlib.sha256()
-    with path.open("rb") as stream:
-        for block in iter(lambda: stream.read(1024 * 1024), b""):
-            value.update(block)
-    return value.hexdigest()
 
 
 def schema_errors(
@@ -566,43 +588,92 @@ def schema_errors(
 
 
 def artifact_path(artifact: dict[str, Any], label: str) -> pathlib.Path | None:
+    before = len(failures)
     raw_path = artifact.get("path")
     if not isinstance(raw_path, str) or not raw_path:
         failures.append(f"{label} artifact has no path")
         return None
-    path = pathlib.Path(raw_path)
     storage = artifact.get("storage")
-    if storage in {"evidence-id-specific-copy", "evidence-id-specific-stream"}:
-        check(not path.is_absolute(), f"{label} committed artifact path is not repository-relative: {raw_path}")
-    if not path.is_absolute():
-        path = ROOT / path
-    try:
-        resolved = path.resolve(strict=True)
-    except OSError as error:
-        failures.append(f"{label} artifact is missing: {raw_path}: {error}")
+    if storage not in {
+        "evidence-id-specific-copy",
+        "evidence-id-specific-stream",
+        "external-hash-only",
+    }:
+        failures.append(f"{label} artifact storage is unsupported")
         return None
-    if storage != "external-hash-only":
+    expected_bytes = artifact.get("bytes")
+    expected_hash = artifact.get("sha256")
+    check(
+        isinstance(expected_bytes, int)
+        and not isinstance(expected_bytes, bool)
+        and expected_bytes >= 0,
+        f"{label} artifact byte count is invalid",
+    )
+    check(
+        isinstance(expected_hash, str)
+        and re.fullmatch(r"[0-9a-f]{64}", expected_hash) is not None,
+        f"{label} artifact SHA-256 is invalid",
+    )
+    maximum_bytes = (
+        MAXIMUM_EXTERNAL_ARTIFACT_BYTES
+        if storage == "external-hash-only"
+        else MAXIMUM_PRESERVED_ARTIFACT_BYTES
+    )
+    if isinstance(expected_bytes, int) and not isinstance(expected_bytes, bool):
+        check(
+            0 <= expected_bytes <= maximum_bytes,
+            f"{label} artifact exceeds its {maximum_bytes}-byte storage bound",
+        )
+    if len(failures) != before:
+        return None
+
+    if storage == "external-hash-only":
         try:
-            resolved.relative_to(ROOT)
-        except ValueError:
-            failures.append(f"{label} artifact is outside the repository: {raw_path}")
+            encoded_path = raw_path.encode("utf-8", errors="strict")
+        except UnicodeEncodeError:
+            failures.append(f"{label} external artifact path is invalid")
             return None
-    else:
-        check(pathlib.Path(raw_path).is_absolute(), f"{label} external artifact path is not absolute")
+        if b"\0" in encoded_path or len(encoded_path) > MAXIMUM_QUALIFICATION_PROVENANCE_BYTES:
+            failures.append(f"{label} external artifact path is invalid")
+            return None
+        path = pathlib.Path(raw_path)
+        check(path.is_absolute(), f"{label} external artifact path is not absolute")
         check(
             artifact.get("portability") == "origin-host-required",
             f"{label} external artifact has no explicit portability policy",
         )
-    check(not path.is_symlink() and resolved.is_file(), f"{label} artifact is not a regular non-symlink file")
-    expected_bytes = artifact.get("bytes")
-    expected_hash = artifact.get("sha256")
-    check(isinstance(expected_bytes, int) and not isinstance(expected_bytes, bool), f"{label} artifact byte count is invalid")
-    check(isinstance(expected_hash, str) and len(expected_hash) == 64, f"{label} artifact SHA-256 is invalid")
-    if isinstance(expected_bytes, int):
-        check(resolved.stat().st_size == expected_bytes, f"{label} artifact byte mismatch: {raw_path}")
-    if isinstance(expected_hash, str) and len(expected_hash) == 64:
-        check(digest(resolved) == expected_hash, f"{label} artifact SHA-256 mismatch: {raw_path}")
-    return resolved
+        if len(failures) != before:
+            return None
+        try:
+            actual_hash, actual_bytes = sha256_bounded_regular_file(
+                path,
+                label=f"{label} artifact",
+                maximum_bytes=maximum_bytes,
+                budget=P10_EVIDENCE_READ_BUDGET,
+            )
+        except EvidenceSupportError as error:
+            failures.append(f"{label} artifact cannot be verified: {error}")
+            return None
+        resolved = path
+    else:
+        try:
+            raw = read_bounded_repository_bytes(
+                ROOT,
+                raw_path,
+                label=f"{label} artifact",
+                maximum_bytes=maximum_bytes,
+                budget=P10_EVIDENCE_READ_BUDGET,
+            )
+        except EvidenceSupportError as error:
+            failures.append(f"{label} artifact cannot be verified: {error}")
+            return None
+        actual_bytes = len(raw)
+        actual_hash = hashlib.sha256(raw).hexdigest()
+        resolved = ROOT / pathlib.PurePosixPath(raw_path)
+
+    check(actual_bytes == expected_bytes, f"{label} artifact byte mismatch: {raw_path}")
+    check(actual_hash == expected_hash, f"{label} artifact SHA-256 mismatch: {raw_path}")
+    return resolved if len(failures) == before else None
 
 
 CURRENT_MANIFEST = source_manifest(ROOT)
@@ -885,6 +956,8 @@ def artifact_reference_valid(
                     expected_bytes=matched_artifact.get("bytes"),
                     repository_root=ROOT,
                     schema_path=QUALIFICATION_ARTIFACT_SCHEMA,
+                    artifact_budget=P10_EVIDENCE_READ_BUDGET,
+                    schema_budget=P10_JSON_READ_BUDGET,
                 )
             except EvidenceSupportError as error:
                 failures.append(f"{label} semantic artifact is invalid: {error}")
@@ -959,7 +1032,9 @@ def evidence_record(
     command_fragments: tuple[str, ...],
     require_success: bool = True,
 ) -> dict[str, Any]:
-    if not isinstance(evidence_id, str) or not evidence_id.startswith("EVID-"):
+    if not isinstance(evidence_id, str) or re.fullmatch(
+        r"EVID-[A-Za-z0-9][A-Za-z0-9._-]{0,250}", evidence_id
+    ) is None:
         failures.append(f"{label} has no evidence id")
         return {}
     record = load(f".forge-codex/evidence/{evidence_id}.json")
@@ -996,12 +1071,36 @@ def evidence_record(
 def stdout_text(record: dict[str, Any], label: str) -> str:
     for artifact in record.get("artifacts", []):
         if isinstance(artifact, dict) and str(artifact.get("path", "")).endswith(".stdout.txt"):
+            declared_bytes = artifact.get("bytes")
+            if (
+                not isinstance(declared_bytes, int)
+                or isinstance(declared_bytes, bool)
+                or declared_bytes < 0
+                or declared_bytes > MAXIMUM_P10_PARSED_STDOUT_BYTES
+            ):
+                failures.append(f"{label} stdout exceeds parsing bound")
+                return ""
             path = artifact_path(artifact, f"{label} stdout")
             if path is not None:
                 try:
-                    check(path.stat().st_size <= 16 * 1024 * 1024, f"{label} stdout exceeds parsing bound")
-                    return path.read_text(encoding="utf-8", errors="replace")
-                except OSError as error:
+                    relative = pathlib.PurePosixPath(path.relative_to(ROOT).as_posix())
+                    raw = read_bounded_repository_bytes(
+                        ROOT,
+                        relative,
+                        label=f"{label} stdout",
+                        maximum_bytes=MAXIMUM_P10_PARSED_STDOUT_BYTES,
+                        budget=P10_EVIDENCE_READ_BUDGET,
+                    )
+                    if (
+                        len(raw) != declared_bytes
+                        or hashlib.sha256(raw).hexdigest() != artifact.get("sha256")
+                    ):
+                        failures.append(
+                            f"{label} stdout changed after artifact verification"
+                        )
+                        return ""
+                    return raw.decode("utf-8", errors="replace")
+                except (EvidenceSupportError, ValueError) as error:
                     failures.append(f"{label} stdout cannot be read: {error}")
                     return ""
     failures.append(f"{label} evidence has no stdout artifact")
@@ -1009,12 +1108,13 @@ def stdout_text(record: dict[str, Any], label: str) -> str:
 
 
 def preserved_report(record: dict[str, Any], relative: str, label: str) -> None:
-    report = ROOT / relative
-    try:
-        expected = (report.stat().st_size, digest(report))
-    except OSError as error:
-        failures.append(f"{label} report cannot be read: {error}")
+    raw = P10_LOADED_INPUT_BYTES.get(relative)
+    if raw is None:
+        failures.append(
+            f"{label} report has no exact bounded input snapshot: {relative}"
+        )
         return
+    expected = (len(raw), hashlib.sha256(raw).hexdigest())
     matches = []
     for artifact in record.get("artifacts", []):
         if not isinstance(artifact, dict) or artifact.get("storage") != "evidence-id-specific-copy":
@@ -1035,8 +1135,16 @@ if isinstance(features, list):
     check(all(isinstance(item, dict) and item.get("parity_status") == "preserved" for item in features), "baseline feature inventory contains a non-preserved entry")
     check(all(isinstance(item, dict) and item.get("evidence") and item.get("tests") for item in features), "baseline feature inventory contains an entry without evidence or tests")
 
-project_path = ROOT / "ForgeConductor.xcodeproj/project.pbxproj"
-project = project_path.read_text(encoding="utf-8") if project_path.is_file() else ""
+try:
+    project = read_bounded_repository_bytes(
+        ROOT,
+        "ForgeConductor.xcodeproj/project.pbxproj",
+        label="Xcode project",
+        maximum_bytes=MAXIMUM_MANIFEST_FILE_BYTES,
+    ).decode("utf-8", errors="strict")
+except (EvidenceSupportError, UnicodeError) as error:
+    failures.append(f"Xcode project cannot be read: {error}")
+    project = ""
 for source in (
     "ContinuityCoordinator.swift",
     "ForgeNativeSessionHostPlugin.swift",

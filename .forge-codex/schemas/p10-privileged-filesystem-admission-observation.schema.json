@@ -182,7 +182,7 @@
       "required": ["schema_version", "sha256", "file_count", "bytes"],
       "properties": {
         "schema_version": {"const": 1}, "sha256": {"$ref": "#/$defs/sha256"},
-        "file_count": {"type": "integer", "minimum": 1}, "bytes": {"type": "integer", "minimum": 1}
+        "file_count": {"type": "integer", "minimum": 1, "maximum": 32768}, "bytes": {"type": "integer", "minimum": 1, "maximum": 536870912}
       }
     },
     "recorderRepository": {
