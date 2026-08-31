@@ -805,6 +805,15 @@ def validate_shell_denial(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def shell_probe_completion_report(outcome: str) -> dict[str, list[str]]:
+    return {
+        "commands": [SHELL_COMMAND],
+        "results": [outcome],
+        "gaps": ["Settings UI visibility is outside this MCP subprocess probe."],
+        "follow_ups": ["Complete the enclosing signed-manager lifecycle qualification and cleanup."],
+    }
+
+
 def mcp_shell_probe(
     binary: pathlib.Path,
     home: pathlib.Path,
@@ -889,12 +898,7 @@ def mcp_shell_probe(
                 "name": "agent_run_complete",
                 "arguments": {
                     "session_id": session_id,
-                    "report": {
-                        "commands": [SHELL_COMMAND],
-                        "results": [outcome],
-                        "gaps": [],
-                        "follow_ups": [],
-                    },
+                    "report": shell_probe_completion_report(outcome),
                 },
             },
         }

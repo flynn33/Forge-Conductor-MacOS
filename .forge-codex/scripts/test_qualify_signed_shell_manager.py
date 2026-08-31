@@ -273,6 +273,22 @@ class SignedShellManagerHarnessTests(unittest.TestCase):
                 }
             )
 
+    def test_shell_probe_completion_report_fills_every_required_field(self) -> None:
+        for outcome in ("passed", "denied_by_explicit_opt_out"):
+            with self.subTest(outcome=outcome):
+                report = subject.shell_probe_completion_report(outcome)
+                self.assertEqual(set(report), {"commands", "results", "gaps", "follow_ups"})
+                self.assertTrue(
+                    all(
+                        isinstance(value, list)
+                        and value
+                        and all(isinstance(item, str) and item for item in value)
+                        for value in report.values()
+                    )
+                )
+                self.assertEqual(report["commands"], [subject.SHELL_COMMAND])
+                self.assertEqual(report["results"], [outcome])
+
     def test_tools_list_requires_shell_exec(self) -> None:
         response = {
             "jsonrpc": "2.0",
