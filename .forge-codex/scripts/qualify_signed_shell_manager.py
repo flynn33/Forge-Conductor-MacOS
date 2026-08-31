@@ -71,6 +71,7 @@ SHELL_RESULT_KEYS = {
 }
 SANDBOX_EXEC = pathlib.Path("/usr/bin/sandbox-exec")
 FIREWALL_TOOL = "/usr/libexec/ApplicationFirewall/socketfilterfw"
+MANAGER_DENIAL_MAXIMUM_BYTES = 4096
 INSTALL_SANDBOX_PROFILE = (
     '(version 1) (allow default) '
     '(allow job-creation) '
@@ -333,10 +334,13 @@ def parse_launchctl_job(output: str) -> dict[str, Any]:
 
 
 def parse_disabled_entry(output: str, label: str = LABEL) -> bool | None:
-    match = re.search(rf'"{re.escape(label)}"\s*=>\s*(true|false)', output)
+    match = re.search(
+        rf'"{re.escape(label)}"\s*=>\s*(true|false|enabled|disabled)',
+        output,
+    )
     if match is None:
         return None
-    return match.group(1) == "true"
+    return match.group(1) in {"true", "disabled"}
 
 
 def launchctl_job(uid: int) -> dict[str, Any] | None:
@@ -613,13 +617,7 @@ def manager_request(
         request.data = data
         request.add_header("Content-Type", "application/json")
     if method != "GET":
-        credential = home / "manager-control.secret"
-        require(credential.exists() and not credential.is_symlink(), "manager credential is unavailable")
-        metadata = credential.stat()
-        require(stat.S_IMODE(metadata.st_mode) == 0o600, "manager credential permissions changed")
-        require(metadata.st_uid == os.geteuid(), "manager credential owner changed")
-        token = credential.read_text(encoding="ascii")
-        require(re.fullmatch(r"[0-9a-f]{64}", token) is not None, "manager credential format changed")
+        token = read_manager_credential(home)
         request.add_header("Authorization", f"Bearer {token}")
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
@@ -628,6 +626,77 @@ def manager_request(
         raise QualificationError(f"manager request failed: {method} {path}: {error}") from error
     require(isinstance(payload, dict), f"manager returned a non-object: {path}")
     return payload
+
+
+def read_manager_credential(home: pathlib.Path) -> str:
+    credential = home / "manager-control.secret"
+    require(credential.exists() and not credential.is_symlink(), "manager credential is unavailable")
+    metadata = credential.stat()
+    require(stat.S_ISREG(metadata.st_mode), "manager credential is not a regular file")
+    require(stat.S_IMODE(metadata.st_mode) == 0o600, "manager credential permissions changed")
+    require(metadata.st_uid == os.geteuid(), "manager credential owner changed")
+    token = credential.read_text(encoding="ascii")
+    require(re.fullmatch(r"[0-9a-f]{64}", token) is not None, "manager credential format changed")
+    return token
+
+
+def prime_manager_credential(home: pathlib.Path, timeout: float) -> dict[str, Any]:
+    credential = home / "manager-control.secret"
+    if credential.exists():
+        read_manager_credential(home)
+        return {
+            "status": "passed",
+            "path": str(credential),
+            "created_by_manager": False,
+            "unauthorized_probe_status": "not_needed",
+        }
+
+    request = urllib.request.Request(
+        "http://127.0.0.1:7788/api/manager/settings",
+        method="POST",
+        data=json.dumps(
+            {"settings": {}, "apply": False},
+            separators=(",", ":"),
+        ).encode("utf-8"),
+    )
+    request.add_header("Accept", "application/json")
+    request.add_header("Content-Type", "application/json")
+    request.add_header("Authorization", "Bearer invalid")
+    try:
+        with urllib.request.urlopen(request, timeout=min(timeout, 3)):
+            raise QualificationError("unauthorized manager credential probe unexpectedly succeeded")
+    except urllib.error.HTTPError as error:
+        try:
+            denial_body = error.read(MANAGER_DENIAL_MAXIMUM_BYTES + 1)
+            require(
+                len(denial_body) <= MANAGER_DENIAL_MAXIMUM_BYTES,
+                "manager credential probe denial exceeded its byte bound",
+            )
+            payload = json.loads(denial_body)
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError) as decode_error:
+            raise QualificationError("manager credential probe returned invalid JSON") from decode_error
+        require(error.code == 401, f"manager credential probe returned HTTP {error.code}")
+        require(
+            isinstance(payload, dict)
+            and payload.get("code") == "manager_mutation_unauthorized",
+            "manager credential probe returned the wrong denial",
+        )
+    except (OSError, urllib.error.URLError) as error:
+        raise QualificationError(f"manager credential probe failed: {error}") from error
+
+    wait_until(
+        lambda: credential.exists(),
+        timeout,
+        "manager did not create its control credential after the denied mutation probe",
+    )
+    read_manager_credential(home)
+    return {
+        "status": "passed",
+        "path": str(credential),
+        "created_by_manager": True,
+        "unauthorized_probe_status": 401,
+        "unauthorized_probe_code": "manager_mutation_unauthorized",
+    }
 
 
 def wait_for_manager_api(home: pathlib.Path, timeout: float) -> dict[str, Any]:
@@ -1013,6 +1082,7 @@ class QualificationRun:
         staged = validate_staged_artifacts(self.home, self.source)
         manager_initial = manager_process_identity(self.uid, self.expected_app_main, self.startup_timeout)
         manager_status = wait_for_manager_api(self.home, self.startup_timeout)
+        manager_credential = prime_manager_credential(self.home, self.response_timeout)
 
         clean_default = read_clean_default_config(self.home)
         default_settings = manager_request("GET", "/api/manager/settings", home=self.home)
@@ -1128,6 +1198,7 @@ class QualificationRun:
             "staged_artifacts": staged,
             "clean_install_default": clean_default,
             "manager_status": manager_status,
+            "manager_control_credential": manager_credential,
             "shell_probes": {
                 "clean_default_success": first_success,
                 "explicit_opt_out_denial": first_denial,
