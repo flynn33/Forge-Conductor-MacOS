@@ -2,16 +2,19 @@
 
 ## Current checkpoint status — not release-qualified
 
-The active repair line is `security/e2-harness-controls`, stacked on
-`security/e2-evidence-binding` at
-`dfebd8e4b0fe4aea6c6ff33717b9dfce717617d4`. The release base is `main` at
-`67181bc5f420203099dc827018587034f2c09d95`, the pull request #16 merge. The
-H0 source checkpoint is `399e6a84c4760ddf6c13e02319dc120b4b8998c4`, and its
-state-and-evidence transport checkpoint is
-`63630658147c51af1c63a5c57b685bfd3d3c644b`. A later state-only handoff,
-doctor, or base-integration commit may advance the pull-request transport HEAD
-without changing the source checkpoint. Draft pull request #19 is stacked on
-open pull request #17. Pull request #18 was squash-merged into #17 as
+The active repair line is `security/e2-harness-controls` in draft pull request
+#19, now based directly on `main` at
+`3e4fe44b3d96938c30d6b83f7d92d417489a97be`. Pull request #17 was
+squash-merged into `main` at that commit from its former head
+`dfebd8e4b0fe4aea6c6ff33717b9dfce717617d4`; both commits have the exact tree
+`4e693995343b7115790b6beb849cc20b3518b8c4`. Pull request #19's tree-preserving
+base-ancestry repair is `57c0366b82b992853ddd967d46d726b56abf233e`.
+The H0 source checkpoint remains
+`399e6a84c4760ddf6c13e02319dc120b4b8998c4`, and its state-and-evidence
+transport checkpoint remains `63630658147c51af1c63a5c57b685bfd3d3c644b`.
+A later state-only handoff, doctor, or base-integration commit may advance the
+pull-request transport HEAD without changing the source checkpoint. Pull
+request #18 was squash-merged into #17 as
 `6ae3ca2b6abf4d67ce6b5ceb70bc5980794466a1`. No current claim is made that
 P10, the filesystem E2 finding, shell compatibility, native UI validation,
 autonomous continuity, representative hardware qualification, or final
