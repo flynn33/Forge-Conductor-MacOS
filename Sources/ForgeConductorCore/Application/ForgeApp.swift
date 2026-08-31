@@ -11,6 +11,7 @@ import ForgeFilesystemProtocol
 /// All layers hang off this object; suitable for CLI, MCP stdio, and future Xcode shell.
 public final class ForgeApp: @unchecked Sendable {
     public static let version = ForgeFilesystemProtocolConstants.productVersion
+    public static let buildVersion = ForgeFilesystemProtocolConstants.productBuildVersion
     public static let productName = "Forge-Conductor"
 
     public let paths: AppPaths

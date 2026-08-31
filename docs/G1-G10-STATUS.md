@@ -1,7 +1,7 @@
 # Historical G1–G10 status (0.9.0)
 
 This table preserves the product-status snapshot recorded for the historical
-0.9.0 baseline. Its G1–G10 labels predate the current repair gate ledger and do
+0.9.0 build 1 baseline. Its G1–G10 labels predate the current repair gate ledger and do
 not qualify the active P10 source tree. Current status is recorded in
 [`../.forge-codex/state/release-handoff.md`](../.forge-codex/state/release-handoff.md).
 
@@ -21,11 +21,14 @@ exact historical automated proof · **OPS** = operator-owned follow-up
 | G9 | Installable single product identity | Prefer running app for Deploy; install still multi-path | Resolve + smoke | **You** install one app |
 | G10 | No fake “done” without evidence | This historical matrix; Deploy fails if smoke fails | Completion gates and indexed evidence expose pass/fail state | Operator acceptance |
 
-The active line does not currently claim P10, filesystem E2, shell
-compatibility, native UI validation, autonomous continuity, or release
-qualification complete. Native UI execution remains deferred and
-release-blocking, and historical unit, UI, or direct-adapter results do not
-replace current-source authority.
+The active line does not currently claim P10, filesystem E2, live shell
+compatibility, signed native UI and release validation, manager-owned
+real-provider autonomous continuity, owner-deferred representative physical-
+hardware qualification, current G09-G12, or release qualification complete.
+Native UI execution remains deferred and release-blocking. Historical unit, UI,
+simulator, synthetic-host, or direct-adapter results do not replace current-
+source authority. Filesystem capture and quarantine are mitigation, not
+elimination, until the signed E2 matrix and formal closure pass.
 
 ## Port ownership behavior
 

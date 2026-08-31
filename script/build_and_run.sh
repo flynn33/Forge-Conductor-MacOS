@@ -29,10 +29,15 @@ FILESYSTEM_DAEMON_PLIST="$APP_LAUNCH_DAEMONS/$FILESYSTEM_DAEMON_IDENTIFIER.plist
 FILESYSTEM_DAEMON_PLIST_SOURCE="$ROOT_DIR/Sources/ForgeConductorApp/Resources/$FILESYSTEM_DAEMON_IDENTIFIER.plist"
 VERSION_SOURCE="$ROOT_DIR/Sources/ForgeFilesystemProtocol/ForgeFilesystemProtocol.swift"
 APP_MARKETING_VERSION="$(sed -n 's/.*public static let productVersion = "\([0-9][0-9.]*\)".*/\1/p' "$VERSION_SOURCE" | head -1)"
-APP_BUILD_VERSION="${FORGE_BUILD_NUMBER:-1}"
+DEFAULT_BUILD_VERSION="$(sed -n 's/.*public static let productBuildVersion = "\([1-9][0-9]*\)".*/\1/p' "$VERSION_SOURCE" | head -1)"
+APP_BUILD_VERSION="${FORGE_BUILD_NUMBER:-$DEFAULT_BUILD_VERSION}"
 
 if [[ ! "$APP_MARKETING_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "unable to read a semantic version from $VERSION_SOURCE" >&2
+  exit 1
+fi
+if [[ ! "$DEFAULT_BUILD_VERSION" =~ ^[1-9][0-9]*$ ]]; then
+  echo "unable to read a build version from $VERSION_SOURCE" >&2
   exit 1
 fi
 if [[ ! "$APP_BUILD_VERSION" =~ ^[1-9][0-9]*$ ]]; then

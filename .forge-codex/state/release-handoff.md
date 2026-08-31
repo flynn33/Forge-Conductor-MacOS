@@ -2,17 +2,19 @@
 
 ## Current checkpoint status — not release-qualified
 
-The active repair line is `security/privileged-filesystem-boundary`, based on
-`main` at `8bcc039a2f0d4d17b871d5e968b3b37a663c5ccb` (the pull request #14
-squash merge). The current implementation and evidence checkpoint is
-`8f251a5ec79263a70776f800df6403aca9345c3d`. A later state-only handoff or
-doctor commit may advance the pull request transport HEAD without changing that
-manifest-bound source checkpoint. It is being published in draft pull request
-#15. No current claim is made that P10, the filesystem E2 finding,
-shell compatibility, native UI validation, autonomous continuity,
-representative hardware qualification, or final release qualification is
-complete. Earlier green suites remain exact-revision evidence only and do not
-confer release authority on this source tree.
+Live GitHub readback identifies `main` at
+`cd7e84fed8ed0fe0a8ec90793e83388c8a451f09`, the squash merge of pull
+request #15. The prior PR description captured an earlier draft checkpoint and
+is not current transport authority. The public documentation and build-metadata
+alignment checkpoint is `docs/release-alignment` at
+`b18bd3928127decaaa59cb556476fc7c758c78b3`, based directly on that `main`,
+and is published in open pull request #16. A later state-only handoff commit may
+advance the pull-request transport HEAD without changing that manifest-bound
+documentation/source checkpoint. No current claim is made that P10, the
+filesystem E2 finding, shell compatibility, native UI validation, autonomous
+continuity, representative hardware qualification, or final release
+qualification is complete. Earlier green suites remain exact-revision evidence
+only and do not confer release authority on this source tree.
 
 Current release blockers are:
 
@@ -257,12 +259,14 @@ is installed, and Release build-settings evidence
 request Developer ID Application. Signed Debug UI evidence
 `EVID-20260830T153118Z-752f058222` passed all six bounded cases.
 
-Post-push doctor evidence `EVID-20260830T221552Z-23fccf23e2` verifies the
-active branch and remote at `61c3a00f3d0289cf4086182f0e8217567915b763`, the
-base, and open draft PR #15; it reports the partial checkpoint reviewable while
-retaining `merge_authorized=false` and `release_authorized=false`. The
-corresponding next-work record `EVID-20260830T221558Z-70e4c016b7` resumes P10
-with the same policy and preserves every mandatory blocker. State validation
+Historical post-push doctor evidence `EVID-20260830T221552Z-23fccf23e2`
+verified the then-active PR #15 transport at
+`61c3a00f3d0289cf4086182f0e8217567915b763` while retaining
+`merge_authorized=false` and `release_authorized=false`. PR #15 was later
+merged as `cd7e84fed8ed0fe0a8ec90793e83388c8a451f09`; the historical doctor
+record does not describe that later GitHub transition. The corresponding
+next-work record `EVID-20260830T221558Z-70e4c016b7` still resumes P10 and
+preserves every mandatory blocker. State validation
 `EVID-20260830T221613Z-ea0d244fa9`, package validation
 `EVID-20260830T221614Z-188ad8b638`, attribution scan
 `EVID-20260830T221614Z-a83cfa3e4a`, and secret scan
@@ -274,24 +278,25 @@ nonpassing G09-G12 gates.
 
 ## Current branch and pull-request lineage
 
-- Active branch: `security/privileged-filesystem-boundary`.
-- Implementation and evidence checkpoint:
-  `8f251a5ec79263a70776f800df6403aca9345c3d`.
+- Active published documentation checkpoint branch: `docs/release-alignment`.
+- Documentation and build-metadata checkpoint:
+  `b18bd3928127decaaa59cb556476fc7c758c78b3`.
 - A later commit containing only handoff, doctor, selector, or publication
   readback does not change that manifest-bound checkpoint; the pull request
   readback is authoritative for its transport HEAD.
 - Base branch and SHA: `main` at
-  `8bcc039a2f0d4d17b871d5e968b3b37a663c5ccb`.
-- Current pull request: draft #15,
-  `https://github.com/flynn33/Forge-Conductor-MacOS/pull/15`.
-- The post-push GitHub readback recorded #15 open and draft from
-  `security/privileged-filesystem-boundary@61c3a00f3d0289cf4086182f0e8217567915b763`
-  into `main@8bcc039a2f0d4d17b871d5e968b3b37a663c5ccb`. The pull request is
-  reviewable as a partial checkpoint but has neither merge nor release
-  authority.
+  `cd7e84fed8ed0fe0a8ec90793e83388c8a451f09`.
+- Current pull request: open, non-draft #16,
+  `https://github.com/flynn33/Forge-Conductor-MacOS/pull/16`.
+- Live readback records #16 from
+  `docs/release-alignment@b18bd3928127decaaa59cb556476fc7c758c78b3`
+  into `main@cd7e84fed8ed0fe0a8ec90793e83388c8a451f09`, one commit ahead and
+  zero behind. It is a documentation/build-metadata checkpoint, not a release
+  qualification.
 - Pull request #9 (`repair/autonomous-continuity` at
-  `6321bd98012e5f60b2779bbb401cc2827f372b16`) was based on
-  `ae0ceace702274857afce3097ac7cde18b7a6c63` and closed without merge.
+  `6321bd98012e5f60b2779bbb401cc2827f372b16`) targeted `main` at
+  `ae0ceace702274857afce3097ac7cde18b7a6c63`, but its head retained
+  divergent pre-base history. It closed without merge.
 - Pull request #10 (`repair/cancellation-recovery` at
   `4b887fcc423284d0a60f57baed3adab4b943a576`) used the same base, superseded
   #9 with the same resulting tree, and was squash-merged as
@@ -300,9 +305,12 @@ nonpassing G09-G12 gates.
   `92122970c54cf549cdc5002db23044ed0b3552cb`) was based directly on the #10
   merge and was squash-merged as
   `6288210d82270b26add5f0e078d150bc4377bd62`.
-- Pull request #14 was squash-merged into `main` as
-  `8bcc039a2f0d4d17b871d5e968b3b37a663c5ccb` and is the base of this work.
-  It does not close P10, E2, shell compatibility, native validation,
+- The historical remote head branches for #9, #10, #11, #14, and #15 are
+  already deleted. No additional cleanup is required for those branches.
+- Pull request #14 was squash-merged as
+  `8bcc039a2f0d4d17b871d5e968b3b37a663c5ccb`. Pull request #15 then merged
+  linearly as `cd7e84fed8ed0fe0a8ec90793e83388c8a451f09`, the base of #16.
+  Neither merge closes P10, E2, shell compatibility, native validation,
   autonomous continuity, representative hardware qualification, or G09-G12.
 
 ## Historical 0.9.0 outcome
