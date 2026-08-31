@@ -1,0 +1,24 @@
+name: Repository Attribution Policy
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: attribution-check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  attribution:
+    name: Check for AI Attribution
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Enforce repository attribution policy
+        run: python3 .forge-codex/scripts/scan_attribution.py --root .
