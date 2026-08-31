@@ -1,0 +1,3 @@
+import ForgeFilesystemQualificationSupport
+
+ForgeFilesystemQualificationToolMain.run(role: .adversary)

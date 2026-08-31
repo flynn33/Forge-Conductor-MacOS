@@ -15,6 +15,12 @@ release gates remain open.
 
 ### Changed
 
+- Added nonshipping, non-archived signed qualification-harness and adversary
+  targets plus a fail-closed H0 readiness runner. H0 binds repository, recorder,
+  signing, live-process, command-result, and local-APFS inode/change-time facts,
+  but exercises no production mutation: all 57 E2 rows and all 12 formal
+  predicates remain unexecuted and unproven. The path-replacement check is a
+  local-APFS mitigation, not elimination of same-UID interference.
 - Fresh configurations enable project shell tools by default. Migration enables
   schema-v1 configurations whose disabled value had no provenance; schema-v1
   could not distinguish the shipped default from a user-chosen false value.

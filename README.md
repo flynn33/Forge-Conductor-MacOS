@@ -2,7 +2,7 @@
 
 Native **Swift** control plane and MCP server for **local models in [LM Studio](https://lmstudio.ai)** on macOS.
 
-This project is **not** Claude Code orchestration, CCDT, or `~/.claude/local-mcp`.
+Forge Conductor is purpose-built for LM Studio and its local MCP runtime.
 
 | | |
 |---|---|
@@ -78,7 +78,8 @@ forge-conductor manager start --open   # native dashboard / manager
 | **Agents / Tools / Feed** | Playbooks and tool audit for local-model agent runs |
 | **Manager** | Start/Stop HTTP control plane, settings, doctor |
 
-**Never listed:** CCDT, Claude Code `local-mcp` binaries, project-continuity (foreign projects).
+Only Forge-managed LM Studio runtime entries appear in these surfaces; unrelated
+processes and foreign-project continuity remain excluded.
 
 The LaunchAgent manager is the single owner of the loopback dashboard port. Opening the SwiftUI app attaches to that manager through a native typed client; it does not start a competing listener. The app uses a persistent button-based navigation column; use its toolbar button or the **Navigation** menu to show or hide it.
 
