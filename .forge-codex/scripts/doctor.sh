@@ -40,7 +40,7 @@ def git_value(*arguments):
 def checkpoint_identity():
     branch = git_value("branch", "--show-current")
     head = git_value("rev-parse", "HEAD")
-    base_sha = git_value("rev-parse", "origin/main")
+    main_sha = git_value("rev-parse", "origin/main")
     remote_head = git_value("rev-parse", f"origin/{branch}") if branch else None
     pull_request = None
     if branch and shutil.which("gh"):
@@ -59,19 +59,29 @@ def checkpoint_identity():
                 pull_request = values[0]
         except (OSError, subprocess.SubprocessError, ValueError, TypeError):
             pull_request = None
+    base_branch = (
+        pull_request.get("baseRefName")
+        if pull_request and isinstance(pull_request.get("baseRefName"), str)
+        and pull_request.get("baseRefName")
+        else "main"
+    )
+    base_sha = git_value("rev-parse", f"origin/{base_branch}")
     readback_verified = bool(
         pull_request
         and pull_request.get("state") == "OPEN"
-        and pull_request.get("baseRefName") == "main"
+        and pull_request.get("baseRefName") == base_branch
         and pull_request.get("headRefName") == branch
         and pull_request.get("headRefOid") == head
+        and base_sha
         and remote_head == head
     )
     return {
         "active_branch": branch,
         "head_sha": head,
-        "base_branch": "main",
+        "base_branch": base_branch,
         "base_sha": base_sha,
+        "main_branch": "main",
+        "main_sha": main_sha,
         "remote_head_sha": remote_head,
         "pull_request": pull_request,
         "github_readback_verified": readback_verified,
@@ -113,7 +123,7 @@ mandatory_release_issue_ids = {
 }
 gate_deferrals = {
     "G09": "real_provider_manager_owned_rollover_evidence_required",
-    "G10": "p10_e2_native_and_shell_evidence_required",
+    "G10": "p10_e2_native_and_privileged_lifecycle_evidence_required",
     "G11": "owner_deferred_representative_physical_hardware_release_blocker",
     "G12": "all_prior_hard_gates_and_final_release_evidence_required",
 }
@@ -184,7 +194,7 @@ try:
             "reviewable": identity["github_readback_verified"] and disclosures_aligned,
             "merge_authorized": False,
             "merge_requires_residuals_in_pr_state_doctor_and_selector": True,
-            "does_not_close_p10_e2_native_shell_continuity_or_hardware": True,
+            "does_not_close_p10_e2_native_continuity_or_hardware": True,
             "simulator_or_current_host_results_do_not_pass_owner_deferred_g11": True,
         },
     }
