@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import argparse, json, shutil, subprocess
+import argparse, json
 from pathlib import Path
 from datetime import datetime, timezone
+
+from checkpoint_identity import resolve_checkpoint_identity
 
 def locate_repo(explicit):
     if explicit: return Path(explicit).resolve()
@@ -43,65 +45,6 @@ gate_deferrals={
     "G12": "all_prior_hard_gates_and_final_release_evidence_required",
 }
 
-def git_value(*arguments):
-    try:
-        result=subprocess.run(
-            ["git", *arguments], cwd=repo, text=True,
-            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=10,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return None
-    return result.stdout.strip() if result.returncode == 0 else None
-
-def checkpoint_identity():
-    branch=git_value("branch", "--show-current")
-    head=git_value("rev-parse", "HEAD")
-    main_sha=git_value("rev-parse", "origin/main")
-    remote_head=git_value("rev-parse", f"origin/{branch}") if branch else None
-    pull_request=None
-    if branch and shutil.which("gh"):
-        try:
-            result=subprocess.run(
-                [
-                    "gh", "pr", "list", "--head", branch, "--state", "all",
-                    "--limit", "1", "--json",
-                    "number,state,isDraft,baseRefName,headRefName,headRefOid,url",
-                ],
-                cwd=repo, text=True, stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL, timeout=20,
-            )
-            values=json.loads(result.stdout) if result.returncode == 0 else []
-            if isinstance(values, list) and values:
-                pull_request=values[0]
-        except (OSError, subprocess.SubprocessError, ValueError, TypeError):
-            pull_request=None
-    base_branch=(
-        pull_request.get("baseRefName")
-        if pull_request and isinstance(pull_request.get("baseRefName"),str)
-        and pull_request.get("baseRefName")
-        else "main"
-    )
-    base_sha=git_value("rev-parse", f"origin/{base_branch}")
-    readback_verified=bool(
-        pull_request
-        and pull_request.get("state") == "OPEN"
-        and pull_request.get("baseRefName") == base_branch
-        and pull_request.get("headRefName") == branch
-        and pull_request.get("headRefOid") == head
-        and base_sha
-        and remote_head == head
-    )
-    return {
-        "active_branch": branch,
-        "head_sha": head,
-        "base_branch": base_branch,
-        "base_sha": base_sha,
-        "main_branch": "main",
-        "main_sha": main_sha,
-        "remote_head_sha": remote_head,
-        "pull_request": pull_request,
-        "github_readback_verified": readback_verified,
-    }
 by_id={p["id"]:p for p in plan["phases"]}
 passed={pid for pid,s in state["phases"].items() if s["status"]=="passed"}
 running=[pid for pid,s in state["phases"].items() if s["status"]=="running"]
@@ -146,7 +89,7 @@ nonpassing_hard_gates=[
     for gate_id in sorted(hard_gate_ids)
     if state.get("gates", {}).get(gate_id, {}).get("status") != "passed"
 ]
-identity=checkpoint_identity()
+identity=resolve_checkpoint_identity(repo)
 disclosures_aligned=all(
     required_id in {issue.get("id") for issue in mandatory_release_blockers}
     for required_id in required_open_disclosure_ids

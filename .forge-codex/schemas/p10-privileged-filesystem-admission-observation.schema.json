@@ -1,0 +1,314 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://forge-conductor.local/schemas/p10-privileged-filesystem-admission-observation.schema.json",
+  "title": "Privileged filesystem admission observation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "kind", "generated_at", "run_id", "overall_status",
+    "classification", "production_mutation_exercised", "qualification_status",
+    "rows_updated", "formal_predicates_updated", "caller_identity_rejection_status",
+    "matrix", "formal_closure", "completion_claims", "repository", "source_manifest",
+    "recorder_evidence_context", "canonical_qualification_template", "inputs",
+    "signatures", "observations", "correlation", "commands", "blocking_reasons",
+    "release_blockers"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "kind": {"const": "p10-privileged-filesystem-admission-observation"},
+    "generated_at": {"type": "string", "minLength": 1, "maxLength": 128},
+    "run_id": {"type": "string", "format": "uuid"},
+    "overall_status": {"enum": ["observed", "blocked"]},
+    "classification": {
+      "enum": [
+        "candidate_invalidation_observed", "adversary_admitted",
+        "adversary_connection_error", "adversary_interrupted", "adversary_timeout",
+        "authorized_daemon_unavailable", "authorized_daemon_restart_or_session_loss",
+        "signature_or_executable_drift", "suspicious_adversary_exit", "inconclusive"
+      ]
+    },
+    "production_mutation_exercised": {"const": false},
+    "qualification_status": {"const": "not_run"},
+    "rows_updated": {"const": 0},
+    "formal_predicates_updated": {"const": 0},
+    "caller_identity_rejection_status": {
+      "const": "pending_full_signed_paired_control_interpretation"
+    },
+    "matrix": {
+      "type": "object", "additionalProperties": false,
+      "required": ["required_rows", "executed_rows"],
+      "properties": {"required_rows": {"const": 57}, "executed_rows": {"const": 0}}
+    },
+    "formal_closure": {
+      "type": "object", "additionalProperties": false,
+      "required": ["required_predicates", "proven_predicates"],
+      "properties": {"required_predicates": {"const": 12}, "proven_predicates": {"const": 0}}
+    },
+    "completion_claims": {"$ref": "#/$defs/completionClaims"},
+    "repository": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/repository"}]},
+    "source_manifest": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sourceManifest"}]},
+    "recorder_evidence_context": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/recorderContext"}]},
+    "canonical_qualification_template": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/template"}]},
+    "inputs": {"$ref": "#/$defs/inputs"},
+    "signatures": {
+      "type": "object", "additionalProperties": false,
+      "required": ["cli", "adversary"],
+      "properties": {
+        "cli": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/signature"}]},
+        "adversary": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/signature"}]}
+      }
+    },
+    "observations": {
+      "type": "object", "additionalProperties": false,
+      "required": ["authorized_pre_health", "adversary", "authorized_post_health"],
+      "properties": {
+        "authorized_pre_health": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/health"}]},
+        "adversary": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/adversary"}]},
+        "authorized_post_health": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/health"}]}
+      }
+    },
+    "correlation": {"$ref": "#/$defs/correlation"},
+    "commands": {"type": "array", "maxItems": 2, "items": {"$ref": "#/$defs/command"}},
+    "blocking_reasons": {"type": "array", "maxItems": 16, "items": {"type": "string", "minLength": 1, "maxLength": 2048}},
+    "release_blockers": {"type": "array", "minItems": 3, "maxItems": 8, "items": {"type": "string", "minLength": 1, "maxLength": 2048}}
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": ["overall_status"],
+        "properties": {"overall_status": {"const": "observed"}}
+      },
+      "then": {
+        "properties": {
+          "classification": {"const": "candidate_invalidation_observed"},
+          "blocking_reasons": {"maxItems": 0},
+          "repository": {"$ref": "#/$defs/repository"},
+          "source_manifest": {"$ref": "#/$defs/sourceManifest"},
+          "recorder_evidence_context": {"$ref": "#/$defs/recorderContext"},
+          "canonical_qualification_template": {"$ref": "#/$defs/template"},
+          "inputs": {
+            "properties": {
+              "daemon_signing_requirement_sha256": {"$ref": "#/$defs/sha256"}
+            }
+          },
+          "signatures": {
+            "properties": {
+              "cli": {"$ref": "#/$defs/signature"},
+              "adversary": {"$ref": "#/$defs/signature"}
+            }
+          },
+          "observations": {
+            "properties": {
+              "authorized_pre_health": {
+                "allOf": [
+                  {"$ref": "#/$defs/health"},
+                  {"properties": {"event": {"const": "pre_health"}, "ok": {"const": true}}}
+                ]
+              },
+              "adversary": {
+                "allOf": [
+                  {"$ref": "#/$defs/adversary"},
+                  {
+                    "properties": {
+                      "terminal_event": {"const": "connection_invalidated"},
+                      "outcome": {"const": "candidate_connection_rejected_pending_authorized_control"},
+                      "qualification_status": {"const": "candidate_only"}
+                    }
+                  }
+                ]
+              },
+              "authorized_post_health": {
+                "allOf": [
+                  {"$ref": "#/$defs/health"},
+                  {"properties": {"event": {"const": "post_health"}, "ok": {"const": true}, "connection_reused": {"const": true}}}
+                ]
+              }
+            }
+          },
+          "correlation": {
+            "properties": {
+              "same_session_id": {"const": true},
+              "connection_reused": {"const": true},
+              "daemon_code_directory_hash_equal": {"const": true},
+              "daemon_hash_in_exact_context": {"const": true},
+              "caller_sealed_hash_set_equal": {"const": true},
+              "service_facts_stable": {"const": true}
+            }
+          },
+          "commands": {
+            "minItems": 2,
+            "maxItems": 2,
+            "prefixItems": [
+              {"properties": {"label": {"const": "signed_authorized_same_connection_health"}}},
+              {"properties": {"label": {"const": "signed_wrong_identifier_admission_probe"}, "return_code": {"not": {"const": 0}}}}
+            ],
+            "contains": {
+              "type": "object",
+              "required": ["label", "return_code"],
+              "properties": {
+                "label": {"const": "signed_wrong_identifier_admission_probe"},
+                "return_code": {"not": {"const": 0}}
+              }
+            },
+            "minContains": 1,
+            "maxContains": 1
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "cdhash": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "completionClaims": {
+      "type": "object", "additionalProperties": false,
+      "required": ["e2", "p10", "g10", "g12", "release"],
+      "properties": {
+        "e2": {"const": false}, "p10": {"const": false}, "g10": {"const": false},
+        "g12": {"const": false}, "release": {"const": false}
+      }
+    },
+    "repository": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "branch", "head", "base_branch", "base_sha"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1}, "branch": {"type": "string", "minLength": 1, "maxLength": 256},
+        "head": {"type": "string", "pattern": "^[0-9a-f]{40}$"}, "base_branch": {"const": "main"},
+        "base_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"}
+      }
+    },
+    "sourceManifest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "sha256", "file_count", "bytes"],
+      "properties": {
+        "schema_version": {"const": 1}, "sha256": {"$ref": "#/$defs/sha256"},
+        "file_count": {"type": "integer", "minimum": 1}, "bytes": {"type": "integer", "minimum": 1}
+      }
+    },
+    "recorderRepository": {
+      "type": "object", "additionalProperties": false,
+      "required": ["branch", "head_sha", "base_branch", "base_sha", "repository_path"],
+      "properties": {
+        "branch": {"type": "string", "minLength": 1}, "head_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "base_branch": {"const": "main"}, "base_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "repository_path": {"type": "string", "minLength": 1}
+      }
+    },
+    "testEnvironment": {
+      "type": "object", "additionalProperties": false,
+      "required": ["macos_build", "machine_identifier", "platform", "architecture"],
+      "properties": {
+        "macos_build": {"type": "string", "minLength": 1}, "machine_identifier": {"type": "string", "minLength": 1},
+        "platform": {"type": "string", "minLength": 1}, "architecture": {"type": "string", "minLength": 1}
+      }
+    },
+    "recorderContext": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "binding_schema_version", "evidence_id", "source_manifest", "repository", "test_environment", "qualification_context_present"],
+      "properties": {
+        "schema_version": {"const": 1}, "binding_schema_version": {"const": 1},
+        "evidence_id": {"type": "string", "pattern": "^EVID-[A-Za-z0-9][A-Za-z0-9._-]{0,250}$"},
+        "source_manifest": {"$ref": "#/$defs/sourceManifest"}, "repository": {"$ref": "#/$defs/recorderRepository"},
+        "test_environment": {"$ref": "#/$defs/testEnvironment"}, "qualification_context_present": {"const": false}
+      }
+    },
+    "template": {
+      "type": "object", "additionalProperties": false,
+      "required": ["matrix_rows_required", "matrix_rows_executed", "formal_predicates_required", "formal_predicates_proven", "status", "ok", "residual_disposition", "before_sha256", "after_sha256", "byte_stable"],
+      "properties": {
+        "matrix_rows_required": {"const": 57}, "matrix_rows_executed": {"const": 0},
+        "formal_predicates_required": {"const": 12}, "formal_predicates_proven": {"const": 0},
+        "status": {"const": "partial"}, "ok": {"const": false}, "residual_disposition": {"const": "open_release_blocker"},
+        "before_sha256": {"$ref": "#/$defs/sha256"}, "after_sha256": {"$ref": "#/$defs/sha256"}, "byte_stable": {"const": true}
+      }
+    },
+    "inputs": {
+      "type": "object", "additionalProperties": false,
+      "required": ["cli_path", "adversary_path", "expected_team", "daemon_code_directory_hashes", "hold_milliseconds", "total_deadline_seconds", "daemon_signing_requirement_sha256"],
+      "properties": {
+        "cli_path": {"type": "string", "minLength": 1}, "adversary_path": {"type": "string", "minLength": 1},
+        "expected_team": {"type": "string", "minLength": 1, "maxLength": 32},
+        "daemon_code_directory_hashes": {"type": "array", "minItems": 1, "maxItems": 2, "uniqueItems": true, "items": {"type": "string"}},
+        "hold_milliseconds": {"type": "integer", "minimum": 3000, "maximum": 10000},
+        "total_deadline_seconds": {"type": "number", "minimum": 5, "maximum": 30},
+        "daemon_signing_requirement_sha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]}
+      }
+    },
+    "signature": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "sha256", "size", "device", "inode", "change_time_ns", "identifier", "team_identifier", "code_directory_hash", "hardened_runtime", "exact_identity_requirement_satisfied", "daemon_client_requirement_satisfied"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1}, "sha256": {"$ref": "#/$defs/sha256"},
+        "size": {"type": "integer", "minimum": 1}, "device": {"type": "integer", "minimum": 0},
+        "inode": {"type": "integer", "minimum": 1}, "change_time_ns": {"type": "integer", "minimum": 1},
+        "identifier": {"type": "string", "minLength": 1}, "team_identifier": {"type": "string", "minLength": 1},
+        "code_directory_hash": {"$ref": "#/$defs/cdhash"}, "hardened_runtime": {"const": true},
+        "exact_identity_requirement_satisfied": {"const": true}, "daemon_client_requirement_satisfied": {"type": "boolean"}
+      }
+    },
+    "health": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "event", "session_id", "ok", "code", "message", "service_identity_verified", "connection_reused", "status_durability_confirmed", "hold_ms"],
+      "properties": {
+        "schema_version": {"const": 1}, "event": {"enum": ["pre_health", "post_health"]},
+        "session_id": {"type": "string", "pattern": "^[0-9a-f-]{36}$"}, "ok": {"type": "boolean"},
+        "code": {"type": "string", "minLength": 1, "maxLength": 128}, "message": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "service_identity_verified": {"type": "boolean"}, "connection_reused": {"type": "boolean"},
+        "status_durability_confirmed": {"type": "boolean"}, "hold_ms": {"type": "integer", "minimum": 3000, "maximum": 10000},
+        "protocol_version": {"const": 5}, "product_version": {"const": "0.9.0"},
+        "service_identifier": {"const": "com.forge-conductor.filesystem-daemon"}, "effective_uid": {"const": 0},
+        "code_directory_hash": {"$ref": "#/$defs/cdhash"},
+        "allowed_code_directory_hashes": {"type": "array", "minItems": 0, "maxItems": 2, "uniqueItems": true, "items": {"$ref": "#/$defs/cdhash"}}
+      },
+      "allOf": [
+        {
+          "if": {"required": ["ok"], "properties": {"ok": {"const": true}}},
+          "then": {
+            "required": ["protocol_version", "product_version", "service_identifier", "effective_uid", "code_directory_hash", "allowed_code_directory_hashes"],
+            "properties": {"allowed_code_directory_hashes": {"minItems": 1}}
+          }
+        }
+      ]
+    },
+    "adversary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "operation", "run_id", "case_id", "role", "process_id", "effective_user_id", "bundle_identifier", "client_code_directory_hash", "daemon_code_directory_hashes", "daemon_signing_requirement_sha256", "deadline_milliseconds", "elapsed_monotonic_nanoseconds", "terminal_event", "outcome", "authorized_same_connection_control_observed", "daemon_reachability_confirmed", "unauthorized_client_rejection_confirmed", "production_mutation_exercised", "qualification_status", "rows_updated", "formal_predicates_updated", "completion_claims"],
+      "properties": {
+        "schema_version": {"const": 1}, "operation": {"const": "admission-probe"}, "run_id": {"type": "string"},
+        "case_id": {"const": "unauthorized_same_uid_client"}, "role": {"const": "adversary"},
+        "process_id": {"type": "integer", "minimum": 1}, "effective_user_id": {"type": "integer", "minimum": 1},
+        "bundle_identifier": {"const": "com.forge-conductor.qualification-adversary"}, "client_code_directory_hash": {"$ref": "#/$defs/cdhash"},
+        "daemon_code_directory_hashes": {"type": "array", "minItems": 1, "maxItems": 2, "uniqueItems": true, "items": {"$ref": "#/$defs/cdhash"}},
+        "daemon_signing_requirement_sha256": {"$ref": "#/$defs/sha256"}, "deadline_milliseconds": {"const": 2000},
+        "elapsed_monotonic_nanoseconds": {"type": "integer", "minimum": 0, "maximum": 2000000000},
+        "terminal_event": {"enum": ["service_info_reply", "connection_error", "connection_interrupted", "connection_invalidated", "deadline_expired"]},
+        "outcome": {"enum": ["candidate_connection_rejected_pending_authorized_control", "unexpected_admission", "ambiguous_timeout"]},
+        "authorized_same_connection_control_observed": {"const": false}, "daemon_reachability_confirmed": {"const": false},
+        "unauthorized_client_rejection_confirmed": {"const": false}, "production_mutation_exercised": {"const": false},
+        "qualification_status": {"enum": ["candidate_only", "failed", "ambiguous"]}, "rows_updated": {"const": 0},
+        "formal_predicates_updated": {"const": 0}, "completion_claims": {"$ref": "#/$defs/completionClaims"}
+      }
+    },
+    "correlation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["same_session_id", "connection_reused", "daemon_code_directory_hash_equal", "daemon_hash_in_exact_context", "caller_sealed_hash_set_equal", "service_facts_stable"],
+      "properties": {
+        "same_session_id": {"type": "boolean"}, "connection_reused": {"type": "boolean"},
+        "daemon_code_directory_hash_equal": {"type": "boolean"}, "daemon_hash_in_exact_context": {"type": "boolean"},
+        "caller_sealed_hash_set_equal": {"type": "boolean"},
+        "service_facts_stable": {"type": "boolean"}
+      }
+    },
+    "command": {
+      "type": "object", "additionalProperties": false,
+      "required": ["label", "arguments", "process_id", "return_code", "timed_out", "stdout_bytes", "stderr_bytes", "stdout_sha256", "stderr_sha256", "process_group_cleanup", "live_code_directory_hash"],
+      "properties": {
+        "label": {"type": "string", "minLength": 1}, "arguments": {"type": "array", "minItems": 2, "maxItems": 6, "items": {"type": "string"}},
+        "process_id": {"type": "integer", "minimum": 1}, "return_code": {"type": "integer"}, "timed_out": {"const": false},
+        "stdout_bytes": {"type": "integer", "minimum": 0, "maximum": 32768}, "stderr_bytes": {"type": "integer", "minimum": 0, "maximum": 32768},
+        "stdout_sha256": {"$ref": "#/$defs/sha256"}, "stderr_sha256": {"$ref": "#/$defs/sha256"},
+        "process_group_cleanup": {"type": "string", "minLength": 1}, "live_code_directory_hash": {"$ref": "#/$defs/cdhash"}
+      }
+    }
+  }
+}

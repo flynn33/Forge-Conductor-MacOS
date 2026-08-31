@@ -52,6 +52,86 @@ final class H0IsolationTests: XCTestCase {
         XCTAssertFalse(admission.contains("com.forge-conductor.qualification-adversary"))
     }
 
+    func testAdmissionProbeRemainsReadOnlyAndQualificationTargetOnly() throws {
+        let source = try text(
+            "Sources/ForgeFilesystemQualificationSupport/UnauthorizedAdmissionProbe.swift"
+        )
+        XCTAssertEqual(
+            source.components(separatedBy: "proxy.serviceInfo").count - 1,
+            1
+        )
+        XCTAssertFalse(source.contains("ForgeFilesystemServiceXPC.self"))
+        for forbidden in [
+            "deleteLeaf(",
+            "queryTransaction(",
+            "resumeTransaction(",
+            "acknowledgeTransaction(",
+            "authorizedRoot",
+            "FileHandle",
+        ] {
+            XCTAssertFalse(source.contains(forbidden), "unexpected surface: \(forbidden)")
+        }
+
+        let project = try text("ForgeConductor.xcodeproj/project.pbxproj")
+        let buildFileID = "E2A000000000000000000009"
+        XCTAssertEqual(
+            project.components(separatedBy: buildFileID).count - 1,
+            2,
+            "probe source must have one build-file definition and one source-phase membership"
+        )
+        let supportPhaseStart = try XCTUnwrap(
+            project.range(of: "E2A000000000000000000050 /* Sources */ = {")
+        )
+        let supportPhaseTail = project[supportPhaseStart.lowerBound...]
+        let supportPhaseEnd = try XCTUnwrap(
+            supportPhaseTail.range(of: "\t\t};")
+        )
+        let supportPhase = String(supportPhaseTail[..<supportPhaseEnd.upperBound])
+        XCTAssertTrue(supportPhase.contains(buildFileID))
+    }
+
+    func testAuthorizedHealthProbeExposesOnlyReadOnlyXPCSelectors() throws {
+        let source = try text(
+            "Sources/ForgeConductorCore/Infrastructure/SecureFilesystemQualificationHealthSession.swift"
+        )
+        let protocolStart = try XCTUnwrap(
+            source.range(of: "@objc private protocol SecureFilesystemQualificationHealthXPC")
+        )
+        let protocolTail = source[protocolStart.lowerBound...]
+        let protocolEnd = try XCTUnwrap(protocolTail.range(of: "\n}"))
+        let protocolSource = String(protocolTail[..<protocolEnd.upperBound])
+
+        XCTAssertEqual(
+            protocolSource.components(separatedBy: "func serviceInfo").count - 1,
+            1
+        )
+        XCTAssertEqual(
+            protocolSource.components(separatedBy: "func status").count - 1,
+            1
+        )
+        for forbidden in [
+            "deleteLeaf",
+            "queryTransaction",
+            "resumeTransaction",
+            "acknowledgeTransaction",
+            "authorizedRoot",
+            "FileHandle",
+        ] {
+            XCTAssertFalse(
+                protocolSource.contains(forbidden),
+                "authorized health XPC exposed mutation surface: \(forbidden)"
+            )
+        }
+
+        let project = try text("ForgeConductor.xcodeproj/project.pbxproj")
+        let buildFileID = "E2F500000000000000000052"
+        XCTAssertEqual(
+            project.components(separatedBy: buildFileID).count - 1,
+            2,
+            "health source must have one build-file definition and one Core source-phase membership"
+        )
+    }
+
     func testQualificationSchemeCannotArchiveTargets() throws {
         let scheme = try text(
             "ForgeConductor.xcodeproj/xcshareddata/xcschemes/ForgeFilesystemQualification.xcscheme"

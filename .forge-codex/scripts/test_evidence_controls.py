@@ -37,6 +37,7 @@ SCRIPT_ROOT = pathlib.Path(__file__).resolve().parent
 RECORDER = SCRIPT_ROOT / "record_command.py"
 COMPLETION_CHECKER = SCRIPT_ROOT / "check_p10_completion.py"
 DOCTOR = SCRIPT_ROOT / "doctor.sh"
+CHECKPOINT_IDENTITY = SCRIPT_ROOT / "checkpoint_identity.py"
 STATECTL = SCRIPT_ROOT / "statectl.py"
 PRIVILEGED_FILESYSTEM_QUALIFICATION = (
     SCRIPT_ROOT.parent / "docs/PRIVILEGED_FILESYSTEM_QUALIFICATION.md"
@@ -2319,6 +2320,11 @@ class EvidenceControlTests(unittest.TestCase):
             script = root / ".forge-codex/scripts/doctor.sh"
             script.parent.mkdir(parents=True)
             script.write_text(DOCTOR.read_text(encoding="utf-8"), encoding="utf-8")
+            identity_script = script.parent / "checkpoint_identity.py"
+            identity_script.write_text(
+                CHECKPOINT_IDENTITY.read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
             self.write_json(
                 root / ".forge-codex/state/run-state.json",
                 {

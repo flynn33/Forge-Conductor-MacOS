@@ -228,6 +228,7 @@
 		E2F500000000000000000002 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000011 /* main.swift */; };
 		E2F500000000000000000003 /* Infrastructure/SecureFilesystemService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000012 /* Infrastructure/SecureFilesystemService.swift */; };
 		E2F500000000000000000050 /* Infrastructure/SecureFilesystemRecoveryLedger.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000051 /* Infrastructure/SecureFilesystemRecoveryLedger.swift */; };
+		E2F500000000000000000052 /* Infrastructure/SecureFilesystemQualificationHealthSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000053 /* Infrastructure/SecureFilesystemQualificationHealthSession.swift */; };
 		E2F500000000000000000004 /* ForgeFilesystemProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000013 /* ForgeFilesystemProtocolTests.swift */; };
 		E2F500000000000000000005 /* libForgeFilesystemProtocol.a in Frameworks */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000014 /* libForgeFilesystemProtocol.a */; };
 		E2F500000000000000000006 /* libForgeFilesystemProtocol.a in Frameworks */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000014 /* libForgeFilesystemProtocol.a */; };
@@ -237,7 +238,9 @@
 		E2F500000000000000000049 /* forge-conductor in Embed Manager CLI */ = {isa = PBXBuildFile; fileRef = FAD7DC3FA3A1480E9B4955B1 /* forge-conductor */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		E2F500000000000000000041 /* PrivilegedLeafDeleteEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000043 /* PrivilegedLeafDeleteEngine.swift */; };
 		E2F500000000000000000042 /* SecureFilesystemMutationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000044 /* SecureFilesystemMutationTests.swift */; };
+		E2F500000000000000000054 /* SecureFilesystemQualificationHealthSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000055 /* SecureFilesystemQualificationHealthSessionTests.swift */; };
 		E2A000000000000000000001 /* QualificationReadiness.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2A000000000000000000010 /* QualificationReadiness.swift */; };
+		E2A000000000000000000009 /* UnauthorizedAdmissionProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2A000000000000000000016 /* UnauthorizedAdmissionProbe.swift */; };
 		E2A000000000000000000002 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2A000000000000000000011 /* main.swift */; };
 		E2A000000000000000000003 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2A000000000000000000012 /* main.swift */; };
 		E2A000000000000000000004 /* libForgeFilesystemProtocol.a in Frameworks */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000014 /* libForgeFilesystemProtocol.a */; };
@@ -676,13 +679,16 @@
 		E2F500000000000000000011 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		E2F500000000000000000012 /* Infrastructure/SecureFilesystemService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Infrastructure/SecureFilesystemService.swift; sourceTree = "<group>"; };
 		E2F500000000000000000051 /* Infrastructure/SecureFilesystemRecoveryLedger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Infrastructure/SecureFilesystemRecoveryLedger.swift; sourceTree = "<group>"; };
+		E2F500000000000000000053 /* Infrastructure/SecureFilesystemQualificationHealthSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Infrastructure/SecureFilesystemQualificationHealthSession.swift; sourceTree = "<group>"; };
 		E2F500000000000000000013 /* ForgeFilesystemProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForgeFilesystemProtocolTests.swift; sourceTree = "<group>"; };
 		E2F500000000000000000014 /* libForgeFilesystemProtocol.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libForgeFilesystemProtocol.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		E2F500000000000000000015 /* forge-filesystem-daemon */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "forge-filesystem-daemon"; sourceTree = BUILT_PRODUCTS_DIR; };
 		E2F500000000000000000016 /* com.forge-conductor.filesystem-daemon.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Resources/com.forge-conductor.filesystem-daemon.plist"; sourceTree = "<group>"; };
 		E2F500000000000000000043 /* PrivilegedLeafDeleteEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivilegedLeafDeleteEngine.swift; sourceTree = "<group>"; };
 		E2F500000000000000000044 /* SecureFilesystemMutationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureFilesystemMutationTests.swift; sourceTree = "<group>"; };
+		E2F500000000000000000055 /* SecureFilesystemQualificationHealthSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureFilesystemQualificationHealthSessionTests.swift; sourceTree = "<group>"; };
 		E2A000000000000000000010 /* QualificationReadiness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QualificationReadiness.swift; sourceTree = "<group>"; };
+		E2A000000000000000000016 /* UnauthorizedAdmissionProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnauthorizedAdmissionProbe.swift; sourceTree = "<group>"; };
 		E2A000000000000000000011 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		E2A000000000000000000012 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		E2A000000000000000000013 /* libForgeFilesystemQualificationSupport.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libForgeFilesystemQualificationSupport.a; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -805,6 +811,7 @@
 			children = (
 				E2F500000000000000000013 /* ForgeFilesystemProtocolTests.swift */,
 				E2F500000000000000000044 /* SecureFilesystemMutationTests.swift */,
+				E2F500000000000000000055 /* SecureFilesystemQualificationHealthSessionTests.swift */,
 				A26F00000000000000000035 /* AutonomousContinuityAcceptanceTests.swift */,
 				A26F00000000000000000023 /* AutonomySupervisorTests.swift */,
 				A26F00000000000000000024 /* ContextBudgetSupervisorTests.swift */,
@@ -929,6 +936,7 @@
 			isa = PBXGroup;
 			children = (
 				E2A000000000000000000010 /* QualificationReadiness.swift */,
+				E2A000000000000000000016 /* UnauthorizedAdmissionProbe.swift */,
 			);
 			path = ForgeFilesystemQualificationSupport;
 			sourceTree = "<group>";
@@ -1046,6 +1054,7 @@
 				B28F00000000000000000001 /* Infrastructure/FilesystemQuarantineLedger.swift */,
 				E2F500000000000000000051 /* Infrastructure/SecureFilesystemRecoveryLedger.swift */,
 				E2F500000000000000000012 /* Infrastructure/SecureFilesystemService.swift */,
+				E2F500000000000000000053 /* Infrastructure/SecureFilesystemQualificationHealthSession.swift */,
 				P10F00000000000000000010 /* Application/ProjectMemoryService.swift */,
 				P10F00000000000000000011 /* Application/Tools/ProjectMemoryToolPack.swift */,
 				P10F00000000000000000012 /* Infrastructure/ResourcePolicy.swift */,
@@ -1489,6 +1498,7 @@
 			files = (
 				E2F500000000000000000004 /* ForgeFilesystemProtocolTests.swift in Sources */,
 				E2F500000000000000000042 /* SecureFilesystemMutationTests.swift in Sources */,
+				E2F500000000000000000054 /* SecureFilesystemQualificationHealthSessionTests.swift in Sources */,
 				A26B00000000000000000035 /* AutonomousContinuityAcceptanceTests.swift in Sources */,
 				A26B00000000000000000023 /* AutonomySupervisorTests.swift in Sources */,
 				A26B00000000000000000024 /* ContextBudgetSupervisorTests.swift in Sources */,
@@ -1603,6 +1613,7 @@
 			files = (
 				E2F500000000000000000050 /* Infrastructure/SecureFilesystemRecoveryLedger.swift in Sources */,
 				E2F500000000000000000003 /* Infrastructure/SecureFilesystemService.swift in Sources */,
+				E2F500000000000000000052 /* Infrastructure/SecureFilesystemQualificationHealthSession.swift in Sources */,
 				A26B00000000000000000001 /* Application/AutonomySupervisor.swift in Sources */,
 				A26B00000000000000000002 /* Application/ContextBudgetSupervisor.swift in Sources */,
 				A26B00000000000000000003 /* Application/ExecutionJobService.swift in Sources */,
@@ -1743,6 +1754,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E2A000000000000000000001 /* QualificationReadiness.swift in Sources */,
+				E2A000000000000000000009 /* UnauthorizedAdmissionProbe.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

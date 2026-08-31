@@ -244,7 +244,7 @@ public enum ForgeFilesystemQualificationContractError: Error, Equatable, Localiz
     }
 }
 
-private struct ForgeFilesystemStrictJSONKeyScanner {
+struct ForgeFilesystemStrictJSONKeyScanner {
     private let bytes: [UInt8]
     private var index = 0
 
@@ -785,17 +785,65 @@ public enum ForgeFilesystemQualificationContract {
     }
 }
 
+enum ForgeFilesystemQualificationToolRoute: Equatable {
+    case admissionProbe
+    case readiness
+}
+
 public enum ForgeFilesystemQualificationToolMain {
+    static func prepareRoute(
+        arguments: [String],
+        role: ForgeFilesystemQualificationRole,
+        environment: [String: String],
+        suspensionBarrier: () -> Int32
+    ) throws -> ForgeFilesystemQualificationToolRoute {
+        if environment[
+            ForgeFilesystemQualificationContract.startSuspendedEnvironmentKey
+        ] == "1" {
+            guard suspensionBarrier() == 0 else {
+                throw ForgeFilesystemQualificationContractError.invalidValue(
+                    "start_suspended"
+                )
+            }
+        }
+        return try ForgeFilesystemAdmissionProbeContract.shouldRoute(
+            arguments: arguments,
+            role: role
+        ) ? .admissionProbe : .readiness
+    }
+
     public static func run(role: ForgeFilesystemQualificationRole) -> Never {
         do {
-            if ProcessInfo.processInfo.environment[
-                ForgeFilesystemQualificationContract.startSuspendedEnvironmentKey
-            ] == "1" {
-                guard raise(SIGSTOP) == 0 else {
+            let environment = ProcessInfo.processInfo.environment
+            let route = try prepareRoute(
+                arguments: CommandLine.arguments,
+                role: role,
+                environment: environment,
+                suspensionBarrier: { raise(SIGSTOP) }
+            )
+            if route == .admissionProbe {
+                guard let rawContext = environment[
+                    ForgeFilesystemAdmissionProbeContract.recorderContextEnvironmentKey
+                ] else {
                     throw ForgeFilesystemQualificationContractError.invalidValue(
-                        "start_suspended"
+                        "admission_probe_recorder_context"
                     )
                 }
+                let context = try ForgeFilesystemAdmissionProbeContract
+                    .decodeRecorderContext(rawContext)
+                let readiness = try ForgeFilesystemQualificationContract.makeReadiness(
+                    role: .adversary,
+                    command: .describe,
+                    environment: [:]
+                )
+                let result = try ForgeFilesystemAdmissionProbeContract.runLive(
+                    context: context,
+                    readiness: readiness
+                )
+                var data = try ForgeFilesystemQualificationContract.canonicalJSON(result)
+                data.append(0x0A)
+                FileHandle.standardOutput.write(data)
+                Darwin.exit(ForgeFilesystemAdmissionProbeContract.exitStatus(for: result))
             }
             let command = try ForgeFilesystemQualificationContract.parseCommand(
                 arguments: CommandLine.arguments
