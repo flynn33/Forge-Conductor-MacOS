@@ -1,0 +1,41 @@
+--prepared:/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/__preview.dylib
+--validated:/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/__preview.dylib
+--prepared:/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon
+--validated:/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon
+--prepared:/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-conductor
+--validated:/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-conductor
+--prepared:/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher
+--validated:/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher
+--prepared:/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/Forge Conductor.debug.dylib
+--validated:/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/Forge Conductor.debug.dylib
+--prepared:/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework/Versions/Current/.
+--validated:/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework/Versions/Current/.
+/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app: valid on disk
+/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app: satisfies its Designated Requirement
+--prepared:/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/__preview.dylib
+--validated:/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/__preview.dylib
+--prepared:/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon
+--validated:/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon
+--prepared:/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/Forge Conductor.debug.dylib
+--validated:/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/Forge Conductor.debug.dylib
+--prepared:/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher
+--validated:/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher
+--prepared:/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-conductor
+--validated:/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-conductor
+--prepared:/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework/Versions/Current/.
+--validated:/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework/Versions/Current/.
+/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app: valid on disk
+/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app: satisfies its Designated Requirement
+/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app: explicit requirement satisfied
+/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon: valid on disk
+/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon: satisfies its Designated Requirement
+/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon: explicit requirement satisfied
+/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon: valid on disk
+/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon: satisfies its Designated Requirement
+/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon: explicit requirement satisfied
+/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-conductor: valid on disk
+/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-conductor: satisfies its Designated Requirement
+/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-conductor: explicit requirement satisfied
+/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/forge-conductor: valid on disk
+/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/forge-conductor: satisfies its Designated Requirement
+/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-ServiceStatus-e1bbd951e180/Build/Products/Debug/forge-conductor: explicit requirement satisfied
