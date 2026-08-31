@@ -210,6 +210,48 @@ private struct TestManagerExecutableCodeDirectoryHashInspector:
     }
 }
 
+private final class TestManagerLaunchctlRunner: ManagerLaunchctlRunning {
+    struct Invocation: Equatable {
+        let arguments: [String]
+        let timeoutSec: TimeInterval
+    }
+
+    private var results: [ProcessResult]
+    private(set) var invocations: [Invocation] = []
+
+    init(results: [ProcessResult]) {
+        self.results = results
+    }
+
+    func run(arguments: [String], timeoutSec: TimeInterval) throws -> ProcessResult {
+        invocations.append(Invocation(arguments: arguments, timeoutSec: timeoutSec))
+        guard !results.isEmpty else {
+            throw NSError(
+                domain: "ManagerTests",
+                code: 6,
+                userInfo: [NSLocalizedDescriptionKey: "No launchctl result remains for \(arguments)"]
+            )
+        }
+        return results.removeFirst()
+    }
+}
+
+private func launchctlResult(
+    exitCode: Int32,
+    stdout: String = "",
+    stderr: String = "",
+    timedOut: Bool = false
+) -> ProcessResult {
+    ProcessResult(
+        exitCode: exitCode,
+        stdout: stdout,
+        stderr: stderr,
+        timedOut: timedOut,
+        stdoutTruncated: false,
+        stderrTruncated: false
+    )
+}
+
 final class ManagerTests: XCTestCase {
     private var home: URL!
 
@@ -1876,6 +1918,113 @@ final class ManagerTests: XCTestCase {
 
         XCTAssertEqual(after, before)
         XCTAssertEqual(after.teamIdentifier, teamIdentifier)
+    }
+
+    func testLoginAgentFallbackRejectsLoadSuccessWithoutLiveJobAndPositivePID() throws {
+        let uid: uid_t = 501
+        let userDomain = "gui/\(uid)"
+        let jobTarget = "\(userDomain)/\(ManagerInstaller.launchAgentLabel)"
+        let plistURL = home.appendingPathComponent("manager.plist")
+        let readinessFailures = [
+            launchctlResult(exitCode: 113, stderr: "Could not find service"),
+            launchctlResult(
+                exitCode: 0,
+                stdout: "\(jobTarget) = {\n\tstate = waiting\n}"
+            ),
+        ]
+
+        for readiness in readinessFailures {
+            let runner = TestManagerLaunchctlRunner(results: [
+                launchctlResult(exitCode: 5, stderr: "bootstrap unavailable"),
+                launchctlResult(exitCode: 0),
+                launchctlResult(exitCode: 0),
+                readiness,
+                readiness,
+            ])
+            let paths = AppPaths(home: home)
+            let installer = ManagerInstaller(
+                paths: paths,
+                config: ConfigStore(paths: paths),
+                artifactValidator: TestManagerArtifactValidator(),
+                launchctlRunner: runner
+            )
+
+            XCTAssertThrowsError(
+                try installer.loadLoginAgent(
+                    plistURL: plistURL,
+                    uid: uid,
+                    readinessAttempts: 2,
+                    readinessDelaySec: 0
+                )
+            ) { error in
+                let nsError = error as NSError
+                XCTAssertEqual(nsError.domain, "ManagerInstaller")
+                XCTAssertEqual(nsError.code, 2)
+                XCTAssertTrue(nsError.localizedDescription.contains("launchctl load failed"))
+                XCTAssertTrue(nsError.localizedDescription.contains(jobTarget))
+                XCTAssertTrue(nsError.localizedDescription.contains("positive pid"))
+            }
+            XCTAssertEqual(
+                runner.invocations,
+                [
+                    .init(
+                        arguments: ["bootstrap", userDomain, plistURL.path],
+                        timeoutSec: 15
+                    ),
+                    .init(
+                        arguments: ["load", "-w", plistURL.path],
+                        timeoutSec: 15
+                    ),
+                    .init(
+                        arguments: ["kickstart", "-k", jobTarget],
+                        timeoutSec: 10
+                    ),
+                    .init(arguments: ["print", jobTarget], timeoutSec: 5),
+                    .init(arguments: ["print", jobTarget], timeoutSec: 5),
+                ]
+            )
+        }
+    }
+
+    func testLoginAgentFallbackAcceptsExactLiveJobWithPositivePID() throws {
+        let uid: uid_t = 501
+        let userDomain = "gui/\(uid)"
+        let jobTarget = "\(userDomain)/\(ManagerInstaller.launchAgentLabel)"
+        let plistURL = home.appendingPathComponent("manager.plist")
+        let runner = TestManagerLaunchctlRunner(results: [
+            launchctlResult(exitCode: 5, stderr: "bootstrap unavailable"),
+            launchctlResult(exitCode: 0),
+            launchctlResult(exitCode: 64, stderr: "already running"),
+            launchctlResult(
+                exitCode: 0,
+                stdout: "\(jobTarget) = {\n\tstate = waiting\n}"
+            ),
+            launchctlResult(
+                exitCode: 0,
+                stdout: "\(jobTarget) = {\n\tstate = running\n\tpid = 4321\n}"
+            ),
+        ])
+        let paths = AppPaths(home: home)
+        let installer = ManagerInstaller(
+            paths: paths,
+            config: ConfigStore(paths: paths),
+            artifactValidator: TestManagerArtifactValidator(),
+            launchctlRunner: runner
+        )
+
+        XCTAssertNoThrow(
+            try installer.loadLoginAgent(
+                plistURL: plistURL,
+                uid: uid,
+                readinessAttempts: 2,
+                readinessDelaySec: 0
+            )
+        )
+        XCTAssertEqual(runner.invocations.last?.arguments, ["print", jobTarget])
+        XCTAssertEqual(
+            runner.invocations.filter { $0.arguments.first == "print" }.count,
+            2
+        )
     }
 
     func testLaunchAgentLogRotationRetainsOnlyBoundedTailsInForgeHome() throws {
