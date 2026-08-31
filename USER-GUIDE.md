@@ -1,13 +1,16 @@
 # Forge Conductor user guide
 
-Version **0.9.0**, with the current unreleased P10 behavior called out explicitly.
+Version **0.9.0**, build **1**, with the current unreleased P10 behavior called
+out explicitly.
 This guide is for operators who run Forge Conductor with
 [LM Studio](https://lmstudio.ai) on macOS.
 
-The current tree is not release-qualified. P10, filesystem E2, shell
-compatibility, native UI validation, and autonomous continuity remain open.
-Where implementation has only non-native or build-only evidence, that boundary
-is stated plainly.
+The current tree is not release-qualified. P10, filesystem E2, live shell
+compatibility, signed native UI and release validation, manager-owned
+real-provider autonomous continuity, owner-deferred representative physical-
+hardware qualification, and current G09-G12 remain open and release-blocking.
+Where implementation has only unit, synthetic-host, simulator, non-native, or
+build-only evidence, that boundary is stated plainly.
 
 Related detail (developer-oriented):
 
@@ -102,6 +105,9 @@ forge-conductor version    # should print 0.9.0
 plutil -p ~/.lmstudio/mcp.json
 ```
 
+For an app bundle, `CFBundleShortVersionString` must be `0.9.0` and
+`CFBundleVersion` must be `1`.
+
 On a clean install, project shell tools are enabled by default. Schema-v1
 configurations persisted no provenance capable of distinguishing the shipped
 disabled default from a user-chosen false value, so they migrate to enabled. An
@@ -121,10 +127,12 @@ it does not replace or redefine `shell_exec`.
 The non-native policy, migration, registration, execution, and result-contract
 regressions exist in the current tree. Restart coverage at that boundary uses a
 manager-service restart plus `ForgeApp` teardown/rebootstrap inside the test
-process. The Settings XCUITest includes an actual app terminate/relaunch flow,
-but it has build-only evidence: Developer Mode and a matching signing
-configuration are still required for native execution. Neither native relaunch
-nor shell compatibility is release-qualified.
+process. Development-signed Settings and relaunch evidence does not satisfy the
+missing live scenario: `shell_exec` must execute successfully after an app
+close/reopen and an actual installed-manager process restart. Developer ID
+Release signing, production native UI execution, archive, notarization, and
+staple/Gatekeeper evidence also remain open. Neither native relaunch nor shell
+compatibility is release-qualified.
 
 ---
 
@@ -154,6 +162,9 @@ proves exact successor acknowledgment, predecessor fencing, idempotent sealing,
 automatic continuation, GUI-closed operation, and crash-state recovery, use the
 new-chat recipe as the operational path rather than treating autonomous
 continuity as qualified.
+
+Unit and synthetic-host tests do not close this gate. The authority run must use
+the real provider with the GUI closed and recover from every durable crash state.
 
 ### 6.1 What the model can still call
 
@@ -296,6 +307,12 @@ LM Studio may send all `tools/call` traffic to one of them (often fallback). Tha
 - The current checkpoint does not yet qualify manager-owned autonomous
   succession. A directly invoked provider-adapter test is not a substitute for
   the required forced-rollover scenario.
+- Protected filesystem capture and quarantine mitigate known destructive-path
+  races but do not eliminate them. E2 remains mandatory until the signed
+  distinct-process 57-case matrix and formal predicates pass.
+- Current G09-G12, native release/signing, live shell restart, real-provider
+  continuity, and owner-deferred representative physical-hardware gates remain
+  open; this guide is not a ship authorization.
 - `/Applications/Forge Conductor.app` is not updated by `install` if the OS refuses the overwrite. Check **version** on the binary LM Studio actually spawns.
 - `forge-conductor install` from the CLI may stage a **CLI** binary inside `~/.forge-conductor/Forge Conductor.app`. That bundle is not a substitute for the SwiftUI GUI in `dist/` or a proper app-bundle install.
 - Read-only tools can list most of your home directory. Treat that as a real permission, not a sandbox.

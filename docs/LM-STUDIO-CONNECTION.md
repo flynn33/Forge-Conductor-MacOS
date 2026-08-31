@@ -2,6 +2,9 @@
 
 This document is derived from **this Xcode project’s source** and **on-disk / runtime checks**, not from the retired Python stack.
 
+Product identity: version **0.9.0**, build **1**. This connection document does
+not authorize release; the qualification boundary below remains controlling.
+
 ## What the product is
 
 | Component | Role |
@@ -69,7 +72,9 @@ LaunchAgent already uses the app as: `manager run --home …` (unrelated to MCP 
 
 **Secondary (lockstep mirror on this Mac):**  
 `~/.lmstudio/extensions/plugins/mcp/<name>/` with `runner: "mcpBridge"`.  
-Same command/args/env as `mcp.json`. Observed working layout for `project-continuity` and used by LM Studio’s `PluginProcess(mcp/…)` logs.
+The Forge primary and fallback mirrors use the same command, arguments, and
+environment as `mcp.json`, and LM Studio reports them through
+`PluginProcess(mcp/…)` logs.
 
 Source of truth in code:
 
@@ -149,7 +154,9 @@ printf '%s\n' \
 Success criteria:
 
 - `serverInfo.name` = `forge-conductor` (or `forge-conductor-fallback` with role=fallback)
-- `tools/list` → **25** tools (`agent_*`, `fs_*`, `shell_exec`, `forge_status`, …)
+- `tools/list` exposes the versioned Forge surface, including legacy compatibility
+  tools, `project_memory.*`, durable runtime tools, `fs_delete_recovery`,
+  `shell_exec`, and additive `bash.run`
 - Each response is a single compact JSON object terminated by `\n`; stdout contains no `Content-Length` header
 - No `forge-serve` in `~/.lmstudio/mcp.json` or mcpBridge configs
 
@@ -184,12 +191,19 @@ The two registrations are separate LM Studio-hosted processes with distinct `ser
 3. Deploy and activate: **Deploy to LM Studio** in the GUI, or `forge-conductor install-lmstudio-plugin`.
 4. Load a tool-capable local model. Configuration, activation, and connection verification are already complete.
 
-### App-as-MCP ship checklist
+### App-as-MCP qualification checklist
 
 1. Build an app whose executable enters MCP stdio mode when run with `serve`; normal startup must remain silent on stderr.
 2. Smoke that app path with the same initialize/`tools/list` protocol.
 3. `forge-conductor install-lmstudio-plugin --binary "<app executable>"`.
 4. Confirm the command reports host acknowledgement for primary and fallback; restart is automated only if hot reload is insufficient.
+
+Completing this connector checklist proves only the LM Studio registration and
+stdio path. It does not close P10, filesystem E2, current G09-G12, Developer ID
+Release signing/native UI/notarization, live `shell_exec` after app and installed-
+manager restart, manager-owned real-provider forced rollover, or owner-deferred
+representative physical-hardware qualification. Unit, synthetic-host, simulator,
+and connector-smoke evidence cannot substitute for those release-blocking runs.
 
 ## Auto-heal
 

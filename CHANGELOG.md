@@ -6,15 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 for marketing versions (`MAJOR.MINOR.PATCH`).
 
+Current product identity is marketing version **0.9.0**, build **1**. The work
+under **Unreleased** is not a new qualified release.
+
 ## [Unreleased]
 
 This is an in-progress P10 checkpoint, not a qualified release. P10,
-filesystem E2, shell compatibility, native UI validation, autonomous continuity,
-owner-deferred representative physical-hardware qualification, and the final
-release gates remain open.
+filesystem E2, live shell compatibility, signed native UI and release validation,
+manager-owned real-provider autonomous continuity, owner-deferred representative
+physical-hardware qualification, and current G09-G12 remain open and
+release-blocking.
 
 ### Changed
 
+- Aligned the public README, user guide, architecture, connector, telemetry,
+  status documentation, and wiki to marketing version `0.9.0`, build `1`, and
+  the current nonpassing release boundary. Obsolete external-tool comparisons
+  and stale pre-0.9 screenshots no longer appear in the rendered guides.
+- Generated manager app wrappers now take `CFBundleShortVersionString` and
+  `CFBundleVersion` from the canonical product version (`0.9.0`) and build (`1`)
+  constants. Regression coverage reads the generated wrapper Info.plist and
+  verifies all Xcode target version settings.
 - Fresh configurations enable project shell tools by default. Migration enables
   schema-v1 configurations whose disabled value had no provenance; schema-v1
   could not distinguish the shipped default from a user-chosen false value.
@@ -156,6 +168,10 @@ release gates remain open.
   acknowledgment, predecessor fencing and idempotent sealing, automatic
   continuation, GUI-closed operation, and recovery from every durable crash
   state. Unit and synthetic-host tests do not satisfy this gate.
+- Current G09-G12 remain nonpassing. Historical compatibility, direct-adapter,
+  build, unit, synthetic-host, or simulator evidence does not replace the
+  current-source parity, signed native, real-provider continuity, and
+  owner-deferred physical-hardware evidence required by those gates.
 
 ## [0.9.0] — 2026-08-23
 
