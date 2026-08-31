@@ -1,7 +1,7 @@
 {
   "baseline_features": 66,
   "failures": [
-    "cannot read P10 input .forge-codex/evidence/P10-privileged-filesystem-qualification-report.json: [Errno 2] No such file or directory: '/Users/jimdaley/GitHub/Forge-Conductor-E2-Next/.forge-codex/evidence/P10-privileged-filesystem-qualification-report.json'",
+    "cannot read P10 input .forge-codex/evidence/P10-privileged-filesystem-qualification-report.json: qualification artifact path is unavailable or contains a symlink: [Errno 2] No such file or directory: 'P10-privileged-filesystem-qualification-report.json'",
     "privileged filesystem qualification does not conform to its exact JSON schema",
     "privileged filesystem qualification schema error at <root>: 'schema_version' is a required property",
     "privileged filesystem qualification schema error at <root>: 'artifact_binding_schema_version' is a required property",
@@ -52,9 +52,9 @@
   "ok": false,
   "phase": "P10",
   "source_manifest": {
-    "bytes": 10467039,
-    "file_count": 282,
+    "bytes": 11353041,
+    "file_count": 360,
     "schema_version": 1,
-    "sha256": "e693f85ab49afd4281ef55ecd604609e85caea180309d00f09a2e05e05041a83"
+    "sha256": "75e2f5ae4d967cce9f9b73e88ca7628ecaea0b90b7d61741706c42c0fd20f854"
   }
 }

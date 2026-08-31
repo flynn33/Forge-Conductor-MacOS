@@ -3,7 +3,7 @@
     {
       "kind": "stdout",
       "path": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next/.forge-codex/state/gate-results/G10.stdout.txt",
-      "sha256": "aae6f19ed3e2d7207dddc80cf4013ce72f7b0898f72f19a10a701d2ece7e7920"
+      "sha256": "81d149d9b30ba056ac349898c1dcb4ed94063d37303bf3d1539729498ce28dca"
     },
     {
       "kind": "stderr",
@@ -16,11 +16,11 @@
       "command": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next/.forge-codex/state/gate-handlers/G10.sh",
       "exit_code": 1,
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdout_sha256": "aae6f19ed3e2d7207dddc80cf4013ce72f7b0898f72f19a10a701d2ece7e7920",
+      "stdout_sha256": "81d149d9b30ba056ac349898c1dcb4ed94063d37303bf3d1539729498ce28dca",
       "timed_out": false
     }
   ],
-  "ended_at": "2026-08-31T15:53:54.598607+00:00",
+  "ended_at": "2026-08-31T23:02:03.535617+00:00",
   "environment": {
     "machine": "arm64",
     "platform": "macOS-26.6.2-arm64-arm-64bit",
@@ -30,36 +30,46 @@
     "criteria_results": [
       {
         "criterion": "every baseline feature preserved/additive/migrated",
-        "evidence": "handler exit status; replace with criterion-specific evidence",
+        "evidence": "criteria sidecar missing after handler execution",
         "passed": false
       },
       {
         "criterion": "all old fixtures migrate and reopen",
-        "evidence": "handler exit status; replace with criterion-specific evidence",
+        "evidence": "criteria sidecar missing after handler execution",
         "passed": false
       },
       {
         "criterion": "MCP golden snapshots compatible",
-        "evidence": "handler exit status; replace with criterion-specific evidence",
+        "evidence": "criteria sidecar missing after handler execution",
         "passed": false
       },
       {
         "criterion": "UI commands/settings/accessibility tests pass",
-        "evidence": "handler exit status; replace with criterion-specific evidence",
+        "evidence": "criteria sidecar missing after handler execution",
         "passed": false
       },
       {
         "criterion": "no unknown or untested affected feature",
-        "evidence": "handler exit status; replace with criterion-specific evidence",
+        "evidence": "criteria sidecar missing after handler execution",
         "passed": false
       }
     ],
     "name": "forge-gate-handler",
     "version": "1"
   },
+  "finalized": true,
   "gate_id": "G10",
   "notes": "",
+  "operation_id": "a2f65346-b22b-4e18-aa87-fdac8a805676",
   "schema_version": 1,
-  "started_at": "2026-08-31T15:53:54.170236+00:00",
+  "source_head": "44022da950e75362dfe5120bfd2d92d474ea0ce6",
+  "source_manifest": {
+    "bytes": 11353041,
+    "file_count": 360,
+    "schema_version": 1,
+    "sha256": "75e2f5ae4d967cce9f9b73e88ca7628ecaea0b90b7d61741706c42c0fd20f854"
+  },
+  "started_at": "2026-08-31T23:02:03.134080+00:00",
+  "state_sequence_before": 809,
   "status": "failed"
 }
