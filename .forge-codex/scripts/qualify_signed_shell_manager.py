@@ -1450,6 +1450,13 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def default_qualification_home() -> pathlib.Path:
+    return (
+        pathlib.Path(tempfile.gettempdir())
+        / f"forge-signed-shell-manager-{os.getpid()}-{int(time.time())}"
+    ).resolve(strict=False)
+
+
 def main() -> int:
     args = parse_args()
     report = initial_report("execute" if args.execute else "preflight_only", args.app)
@@ -1483,9 +1490,7 @@ def main() -> int:
         return 3
 
     if args.qualification_home is None:
-        qualification_home = pathlib.Path(tempfile.gettempdir()) / (
-            f"forge-signed-shell-manager-{os.getpid()}-{int(time.time())}"
-        )
+        qualification_home = default_qualification_home()
     else:
         qualification_home = args.qualification_home.expanduser().resolve(strict=False)
     require(qualification_home.is_absolute(), "qualification home must be absolute")

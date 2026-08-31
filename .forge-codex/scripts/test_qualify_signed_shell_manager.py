@@ -247,6 +247,12 @@ class SignedShellManagerHarnessTests(unittest.TestCase):
                     expected,
                 )
 
+    def test_default_qualification_home_resolves_system_temp_alias(self) -> None:
+        with mock.patch.object(subject.tempfile, "gettempdir", return_value="/tmp"):
+            home = subject.default_qualification_home()
+        self.assertEqual(home.parent, pathlib.Path("/tmp").resolve(strict=True))
+        self.assertTrue(home.name.startswith("forge-signed-shell-manager-"))
+
     def test_shell_denial_validator_requires_explicit_opt_out_code(self) -> None:
         validated = subject.validate_shell_denial(
             {
