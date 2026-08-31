@@ -98,7 +98,7 @@
     "Do not request operator decisions.",
     "Do not add automated authorship credits."
   ],
-  "created_at": "2026-08-30T22:16:48.843386+00:00",
+  "created_at": "2026-08-31T02:09:38.398740+00:00",
   "current_work": {
     "active_files": [],
     "phase_id": "P10",
@@ -586,7 +586,7 @@
     "f1d06d7dd23bf3bd71f138fc1a9a5799dc4aa0e474e9a60552dfcecb68f41dc2",
     "fa52a67ada4051cdaf064cb6fc52cdd72cd7957006924443b4e414e2f5abda61"
   ],
-  "handoff_id": "647aac53-0d73-43bf-b1c7-860e35112a0f",
+  "handoff_id": "c7ccf95b-8206-46e8-a8c8-fffeb3d278b1",
   "host_state": {
     "adapter_id": null,
     "context_budget_source": null,
@@ -595,46 +595,94 @@
     "retry": null
   },
   "integrity": {
-    "content_sha256": "6627cb7c6645c66f4697ddeb7b0b661289bc2f47167caf262a84c7804e406767",
+    "content_sha256": "bd2122d2acd56b3ccf65267c6c201b58d880c700b5f977587368a08fb81e9c27",
     "redaction_complete": true
   },
   "memory_references": [],
   "mission": "# Execution directive\n\nExecute the Forge Conductor repair and extension package end to end.\n\n1. Read the repository root `AGENTS.md` and every document it marks as required.\n2. Load `.forge-codex/state/run-state.json`; initialize it only if absent.\n3. Use the included audit evidence as the starting hypothesis set, then prove runtime reachability before labeling source-level lifecycle risks as live leaks.\n4. Preserve every current capability and compatibility surface. Build a feature baseline and executable parity tests before behavior-changing refactors.\n5. Repair the known telemetry, gauge, lifecycle, concurrency, and performance defects.\n6. implement the project-scoped memory MCP and autonomous continuity system described by the contracts.\n7. Build a supported host adapter as an internal plugin target when automatic session creation is not already supplied by the host. Never use private UI scripting as a substitute for a supported session API.\n8. Build, test, profile, debug, repair, and repeat until every hard gate passes.\n9. Persist progress, evidence, decisions, and handoffs after every material step. Resume automatically after interruption.\n10. Do not ask the operator for decisions. Follow the fail-forward and decision policies.\n11. Do not add generator credits, automated-author notices, watermarks, or authorship trailers to source, documentation, commits, assets, or metadata.\n12. Do not declare completion until `.forge-codex/scripts/verify_completion.py` exits successfully and the resulting completion report points to the underlying evidence.\n\nBegin with phase P00 and continue through P12 in dependency order, while executing independent ready work whenever a non-global gate is blocked.\n",
   "next_actions": [
     {
-      "action": "Implement versioned signed case-scoped and predicate-scoped E2 artifact semantics, reject cross-case reuse, and retain E2 as open until the full signed matrix passes.",
+      "action": "Treat security/e2-evidence-binding at source checkpoint 2dd504e53a5a09837cd289a99eee48ab7f4547eb, main at cd7e84fed8ed0fe0a8ec90793e83388c8a451f09, and open draft pull request 17 as the exact source identity; distinguish any later state-only transport HEAD.",
       "command": null,
       "order": 1,
       "success_condition": null
     },
     {
-      "action": "Run the complete signed distinct-process 57-row filesystem matrix, including atomic swaps, every durable crash phase, recovery, volumes, caller identity, lifecycle, hard links, writable descriptors, and explicit residual-impact verification.",
+      "action": "Keep quarantine-and-verify classified as mitigation, not elimination. Public macOS descriptor-relative and rename APIs, including renameatx_np, do not provide terminal mutation conditional on an expected device, inode, vnode generation, or content token.",
       "command": null,
       "order": 2,
       "success_condition": null
     },
     {
-      "action": "Qualify the established synchronous shell_exec contract through the signed real app and installed manager across app and manager restart; keep additive bash.run separate.",
+      "action": "Keep the source-parent residual explicit: one winning same-UID relocation can delete one eligible outside-root regular file or symlink whose bytes are unbounded, or quarantine one ineligible directory whose subtree is unbounded.",
       "command": null,
       "order": 3,
       "success_condition": null
     },
     {
-      "action": "Obtain Developer ID Application authority and complete Release signing, installed-service lifecycle, production native UI, notarization, staple, and Gatekeeper evidence; keep the gate deferred until then.",
+      "action": "Keep the final ACL/BSD-metadata residual explicit: one race can delete one already captured expected regular file or symlink after its authorization metadata changes; regular-file bytes are unbounded.",
       "command": null,
       "order": 4,
       "success_condition": null
     },
     {
-      "action": "Run the manager-owned real-provider forced rollover with exact successor acknowledgment, predecessor fencing, idempotent sealing, automatic continuation, GUI closed, and every durable crash-state recovery.",
+      "action": "Keep the disposition residual explicit: terminal quarantine has no authorized restore, release, or purge disposition and cannot be acknowledged while its protected leaf exists; 32 conflicts can exhaust every protected slot on one volume.",
       "command": null,
       "order": 5,
       "success_condition": null
     },
     {
-      "action": "Leave representative physical-hardware qualification owner-deferred and G11 nonpassing until the owner supplies real-hardware evidence.",
+      "action": "Keep the caller and generation residual explicit: ledger removal, relocation, or lock-inode replacement and generation races can strand or allow up to 32 captured or terminal transactions per protected volume; each affected regular file can contain unbounded bytes.",
       "command": null,
       "order": 6,
+      "success_condition": null
+    },
+    {
+      "action": "Keep writable descriptors and hard links, startup recovery fencing, terminal physical-state repair, daemon-owned discovery and revoke, project-binding revoke and garbage collection, qualified volume behavior, freshness, and direct daemon execution open.",
+      "command": null,
+      "order": 7,
+      "success_condition": null
+    },
+    {
+      "action": "Keep the evidence-control nonclaims explicit: qualification assumes a trusted quiescent workspace against same-UID transient source-manifest replacement; an arbitrary caller-selected harness is not authenticated; aggregate report and evidence input reads remain unbounded fail-closed denial-of-service surfaces; the G10 handler does not invoke the checker; post-verification mutation remains outside immutable-content proof.",
+      "command": null,
+      "order": 8,
+      "success_condition": null
+    },
+    {
+      "action": "The template remains partial with 57 rows not_run, all 12 predicates false, zero formal references, and a null qualification-context reference. Execute the full signed distinct-process 57-row crash, adversarial, lifecycle, volume, hard-link, writable-descriptor, Release, and notarization matrix; controls alone prove no formal claim.",
+      "command": null,
+      "order": 9,
+      "success_condition": null
+    },
+    {
+      "action": "Preserve shell_exec as synchronous /bin/bash -lc and keep bash.run additive; run successful signed real-app and installed-manager shell execution across actual app and manager restarts.",
+      "command": null,
+      "order": 10,
+      "success_condition": null
+    },
+    {
+      "action": "Run current-source native signing, Settings, protected-service lifecycle, Release signing, and notarization qualification; build-only, unit, simulator, synthetic-host, or partial XCUI evidence cannot pass it.",
+      "command": null,
+      "order": 11,
+      "success_condition": null
+    },
+    {
+      "action": "Run the manager-owned real-provider forced rollover proving exact successor acknowledgment, predecessor fencing, automatic continuation, GUI-closed operation, and recovery from every durable crash state.",
+      "command": null,
+      "order": 12,
+      "success_condition": null
+    },
+    {
+      "action": "Run representative physical-hardware qualification only on the owner-selected hardware matrix; simulator, synthetic-host, and current-machine results cannot pass G11.",
+      "command": null,
+      "order": 13,
+      "success_condition": null
+    },
+    {
+      "action": "Keep E2, P10, G09, G10, G11, G12, native, shell, continuity, hardware, final release qualification, release_authorized, and merge_authorized nonpassing.",
+      "command": null,
+      "order": 14,
       "success_condition": null
     }
   ],
@@ -688,49 +736,36 @@
       "summary": "Caller-sealed helper identity requires signed-process and freshness qualification"
     }
   ],
-  "operation_id": "2e89de7f-3afe-4f12-b1a5-b9e5a0c7741e",
+  "operation_id": "25347b80-8108-47db-92f2-d9b5ba5c02de",
   "predecessor_session": {
     "model": null,
     "provider_session_id": null,
-    "session_id": "p10-checkpoint-20260830"
+    "session_id": "p10-e2-evidence-control-checkpoint"
   },
   "project": {
-    "branch": "security/privileged-filesystem-boundary",
-    "commit": "61c3a00f3d0289cf4086182f0e8217567915b763",
+    "branch": "security/e2-evidence-binding",
+    "commit": "2dd504e53a5a09837cd289a99eee48ab7f4547eb",
     "dirty_summary": [
-      "M .forge-codex/PACKAGE_VALIDATION.json",
+      "M .forge-autonomy-state/blockers/FC-RELEASE-001.json",
+      " M .forge-autonomy-state/blockers/FC-UI-001.json",
+      " M .forge-autonomy-state/current-handoff.json",
+      " M .forge-autonomy-state/events.jsonl",
+      " M .forge-autonomy-state/run.json",
+      " M .forge-codex/PACKAGE_VALIDATION.json",
+      " M .forge-codex/state/completion-report.json",
+      " M .forge-codex/state/completion-report.md",
+      " M .forge-codex/state/current-handoff.json",
       " M .forge-codex/state/environment.json",
       " M .forge-codex/state/events.jsonl",
+      " M .forge-codex/state/evidence-index.json",
+      " M .forge-codex/state/findings-resolution.json",
+      " M .forge-codex/state/recovery-instructions.md",
       " M .forge-codex/state/release-handoff.md",
-      " M .forge-codex/state/run-state.json",
-      "?? .forge-codex/evidence/EVID-20260830T221505Z-02858db962.json",
-      "?? .forge-codex/evidence/EVID-20260830T221505Z-02858db962.stderr.txt",
-      "?? .forge-codex/evidence/EVID-20260830T221505Z-02858db962.stdout.txt",
-      "?? .forge-codex/evidence/EVID-20260830T221512Z-76aa1df459.json",
-      "?? .forge-codex/evidence/EVID-20260830T221512Z-76aa1df459.stderr.txt",
-      "?? .forge-codex/evidence/EVID-20260830T221512Z-76aa1df459.stdout.txt",
-      "?? .forge-codex/evidence/EVID-20260830T221552Z-23fccf23e2.json",
-      "?? .forge-codex/evidence/EVID-20260830T221552Z-23fccf23e2.stderr.txt",
-      "?? .forge-codex/evidence/EVID-20260830T221552Z-23fccf23e2.stdout.txt",
-      "?? .forge-codex/evidence/EVID-20260830T221558Z-70e4c016b7.json",
-      "?? .forge-codex/evidence/EVID-20260830T221558Z-70e4c016b7.stderr.txt",
-      "?? .forge-codex/evidence/EVID-20260830T221558Z-70e4c016b7.stdout.txt",
-      "?? .forge-codex/evidence/EVID-20260830T221613Z-ea0d244fa9.json",
-      "?? .forge-codex/evidence/EVID-20260830T221613Z-ea0d244fa9.stderr.txt",
-      "?? .forge-codex/evidence/EVID-20260830T221613Z-ea0d244fa9.stdout.txt",
-      "?? .forge-codex/evidence/EVID-20260830T221614Z-188ad8b638.json",
-      "?? .forge-codex/evidence/EVID-20260830T221614Z-188ad8b638.stderr.txt",
-      "?? .forge-codex/evidence/EVID-20260830T221614Z-188ad8b638.stdout.txt",
-      "?? .forge-codex/evidence/EVID-20260830T221614Z-a83cfa3e4a.json",
-      "?? .forge-codex/evidence/EVID-20260830T221614Z-a83cfa3e4a.stderr.txt",
-      "?? .forge-codex/evidence/EVID-20260830T221614Z-a83cfa3e4a.stdout.txt",
-      "?? .forge-codex/evidence/EVID-20260830T221615Z-e08156083e.json",
-      "?? .forge-codex/evidence/EVID-20260830T221615Z-e08156083e.stderr.txt",
-      "?? .forge-codex/evidence/EVID-20260830T221615Z-e08156083e.stdout.txt"
+      " M .forge-codex/state/run-state.json"
     ],
-    "display_name": "Forge-Conductor-P10-Security",
-    "project_id": "f3c802cb-7baf-5802-926d-9bc482ecc8b1",
-    "repository_root": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security"
+    "display_name": "Forge-Conductor-E2-Evidence",
+    "project_id": "afbb1214-3836-5d23-a13a-a1abf65176af",
+    "repository_root": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence"
   },
   "schema_version": 1,
   "successor_session": null,

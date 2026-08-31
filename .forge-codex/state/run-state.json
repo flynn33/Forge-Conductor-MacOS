@@ -683,6 +683,8 @@
     "647aac53-0d73-43bf-b1c7-860e35112a0f",
     "810010d7-b872-41ff-8d51-414b7270ca9d",
     "82441ec1-a7ed-4137-8ec5-3d2dd99739bb",
+    "85889be2-5065-40ac-9e82-0814a66d130d",
+    "c7ccf95b-8206-46e8-a8c8-fffeb3d278b1",
     "ee862f4a-ebcc-466f-9817-1881ff1a6172",
     "fc51f448-84e9-4a30-8d7a-f4b938f60d10",
     "fdaa1903-9dea-4989-97a6-4a5518e2eddf"
@@ -901,23 +903,23 @@
       "created_at": "2026-08-27T23:39:59.864993+00:00",
       "evidence_class": "E2",
       "id": "FC-FILESYSTEM-PATH-TOCTOU-001",
-      "notes": "E2 and FCA-007 remain mandatory release blockers under the same-UID threat model. Protocol v5 uses capture-first quarantine-and-verify semantics, a canonical SHA-256 authority-envelope digest, schema-3 receipts, and exact-only legacy handling. Successful renameatx_np with RENAME_EXCL is the capture linearization point. Namespace-exact mismatch and post-capture metadata change retain the object in root-owned quarantine; content-exact fails closed. This is mitigation, not elimination. Public macOS descriptor-relative and rename APIs do not provide identity-conditional terminal mutation. Source-parent authorization and capture are not atomic: same-UID parent relocation can move the pinned parent outside the allowed root before capture, allowing deletion of one eligible outside-root regular file or symlink with unbounded bytes, or quarantine of one ineligible directory with an unbounded subtree. The final ACL or BSD-metadata-to-unlinkat race can delete one captured expected regular file or symlink, with regular-file bytes unbounded. Quarantine has no authorized restore, release, or purge disposition, so 32 conflicts can exhaust the volume ledger. Startup recovery fencing, terminal physical-state repair, caller-ledger and generation fencing, daemon-owned discovery and revoke, binding lifecycle, qualified volume behavior, whole-product freshness, direct daemon execution, and the signed 57-row distinct-process crash, adversarial, lifecycle, and Release matrix remain open. Debug EVID-20260830T220320Z-4cccc31cce and Release EVID-20260830T220539Z-eac42f2a8c each pass 771 source tests with two declared skips and zero failures on source manifest 89e94937e86eb617eb7c6b2138f1584d3ecc7b32ce524919734fee39766a63a0. The evidence controls pass 23 focused tests and verify provenance structure, but a completed 34-item security diff review confirmed that one generic aggregate artifact can still be reused across cases and that one arbitrary formal-kind artifact can support all formal predicates without semantic case, role, iteration, barrier, mount, crash-phase, fixture, signing, process, or formal-claim binding. The schema and unexecuted template are controls only and cannot prove E2. E2, P10, G10, and G12 remain open.",
+      "notes": "E2 and FCA-007 remain mandatory release blockers under the same-UID threat model. Protocol v5 uses capture-first quarantine-and-verify semantics, a canonical SHA-256 authority-envelope digest, schema-3 receipts, and exact-only legacy handling. Successful renameatx_np with RENAME_EXCL is the capture linearization point. Namespace-exact mismatch and post-capture metadata change retain the object in root-owned quarantine; content-exact fails closed. This is mitigation, not elimination. Public macOS descriptor-relative open, stat, unlink, rename, renameatx_np, descriptor, fcntl, fsync, and F_FULLFSYNC interfaces do not combine terminal namespace mutation with an expected device, inode, vnode generation, or content token. Source-parent authorization and capture are not atomic: same-UID relocation can move the validated pinned parent outside the authorized root before capture. One winning race can delete one eligible outside-root regular file or symlink whose bytes are unbounded, or quarantine one ineligible directory whose subtree is unbounded. The final ACL/BSD-metadata-check-to-unlinkat race can delete one already captured expected regular file or symlink after its authorization metadata changes; regular-file bytes are unbounded. Terminal quarantine has no authorized restore, release, or purge disposition and cannot be acknowledged while the protected leaf exists; 32 conflicts can exhaust every protected slot on one volume. Caller-ledger removal, relocation, or lock-inode replacement and project-generation races can strand or allow up to 32 captured or terminal transactions per protected volume; each affected regular file can contain unbounded bytes. Writable descriptors and hard links prevent an exact immutable-content guarantee. Startup recovery fencing, terminal physical-state repair, caller-ledger and generation fencing, daemon-owned discovery and revoke, project-binding revoke and garbage collection, qualified external/removable volume behavior, whole-product freshness, direct daemon execution, and the full signed distinct-process 57-row crash, adversarial, lifecycle, volume, hard-link, writable-descriptor, Release, and notarization matrix remain open. Source checkpoint 2dd504e53a5a09837cd289a99eee48ab7f4547eb adds evidence-control schema v2 and artifact-binding schema v1, recorder-owned evidence-specific copies, exact case/role/iteration/subject/predicate/fact and qualification-context binding, current-manifest and Git execution identity checks, bounded descriptor reads, and pathname replacement/rewrite negative tests. The evidence-control suite passed 57 of 57 tests in the final repeated validation. The template remains partial with all 57 rows not_run, all 12 formal predicates false, zero formal references, and a null qualification-context reference. These are controls only: they do not execute a signed distinct-process case, prove a claim true, provide an identity-conditional macOS mutation, or close any formal predicate. Qualification still assumes a trusted quiescent workspace against same-UID transient source-manifest replacement; an arbitrary caller-selected harness is not authenticated; aggregate report and evidence input reads remain unbounded fail-closed denial-of-service surfaces; and the G10 handler does not yet invoke this checker. Post-verification mutation also remains outside immutable-content proof. E2, P10, G10, and G12 remain open; G09 continuity, G11 hardware, native signing/UI, shell qualification, and final release qualification also remain release-blocking.",
       "path": "Sources/ForgeFilesystemDaemon/PrivilegedLeafDeleteEngine.swift",
       "severity": "High",
       "status": "patching",
       "title": "Privileged filesystem boundary remains mitigated but not identity-conditionally closed",
-      "updated_at": "2026-08-30T22:10:21.061928+00:00"
+      "updated_at": "2026-08-31T01:53:29.090893+00:00"
     },
     {
       "created_at": "2026-08-28T10:20:34.631148+00:00",
       "evidence_class": "E0",
       "id": "FC-SHELL-COMPAT-QUALIFICATION-001",
-      "notes": "The established shell_exec surface remains synchronous /bin/bash -lc and clean-profile bash.run remains additive. Source tests prove clean-install default enablement, accidental legacy-disabled migration, explicit user opt-out, MCP tools/list registration, successful execution, the established result contract and timeout clamp, app rebootstrap, manager-service restart, and Settings visibility and control. Current Debug EVID-20260830T220320Z-4cccc31cce and Release EVID-20260830T220539Z-eac42f2a8c each pass 771 tests with two declared skips and zero failures. Earlier signed Debug XCUI EVID-20260830T153118Z-752f058222 proves bounded Settings visibility, control, persistence, and GUI relaunch at its exact revision. Prior-manifest signed build EVID-20260830T211007Z-760c293557 and bundle check EVID-20260830T211029Z-ae82e789b1 are supporting evidence only. Live installed-artifact run EVID-20260830T185444Z-7878ff2abf was denied at launchctl bootstrap by the automation-host process tree and made no shell_exec pass claim. Successful shell_exec through the signed real app and installed manager across both process restarts remains required. Shell compatibility remains open and release-blocking.",
+      "notes": "The established shell_exec surface remains synchronous /bin/bash -lc and clean-profile bash.run remains additive. Source regressions cover clean-install default enablement, accidental legacy-disabled migration, preservation of explicit user opt-out, MCP tools/list registration, successful execution, the established shell_exec result contract and timeout clamp, app rebootstrap, manager-service restart, and Settings visibility and control. Prior-source Debug EVID-20260830T220320Z-4cccc31cce and Release EVID-20260830T220539Z-eac42f2a8c each passed 771 tests with two declared skips and zero failures; they are supporting evidence only for source checkpoint 2dd504e53a5a09837cd289a99eee48ab7f4547eb. Earlier signed Debug XCUI EVID-20260830T153118Z-752f058222 proves bounded Settings visibility, control, persistence, and GUI relaunch only at its exact revision. Prior-manifest signed build EVID-20260830T211007Z-760c293557 and bundle check EVID-20260830T211029Z-ae82e789b1 are supporting evidence only. Live installed-artifact run EVID-20260830T185444Z-7878ff2abf was denied at launchctl bootstrap by the automation-host process tree and made no shell_exec pass claim. Successful shell_exec through the signed real app and installed manager across both actual process restarts remains required. Shell compatibility, P10, G10, native qualification, and release qualification remain open and release-blocking.",
       "path": "Tests/ForgeConductorUITests/ForgeConductorUITests.swift",
       "severity": "High",
       "status": "validating",
       "title": "Shell compatibility qualification requires current-source native execution",
-      "updated_at": "2026-08-30T22:10:21.231099+00:00"
+      "updated_at": "2026-08-31T01:53:45.032043+00:00"
     },
     {
       "created_at": "2026-08-28T10:20:34.787513+00:00",
@@ -1030,7 +1032,7 @@
       "updated_at": "2026-08-30T22:15:41.618707+00:00"
     }
   ],
-  "last_event_sequence": 691,
+  "last_event_sequence": 697,
   "phases": {
     "P00": {
       "attempts": 1,
@@ -1112,13 +1114,13 @@
     }
   },
   "repository": {
-    "branch": "security/privileged-filesystem-boundary",
-    "commit": "61c3a00f3d0289cf4086182f0e8217567915b763",
+    "branch": "security/e2-evidence-binding",
+    "commit": "2dd504e53a5a09837cd289a99eee48ab7f4547eb",
     "dirty": true,
-    "root": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security"
+    "root": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence"
   },
   "run_id": "aba90ab1-be80-4cc5-aa0b-23dd54d4a24d",
   "schema_version": 1,
   "status": "active",
-  "updated_at": "2026-08-30T22:16:48.897094+00:00"
+  "updated_at": "2026-08-31T02:09:38.449269+00:00"
 }

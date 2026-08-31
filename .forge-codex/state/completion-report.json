@@ -21,7 +21,7 @@
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex/state/gate-results/G00.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G00.json",
       "name": "gate-result-exists:G00",
       "passed": true
     },
@@ -43,20 +43,35 @@
     {
       "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.stdout.txt",
       "name": "gate-artifact-exists:G00:G00.stdout.txt",
-      "passed": false
+      "passed": true
+    },
+    {
+      "detail": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "name": "gate-artifact-hash:G00:G00.stdout.txt",
+      "passed": true
     },
     {
       "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.stderr.txt",
       "name": "gate-artifact-exists:G00:G00.stderr.txt",
-      "passed": false
+      "passed": true
+    },
+    {
+      "detail": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "name": "gate-artifact-hash:G00:G00.stderr.txt",
+      "passed": true
     },
     {
       "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.criteria.json",
       "name": "gate-artifact-exists:G00:G00.criteria.json",
-      "passed": false
+      "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex/state/gate-results/G01.json",
+      "detail": "1aa97c749b734a48dd19dfca93d250d454f0ee25c9496b2227c0ab6f8f7d842b",
+      "name": "gate-artifact-hash:G00:G00.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G01.json",
       "name": "gate-result-exists:G01",
       "passed": true
     },
@@ -78,20 +93,35 @@
     {
       "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G01.stdout.txt",
       "name": "gate-artifact-exists:G01:G01.stdout.txt",
-      "passed": false
+      "passed": true
+    },
+    {
+      "detail": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "name": "gate-artifact-hash:G01:G01.stdout.txt",
+      "passed": true
     },
     {
       "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G01.stderr.txt",
       "name": "gate-artifact-exists:G01:G01.stderr.txt",
-      "passed": false
+      "passed": true
+    },
+    {
+      "detail": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "name": "gate-artifact-hash:G01:G01.stderr.txt",
+      "passed": true
     },
     {
       "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G01.criteria.json",
       "name": "gate-artifact-exists:G01:G01.criteria.json",
-      "passed": false
+      "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex/state/gate-results/G02.json",
+      "detail": "db06fee93b77af7b76208f85e3c0c53c49c5be48c2f61047199f2120f2325daf",
+      "name": "gate-artifact-hash:G01:G01.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G02.json",
       "name": "gate-result-exists:G02",
       "passed": true
     },
@@ -113,20 +143,35 @@
     {
       "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G02.stdout.txt",
       "name": "gate-artifact-exists:G02:G02.stdout.txt",
-      "passed": false
+      "passed": true
+    },
+    {
+      "detail": "72c77100be1e99a6acecdfc985ebf529458708b5de41a8ccb49fbbbbe48b0b3e",
+      "name": "gate-artifact-hash:G02:G02.stdout.txt",
+      "passed": true
     },
     {
       "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G02.stderr.txt",
       "name": "gate-artifact-exists:G02:G02.stderr.txt",
-      "passed": false
+      "passed": true
+    },
+    {
+      "detail": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "name": "gate-artifact-hash:G02:G02.stderr.txt",
+      "passed": true
     },
     {
       "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G02.criteria.json",
       "name": "gate-artifact-exists:G02:G02.criteria.json",
-      "passed": false
+      "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex/state/gate-results/G03.json",
+      "detail": "1f33267dc6f77f755f5c8a2b537d600ba9f0b4218d3854af1f24263003af0b49",
+      "name": "gate-artifact-hash:G02:G02.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G03.json",
       "name": "gate-result-exists:G03",
       "passed": true
     },
@@ -148,20 +193,35 @@
     {
       "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G03.stdout.txt",
       "name": "gate-artifact-exists:G03:G03.stdout.txt",
-      "passed": false
+      "passed": true
+    },
+    {
+      "detail": "47d39d678a1d5b15134be9e4a45880a184adb5541942e6ffb2bcaecbfa8362be",
+      "name": "gate-artifact-hash:G03:G03.stdout.txt",
+      "passed": true
     },
     {
       "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G03.stderr.txt",
       "name": "gate-artifact-exists:G03:G03.stderr.txt",
-      "passed": false
+      "passed": true
+    },
+    {
+      "detail": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "name": "gate-artifact-hash:G03:G03.stderr.txt",
+      "passed": true
     },
     {
       "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G03.criteria.json",
       "name": "gate-artifact-exists:G03:G03.criteria.json",
-      "passed": false
+      "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex/state/gate-results/G04.json",
+      "detail": "7560820c0530d52b1a97f265cecd284c99a0a416b670919d11204e48eb6b367c",
+      "name": "gate-artifact-hash:G03:G03.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G04.json",
       "name": "gate-result-exists:G04",
       "passed": true
     },
@@ -183,20 +243,35 @@
     {
       "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G04.stdout.txt",
       "name": "gate-artifact-exists:G04:G04.stdout.txt",
-      "passed": false
+      "passed": true
+    },
+    {
+      "detail": "fa52a67ada4051cdaf064cb6fc52cdd72cd7957006924443b4e414e2f5abda61",
+      "name": "gate-artifact-hash:G04:G04.stdout.txt",
+      "passed": true
     },
     {
       "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G04.stderr.txt",
       "name": "gate-artifact-exists:G04:G04.stderr.txt",
-      "passed": false
+      "passed": true
+    },
+    {
+      "detail": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "name": "gate-artifact-hash:G04:G04.stderr.txt",
+      "passed": true
     },
     {
       "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G04.criteria.json",
       "name": "gate-artifact-exists:G04:G04.criteria.json",
-      "passed": false
+      "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex/state/gate-results/G05.json",
+      "detail": "04fb03812290bdb7b43b973bde31d4399d351e29587f17096a419afd0c824b77",
+      "name": "gate-artifact-hash:G04:G04.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G05.json",
       "name": "gate-result-exists:G05",
       "passed": true
     },
@@ -218,20 +293,35 @@
     {
       "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G05.stdout.txt",
       "name": "gate-artifact-exists:G05:G05.stdout.txt",
-      "passed": false
+      "passed": true
+    },
+    {
+      "detail": "cceda1d1209095847a386a86f9048b1de62691c7e7d8ef6a1954b151b7ad759d",
+      "name": "gate-artifact-hash:G05:G05.stdout.txt",
+      "passed": true
     },
     {
       "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G05.stderr.txt",
       "name": "gate-artifact-exists:G05:G05.stderr.txt",
-      "passed": false
+      "passed": true
+    },
+    {
+      "detail": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "name": "gate-artifact-hash:G05:G05.stderr.txt",
+      "passed": true
     },
     {
       "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G05.criteria.json",
       "name": "gate-artifact-exists:G05:G05.criteria.json",
-      "passed": false
+      "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex/state/gate-results/G06.json",
+      "detail": "88711d133c06c28d1c6344846856bfac0c409fb3d2627616faa5a8da2d14af39",
+      "name": "gate-artifact-hash:G05:G05.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G06.json",
       "name": "gate-result-exists:G06",
       "passed": true
     },
@@ -253,20 +343,35 @@
     {
       "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G06.stdout.txt",
       "name": "gate-artifact-exists:G06:G06.stdout.txt",
-      "passed": false
+      "passed": true
+    },
+    {
+      "detail": "b73cca38f82eb1e02a02cd37a504653a7561c5ed02bdcdfffe9f3891eacddc88",
+      "name": "gate-artifact-hash:G06:G06.stdout.txt",
+      "passed": true
     },
     {
       "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G06.stderr.txt",
       "name": "gate-artifact-exists:G06:G06.stderr.txt",
-      "passed": false
+      "passed": true
+    },
+    {
+      "detail": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "name": "gate-artifact-hash:G06:G06.stderr.txt",
+      "passed": true
     },
     {
       "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G06.criteria.json",
       "name": "gate-artifact-exists:G06:G06.criteria.json",
-      "passed": false
+      "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex/state/gate-results/G07.json",
+      "detail": "ded439d6b183d7f8074fa2a4bb9d28d6eca6b31d03160a650085360b877dca5a",
+      "name": "gate-artifact-hash:G06:G06.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G07.json",
       "name": "gate-result-exists:G07",
       "passed": true
     },
@@ -288,20 +393,35 @@
     {
       "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G07.stdout.txt",
       "name": "gate-artifact-exists:G07:G07.stdout.txt",
-      "passed": false
+      "passed": true
+    },
+    {
+      "detail": "d35955092f94076cf65a68f7ac24f677303902ca70b1a7a7b65fa12524d948a6",
+      "name": "gate-artifact-hash:G07:G07.stdout.txt",
+      "passed": true
     },
     {
       "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G07.stderr.txt",
       "name": "gate-artifact-exists:G07:G07.stderr.txt",
-      "passed": false
+      "passed": true
+    },
+    {
+      "detail": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "name": "gate-artifact-hash:G07:G07.stderr.txt",
+      "passed": true
     },
     {
       "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G07.criteria.json",
       "name": "gate-artifact-exists:G07:G07.criteria.json",
-      "passed": false
+      "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex/state/gate-results/G08.json",
+      "detail": "0f5ff5eaffd84882273c49eebfd3e378246b67d2dafdf327735ec4e0a73806b2",
+      "name": "gate-artifact-hash:G07:G07.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G08.json",
       "name": "gate-result-exists:G08",
       "passed": true
     },
@@ -323,20 +443,35 @@
     {
       "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G08.stdout.txt",
       "name": "gate-artifact-exists:G08:G08.stdout.txt",
-      "passed": false
+      "passed": true
+    },
+    {
+      "detail": "456c68fd77f436c47987b7dd6b71d21c2b8a43790b473444e99a331b877da09b",
+      "name": "gate-artifact-hash:G08:G08.stdout.txt",
+      "passed": true
     },
     {
       "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G08.stderr.txt",
       "name": "gate-artifact-exists:G08:G08.stderr.txt",
-      "passed": false
+      "passed": true
+    },
+    {
+      "detail": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "name": "gate-artifact-hash:G08:G08.stderr.txt",
+      "passed": true
     },
     {
       "detail": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G08.criteria.json",
       "name": "gate-artifact-exists:G08:G08.criteria.json",
-      "passed": false
+      "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex/state/gate-results/G09.json",
+      "detail": "9400af9cca98362000bcd1426c6557108e041511a348c24617d1ad85f3d6fce1",
+      "name": "gate-artifact-hash:G08:G08.criteria.json",
+      "passed": true
+    },
+    {
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G09.json",
       "name": "gate-result-exists:G09",
       "passed": true
     },
@@ -371,7 +506,7 @@
       "passed": false
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex/state/gate-results/G10.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G10.json",
       "name": "gate-result-exists:G10",
       "passed": true
     },
@@ -406,7 +541,7 @@
       "passed": false
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex/state/gate-results/G11.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/gate-results/G11.json",
       "name": "gate-result-exists:G11",
       "passed": true
     },
@@ -441,7 +576,7 @@
       "passed": false
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex/state/feature-baseline.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/feature-baseline.json",
       "name": "feature-baseline-exists",
       "passed": true
     },
@@ -494,7 +629,7 @@
       "passed": true
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex/state/findings-resolution.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/findings-resolution.json",
       "name": "findings-resolution-exists",
       "passed": true
     },
@@ -511,7 +646,7 @@
       "passed": false
     },
     {
-      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex/state/host-capability-report.json",
+      "detail": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex/state/host-capability-report.json",
       "name": "host-capability-report-exists",
       "passed": true
     },
@@ -526,35 +661,8 @@
       "passed": true
     }
   ],
-  "commit": "61c3a00f3d0289cf4086182f0e8217567915b763",
+  "commit": "2dd504e53a5a09837cd289a99eee48ab7f4547eb",
   "errors": [
-    "gate-artifact-exists:G00:G00.stdout.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.stdout.txt",
-    "gate-artifact-exists:G00:G00.stderr.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.stderr.txt",
-    "gate-artifact-exists:G00:G00.criteria.json: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.criteria.json",
-    "gate-artifact-exists:G01:G01.stdout.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G01.stdout.txt",
-    "gate-artifact-exists:G01:G01.stderr.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G01.stderr.txt",
-    "gate-artifact-exists:G01:G01.criteria.json: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G01.criteria.json",
-    "gate-artifact-exists:G02:G02.stdout.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G02.stdout.txt",
-    "gate-artifact-exists:G02:G02.stderr.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G02.stderr.txt",
-    "gate-artifact-exists:G02:G02.criteria.json: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G02.criteria.json",
-    "gate-artifact-exists:G03:G03.stdout.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G03.stdout.txt",
-    "gate-artifact-exists:G03:G03.stderr.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G03.stderr.txt",
-    "gate-artifact-exists:G03:G03.criteria.json: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G03.criteria.json",
-    "gate-artifact-exists:G04:G04.stdout.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G04.stdout.txt",
-    "gate-artifact-exists:G04:G04.stderr.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G04.stderr.txt",
-    "gate-artifact-exists:G04:G04.criteria.json: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G04.criteria.json",
-    "gate-artifact-exists:G05:G05.stdout.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G05.stdout.txt",
-    "gate-artifact-exists:G05:G05.stderr.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G05.stderr.txt",
-    "gate-artifact-exists:G05:G05.criteria.json: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G05.criteria.json",
-    "gate-artifact-exists:G06:G06.stdout.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G06.stdout.txt",
-    "gate-artifact-exists:G06:G06.stderr.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G06.stderr.txt",
-    "gate-artifact-exists:G06:G06.criteria.json: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G06.criteria.json",
-    "gate-artifact-exists:G07:G07.stdout.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G07.stdout.txt",
-    "gate-artifact-exists:G07:G07.stderr.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G07.stderr.txt",
-    "gate-artifact-exists:G07:G07.criteria.json: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G07.criteria.json",
-    "gate-artifact-exists:G08:G08.stdout.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G08.stdout.txt",
-    "gate-artifact-exists:G08:G08.stderr.txt: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G08.stderr.txt",
-    "gate-artifact-exists:G08:G08.criteria.json: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G08.criteria.json",
     "gate-passed:G09: passed; This record preserves the exact-revision adapter qualification. The live scenario invoked the adapter directly and does not establish current manager-owned threshold-forced rollover authority. Current release qualification requires exact successor acknowledgement, predecessor fencing and idempotent sealing, automatic continuation, GUI-closed operation, and recovery from every durable crash state in one real-provider forced-rollover scenario.",
     "gate-ledger-passed:G09: blocked_dependency",
     "gate-current-release-authority:G09: This record preserves the exact-revision adapter qualification. The live scenario invoked the adapter directly and does not establish current manager-owned threshold-forced rollover authority. Current release qualification requires exact successor acknowledgement, predecessor fencing and idempotent sealing, automatic continuation, GUI-closed operation, and recovery from every durable crash state in one real-provider forced-rollover scenario.",
@@ -574,14 +682,14 @@
     "critical-high-findings-resolved: ['FC-FILESYSTEM-PATH-TOCTOU-001', 'FC-PRIVILEGED-SERVICE-LIFECYCLE-001', 'FC-PRIVILEGED-CALLER-IDENTITY-001', 'FC-SHELL-COMPAT-QUALIFICATION-001', 'FC-UI-QUALIFICATION-001', 'FC-AUTONOMOUS-CONTINUITY-E2E-001']",
     "autonomous-rollover-mode-proven: forge.native-session-host"
   ],
-  "evaluated_at": "2026-08-30T22:16:59.357291+00:00",
+  "evaluated_at": "2026-08-31T02:16:37.071701+00:00",
   "finalization_gate": {
     "gate_id": "G12",
     "reason": "G12 is written as passed only after every prerequisite and final integrity check passes and finalization is authorized.",
     "status": "blocked_open"
   },
   "passed": false,
-  "repository": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security",
+  "repository": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence",
   "run_id": "aba90ab1-be80-4cc5-aa0b-23dd54d4a24d",
   "schema_version": 1
 }

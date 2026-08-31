@@ -1,12 +1,14 @@
 # Recovery instructions
 
-The active preparation branch is `security/privileged-filesystem-boundary`,
-based on `main` at `8bcc039a2f0d4d17b871d5e968b3b37a663c5ccb` and published through
-draft pull request #15. The exact checkpoint HEAD is recorded only after a
-commit, push, fetch, and GitHub readback in `environment.json` and
-`release-handoff.md`; verify those records against live Git before resuming.
-Also verify the dirty state and `.forge-codex/state/run-state.json`; do not infer
-readiness from the package directory alone.
+The active preparation branch is `security/e2-evidence-binding`, based on
+`main` at `cd7e84fed8ed0fe0a8ec90793e83388c8a451f09` and published through
+open draft pull request #17. The source and evidence-control checkpoint is
+`2dd504e53a5a09837cd289a99eee48ab7f4547eb`. A later state-only commit can
+advance the pull-request transport HEAD without changing that source checkpoint;
+record and verify both identities independently in `environment.json` and
+`release-handoff.md`. Also verify the dirty state and
+`.forge-codex/state/run-state.json`; do not infer readiness from the package
+directory alone.
 
 The earlier continuity source checkpoint
 `52f8aca47463f88fa94276115fb5c2070ca683ef` on
@@ -26,7 +28,7 @@ authority scenario recorded in `FC-AUTONOMOUS-CONTINUITY-E2E-001`.
 ## Rollback boundaries
 
 - Do not broadly reset or clean the repository. Preserve user-owned work and inspect intended paths before staging.
-- The current rollback base is `main` at `8bcc039a2f0d4d17b871d5e968b3b37a663c5ccb`; draft pull request #15 carries the active branch. Read the exact publication HEAD back from GitHub before relying on it. The autonomy baseline `b72d6e8dc00681477224fb1b79859f553bc02558` and bounded-continuation checkpoint `52f8aca47463f88fa94276115fb5c2070ca683ef` are historical reference points, not current authority.
+- The current rollback base is `main` at `cd7e84fed8ed0fe0a8ec90793e83388c8a451f09`; draft pull request #17 carries the active branch and source checkpoint `2dd504e53a5a09837cd289a99eee48ab7f4547eb`. Read the exact publication transport HEAD back from GitHub before relying on it. The autonomy baseline `b72d6e8dc00681477224fb1b79859f553bc02558` and bounded-continuation checkpoint `52f8aca47463f88fa94276115fb5c2070ca683ef` are historical reference points, not current authority.
 - External profile traces are under `/Users/jimdaley/Documents/RavenForge/Forge-Conductor-MacOS/Forge-Conductor-Repair-Evidence/aba90ab1-be80-4cc5-aa0b-23dd54d4a24d`.
 - Developer ID signing, notarization, and distribution remain outside this checkpoint. Repository publication is authorized only for verified checkpoints on the current branch.
 
@@ -37,7 +39,39 @@ authority scenario recorded in `FC-AUTONOMOUS-CONTINUITY-E2E-001`.
 - A `quarantined` result is durable, terminal, recovery-required, and deliberately nonacknowledgeable while the protected leaf exists. No separately authorized restore, release, or purge operation exists. Preserve the slot and escalate; do not mutate it to regain capacity.
 - If the transaction ID is unavailable, a terminal receipt contradicts physical protected-leaf state, startup/per-volume recovery has not fenced new mutations, or the tool returns generic unavailable, do not infer success from pathname absence and do not redispatch the delete. Preserve the state for E2 investigation.
 - Capacity exhaustion after 32 retained transactions is a fail-closed condition. It is not authority for manual cleanup. After any supported query, resume, or acknowledgement, rerun `doctor.sh`, `statectl.py validate`, and the exact bounded qualification lane before relying on the result.
-- These controls mitigate crash and replay ambiguity. They do not eliminate source-parent relocation, final ACL/BSD-metadata races, caller-ledger tampering, or the other open E2 residuals.
+- These controls mitigate crash and replay ambiguity. They do not eliminate
+  source-parent relocation, final ACL/BSD-metadata races, caller-ledger
+  tampering, or the other open E2 residuals. Source-parent authorization and
+  capture are not atomic: one winning same-UID relocation can delete one
+  eligible outside-root regular file or symlink whose bytes are unbounded, or
+  quarantine one ineligible directory whose subtree is unbounded. The final
+  ACL/BSD-metadata-check-to-unlinkat race can delete one already captured
+  expected regular file or symlink after its authorization metadata changes;
+  regular-file bytes are unbounded. Caller-ledger removal, relocation, or
+  lock-inode replacement and generation races can strand or allow up to 32
+  captured or terminal transactions per protected volume, with unbounded bytes
+  in each affected regular file. Writable descriptors and hard links prevent an
+  exact immutable-content guarantee.
+
+## Evidence-control recovery boundary
+
+- Source checkpoint `2dd504e53a5a09837cd289a99eee48ab7f4547eb`
+  adds semantic artifact binding and passed 57 of 57 evidence-control tests.
+  This is control evidence only. It does not execute any signed distinct-process
+  qualification case or prove a formal predicate.
+- The checked-in template deliberately has all 57 rows `not_run`, all 12 formal
+  predicates false, zero formal references, and a null qualification-context
+  reference. Do not edit those values to recover or advance a gate.
+- Qualification assumes a trusted quiescent workspace against same-UID
+  transient source-manifest replacement. An arbitrary caller-selected harness
+  is not authenticated. Aggregate report and evidence input reads remain
+  unbounded fail-closed denial-of-service surfaces. The G10 handler does not yet
+  invoke the checker. Post-verification mutation is outside immutable-content
+  proof.
+- Resume P10 by executing the full signed distinct-process 57-row matrix and
+  addressing the remaining filesystem residuals. E2, P10, G10, G12, G09
+  continuity, G11 hardware, native signing/UI, shell qualification, and final
+  release qualification remain open and release-blocking.
 
 ## Environment limits
 

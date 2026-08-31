@@ -2707,6 +2707,11 @@
     },
     {
       "detail": "valid",
+      "name": "json:schemas/p10-privileged-filesystem-artifact-binding.schema.json",
+      "passed": true
+    },
+    {
+      "detail": "valid",
       "name": "json:schemas/p10-privileged-filesystem-qualification-report.schema.json",
       "passed": true
     },
@@ -3676,20 +3681,20 @@
       "passed": true
     },
     {
-      "detail": "Authorship-attribution scan passed for /Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex",
+      "detail": "Authorship-attribution scan passed for /Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex",
       "name": "authorship-attribution-scan",
       "passed": true
     },
     {
-      "detail": "Secret scan passed for /Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex",
+      "detail": "Secret scan passed for /Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex",
       "name": "secret-scan",
       "passed": true
     }
   ],
   "errors": [],
-  "root": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security/.forge-codex",
+  "root": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Evidence/.forge-codex",
   "schema_version": 1,
   "valid": true,
-  "validated_at": "2026-08-30T22:16:59.764877+00:00",
+  "validated_at": "2026-08-31T02:16:36.299577+00:00",
   "warnings": []
 }
