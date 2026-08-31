@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T15:10:20.622518+00:00",
+  "captured_at": "2026-08-31T15:15:11.777960+00:00",
   "environment_keys_present": [
     "CODEX_APP_TOOLS_PIPE_PATH",
     "CODEX_CI",
@@ -16,9 +16,9 @@
       "active_branch": "repair/e2-qualification-next",
       "base_branch": "main",
       "base_sha": "3e4fe44b3d96938c30d6b83f7d92d417489a97be",
-      "github_readback_verified": false,
-      "head_sha": "e1bbd951e180e2447d3951d916e5e223f331045e",
-      "identity_resolution": "pull_request_readback_mismatch",
+      "github_readback_verified": true,
+      "head_sha": "f5a30af7bdd1390cf4baec986b0b1af83fb19160",
+      "identity_resolution": "verified",
       "main_branch": "main",
       "main_sha": "3e4fe44b3d96938c30d6b83f7d92d417489a97be",
       "publication_head_branch": "security/e2-harness-controls",
@@ -27,13 +27,13 @@
         "baseRefName": "main",
         "baseRefOid": "3e4fe44b3d96938c30d6b83f7d92d417489a97be",
         "headRefName": "security/e2-harness-controls",
-        "headRefOid": "41c592f7344a16020bbfc8fb72371233698d2f8f",
+        "headRefOid": "f5a30af7bdd1390cf4baec986b0b1af83fb19160",
         "isDraft": true,
         "number": 19,
         "state": "OPEN",
         "url": "https://github.com/flynn33/Forge-Conductor-MacOS/pull/19"
       },
-      "remote_head_sha": "41c592f7344a16020bbfc8fb72371233698d2f8f"
+      "remote_head_sha": "f5a30af7bdd1390cf4baec986b0b1af83fb19160"
     },
     "current_work": "P10",
     "mandatory_release_blockers": [
@@ -182,7 +182,7 @@
       "does_not_close_p10_e2_native_continuity_or_hardware": true,
       "merge_authorized": false,
       "merge_requires_residuals_in_pr_state_doctor_and_selector": true,
-      "reviewable": false,
+      "reviewable": true,
       "simulator_or_current_host_results_do_not_pass_owner_deferred_g11": true
     },
     "release_authorized": false,

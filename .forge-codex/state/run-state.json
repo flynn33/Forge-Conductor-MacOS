@@ -1120,7 +1120,7 @@
       "updated_at": "2026-08-31T13:36:24.702972+00:00"
     }
   ],
-  "last_event_sequence": 785,
+  "last_event_sequence": 786,
   "phases": {
     "P00": {
       "attempts": 1,
@@ -1203,12 +1203,12 @@
   },
   "repository": {
     "branch": "repair/e2-qualification-next",
-    "commit": "e1bbd951e180e2447d3951d916e5e223f331045e",
+    "commit": "f5a30af7bdd1390cf4baec986b0b1af83fb19160",
     "dirty": true,
     "root": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next"
   },
   "run_id": "aba90ab1-be80-4cc5-aa0b-23dd54d4a24d",
   "schema_version": 1,
   "status": "active",
-  "updated_at": "2026-08-31T15:10:45.399112+00:00"
+  "updated_at": "2026-08-31T15:15:31.823134+00:00"
 }
