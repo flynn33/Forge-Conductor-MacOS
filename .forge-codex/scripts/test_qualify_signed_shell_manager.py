@@ -218,23 +218,30 @@ class SignedShellManagerHarnessTests(unittest.TestCase):
             with self.assertRaisesRegex(subject.QualificationError, "missing keys"):
                 subject.validate_shell_result(payload, cwd)
 
-    def test_allowed_root_validation_uses_resolved_filesystem_identity(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = pathlib.Path(temporary)
-            expected = root / "expected"
-            expected.mkdir()
-            alias = root / "alias"
-            alias.symlink_to(expected, target_is_directory=True)
+    def test_allowed_root_validation_accepts_only_fixed_tmp_alias(self) -> None:
+        with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
+            observed = pathlib.Path(temporary)
+            expected = observed.resolve(strict=True)
             validated = subject.validate_single_allowed_root(
-                {"allowed_roots": [str(alias)]},
+                {"allowed_roots": [str(observed)]},
                 expected,
             )
-            self.assertEqual(validated["configured"], str(alias))
+            self.assertEqual(validated["configured"], str(observed))
+            self.assertEqual(pathlib.Path(validated["normalized"]), expected)
             self.assertEqual(pathlib.Path(validated["resolved"]), expected.resolve())
 
-            wrong = root / "wrong"
+            alias = observed.parent / f"{observed.name}-alias"
+            alias.symlink_to(expected, target_is_directory=True)
+            self.addCleanup(lambda: alias.unlink(missing_ok=True))
+            with self.assertRaisesRegex(subject.QualificationError, "canonical"):
+                subject.validate_single_allowed_root(
+                    {"allowed_roots": [str(alias)]},
+                    expected,
+                )
+
+            wrong = observed / "wrong"
             wrong.mkdir()
-            with self.assertRaisesRegex(subject.QualificationError, "unexpected directory"):
+            with self.assertRaisesRegex(subject.QualificationError, "canonical"):
                 subject.validate_single_allowed_root(
                     {"allowed_roots": [str(wrong)]},
                     expected,

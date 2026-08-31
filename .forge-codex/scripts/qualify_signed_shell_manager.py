@@ -731,10 +731,16 @@ def validate_single_allowed_root(
     )
     observed = pathlib.Path(roots[0])
     require(observed.is_absolute(), "manager returned a relative allowed project root")
+    observed_normalized = normalized_launchagent_path(observed)
+    expected_normalized = normalized_launchagent_path(expected)
+    require(
+        observed_normalized == expected_normalized,
+        "manager did not persist the canonical allowed project root",
+    )
     try:
         observed_resolved = observed.resolve(strict=True)
         expected_resolved = expected.resolve(strict=True)
-    except (OSError, RuntimeError) as error:
+    except (OSError, RuntimeError, ValueError) as error:
         raise QualificationError(f"allowed project root cannot be resolved: {error}") from error
     require(
         observed_resolved == expected_resolved,
@@ -742,6 +748,7 @@ def validate_single_allowed_root(
     )
     return {
         "configured": str(observed),
+        "normalized": str(observed_normalized),
         "resolved": str(observed_resolved),
     }
 
