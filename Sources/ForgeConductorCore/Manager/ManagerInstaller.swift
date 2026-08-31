@@ -1714,6 +1714,14 @@ public final class ManagerInstaller: @unchecked Sendable {
     ) throws {
         let userDomain = "gui/\(uid)"
         let jobTarget = "\(userDomain)/\(Self.launchAgentLabel)"
+        func cleanupDetail() -> String {
+            cleanupFailedLoginAgent(
+                jobTarget: jobTarget,
+                plistURL: plistURL,
+                verificationAttempts: readinessAttempts,
+                verificationDelaySec: readinessDelaySec
+            )
+        }
         let beforeLoad: ProcessResult
         do {
             beforeLoad = try launchctlRunner.run(
@@ -1721,23 +1729,24 @@ public final class ManagerInstaller: @unchecked Sendable {
                 timeoutSec: 5
             )
         } catch {
-            cleanupFailedLoginAgent(jobTarget: jobTarget, plistURL: plistURL)
+            let cleanup = cleanupDetail()
             throw launchAgentReadinessError(
                 jobTarget: jobTarget,
                 bootstrap: nil,
                 legacyLoad: nil,
                 detail: "could not prove the exact job absent before load: "
-                    + error.localizedDescription
+                    + error.localizedDescription + "; " + cleanup
             )
         }
         guard launchAgentIsProvenAbsent(beforeLoad) else {
-            cleanupFailedLoginAgent(jobTarget: jobTarget, plistURL: plistURL)
+            let cleanup = cleanupDetail()
             throw launchAgentReadinessError(
                 jobTarget: jobTarget,
                 bootstrap: nil,
                 legacyLoad: nil,
                 detail: "exact job was still present or absence was ambiguous before load "
-                    + "(exit \(beforeLoad.exitCode), timed_out=\(beforeLoad.timedOut))"
+                    + "(exit \(beforeLoad.exitCode), timed_out=\(beforeLoad.timedOut)); "
+                    + cleanup
             )
         }
 
@@ -1748,12 +1757,12 @@ public final class ManagerInstaller: @unchecked Sendable {
                 timeoutSec: 15
             )
         } catch {
-            cleanupFailedLoginAgent(jobTarget: jobTarget, plistURL: plistURL)
+            let cleanup = cleanupDetail()
             throw launchAgentReadinessError(
                 jobTarget: jobTarget,
                 bootstrap: nil,
                 legacyLoad: nil,
-                detail: "launchctl bootstrap failed: \(error.localizedDescription)"
+                detail: "launchctl bootstrap failed: \(error.localizedDescription); \(cleanup)"
             )
         }
 
@@ -1766,22 +1775,23 @@ public final class ManagerInstaller: @unchecked Sendable {
                     timeoutSec: 15
                 )
             } catch {
-                cleanupFailedLoginAgent(jobTarget: jobTarget, plistURL: plistURL)
+                let cleanup = cleanupDetail()
                 throw launchAgentReadinessError(
                     jobTarget: jobTarget,
                     bootstrap: bootstrap,
                     legacyLoad: nil,
-                    detail: "legacy launchctl load failed: \(error.localizedDescription)"
+                    detail: "legacy launchctl load failed: "
+                        + error.localizedDescription + "; " + cleanup
                 )
             }
             legacyLoad = fallback
             if fallback.exitCode != 0 || fallback.timedOut {
-                cleanupFailedLoginAgent(jobTarget: jobTarget, plistURL: plistURL)
-                throw NSError(
-                    domain: "ManagerInstaller",
-                    code: 2,
-                    userInfo: [NSLocalizedDescriptionKey:
-                        "launchctl load failed: \(bootstrap.stderr) \(fallback.stderr)"]
+                let cleanup = cleanupDetail()
+                throw launchAgentReadinessError(
+                    jobTarget: jobTarget,
+                    bootstrap: bootstrap,
+                    legacyLoad: fallback,
+                    detail: "legacy launchctl load returned an unsuccessful result; " + cleanup
                 )
             }
         }
@@ -1829,12 +1839,12 @@ public final class ManagerInstaller: @unchecked Sendable {
             }
         }
 
-        cleanupFailedLoginAgent(jobTarget: jobTarget, plistURL: plistURL)
+        let cleanup = cleanupDetail()
         throw launchAgentReadinessError(
             jobTarget: jobTarget,
             bootstrap: bootstrap,
             legacyLoad: legacyLoad,
-            detail: lastReadinessDetail
+            detail: lastReadinessDetail + "; " + cleanup
         )
     }
 
@@ -1892,22 +1902,77 @@ public final class ManagerInstaller: @unchecked Sendable {
             .path
     }
 
-    private func cleanupFailedLoginAgent(jobTarget: String, plistURL: URL) {
-        _ = try? launchctlRunner.run(
-            arguments: ["bootout", jobTarget],
-            timeoutSec: 10
-        )
-        _ = try? launchctlRunner.run(
-            arguments: ["disable", jobTarget],
-            timeoutSec: 5
-        )
-        _ = try? launchctlRunner.run(
-            arguments: ["unload", "-w", plistURL.path],
-            timeoutSec: 10
-        )
+    private func cleanupFailedLoginAgent(
+        jobTarget: String,
+        plistURL: URL,
+        verificationAttempts: Int,
+        verificationDelaySec: TimeInterval
+    ) -> String {
+        var commandSummaries: [String] = []
+        for (arguments, timeoutSec) in [
+            (["bootout", jobTarget], TimeInterval(10)),
+            (["disable", jobTarget], TimeInterval(5)),
+            (["unload", "-w", plistURL.path], TimeInterval(10)),
+        ] {
+            do {
+                let result = try launchctlRunner.run(
+                    arguments: arguments,
+                    timeoutSec: timeoutSec
+                )
+                commandSummaries.append(
+                    "\(arguments[0])_exit=\(result.exitCode) "
+                        + "\(arguments[0])_timed_out=\(result.timedOut)"
+                )
+            } catch {
+                commandSummaries.append(
+                    "\(arguments[0])_error="
+                        + String(error.localizedDescription.prefix(256))
+                )
+            }
+        }
+
         if FileManager.default.fileExists(atPath: plistURL.path) {
             try? FileManager.default.removeItem(at: plistURL)
         }
+        let plistAbsent = !FileManager.default.fileExists(atPath: plistURL.path)
+
+        let attemptLimit = max(1, min(verificationAttempts, 10))
+        let retryDelay = max(0, min(verificationDelaySec, 1))
+        var exactJobAbsent = false
+        var verificationSummary = "cleanup print was not attempted"
+        for attempt in 1...attemptLimit {
+            do {
+                let result = try launchctlRunner.run(
+                    arguments: ["print", jobTarget],
+                    timeoutSec: 5
+                )
+                if launchAgentIsProvenAbsent(result) {
+                    exactJobAbsent = true
+                    verificationSummary = "cleanup print proved exact job absent "
+                        + "on attempt \(attempt)/\(attemptLimit)"
+                    break
+                }
+                let identity = launchAgentIdentity(from: result.stdout)
+                verificationSummary = "cleanup print retained or ambiguously reported job "
+                    + "on attempt \(attempt)/\(attemptLimit) "
+                    + "(exit \(result.exitCode), timed_out=\(result.timedOut), "
+                    + "pid=\(identity.pid.map(String.init) ?? "none"), "
+                    + "program=\(identity.programPath ?? "none"))"
+            } catch {
+                verificationSummary = "cleanup print failed on attempt "
+                    + "\(attempt)/\(attemptLimit): "
+                    + String(error.localizedDescription.prefix(256))
+            }
+
+            if attempt < attemptLimit, retryDelay > 0 {
+                Thread.sleep(forTimeInterval: retryDelay)
+            }
+        }
+
+        return "cleanup_exact_job_absent=\(exactJobAbsent) "
+            + "cleanup_plist_absent=\(plistAbsent) "
+            + commandSummaries.joined(separator: " ") + "; "
+            + verificationSummary
     }
 
     private func launchAgentReadinessError(

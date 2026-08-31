@@ -1953,6 +1953,7 @@ final class ManagerTests: XCTestCase {
                 launchctlResult(exitCode: 0),
                 launchctlResult(exitCode: 0),
                 launchctlResult(exitCode: 0),
+                missingLaunchctlJobResult(),
             ])
             let paths = AppPaths(home: home)
             let installer = ManagerInstaller(
@@ -1976,6 +1977,9 @@ final class ManagerTests: XCTestCase {
                 XCTAssertTrue(nsError.localizedDescription.contains("launchctl load failed"))
                 XCTAssertTrue(nsError.localizedDescription.contains(jobTarget))
                 XCTAssertTrue(nsError.localizedDescription.contains("positive pid"))
+                XCTAssertTrue(
+                    nsError.localizedDescription.contains("cleanup_exact_job_absent=true")
+                )
             }
             XCTAssertEqual(
                 runner.invocations,
@@ -2001,6 +2005,7 @@ final class ManagerTests: XCTestCase {
                         arguments: ["unload", "-w", plistURL.path],
                         timeoutSec: 10
                     ),
+                    .init(arguments: ["print", jobTarget], timeoutSec: 5),
                 ]
             )
         }
@@ -2021,6 +2026,7 @@ final class ManagerTests: XCTestCase {
             launchctlResult(exitCode: 0),
             launchctlResult(exitCode: 0),
             launchctlResult(exitCode: 0),
+            missingLaunchctlJobResult(),
         ])
         let installer = ManagerInstaller(
             paths: paths,
@@ -2041,6 +2047,9 @@ final class ManagerTests: XCTestCase {
             XCTAssertEqual(nsError.domain, "ManagerInstaller")
             XCTAssertEqual(nsError.code, 2)
             XCTAssertTrue(nsError.localizedDescription.contains("still present"))
+            XCTAssertTrue(
+                nsError.localizedDescription.contains("cleanup_exact_job_absent=true")
+            )
         }
         XCTAssertEqual(
             runner.invocations,
@@ -2049,6 +2058,7 @@ final class ManagerTests: XCTestCase {
                 .init(arguments: ["bootout", jobTarget], timeoutSec: 10),
                 .init(arguments: ["disable", jobTarget], timeoutSec: 5),
                 .init(arguments: ["unload", "-w", plistURL.path], timeoutSec: 10),
+                .init(arguments: ["print", jobTarget], timeoutSec: 5),
             ]
         )
     }
@@ -2076,6 +2086,7 @@ final class ManagerTests: XCTestCase {
             launchctlResult(exitCode: 0),
             launchctlResult(exitCode: 0),
             launchctlResult(exitCode: 0),
+            missingLaunchctlJobResult(),
         ])
         let installer = ManagerInstaller(
             paths: paths,
@@ -2099,14 +2110,66 @@ final class ManagerTests: XCTestCase {
             XCTAssertTrue(nsError.localizedDescription.contains(wrongProgram))
         }
         XCTAssertEqual(
-            Array(runner.invocations.suffix(3)),
+            Array(runner.invocations.suffix(4)),
             [
                 .init(arguments: ["bootout", jobTarget], timeoutSec: 10),
                 .init(arguments: ["disable", jobTarget], timeoutSec: 5),
                 .init(arguments: ["unload", "-w", plistURL.path], timeoutSec: 10),
+                .init(arguments: ["print", jobTarget], timeoutSec: 5),
             ]
         )
         XCTAssertFalse(FileManager.default.fileExists(atPath: plistURL.path))
+    }
+
+    func testLoginAgentFailureReportsWhenCleanupCannotProveJobAbsence() throws {
+        let uid: uid_t = 501
+        let userDomain = "gui/\(uid)"
+        let jobTarget = "\(userDomain)/\(ManagerInstaller.launchAgentLabel)"
+        let plistURL = home.appendingPathComponent("manager.plist")
+        let paths = AppPaths(home: home)
+        let retainedJob = launchctlResult(
+            exitCode: 0,
+            stdout: "\(jobTarget) = {\n\tstate = running\n\tpid = 9001\n"
+                + "\tprogram = \(paths.home.path)/stale-manager\n}"
+        )
+        try "fixture".write(to: plistURL, atomically: true, encoding: .utf8)
+        let runner = TestManagerLaunchctlRunner(results: [
+            retainedJob,
+            launchctlResult(exitCode: 5, stderr: "bootout denied"),
+            launchctlResult(exitCode: 5, stderr: "disable denied"),
+            launchctlResult(exitCode: 5, stderr: "unload denied"),
+            retainedJob,
+            retainedJob,
+        ])
+        let installer = ManagerInstaller(
+            paths: paths,
+            config: ConfigStore(paths: paths),
+            artifactValidator: TestManagerArtifactValidator(),
+            launchctlRunner: runner
+        )
+
+        XCTAssertThrowsError(
+            try installer.loadLoginAgent(
+                plistURL: plistURL,
+                uid: uid,
+                readinessAttempts: 2,
+                readinessDelaySec: 0
+            )
+        ) { error in
+            let nsError = error as NSError
+            XCTAssertEqual(nsError.domain, "ManagerInstaller")
+            XCTAssertEqual(nsError.code, 2)
+            XCTAssertTrue(
+                nsError.localizedDescription.contains("cleanup_exact_job_absent=false")
+            )
+            XCTAssertTrue(nsError.localizedDescription.contains("bootout_exit=5"))
+            XCTAssertTrue(nsError.localizedDescription.contains("pid=9001"))
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: plistURL.path))
+        XCTAssertEqual(
+            runner.invocations.filter { $0.arguments.first == "print" }.count,
+            3
+        )
     }
 
     func testLoginAgentFallbackAcceptsExactLiveJobWithPositivePID() throws {
