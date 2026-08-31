@@ -290,7 +290,9 @@ final class G1G10AcceptanceTests: XCTestCase {
 
     func testG3_VersionAndReleaseDocumentsAreAligned() throws {
         let version = ForgeApp.version
+        let buildVersion = ForgeApp.buildVersion
         XCTAssertEqual(version, "0.9.0")
+        XCTAssertEqual(buildVersion, "1")
 
         let repository = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -314,7 +316,17 @@ final class G1G10AcceptanceTests: XCTestCase {
             contentsOf: repository.appendingPathComponent("ForgeConductor.xcodeproj/project.pbxproj"),
             encoding: .utf8
         )
-        XCTAssertEqual(project.components(separatedBy: "MARKETING_VERSION = \(version);").count - 1, 12)
+        let shippingConfigurationCount = 12
+        let nonshippingQualificationConfigurationCount = 4
+        XCTAssertEqual(
+            project.components(separatedBy: "MARKETING_VERSION = \(version);").count - 1,
+            shippingConfigurationCount
+        )
+        XCTAssertEqual(
+            project.components(separatedBy: "CURRENT_PROJECT_VERSION = \(buildVersion);").count - 1,
+            shippingConfigurationCount + nonshippingQualificationConfigurationCount
+        )
+
     }
 
     func testG9_ResolvePrefersExplicitBinary() {

@@ -66,6 +66,10 @@ final class H0IsolationTests: XCTestCase {
             project.components(separatedBy: "MARKETING_VERSION = 0.9.0;").count - 1,
             12
         )
+        XCTAssertEqual(
+            project.components(separatedBy: "CURRENT_PROJECT_VERSION = 1;").count - 1,
+            16
+        )
         for identifier in [
             "com.forge-conductor.qualification-harness",
             "com.forge-conductor.qualification-adversary",

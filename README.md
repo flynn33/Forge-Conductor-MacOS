@@ -7,6 +7,7 @@ Forge Conductor is purpose-built for LM Studio and its local MCP runtime.
 | | |
 |---|---|
 | **Version** | **0.9.0** |
+| **Build** | **1** |
 | **User guide** | [USER-GUIDE.md](USER-GUIDE.md) |
 | **Changelog** | [CHANGELOG.md](CHANGELOG.md) |
 | **License** | [Apache License 2.0](LICENSE) |
@@ -15,9 +16,10 @@ Forge Conductor is purpose-built for LM Studio and its local MCP runtime.
 | **Contributions** | **Closed** — see [CONTRIBUTING.md](CONTRIBUTING.md) |
 
 > **Current qualification boundary:** this source line is an in-progress P10
-> checkpoint, not a qualified release. Filesystem E2, shell compatibility,
-> native UI execution, manager-owned autonomous continuity, and the dependent
-> release gates remain open. See
+> checkpoint, not a qualified release. Filesystem E2, signed native UI and
+> release validation, live shell compatibility, manager-owned autonomous
+> continuity, owner-deferred representative physical-hardware qualification,
+> and current G09-G12 remain open and release-blocking. See
 > [`.forge-codex/state/release-handoff.md`](.forge-codex/state/release-handoff.md)
 > for the active state.
 
@@ -32,7 +34,7 @@ LM Studio is the MCP **host**. It spawns a Forge **stdio** server:
 | App (LaunchAgent) | `manager run --home …` | Dashboard manager (`install-login`) |
 | App (double-click) | _(none)_ | SwiftUI GUI |
 
-**Product path (v0.5+):** GUI → **LM Studio MCP** → **Deploy to LM Studio**. Forge transactionally writes primary + failover configuration, triggers LM Studio reload (relaunching it only if needed), verifies LM Studio synchronized the exact revision, and independently smokes both tool servers. Details: [`docs/LM-STUDIO-CONNECTION.md`](docs/LM-STUDIO-CONNECTION.md), operator test plan: [`docs/RELEASE-0.5.0-TEST.md`](docs/RELEASE-0.5.0-TEST.md).
+**Product path (v0.5+):** GUI → **LM Studio MCP** → **Deploy to LM Studio**. Forge transactionally writes primary + failover configuration, triggers LM Studio reload (relaunching it only if needed), verifies LM Studio synchronized the exact revision, and independently smokes both tool servers. Details: [`docs/LM-STUDIO-CONNECTION.md`](docs/LM-STUDIO-CONNECTION.md). Current qualification status is recorded in [CHANGELOG.md](CHANGELOG.md) and the active [release handoff](.forge-codex/state/release-handoff.md); historical release test plans are not current ship authority.
 
 ```bash
 # After building products — does NOT write LM Studio by itself:
@@ -76,7 +78,7 @@ forge-conductor manager start --open   # native dashboard / manager
 | **FORGE RIG** | Host telemetry (CPU/GPU/RAM/disk) + LM Studio-oriented load |
 | **LM Studio MCP** | LM Studio host, model backends, Forge MCP from `mcp.json` / live processes |
 | **Agents / Tools / Feed** | Playbooks and tool audit for local-model agent runs |
-| **Manager** | Start/Stop HTTP control plane, settings, doctor |
+| **Manager / Settings** | Start/Stop HTTP control plane, doctor, authorized folders, and project-shell policy |
 
 Only Forge-managed LM Studio runtime entries appear in these surfaces; unrelated
 processes and foreign-project continuity remain excluded.
@@ -89,10 +91,11 @@ The LaunchAgent manager is the single owner of the loopback dashboard port. Open
 |-------|----------------|
 | **Domain** | Typed models (`ForgeSnapshot`, `AppConfig`, agent sessions) |
 | **Infrastructure** | SQLite, paths, process runner, PDF, audit |
-| **Application** | `ForgeApp`, catalog, sessions, tool packs |
+| **Application** | `ForgeApp`, catalog, sessions, continuity, project memory, durable jobs, tool packs |
 | **MCP** | JSON-RPC stdio for LM Studio (`tools/list`, `tools/call`) |
 | **Dashboard / App** | SwiftUI + Metal gauges; optional loopback HTTP |
 | **CLI** | install / doctor / serve / manager |
+| **Native support** | Runtime launcher, session-host adapter, and protocol-v5 privileged filesystem helper |
 
 State: `~/.forge-conductor` (`FORGE_CONDUCTOR_HOME` override).  
 LM Studio MCP config: `~/.lmstudio/mcp.json`.  
@@ -114,11 +117,18 @@ release-qualified.
 | **Project memory** | Twelve `project_memory.*` tools provide bounded search, optimistic updates, links, batch writes, health, and checksummed import/export. |
 | **Continuity** | A serialized coordinator and native session-host adapter preserve handoff state across process and chat boundaries. Manager-owned autonomous rollover still requires the recorded real-provider forced-rollover authority scenario. |
 | **Runtime** | Resource policy, lifecycle ownership, diagnostics, bounded latest-value telemetry, and shared Metal resources reduce unbounded work and retained state. |
-| **Security** | Project shell tools are enabled by default, remain limited to authorized workspace roots, expose an explicit native opt-out, and keep `shell_exec` capped at 120 seconds. |
+| **Filesystem** | Protocol-v5 capture, bounded protected quarantine, and additive `fs_delete_recovery` mitigate destructive-path substitution races; the signed 57-case E2 matrix and formal closure remain unexecuted. This is mitigation, not elimination. |
+| **Shell** | Project shell tools are enabled by default, remain limited to authorized workspace roots, expose an explicit native opt-out, and keep the established synchronous `shell_exec` contract capped at 120 seconds. Clean-profile `bash.run` is additive. |
 
 Legacy `memory_*` and `session_*`/`context_*` tools remain compatible. Current
 qualification boundaries are in **[CHANGELOG.md](CHANGELOG.md)** and the active
 [checkpoint handoff](.forge-codex/state/release-handoff.md).
+
+No implementation or unit-test result in this checkpoint closes P10 or E2.
+Developer ID Release signing and native UI execution, successful `shell_exec`
+after both app and installed-manager restart, the required real-provider forced
+rollover, owner-deferred representative physical-hardware testing, and current
+G09-G12 must all produce their required evidence before release qualification.
 
 ## Design principles
 
@@ -144,7 +154,7 @@ forge-conductor agents
 forge-conductor serve                 # MCP stdio (LM Studio client)
 forge-conductor manager run [--open]
 forge-conductor manager start|stop|restart|status
-forge-conductor version               # prints 0.9.0 (and related build info)
+forge-conductor version               # prints 0.9.0; app bundle build is 1
 ```
 
 ## Changelog

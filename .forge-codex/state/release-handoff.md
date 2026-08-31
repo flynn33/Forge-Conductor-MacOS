@@ -3,18 +3,20 @@
 ## Current checkpoint status — not release-qualified
 
 The active repair line is `security/e2-harness-controls`, stacked on
-`fix/launchagent-readiness` at
-`96d5cfa3dba30df3e3137120b47357a4eaa9d4da`. The release base remains `main`
-at `cd7e84fed8ed0fe0a8ec90793e83388c8a451f09` (the pull request #15 squash
-merge). The current H0 source checkpoint is
-`399e6a84c4760ddf6c13e02319dc120b4b8998c4`. A later state-only handoff or
-doctor commit may advance the pull-request transport HEAD without changing that
-source checkpoint. It is published in draft pull request #19, which is stacked
-on #18; #18 is stacked on #17. No current claim is made that P10, the
-filesystem E2 finding, native UI validation, autonomous continuity,
-representative hardware qualification, or final release qualification is
-complete. Earlier green suites remain exact-revision evidence only and do not
-confer release authority on this source tree.
+`security/e2-evidence-binding` at
+`dfebd8e4b0fe4aea6c6ff33717b9dfce717617d4`. The release base is `main` at
+`67181bc5f420203099dc827018587034f2c09d95`, the pull request #16 merge. The
+H0 source checkpoint is `399e6a84c4760ddf6c13e02319dc120b4b8998c4`, and its
+state-and-evidence transport checkpoint is
+`63630658147c51af1c63a5c57b685bfd3d3c644b`. A later state-only handoff,
+doctor, or base-integration commit may advance the pull-request transport HEAD
+without changing the source checkpoint. Draft pull request #19 is stacked on
+open pull request #17. Pull request #18 was squash-merged into #17 as
+`6ae3ca2b6abf4d67ce6b5ceb70bc5980794466a1`. No current claim is made that
+P10, the filesystem E2 finding, shell compatibility, native UI validation,
+autonomous continuity, representative hardware qualification, or final
+release qualification is complete. Earlier green suites remain exact-revision
+evidence only and do not confer release authority on this source tree.
 
 The nonshipping H0 readiness run is
 `EVID-20260831T060522Z-03c32cb838`. It binds the exact source checkpoint,
@@ -288,7 +290,7 @@ request Developer ID Application. Signed Debug UI evidence
 
 The publication-state transition refreshes doctor, handoff, completion,
 evidence-index, package-validation, and selector artifacts after recording the
-source checkpoint and draft pull-request identity. The source checkpoint and a
+source checkpoint and pull-request identity. The source checkpoint and a
 later state-only transport HEAD must remain distinct. Doctor and the next-work
 selector must emit `release_authorized=false`, `merge_authorized=false`, every
 open mandatory finding, and nonpassing G09-G12. `check_p10_completion.py` and
@@ -305,18 +307,19 @@ baseline, not pass evidence.
 - A later commit containing only handoff, doctor, selector, or publication
   readback does not change that source checkpoint; it is a distinct state-only
   transport HEAD. Pull-request readback is authoritative for the transport HEAD.
-- Pull-request base branch and SHA: `fix/launchagent-readiness` at
-  `96d5cfa3dba30df3e3137120b47357a4eaa9d4da`; the release base is `main` at
-  `cd7e84fed8ed0fe0a8ec90793e83388c8a451f09`.
+- Pull-request base branch and SHA: `security/e2-evidence-binding` at
+  `dfebd8e4b0fe4aea6c6ff33717b9dfce717617d4`; the release base is `main` at
+  `67181bc5f420203099dc827018587034f2c09d95`.
 - Current pull request: open draft #19,
   `https://github.com/flynn33/Forge-Conductor-MacOS/pull/19`, from H0 source
-  checkpoint `399e6a84c4760ddf6c13e02319dc120b4b8998c4` into the #18 branch. It is a
-  nonshipping readiness checkpoint with neither merge nor release authority.
-- Pull request #18 is based on #17; #17 is based on `main`. Their open stack
-  remains distinct from #16.
-- Pull request #16 is an independent sibling from the same base, with head
-  `727cf858729d3410a09a8eba1e00b8e24410459f`; it is not stacked beneath or
-  above #17.
+  checkpoint `399e6a84c4760ddf6c13e02319dc120b4b8998c4` into the #17 branch. It is
+  a nonshipping readiness checkpoint with neither merge nor release authority.
+- Pull request #18 was squash-merged into #17 as
+  `6ae3ca2b6abf4d67ce6b5ceb70bc5980794466a1`. Pull request #17 is open and
+  non-draft against current `main`.
+- Pull request #16 was merged into `main` as
+  `67181bc5f420203099dc827018587034f2c09d95`; it is now in the ancestry of
+  both #17 and #19.
 - Pull request #9 (`repair/autonomous-continuity` at
   `6321bd98012e5f60b2779bbb401cc2827f372b16`) was based on
   `ae0ceace702274857afce3097ac7cde18b7a6c63` and closed without merge. Its tree is
@@ -331,11 +334,15 @@ baseline, not pass evidence.
   merge and has tree `b109d2ae6ec64ce5c4ce89c046301c4ac25a4672`.
   It was squash-merged as
   `6288210d82270b26add5f0e078d150bc4377bd62` with that same tree.
-- Pull request #15 was squash-merged as
-  `cd7e84fed8ed0fe0a8ec90793e83388c8a451f09`; that commit is the common base
-  of sibling pull requests #16 and #17. None of those relationships closes P10,
-  E2, shell compatibility, native validation, autonomous continuity,
-  representative hardware qualification, or G09-G12.
+- The historical remote head branches for #9, #10, #11, #14, #15, #16, and
+  #18 are deleted. No additional cleanup is required for those branches.
+- Pull request #14 was squash-merged as
+  `8bcc039a2f0d4d17b871d5e968b3b37a663c5ccb`. Pull request #15 was then
+  squash-merged as `cd7e84fed8ed0fe0a8ec90793e83388c8a451f09`, and pull
+  request #16 was merged as `67181bc5f420203099dc827018587034f2c09d95`.
+- Those commits are ancestors of this branch. None of these relationships
+  closes P10, E2, shell compatibility, native validation,
+  autonomous continuity, representative hardware qualification, or G09-G12.
 
 ## Historical 0.9.0 outcome
 
