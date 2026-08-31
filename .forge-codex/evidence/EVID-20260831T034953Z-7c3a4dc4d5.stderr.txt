@@ -1,0 +1,41 @@
+--prepared:/private/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/__preview.dylib
+--validated:/private/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/__preview.dylib
+--prepared:/private/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon
+--validated:/private/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon
+--prepared:/private/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher
+--validated:/private/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher
+--prepared:/private/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-conductor
+--validated:/private/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-conductor
+--prepared:/private/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/Forge Conductor.debug.dylib
+--validated:/private/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/Forge Conductor.debug.dylib
+--prepared:/private/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework/Versions/Current/.
+--validated:/private/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework/Versions/Current/.
+/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app: valid on disk
+/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app: satisfies its Designated Requirement
+--prepared:/private/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/__preview.dylib
+--validated:/private/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/__preview.dylib
+--prepared:/private/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon
+--validated:/private/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon
+--prepared:/private/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/Forge Conductor.debug.dylib
+--validated:/private/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/Forge Conductor.debug.dylib
+--prepared:/private/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher
+--validated:/private/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher
+--prepared:/private/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-conductor
+--validated:/private/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-conductor
+--prepared:/private/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework/Versions/Current/.
+--validated:/private/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework/Versions/Current/.
+/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app: valid on disk
+/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app: satisfies its Designated Requirement
+/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app: explicit requirement satisfied
+/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon: valid on disk
+/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon: satisfies its Designated Requirement
+/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon: explicit requirement satisfied
+/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon: valid on disk
+/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon: satisfies its Designated Requirement
+/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon: explicit requirement satisfied
+/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-conductor: valid on disk
+/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-conductor: satisfies its Designated Requirement
+/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-conductor: explicit requirement satisfied
+/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/forge-conductor: valid on disk
+/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/forge-conductor: satisfies its Designated Requirement
+/tmp/forge-launchagent-cleanbuild7.mod6na/Build/Products/Debug/forge-conductor: explicit requirement satisfied
