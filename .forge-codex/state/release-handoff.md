@@ -3,18 +3,18 @@
 ## Current checkpoint status — not release-qualified
 
 Live GitHub readback identifies `main` at
-`cd7e84fed8ed0fe0a8ec90793e83388c8a451f09`, the squash merge of pull
-request #15. The prior PR description captured an earlier draft checkpoint and
-is not current transport authority. The public documentation and build-metadata
-alignment checkpoint is `docs/release-alignment` at
-`b18bd3928127decaaa59cb556476fc7c758c78b3`, based directly on that `main`,
-and is published in open pull request #16. A later state-only handoff commit may
-advance the pull-request transport HEAD without changing that manifest-bound
-documentation/source checkpoint. No current claim is made that P10, the
-filesystem E2 finding, shell compatibility, native UI validation, autonomous
-continuity, representative hardware qualification, or final release
-qualification is complete. Earlier green suites remain exact-revision evidence
-only and do not confer release authority on this source tree.
+`67181bc5f420203099dc827018587034f2c09d95`, the pull request #16 merge. The
+active repair line is `security/e2-evidence-binding`. Its evidence-control
+source checkpoint is `2dd504e53a5a09837cd289a99eee48ab7f4547eb`, and pull
+request #18 was squash-merged into this line as
+`6ae3ca2b6abf4d67ce6b5ceb70bc5980794466a1`. A later state-only handoff,
+doctor, or base-integration commit may advance the pull-request transport HEAD
+without changing either source checkpoint. Pull request #17 is open and
+non-draft. No current claim is made that P10, the filesystem E2 finding, shell
+compatibility, native UI validation, autonomous continuity, representative
+hardware qualification, or final release qualification is complete. Earlier
+green suites remain exact-revision evidence only and do not confer release
+authority on this source tree.
 
 Current release blockers are:
 
@@ -86,13 +86,23 @@ Current release blockers are:
   explicitly unexecuted template requiring per-case contract coverage, raw
   artifacts, barrier hits, iterations, process/signing identities, fixture
   digests, mount facts, crash points, and observed outcomes. Boolean-only rows
-  are rejected. The current verifier establishes artifact provenance, hashes,
-  ledger membership, schema conformance, and broad structural consistency, but
-  it does not yet bind a generic aggregate artifact semantically to every case,
-  role, iteration, barrier, mount observation, crash phase, fixture assertion,
-  or formal argument. Case-scoped and role-scoped machine-readable harness
-  results plus corresponding checker enforcement remain required before any
-  passing report is authorized. The full signed distinct-process atomic-swap,
+  are rejected. Source checkpoint
+  `2dd504e53a5a09837cd289a99eee48ab7f4547eb` adds evidence-control schema v2
+  and artifact-binding schema v1, recorder-owned evidence-specific copies,
+  exact case/role/iteration and subject/predicate/fact binding,
+  qualification-context binding, current-manifest and Git execution identity
+  checks, bounded descriptor reads, and pathname replacement/rewrite negative
+  tests. The evidence-control suite passed 57 of 57 tests in its final repeated
+  validation. The template still has all 57 rows `not_run`, all 12 formal
+  predicates false, zero formal references, and a null qualification-context
+  reference. These controls do not execute a signed distinct-process case,
+  establish any formal claim, provide an identity-conditional macOS mutation,
+  or close E2. Qualification still assumes a trusted quiescent workspace
+  against same-UID transient source-manifest replacement; an arbitrary
+  caller-selected harness is not authenticated; aggregate report and evidence
+  input reads remain unbounded fail-closed denial-of-service surfaces; the G10
+  handler does not yet invoke this checker; and post-verification mutation
+  remains outside immutable-content proof. The full signed distinct-process atomic-swap,
   crash-at-every-durable-phase and recovery, volume, wrong-signature,
   hard-link, and writable-descriptor matrices have not run.
 
@@ -211,11 +221,12 @@ Current release blockers are:
   Mode is enabled and the valid Apple Development James Daley identity for team
   `9AQ2C2838M` is available. The six bounded signed Debug cases in
   `EVID-20260830T153118Z-752f058222` cover root controls, shell controls,
-  protected-service control visibility, and GUI relaunch. A current-source
+  protected-service control visibility, and GUI relaunch. A prior-manifest
   normal signed Debug build and paired app/daemon/CLI inspection passed as
   `EVID-20260830T211007Z-760c293557` and
-  `EVID-20260830T211029Z-ae82e789b1`. Signing inventory
-  `EVID-20260830T211040Z-5f8b21e6d9` confirms that no usable Developer ID
+  `EVID-20260830T211029Z-ae82e789b1` as supporting evidence only; their bundles
+  contain no commit SHA, so neither is current-source qualification. Signing
+  inventory `EVID-20260830T211040Z-5f8b21e6d9` confirms that no usable Developer ID
   identity is installed, while `EVID-20260830T211040Z-a8619d99c2` confirms
   that shipped Release configurations request Developer ID Application.
   These records do not cover the production
@@ -237,20 +248,26 @@ Current release blockers are:
 The checkpoint also resolves the project-bootstrap and Forge control-state
 authorization bypasses without broadening default authority. Their focused
 denial/permitted tests, independent source review, signed root-control UI
-support, and the current-source strict suite passed. Those two issue closures do
-not pass P10, E2, shell compatibility, native validation, or any release gate.
+support, and the prior exact-revision strict suite passed. That strict evidence
+is stale for source checkpoint `2dd504e53a5a09837cd289a99eee48ab7f4547eb`
+and remains supporting evidence only. Those two issue closures do not pass P10,
+E2, shell compatibility, native validation, or any release gate.
 
 G09 is therefore historical exact-revision evidence rather than current release
 authority. G09, G10, G11, and G12 remain nonpassing. A partial security pull request
 may be reviewed only with these residual risks and deferred gates visible in its
 description, the state ledger, doctor output, and next-work selection.
 
-The current source manifest is
-`89e94937e86eb617eb7c6b2138f1584d3ecc7b32ce524919734fee39766a63a0`
-over 256 inputs. Debug strict evidence
-`EVID-20260830T220320Z-4cccc31cce` and Release strict evidence
+Source checkpoint `2dd504e53a5a09837cd289a99eee48ab7f4547eb`
+passed all 57 evidence-control tests on the final repeated validation. Its
+unexecuted qualification template remains deliberately nonpassing: 57 of 57
+rows are `not_run`, all 12 formal predicates are false, there are zero formal
+references, and the qualification-context reference is null. Debug strict
+evidence `EVID-20260830T220320Z-4cccc31cce` and Release strict evidence
 `EVID-20260830T220539Z-eac42f2a8c` each passed 771 tests with two declared
-environment skips and no failures. Prior-manifest signed Debug build evidence is
+environment skips and no failures; they are supporting source evidence rather
+than signed execution of the 57-row qualification matrix. Prior-manifest signed
+Debug build evidence is
 `EVID-20260830T211007Z-760c293557`; the exact paired app/daemon/CLI check is
 `EVID-20260830T211029Z-ae82e789b1`. Signing inventory
 `EVID-20260830T211040Z-5f8b21e6d9` confirms that no usable Developer ID identity
@@ -259,63 +276,67 @@ is installed, and Release build-settings evidence
 request Developer ID Application. Signed Debug UI evidence
 `EVID-20260830T153118Z-752f058222` passed all six bounded cases.
 
-Historical post-push doctor evidence `EVID-20260830T221552Z-23fccf23e2`
-verified the then-active PR #15 transport at
-`61c3a00f3d0289cf4086182f0e8217567915b763` while retaining
-`merge_authorized=false` and `release_authorized=false`. PR #15 was later
-merged as `cd7e84fed8ed0fe0a8ec90793e83388c8a451f09`; the historical doctor
-record does not describe that later GitHub transition. The corresponding
-next-work record `EVID-20260830T221558Z-70e4c016b7` still resumes P10 and
-preserves every mandatory blocker. State validation
-`EVID-20260830T221613Z-ea0d244fa9`, package validation
-`EVID-20260830T221614Z-188ad8b638`, attribution scan
-`EVID-20260830T221614Z-a83cfa3e4a`, and secret scan
-`EVID-20260830T221615Z-e08156083e` pass. The earlier failed strict record
-`EVID-20260830T151425Z-09e2526950` is retained as a superseded negative
-baseline, not pass evidence. Doctor and the next-work selector must continue to
-emit `release_authorized=false`, all open mandatory findings, and the
-nonpassing G09-G12 gates.
+The publication-state transition refreshes doctor, handoff, completion,
+evidence-index, package-validation, and selector artifacts after recording the
+source checkpoint and pull-request identity. The source checkpoint and a
+later state-only transport HEAD must remain distinct. Doctor and the next-work
+selector must emit `release_authorized=false`, `merge_authorized=false`, every
+open mandatory finding, and nonpassing G09-G12. `check_p10_completion.py` and
+`verify_completion.py --no-finalize` are expected to exit nonzero because the
+required signed matrix and all other hard gates remain open. The earlier failed
+strict record `EVID-20260830T151425Z-09e2526950` remains a superseded negative
+baseline, not pass evidence.
 
 ## Current branch and pull-request lineage
 
-- Active published documentation checkpoint branch: `docs/release-alignment`.
-- Documentation and build-metadata checkpoint:
-  `b18bd3928127decaaa59cb556476fc7c758c78b3`.
+- Active branch: `security/e2-evidence-binding`.
+- Evidence-control source checkpoint:
+  `2dd504e53a5a09837cd289a99eee48ab7f4547eb`.
+- Pull request #18 source head:
+  `96d5cfa3dba30df3e3137120b47357a4eaa9d4da`; it was squash-merged into
+  this branch as `6ae3ca2b6abf4d67ce6b5ceb70bc5980794466a1`.
 - A later commit containing only handoff, doctor, selector, or publication
-  readback does not change that manifest-bound checkpoint; the pull request
-  readback is authoritative for its transport HEAD.
+  readback does not change that source checkpoint; it is a distinct state-only
+  transport HEAD. Pull-request readback is authoritative for the transport HEAD.
 - Base branch and SHA: `main` at
-  `cd7e84fed8ed0fe0a8ec90793e83388c8a451f09`.
-- Current pull request: open, non-draft #16,
-  `https://github.com/flynn33/Forge-Conductor-MacOS/pull/16`.
-- Live readback records #16 from
-  `docs/release-alignment@b18bd3928127decaaa59cb556476fc7c758c78b3`
-  into `main@cd7e84fed8ed0fe0a8ec90793e83388c8a451f09`, one commit ahead and
-  zero behind. It is a documentation/build-metadata checkpoint, not a release
-  qualification.
+  `67181bc5f420203099dc827018587034f2c09d95`.
+- Current pull request: open, non-draft #17,
+  `https://github.com/flynn33/Forge-Conductor-MacOS/pull/17`. It remains a
+  partial evidence and shell-readiness checkpoint with neither merge nor
+  release authority.
+- Pull request #16 was merged into `main` as
+  `67181bc5f420203099dc827018587034f2c09d95`; it is now part of #17's base.
+- Pull request #19 is stacked on #17 from
+  `security/e2-harness-controls@63630658147c51af1c63a5c57b685bfd3d3c644b`.
+  It is a nonshipping H0 readiness checkpoint and does not close any release
+  gate.
 - Pull request #9 (`repair/autonomous-continuity` at
-  `6321bd98012e5f60b2779bbb401cc2827f372b16`) targeted `main` at
-  `ae0ceace702274857afce3097ac7cde18b7a6c63`, but its head retained
-  divergent pre-base history. It closed without merge.
+  `6321bd98012e5f60b2779bbb401cc2827f372b16`) was based on
+  `ae0ceace702274857afce3097ac7cde18b7a6c63` and closed without merge. Its tree is
+  `9c3b4fb924a81cce17d78f8356c3cd87af4a3002`.
 - Pull request #10 (`repair/cancellation-recovery` at
   `4b887fcc423284d0a60f57baed3adab4b943a576`) used the same base, superseded
-  #9 with the same resulting tree, and was squash-merged as
-  `7808790d9f52f4ec287434d45826bfa0e5586892`.
+  #9 with the same resulting tree
+  `9c3b4fb924a81cce17d78f8356c3cd87af4a3002`, and was squash-merged as
+  `7808790d9f52f4ec287434d45826bfa0e5586892` with that same tree.
 - Pull request #11 (`repair/filesystem-path-hardening` at
   `92122970c54cf549cdc5002db23044ed0b3552cb`) was based directly on the #10
-  merge and was squash-merged as
-  `6288210d82270b26add5f0e078d150bc4377bd62`.
-- The historical remote head branches for #9, #10, #11, #14, and #15 are
-  already deleted. No additional cleanup is required for those branches.
+  merge and has tree `b109d2ae6ec64ce5c4ce89c046301c4ac25a4672`.
+  It was squash-merged as
+  `6288210d82270b26add5f0e078d150bc4377bd62` with that same tree.
+- The historical remote head branches for #9, #10, #11, #14, #15, #16, and
+  #18 are deleted. No additional cleanup is required for those branches.
 - Pull request #14 was squash-merged as
-  `8bcc039a2f0d4d17b871d5e968b3b37a663c5ccb`. Pull request #15 then merged
-  linearly as `cd7e84fed8ed0fe0a8ec90793e83388c8a451f09`, the base of #16.
-  Neither merge closes P10, E2, shell compatibility, native validation,
+  `8bcc039a2f0d4d17b871d5e968b3b37a663c5ccb`. Pull request #15 was then
+  squash-merged as `cd7e84fed8ed0fe0a8ec90793e83388c8a451f09`, and pull
+  request #16 was merged as `67181bc5f420203099dc827018587034f2c09d95`.
+- Those commits are ancestors of this branch. None of these relationships
+  closes P10, E2, shell compatibility, native validation,
   autonomous continuity, representative hardware qualification, or G09-G12.
 
 ## Historical 0.9.0 outcome
 
-The autonomous repair phases P00-P12 were merged to `main` by pull request #6. The pre-P12 repair checkpoint is `082404ec42bf2adb775385dea85ad3b20d0076f4`; final P12 evidence and security remediation are included in that merged release checkpoint. Version and release-document alignment for 0.9.0 is prepared on `release/0.9.0-alignment` in pull request #7.
+The autonomous repair phases P00-P12 were merged to `main` by pull request #6. The pre-P12 repair checkpoint is `082404ec42bf2adb775385dea85ad3b20d0076f4`; final P12 evidence and security remediation are included in that merged release checkpoint. Version and release-document alignment for 0.9.0 was merged from pull request #7 as `1f39ee6bdf1d4f907c6e1cb31f6213f2945d3985`.
 
 Everything below this point describes that historical checkpoint. It must not be
 read as qualification of the current P10 source tree.
@@ -341,7 +362,7 @@ read as qualification of the current P10 source tree.
 - Address and Thread Sanitizer test hosts built but were blocked before product test entry by the installed Xcode 26.2/macOS sanitizer runtime behavior. No sanitizer test pass is claimed.
 - The 8 GiB resource policy was exercised on a 48 GiB host; this is constrained-policy evidence, not physical 8 GiB hardware evidence.
 - Developer ID signing, notarization, and distribution were not performed.
-- Pull request #6 was merged to `main`; pull request #7 is open for the 0.9.0 alignment.
+- Pull request #6 was merged to `main`; pull request #7 was merged as `1f39ee6bdf1d4f907c6e1cb31f6213f2945d3985` for the 0.9.0 alignment.
 - No Simulator was started. Every launched app, UI runner, profiler, and test host was terminated and checked after use.
 
 ## Historical evidence and recovery

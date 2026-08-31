@@ -129,9 +129,11 @@ an accumulation bound for cooperating Forge processes and crashes, not an
 adversarial identity guarantee: a same-UID writer can remove receipts or move
 quarantines outside their recorded basenames. Path-based initial anchoring,
 destination-hierarchy construction, and the narrow hard-link ctime refresh
-interval are additional residuals. `FC-FILESYSTEM-PATH-TOCTOU-001`
-therefore remains open as E2 pending an actual identity-conditional terminal
-mutation primitive or an independent privilege boundary.
+interval are additional residuals. `FC-FILESYSTEM-PATH-TOCTOU-001` therefore
+remains open as E2. The separately privileged boundary described below now
+exists in source, but it retains documented authorization, recovery, lifecycle,
+and capacity residuals and has not passed its signed distinct-process matrix or
+formal closure. Source presence is not qualification.
 
 The adversarial regression matrix uses atomic `RENAME_SWAP` at the exact
 pre-quarantine verification window for direct recursive deletion, same-volume
@@ -167,12 +169,51 @@ occur. The manager has no same-UID production fallback: unavailable,
 unapproved, identity-mismatched, unqualified-volume, or unavailable-namespace
 states return their required typed errors.
 
-The qualification-report checker is not itself boundary proof. It fails closed
-on schema errors, stale or missing evidence, hash mismatch, placeholder facts,
-and required mount/crash facts marked inapplicable. It still requires
-case-scoped and role-scoped machine-readable harness results before a generic
-aggregate artifact can be treated as semantic proof for every matrix row. That
-evidence-binding work remains release-blocking with E2.
+The qualification-report checker is not itself boundary proof. Report schema
+v2 and artifact-binding schema v1 bind every recorder-preserved read-only JSON
+snapshot to its qualification and evidence identifiers, current source
+manifest, case, role, iteration, subject or formal predicate, and the canonical
+digest of the exact report fact. A dedicated context envelope binds the exact
+report timestamp, repository, host, process, and same-UID declarations. Before
+child launch, the recorder captures the branch, execution HEAD, canonical base
+`main`, exact required `refs/remotes/origin/main` SHA, canonical repository
+path, macOS build, hardware model, platform, and architecture. The base must be
+an ancestor of the execution HEAD, which must remain an ancestor of current
+HEAD. Every intervening commit may touch only `.forge-codex/state/**` or
+`.forge-codex/evidence/**`, and source-manifest targets must be clean in the
+worktree. Thus state-and-evidence transport is allowed without permitting a
+product, script, or arbitrary repository path change, including a change later
+reverted to the same bytes.
+
+The checker accepts semantic envelopes only from the recorder's
+evidence-ID-specific repository copy, never an external hash-only artifact or
+captured process stream. It opens a canonical repository-relative path through
+descriptor-relative no-follow traversal, accepts at most 1 MiB, and requires a
+regular current-euid-owned, singly linked, mode-`0444` object with the exact
+recorded byte count and digest. Descriptor metadata must remain stable during
+the read, and a second no-follow lookup must name the same device/inode and
+regular-file metadata. This is a bounded read-only snapshot check, not a
+filesystem-immutability guarantee; a same-UID process can replace the pathname
+after evaluation. Evidence timing must be bounded, ordered ISO-8601, and
+contain the report capture time for the context record; the exact recorded
+environment and repository cwd must match the report and live evaluator.
+The checker rejects cross-case or cross-role reuse, duplicate formal-predicate
+support, stale manifests, placeholder claims or scope, identity, timing, and
+environment mismatch, fact-digest mismatch,
+referenced-byte mutation, mutation during its bounded single-descriptor read,
+pathname replacement after descriptor open, and required mount/crash facts
+marked inapplicable. These are evidence controls only: all 57 signed-host rows
+remain unexecuted, all 12 formal predicates remain false, and E2, P10, G10, and
+G12 remain open. The recorder runs an operator-selected command and does not
+authenticate an arbitrary harness or prove its claims. Source-manifest capture
+and current-euid mode-`0444` snapshots are not authentication: a same-UID
+process can author or replace the snapshot or record before evaluation as well
+as replace it afterward. The control assumes a trusted operator and a
+quiescent same-UID writer during manifest capture, recording, and evaluation;
+aggregate report and evidence-record reads are not yet bounded by this semantic
+copy loader; and direct integration of this qualification checker into the G10
+gate runner remains deferred. Those limits, plus same-UID replacement after the
+check completes, keep this checkpoint non-authoritative for release closure.
 
 Protocol v5 binds the request, transaction, project generation, authorized
 root, relative components, operation, explicit exactness contract, and expected

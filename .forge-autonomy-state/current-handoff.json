@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-08-28T13:17:52Z",
+  "updated_at": "2026-08-31T02:10:43Z",
   "run_id": "1e48ce8e-c41f-4d6d-a0e6-c3201200671b",
-  "branch": "repair/filesystem-race-mitigation",
+  "branch": "security/e2-evidence-binding",
   "base_branch": "main",
-  "baseline_commit": "6288210d82270b26add5f0e078d150bc4377bd62",
-  "published_source_commit": "f721ce063104817e9f08013350ab855bac708c77",
-  "working_tree": false,
-  "publication_status": "published as the source checkpoint in open pull request 12; GitHub readback confirmed repair/filesystem-race-mitigation at f721ce063104817e9f08013350ab855bac708c77 into main at 6288210d82270b26add5f0e078d150bc4377bd62",
-  "current_work_package": "P10 filesystem race mitigation and shell compatibility qualification",
+  "baseline_commit": "cd7e84fed8ed0fe0a8ec90793e83388c8a451f09",
+  "published_source_commit": "2dd504e53a5a09837cd289a99eee48ab7f4547eb",
+  "working_tree": true,
+  "publication_status": "source checkpoint 2dd504e53a5a09837cd289a99eee48ab7f4547eb is published in open draft pull request 17 from security/e2-evidence-binding into main at cd7e84fed8ed0fe0a8ec90793e83388c8a451f09; this uncommitted publication-state transition can later produce a distinct state-only transport HEAD and does not change source authority",
+  "current_work_package": "P10 filesystem E2 evidence control and remaining release qualification",
   "current_phase": "P10",
   "completed_work_packages": [
     "FC-BASE-000",
@@ -20,62 +20,70 @@
     "FC-ROLL-001",
     "FC-RUNTIME-001"
   ],
+  "completed_work_packages_scope": "historical implementation-package state only; it does not pass current E2, shell, native, continuity, hardware, or release acceptance",
   "pull_request_lineage": {
-    "9": "closed without merge; repair/autonomous-continuity at 6321bd98012e5f60b2779bbb401cc2827f372b16; superseded by PR 10 because the trees are identical",
-    "10": "squash merged as 7808790d9f52f4ec287434d45826bfa0e5586892 from repair/cancellation-recovery at 4b887fcc423284d0a60f57baed3adab4b943a576",
-    "11": "based on PR 10 merge and squash merged as 6288210d82270b26add5f0e078d150bc4377bd62 from repair/filesystem-path-hardening at 92122970c54cf549cdc5002db23044ed0b3552cb",
-    "12": "open partial P10 checkpoint from repair/filesystem-race-mitigation at f721ce063104817e9f08013350ab855bac708c77 into main at 6288210d82270b26add5f0e078d150bc4377bd62; all deferred gates remain open"
+    "9": "closed without merge; head 6321bd98012e5f60b2779bbb401cc2827f372b16; tree 9c3b4fb924a81cce17d78f8356c3cd87af4a3002; functionally superseded by pull request 10",
+    "10": "head 4b887fcc423284d0a60f57baed3adab4b943a576; tree 9c3b4fb924a81cce17d78f8356c3cd87af4a3002; superseded pull request 9 and squash merged as 7808790d9f52f4ec287434d45826bfa0e5586892 with the same tree",
+    "11": "stacked on the pull request 10 merge; head 92122970c54cf549cdc5002db23044ed0b3552cb; tree b109d2ae6ec64ce5c4ce89c046301c4ac25a4672; squash merged as 6288210d82270b26add5f0e078d150bc4377bd62 with the same tree",
+    "15": "squash merged as cd7e84fed8ed0fe0a8ec90793e83388c8a451f09, the common base of sibling pull requests 16 and 17",
+    "16": "independent sibling from the pull request 15 base; head 727cf858729d3410a09a8eba1e00b8e24410459f",
+    "17": "open draft independent evidence-control sibling from the pull request 15 base; source head 2dd504e53a5a09837cd289a99eee48ab7f4547eb"
   },
   "verified_results": [
-    "current-source strict SwiftPM Debug: 657 tests, 4 skipped, 0 failures (EVID-20260828T124332Z-1e2a050c0e)",
-    "current-source strict SwiftPM Release: 657 tests, 4 skipped, 0 failures (EVID-20260828T124624Z-00a3dd27c2)",
-    "four deterministic RENAME_SWAP probes exercise direct deletion, same-volume publication, cross-volume staging publication, and post-copy source removal; additional regressions preserve one or two live recovery receipts under combined namespace-instability and durability failures",
-    "shell regressions cover clean enablement, schema-v1 disabled-state migration, schema-v2 explicit opt-out preservation, tools/list, execution, manager and ForgeApp restart, and legacy shell_exec behavior and result shape; released schema-v1 had no opt-out provenance, and native process relaunch remains unexecuted",
-    "current-source executable compatibility passed for CLI EVID-20260828T125021Z-6c31192210, MCP EVID-20260828T125651Z-ad5ebff94c, and manager HTTP EVID-20260828T125046Z-c15d53c9c9",
-    "EVID-20260828T124634Z-c6c0c861da compiles the current Settings shell-control XCUITest target unsigned; it executes zero tests and is not native UI authority",
-    "fixed-capacity, corrupt-receipt, preexisting-name, stale-reservation, concurrent 32-slot ledger, unsafe rollback, unknown presence, and receipt durability tests pass on the current source manifest",
-    "publication controls pass in EVID-20260828T130418Z-5574c5b7d8, EVID-20260828T130424Z-8504424e70, EVID-20260828T130424Z-7eb8ebf490, EVID-20260828T130425Z-686a1e57bc, and EVID-20260828T130426Z-9f1dba3882",
-    "doctor EVID-20260828T130522Z-a830cc844e and selector EVID-20260828T130522Z-9f6e40e665 retain all four deferred findings, G09-G12 nonpassing, and P10 selected",
-    "P10 boundary EVID-20260828T130522Z-849134968b and completion boundary EVID-20260828T130523Z-73516c6e94 intentionally fail; no phase or release completion is claimed",
-    "current G09 acceptance boundary EVID-20260828T130426Z-af339f479f fails because direct-adapter evidence is not manager-owned forced-rollover authority",
-    "GitHub readback confirmed open PR 12 from repair/filesystem-race-mitigation at f721ce063104817e9f08013350ab855bac708c77 into main at 6288210d82270b26add5f0e078d150bc4377bd62",
-    "local app smoke EVID-20260828T131739Z-66596e8e37 ad-hoc signs, launches, and process-verifies dist/Forge Conductor.app on the current source manifest; it is local exploratory-test evidence, not signed native UI authority"
+    "source checkpoint 2dd504e53a5a09837cd289a99eee48ab7f4547eb passed 57 of 57 evidence-control tests on the final repeated validation",
+    "the checked-in qualification template remains deliberately nonpassing with 57 of 57 rows not_run, all 12 formal predicates false, zero formal references, and a null qualification-context reference",
+    "evidence controls bind recorder-owned copies to exact case, role, iteration, subject, predicate, fact, qualification context, current manifest, and Git execution identity; they do not execute a signed distinct-process case or prove any formal claim",
+    "strict SwiftPM Debug EVID-20260830T220320Z-4cccc31cce and Release EVID-20260830T220539Z-eac42f2a8c each passed 771 tests with two declared skips and zero failures as supporting source evidence only",
+    "signed Debug XCUI EVID-20260830T153118Z-752f058222 passed six bounded Settings and relaunch cases at its exact earlier revision only",
+    "prior-manifest signed Debug build EVID-20260830T211007Z-760c293557 and paired bundle check EVID-20260830T211029Z-ae82e789b1 are static supporting evidence only"
   ],
   "current_environment_results": [
-    "Developer Mode remains disabled",
-    "the installed Apple Development identity team does not match the project signing configuration",
-    "native signed XCUITest remains unavailable and is release-blocking",
-    "current-source strict Debug, Release, CLI, MCP, manager HTTP, and unsigned Settings-build evidence is recorded",
-    "unsigned build-for-testing is compile evidence only and does not satisfy native execution"
+    "Developer Mode is enabled",
+    "the valid Apple Development James Daley identity for team 9AQ2C2838M is available",
+    "two product-source-equivalent prior-revision signed native attempts exited 65 before test execution because the test runner timed out while enabling automation authorization; their bundles contain no commit SHA, so neither is current-source evidence or a native UI pass",
+    "the writer daemon requires authorization and its signed lifecycle has not passed",
+    "no usable Developer ID identity is installed; Release signing, archive, notarization, staple, and Gatekeeper evidence are absent"
   ],
   "gate_status": {
     "G09": "blocked_dependency: full real-provider manager-owned forced-rollover authority is incomplete",
-    "G10": "blocked_dependency: P10 parity is incomplete and native UI execution is deferred and release-blocking",
-    "G11": "blocked_dependency",
-    "G12": "blocked_dependency"
+    "G10": "blocked_dependency: P10 E2, signed native, signed shell, service lifecycle, and evidence-handler wiring are incomplete",
+    "G11": "blocked_dependency: owner-deferred representative physical-hardware evidence is incomplete",
+    "G12": "blocked_dependency: all preceding hard gates and final release evidence are incomplete"
   },
   "open_blockers": [
-    "FC-FILESYSTEM-PATH-TOCTOU-001: High E2; the global 32-slot quarantine ledger bounds cooperating-process recovery state, but quarantine-and-verify mitigates rather than eliminates the remaining final-component race",
-    "FC-SHELL-COMPAT-QUALIFICATION-001: High E0; Settings test is compile-only and shell compatibility is not complete",
-    "FC-UI-QUALIFICATION-001: High E0; native signing and Developer Mode validation is deferred and release-blocking",
-    "FC-AUTONOMOUS-CONTINUITY-E2E-001: High E0; real-provider manager-owned forced-rollover authority is incomplete",
+    "FC-FILESYSTEM-PATH-TOCTOU-001 / FCA-007: High E2 remains patching and release-blocking",
+    "FC-SHELL-COMPAT-QUALIFICATION-001: signed real-app and installed-manager execution across both process restarts remains open",
+    "FC-UI-QUALIFICATION-001: native signing, UI, service lifecycle, Release signing, and notarization remain deferred and release-blocking",
+    "FC-AUTONOMOUS-CONTINUITY-E2E-001: real-provider manager-owned forced-rollover authority remains open",
+    "FC-HARDWARE-QUALIFICATION-001: representative physical-hardware evidence is owner-deferred and release-blocking",
     ".forge-autonomy-state/blockers/FC-UI-001.json",
     ".forge-autonomy-state/blockers/FC-PERF-001.json",
     ".forge-autonomy-state/blockers/FC-E2E-001.json",
     ".forge-autonomy-state/blockers/FC-RELEASE-001.json"
   ],
   "residual_risk": [
-    "A same-user writer can discover and atomically swap a quarantine basename after final verification and before unlinkat or renameatx_np. One winning race affects one entry under a pinned parent; final-link deletion can lose unbounded bytes and directory publication can relocate an unbounded subtree.",
-    "One recursive request can reuse released slots across up to 100000 planned entries, so the 32-slot accumulation bound limits simultaneous cooperating-process recovery state rather than cumulative adversarial wrong-object mutations. It does not protect against a same-UID writer that can alter owner-controlled receipts or move quarantine parents.",
-    "Initial path anchoring, destination hierarchy creation, and hard-link ctime ambiguity remain E2.",
-    "Unit, synthetic-host, and direct-adapter provider tests are supporting evidence only and do not establish autonomous continuity."
+    "Public macOS descriptor-relative open, stat, unlink, rename, renameatx_np, descriptor, fcntl, fsync, and F_FULLFSYNC interfaces do not provide terminal mutation conditional on an expected device, inode, vnode generation, or content token. Quarantine-and-verify mitigates but does not eliminate the race.",
+    "Source-parent authorization and capture are not atomic. One winning same-UID relocation can delete one eligible outside-root regular file or symlink whose bytes are unbounded, or quarantine one ineligible directory whose subtree is unbounded.",
+    "The final ACL/BSD-metadata-check-to-unlinkat race can delete one already captured expected regular file or symlink after its authorization metadata changes; regular-file bytes are unbounded.",
+    "Terminal quarantine has no authorized restore, release, or purge disposition and cannot be acknowledged while its protected leaf exists; 32 conflicts can exhaust every protected slot on one volume.",
+    "Caller-ledger removal, relocation, or lock-inode replacement and project-generation races can strand or allow up to 32 captured or terminal transactions per protected volume; each affected regular file can contain unbounded bytes.",
+    "Writable descriptors and hard links prevent an exact immutable-content guarantee. Startup recovery fencing, terminal physical-state repair, daemon-owned discovery and revoke, project-binding revoke and garbage collection, qualified volume behavior, freshness, and direct daemon execution remain open.",
+    "The full signed distinct-process 57-row crash, adversarial, lifecycle, volume, hard-link, writable-descriptor, Release, and notarization matrix has not run.",
+    "Qualification assumes a trusted quiescent workspace against same-UID transient source-manifest replacement. An arbitrary caller-selected harness is not authenticated. Aggregate report and evidence input reads remain unbounded fail-closed denial-of-service surfaces. The G10 handler does not yet invoke the checker. Post-verification mutation remains outside immutable-content proof.",
+    "Unit, synthetic-host, simulator, and directly invoked adapter tests are supporting evidence only and do not establish autonomous continuity or representative physical-hardware qualification."
   ],
   "next_actions": [
-    "Publish the partial mitigation checkpoint with every residual risk and deferred gate explicit.",
-    "Run the signed native Settings and UI matrix after Developer Mode and matching signing prerequisites are available.",
-    "Run one manager-owned threshold-forced real-provider rollover proving exact successor acknowledgment, predecessor fencing and idempotent sealing, automatic continuation with the GUI closed, and durable recovery from every rollover crash state.",
-    "Continue P10 without marking P10, E2, shell compatibility, native validation, or autonomous continuity complete."
+    "Execute the full signed distinct-process 57-row qualification matrix and retain exact recorder-bound artifacts without changing the nonpassing template by hand.",
+    "Close the remaining source-parent, metadata, disposition, recovery, caller-ledger, generation, volume, freshness, and daemon-lifecycle residuals or retain them explicitly as release blockers.",
+    "Run successful shell_exec through the signed real app and installed manager across actual app and manager restarts while preserving synchronous /bin/bash -lc behavior; keep bash.run additive.",
+    "Run the native signing, Settings, service approval, update, disable, Release, and notarization matrix; build-only, unit, simulator, or partial XCUI evidence cannot pass it.",
+    "Run one manager-owned threshold-forced real-provider rollover proving exact successor acknowledgment, predecessor fencing and idempotent sealing, automatic continuation with the GUI closed, and recovery from every durable crash state.",
+    "Run the owner-selected representative physical-hardware matrix before shipment.",
+    "Keep P10, E2, shell compatibility, native validation, autonomous continuity, hardware qualification, G09, G10, G11, G12, and final release qualification open."
   ],
+  "legacy_run_state": ".forge-autonomy-state/run.json is a historical autonomy-run ledger and is not the current selector; .forge-codex/state/run-state.json and .forge-codex/scripts/select_next_work.py are authoritative for current P10 work",
+  "release_authorized": false,
+  "merge_authorized": false,
   "evidence_root": ".forge-autonomy-state/evidence",
   "command_log_root": ".forge-autonomy-state/command-logs"
 }

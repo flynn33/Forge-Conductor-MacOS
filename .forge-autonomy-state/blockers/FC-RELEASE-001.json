@@ -2,31 +2,39 @@
   "schema_version": 1,
   "work_package": "FC-RELEASE-001",
   "status": "blocked_hard_gates",
-  "recorded_at": "2026-08-27T02:42:29Z",
-  "summary": "Focused runtime and product-path proofs pass, but the locked-session full-suite rerun and sanitizer, UI, profiling, soak, signed lifecycle, notarization, and final parity gates remain open.",
-  "passed": [
-    "strict SwiftPM runtime: 64 tests, 1 host skip, 0 failures",
-    "ad-hoc-signed Xcode runtime: 64 tests, 1 host skip, 0 failures",
-    "Xcode helper exact product identifier",
-    "project-local app build, nested signing, deep verification, and launch"
+  "recorded_at": "2026-08-31T02:02:48Z",
+  "summary": "Source checkpoint 2dd504e53a5a09837cd289a99eee48ab7f4547eb adds and validates evidence controls only. E2, P10, G09-G12, native signing and UI, signed shell compatibility, autonomous continuity, representative hardware, and final release qualification remain open and release-blocking.",
+  "source_checkpoint": {
+    "branch": "security/e2-evidence-binding",
+    "head": "2dd504e53a5a09837cd289a99eee48ab7f4547eb",
+    "base": "cd7e84fed8ed0fe0a8ec90793e83388c8a451f09",
+    "pull_request": 17,
+    "pull_request_state": "open draft",
+    "release_authorized": false,
+    "merge_authorized": false
+  },
+  "supporting_results": [
+    "The evidence-control suite passed 57 of 57 tests on the final repeated validation.",
+    "The qualification template remains deliberately nonpassing: all 57 rows are not_run, all 12 formal predicates are false, there are zero formal references, and the qualification-context reference is null.",
+    "Strict SwiftPM Debug EVID-20260830T220320Z-4cccc31cce and Release EVID-20260830T220539Z-eac42f2a8c each passed 771 tests with two declared skips and zero failures as supporting source evidence only.",
+    "Earlier strict runtime 64-test and locked-session 444-test results are historical exact-revision records only; they do not qualify this source checkpoint or any current hard gate."
   ],
-  "locked_session_blocker": {
+  "historical_locked_session_result": {
     "command_references": [
       "CMD-20260827T025715Z-b42c01b23b",
       "CMD-20260827T025822Z-dc523f8bbf",
       "CMD-20260827T024229Z-92a78059b3"
     ],
-    "result": "Debug and Release compile and execute 444 tests but fail with identical protected registry.json reopen errors while CGSSessionScreenIsLocked=Yes.",
-    "resume_condition": "Unlock the console session and rerun both strict full suites without changing file protection."
+    "result": "At that historical revision, Debug and Release compiled and executed 444 tests but failed with identical protected registry.json reopen errors while CGSSessionScreenIsLocked=Yes. This is not current-source qualification."
   },
-  "sanitizer_blockers": [
+  "historical_sanitizer_blockers": [
     {
       "kind": "address",
       "command_references": [
         "CMD-20260826T231558Z-5314efd9b5",
         "CMD-20260826T232746Z-278074fd92"
       ],
-      "result": "SwiftPM and Xcode workers spin before tests in Address Sanitizer allocator initialization.",
+      "result": "SwiftPM and Xcode workers spun before tests in Address Sanitizer allocator initialization.",
       "samples": [
         ".forge-autonomy-state/evidence/FC-RELEASE-001/asan-swiftpm-startup-spin.sample.txt",
         ".forge-autonomy-state/evidence/FC-RELEASE-001/asan-xcode-startup-spin.sample.txt"
@@ -38,17 +46,35 @@
         "CMD-20260826T233210Z-a494b24c35",
         "CMD-20260826T233250Z-e11abc6e37"
       ],
-      "result": "SwiftPM runtime loading violates platform policy; the Xcode worker exits before establishing its test connection."
+      "result": "SwiftPM runtime loading violated platform policy; the Xcode worker exited before establishing its test connection."
     }
   ],
+  "filesystem_residuals": [
+    "Quarantine-and-verify is mitigation, not elimination. Public macOS descriptor-relative and rename APIs, including renameatx_np, do not provide terminal mutation conditional on an expected device, inode, vnode generation, or content token.",
+    "Source-parent authorization and capture are not atomic. One winning same-UID relocation can delete one eligible outside-root regular file or symlink whose bytes are unbounded, or quarantine one ineligible directory whose subtree is unbounded.",
+    "The final ACL/BSD-metadata-check-to-unlinkat race can delete one already captured expected regular file or symlink after its authorization metadata changes; regular-file bytes are unbounded.",
+    "Terminal quarantine lacks an authorized restore, release, or purge disposition and cannot be acknowledged while the protected leaf exists; 32 conflicts can exhaust every protected slot on one volume.",
+    "Caller-ledger removal, relocation, or lock-inode replacement and project-generation races can strand or allow up to 32 captured or terminal transactions per protected volume; each affected regular file can contain unbounded bytes.",
+    "Writable descriptors and hard links prevent an exact immutable-content guarantee. Startup fencing, terminal physical-state repair, daemon-owned discovery and revoke, project-binding revoke and garbage collection, qualified volume behavior, freshness, and direct daemon execution remain open.",
+    "The full signed distinct-process 57-row crash, adversarial, lifecycle, volume, hard-link, writable-descriptor, Release, and notarization matrix has not run."
+  ],
+  "evidence_control_nonclaims": [
+    "Evidence controls do not execute a signed distinct-process case, prove a claim true, provide identity-conditional mutation, or close a formal predicate.",
+    "Qualification assumes a trusted quiescent workspace against same-UID transient source-manifest replacement.",
+    "An arbitrary caller-selected harness is not authenticated.",
+    "Aggregate report and evidence input reads remain unbounded fail-closed denial-of-service surfaces.",
+    "The G10 handler does not yet invoke the checker.",
+    "Post-verification mutation remains outside immutable-content proof."
+  ],
   "dependencies": [
-    "FC-UI-001",
-    "FC-PERF-001",
-    "FC-E2E-001 current-source refresh",
-    "signed app and LaunchAgent verification",
-    "notarization",
-    "final feature and protocol parity"
+    "FC-FILESYSTEM-PATH-TOCTOU-001 / FCA-007 and P10",
+    "FC-UI-001 and current-source native signed execution",
+    "FC-SHELL-COMPAT-QUALIFICATION-001 signed real-app and installed-manager execution across both process restarts",
+    "FC-AUTONOMOUS-CONTINUITY-E2E-001 real-provider manager-owned forced rollover with exact successor acknowledgment, predecessor fencing, automatic continuation, GUI-closed operation, and every durable crash-state recovery",
+    "FC-HARDWARE-QUALIFICATION-001 owner-selected representative physical hardware",
+    "G09, G10, G11, and G12",
+    "sanitizer, profiling, soak, migration, parity, signed lifecycle, Release signing, notarization, staple, and Gatekeeper evidence"
   ],
   "evidence": ".forge-autonomy-state/evidence/FC-RELEASE-001",
-  "resume_condition": "Resolve the locked-session, host security, signing, sanitizer, UI, profiling, soak, and downstream hard-gate conditions, then run the final completion validator."
+  "resume_condition": "Keep release_authorized and merge_authorized false. Resolve or explicitly retain every residual release blocker, execute every required current-source runtime matrix, and rerun the final completion validator. A nonzero P10 or completion result is expected while these gates remain open."
 }

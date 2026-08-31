@@ -9,33 +9,86 @@ Every applicable case must run against the normally built app bundle with the
 daemon installed through `SMAppService`, the daemon observed at effective UID
 0, and attacker/client programs signed as separate processes. Raw transcripts,
 signing information, process identities, fixture identities, and before/after
-sentinel hashes must be preserved by the immutable evidence recorder.
+sentinel hashes must be preserved by the bounded evidence recorder.
 
 The current implementation checkpoint has not executed this matrix. A row in
 this document defines required evidence; it is not a pass result.
 
-The report contract is
-`.forge-codex/schemas/p10-privileged-filesystem-qualification-report.schema.json`.
-The companion template is intentionally `partial`, `ok=false`, and `not_run`.
-Every row records the contracts exercised and raw per-case artifacts; a Boolean
-matrix is invalid and cannot close a gate. The formal closure object separately
-requires source-parent containment and requester authority to be atomic with
-capture; its template value is false because the current implementation does
-not meet that predicate.
+Report schema v2 is
+`.forge-codex/schemas/p10-privileged-filesystem-qualification-report.schema.json`;
+it uses companion artifact-binding schema v1 at
+`.forge-codex/schemas/p10-privileged-filesystem-artifact-binding.schema.json`.
+Each recorder-preserved, read-only JSON snapshot binds its qualification and
+evidence identifiers, current source manifest, case, role, iteration, subject
+or formal predicate, and the canonical digest of the exact report fact. A dedicated
+`qualification_context` envelope binds the exact capture timestamp, repository
+identity, test environment, process identities, and same-UID declarations. A
+passed report must identify a nonempty current branch, its 40-hex execution
+HEAD, canonical base branch `main`, the exact SHA resolved from required
+`refs/remotes/origin/main`, the canonical repository path, macOS build,
+hardware model, platform, and architecture. The base must be an ancestor of
+the execution HEAD, and the execution HEAD must resolve and remain an ancestor
+of the current HEAD. Every intervening commit is inspected; only
+`.forge-codex/state/**` and `.forge-codex/evidence/**` paths may occur. Any
+other committed path fails even when a later commit restores the original
+bytes. Source-manifest targets must also be clean in the worktree. This permits
+bounded state-and-evidence transport without accepting product, script, or
+other repository changes. The report capture timestamp must fall within the
+context evidence record's bounded and ordered ISO-8601 start/end interval.
 
-The current completion checker validates schema, provenance, hashes, ledger
-membership, source-manifest freshness, and structural consistency. It does not
-yet interpret a generic aggregate transcript well enough to bind every case,
-role, iteration, barrier, mount observation, crash phase, fixture assertion,
-and formal argument to distinct machine-readable harness facts. Until the
-harness emits those bindings and the checker enforces them, this limitation is
-an open release requirement and no passing qualification report is authorized.
+Before child launch, the recorder captures and supplies the evidence
+identifier, source manifest, active branch, execution HEAD, base branch and
+exact base SHA, repository path, macOS build, hardware model, platform,
+architecture, qualification, and binding version. Semantic envelopes are
+accepted only from the recorder's evidence-ID-specific repository copy;
+external hash-only artifacts and captured stdout/stderr streams cannot support
+a semantic fact. Each evidence record must reproduce that exact context and
+contain bounded, nonplaceholder timing and environment provenance.
+
+The semantic-copy loader accepts at most 1 MiB. It requires a canonical
+repository-relative recorder source path and an evidence-ID-specific captured
+path, then traverses from the repository descriptor without following final or
+intermediate symlinks. The opened object must be a regular file owned by the
+current effective user, have one link and mode exactly `0444`, and match the
+recorded byte count and SHA-256. Device, inode, type/mode, owner, link count,
+size, modification time, and change time must stay stable during the bounded
+read. A second descriptor-relative lookup must still name that same regular
+file after the read. These checks establish a bounded read-only snapshot at
+evaluation time; they do not establish filesystem immutability or prevent the
+same user from replacing the pathname after the check completes.
+
+The checker rejects cross-case or cross-role reuse, duplicate formal-predicate
+support, stale manifests, placeholder claims or scope, fact-digest mismatch,
+obsolete or reversed timing, environment mismatch, referenced-byte mutation,
+read-time mutation, and pathname replacement before the post-read lookup.
+
+These are evidence controls only. The companion template remains intentionally
+`partial` and `ok=false`; all 57 rows remain `not_run`, all 12 formal predicates
+remain false, and it contains neither a qualification-context reference nor a
+formal artifact reference. No signed
+distinct-process row or formal closure has passed. A Boolean matrix is invalid
+and cannot close a gate, and no passing qualification report is authorized.
+E2, P10, G10, and G12 remain open.
+The recorder executes the operator-selected command; these controls do not
+authenticate an arbitrary harness or prove that its semantic claim is true.
+The signed-host matrix separately requires the real signed processes and
+attacker programs described below.
+Mode `0444` and current-euid ownership are not authentication. A same-UID
+process can author or replace a snapshot or record before evaluation, as well
+as replace it afterward. The evidence control therefore assumes a trusted
+operator and a quiescent same-UID writer during manifest capture, recording,
+and evaluation. Aggregate report and evidence-record reads remain outside the
+1 MiB semantic-copy loader bound, and direct integration of this checker into
+the G10 gate runner remains deferred. These limitations are explicit release
+nonclaims, not qualified security properties.
 
 ## Process and fixture rules
 
-- Record active branch, exact HEAD, `origin/main`, app/helper CDHashes,
+- Record active branch, exact execution HEAD, exact
+  `refs/remotes/origin/main` SHA, repository path, app/helper CDHashes,
   designated requirements, provisioning/signing identities, macOS build,
-  machine identity, APFS mount flags, and helper effective UID.
+  hardware model, platform, architecture, APFS mount flags, and helper
+  effective UID.
 - Use distinct authorized app, authorized manager/CLI, unauthorized same-UID,
   differently signed, and malformed-wire processes. Never simulate identity by
   calling daemon code in-process.

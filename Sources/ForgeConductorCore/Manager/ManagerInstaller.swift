@@ -510,6 +510,22 @@ private struct FileManagerArtifactReplacer: ManagerArtifactReplacing {
     }
 }
 
+protocol ManagerLaunchctlRunning {
+    func run(arguments: [String], timeoutSec: TimeInterval) throws -> ProcessResult
+}
+
+private struct ProcessManagerLaunchctlRunner: ManagerLaunchctlRunning {
+    private let runner = ProcessRunner()
+
+    func run(arguments: [String], timeoutSec: TimeInterval) throws -> ProcessResult {
+        try runner.run(
+            executable: "/bin/launchctl",
+            arguments: arguments,
+            timeoutSec: timeoutSec
+        )
+    }
+}
+
 struct CodesignManagerArtifactValidator: ManagerArtifactValidating {
     private let runner: ProcessRunner
     private let signatureInspector: any ManagerCodeSignatureInspecting
@@ -696,6 +712,7 @@ public final class ManagerInstaller: @unchecked Sendable {
     private let artifactReplacer: any ManagerArtifactReplacing
     private let privilegedApplicationIdentityValidator:
         any ManagerPrivilegedApplicationIdentityValidating
+    private let launchctlRunner: any ManagerLaunchctlRunning
 
     public init(paths: AppPaths, config: ConfigStore) {
         self.paths = paths
@@ -705,6 +722,7 @@ public final class ManagerInstaller: @unchecked Sendable {
         self.artifactReplacer = FileManagerArtifactReplacer()
         self.privilegedApplicationIdentityValidator =
             SecurityManagerPrivilegedApplicationIdentityValidator()
+        self.launchctlRunner = ProcessManagerLaunchctlRunner()
     }
 
     init(
@@ -715,7 +733,8 @@ public final class ManagerInstaller: @unchecked Sendable {
         artifactReplacer: any ManagerArtifactReplacing = FileManagerArtifactReplacer(),
         privilegedApplicationIdentityValidator:
             any ManagerPrivilegedApplicationIdentityValidating =
-                SecurityManagerPrivilegedApplicationIdentityValidator()
+                SecurityManagerPrivilegedApplicationIdentityValidator(),
+        launchctlRunner: (any ManagerLaunchctlRunning)? = nil
     ) {
         self.paths = paths
         self.config = config
@@ -724,6 +743,7 @@ public final class ManagerInstaller: @unchecked Sendable {
         self.artifactReplacer = artifactReplacer
         self.privilegedApplicationIdentityValidator =
             privilegedApplicationIdentityValidator
+        self.launchctlRunner = launchctlRunner ?? ProcessManagerLaunchctlRunner()
     }
 
     public convenience init(app: ForgeApp) {
@@ -1679,34 +1699,302 @@ public final class ManagerInstaller: @unchecked Sendable {
             timeoutSec: 5
         )
 
-        let load = try ProcessRunner().run(
-            executable: "/bin/launchctl",
-            arguments: ["bootstrap", "gui/\(uid)", launchAgentURL.path],
-            timeoutSec: 15
-        )
-        if load.exitCode != 0 {
-            let load2 = try ProcessRunner().run(
-                executable: "/bin/launchctl",
-                arguments: ["load", "-w", launchAgentURL.path],
+        try loadLoginAgent(plistURL: launchAgentURL, uid: uid)
+
+        return launchAgentURL
+    }
+
+    /// Loads the LaunchAgent through the modern bootstrap path with the established
+    /// legacy fallback, then proves launchd owns a live process for the exact job label.
+    /// A successful legacy `load` exit alone is not readiness evidence.
+    func loadLoginAgent(
+        plistURL: URL,
+        uid: uid_t,
+        readinessAttempts: Int = 5,
+        readinessDelaySec: TimeInterval = 0.2
+    ) throws {
+        let userDomain = "gui/\(uid)"
+        let jobTarget = "\(userDomain)/\(Self.launchAgentLabel)"
+        func cleanupDetail() -> String {
+            cleanupFailedLoginAgent(
+                jobTarget: jobTarget,
+                plistURL: plistURL,
+                verificationAttempts: readinessAttempts,
+                verificationDelaySec: readinessDelaySec
+            )
+        }
+        let beforeLoad: ProcessResult
+        do {
+            beforeLoad = try launchctlRunner.run(
+                arguments: ["print", jobTarget],
+                timeoutSec: 5
+            )
+        } catch {
+            let cleanup = cleanupDetail()
+            throw launchAgentReadinessError(
+                jobTarget: jobTarget,
+                bootstrap: nil,
+                legacyLoad: nil,
+                detail: "could not prove the exact job absent before load: "
+                    + error.localizedDescription + "; " + cleanup
+            )
+        }
+        guard launchAgentIsProvenAbsent(beforeLoad) else {
+            let cleanup = cleanupDetail()
+            throw launchAgentReadinessError(
+                jobTarget: jobTarget,
+                bootstrap: nil,
+                legacyLoad: nil,
+                detail: "exact job was still present or absence was ambiguous before load "
+                    + "(exit \(beforeLoad.exitCode), timed_out=\(beforeLoad.timedOut)); "
+                    + cleanup
+            )
+        }
+
+        let bootstrap: ProcessResult
+        do {
+            bootstrap = try launchctlRunner.run(
+                arguments: ["bootstrap", userDomain, plistURL.path],
                 timeoutSec: 15
             )
-            if load2.exitCode != 0 {
-                throw NSError(
-                    domain: "ManagerInstaller",
-                    code: 2,
-                    userInfo: [NSLocalizedDescriptionKey:
-                        "launchctl load failed: \(load.stderr) \(load2.stderr)"]
+        } catch {
+            let cleanup = cleanupDetail()
+            throw launchAgentReadinessError(
+                jobTarget: jobTarget,
+                bootstrap: nil,
+                legacyLoad: nil,
+                detail: "launchctl bootstrap failed: \(error.localizedDescription); \(cleanup)"
+            )
+        }
+
+        var legacyLoad: ProcessResult?
+        if bootstrap.exitCode != 0 || bootstrap.timedOut {
+            let fallback: ProcessResult
+            do {
+                fallback = try launchctlRunner.run(
+                    arguments: ["load", "-w", plistURL.path],
+                    timeoutSec: 15
+                )
+            } catch {
+                let cleanup = cleanupDetail()
+                throw launchAgentReadinessError(
+                    jobTarget: jobTarget,
+                    bootstrap: bootstrap,
+                    legacyLoad: nil,
+                    detail: "legacy launchctl load failed: "
+                        + error.localizedDescription + "; " + cleanup
+                )
+            }
+            legacyLoad = fallback
+            if fallback.exitCode != 0 || fallback.timedOut {
+                let cleanup = cleanupDetail()
+                throw launchAgentReadinessError(
+                    jobTarget: jobTarget,
+                    bootstrap: bootstrap,
+                    legacyLoad: fallback,
+                    detail: "legacy launchctl load returned an unsuccessful result; " + cleanup
                 )
             }
         }
 
-        _ = try? ProcessRunner().run(
-            executable: "/bin/launchctl",
-            arguments: ["kickstart", "-k", "gui/\(uid)/\(Self.launchAgentLabel)"],
+        _ = try? launchctlRunner.run(
+            arguments: ["kickstart", "-k", jobTarget],
             timeoutSec: 10
         )
 
-        return launchAgentURL
+        let attemptLimit = max(1, min(readinessAttempts, 10))
+        let retryDelay = max(0, min(readinessDelaySec, 1))
+        let expectedProgramPath = canonicalExecutablePath(appExecutableURL.path)
+            ?? appExecutableURL.standardizedFileURL.path
+        var lastReadinessDetail = "launchctl print was not attempted"
+        for attempt in 1...attemptLimit {
+            do {
+                let readiness = try launchctlRunner.run(
+                    arguments: ["print", jobTarget],
+                    timeoutSec: 5
+                )
+                let identity = launchAgentIdentity(from: readiness.stdout)
+                let programMatches = identity.programPath
+                    .flatMap(canonicalExecutablePath)
+                    .map { $0 == expectedProgramPath }
+                    ?? false
+                if readiness.exitCode == 0,
+                   !readiness.timedOut,
+                   identity.pid != nil,
+                   programMatches {
+                    return
+                }
+                lastReadinessDetail = "launchctl print did not report both a positive pid "
+                    + "and expected program \(appExecutableURL.path) "
+                    + "on attempt \(attempt)/\(attemptLimit) "
+                    + "(exit \(readiness.exitCode), timed_out=\(readiness.timedOut), "
+                    + "observed_pid=\(identity.pid.map(String.init) ?? "none"), "
+                    + "observed_program=\(identity.programPath ?? "none"))"
+            } catch {
+                lastReadinessDetail = "launchctl print failed on attempt "
+                    + "\(attempt)/\(attemptLimit): \(error.localizedDescription)"
+            }
+
+            if attempt < attemptLimit, retryDelay > 0 {
+                Thread.sleep(forTimeInterval: retryDelay)
+            }
+        }
+
+        let cleanup = cleanupDetail()
+        throw launchAgentReadinessError(
+            jobTarget: jobTarget,
+            bootstrap: bootstrap,
+            legacyLoad: legacyLoad,
+            detail: lastReadinessDetail + "; " + cleanup
+        )
+    }
+
+    private func launchAgentIsProvenAbsent(_ result: ProcessResult) -> Bool {
+        let missingService = "Could not find service \"\(Self.launchAgentLabel)\""
+        return result.exitCode == 113
+            && !result.timedOut
+            && result.stdout.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && result.stderr.contains(missingService)
+    }
+
+    private func launchAgentIdentity(from output: String) -> (
+        pid: Int32?,
+        programPath: String?
+    ) {
+        var pid: Int32?
+        var programPath: String?
+        for rawLine in output.split(separator: "\n", omittingEmptySubsequences: true) {
+            let fields = rawLine.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+            guard fields.count == 2 else { continue }
+            let key = fields[0].trimmingCharacters(in: .whitespaces)
+            let value = launchctlScalarValue(fields[1])
+            switch key {
+            case "pid":
+                if let parsedPID = Int32(value), parsedPID > 0 {
+                    pid = parsedPID
+                }
+            case "program":
+                if value.hasPrefix("/") {
+                    programPath = value
+                }
+            default:
+                break
+            }
+        }
+        return (pid, programPath)
+    }
+
+    private func launchctlScalarValue(_ rawValue: Substring) -> String {
+        var value = rawValue.trimmingCharacters(in: .whitespaces)
+        if value.count >= 2,
+           (value.first == "\"" && value.last == "\"")
+            || (value.first == "'" && value.last == "'") {
+            value.removeFirst()
+            value.removeLast()
+        }
+        return value
+    }
+
+    private func canonicalExecutablePath(_ path: String) -> String? {
+        guard path.hasPrefix("/") else { return nil }
+        return URL(fileURLWithPath: path)
+            .standardizedFileURL
+            .resolvingSymlinksInPath()
+            .path
+    }
+
+    private func cleanupFailedLoginAgent(
+        jobTarget: String,
+        plistURL: URL,
+        verificationAttempts: Int,
+        verificationDelaySec: TimeInterval
+    ) -> String {
+        var commandSummaries: [String] = []
+        for (arguments, timeoutSec) in [
+            (["bootout", jobTarget], TimeInterval(10)),
+            (["disable", jobTarget], TimeInterval(5)),
+            (["unload", "-w", plistURL.path], TimeInterval(10)),
+        ] {
+            do {
+                let result = try launchctlRunner.run(
+                    arguments: arguments,
+                    timeoutSec: timeoutSec
+                )
+                commandSummaries.append(
+                    "\(arguments[0])_exit=\(result.exitCode) "
+                        + "\(arguments[0])_timed_out=\(result.timedOut)"
+                )
+            } catch {
+                commandSummaries.append(
+                    "\(arguments[0])_error="
+                        + String(error.localizedDescription.prefix(256))
+                )
+            }
+        }
+
+        if FileManager.default.fileExists(atPath: plistURL.path) {
+            try? FileManager.default.removeItem(at: plistURL)
+        }
+        let plistAbsent = !FileManager.default.fileExists(atPath: plistURL.path)
+
+        let attemptLimit = max(1, min(verificationAttempts, 10))
+        let retryDelay = max(0, min(verificationDelaySec, 1))
+        var exactJobAbsent = false
+        var verificationSummary = "cleanup print was not attempted"
+        for attempt in 1...attemptLimit {
+            do {
+                let result = try launchctlRunner.run(
+                    arguments: ["print", jobTarget],
+                    timeoutSec: 5
+                )
+                if launchAgentIsProvenAbsent(result) {
+                    exactJobAbsent = true
+                    verificationSummary = "cleanup print proved exact job absent "
+                        + "on attempt \(attempt)/\(attemptLimit)"
+                    break
+                }
+                let identity = launchAgentIdentity(from: result.stdout)
+                verificationSummary = "cleanup print retained or ambiguously reported job "
+                    + "on attempt \(attempt)/\(attemptLimit) "
+                    + "(exit \(result.exitCode), timed_out=\(result.timedOut), "
+                    + "pid=\(identity.pid.map(String.init) ?? "none"), "
+                    + "program=\(identity.programPath ?? "none"))"
+            } catch {
+                verificationSummary = "cleanup print failed on attempt "
+                    + "\(attempt)/\(attemptLimit): "
+                    + String(error.localizedDescription.prefix(256))
+            }
+
+            if attempt < attemptLimit, retryDelay > 0 {
+                Thread.sleep(forTimeInterval: retryDelay)
+            }
+        }
+
+        return "cleanup_exact_job_absent=\(exactJobAbsent) "
+            + "cleanup_plist_absent=\(plistAbsent) "
+            + commandSummaries.joined(separator: " ") + "; "
+            + verificationSummary
+    }
+
+    private func launchAgentReadinessError(
+        jobTarget: String,
+        bootstrap: ProcessResult?,
+        legacyLoad: ProcessResult?,
+        detail: String
+    ) -> NSError {
+        let bootstrapSummary = bootstrap.map {
+            "bootstrap_exit=\($0.exitCode) bootstrap_timed_out=\($0.timedOut)"
+        } ?? "bootstrap_not_attempted=true"
+        let fallback = legacyLoad.map {
+            " legacy_load_exit=\($0.exitCode) legacy_load_timed_out=\($0.timedOut)"
+        } ?? ""
+        return NSError(
+            domain: "ManagerInstaller",
+            code: 2,
+            userInfo: [NSLocalizedDescriptionKey:
+                "launchctl load failed: expected live job \(jobTarget); \(detail); "
+                + "\(bootstrapSummary)\(fallback)"]
+        )
     }
 
     /// Retains a small, fixed number of bounded launchd log tails during reinstall.

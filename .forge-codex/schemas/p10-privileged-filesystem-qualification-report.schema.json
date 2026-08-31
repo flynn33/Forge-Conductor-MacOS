@@ -6,6 +6,7 @@
   "type": "object",
   "required": [
     "schema_version",
+    "artifact_binding_schema_version",
     "status",
     "ok",
     "source_manifest",
@@ -13,6 +14,7 @@
     "repository",
     "test_environment",
     "test_processes",
+    "qualification_context_artifact_reference",
     "matrix",
     "same_uid_fallback",
     "same_uid_threat_model",
@@ -22,6 +24,9 @@
   ],
   "properties": {
     "schema_version": {
+      "const": 2
+    },
+    "artifact_binding_schema_version": {
       "const": 1
     },
     "status": {
@@ -57,7 +62,9 @@
       "required": [
         "branch",
         "head_sha",
-        "base_branch"
+        "base_branch",
+        "base_sha",
+        "repository_path"
       ],
       "properties": {
         "branch": {
@@ -65,7 +72,8 @@
             "string",
             "null"
           ],
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 256
         },
         "head_sha": {
           "type": [
@@ -79,7 +87,24 @@
             "string",
             "null"
           ],
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "base_sha": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "repository_path": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^/",
+          "minLength": 1,
+          "maxLength": 4096
         }
       },
       "additionalProperties": false
@@ -88,7 +113,9 @@
       "type": "object",
       "required": [
         "macos_build",
-        "machine_identifier"
+        "machine_identifier",
+        "platform",
+        "architecture"
       ],
       "properties": {
         "macos_build": {
@@ -96,14 +123,32 @@
             "string",
             "null"
           ],
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 256
         },
         "machine_identifier": {
           "type": [
             "string",
             "null"
           ],
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "platform": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "architecture": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 256
         }
       },
       "additionalProperties": false
@@ -127,6 +172,16 @@
         }
       },
       "additionalProperties": false
+    },
+    "qualification_context_artifact_reference": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/artifactReference"
+        }
+      ]
     },
     "matrix": {
       "type": "object",
@@ -471,6 +526,76 @@
             "type": "string",
             "format": "date-time"
           },
+          "repository": {
+            "type": "object",
+            "required": [
+              "branch",
+              "head_sha",
+              "base_branch",
+              "base_sha",
+              "repository_path"
+            ],
+            "properties": {
+              "branch": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "head_sha": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{40}$"
+              },
+              "base_branch": {
+                "const": "main"
+              },
+              "base_sha": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{40}$"
+              },
+              "repository_path": {
+                "type": "string",
+                "pattern": "^/",
+                "minLength": 1,
+                "maxLength": 4096
+              }
+            },
+            "additionalProperties": false
+          },
+          "test_environment": {
+            "type": "object",
+            "required": [
+              "macos_build",
+              "machine_identifier",
+              "platform",
+              "architecture"
+            ],
+            "properties": {
+              "macos_build": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "machine_identifier": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "platform": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              "architecture": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              }
+            },
+            "additionalProperties": false
+          },
+          "qualification_context_artifact_reference": {
+            "$ref": "#/$defs/artifactReference"
+          },
           "same_uid_fallback": {
             "const": "absent"
           },
@@ -513,7 +638,8 @@
                 "const": true
               },
               "formal_argument_artifact_references": {
-                "minItems": 1
+                "minItems": 12,
+                "maxItems": 12
               }
             }
           },
@@ -618,7 +744,8 @@
           "items": {
             "$ref": "#/$defs/artifactReference"
           },
-          "uniqueItems": true
+          "uniqueItems": true,
+          "maxItems": 12
         }
       },
       "additionalProperties": false
@@ -756,7 +883,8 @@
         "role",
         "pid",
         "effective_uid",
-        "executable_path"
+        "executable_path",
+        "raw_artifact_reference"
       ],
       "properties": {
         "role": {
@@ -774,6 +902,9 @@
         "executable_path": {
           "type": "string",
           "minLength": 1
+        },
+        "raw_artifact_reference": {
+          "$ref": "#/$defs/artifactReference"
         }
       },
       "additionalProperties": false
@@ -786,7 +917,8 @@
         "team_identifier",
         "signing_identifier",
         "code_directory_hash",
-        "designated_requirement"
+        "designated_requirement",
+        "raw_artifact_reference"
       ],
       "properties": {
         "role": {
@@ -812,6 +944,9 @@
         "designated_requirement": {
           "type": "string",
           "minLength": 1
+        },
+        "raw_artifact_reference": {
+          "$ref": "#/$defs/artifactReference"
         }
       },
       "additionalProperties": false
@@ -826,7 +961,8 @@
         "entry_type",
         "sha256",
         "acl_sha256",
-        "bsd_flags"
+        "bsd_flags",
+        "raw_artifact_reference"
       ],
       "properties": {
         "label": {
@@ -877,6 +1013,9 @@
             "null"
           ],
           "minimum": 0
+        },
+        "raw_artifact_reference": {
+          "$ref": "#/$defs/artifactReference"
         }
       },
       "additionalProperties": false

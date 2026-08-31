@@ -3,13 +3,17 @@
 
 from __future__ import annotations
 
+import io
 import json
 import os
 import pathlib
 import plistlib
+import subprocess
 import sys
 import tempfile
 import unittest
+import urllib.error
+from unittest import mock
 
 
 SCRIPT_ROOT = pathlib.Path(__file__).resolve().parent
@@ -65,16 +69,132 @@ class SignedShellManagerHarnessTests(unittest.TestCase):
         self.assertTrue(
             subject.parse_disabled_entry('{ "com.forge-conductor.manager" => true }')
         )
+        self.assertFalse(
+            subject.parse_disabled_entry('{ "com.forge-conductor.manager" => enabled }')
+        )
+        self.assertTrue(
+            subject.parse_disabled_entry('{ "com.forge-conductor.manager" => disabled }')
+        )
+
+    def test_manager_credential_is_primed_by_exact_unauthorized_denial(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            home = pathlib.Path(temporary)
+            credential = home / "manager-control.secret"
+
+            def reject(request: object, timeout: float) -> object:
+                self.assertGreater(timeout, 0)
+                self.assertEqual(request.get_header("Authorization"), "Bearer invalid")
+                credential.write_text("a" * 64, encoding="ascii")
+                credential.chmod(0o600)
+                raise urllib.error.HTTPError(
+                    request.full_url,
+                    401,
+                    "Unauthorized",
+                    {},
+                    io.BytesIO(
+                        json.dumps(
+                            {
+                                "ok": False,
+                                "code": "manager_mutation_unauthorized",
+                                "message": "authorization required",
+                            }
+                        ).encode("utf-8")
+                    ),
+                )
+
+            with mock.patch.object(subject.urllib.request, "urlopen", side_effect=reject):
+                result = subject.prime_manager_credential(home, timeout=1)
+
+            self.assertTrue(result["created_by_manager"])
+            self.assertEqual(result["unauthorized_probe_status"], 401)
+            self.assertEqual(subject.read_manager_credential(home), "a" * 64)
+
+    def test_manager_credential_prime_rejects_invalid_denial_bodies(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            home = pathlib.Path(temporary)
+            for body in (b"{", b"\xff"):
+                with self.subTest(body=body):
+                    error = urllib.error.HTTPError(
+                        "http://127.0.0.1:7788/api/manager/settings",
+                        401,
+                        "Unauthorized",
+                        {},
+                        io.BytesIO(body),
+                    )
+                    with mock.patch.object(
+                        subject.urllib.request,
+                        "urlopen",
+                        side_effect=error,
+                    ):
+                        with self.assertRaisesRegex(
+                            subject.QualificationError,
+                            "invalid JSON",
+                        ):
+                            subject.prime_manager_credential(home, timeout=1)
+
+    def test_manager_credential_prime_bounds_denial_body(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            home = pathlib.Path(temporary)
+            error = urllib.error.HTTPError(
+                "http://127.0.0.1:7788/api/manager/settings",
+                401,
+                "Unauthorized",
+                {},
+                io.BytesIO(b"x" * (subject.MANAGER_DENIAL_MAXIMUM_BYTES + 1)),
+            )
+            with mock.patch.object(subject.urllib.request, "urlopen", side_effect=error):
+                with self.assertRaisesRegex(subject.QualificationError, "byte bound"):
+                    subject.prime_manager_credential(home, timeout=1)
+
+    def test_manager_credential_rejects_non_ascii_storage(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            home = pathlib.Path(temporary)
+            credential = home / "manager-control.secret"
+            credential.write_bytes(b"\xff" * 64)
+            credential.chmod(0o600)
+            with self.assertRaisesRegex(subject.QualificationError, "readable ASCII"):
+                subject.read_manager_credential(home)
 
     def test_install_command_denies_firewall_and_preserves_stale_agents(self) -> None:
         cli = pathlib.Path("/tmp/Forge Conductor.app/Contents/Helpers/forge-conductor")
         home = pathlib.Path("/tmp/qualification")
         command = subject.sandboxed_install_command(cli, home)
         self.assertEqual(command[0], str(subject.SANDBOX_EXEC))
+        self.assertIn("(allow job-creation)", command[2])
         self.assertIn(subject.FIREWALL_TOOL, command[2])
+        self.assertIn("(deny process-exec", command[2])
         self.assertEqual(command[3], str(cli))
         self.assertIn("--keep-stale", command)
         self.assertEqual(command[-2:], ["--home", str(home)])
+
+    def test_install_profile_compiles_and_denies_exact_firewall_executable(self) -> None:
+        expected = (
+            '(version 1) (allow default) (allow job-creation) '
+            f'(deny process-exec (literal "{subject.FIREWALL_TOOL}"))'
+        )
+        self.assertEqual(subject.INSTALL_SANDBOX_PROFILE, expected)
+        if sys.platform != "darwin" or not subject.SANDBOX_EXEC.exists():
+            self.skipTest("sandbox-exec semantic probe requires macOS")
+        allowed = subprocess.run(
+            [str(subject.SANDBOX_EXEC), "-p", expected, "/usr/bin/true"],
+            capture_output=True,
+            check=False,
+            timeout=5,
+        )
+        denied = subprocess.run(
+            [
+                str(subject.SANDBOX_EXEC),
+                "-p",
+                expected,
+                subject.FIREWALL_TOOL,
+                "--getglobalstate",
+            ],
+            capture_output=True,
+            check=False,
+            timeout=5,
+        )
+        self.assertEqual(allowed.returncode, 0)
+        self.assertNotEqual(denied.returncode, 0)
 
     def test_shell_success_validator_requires_full_legacy_contract(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -98,6 +218,41 @@ class SignedShellManagerHarnessTests(unittest.TestCase):
             with self.assertRaisesRegex(subject.QualificationError, "missing keys"):
                 subject.validate_shell_result(payload, cwd)
 
+    def test_allowed_root_validation_accepts_only_fixed_tmp_alias(self) -> None:
+        with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
+            observed = pathlib.Path(temporary)
+            expected = observed.resolve(strict=True)
+            validated = subject.validate_single_allowed_root(
+                {"allowed_roots": [str(observed)]},
+                expected,
+            )
+            self.assertEqual(validated["configured"], str(observed))
+            self.assertEqual(pathlib.Path(validated["normalized"]), expected)
+            self.assertEqual(pathlib.Path(validated["resolved"]), expected.resolve())
+
+            alias = observed.parent / f"{observed.name}-alias"
+            alias.symlink_to(expected, target_is_directory=True)
+            self.addCleanup(lambda: alias.unlink(missing_ok=True))
+            with self.assertRaisesRegex(subject.QualificationError, "canonical"):
+                subject.validate_single_allowed_root(
+                    {"allowed_roots": [str(alias)]},
+                    expected,
+                )
+
+            wrong = observed / "wrong"
+            wrong.mkdir()
+            with self.assertRaisesRegex(subject.QualificationError, "canonical"):
+                subject.validate_single_allowed_root(
+                    {"allowed_roots": [str(wrong)]},
+                    expected,
+                )
+
+    def test_default_qualification_home_resolves_system_temp_alias(self) -> None:
+        with mock.patch.object(subject.tempfile, "gettempdir", return_value="/tmp"):
+            home = subject.default_qualification_home()
+        self.assertEqual(home.parent, pathlib.Path("/tmp").resolve(strict=True))
+        self.assertTrue(home.name.startswith("forge-signed-shell-manager-"))
+
     def test_shell_denial_validator_requires_explicit_opt_out_code(self) -> None:
         validated = subject.validate_shell_denial(
             {
@@ -117,6 +272,22 @@ class SignedShellManagerHarnessTests(unittest.TestCase):
                     "retryable": False,
                 }
             )
+
+    def test_shell_probe_completion_report_fills_every_required_field(self) -> None:
+        for outcome in ("passed", "denied_by_explicit_opt_out"):
+            with self.subTest(outcome=outcome):
+                report = subject.shell_probe_completion_report(outcome)
+                self.assertEqual(set(report), {"commands", "results", "gaps", "follow_ups"})
+                self.assertTrue(
+                    all(
+                        isinstance(value, list)
+                        and value
+                        and all(isinstance(item, str) and item for item in value)
+                        for value in report.values()
+                    )
+                )
+                self.assertEqual(report["commands"], [subject.SHELL_COMMAND])
+                self.assertEqual(report["results"], [outcome])
 
     def test_tools_list_requires_shell_exec(self) -> None:
         response = {

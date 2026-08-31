@@ -8,6 +8,7 @@ import json
 import os
 import pathlib
 import re
+from datetime import datetime
 from typing import Any
 
 try:
@@ -16,10 +17,25 @@ except ImportError:  # pragma: no cover - exercised only on an incomplete gate h
     Draft202012Validator = None
     FormatChecker = None
 
-from evidence_support import parse_xctest_summaries, source_manifest
+from evidence_support import (
+    EVIDENCE_CONTEXT_SCHEMA_VERSION,
+    EvidenceSupportError,
+    MANIFEST_TARGETS,
+    QUALIFICATION_ARTIFACT_BINDING_SCHEMA_VERSION,
+    canonical_json_sha256,
+    load_qualification_artifact,
+    parse_xctest_summaries,
+    run_bounded_readonly_command,
+    source_manifest,
+)
+from record_command import execution_provenance
 
 
 ROOT = pathlib.Path(os.environ.get("FORGE_P10_REPOSITORY", pathlib.Path(__file__).resolve().parents[2])).resolve()
+QUALIFICATION_ARTIFACT_SCHEMA = (
+    ROOT
+    / ".forge-codex/schemas/p10-privileged-filesystem-artifact-binding.schema.json"
+)
 EXPECTED_MIGRATION_FIXTURES = {
     "config-v1-to-v2",
     "global-sqlite-v2-to-v5",
@@ -308,6 +324,7 @@ REQUIRED_PRIVILEGED_FILESYSTEM_CRASH_FACT_CASES = {
     "upgrade_unregister_reregister",
 }
 PRIVILEGED_FILESYSTEM_EVIDENCE_KINDS = {
+    "context": {"p10-privileged-filesystem-qualification"},
     "case": {"p10-privileged-filesystem-qualification"},
     "formal": {"p10-privileged-filesystem-formal-argument"},
 }
@@ -332,12 +349,163 @@ EXPECTED_PATHNAME_BOUNDARY_REQUIREMENTS = {
     "custom_sqlite_vfs_for_database_family_identity",
     "independent_privilege_boundary_for_direct_mutation",
 }
+MAXIMUM_QUALIFICATION_TIMESTAMP_BYTES = 128
+MAXIMUM_QUALIFICATION_PROVENANCE_BYTES = 4096
+MAXIMUM_QUALIFICATION_TRANSPORT_PATH_BYTES = 1024 * 1024
+MAXIMUM_QUALIFICATION_TRANSPORT_PATHS = 10_000
+MAXIMUM_QUALIFICATION_EVIDENCE_SECONDS = 24 * 60 * 60
 failures: list[str] = []
 
 
 def check(condition: bool, message: str) -> None:
     if not condition:
         failures.append(message)
+
+
+def bounded_nonplaceholder_text(value: Any, label: str, *, maximum_bytes: int) -> str | None:
+    if not isinstance(value, str) or not value.strip():
+        failures.append(f"{label} is empty")
+        return None
+    try:
+        encoded_size = len(value.encode("utf-8"))
+    except UnicodeEncodeError:
+        failures.append(f"{label} is not valid UTF-8 text")
+        return None
+    if encoded_size > maximum_bytes:
+        failures.append(f"{label} exceeds {maximum_bytes} bytes")
+        return None
+    normalized = " ".join(value.strip().lower().replace("_", " ").split())
+    if (
+        normalized in PRIVILEGED_FILESYSTEM_PLACEHOLDER_TERMS
+        or "placeholder" in normalized
+        or "not executed" in normalized
+    ):
+        failures.append(f"{label} is a placeholder")
+        return None
+    return value
+
+
+def bounded_timestamp(value: Any, label: str) -> datetime | None:
+    text_value = bounded_nonplaceholder_text(
+        value,
+        label,
+        maximum_bytes=MAXIMUM_QUALIFICATION_TIMESTAMP_BYTES,
+    )
+    if text_value is None:
+        return None
+    normalized = text_value[:-1] + "+00:00" if text_value.endswith("Z") else text_value
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        failures.append(f"{label} is not a valid ISO-8601 timestamp")
+        return None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        failures.append(f"{label} has no timezone")
+        return None
+    return parsed
+
+
+def git_predicate(label: str, *arguments: str) -> bool:
+    try:
+        return_code, _, _ = run_bounded_readonly_command(
+            ROOT,
+            label,
+            ["git", *arguments],
+            timeout_seconds=10,
+            maximum_output_bytes=MAXIMUM_QUALIFICATION_PROVENANCE_BYTES,
+        )
+    except EvidenceSupportError as error:
+        failures.append(str(error))
+        return False
+    if return_code != 0:
+        failures.append(label)
+        return False
+    return True
+
+
+def git_manifest_worktree_clean(label: str) -> bool:
+    try:
+        return_code, stdout, _ = run_bounded_readonly_command(
+            ROOT,
+            label,
+            [
+                "git",
+                "status",
+                "--porcelain=v1",
+                "--untracked-files=all",
+                "--",
+                *MANIFEST_TARGETS,
+            ],
+            timeout_seconds=10,
+            maximum_output_bytes=MAXIMUM_QUALIFICATION_PROVENANCE_BYTES,
+        )
+    except EvidenceSupportError as error:
+        failures.append(str(error))
+        return False
+    clean = return_code == 0 and not stdout.strip()
+    if not clean:
+        failures.append(label)
+    return clean
+
+
+def git_transport_paths_valid(
+    reported_head: str,
+    current_head: str,
+    label: str,
+) -> bool:
+    try:
+        return_code, stdout, _ = run_bounded_readonly_command(
+            ROOT,
+            label,
+            [
+                "git",
+                "log",
+                "-m",
+                "--ancestry-path",
+                "--format=",
+                "--name-only",
+                "--no-renames",
+                "-z",
+                f"{reported_head}..{current_head}",
+            ],
+            timeout_seconds=10,
+            maximum_output_bytes=MAXIMUM_QUALIFICATION_TRANSPORT_PATH_BYTES,
+        )
+    except EvidenceSupportError as error:
+        failures.append(str(error))
+        return False
+    if return_code != 0:
+        failures.append(f"{label} command failed")
+        return False
+    try:
+        paths = [
+            value.decode("utf-8", errors="strict")
+            for value in stdout.split(b"\0")
+            if value
+        ]
+    except UnicodeDecodeError:
+        failures.append(f"{label} contains a non-UTF-8 path")
+        return False
+    if len(paths) > MAXIMUM_QUALIFICATION_TRANSPORT_PATHS:
+        failures.append(f"{label} exceeds its path-count bound")
+        return False
+    valid = True
+    for path in paths:
+        pure = pathlib.PurePosixPath(path)
+        allowed = (
+            not pure.is_absolute()
+            and ".." not in pure.parts
+            and len(path.encode("utf-8"))
+            <= MAXIMUM_QUALIFICATION_PROVENANCE_BYTES
+            and (
+                pure.parts[:2] == (".forge-codex", "state")
+                or pure.parts[:2] == (".forge-codex", "evidence")
+            )
+        )
+        if not allowed:
+            failures.append(f"{label}: {path}")
+            valid = False
+    return valid
 
 
 def load(relative: str) -> dict[str, Any]:
@@ -451,22 +619,34 @@ E2_ISSUE = next(
 LEDGER_EVIDENCE_IDS = {
     item for item in RUN_STATE.get("evidence", []) if isinstance(item, str)
 }
-VALIDATED_ARTIFACT_REFERENCES: set[tuple[str, str, str, str]] = set()
+QUALIFICATION_ARTIFACT_BINDINGS: dict[
+    tuple[str, str, str], tuple[object, ...]
+] = {}
+QUALIFICATION_REPOSITORY_CONTEXT: dict[str, Any] = {}
+QUALIFICATION_TEST_ENVIRONMENT_CONTEXT: dict[str, Any] = {}
 
 
-def artifact_reference_valid(reference: Any, label: str, *, purpose: str) -> bool:
+def artifact_reference_valid(
+    reference: Any,
+    label: str,
+    *,
+    purpose: str,
+    expected_scope: dict[str, Any],
+    expected_fact: Any | None,
+    required_capture_time: datetime | None = None,
+) -> dict[str, Any] | None:
     before = len(failures)
     expected_kinds = PRIVILEGED_FILESYSTEM_EVIDENCE_KINDS.get(purpose)
     if expected_kinds is None:
         failures.append(f"{label} has an unsupported qualification purpose")
-        return False
+        return None
     if not isinstance(reference, dict) or set(reference) != {
         "evidence_id",
         "path",
         "sha256",
     }:
         failures.append(f"{label} is not an exact artifact reference")
-        return False
+        return None
 
     evidence_id = reference.get("evidence_id")
     raw_path = reference.get("path")
@@ -482,17 +662,13 @@ def artifact_reference_valid(reference: Any, label: str, *, purpose: str) -> boo
     ) is None:
         failures.append(f"{label} SHA-256 is invalid")
     if len(failures) != before:
-        return False
-
-    key = (evidence_id, raw_path, expected_hash, purpose)
-    if key in VALIDATED_ARTIFACT_REFERENCES:
-        return True
+        return None
 
     record = load(f".forge-codex/evidence/{evidence_id}.json")
     if not record:
         failures.append(f"{label} evidence record is unavailable: {evidence_id}")
-        return False
-    check(record.get("schema_version") == 2, f"{label} evidence is not immutable schema v2")
+        return None
+    check(record.get("schema_version") == 2, f"{label} evidence is not recorded schema v2")
     check(record.get("id") == evidence_id, f"{label} evidence id does not match its record")
     check(
         record.get("kind") in expected_kinds,
@@ -530,6 +706,57 @@ def artifact_reference_valid(reference: Any, label: str, *, purpose: str) -> boo
         record.get("artifact_capture_errors") == [],
         f"{label} evidence has artifact capture errors",
     )
+    started_at = bounded_timestamp(
+        record.get("started_at"),
+        f"{label} evidence started_at",
+    )
+    ended_at = bounded_timestamp(
+        record.get("ended_at"),
+        f"{label} evidence ended_at",
+    )
+    if started_at is not None and ended_at is not None:
+        check(started_at <= ended_at, f"{label} evidence timestamps are reversed")
+        check(
+            (ended_at - started_at).total_seconds()
+            <= MAXIMUM_QUALIFICATION_EVIDENCE_SECONDS,
+            f"{label} evidence interval exceeds its 24-hour bound",
+        )
+        if required_capture_time is not None:
+            check(
+                started_at <= required_capture_time <= ended_at,
+                f"{label} does not contain the report captured_at timestamp",
+            )
+    expected_environment = {
+        "platform": QUALIFICATION_TEST_ENVIRONMENT_CONTEXT.get("platform"),
+        "architecture": QUALIFICATION_TEST_ENVIRONMENT_CONTEXT.get("architecture"),
+        "macos_build": QUALIFICATION_TEST_ENVIRONMENT_CONTEXT.get("macos_build"),
+        "machine_identifier": QUALIFICATION_TEST_ENVIRONMENT_CONTEXT.get(
+            "machine_identifier"
+        ),
+        "cwd": QUALIFICATION_REPOSITORY_CONTEXT.get("repository_path"),
+    }
+    environment = record.get("environment")
+    check(
+        isinstance(environment, dict) and set(environment) == set(expected_environment),
+        f"{label} evidence environment field set is not exact",
+    )
+    if isinstance(environment, dict):
+        for field, maximum_bytes in (
+            ("platform", MAXIMUM_QUALIFICATION_PROVENANCE_BYTES),
+            ("architecture", 256),
+            ("macos_build", 256),
+            ("machine_identifier", 256),
+            ("cwd", MAXIMUM_QUALIFICATION_PROVENANCE_BYTES),
+        ):
+            bounded_nonplaceholder_text(
+                environment.get(field),
+                f"{label} evidence {field}",
+                maximum_bytes=maximum_bytes,
+            )
+        check(
+            environment == expected_environment,
+            f"{label} evidence environment does not match the evaluator host and repository",
+        )
     check(
         record.get("source_manifest_changed") is False,
         f"{label} evidence changed source during capture",
@@ -541,6 +768,27 @@ def artifact_reference_valid(reference: Any, label: str, *, purpose: str) -> boo
     check(
         record.get("source_manifest_after") == CURRENT_MANIFEST,
         f"{label} ending source manifest is stale",
+    )
+    check(
+        record.get("child_evidence_context")
+        == {
+            "schema_version": EVIDENCE_CONTEXT_SCHEMA_VERSION,
+            "binding_schema_version": QUALIFICATION_ARTIFACT_BINDING_SCHEMA_VERSION,
+            "evidence_id": evidence_id,
+            "source_manifest": CURRENT_MANIFEST,
+            "repository": QUALIFICATION_REPOSITORY_CONTEXT,
+            "test_environment": QUALIFICATION_TEST_ENVIRONMENT_CONTEXT,
+            "qualification": "p10-privileged-filesystem",
+        },
+        f"{label} evidence record has no exact recorder-owned child context",
+    )
+    check(
+        record.get("execution_provenance")
+        == {
+            "repository": QUALIFICATION_REPOSITORY_CONTEXT,
+            "test_environment": QUALIFICATION_TEST_ENVIRONMENT_CONTEXT,
+        },
+        f"{label} evidence record has no exact recorder-owned execution provenance",
     )
 
     artifacts = record.get("artifacts")
@@ -559,13 +807,148 @@ def artifact_reference_valid(reference: Any, label: str, *, purpose: str) -> boo
         len(matches) == 1,
         f"{label} does not identify exactly one artifact in its evidence record",
     )
+    binding_artifact: dict[str, Any] | None = None
     if len(matches) == 1:
-        artifact_path(matches[0], label)
+        matched_artifact = matches[0]
+        expected_path_pattern = re.compile(
+            rf"^\.forge-codex/evidence/{re.escape(evidence_id)}"
+            r"\.artifact-[0-9]{3}-[^/]+$"
+        )
+        source_path = matched_artifact.get("source_path")
+        raw_path_parts = (
+            pathlib.PurePosixPath(raw_path).parts
+            if isinstance(raw_path, str)
+            else ()
+        )
+        try:
+            raw_path_size = (
+                len(raw_path.encode("utf-8")) if isinstance(raw_path, str) else None
+            )
+        except UnicodeEncodeError:
+            raw_path_size = None
+        canonical_raw_path = (
+            isinstance(raw_path, str)
+            and bool(raw_path)
+            and raw_path_size is not None
+            and raw_path_size <= MAXIMUM_QUALIFICATION_PROVENANCE_BYTES
+            and "\\" not in raw_path
+            and not pathlib.PurePosixPath(raw_path).is_absolute()
+            and pathlib.PurePosixPath(raw_path).as_posix() == raw_path
+            and all(part not in {"", ".", ".."} for part in raw_path_parts)
+        )
+        source_path_parts = (
+            pathlib.PurePosixPath(source_path).parts
+            if isinstance(source_path, str)
+            else ()
+        )
+        try:
+            source_path_size = (
+                len(source_path.encode("utf-8"))
+                if isinstance(source_path, str)
+                else None
+            )
+        except UnicodeEncodeError:
+            source_path_size = None
+        canonical_source_path = (
+            isinstance(source_path, str)
+            and bool(source_path)
+            and source_path_size is not None
+            and source_path_size <= MAXIMUM_QUALIFICATION_PROVENANCE_BYTES
+            and "\\" not in source_path
+            and not pathlib.PurePosixPath(source_path).is_absolute()
+            and pathlib.PurePosixPath(source_path).as_posix() == source_path
+            and all(part not in {"", ".", ".."} for part in source_path_parts)
+        )
+        recorder_copy = (
+            set(matched_artifact)
+            == {"path", "source_path", "sha256", "bytes", "storage"}
+            and matched_artifact.get("storage") == "evidence-id-specific-copy"
+            and canonical_raw_path
+            and expected_path_pattern.fullmatch(raw_path) is not None
+            and canonical_source_path
+        )
+        check(
+            recorder_copy,
+            f"{label} semantic artifact is not a recorder-preserved "
+            "evidence-id-specific copy inside the repository",
+        )
+        if recorder_copy:
+            resolved_artifact = ROOT / raw_path
+            check(
+                resolved_artifact.suffix.lower() == ".json",
+                f"{label} semantic artifact is not JSON",
+            )
+            try:
+                binding_artifact = load_qualification_artifact(
+                    resolved_artifact,
+                    expected_sha256=expected_hash,
+                    expected_bytes=matched_artifact.get("bytes"),
+                    repository_root=ROOT,
+                    schema_path=QUALIFICATION_ARTIFACT_SCHEMA,
+                )
+            except EvidenceSupportError as error:
+                failures.append(f"{label} semantic artifact is invalid: {error}")
+
+    if binding_artifact is not None:
+        check(
+            binding_artifact.get("evidence_id") == evidence_id,
+            f"{label} semantic artifact evidence id does not match its record",
+        )
+        check(
+            binding_artifact.get("source_manifest") == CURRENT_MANIFEST,
+            f"{label} semantic artifact is stale for the current source manifest",
+        )
+        scope = binding_artifact.get("scope")
+        if not isinstance(scope, dict):
+            failures.append(f"{label} semantic artifact has no exact scope")
+        else:
+            allowed_scope_keys = {
+                "case_id",
+                "role",
+                "iteration",
+                "subject",
+                "predicate",
+            }
+            if not set(expected_scope) <= allowed_scope_keys:
+                failures.append(f"{label} evaluator requested an invalid semantic scope")
+            for field, expected in expected_scope.items():
+                check(
+                    scope.get(field) == expected,
+                    f"{label} semantic artifact does not bind {field}={expected!r}",
+                )
+
+            scope_order = (
+                "case_id",
+                "role",
+                "iteration",
+                "subject",
+                "predicate",
+            )
+            semantic_use = tuple(
+                expected_scope.get(field, scope.get(field)) for field in scope_order
+            )
+            reference_key = (evidence_id, raw_path, expected_hash)
+            prior_use = QUALIFICATION_ARTIFACT_BINDINGS.get(reference_key)
+            if prior_use is not None and prior_use != semantic_use:
+                failures.append(
+                    f"{label} artifact is reused across case or role scopes"
+                )
+            else:
+                QUALIFICATION_ARTIFACT_BINDINGS[reference_key] = semantic_use
+
+        if expected_fact is not None:
+            try:
+                expected_fact_hash = canonical_json_sha256(expected_fact)
+            except EvidenceSupportError as error:
+                failures.append(f"{label} expected fact is invalid: {error}")
+            else:
+                check(
+                    binding_artifact.get("fact_sha256") == expected_fact_hash,
+                    f"{label} semantic artifact does not bind the exact report fact",
+                )
 
     valid = len(failures) == before
-    if valid:
-        VALIDATED_ARTIFACT_REFERENCES.add(key)
-    return valid
+    return binding_artifact if valid else None
 
 
 def evidence_record(
@@ -580,7 +963,7 @@ def evidence_record(
         failures.append(f"{label} has no evidence id")
         return {}
     record = load(f".forge-codex/evidence/{evidence_id}.json")
-    check(record.get("schema_version") == 2, f"{label} evidence is not immutable schema v2: {evidence_id}")
+    check(record.get("schema_version") == 2, f"{label} evidence is not recorded schema v2: {evidence_id}")
     check(record.get("id") == evidence_id, f"{label} evidence id mismatch: {evidence_id}")
     check(record.get("kind") in expected_kinds, f"{label} evidence kind is unexpected: {record.get('kind')}")
     command = record.get("command")
@@ -688,6 +1071,11 @@ privileged_filesystem_schema_errors = schema_errors(
     ".forge-codex/schemas/p10-privileged-filesystem-qualification-report.schema.json",
     "privileged filesystem qualification",
 )
+check(
+    privileged_filesystem.get("artifact_binding_schema_version")
+    == QUALIFICATION_ARTIFACT_BINDING_SCHEMA_VERSION,
+    "privileged filesystem qualification artifact binding schema is unsupported",
+)
 PRIVILEGED_FILESYSTEM_SCHEMA_INVALID_CASES = {
     str(path[1])
     for error in privileged_filesystem_schema_errors
@@ -696,15 +1084,191 @@ PRIVILEGED_FILESYSTEM_SCHEMA_INVALID_CASES = {
     if len(path) >= 2 and path[0] == "matrix"
 }
 
-check(
+privileged_filesystem_passed = (
     privileged_filesystem.get("status") == "passed"
-    and privileged_filesystem.get("ok") is True,
+    and privileged_filesystem.get("ok") is True
+)
+check(
+    privileged_filesystem_passed,
     "privileged filesystem qualification is not passed",
 )
 check(
     privileged_filesystem.get("source_manifest") == CURRENT_MANIFEST,
     "privileged filesystem qualification is stale for the current source manifest",
 )
+if privileged_filesystem_passed:
+    captured_at = bounded_timestamp(
+        privileged_filesystem.get("captured_at"),
+        "privileged filesystem qualification captured_at",
+    )
+    repository = privileged_filesystem.get("repository")
+    if not isinstance(repository, dict) or set(repository) != {
+        "branch",
+        "head_sha",
+        "base_branch",
+        "base_sha",
+        "repository_path",
+    }:
+        failures.append(
+            "privileged filesystem qualification repository identity is not exact"
+        )
+        repository = {}
+    report_branch = bounded_nonplaceholder_text(
+        repository.get("branch"),
+        "privileged filesystem qualification repository branch",
+        maximum_bytes=256,
+    )
+    report_head = repository.get("head_sha")
+    check(
+        isinstance(report_head, str)
+        and re.fullmatch(r"[0-9a-f]{40}", report_head) is not None,
+        "privileged filesystem qualification repository HEAD is invalid",
+    )
+    report_base = bounded_nonplaceholder_text(
+        repository.get("base_branch"),
+        "privileged filesystem qualification repository base branch",
+        maximum_bytes=256,
+    )
+    check(
+        report_base == "main",
+        "privileged filesystem qualification base branch is not canonical main",
+    )
+    report_base_sha = repository.get("base_sha")
+    check(
+        isinstance(report_base_sha, str)
+        and re.fullmatch(r"[0-9a-f]{40}", report_base_sha) is not None,
+        "privileged filesystem qualification repository base SHA is invalid",
+    )
+    report_repository_path = bounded_nonplaceholder_text(
+        repository.get("repository_path"),
+        "privileged filesystem qualification repository path",
+        maximum_bytes=MAXIMUM_QUALIFICATION_PROVENANCE_BYTES,
+    )
+    check(
+        report_repository_path == str(ROOT),
+        "privileged filesystem qualification repository path does not match the evaluator repository",
+    )
+
+    test_environment = privileged_filesystem.get("test_environment")
+    if not isinstance(test_environment, dict) or set(test_environment) != {
+        "macos_build",
+        "machine_identifier",
+        "platform",
+        "architecture",
+    }:
+        failures.append(
+            "privileged filesystem qualification test environment is not exact"
+        )
+        test_environment = {}
+    for field, display_name in (
+        ("macos_build", "macOS build"),
+        ("machine_identifier", "machine identifier"),
+        ("platform", "platform"),
+        ("architecture", "architecture"),
+    ):
+        bounded_nonplaceholder_text(
+            test_environment.get(field),
+            f"privileged filesystem qualification {display_name}",
+            maximum_bytes=MAXIMUM_QUALIFICATION_PROVENANCE_BYTES,
+        )
+
+    QUALIFICATION_REPOSITORY_CONTEXT = repository
+    QUALIFICATION_TEST_ENVIRONMENT_CONTEXT = test_environment
+    try:
+        live_provenance = execution_provenance(ROOT)
+    except EvidenceSupportError as error:
+        failures.append(
+            "privileged filesystem evaluator provenance is unavailable: "
+            f"{error}"
+        )
+        live_repository: dict[str, Any] = {}
+        live_test_environment: dict[str, Any] = {}
+    else:
+        live_repository = live_provenance["repository"]
+        live_test_environment = live_provenance["test_environment"]
+    check(
+        report_branch is not None
+        and report_branch == live_repository.get("branch"),
+        "privileged filesystem qualification repository branch does not match current Git",
+    )
+    check(
+        report_base == live_repository.get("base_branch"),
+        "privileged filesystem qualification base branch does not match current Git",
+    )
+    check(
+        report_base_sha == live_repository.get("base_sha"),
+        "privileged filesystem qualification base SHA does not match refs/remotes/origin/main",
+    )
+    check(
+        report_repository_path == live_repository.get("repository_path"),
+        "privileged filesystem qualification repository path does not match current Git",
+    )
+    check(
+        test_environment == live_test_environment,
+        "privileged filesystem qualification test environment does not match the evaluator host",
+    )
+    current_head = live_repository.get("head_sha")
+    if (
+        isinstance(report_head, str)
+        and re.fullmatch(r"[0-9a-f]{40}", report_head)
+        and isinstance(report_base_sha, str)
+        and re.fullmatch(r"[0-9a-f]{40}", report_base_sha)
+    ):
+        git_predicate(
+            "privileged filesystem qualification reported execution HEAD does not resolve",
+            "cat-file",
+            "-e",
+            f"{report_head}^{{commit}}",
+        )
+        git_predicate(
+            "privileged filesystem qualification origin main is not an ancestor of "
+            "the reported execution HEAD",
+            "merge-base",
+            "--is-ancestor",
+            report_base_sha,
+            report_head,
+        )
+        if isinstance(current_head, str):
+            git_predicate(
+                "privileged filesystem qualification reported execution HEAD is not "
+                "an ancestor of current Git HEAD",
+                "merge-base",
+                "--is-ancestor",
+                report_head,
+                current_head,
+            )
+            git_transport_paths_valid(
+                report_head,
+                current_head,
+                "privileged filesystem qualification committed transport changed "
+                "a non-state/non-evidence path",
+            )
+    git_manifest_worktree_clean(
+        "privileged filesystem manifest targets have uncommitted changes"
+    )
+
+    qualification_context_fact = {
+        "captured_at": privileged_filesystem.get("captured_at"),
+        "repository": privileged_filesystem.get("repository"),
+        "test_environment": privileged_filesystem.get("test_environment"),
+        "test_processes": privileged_filesystem.get("test_processes"),
+        "same_uid_fallback": privileged_filesystem.get("same_uid_fallback"),
+        "same_uid_threat_model": privileged_filesystem.get("same_uid_threat_model"),
+    }
+    artifact_reference_valid(
+        privileged_filesystem.get("qualification_context_artifact_reference"),
+        "privileged filesystem qualification context artifact",
+        purpose="context",
+        expected_scope={
+            "case_id": None,
+            "role": "qualification_context",
+            "iteration": None,
+            "subject": None,
+            "predicate": None,
+        },
+        expected_fact=qualification_context_fact,
+        required_capture_time=captured_at,
+    )
 matrix = privileged_filesystem.get("matrix", {})
 check(isinstance(matrix, dict), "privileged filesystem qualification has no matrix")
 if isinstance(matrix, dict):
@@ -849,6 +1413,18 @@ if isinstance(matrix, dict):
                     barrier.get("raw_artifact_reference"),
                     f"privileged filesystem case {name} barrier {index} artifact",
                     purpose="case",
+                    expected_scope={
+                        "case_id": name,
+                        "role": "barrier",
+                        "iteration": barrier_iteration,
+                        "subject": barrier_name,
+                        "predicate": None,
+                    },
+                    expected_fact={
+                        key: item
+                        for key, item in barrier.items()
+                        if key != "raw_artifact_reference"
+                    },
                 ):
                     valid = False
             elif barrier.get("raw_artifact_reference") is not None:
@@ -856,14 +1432,44 @@ if isinstance(matrix, dict):
                     barrier.get("raw_artifact_reference"),
                     f"privileged filesystem case {name} barrier {index} artifact",
                     purpose="case",
+                    expected_scope={
+                        "case_id": name,
+                        "role": "barrier",
+                        "iteration": barrier_iteration,
+                        "subject": barrier_name,
+                        "predicate": None,
+                    },
+                    expected_fact={
+                        key: item
+                        for key, item in barrier.items()
+                        if key != "raw_artifact_reference"
+                    },
                 ):
                     valid = False
 
-        for index, reference in enumerate(artifacts):
+        require(
+            len(artifacts) == executed,
+            f"privileged filesystem case {name} does not bind every executed iteration",
+        )
+        case_result_fact = {
+            "contracts_exercised": contracts,
+            "status": value.get("status"),
+            "iterations": iterations,
+            "observed_result": observed,
+        }
+        for index, reference in enumerate(artifacts, start=1):
             if not artifact_reference_valid(
                 reference,
-                f"privileged filesystem case {name} raw artifact {index}",
+                f"privileged filesystem case {name} raw artifact {index - 1}",
                 purpose="case",
+                expected_scope={
+                    "case_id": name,
+                    "role": "case_result",
+                    "iteration": index,
+                    "subject": None,
+                    "predicate": None,
+                },
+                expected_fact=case_result_fact,
             ):
                 valid = False
 
@@ -904,6 +1510,24 @@ if isinstance(matrix, dict):
                 ),
                 f"privileged filesystem case {name} process {index} executable is unavailable",
             )
+            if not artifact_reference_valid(
+                process.get("raw_artifact_reference"),
+                f"privileged filesystem case {name} process {index} artifact",
+                purpose="case",
+                expected_scope={
+                    "case_id": name,
+                    "role": "process_identity",
+                    "iteration": None,
+                    "subject": role,
+                    "predicate": None,
+                },
+                expected_fact={
+                    key: item
+                    for key, item in process.items()
+                    if key != "raw_artifact_reference"
+                },
+            ):
+                valid = False
             if role_valid:
                 require(
                     role not in process_roles,
@@ -943,6 +1567,24 @@ if isinstance(matrix, dict):
                 and signing_identifier in requirement,
                 f"privileged filesystem case {name} signing identity {index} is incomplete",
             )
+            if not artifact_reference_valid(
+                identity.get("raw_artifact_reference"),
+                f"privileged filesystem case {name} signing identity {index} artifact",
+                purpose="case",
+                expected_scope={
+                    "case_id": name,
+                    "role": "signing_identity",
+                    "iteration": None,
+                    "subject": role,
+                    "predicate": None,
+                },
+                expected_fact={
+                    key: item
+                    for key, item in identity.items()
+                    if key != "raw_artifact_reference"
+                },
+            ):
+                valid = False
             if isinstance(role, str) and bool(role.strip()):
                 require(
                     role not in signing_roles,
@@ -999,6 +1641,24 @@ if isinstance(matrix, dict):
                         and fixture["bsd_flags"] >= 0,
                         f"privileged filesystem case {name} {phase} fixture {index} identity is incomplete",
                     )
+                if not artifact_reference_valid(
+                    fixture.get("raw_artifact_reference"),
+                    f"privileged filesystem case {name} {phase} fixture {index} artifact",
+                    purpose="case",
+                    expected_scope={
+                        "case_id": name,
+                        "role": f"fixture_{phase}",
+                        "iteration": None,
+                        "subject": fixture_label,
+                        "predicate": None,
+                    },
+                    expected_fact={
+                        key: item
+                        for key, item in fixture.items()
+                        if key != "raw_artifact_reference"
+                    },
+                ):
+                    valid = False
         require(
             len(before_labels) == len(set(before_labels))
             and len(after_labels) == len(set(after_labels))
@@ -1051,6 +1711,18 @@ if isinstance(matrix, dict):
                 mount_facts.get("raw_artifact_reference"),
                 f"privileged filesystem case {name} mount artifact",
                 purpose="case",
+                expected_scope={
+                    "case_id": name,
+                    "role": "mount",
+                    "iteration": None,
+                    "subject": None,
+                    "predicate": None,
+                },
+                expected_fact={
+                    key: item
+                    for key, item in mount_facts.items()
+                    if key != "raw_artifact_reference"
+                },
             ):
                 valid = False
             if name == "local_ownership_enforced_apfs":
@@ -1102,6 +1774,18 @@ if isinstance(matrix, dict):
                 crash_point.get("raw_artifact_reference"),
                 f"privileged filesystem case {name} crash artifact",
                 purpose="case",
+                expected_scope={
+                    "case_id": name,
+                    "role": "crash",
+                    "iteration": None,
+                    "subject": None,
+                    "predicate": None,
+                },
+                expected_fact={
+                    key: item
+                    for key, item in crash_point.items()
+                    if key != "raw_artifact_reference"
+                },
             ):
                 valid = False
 
@@ -1143,15 +1827,57 @@ formal_references = (
     if isinstance(formal_closure, dict)
     else []
 )
-formal_references_valid = isinstance(formal_references, list) and bool(formal_references)
+formal_references_valid = (
+    isinstance(formal_references, list)
+    and len(formal_references) == len(REQUIRED_PRIVILEGED_FILESYSTEM_FORMAL_CLOSURE)
+)
+formal_predicates_with_artifacts: set[str] = set()
 if isinstance(formal_references, list):
     for index, reference in enumerate(formal_references):
-        if not artifact_reference_valid(
+        binding = artifact_reference_valid(
             reference,
             f"privileged filesystem formal argument artifact {index}",
             purpose="formal",
-        ):
+            expected_scope={
+                "case_id": None,
+                "role": "formal_argument",
+                "iteration": None,
+                "subject": None,
+            },
+            expected_fact=None,
+        )
+        if binding is None:
             formal_references_valid = False
+            continue
+        scope = binding.get("scope")
+        predicate = scope.get("predicate") if isinstance(scope, dict) else None
+        if predicate not in REQUIRED_PRIVILEGED_FILESYSTEM_FORMAL_CLOSURE:
+            failures.append(
+                f"privileged filesystem formal argument artifact {index} "
+                "does not bind a required predicate"
+            )
+            formal_references_valid = False
+            continue
+        if predicate in formal_predicates_with_artifacts:
+            failures.append(
+                f"privileged filesystem formal predicate {predicate} reuses evidence"
+            )
+            formal_references_valid = False
+            continue
+        expected_formal_fact = {"predicate": predicate, "value": True}
+        if binding.get("fact_sha256") != canonical_json_sha256(expected_formal_fact):
+            failures.append(
+                f"privileged filesystem formal predicate {predicate} artifact "
+                "does not bind the exact formal claim"
+            )
+            formal_references_valid = False
+            continue
+        formal_predicates_with_artifacts.add(predicate)
+formal_references_valid = (
+    formal_references_valid
+    and formal_predicates_with_artifacts
+    == REQUIRED_PRIVILEGED_FILESYSTEM_FORMAL_CLOSURE
+)
 check(
     isinstance(formal_closure, dict)
     and set(formal_closure)
