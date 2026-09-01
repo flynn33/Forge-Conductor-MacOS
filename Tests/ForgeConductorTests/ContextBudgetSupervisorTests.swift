@@ -576,7 +576,7 @@ final class ContextBudgetSupervisorTests: XCTestCase {
         do {
             let projectID = ProjectID()
             let projectRoot = root.appendingPathComponent("project", isDirectory: true)
-            _ = try await repository.registerProject(
+            _ = try await repository.registerProjectUnchecked(
                 projectID: projectID,
                 displayName: "Context Budget Fixture",
                 canonicalRoot: projectRoot

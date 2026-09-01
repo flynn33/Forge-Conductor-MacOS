@@ -12,6 +12,7 @@ private actor ScriptedProviderBridgeTransport: LMStudioManagedTransporting {
     enum Mode: Sendable {
         case completed
         case incomplete
+        case ambiguousAfterReceipt
     }
 
     struct Snapshot: Sendable {
@@ -21,13 +22,15 @@ private actor ScriptedProviderBridgeTransport: LMStudioManagedTransporting {
     }
 
     private let mode: Mode
+    private let responseModel: String?
     private var rootRequest: LMStudioRootRequest?
     private var continuationRequest: LMStudioContinuationRequest?
     private var receipts: [String: LMStudioResponseTurn] = [:]
     private var cancellations: [String] = []
 
-    init(mode: Mode = .completed) {
+    init(mode: Mode = .completed, responseModel: String? = nil) {
         self.mode = mode
+        self.responseModel = responseModel
     }
 
     func probe() async throws -> LMStudioProviderCapabilities {
@@ -53,7 +56,7 @@ private actor ScriptedProviderBridgeTransport: LMStudioManagedTransporting {
         let turn = LMStudioResponseTurn(
             responseID: "resp_provider_root",
             previousResponseID: nil,
-            model: request.modelKey ?? "fixture/tool-model",
+            model: responseModel ?? request.modelKey ?? "fixture/tool-model",
             status: mode == .completed ? "completed" : "incomplete",
             assistantText: "Visible assistant response.",
             functionCalls: [LMStudioFunctionCall(
@@ -65,6 +68,9 @@ private actor ScriptedProviderBridgeTransport: LMStudioManagedTransporting {
             usage: LMStudioUsage(inputTokens: 120, outputTokens: 18, totalTokens: 138)
         )
         receipts[request.idempotencyKey] = turn
+        if case .ambiguousAfterReceipt = mode {
+            throw LMStudioProviderError.deadlineExceeded(phase: "total")
+        }
         return turn
     }
 
@@ -75,7 +81,7 @@ private actor ScriptedProviderBridgeTransport: LMStudioManagedTransporting {
         let turn = LMStudioResponseTurn(
             responseID: "resp_provider_continuation",
             previousResponseID: request.previousResponseID,
-            model: request.modelKey ?? "fixture/tool-model",
+            model: responseModel ?? request.modelKey ?? "fixture/tool-model",
             status: mode == .completed ? "completed" : "incomplete",
             assistantText: "Continuation complete.",
             functionCalls: [],
@@ -103,6 +109,63 @@ private actor ScriptedProviderBridgeTransport: LMStudioManagedTransporting {
 }
 
 final class ManagedModelProviderBridgeTests: XCTestCase {
+    func testLoadedInstanceResponseAliasNormalizesToConfiguredModelKey() async throws {
+        let transport = ScriptedProviderBridgeTransport(
+            responseModel: "fixture/tool-model@32768"
+        )
+        let provider = LMStudioManagedModelProvider(transport: transport)
+        let root = try await provider.createRoot(try ProviderRootRequest(
+            operationID: UUID(),
+            idempotencyKey: "provider-loaded-instance-root",
+            modelKey: "fixture/tool-model",
+            input: "Use the exact probed loaded instance.",
+            tools: [try providerBridgeToolDefinition()]
+        ))
+        XCTAssertEqual(root.modelKey, "fixture/tool-model")
+        XCTAssertEqual(root.providerInstanceID, "fixture/tool-model@32768")
+
+        let continuation = try await provider.continueSession(
+            ProviderContinuationRequest(
+                operationID: UUID(),
+                idempotencyKey: "provider-loaded-instance-continuation",
+                modelKey: "fixture/tool-model",
+                previousResponseID: root.responseID,
+                input: try JSONSerialization.data(
+                    withJSONObject: [[
+                        "type": "message",
+                        "role": "user",
+                        "content": "Continue on the same loaded instance.",
+                    ]],
+                    options: [.sortedKeys]
+                ),
+                tools: []
+            )
+        )
+        XCTAssertEqual(continuation.modelKey, "fixture/tool-model")
+        XCTAssertEqual(continuation.providerInstanceID, "fixture/tool-model@32768")
+    }
+
+    func testUnprobedResponseModelAliasIsRejected() async throws {
+        let provider = LMStudioManagedModelProvider(
+            transport: ScriptedProviderBridgeTransport(responseModel: "other-loaded-instance")
+        )
+        do {
+            _ = try await provider.createRoot(try ProviderRootRequest(
+                operationID: UUID(),
+                idempotencyKey: "provider-unprobed-instance",
+                modelKey: "fixture/tool-model",
+                input: "Reject an unprobed response identity.",
+                tools: [try providerBridgeToolDefinition()]
+            ))
+            XCTFail("An unprobed response model must fail closed")
+        } catch let error as ManagedModelProviderContractError {
+            XCTAssertEqual(
+                error,
+                .invalidValue("response model does not match the probed model")
+            )
+        }
+    }
+
     func testPluginRegistrationResolvesDistinctAdapterAndManagedProviderFactories() throws {
         let root = providerBridgeTemporaryRoot("registry")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -267,6 +330,125 @@ final class ManagedModelProviderBridgeTests: XCTestCase {
         }
         XCTAssertEqual(role, "user")
         XCTAssertEqual(text, "Continue visibly.")
+    }
+
+    func testDurableProviderReceiptSurvivesFreshProviderAndReplaysExactly() async throws {
+        let root = providerBridgeTemporaryRoot("durable-receipt")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let request = try ProviderRootRequest(
+            operationID: UUID(),
+            idempotencyKey: "durable-provider-private-key",
+            modelKey: "fixture/tool-model",
+            input: "Persist this exact completed provider turn.",
+            tools: [try providerBridgeToolDefinition()]
+        )
+        let firstTransport = ScriptedProviderBridgeTransport()
+        let firstProvider = try LMStudioManagedModelProvider(
+            storageDirectory: root,
+            transport: firstTransport
+        )
+        let completed = try await firstProvider.createRoot(request)
+
+        let restartedTransport = ScriptedProviderBridgeTransport()
+        let restartedProvider = try LMStudioManagedModelProvider(
+            storageDirectory: root,
+            transport: restartedTransport
+        )
+        let restored = try await restartedProvider.lookup(
+            idempotencyKey: request.idempotencyKey
+        )
+        XCTAssertEqual(restored, completed)
+        let replayed = try await restartedProvider.createRoot(request)
+        XCTAssertEqual(replayed, completed)
+        let restartedSnapshot = await restartedTransport.snapshot()
+        XCTAssertNil(
+            restartedSnapshot.rootRequest,
+            "a fresh provider must not redispatch a durably accepted idempotent turn"
+        )
+
+        let ledgerURL = root.appendingPathComponent("managed-provider-receipts.json")
+        let ledgerData = try Data(contentsOf: ledgerURL)
+        let ledgerText = try XCTUnwrap(String(data: ledgerData, encoding: .utf8))
+        XCTAssertFalse(ledgerText.contains(request.idempotencyKey))
+        XCTAssertFalse(ledgerText.contains(request.input))
+        let permissions = try XCTUnwrap(
+            FileManager.default.attributesOfItem(atPath: ledgerURL.path)[.posixPermissions]
+                as? NSNumber
+        )
+        XCTAssertEqual(permissions.intValue & 0o777, 0o600)
+
+        let mismatched = try ProviderRootRequest(
+            operationID: request.operationID,
+            idempotencyKey: request.idempotencyKey,
+            modelKey: request.modelKey,
+            input: "A different request must not reuse the receipt.",
+            tools: request.tools
+        )
+        do {
+            _ = try await restartedProvider.createRoot(mismatched)
+            XCTFail("idempotency reuse for a different request must fail closed")
+        } catch LMStudioProviderError.invalidConfiguration {}
+    }
+
+    func testFreshProviderFencesUnresolvedIntentBeforeAnyDuplicateDispatch() async throws {
+        let root = providerBridgeTemporaryRoot("durable-intent")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let request = try ProviderRootRequest(
+            operationID: UUID(),
+            idempotencyKey: "durable-provider-ambiguous-key",
+            modelKey: "fixture/tool-model",
+            input: "Leave a bounded unresolved provider intent.",
+            tools: []
+        )
+        let ambiguousProvider = try LMStudioManagedModelProvider(
+            storageDirectory: root,
+            transport: ScriptedProviderBridgeTransport(mode: .ambiguousAfterReceipt)
+        )
+        do {
+            _ = try await ambiguousProvider.createRoot(request)
+            XCTFail("the fixture must model a lost terminal response")
+        } catch LMStudioProviderError.deadlineExceeded {}
+
+        let restartedTransport = ScriptedProviderBridgeTransport()
+        let restartedProvider = try LMStudioManagedModelProvider(
+            storageDirectory: root,
+            transport: restartedTransport
+        )
+        let missing = try await restartedProvider.lookup(
+            idempotencyKey: request.idempotencyKey
+        )
+        XCTAssertNil(missing)
+        do {
+            _ = try await restartedProvider.createRoot(request)
+            XCTFail("a live unresolved intent must fence an immediate duplicate inference")
+        } catch LMStudioProviderError.conflict {}
+        let restartedSnapshot = await restartedTransport.snapshot()
+        XCTAssertNil(restartedSnapshot.rootRequest)
+    }
+
+    func testDurableProviderReceiptLedgerCompactsToBoundedRecordCount() async throws {
+        let root = providerBridgeTemporaryRoot("durable-compaction")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let provider = try LMStudioManagedModelProvider(
+            storageDirectory: root,
+            transport: ScriptedProviderBridgeTransport()
+        )
+        for index in 0..<40 {
+            _ = try await provider.createRoot(ProviderRootRequest(
+                operationID: UUID(),
+                idempotencyKey: "durable-compaction-key-\(index)",
+                modelKey: "fixture/tool-model",
+                input: "Bounded receipt \(index).",
+                tools: []
+            ))
+        }
+        let data = try Data(contentsOf: root.appendingPathComponent(
+            "managed-provider-receipts.json"
+        ))
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        XCTAssertEqual((object["records"] as? [[String: Any]])?.count, 32)
     }
 
     func testBridgeRejectsIncompleteTerminalResponseAndUnsupportedStructuredOutput() async throws {

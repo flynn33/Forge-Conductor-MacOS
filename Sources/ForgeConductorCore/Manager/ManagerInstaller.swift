@@ -50,14 +50,28 @@ struct ManagerArtifactSignatureInspection: Equatable {
 }
 
 protocol ManagerCodeSignatureInspecting {
-    func inspect(_ url: URL, kind: ManagerArtifactKind) throws
+    func inspect(
+        _ url: URL,
+        kind: ManagerArtifactKind,
+        requirement: String?
+    ) throws
         -> ManagerArtifactSignatureInspection
+}
+
+extension ManagerCodeSignatureInspecting {
+    func inspect(
+        _ url: URL,
+        kind: ManagerArtifactKind
+    ) throws -> ManagerArtifactSignatureInspection {
+        try inspect(url, kind: kind, requirement: nil)
+    }
 }
 
 struct SecurityManagerCodeSignatureInspector: ManagerCodeSignatureInspecting {
     func inspect(
         _ url: URL,
-        kind: ManagerArtifactKind
+        kind: ManagerArtifactKind,
+        requirement requirementText: String?
     ) throws -> ManagerArtifactSignatureInspection {
         var staticCode: SecStaticCode?
         let createStatus = SecStaticCodeCreateWithPath(
@@ -81,10 +95,26 @@ struct SecurityManagerCodeSignatureInspector: ManagerCodeSignatureInspecting {
             validationFlags.formUnion(SecCSFlags(rawValue: kSecCSCheckNestedCode))
         }
 
+        var compiledRequirement: SecRequirement?
+        if let requirementText {
+            let requirementStatus = SecRequirementCreateWithString(
+                requirementText as CFString,
+                SecCSFlags(rawValue: 0),
+                &compiledRequirement
+            )
+            guard requirementStatus == errSecSuccess, compiledRequirement != nil else {
+                throw inspectionError(
+                    url: url,
+                    operation: "compile code-signing requirement",
+                    status: requirementStatus
+                )
+            }
+        }
+
         let validationStatus = SecStaticCodeCheckValidity(
             staticCode,
             validationFlags,
-            nil
+            compiledRequirement
         )
         var rawInformation: CFDictionary?
         let informationStatus = SecCodeCopySigningInformation(
@@ -420,7 +450,28 @@ struct SecurityManagerPrivilegedApplicationIdentityValidator:
         allowedIdentifiers: Set<String>,
         expectedTeam: String
     ) throws -> ManagerArtifactSignatureInspection {
-        let inspection = try signatureInspector.inspect(url, kind: kind)
+        let requirements = allowedIdentifiers.sorted().compactMap { identifier in
+            ForgeFilesystemProtocolConstants.requiredProductCodeSigningRequirement(
+                identifier: identifier,
+                teamIdentifier: expectedTeam
+            )
+        }
+        guard requirements.count == allowedIdentifiers.count else {
+            throw NSError(
+                domain: "ManagerInstaller",
+                code: 18,
+                userInfo: [NSLocalizedDescriptionKey:
+                    "Refusing to stage \(role) because its exact product signing policy is unavailable."]
+            )
+        }
+        let requirement = requirements.count == 1
+            ? requirements[0]
+            : requirements.map { "(\($0))" }.joined(separator: " or ")
+        let inspection = try signatureInspector.inspect(
+            url,
+            kind: kind,
+            requirement: requirement
+        )
         guard inspection.state == .valid,
               let identifier = inspection.identifier,
               allowedIdentifiers.contains(identifier),
@@ -696,6 +747,7 @@ public final class ManagerInstaller: @unchecked Sendable {
     public static let bundleIdentifier = "com.forge-conductor.app"
     public static let appDisplayName = "Forge Conductor"
     public static let preferredBinaryName = "forge-conductor"
+    public static let runtimeLauncherName = RuntimeLaunchGate.executableName
     public static let embeddedManagerRelativePath = "Contents/Helpers/forge-conductor"
 
     /// Legacy Python/bash LaunchAgents that show as "bash" / "python3" in Login Items.
@@ -755,6 +807,11 @@ public final class ManagerInstaller: @unchecked Sendable {
     public var installedBinaryURL: URL {
         paths.home.appendingPathComponent("bin", isDirectory: true)
             .appendingPathComponent(Self.preferredBinaryName)
+    }
+
+    public var installedRuntimeLauncherURL: URL {
+        paths.home.appendingPathComponent("bin", isDirectory: true)
+            .appendingPathComponent(Self.runtimeLauncherName)
     }
 
     /// App bundle so Login Items shows "Forge Conductor" instead of "bash".
@@ -847,6 +904,10 @@ public final class ManagerInstaller: @unchecked Sendable {
             invokedBy: src,
             sourceApplication: sourceApplication
         )
+        let runtimeLauncherSource = try runtimeLauncherSource(
+            managerBinary: binarySource,
+            sourceApplication: sourceApplication
+        )
         if requiringPrivilegedApplication, let sourceApplication {
             if isInstalledExecutable(src),
                sameResolvedPath(sourceApplication, appBundleURL) {
@@ -872,6 +933,12 @@ public final class ManagerInstaller: @unchecked Sendable {
         let binaryTarget = installedBinaryURL.standardizedFileURL
         let binaryStage = temporarySibling(
             of: binaryTarget,
+            marker: "stage",
+            transactionID: transactionID
+        )
+        let runtimeLauncherTarget = installedRuntimeLauncherURL.standardizedFileURL
+        let runtimeLauncherStage = temporarySibling(
+            of: runtimeLauncherTarget,
             marker: "stage",
             transactionID: transactionID
         )
@@ -917,6 +984,7 @@ public final class ManagerInstaller: @unchecked Sendable {
 
         let temporaryURLs = [
             binaryStage,
+            runtimeLauncherStage,
             frameworkStage,
             mirroredFrameworkStage,
             appStage,
@@ -933,6 +1001,14 @@ public final class ManagerInstaller: @unchecked Sendable {
         try artifactValidator.prepareAndSign(binaryStage, kind: .executable)
         try artifactValidator.verify(binaryStage, kind: .executable)
 
+        try artifactCopier.copyItem(at: runtimeLauncherSource, to: runtimeLauncherStage)
+        try fm.setAttributes(
+            [.posixPermissions: 0o755],
+            ofItemAtPath: runtimeLauncherStage.path
+        )
+        try artifactValidator.prepareAndSign(runtimeLauncherStage, kind: .executable)
+        try artifactValidator.verify(runtimeLauncherStage, kind: .executable)
+
         if let sourceFramework, let frameworkStage, let mirroredFrameworkStage {
             try artifactCopier.copyItem(at: sourceFramework, to: frameworkStage)
             try artifactValidator.prepareAndSign(frameworkStage, kind: .framework)
@@ -946,6 +1022,7 @@ public final class ManagerInstaller: @unchecked Sendable {
             sourceApplication: sourceApplication,
             invokedBy: src,
             executable: binaryStage,
+            runtimeLauncher: runtimeLauncherStage,
             framework: frameworkStage,
             at: appStage,
             requiringPrivilegedApplication: requiringPrivilegedApplication
@@ -965,6 +1042,7 @@ public final class ManagerInstaller: @unchecked Sendable {
         var replacements = [
             ArtifactReplacement(target: frameworkTarget, staged: frameworkStage),
             ArtifactReplacement(target: mirroredFrameworkTarget, staged: mirroredFrameworkStage),
+            ArtifactReplacement(target: runtimeLauncherTarget, staged: runtimeLauncherStage),
             ArtifactReplacement(target: binaryTarget, staged: binaryStage),
             ArtifactReplacement(target: appTarget, staged: appStage),
         ]
@@ -1011,6 +1089,10 @@ public final class ManagerInstaller: @unchecked Sendable {
             for: source,
             requiringPrivilegedApplication: false
         )
+        let runtimeLauncher = try runtimeLauncherSource(
+            managerBinary: source,
+            sourceApplication: sourceApplication
+        )
         let framework = sourceFramework(
             for: source,
             sourceApplication: sourceApplication
@@ -1036,6 +1118,7 @@ public final class ManagerInstaller: @unchecked Sendable {
             sourceApplication: sourceApplication,
             invokedBy: source,
             executable: installedBinaryURL,
+            runtimeLauncher: runtimeLauncher,
             framework: framework,
             at: stagedApp,
             requiringPrivilegedApplication: false
@@ -1050,6 +1133,7 @@ public final class ManagerInstaller: @unchecked Sendable {
         sourceApplication: URL?,
         invokedBy sourceExecutable: URL,
         executable: URL,
+        runtimeLauncher: URL,
         framework: URL?,
         at stagedBundle: URL,
         requiringPrivilegedApplication: Bool
@@ -1067,9 +1151,13 @@ public final class ManagerInstaller: @unchecked Sendable {
             try createMinimalAppBundle(
                 at: stagedBundle,
                 executable: executable,
+                runtimeLauncher: runtimeLauncher,
                 framework: framework
             )
         }
+
+        let runtimeLauncherURL = embeddedRuntimeLauncher(in: stagedBundle)
+        try requirePayloadItem(runtimeLauncherURL, type: S_IFREG, executable: true)
 
         let executableURL = applicationExecutable(in: stagedBundle)
         guard fm.isExecutableFile(atPath: executableURL.path) else {
@@ -1095,14 +1183,17 @@ public final class ManagerInstaller: @unchecked Sendable {
     private func createMinimalAppBundle(
         at bundleURL: URL,
         executable: URL,
+        runtimeLauncher: URL,
         framework: URL?
     ) throws {
         let fm = FileManager.default
         let contents = bundleURL.appendingPathComponent("Contents", isDirectory: true)
         let macos = contents.appendingPathComponent("MacOS", isDirectory: true)
         let resources = contents.appendingPathComponent("Resources", isDirectory: true)
+        let helpers = contents.appendingPathComponent("Helpers", isDirectory: true)
         try fm.createDirectory(at: macos, withIntermediateDirectories: true)
         try fm.createDirectory(at: resources, withIntermediateDirectories: true)
+        try fm.createDirectory(at: helpers, withIntermediateDirectories: true)
 
         let version = ForgeApp.version
         let buildVersion = ForgeApp.buildVersion
@@ -1154,6 +1245,13 @@ public final class ManagerInstaller: @unchecked Sendable {
         try artifactCopier.copyItem(at: executable, to: exe)
         try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: exe.path)
 
+        let bundledRuntimeLauncher = embeddedRuntimeLauncher(in: bundleURL)
+        try artifactCopier.copyItem(at: runtimeLauncher, to: bundledRuntimeLauncher)
+        try fm.setAttributes(
+            [.posixPermissions: 0o755],
+            ofItemAtPath: bundledRuntimeLauncher.path
+        )
+
         if let framework {
             let frameworks = contents.appendingPathComponent("Frameworks", isDirectory: true)
             try fm.createDirectory(at: frameworks, withIntermediateDirectories: true)
@@ -1203,6 +1301,17 @@ public final class ManagerInstaller: @unchecked Sendable {
         return embeddedManager
     }
 
+    private func runtimeLauncherSource(
+        managerBinary: URL,
+        sourceApplication: URL?
+    ) throws -> URL {
+        let source = sourceApplication.map { embeddedRuntimeLauncher(in: $0) }
+            ?? managerBinary.deletingLastPathComponent()
+                .appendingPathComponent(Self.runtimeLauncherName)
+        try requirePayloadItem(source, type: S_IFREG, executable: true)
+        return source
+    }
+
     private func applicationExecutable(in bundleURL: URL) -> URL {
         bundleURL
             .appendingPathComponent("Contents/MacOS", isDirectory: true)
@@ -1211,6 +1320,12 @@ public final class ManagerInstaller: @unchecked Sendable {
 
     private func embeddedManagerExecutable(in bundleURL: URL) -> URL {
         bundleURL.appendingPathComponent(Self.embeddedManagerRelativePath)
+    }
+
+    private func embeddedRuntimeLauncher(in bundleURL: URL) -> URL {
+        bundleURL
+            .appendingPathComponent("Contents/Helpers", isDirectory: true)
+            .appendingPathComponent(Self.runtimeLauncherName)
     }
 
     private func temporarySibling(
@@ -1398,6 +1513,7 @@ public final class ManagerInstaller: @unchecked Sendable {
         let infoPlist = contents.appendingPathComponent("Info.plist")
         let appExecutable = applicationExecutable(in: bundle)
         let managerExecutable = embeddedManagerExecutable(in: bundle)
+        let runtimeLauncher = embeddedRuntimeLauncher(in: bundle)
         let daemonExecutable = macOS.appendingPathComponent(
             ForgeFilesystemProtocolConstants.daemonExecutableName
         )
@@ -1420,6 +1536,7 @@ public final class ManagerInstaller: @unchecked Sendable {
         try requirePayloadItem(infoPlist, type: S_IFREG, executable: false)
         try requirePayloadItem(appExecutable, type: S_IFREG, executable: true)
         try requirePayloadItem(managerExecutable, type: S_IFREG, executable: true)
+        try requirePayloadItem(runtimeLauncher, type: S_IFREG, executable: true)
         try requirePayloadItem(daemonExecutable, type: S_IFREG, executable: true)
         try requirePayloadItem(daemonPlist, type: S_IFREG, executable: false)
 
@@ -2177,7 +2294,11 @@ public final class ManagerInstaller: @unchecked Sendable {
     // MARK: - Firewall
 
     public func tryAllowFirewall() -> [String: Any] {
-        var pathsToAllow = [installedBinaryURL.path, appExecutableURL.path]
+        var pathsToAllow = [
+            installedBinaryURL.path,
+            installedRuntimeLauncherURL.path,
+            appExecutableURL.path,
+        ]
         pathsToAllow = pathsToAllow.filter { FileManager.default.fileExists(atPath: $0) }
         guard !pathsToAllow.isEmpty else {
             return ["ok": false, "message": "binary not installed"]

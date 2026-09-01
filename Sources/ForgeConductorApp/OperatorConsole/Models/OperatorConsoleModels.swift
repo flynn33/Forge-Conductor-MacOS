@@ -5,6 +5,7 @@ import Foundation
 
 struct OperatorSnapshot: Decodable, Sendable, Equatable {
     let projects: [OperatorProject]
+    let pendingProjectRegistrations: [OperatorProjectRegistrationTransition]
     let runs: [OperatorRun]
     let continuityOperations: [OperatorContinuity]
     let runtimeJobs: [OperatorRuntimeJob]
@@ -15,6 +16,7 @@ struct OperatorSnapshot: Decodable, Sendable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case projects, runs, provider, runtime, events
+        case pendingProjectRegistrations = "pending_project_registrations"
         case continuityOperations = "continuity_operations"
         case runtimeJobs = "runtime_jobs"
         case nextCursor = "next_cursor"
@@ -23,6 +25,10 @@ struct OperatorSnapshot: Decodable, Sendable, Equatable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         projects = try container.decodeIfPresent([OperatorProject].self, forKey: .projects) ?? []
+        pendingProjectRegistrations = try container.decodeIfPresent(
+            [OperatorProjectRegistrationTransition].self,
+            forKey: .pendingProjectRegistrations
+        ) ?? []
         runs = try container.decodeIfPresent([OperatorRun].self, forKey: .runs) ?? []
         continuityOperations = try container.decodeIfPresent(
             [OperatorContinuity].self,
@@ -33,6 +39,26 @@ struct OperatorSnapshot: Decodable, Sendable, Equatable {
         runtime = try container.decodeIfPresent(OperatorRuntimePolicy.self, forKey: .runtime)
         events = try container.decodeIfPresent([OperatorEvent].self, forKey: .events) ?? []
         nextCursor = try container.decodeIfPresent(String.self, forKey: .nextCursor)
+    }
+}
+
+struct OperatorProjectRegistrationTransition: Decodable, Sendable, Equatable {
+    let projectID: String
+    let state: String
+    let requestPath: String
+    let requestedDisplayName: String?
+    let repositoryIdentityAssertion: String?
+    let operationID: String
+    let createdAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case projectID = "project_id"
+        case state
+        case requestPath = "request_path"
+        case requestedDisplayName = "requested_display_name"
+        case repositoryIdentityAssertion = "repository_identity_assertion"
+        case operationID = "operation_id"
+        case createdAt = "created_at"
     }
 }
 
@@ -47,6 +73,7 @@ struct OperatorProject: Decodable, Sendable, Equatable, Identifiable {
     let continuity: OperatorProjectContinuity?
     let migrationWarnings: [String]
     let resetReceipt: OperatorResetReceipt?
+    let pendingTransition: OperatorProjectTransition?
 
     var id: String { projectID }
 
@@ -59,20 +86,46 @@ struct OperatorProject: Decodable, Sendable, Equatable, Identifiable {
         case bindings, memory, continuity
         case migrationWarnings = "migration_warnings"
         case resetReceipt = "reset_receipt"
+        case pendingTransition = "pending_transition"
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         projectID = try container.decode(String.self, forKey: .projectID)
-        displayName = try container.decodeIfPresent(String.self, forKey: .displayName) ?? "Unnamed project"
-        canonicalRoot = try container.decodeIfPresent(String.self, forKey: .canonicalRoot) ?? "Unavailable"
-        projectGeneration = try container.decodeIfPresent(UInt64.self, forKey: .projectGeneration) ?? 0
-        lifecycleState = try container.decodeIfPresent(String.self, forKey: .lifecycleState) ?? "unknown"
-        bindings = try container.decodeIfPresent([OperatorBinding].self, forKey: .bindings) ?? []
-        memory = try container.decodeIfPresent(OperatorMemoryHealth.self, forKey: .memory)
-        continuity = try container.decodeIfPresent(OperatorProjectContinuity.self, forKey: .continuity)
-        migrationWarnings = try container.decodeIfPresent([String].self, forKey: .migrationWarnings) ?? []
+        displayName = try container.decode(String.self, forKey: .displayName)
+        canonicalRoot = try container.decode(String.self, forKey: .canonicalRoot)
+        projectGeneration = try container.decode(UInt64.self, forKey: .projectGeneration)
+        lifecycleState = try container.decode(String.self, forKey: .lifecycleState)
+        bindings = try container.decode([OperatorBinding].self, forKey: .bindings)
+        memory = try container.decode(OperatorMemoryHealth.self, forKey: .memory)
+        continuity = try container.decode(OperatorProjectContinuity.self, forKey: .continuity)
+        migrationWarnings = try container.decode([String].self, forKey: .migrationWarnings)
         resetReceipt = try container.decodeIfPresent(OperatorResetReceipt.self, forKey: .resetReceipt)
+        pendingTransition = try container.decodeIfPresent(
+            OperatorProjectTransition.self,
+            forKey: .pendingTransition
+        )
+    }
+}
+
+struct OperatorProjectTransition: Decodable, Sendable, Equatable {
+    let kind: String
+    let state: String
+    let requestPath: String
+    let requestedDisplayName: String?
+    let repositoryIdentityAssertion: String?
+    let expectedGeneration: UInt64?
+    let operationID: String
+    let createdAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case kind, state
+        case requestPath = "request_path"
+        case requestedDisplayName = "requested_display_name"
+        case repositoryIdentityAssertion = "repository_identity_assertion"
+        case expectedGeneration = "expected_generation"
+        case operationID = "operation_id"
+        case createdAt = "created_at"
     }
 }
 
@@ -134,6 +187,26 @@ struct OperatorResetReceipt: Decodable, Sendable, Equatable {
         case newGeneration = "new_generation"
         case invalidatedBindingCount = "invalidated_binding_count"
         case completedAt = "completed_at"
+    }
+}
+
+struct OperatorRelinkReceipt: Decodable, Sendable, Equatable {
+    let projectID: String
+    let canonicalRoot: String
+    let priorGeneration: UInt64
+    let newGeneration: UInt64
+    let invalidatedBindingCount: Int
+    let completedAt: String
+    let reconciled: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case projectID = "project_id"
+        case canonicalRoot = "canonical_root"
+        case priorGeneration = "prior_generation"
+        case newGeneration = "new_generation"
+        case invalidatedBindingCount = "invalidated_binding_count"
+        case completedAt = "completed_at"
+        case reconciled
     }
 }
 
@@ -411,7 +484,13 @@ struct OperatorRuntimePolicy: Decodable, Sendable, Equatable {
     }
 }
 
+enum OperatorProviderProbeMode: String, Encodable, Sendable {
+    case connection
+    case contract
+}
+
 struct OperatorProvider: Decodable, Sendable, Equatable {
+    let adapterID: String?
     let providerID: String?
     let health: String
     let endpoint: String?
@@ -428,10 +507,13 @@ struct OperatorProvider: Decodable, Sendable, Equatable {
     let lifecycleManagementEnabled: Bool?
     let idleTTLSeconds: Int?
     let contractFingerprint: String?
+    let lastProbeMode: String?
+    let probeResultStorage: String?
     let lastProbeAt: String?
     let lastProbeError: String?
 
     enum CodingKeys: String, CodingKey {
+        case adapterID = "adapter_id"
         case providerID = "provider_id"
         case health, endpoint, loopback, tls
         case authenticationEnabled = "authentication_enabled"
@@ -445,12 +527,15 @@ struct OperatorProvider: Decodable, Sendable, Equatable {
         case lifecycleManagementEnabled = "lifecycle_management_enabled"
         case idleTTLSeconds = "idle_ttl_seconds"
         case contractFingerprint = "contract_fingerprint"
+        case lastProbeMode = "last_probe_mode"
+        case probeResultStorage = "probe_result_storage"
         case lastProbeAt = "last_probe_at"
         case lastProbeError = "last_probe_error"
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        adapterID = try container.decodeIfPresent(String.self, forKey: .adapterID)
         providerID = try container.decodeIfPresent(String.self, forKey: .providerID)
         health = try container.decodeIfPresent(String.self, forKey: .health) ?? "unavailable"
         endpoint = try container.decodeIfPresent(String.self, forKey: .endpoint)
@@ -467,6 +552,8 @@ struct OperatorProvider: Decodable, Sendable, Equatable {
         lifecycleManagementEnabled = try container.decodeIfPresent(Bool.self, forKey: .lifecycleManagementEnabled)
         idleTTLSeconds = try container.decodeIfPresent(Int.self, forKey: .idleTTLSeconds)
         contractFingerprint = try container.decodeIfPresent(String.self, forKey: .contractFingerprint)
+        lastProbeMode = try container.decodeIfPresent(String.self, forKey: .lastProbeMode)
+        probeResultStorage = try container.decodeIfPresent(String.self, forKey: .probeResultStorage)
         lastProbeAt = try container.decodeIfPresent(String.self, forKey: .lastProbeAt)
         lastProbeError = try container.decodeIfPresent(String.self, forKey: .lastProbeError)
     }
@@ -520,6 +607,7 @@ struct OperatorAutonomySummary: Decodable, Sendable, Equatable {
 
 enum OperatorRunControlAction: String, Encodable, Sendable, Equatable, CaseIterable {
     case pause, resume, cancel, retry
+    case checkpoint, rollover
 }
 
 struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
@@ -562,4 +650,16 @@ struct OperatorProjectRegistrationRequest: Encodable, Sendable, Equatable {
         case displayName = "display_name"
         case repositoryIdentity = "repository_identity"
     }
+}
+
+struct OperatorPendingProjectRegistration: Sendable, Equatable {
+    let request: OperatorProjectRegistrationRequest
+    let projectID: String?
+    let code: String
+    let message: String
+}
+
+enum OperatorProjectRegistrationOutcome: Sendable, Equatable {
+    case committed(project: OperatorProject, reconciled: Bool)
+    case reconciliationRequired(OperatorPendingProjectRegistration)
 }

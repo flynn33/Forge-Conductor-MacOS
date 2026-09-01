@@ -140,6 +140,13 @@
 		M1C2P3S4E5R6V7E80002 /* MCP/MCPServeVerifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = M1C2P3S4E5R6V7E80001 /* MCP/MCPServeVerifier.swift */; };
 		P0W3R50U5C3C0L001002 /* Telemetry/Collectors/PowerSourcesCollector.swift in Sources */ = {isa = PBXBuildFile; fileRef = P0W3R50U5C3C0L001001 /* Telemetry/Collectors/PowerSourcesCollector.swift */; };
 		P1R2O3D4U5C6T7E80002 /* Tests/ForgeConductorTests/ProductPathReliabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = P1R2O3D4U5C6T7E80001 /* Tests/ForgeConductorTests/ProductPathReliabilityTests.swift */; };
+		14782D2FE9544A59A1AED446 /* Tests/ForgeConductorTests/OperatorProjectContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE153ABEB86940BF8945EE52 /* Tests/ForgeConductorTests/OperatorProjectContractTests.swift */; };
+		6F2D0652CF4E442B9F0CE2EB /* ForgeConductorCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E1FEBD9C424A4245A89601F6 /* ForgeConductorCore.framework */; };
+		F09B00000000000000000001 /* CLIContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F09F00000000000000000001 /* CLIContractTests.swift */; };
+		F09B00000000000000000002 /* LiveLMStudioManagedAutonomyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F09F00000000000000000002 /* LiveLMStudioManagedAutonomyTests.swift */; };
+		F09B00000000000000000003 /* RuntimeCancelQualificationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F09F00000000000000000003 /* RuntimeCancelQualificationTests.swift */; };
+		F09B00000000000000000004 /* LMStudioContractFixtureServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F09F00000000000000000004 /* LMStudioContractFixtureServer.swift */; };
+		F09B00000000000000000005 /* LMStudioContractFixtureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F09F00000000000000000005 /* LMStudioContractFixtureTests.swift */; };
 		R1E2A3L4T5I6M7E8000002 /* Telemetry/RealtimeMetricsEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = R1E2A3L4T5I6M7E8000001 /* Telemetry/RealtimeMetricsEngine.swift */; };
 		R1E2A3L4T5S6T7R80002 /* Tests/ForgeConductorTests/RealtimeStreamTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = R1E2A3L4T5S6T7R80001 /* Tests/ForgeConductorTests/RealtimeStreamTests.swift */; };
 		A26B00000000000000000001 /* Application/AutonomySupervisor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000001 /* Application/AutonomySupervisor.swift */; };
@@ -232,7 +239,6 @@
 		E2F500000000000000000004 /* ForgeFilesystemProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000013 /* ForgeFilesystemProtocolTests.swift */; };
 		E2F500000000000000000005 /* libForgeFilesystemProtocol.a in Frameworks */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000014 /* libForgeFilesystemProtocol.a */; };
 		E2F500000000000000000006 /* libForgeFilesystemProtocol.a in Frameworks */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000014 /* libForgeFilesystemProtocol.a */; };
-		E2F500000000000000000007 /* libForgeFilesystemProtocol.a in Frameworks */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000014 /* libForgeFilesystemProtocol.a */; };
 		E2F500000000000000000008 /* forge-filesystem-daemon in Embed Filesystem Daemon */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000015 /* forge-filesystem-daemon */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		E2F500000000000000000009 /* com.forge-conductor.filesystem-daemon.plist in Embed Filesystem LaunchDaemon Plist */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000016 /* com.forge-conductor.filesystem-daemon.plist */; };
 		E2F500000000000000000049 /* forge-conductor in Embed Manager CLI */ = {isa = PBXBuildFile; fileRef = FAD7DC3FA3A1480E9B4955B1 /* forge-conductor */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
@@ -264,6 +270,20 @@
 			proxyType = 1;
 			remoteGlobalIDString = D574F9BCA1204936B158984B;
 			remoteInfo = ForgeConductor;
+		};
+		5146CF2B65E241CDB36B8FF0 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FF3F53A3F88F4DF8B3C98871 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D574F9BCA1204936B158984B;
+			remoteInfo = ForgeConductor;
+		};
+		8A3C7885291B471FBB141CE2 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FF3F53A3F88F4DF8B3C98871 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C596F91D22BA465F8D8290A1;
+			remoteInfo = ForgeConductorCore;
 		};
 		530F32EDF9B44C03BBF84D9F /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -315,13 +335,6 @@
 			remoteInfo = ForgeFilesystemProtocol;
 		};
 		E2F500000000000000000028 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = FF3F53A3F88F4DF8B3C98871 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = E2F500000000000000000025;
-			remoteInfo = ForgeFilesystemProtocol;
-		};
-		E2F500000000000000000029 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = FF3F53A3F88F4DF8B3C98871 /* Project object */;
 			proxyType = 1;
@@ -591,6 +604,13 @@
 		M1C2P3S4E5R6V7E80001 /* MCP/MCPServeVerifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCP/MCPServeVerifier.swift; sourceTree = "<group>"; };
 		P0W3R50U5C3C0L001001 /* Telemetry/Collectors/PowerSourcesCollector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Telemetry/Collectors/PowerSourcesCollector.swift; sourceTree = "<group>"; };
 		P1R2O3D4U5C6T7E80001 /* Tests/ForgeConductorTests/ProductPathReliabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/ForgeConductorTests/ProductPathReliabilityTests.swift; sourceTree = SOURCE_ROOT; };
+		BE153ABEB86940BF8945EE52 /* Tests/ForgeConductorTests/OperatorProjectContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/ForgeConductorTests/OperatorProjectContractTests.swift; sourceTree = SOURCE_ROOT; };
+		3AF976AA2BDA4AE6A631CED4 /* ForgeConductorAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ForgeConductorAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F09F00000000000000000001 /* CLIContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIContractTests.swift; sourceTree = "<group>"; };
+		F09F00000000000000000002 /* LiveLMStudioManagedAutonomyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveLMStudioManagedAutonomyTests.swift; sourceTree = "<group>"; };
+		F09F00000000000000000003 /* RuntimeCancelQualificationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeCancelQualificationTests.swift; sourceTree = "<group>"; };
+		F09F00000000000000000004 /* LMStudioContractFixtureServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LMStudioContractFixtureServer.swift; sourceTree = "<group>"; };
+		F09F00000000000000000005 /* LMStudioContractFixtureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LMStudioContractFixtureTests.swift; sourceTree = "<group>"; };
 		R1E2A3L4T5I6M7E8000001 /* Telemetry/RealtimeMetricsEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Telemetry/RealtimeMetricsEngine.swift; sourceTree = "<group>"; };
 		R1E2A3L4T5S6T7R80001 /* Tests/ForgeConductorTests/RealtimeStreamTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/ForgeConductorTests/RealtimeStreamTests.swift; sourceTree = SOURCE_ROOT; };
 		A26F00000000000000000001 /* Application/AutonomySupervisor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/AutonomySupervisor.swift; sourceTree = "<group>"; };
@@ -697,6 +717,14 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		A91A75214D50435DB3067471 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6F2D0652CF4E442B9F0CE2EB /* ForgeConductorCore.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		2388A51F6AB442BEBA190CF4 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -716,7 +744,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E2F500000000000000000007 /* libForgeFilesystemProtocol.a in Frameworks */,
 				93924385C882488184D54CDD /* ForgeConductorCore.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -809,6 +836,7 @@
 		64BB9664134D41DE87CE4C03 /* Tests/ForgeConductorTests */ = {
 			isa = PBXGroup;
 			children = (
+				BE153ABEB86940BF8945EE52 /* Tests/ForgeConductorTests/OperatorProjectContractTests.swift */,
 				E2F500000000000000000013 /* ForgeFilesystemProtocolTests.swift */,
 				E2F500000000000000000044 /* SecureFilesystemMutationTests.swift */,
 				E2F500000000000000000055 /* SecureFilesystemQualificationHealthSessionTests.swift */,
@@ -816,6 +844,10 @@
 				A26F00000000000000000023 /* AutonomySupervisorTests.swift */,
 				A26F00000000000000000024 /* ContextBudgetSupervisorTests.swift */,
 				A26F00000000000000000025 /* ContinuityV2Tests.swift */,
+				F09F00000000000000000001 /* CLIContractTests.swift */,
+				F09F00000000000000000002 /* LiveLMStudioManagedAutonomyTests.swift */,
+				F09F00000000000000000004 /* LMStudioContractFixtureServer.swift */,
+				F09F00000000000000000005 /* LMStudioContractFixtureTests.swift */,
 				A26F00000000000000000033 /* ManagedAutonomyRuntimeTests.swift */,
 				A26F00000000000000000034 /* ManagedContinuityWorkerTests.swift */,
 				A26F00000000000000000026 /* ManagedModelProviderBridgeTests.swift */,
@@ -823,6 +855,7 @@
 				A26F00000000000000000028 /* ProjectContextIntegrationTests.swift */,
 				A26F00000000000000000029 /* ProjectControlPlaneRepositoryTests.swift */,
 				A26F00000000000000000030 /* RuntimeExecutionJobTests.swift */,
+				F09F00000000000000000003 /* RuntimeCancelQualificationTests.swift */,
 				A26F00000000000000000031 /* ToolDefinitionCatalogTests.swift */,
 				P11F00000000000000000001 /* ReleaseStressTests.swift */,
 				P10F00000000000000000014 /* ContinuityCoordinatorTests.swift */,
@@ -886,6 +919,7 @@
 				F0A70000000000000000000B /* forge-runtime-launcher */,
 				29BC85D97DC146E3AA9DF401 /* Forge Conductor.app */,
 				1EBA34625EF54B7B870DFDC9 /* ForgeConductorTests.xctest */,
+				3AF976AA2BDA4AE6A631CED4 /* ForgeConductorAppTests.xctest */,
 				222C8F97CB2D45D39C28D4B7 /* ForgeConductorUITests.xctest */,
 			);
 			name = Products;
@@ -1187,6 +1221,24 @@
 			productReference = 222C8F97CB2D45D39C28D4B7 /* ForgeConductorUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		DBD99DD4E877449D8703E483 /* ForgeConductorAppTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D43C581B12424333B25FAB62 /* Build configuration list for PBXNativeTarget "ForgeConductorAppTests" */;
+			buildPhases = (
+				1420E9C7330D4AB38BB472BD /* Sources */,
+				A91A75214D50435DB3067471 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				72E2A331BE024299AC34EC3B /* PBXTargetDependency */,
+				9189A1D436164BEF83F8B15B /* PBXTargetDependency */,
+			);
+			name = ForgeConductorAppTests;
+			productName = ForgeConductorAppTests;
+			productReference = 3AF976AA2BDA4AE6A631CED4 /* ForgeConductorAppTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		8897BF3640FD4CBEA73213FC /* ForgeConductorTests */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = DBACB75102DA422EB1237476 /* Build configuration list for PBXNativeTarget "ForgeConductorTests" */;
@@ -1199,7 +1251,6 @@
 			buildRules = (
 			);
 			dependencies = (
-				E2F500000000000000000033 /* PBXTargetDependency */,
 				627D0EA7A73A40C980B61CAC /* PBXTargetDependency */,
 				1B20C9C218D54E71A69A1A02 /* PBXTargetDependency */,
 				F0A700000000000000000008 /* PBXTargetDependency */,
@@ -1365,6 +1416,12 @@
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1600;
 				LastUpgradeCheck = 2660;
+				TargetAttributes = {
+					DBD99DD4E877449D8703E483 = {
+						ProvisioningStyle = Automatic;
+						TestTargetID = D574F9BCA1204936B158984B;
+					};
+				};
 			};
 			buildConfigurationList = 1495A2723FBC442B8EAE3139 /* Build configuration list for PBXProject "ForgeConductor" */;
 			compatibilityVersion = "Xcode 14.0";
@@ -1389,6 +1446,7 @@
 				F0A70000000000000000000E /* ForgeRuntimeLauncher */,
 				D574F9BCA1204936B158984B /* ForgeConductor */,
 				8897BF3640FD4CBEA73213FC /* ForgeConductorTests */,
+				DBD99DD4E877449D8703E483 /* ForgeConductorAppTests */,
 				7AEAA3E3769249359E346C15 /* ForgeConductorUITests */,
 			);
 		};
@@ -1492,6 +1550,14 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		1420E9C7330D4AB38BB472BD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				14782D2FE9544A59A1AED446 /* Tests/ForgeConductorTests/OperatorProjectContractTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		00012A1DBBFF4A2B84B0D26C /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -1503,6 +1569,10 @@
 				A26B00000000000000000023 /* AutonomySupervisorTests.swift in Sources */,
 				A26B00000000000000000024 /* ContextBudgetSupervisorTests.swift in Sources */,
 				A26B00000000000000000025 /* ContinuityV2Tests.swift in Sources */,
+				F09B00000000000000000001 /* CLIContractTests.swift in Sources */,
+				F09B00000000000000000002 /* LiveLMStudioManagedAutonomyTests.swift in Sources */,
+				F09B00000000000000000004 /* LMStudioContractFixtureServer.swift in Sources */,
+				F09B00000000000000000005 /* LMStudioContractFixtureTests.swift in Sources */,
 				A26B00000000000000000033 /* ManagedAutonomyRuntimeTests.swift in Sources */,
 				A26B00000000000000000034 /* ManagedContinuityWorkerTests.swift in Sources */,
 				A26B00000000000000000026 /* ManagedModelProviderBridgeTests.swift in Sources */,
@@ -1510,6 +1580,7 @@
 				A26B00000000000000000028 /* ProjectContextIntegrationTests.swift in Sources */,
 				A26B00000000000000000029 /* ProjectControlPlaneRepositoryTests.swift in Sources */,
 				A26B00000000000000000030 /* RuntimeExecutionJobTests.swift in Sources */,
+				F09B00000000000000000003 /* RuntimeCancelQualificationTests.swift in Sources */,
 				A26B00000000000000000031 /* ToolDefinitionCatalogTests.swift in Sources */,
 				P11B00000000000000000001 /* ReleaseStressTests.swift in Sources */,
 				P10B00000000000000000014 /* ContinuityCoordinatorTests.swift in Sources */,
@@ -1777,6 +1848,16 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		72E2A331BE024299AC34EC3B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D574F9BCA1204936B158984B /* ForgeConductor */;
+			targetProxy = 5146CF2B65E241CDB36B8FF0 /* PBXContainerItemProxy */;
+		};
+		9189A1D436164BEF83F8B15B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C596F91D22BA465F8D8290A1 /* ForgeConductorCore */;
+			targetProxy = 8A3C7885291B471FBB141CE2 /* PBXContainerItemProxy */;
+		};
 		1B20C9C218D54E71A69A1A02 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 05C234606560407787702A3C /* forge-conductor */;
@@ -1827,11 +1908,6 @@
 			target = E2F500000000000000000025 /* ForgeFilesystemProtocol */;
 			targetProxy = E2F500000000000000000028 /* PBXContainerItemProxy */;
 		};
-		E2F500000000000000000033 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = E2F500000000000000000025 /* ForgeFilesystemProtocol */;
-			targetProxy = E2F500000000000000000029 /* PBXContainerItemProxy */;
-		};
 		E2F500000000000000000034 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = E2F500000000000000000026 /* ForgeFilesystemDaemon */;
@@ -1875,6 +1951,60 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		42A19CA963294173ADE17124 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 9AQ2C2838M;
+				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.app-tests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_INCLUDE_PATHS = "$(CONFIGURATION_TEMP_DIR)/ForgeConductor.build/Objects-normal/$(CURRENT_ARCH)";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Forge Conductor.app/Contents/MacOS/Forge Conductor";
+				TEST_TARGET_NAME = ForgeConductor;
+			};
+			name = Debug;
+		};
+		0F1392D0CC8F4D3DB7B395A6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 9AQ2C2838M;
+				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.app-tests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_INCLUDE_PATHS = "$(CONFIGURATION_TEMP_DIR)/ForgeConductor.build/Objects-normal/$(CURRENT_ARCH)";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Forge Conductor.app/Contents/MacOS/Forge Conductor";
+				TEST_TARGET_NAME = ForgeConductor;
+			};
+			name = Release;
+		};
 		000293C386CD4B1A99C9F861 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -2013,6 +2143,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
+				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				EAGER_COMPILATION_ALLOW_SCRIPTS = NO;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -2050,6 +2181,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
+				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 2Y25RTLZET;
 				EAGER_COMPILATION_ALLOW_SCRIPTS = NO;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -2558,6 +2690,15 @@
 			buildConfigurations = (
 				FDE6781008BC4141BDA1233A /* Debug */,
 				6F360A34EC18439189CBEF0F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		D43C581B12424333B25FAB62 /* Build configuration list for PBXNativeTarget "ForgeConductorAppTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				42A19CA963294173ADE17124 /* Debug */,
+				0F1392D0CC8F4D3DB7B395A6 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

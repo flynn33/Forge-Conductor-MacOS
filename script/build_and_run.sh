@@ -4,13 +4,16 @@ set -euo pipefail
 MODE="${1:-run}"
 APP_NAME="Forge Conductor"
 BUILD_PRODUCT="forge-conductor-app"
+CLI_PRODUCT="forge-conductor"
 RUNTIME_HELPER_PRODUCT="forge-runtime-launcher"
 FILESYSTEM_DAEMON_PRODUCT="forge-filesystem-daemon"
 BINARY_CONFIGURATION="${FORGE_BUILD_CONFIGURATION:-debug}"
 BUNDLE_ID="com.forge-conductor.app"
+CLI_IDENTIFIER="com.forge-conductor.cli"
 RUNTIME_HELPER_IDENTIFIER="com.forge-conductor.runtime-launcher"
 FILESYSTEM_DAEMON_IDENTIFIER="com.forge-conductor.filesystem-daemon"
 CODE_SIGN_IDENTITY="${FORGE_CODE_SIGN_IDENTITY:--}"
+DEVELOPMENT_SIGNING="${FORGE_DEVELOPMENT_SIGNING:-0}"
 MIN_SYSTEM_VERSION="26.0"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -22,6 +25,7 @@ APP_HELPERS="$APP_CONTENTS/Helpers"
 APP_RESOURCES="$APP_CONTENTS/Resources"
 APP_LAUNCH_DAEMONS="$APP_CONTENTS/Library/LaunchDaemons"
 APP_BINARY="$APP_MACOS/$APP_NAME"
+CLI_EXECUTABLE="$APP_HELPERS/$CLI_PRODUCT"
 RUNTIME_HELPER="$APP_HELPERS/$RUNTIME_HELPER_PRODUCT"
 FILESYSTEM_DAEMON="$APP_MACOS/$FILESYSTEM_DAEMON_PRODUCT"
 INFO_PLIST="$APP_CONTENTS/Info.plist"
@@ -48,18 +52,32 @@ if [[ "$BINARY_CONFIGURATION" != "debug" && "$BINARY_CONFIGURATION" != "release"
   echo "FORGE_BUILD_CONFIGURATION must be debug or release" >&2
   exit 1
 fi
+if [[ "$DEVELOPMENT_SIGNING" != "0" && "$DEVELOPMENT_SIGNING" != "1" ]]; then
+  echo "FORGE_DEVELOPMENT_SIGNING must be 0 or 1" >&2
+  exit 1
+fi
 
 cd "$ROOT_DIR"
-swift build --configuration "$BINARY_CONFIGURATION" --product "$BUILD_PRODUCT"
-swift build --configuration "$BINARY_CONFIGURATION" --product "$RUNTIME_HELPER_PRODUCT"
-swift build --configuration "$BINARY_CONFIGURATION" --product "$FILESYSTEM_DAEMON_PRODUCT"
-BUILD_DIR="$(swift build --configuration "$BINARY_CONFIGURATION" --show-bin-path)"
+SWIFT_BUILD_ARGUMENTS=(--configuration "$BINARY_CONFIGURATION")
+if [[ "$DEVELOPMENT_SIGNING" == "1" ]]; then
+  SWIFT_BUILD_ARGUMENTS+=(-Xswiftc -DFORGE_DEVELOPMENT_SIGNING)
+fi
+swift build "${SWIFT_BUILD_ARGUMENTS[@]}" --product "$BUILD_PRODUCT"
+swift build "${SWIFT_BUILD_ARGUMENTS[@]}" --product "$CLI_PRODUCT"
+swift build "${SWIFT_BUILD_ARGUMENTS[@]}" --product "$RUNTIME_HELPER_PRODUCT"
+swift build "${SWIFT_BUILD_ARGUMENTS[@]}" --product "$FILESYSTEM_DAEMON_PRODUCT"
+BUILD_DIR="$(swift build "${SWIFT_BUILD_ARGUMENTS[@]}" --show-bin-path)"
 BUILD_BINARY="$BUILD_DIR/$BUILD_PRODUCT"
+BUILD_CLI_EXECUTABLE="$BUILD_DIR/$CLI_PRODUCT"
 BUILD_RUNTIME_HELPER="$BUILD_DIR/$RUNTIME_HELPER_PRODUCT"
 BUILD_FILESYSTEM_DAEMON="$BUILD_DIR/$FILESYSTEM_DAEMON_PRODUCT"
 
 if [[ ! -x "$BUILD_BINARY" ]]; then
   echo "built GUI executable was not found at $BUILD_BINARY" >&2
+  exit 1
+fi
+if [[ ! -x "$BUILD_CLI_EXECUTABLE" ]]; then
+  echo "built manager CLI executable was not found at $BUILD_CLI_EXECUTABLE" >&2
   exit 1
 fi
 if [[ ! -x "$BUILD_RUNTIME_HELPER" ]]; then
@@ -79,12 +97,13 @@ fi
 rm -rf "$APP_BUNDLE"
 mkdir -p "$APP_MACOS" "$APP_HELPERS" "$APP_RESOURCES" "$APP_LAUNCH_DAEMONS"
 cp "$BUILD_BINARY" "$APP_BINARY"
+cp "$BUILD_CLI_EXECUTABLE" "$CLI_EXECUTABLE"
 cp "$BUILD_RUNTIME_HELPER" "$RUNTIME_HELPER"
 cp "$BUILD_FILESYSTEM_DAEMON" "$FILESYSTEM_DAEMON"
 cp "$FILESYSTEM_DAEMON_PLIST_SOURCE" "$FILESYSTEM_DAEMON_PLIST"
 chmod 0755 "$APP_BUNDLE" "$APP_CONTENTS" "$APP_MACOS" "$APP_HELPERS" "$APP_RESOURCES" \
   "$APP_CONTENTS/Library" "$APP_LAUNCH_DAEMONS"
-chmod 0755 "$APP_BINARY" "$RUNTIME_HELPER" "$FILESYSTEM_DAEMON"
+chmod 0755 "$APP_BINARY" "$CLI_EXECUTABLE" "$RUNTIME_HELPER" "$FILESYSTEM_DAEMON"
 cp "$ROOT_DIR/Sources/ForgeConductorApp/Resources/Info.plist" "$INFO_PLIST"
 cp "$ROOT_DIR/Sources/ForgeConductorApp/Resources/Forge-Conductor.icns" "$APP_RESOURCES/Forge-Conductor.icns"
 chmod 0644 "$INFO_PLIST" "$APP_RESOURCES/Forge-Conductor.icns" "$FILESYSTEM_DAEMON_PLIST"
@@ -110,16 +129,43 @@ CODE_SIGN_ARGUMENTS=(
   --options runtime
 )
 /usr/bin/codesign "${CODE_SIGN_ARGUMENTS[@]}" \
+  --identifier "$CLI_IDENTIFIER" \
+  "$CLI_EXECUTABLE" >/dev/null
+/usr/bin/codesign --verify --strict --all-architectures --verbose=4 "$CLI_EXECUTABLE"
+/usr/bin/codesign "${CODE_SIGN_ARGUMENTS[@]}" \
   --identifier "$RUNTIME_HELPER_IDENTIFIER" \
   "$RUNTIME_HELPER" >/dev/null
+/usr/bin/codesign --verify --strict --all-architectures --verbose=4 "$RUNTIME_HELPER"
 /usr/bin/codesign "${CODE_SIGN_ARGUMENTS[@]}" \
   --identifier "$FILESYSTEM_DAEMON_IDENTIFIER" \
   "$FILESYSTEM_DAEMON" >/dev/null
-/usr/bin/codesign --verify --strict "$FILESYSTEM_DAEMON"
+/usr/bin/codesign --verify --strict --all-architectures --verbose=4 "$FILESYSTEM_DAEMON"
 /usr/bin/codesign "${CODE_SIGN_ARGUMENTS[@]}" \
   --identifier "$BUNDLE_ID" \
   "$APP_BUNDLE" >/dev/null
-/usr/bin/codesign --verify --deep --strict "$APP_BUNDLE"
+/usr/bin/codesign --verify --deep --strict --all-architectures --verbose=4 "$APP_BUNDLE"
+
+if [[ "$CODE_SIGN_IDENTITY" != "-" ]]; then
+  if [[ "$BINARY_CONFIGURATION" == "debug" || "$DEVELOPMENT_SIGNING" == "1" ]]; then
+    EXPECTED_TEAM_IDENTIFIER="9AQ2C2838M"
+    EXPECTED_CERTIFICATE_REQUIREMENT='certificate leaf[field.1.2.840.113635.100.6.1.12] exists'
+  else
+    EXPECTED_TEAM_IDENTIFIER="2Y25RTLZET"
+    EXPECTED_CERTIFICATE_REQUIREMENT='certificate leaf[field.1.2.840.113635.100.6.1.13] exists'
+  fi
+  /usr/bin/codesign --verify --strict --all-architectures \
+    "-R=anchor apple generic and identifier \"$BUNDLE_ID\" and certificate leaf[subject.OU] = \"$EXPECTED_TEAM_IDENTIFIER\" and $EXPECTED_CERTIFICATE_REQUIREMENT" \
+    "$APP_BUNDLE"
+  /usr/bin/codesign --verify --strict --all-architectures \
+    "-R=anchor apple generic and identifier \"$CLI_IDENTIFIER\" and certificate leaf[subject.OU] = \"$EXPECTED_TEAM_IDENTIFIER\" and $EXPECTED_CERTIFICATE_REQUIREMENT" \
+    "$CLI_EXECUTABLE"
+  /usr/bin/codesign --verify --strict --all-architectures \
+    "-R=anchor apple generic and identifier \"$RUNTIME_HELPER_IDENTIFIER\" and certificate leaf[subject.OU] = \"$EXPECTED_TEAM_IDENTIFIER\" and $EXPECTED_CERTIFICATE_REQUIREMENT" \
+    "$RUNTIME_HELPER"
+  /usr/bin/codesign --verify --strict --all-architectures \
+    "-R=anchor apple generic and identifier \"$FILESYSTEM_DAEMON_IDENTIFIER\" and certificate leaf[subject.OU] = \"$EXPECTED_TEAM_IDENTIFIER\" and $EXPECTED_CERTIFICATE_REQUIREMENT" \
+    "$FILESYSTEM_DAEMON"
+fi
 
 open_app() {
   /usr/bin/open -n "$APP_BUNDLE"

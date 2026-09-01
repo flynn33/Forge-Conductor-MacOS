@@ -22,6 +22,11 @@ struct ContentView: View {
                     lastError: model.lastError,
                     onSelect: model.selectTab
                 )
+                // Telemetry updates publish several unrelated AppModel fields per
+                // frame. Keep the persistent navigation controls stable unless one
+                // of their own visible inputs changes so an in-flight click cannot
+                // be invalidated by a gauge refresh.
+                .equatable()
                 .transition(.move(edge: .leading).combined(with: .opacity))
 
                 Divider()

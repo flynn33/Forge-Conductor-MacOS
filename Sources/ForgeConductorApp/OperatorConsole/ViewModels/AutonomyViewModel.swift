@@ -134,6 +134,16 @@ final class AutonomyViewModel: ObservableObject {
                     )
                 }
                 acceptStartedRun(run)
+            } catch let clientError as OperatorManagerClientError {
+                if case .configurationRejected = clientError {
+                    pendingStartRequest = nil
+                    startRequiresReconciliation = false
+                    errorMessage = clientError.localizedDescription
+                    notice = "Correct the run configuration and submit it again. No run was persisted."
+                } else {
+                    errorMessage = "Run \(request.runID) must be reconciled before another start: \(clientError.localizedDescription)"
+                    notice = nil
+                }
             } catch {
                 errorMessage = "Run \(request.runID) must be reconciled before another start: \(error.localizedDescription)"
                 notice = nil
@@ -190,6 +200,8 @@ final class AutonomyViewModel: ObservableObject {
                 "failed_recoverable", "blocked_configuration", "waiting_provider", "waiting_resource",
                 "retry_wait",
             ].contains(run.state)
+        case .checkpoint, .rollover:
+            return false
         }
     }
 

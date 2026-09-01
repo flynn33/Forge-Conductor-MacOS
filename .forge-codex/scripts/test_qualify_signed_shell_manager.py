@@ -23,6 +23,24 @@ import qualify_signed_shell_manager as subject
 
 
 class SignedShellManagerHarnessTests(unittest.TestCase):
+    def test_blocked_scenario_retains_completed_production_path_evidence(self) -> None:
+        run = object.__new__(subject.QualificationRun)
+        run.scenario = {
+            "status": "running",
+            "clean_install_default": {"status": "passed"},
+            "shell_probes": {"installed_raw_cli_success": {"status": "passed"}},
+        }
+
+        result = run.blocked_scenario("Settings control was not visible")
+
+        self.assertEqual(result["status"], "blocked")
+        self.assertEqual(result["reason"], "Settings control was not visible")
+        self.assertEqual(result["clean_install_default"]["status"], "passed")
+        self.assertEqual(
+            result["shell_probes"]["installed_raw_cli_success"]["status"],
+            "passed",
+        )
+
     def test_codesign_parser_preserves_identity_team_hash_and_authorities(self) -> None:
         parsed = subject.parse_codesign_details(
             "\n".join(
@@ -42,6 +60,109 @@ class SignedShellManagerHarnessTests(unittest.TestCase):
         self.assertEqual(parsed["cdhash"], "abcdef0123")
         self.assertEqual(parsed["authorities"], ["Apple Development: Example", "Apple Root CA"])
         self.assertIn("runtime", parsed["code_directory"])
+        self.assertEqual(subject.signing_leaf_authority(parsed), "Apple Development: Example")
+
+    def test_product_signing_requirement_maps_each_team_to_only_its_certificate_class(
+        self,
+    ) -> None:
+        development = subject.product_signing_requirement(
+            subject.RUNTIME_LAUNCHER_IDENTIFIER,
+            subject.DEVELOPMENT_TEAM_IDENTIFIER,
+        )
+        self.assertIn("anchor apple generic", development)
+        self.assertIn("9AQ2C2838M", development)
+        self.assertIn("1.2.840.113635.100.6.1.12", development)
+        self.assertNotIn("1.2.840.113635.100.6.1.13", development)
+
+        distribution = subject.product_signing_requirement(
+            subject.FRAMEWORK_IDENTIFIER,
+            subject.DISTRIBUTION_TEAM_IDENTIFIER,
+        )
+        self.assertIn("2Y25RTLZET", distribution)
+        self.assertIn("1.2.840.113635.100.6.1.13", distribution)
+        self.assertNotIn("1.2.840.113635.100.6.1.12", distribution)
+        with self.assertRaisesRegex(subject.QualificationError, "signing team"):
+            subject.product_signing_requirement(subject.APP_IDENTIFIER, "UNAPPROVED1")
+        with self.assertRaisesRegex(subject.QualificationError, "product identifier"):
+            subject.product_signing_requirement(
+                "com.forge-conductor.unrecognized",
+                subject.DEVELOPMENT_TEAM_IDENTIFIER,
+            )
+
+    def test_signature_inspection_enforces_explicit_requirement_for_all_architectures(
+        self,
+    ) -> None:
+        path = pathlib.Path("/private/tmp/Forge Conductor.app")
+        details = "\n".join(
+            [
+                f"Identifier={subject.APP_IDENTIFIER}",
+                "CodeDirectory v=20500 flags=0x10000(runtime) hashes=1+1 location=embedded",
+                "CDHash=ABCDEF0123456789",
+                "Authority=Apple Development: Example",
+                f"TeamIdentifier={subject.DEVELOPMENT_TEAM_IDENTIFIER}",
+            ]
+        )
+        displayed = subprocess.CompletedProcess(
+            ["/usr/bin/codesign"],
+            0,
+            stdout="",
+            stderr=details,
+        )
+        verified = subprocess.CompletedProcess(
+            ["/usr/bin/codesign"],
+            0,
+            stdout="",
+            stderr="",
+        )
+        with mock.patch.object(subject, "run_command", side_effect=[displayed, verified]) as run:
+            inspected = subject.inspect_signature(
+                path,
+                expected_identifier=subject.APP_IDENTIFIER,
+                expected_team=subject.DEVELOPMENT_TEAM_IDENTIFIER,
+                expected_authority="Apple Development: Example",
+                deep=True,
+            )
+
+        self.assertEqual(inspected["team_identifier"], subject.DEVELOPMENT_TEAM_IDENTIFIER)
+        self.assertIn("1.2.840.113635.100.6.1.12", inspected["signing_requirement"])
+        verification = run.call_args_list[1].args[0]
+        self.assertIn("--deep", verification)
+        self.assertIn("--strict", verification)
+        self.assertIn("--all-architectures", verification)
+        self.assertIn(
+            f"-R={inspected['signing_requirement']}",
+            verification,
+        )
+        self.assertEqual(verification[-1], str(path))
+
+    def test_expected_signing_identity_is_an_explicit_portable_constraint(self) -> None:
+        arguments = [
+            "qualify_signed_shell_manager.py",
+            "--app",
+            "/tmp/Forge Conductor.app",
+            "--expected-team-identifier",
+            "TEAM123",
+            "--expected-signing-authority",
+            "Apple Development: Example",
+        ]
+        with mock.patch.object(sys, "argv", arguments):
+            parsed = subject.parse_args()
+        self.assertEqual(parsed.expected_team_identifier, "TEAM123")
+        self.assertEqual(parsed.expected_signing_authority, "Apple Development: Example")
+        self.assertFalse(parsed.allow_system_events_ui)
+        self.assertFalse(hasattr(subject, "EXPECTED_TEAM_IDENTIFIER"))
+        self.assertFalse(hasattr(subject, "EXPECTED_SIGNING_AUTHORITY"))
+
+    def test_system_events_settings_route_requires_explicit_authorization(self) -> None:
+        arguments = [
+            "qualify_signed_shell_manager.py",
+            "--app",
+            "/tmp/Forge Conductor.app",
+            "--allow-system-events-ui",
+        ]
+        with mock.patch.object(sys, "argv", arguments):
+            parsed = subject.parse_args()
+        self.assertTrue(parsed.allow_system_events_ui)
 
     def test_launchctl_parser_extracts_exact_process_identity(self) -> None:
         parsed = subject.parse_launchctl_job(
@@ -60,6 +181,32 @@ class SignedShellManagerHarnessTests(unittest.TestCase):
         )
         self.assertEqual(parsed["state"], "running")
         self.assertEqual(len(parsed["output_sha256"]), 64)
+
+    def test_manager_identity_waits_for_xpcproxy_exec_transition(self) -> None:
+        expected = pathlib.Path("/private/tmp/qualification/Forge Conductor")
+        job = {
+            "pid": 4123,
+            "program": str(expected),
+            "state": "running",
+            "output_sha256": "a" * 64,
+        }
+        process = subprocess.CompletedProcess(
+            ["ps"],
+            0,
+            stdout=f"{expected} manager run --home /private/tmp/qualification\n",
+            stderr="",
+        )
+        with mock.patch.object(subject, "launchctl_job", return_value=job), mock.patch.object(
+            subject,
+            "process_executable",
+            side_effect=[pathlib.Path("/usr/libexec/xpcproxy"), expected],
+        ), mock.patch.object(subject, "run_command", return_value=process), mock.patch.object(
+            subject.time,
+            "sleep",
+        ):
+            identity = subject.manager_process_identity(501, expected, timeout=1)
+        self.assertEqual(identity["pid"], 4123)
+        self.assertEqual(identity["executable"], str(expected))
 
     def test_launchd_disabled_snapshot_distinguishes_absent_false_and_true(self) -> None:
         self.assertIsNone(subject.parse_disabled_entry('{ "unrelated" => true }'))
@@ -253,6 +400,119 @@ class SignedShellManagerHarnessTests(unittest.TestCase):
         self.assertEqual(home.parent, pathlib.Path("/tmp").resolve(strict=True))
         self.assertTrue(home.name.startswith("forge-signed-shell-manager-"))
 
+    def test_qualification_home_cannot_overlap_default_forge_home(self) -> None:
+        account = pathlib.Path("/private/tmp/forge-account-fixture")
+        default_home = account / ".forge-conductor"
+        with mock.patch.object(subject, "account_home", return_value=account):
+            accepted = subject.validate_qualification_home_isolation(
+                pathlib.Path("/private/tmp/forge-qualification-fixture")
+            )
+            self.assertEqual(accepted["default_forge_home"], str(default_home))
+            for rejected in (default_home, default_home / "child", account):
+                with self.subTest(rejected=rejected):
+                    with self.assertRaises(subject.QualificationError):
+                        subject.validate_qualification_home_isolation(rejected)
+
+    def test_accessibility_scripts_target_exact_pid_and_stable_identifiers(self) -> None:
+        ready = subject.accessibility_script(4321, "process_ready")
+        opened = subject.accessibility_script(4321, "open_settings")
+        queried = subject.accessibility_script(4321, "query", "settings-shell-enabled")
+        pressed = subject.accessibility_script(4321, "press", "settings-save")
+        for script in (ready, opened, queried, pressed):
+            self.assertIn("whose unix id is 4321", script)
+        self.assertIn('return "NOT_READY"', ready)
+        self.assertIn('keystroke "," using command down', opened)
+        self.assertIn('"settings-shell-enabled"', queried)
+        self.assertIn('perform action "AXPress"', pressed)
+        with self.assertRaisesRegex(subject.QualificationError, "identifier"):
+            subject.accessibility_script(4321, "query", 'bad"identifier')
+
+    def test_accessibility_scripts_compile_on_macos(self) -> None:
+        compiler = pathlib.Path("/usr/bin/osacompile")
+        if sys.platform != "darwin" or not compiler.exists():
+            self.skipTest("AppleScript compilation requires macOS")
+        scripts = [
+            subject.accessibility_script(4321, "process_ready"),
+            subject.accessibility_script(4321, "open_settings"),
+            subject.accessibility_script(4321, "query", "settings-shell-enabled"),
+            subject.accessibility_script(4321, "press", "settings-save"),
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            for index, script in enumerate(scripts):
+                result = subprocess.run(
+                    [
+                        str(compiler),
+                        "-o",
+                        str(pathlib.Path(temporary) / f"script-{index}.scpt"),
+                        "-e",
+                        script,
+                    ],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    timeout=10,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_accessibility_snapshot_preserves_visible_role_state_and_title(self) -> None:
+        snapshot = subject.parse_accessibility_snapshot(
+            "FOUND\tAXCheckBox\ttrue\t0\tEnable project shell tools",
+            "settings-shell-enabled",
+        )
+        self.assertEqual(snapshot["role"], "AXCheckBox")
+        self.assertTrue(snapshot["enabled"])
+        self.assertFalse(subject.accessibility_value_is_enabled(snapshot))
+        snapshot["value"] = "1"
+        self.assertTrue(subject.accessibility_value_is_enabled(snapshot))
+
+    def test_legacy_disabled_fixture_and_receipt_validation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            home = root / "legacy"
+            project = root / "project"
+            project.mkdir()
+            fixture = subject.write_legacy_disabled_fixture(home, project)
+            self.assertEqual((home / "config.json").stat().st_mode & 0o777, 0o600)
+
+            migrations = home / "config-migrations"
+            migrations.mkdir()
+            backup = migrations / "config.pre-v2.fixture.json"
+            backup.write_bytes((home / "config.json").read_bytes())
+            target = migrations / "config.schema-v2.fixture.json"
+            migrated = {
+                "config_schema_version": 2,
+                "allowed_roots": [str(project)],
+                "shell": {
+                    "enabled": True,
+                    "user_disabled": False,
+                    "policy_version": 2,
+                    "policy_origin": "legacy_disabled_default_migrated",
+                    "default_timeout_sec": 41,
+                },
+            }
+            encoded_target = (json.dumps(migrated, sort_keys=True) + "\n").encode("utf-8")
+            target.write_bytes(encoded_target)
+            (home / "config.json").write_bytes(encoded_target)
+            receipt = {
+                "status": "completed",
+                "backup_filename": backup.name,
+                "backup_sha256": fixture["sha256"],
+                "target_filename": target.name,
+                "target_sha256": subject.sha256_bytes(encoded_target),
+            }
+            (migrations / "shell-policy-v2.json").write_text(
+                json.dumps(receipt),
+                encoding="utf-8",
+            )
+
+            result = subject.validate_legacy_disabled_migration(home, fixture)
+            self.assertEqual(result["status"], "passed")
+            self.assertTrue(result["config"]["enabled"])
+            self.assertEqual(
+                result["config"]["policy_origin"],
+                "legacy_disabled_default_migrated",
+            )
+
     def test_shell_denial_validator_requires_explicit_opt_out_code(self) -> None:
         validated = subject.validate_shell_denial(
             {
@@ -401,6 +661,20 @@ class SignedShellManagerHarnessTests(unittest.TestCase):
             plist.write_bytes(plistlib.dumps(value))
             validated = subject.validate_login_plist(plist, canonical_home)
             self.assertEqual(validated["program_arguments"], value["ProgramArguments"])
+
+    def test_launchagent_path_normalizes_var_and_tmp_system_aliases_only(self) -> None:
+        self.assertEqual(
+            subject.normalized_launchagent_path("/var/folders/fixture"),
+            pathlib.PurePath("/private/var/folders/fixture"),
+        )
+        self.assertEqual(
+            subject.normalized_launchagent_path("/tmp/fixture"),
+            pathlib.PurePath("/private/tmp/fixture"),
+        )
+        self.assertEqual(
+            subject.normalized_launchagent_path("/Users/example/fixture"),
+            pathlib.PurePath("/Users/example/fixture"),
+        )
 
     def test_login_plist_validation_rejects_user_controlled_symlink_alias(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

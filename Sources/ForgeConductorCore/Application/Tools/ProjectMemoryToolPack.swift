@@ -34,7 +34,12 @@ public struct ProjectMemoryToolPack: ToolPackHandling {
             try control.checkCancellation()
             let payload: [String: Any]
             switch name {
-            case "project_memory.initialize": payload = try initialize(arguments, service: app.projectMemory, control: control)
+            case "project_memory.initialize":
+                return .failure(
+                    code: "project_registration_coordinator_required",
+                    message: "Project initialization must pass through manager-owned registration",
+                    retryable: false
+                )
             case "project_memory.remember": payload = try remember(arguments, service: app.projectMemory, control: control)
             case "project_memory.remember_batch": payload = try rememberBatch(arguments, service: app.projectMemory, control: control)
             case "project_memory.search": payload = try search(arguments, service: app.projectMemory, control: control)
@@ -153,20 +158,6 @@ public struct ProjectMemoryToolPack: ToolPackHandling {
             "session_id": string, "expires_at": string, "related_ids": ["type": "array", "items": string],
             "idempotency_key": string, "deadline_ms": ["type": "integer"],
         ]
-    }
-
-    private func initialize(
-        _ arguments: [String: Any],
-        service: ProjectMemoryService,
-        control: ToolCallCancellation
-    ) throws -> [String: Any] {
-        guard let path = string(arguments, "project_path") ?? string(arguments, "path") else {
-            throw ProjectMemoryError.invalidRequest("project_path is required")
-        }
-        return try service.initialize(
-            path: path, projectID: string(arguments, "project_id"), displayName: string(arguments, "display_name"),
-            repositoryIdentity: string(arguments, "repository_identity"), cancellation: control
-        )
     }
 
     private func remember(

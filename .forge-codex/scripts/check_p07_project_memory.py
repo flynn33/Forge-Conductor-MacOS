@@ -15,6 +15,11 @@ import tempfile
 import time
 
 
+CONFIG_SCHEMA_VERSION = 2
+PROJECT_MEMORY_CAPABILITY_VERSION = 1
+PROJECT_MEMORY_SCHEMA_VERSION = 2
+
+
 class MCPProcess:
     def __init__(self, binary: pathlib.Path, home: pathlib.Path) -> None:
         environment = dict(os.environ)
@@ -112,6 +117,77 @@ def require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
+def atomic_write_private_json(path: pathlib.Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    temporary = pathlib.Path(temporary_name)
+    try:
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            descriptor = -1
+            json.dump(payload, stream, indent=2, sort_keys=True)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        if temporary.exists():
+            temporary.unlink()
+
+
+def configure_allowed_roots(home: pathlib.Path, roots: list[pathlib.Path]) -> None:
+    require(bool(roots), "project-memory fixture requires at least one trusted root")
+    resolved = [root.resolve(strict=True) for root in roots]
+    require(
+        all(root.is_dir() for root in resolved),
+        "project-memory fixture roots must be existing directories",
+    )
+    normalized = [str(root) for root in resolved]
+    require(
+        len(normalized) == len(set(normalized)),
+        "project-memory fixture roots contain duplicates",
+    )
+    atomic_write_private_json(
+        home / "config.json",
+        {
+            "config_schema_version": CONFIG_SCHEMA_VERSION,
+            "allowed_roots": normalized,
+        },
+    )
+
+
+def validate_project_memory_capability(capabilities: object) -> dict:
+    require(isinstance(capabilities, dict), "initialize capabilities are missing")
+    project_memory = capabilities.get("projectMemory")
+    require(isinstance(project_memory, dict), "missing project memory capability")
+    require(
+        project_memory.get("capabilityVersion") == PROJECT_MEMORY_CAPABILITY_VERSION,
+        "project memory capability version mismatch",
+    )
+    require(
+        project_memory.get("schemaVersion") == PROJECT_MEMORY_SCHEMA_VERSION,
+        "project memory schema version mismatch",
+    )
+    require(isinstance(project_memory.get("limits"), dict), "project memory limits are missing")
+    return project_memory
+
+
+def validate_project_memory_scope(scope: object) -> dict:
+    require(isinstance(scope, dict), "project memory initialization result is missing")
+    require(scope.get("ok") is True, "project memory initialization did not succeed")
+    require(
+        scope.get("capability_version") == PROJECT_MEMORY_CAPABILITY_VERSION,
+        "project memory initialization capability version mismatch",
+    )
+    require(
+        scope.get("schema_version") == PROJECT_MEMORY_SCHEMA_VERSION,
+        "project memory initialization schema version mismatch",
+    )
+    return scope
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--binary", required=True, type=pathlib.Path)
@@ -124,6 +200,7 @@ def main() -> int:
     home = root / "home"
     project = root / "project"
     project.mkdir(parents=True)
+    configure_allowed_roots(home, [project])
     transcript: list[dict] = []
     first = MCPProcess(binary, home)
     try:
@@ -133,7 +210,7 @@ def main() -> int:
         )
         transcript.append(initialized)
         capabilities = initialized["result"]["capabilities"]
-        require(capabilities["projectMemory"]["schemaVersion"] == 1, "missing project memory capability")
+        validate_project_memory_capability(capabilities)
 
         listed = first.call("tools/list", {})
         transcript.append(listed)
@@ -148,7 +225,10 @@ def main() -> int:
         require(legacy | project_tools <= set(tools), "tool inventory is incomplete")
         require(all(tools[name]["inputSchema"]["type"] == "object" for name in project_tools), "tool schema mismatch")
 
-        scope = first.tool("project_memory.initialize", {"project_path": str(project), "idempotency_key": "scope-v1"})
+        scope = validate_project_memory_scope(first.tool(
+            "project_memory.initialize",
+            {"project_path": str(project), "idempotency_key": "scope-v2"},
+        ))
         transcript.append({"tool": "project_memory.initialize", "result": scope})
         project_id = scope["project_id"]
         remembered = first.tool(
@@ -177,6 +257,7 @@ def main() -> int:
         status = first.tool("project_memory.status", {"project_id": project_id})
         transcript.append({"tool": "project_memory.status", "result": status})
         require(status["integrity"] == "ok" and status["record_count"] == 1, "status health mismatch")
+        require(status.get("schema_version") == PROJECT_MEMORY_SCHEMA_VERSION, "status schema version mismatch")
 
         batch = first.tool(
             "project_memory.remember_batch",
@@ -216,8 +297,12 @@ def main() -> int:
 
     second = MCPProcess(binary, home)
     try:
-        second.call("initialize", {"protocolVersion": "2025-11-25", "capabilities": {}})
-        reopened = second.tool("project_memory.initialize", {"project_path": str(project)})
+        restarted = second.call("initialize", {"protocolVersion": "2025-11-25", "capabilities": {}})
+        validate_project_memory_capability(restarted["result"]["capabilities"])
+        transcript.append({"restart_initialize": restarted})
+        reopened = validate_project_memory_scope(
+            second.tool("project_memory.initialize", {"project_path": str(project)})
+        )
         require(reopened["project_id"] == project_id, "project identity changed after restart")
         durable = second.tool("project_memory.search", {"project_id": project_id, "query": "conformance"})
         transcript.append({"restart_search": durable})
@@ -228,9 +313,11 @@ def main() -> int:
     output = {
         "ok": True,
         "binary": str(binary),
+        "config_schema_version": CONFIG_SCHEMA_VERSION,
+        "project_memory_schema_version": PROJECT_MEMORY_SCHEMA_VERSION,
         "project_id": project_id,
         "checks": [
-            "initialize", "tools_list", "legacy_compatibility", "tool_schemas", "remember",
+            "trusted_root_policy", "schema_v2", "initialize", "tools_list", "legacy_compatibility", "tool_schemas", "remember",
             "redaction", "search", "status", "pagination", "typed_error", "cancellation",
             "process_restart_durability",
         ],

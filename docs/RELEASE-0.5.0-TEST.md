@@ -1,5 +1,10 @@
 # Forge Conductor 0.5.1 — operator test plan (G1–G7 gap close)
 
+> **Historical record:** this plan applies only to the 0.5.x source line. The
+> current product identity is **0.9.0**, build **1**; use the README, user guide,
+> changelog, and current qualification material for present behavior and release
+> status.
+
 Build **from Xcode** (you build and test; agents do not overwrite live `/Applications` or home installs).
 
 **Version:** `0.5.1-swift`
@@ -7,7 +12,7 @@ Build **from Xcode** (you build and test; agents do not overwrite live `/Applica
 ## Product path under test
 
 1. LM Studio installed  
-2. Forge Conductor 0.5.0 installed / run from your Xcode build  
+2. Forge Conductor 0.5.1 installed / run from your Xcode build
 3. **LM Studio MCP** tab → **Deploy to LM Studio**  
 4. Wait for “Deployment complete”; Forge edits configuration, reloads/relaunches LM Studio when required, and verifies both hosted connections  
 5. Load a tool-capable local model; tools / agents available  
@@ -41,8 +46,8 @@ xcodebuild -project ForgeConductor.xcodeproj -scheme forge-conductor -destinatio
 
 ## Version
 
-- Marketing / Swift: **0.5.0-swift** (`ForgeApp.version`)  
-- Info.plist: **0.5.0**
+- Marketing / Swift: **0.5.1-swift** (`ForgeApp.version`)
+- Info.plist: **0.5.1**
 
 ## Out of scope for this build session
 

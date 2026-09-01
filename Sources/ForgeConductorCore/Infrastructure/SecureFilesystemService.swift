@@ -10,14 +10,1094 @@ public enum SecureFilesystemServiceStatus: String, Sendable {
     case notFound = "not_found"
 }
 
-public enum SecureFilesystemServiceLifecycleError: LocalizedError {
+/// The single operator-owned Settings operation that may interact with the
+/// protected filesystem service at a time.
+public enum SecureFilesystemSettingsOperation: String, CaseIterable, Sendable {
+    case bootstrap
+    case enable
+    case update
+    case disable
+    case lifecycleRecovery = "lifecycle_recovery"
+    case approval
+    case refresh
+    case reconcile
+
+    public var accessibilityLabel: String {
+        switch self {
+        case .bootstrap: "Checking protected filesystem service lifecycle"
+        case .enable: "Enabling protected filesystem service"
+        case .update: "Updating protected filesystem service"
+        case .disable: "Disabling protected filesystem service"
+        case .lifecycleRecovery: "Resolving interrupted protected filesystem lifecycle"
+        case .approval: "Opening protected filesystem approval settings"
+        case .refresh: "Refreshing protected filesystem service status"
+        case .reconcile: "Reconciling protected filesystem recovery"
+        }
+    }
+
+    public var mayAwaitServiceUnregister: Bool {
+        switch self {
+        case .bootstrap, .enable, .update, .disable, .lifecycleRecovery: true
+        case .approval, .refresh, .reconcile: false
+        }
+    }
+}
+
+public enum SecureFilesystemServiceLifecyclePhase: String, Sendable {
+    case checking
+    case settled
+    case registering
+    case unregistering
+    case registrationPending = "registration_pending"
+    case outcomeUncertain = "outcome_uncertain"
+    case stateInvalid = "state_invalid"
+}
+
+public enum SecureFilesystemServiceLifecycleIntent: String, Sendable {
+    case enable
+    case update
+    case disable
+}
+
+/// Observable projection of the durable ServiceManagement lifecycle fence.
+/// Any state except `settled` blocks a new registration or unregister request.
+public struct SecureFilesystemServiceLifecycleState: Sendable, Equatable {
+    public let phase: SecureFilesystemServiceLifecyclePhase
+    public let intent: SecureFilesystemServiceLifecycleIntent?
+    public let operationID: String?
+
+    public init(
+        phase: SecureFilesystemServiceLifecyclePhase,
+        intent: SecureFilesystemServiceLifecycleIntent? = nil,
+        operationID: String? = nil
+    ) {
+        self.phase = phase
+        self.intent = intent
+        self.operationID = operationID
+    }
+
+    public static let checking = SecureFilesystemServiceLifecycleState(phase: .checking)
+    public static let settled = SecureFilesystemServiceLifecycleState(phase: .settled)
+
+    public static func cancelled(
+        intent: SecureFilesystemServiceLifecycleIntent?
+    ) -> SecureFilesystemServiceLifecycleState {
+        SecureFilesystemServiceLifecycleState(
+            phase: .outcomeUncertain,
+            intent: intent
+        )
+    }
+
+    public var blocksLifecycleMutation: Bool { phase != .settled }
+
+    public var canRetryResolution: Bool {
+        switch phase {
+        case .registering, .unregistering, .registrationPending, .outcomeUncertain:
+            true
+        case .checking, .settled, .stateInvalid:
+            false
+        }
+    }
+
+    public var operatorStatusLabel: String {
+        switch phase {
+        case .checking:
+            "Checking durable lifecycle state"
+        case .settled:
+            "Settled"
+        case .registering:
+            "Waiting for macOS to finish registering the service"
+        case .unregistering:
+            "Waiting for macOS to finish stopping the service"
+        case .registrationPending:
+            "Service stopped; replacement registration is pending"
+        case .outcomeUncertain:
+            "Lifecycle outcome uncertain; lifecycle changes are blocked"
+        case .stateInvalid:
+            "Lifecycle fence invalid; lifecycle changes are blocked"
+        }
+    }
+
+    public var recoveryActionLabel: String {
+        switch phase {
+        case .registering:
+            "Resume pending registration"
+        case .registrationPending:
+            "Register pending replacement"
+        case .unregistering, .outcomeUncertain:
+            "Resume pending lifecycle change"
+        case .checking, .settled, .stateInvalid:
+            "Resume lifecycle change"
+        }
+    }
+}
+
+/// Identifies one UI-observed lifecycle operation. The independent generation
+/// and UUID prevent a late callback from an older operation from overwriting a
+/// newer Settings state.
+public struct SecureFilesystemServiceLifecycleObservationContext:
+    Sendable,
+    Equatable
+{
+    public let generation: UInt64
+    public let operationID: UUID
+
+    public init(generation: UInt64, operationID: UUID = UUID()) {
+        self.generation = generation
+        self.operationID = operationID
+    }
+}
+
+public struct SecureFilesystemServiceLifecycleObservation: Sendable, Equatable {
+    public let context: SecureFilesystemServiceLifecycleObservationContext
+    public let state: SecureFilesystemServiceLifecycleState
+
+    public init(
+        context: SecureFilesystemServiceLifecycleObservationContext,
+        state: SecureFilesystemServiceLifecycleState
+    ) {
+        self.context = context
+        self.state = state
+    }
+}
+
+/// A single-slot, generation-fenced projection gate for the native Settings
+/// surface. It accepts forward progress for only the newest observed operation;
+/// no queue or history is retained.
+public struct SecureFilesystemServiceLifecycleObservationGate: Sendable {
+    public private(set) var generation: UInt64 = 0
+    public private(set) var activeContext:
+        SecureFilesystemServiceLifecycleObservationContext?
+    private var acceptedPhaseRank = -1
+
+    public init() {}
+
+    public mutating func begin()
+        -> SecureFilesystemServiceLifecycleObservationContext?
+    {
+        guard generation < UInt64.max else { return nil }
+        generation += 1
+        let context = SecureFilesystemServiceLifecycleObservationContext(
+            generation: generation
+        )
+        activeContext = context
+        acceptedPhaseRank = -1
+        return context
+    }
+
+    public mutating func accept(
+        _ observation: SecureFilesystemServiceLifecycleObservation
+    ) -> SecureFilesystemServiceLifecycleState? {
+        guard observation.context == activeContext else { return nil }
+        let rank = Self.rank(of: observation.state.phase)
+        guard rank >= acceptedPhaseRank else { return nil }
+        acceptedPhaseRank = rank
+        return observation.state
+    }
+
+    private static func rank(of phase: SecureFilesystemServiceLifecyclePhase) -> Int {
+        switch phase {
+        case .checking: 0
+        case .unregistering: 1
+        case .outcomeUncertain: 2
+        case .registrationPending: 3
+        case .registering: 4
+        case .settled: 5
+        case .stateInvalid: 6
+        }
+    }
+}
+
+/// A bounded, generation-fenced single-operation gate for the native Settings
+/// surface. The generation prevents a cancelled task from completing a newer
+/// operation of the same kind.
+public struct SecureFilesystemSettingsOperationState: Sendable, Equatable {
+    public private(set) var activeOperation: SecureFilesystemSettingsOperation?
+    public private(set) var generation: UInt64
+
+    public init(
+        activeOperation: SecureFilesystemSettingsOperation? = nil,
+        generation: UInt64 = 0
+    ) {
+        self.activeOperation = activeOperation
+        self.generation = generation
+    }
+
+    public var isActive: Bool { activeOperation != nil }
+
+    @discardableResult
+    public mutating func begin(_ operation: SecureFilesystemSettingsOperation) -> UInt64? {
+        guard activeOperation == nil, generation < UInt64.max else { return nil }
+        generation += 1
+        activeOperation = operation
+        return generation
+    }
+
+    public func owns(
+        _ operation: SecureFilesystemSettingsOperation,
+        generation expectedGeneration: UInt64
+    ) -> Bool {
+        activeOperation == operation && generation == expectedGeneration
+    }
+
+    @discardableResult
+    public mutating func finish(
+        _ operation: SecureFilesystemSettingsOperation,
+        generation expectedGeneration: UInt64
+    ) -> Bool {
+        guard owns(operation, generation: expectedGeneration) else { return false }
+        activeOperation = nil
+        return true
+    }
+
+    public mutating func cancel() {
+        guard activeOperation != nil else { return }
+        activeOperation = nil
+        if generation < UInt64.max {
+            generation += 1
+        }
+    }
+}
+
+/// Computes every control from the same operation gate so no lifecycle,
+/// approval, observation, or recovery command can overlap another.
+public struct SecureFilesystemSettingsControlAvailability: Sendable, Equatable {
+    public let enable: Bool
+    public let update: Bool
+    public let disable: Bool
+    public let approval: Bool
+    public let refresh: Bool
+    public let reconcile: Bool
+    public let lifecycleRecovery: Bool
+
+    public init(
+        registrationStatus: SecureFilesystemServiceStatus,
+        operationState: SecureFilesystemSettingsOperationState,
+        lifecycleState: SecureFilesystemServiceLifecycleState = .settled
+    ) {
+        guard !operationState.isActive else {
+            enable = false
+            update = false
+            disable = false
+            approval = false
+            refresh = false
+            reconcile = false
+            lifecycleRecovery = false
+            return
+        }
+
+        guard !lifecycleState.blocksLifecycleMutation else {
+            enable = false
+            update = false
+            disable = false
+            approval = false
+            refresh = lifecycleState.phase != .checking
+            reconcile = false
+            lifecycleRecovery = lifecycleState.canRetryResolution
+            return
+        }
+
+        enable = registrationStatus != .enabled
+        update = registrationStatus != .notFound
+        disable = registrationStatus != .notRegistered
+            && registrationStatus != .notFound
+        approval = true
+        refresh = true
+        reconcile = true
+        lifecycleRecovery = false
+    }
+}
+
+public enum SecureFilesystemServiceOperationalState: String, Sendable {
+    case notPackaged = "not_packaged"
+    case notRegistered = "not_registered"
+    case requiresApproval = "requires_approval"
+    case registeredUnavailable = "registered_unavailable"
+    case operational
+}
+
+public struct SecureFilesystemOperationalHealth: Sendable, Equatable {
+    public let registrationStatus: SecureFilesystemServiceStatus
+    public let operationalState: SecureFilesystemServiceOperationalState
+    public let localQuarantineOccupied: Int
+    public let localQuarantineCapacity: Int
+    public let privilegedRecoveryRetained: Int
+    public let privilegedRecoveryCapacity: Int
+    public let releasedDuringReconciliation: Int
+    public let debtStatusAvailable: Bool
+
+    public init(
+        registrationStatus: SecureFilesystemServiceStatus,
+        operationalState: SecureFilesystemServiceOperationalState,
+        localQuarantineOccupied: Int,
+        localQuarantineCapacity: Int,
+        privilegedRecoveryRetained: Int,
+        privilegedRecoveryCapacity: Int,
+        releasedDuringReconciliation: Int,
+        debtStatusAvailable: Bool
+    ) {
+        self.registrationStatus = registrationStatus
+        self.operationalState = operationalState
+        self.localQuarantineOccupied = localQuarantineOccupied
+        self.localQuarantineCapacity = localQuarantineCapacity
+        self.privilegedRecoveryRetained = privilegedRecoveryRetained
+        self.privilegedRecoveryCapacity = privilegedRecoveryCapacity
+        self.releasedDuringReconciliation = releasedDuringReconciliation
+        self.debtStatusAvailable = debtStatusAvailable
+    }
+
+    public static let initial = SecureFilesystemOperationalHealth(
+        registrationStatus: .notFound,
+        operationalState: .notPackaged,
+        localQuarantineOccupied: 0,
+        localQuarantineCapacity: 32,
+        privilegedRecoveryRetained: 0,
+        privilegedRecoveryCapacity: 32,
+        releasedDuringReconciliation: 0,
+        debtStatusAvailable: false
+    )
+
+    public var unresolvedDebtCount: Int {
+        localQuarantineOccupied + privilegedRecoveryRetained
+    }
+
+    public var hasExhaustedLedger: Bool {
+        localQuarantineOccupied >= localQuarantineCapacity
+            || privilegedRecoveryRetained >= privilegedRecoveryCapacity
+    }
+}
+
+struct SecureFilesystemServiceOperationalProbe: Sendable, Equatable {
+    let operational: Bool
+    let code: String
+    let message: String
+}
+
+struct SecureFilesystemRecoveryReconciliation: Sendable, Equatable {
+    let retainedCount: Int
+    let releasedCount: Int
+    let available: Bool
+
+    static let unavailable = SecureFilesystemRecoveryReconciliation(
+        retainedCount: 0,
+        releasedCount: 0,
+        available: false
+    )
+}
+
+public enum SecureFilesystemServiceLifecycleError: LocalizedError, Sendable {
     case superseded
+    case registerTimedOut
+    case unregisterTimedOut
+    case lifecycleResolutionRequired
+    case lifecycleStateInvalid
 
     public var errorDescription: String? {
         switch self {
         case .superseded:
-            "The protected filesystem service update was superseded by a newer operator action"
+            "The protected filesystem service lifecycle attempt was superseded"
+        case .registerTimedOut:
+            "The protected filesystem service did not finish registering before the lifecycle timeout"
+        case .unregisterTimedOut:
+            "The protected filesystem service did not finish stopping before the lifecycle timeout"
+        case .lifecycleResolutionRequired:
+            "A previous protected filesystem service lifecycle change is unresolved; resolve it before another lifecycle change"
+        case .lifecycleStateInvalid:
+            "The protected filesystem service lifecycle fence is unavailable or invalid; lifecycle changes remain blocked"
         }
+    }
+}
+
+private enum SecureFilesystemServiceLifecycleRecordPhase: String, Codable, Sendable {
+    case registering
+    case unregistering
+    case registrationPending = "registration_pending"
+    case outcomeUncertain = "outcome_uncertain"
+}
+
+private struct SecureFilesystemServiceLifecycleRecord: Codable, Sendable, Equatable {
+    let schemaVersion: Int
+    let operationID: String
+    let attemptID: String
+    let intent: String
+    let phase: SecureFilesystemServiceLifecycleRecordPhase
+    let attemptNumber: Int?
+    let leaseDevice: UInt64?
+    let leaseInode: UInt64?
+    let createdAtMilliseconds: Int64
+    let updatedAtMilliseconds: Int64
+
+    var normalizedAttemptNumber: Int { attemptNumber ?? 1 }
+
+    var projectedState: SecureFilesystemServiceLifecycleState? {
+        guard (1...2).contains(schemaVersion),
+              UUID(uuidString: operationID) != nil,
+              UUID(uuidString: attemptID) != nil,
+              let lifecycleIntent = SecureFilesystemServiceLifecycleIntent(rawValue: intent),
+              (1...SecureFilesystemServiceLifecycleFenceStore.maximumAttempts)
+                .contains(normalizedAttemptNumber),
+              hasValidIntentAndPhase(lifecycleIntent),
+              hasValidLeaseIdentity,
+              createdAtMilliseconds >= 0,
+              updatedAtMilliseconds >= createdAtMilliseconds else {
+            return nil
+        }
+        let publicPhase: SecureFilesystemServiceLifecyclePhase
+        switch phase {
+        case .registering:
+            publicPhase = .registering
+        case .unregistering:
+            publicPhase = .unregistering
+        case .registrationPending:
+            publicPhase = .registrationPending
+        case .outcomeUncertain:
+            publicPhase = .outcomeUncertain
+        }
+        return SecureFilesystemServiceLifecycleState(
+            phase: publicPhase,
+            intent: lifecycleIntent,
+            operationID: operationID
+        )
+    }
+
+    private var hasValidLeaseIdentity: Bool {
+        switch (leaseDevice, leaseInode) {
+        case (nil, nil):
+            return schemaVersion == 1
+        case (.some, .some):
+            return schemaVersion == 2
+        default:
+            return false
+        }
+    }
+
+    private func hasValidIntentAndPhase(
+        _ lifecycleIntent: SecureFilesystemServiceLifecycleIntent
+    ) -> Bool {
+        switch (lifecycleIntent, phase) {
+        case (.enable, .registering):
+            true
+        case (.disable, .unregistering), (.disable, .outcomeUncertain):
+            true
+        case (.update, _):
+            true
+        default:
+            false
+        }
+    }
+}
+
+private enum SecureFilesystemServiceLifecycleRecoveryAction: Sendable {
+    case register
+    case unregister
+}
+
+/// A descriptor-backed lease is retained through the complete ServiceManagement
+/// side effect. Process death releases `flock` automatically; timeout and task
+/// cancellation deliberately do not. The durable record identifies the exact
+/// lock inode so replacing the lock pathname cannot silently authorize recovery.
+private final class SecureFilesystemServiceLifecycleLease: @unchecked Sendable {
+    let device: UInt64?
+    let inode: UInt64?
+
+    private let stateLock = NSLock()
+    private var descriptor: Int32?
+    private var memoryRelease: (@Sendable () -> Void)?
+    private let lockURL: URL?
+
+    init(
+        descriptor: Int32,
+        information: stat,
+        lockURL: URL
+    ) {
+        self.descriptor = descriptor
+        device = UInt64(information.st_dev)
+        inode = UInt64(information.st_ino)
+        self.lockURL = lockURL
+    }
+
+    init(memoryRelease: @escaping @Sendable () -> Void) {
+        descriptor = nil
+        // The in-memory test seam still uses a schema-v2 record. A stable
+        // sentinel identity keeps its exact-attempt validation equivalent to
+        // the descriptor-backed path without pretending it is a filesystem
+        // inode.
+        device = 0
+        inode = 0
+        lockURL = nil
+        self.memoryRelease = memoryRelease
+    }
+
+    func validateLinkedIdentity() throws {
+        stateLock.lock()
+        let activeDescriptor = descriptor
+        let release = memoryRelease
+        let expectedURL = lockURL
+        stateLock.unlock()
+
+        if release != nil { return }
+        guard let activeDescriptor, let expectedURL else {
+            throw SecureFilesystemServiceLifecycleError.lifecycleStateInvalid
+        }
+        var descriptorInformation = stat()
+        var pathInformation = stat()
+        guard Darwin.fstat(activeDescriptor, &descriptorInformation) == 0,
+              expectedURL.path.withCString({ Darwin.lstat($0, &pathInformation) }) == 0,
+              descriptorInformation.st_mode & S_IFMT == S_IFREG,
+              descriptorInformation.st_uid == geteuid(),
+              descriptorInformation.st_nlink == 1,
+              descriptorInformation.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO)
+                == (S_IRUSR | S_IWUSR),
+              pathInformation.st_dev == descriptorInformation.st_dev,
+              pathInformation.st_ino == descriptorInformation.st_ino else {
+            throw SecureFilesystemServiceLifecycleError.lifecycleStateInvalid
+        }
+    }
+
+    func release() {
+        stateLock.lock()
+        let descriptorToClose = descriptor
+        let releaseMemory = memoryRelease
+        descriptor = nil
+        memoryRelease = nil
+        stateLock.unlock()
+
+        if let descriptorToClose {
+            _ = flock(descriptorToClose, LOCK_UN)
+            _ = Darwin.close(descriptorToClose)
+        }
+        releaseMemory?()
+    }
+
+    deinit { release() }
+}
+
+private final class SecureFilesystemServiceMemoryLeaseCoordinator: @unchecked Sendable {
+    private let lock = NSLock()
+    private var activeToken: UUID?
+
+    func acquire() throws -> SecureFilesystemServiceLifecycleLease {
+        lock.lock()
+        guard activeToken == nil else {
+            lock.unlock()
+            throw SecureFilesystemServiceLifecycleError.lifecycleResolutionRequired
+        }
+        let token = UUID()
+        activeToken = token
+        lock.unlock()
+        return SecureFilesystemServiceLifecycleLease { [weak self] in
+            self?.release(token: token)
+        }
+    }
+
+    private func release(token: UUID) {
+        lock.lock()
+        if activeToken == token { activeToken = nil }
+        lock.unlock()
+    }
+}
+
+private struct SecureFilesystemServiceLifecycleAttempt: @unchecked Sendable {
+    let record: SecureFilesystemServiceLifecycleRecord
+    let lease: SecureFilesystemServiceLifecycleLease
+}
+
+private struct SecureFilesystemServiceLifecycleRecovery: @unchecked Sendable {
+    let attempt: SecureFilesystemServiceLifecycleAttempt
+    let action: SecureFilesystemServiceLifecycleRecoveryAction
+}
+
+/// Serializes the lifecycle fence off the main actor and keeps one stable lease
+/// across every ServiceManagement mutation. Record replacement remains an E2
+/// namespace risk; exact attempt and lease-inode checks mitigate it but do not
+/// claim identity-conditional mutation against a hostile same-UID peer.
+private actor SecureFilesystemServiceLifecycleFenceStore {
+    static let maximumAttempts = 8
+    private static let maximumRecordBytes = 4 * 1_024
+    private let recordURL: URL?
+    private let memoryLeaseCoordinator = SecureFilesystemServiceMemoryLeaseCoordinator()
+    private var inMemoryRecord: SecureFilesystemServiceLifecycleRecord?
+    private var integrityFailure = false
+    private var internallyReconciledAttemptID: String?
+
+    init(recordURL: URL? = nil) {
+        self.recordURL = recordURL
+    }
+
+    func state() -> SecureFilesystemServiceLifecycleState {
+        guard !integrityFailure else {
+            return SecureFilesystemServiceLifecycleState(phase: .stateInvalid)
+        }
+        do {
+            guard let record = try validatedRecordUnlocked() else { return .settled }
+            try validateRecordedLeaseIdentity(record, allowingLegacyRecord: true)
+            return record.projectedState
+                ?? SecureFilesystemServiceLifecycleState(phase: .stateInvalid)
+        } catch {
+            return SecureFilesystemServiceLifecycleState(phase: .stateInvalid)
+        }
+    }
+
+    func begin(
+        intent: SecureFilesystemServiceLifecycleIntent,
+        phase: SecureFilesystemServiceLifecycleRecordPhase
+    ) throws -> SecureFilesystemServiceLifecycleAttempt {
+        let lease = try acquireLease()
+        do {
+            guard !integrityFailure else {
+                throw SecureFilesystemServiceLifecycleError.lifecycleStateInvalid
+            }
+            internallyReconciledAttemptID = nil
+            guard try validatedRecordUnlocked() == nil else {
+                throw SecureFilesystemServiceLifecycleError.lifecycleResolutionRequired
+            }
+            let now = Self.nowMilliseconds()
+            let record = SecureFilesystemServiceLifecycleRecord(
+                schemaVersion: 2,
+                operationID: UUID().uuidString.lowercased(),
+                attemptID: UUID().uuidString.lowercased(),
+                intent: intent.rawValue,
+                phase: phase,
+                attemptNumber: 1,
+                leaseDevice: lease.device,
+                leaseInode: lease.inode,
+                createdAtMilliseconds: now,
+                updatedAtMilliseconds: now
+            )
+            try persistUnlocked(record)
+            return SecureFilesystemServiceLifecycleAttempt(record: record, lease: lease)
+        } catch {
+            lease.release()
+            throw error
+        }
+    }
+
+    func prepareRecovery() throws -> SecureFilesystemServiceLifecycleRecovery? {
+        let lease = try acquireLease()
+        do {
+            guard !integrityFailure else {
+                throw SecureFilesystemServiceLifecycleError.lifecycleStateInvalid
+            }
+            internallyReconciledAttemptID = nil
+            guard let existing = try validatedRecordUnlocked() else {
+                lease.release()
+                return nil
+            }
+            try validateRecordedLeaseIdentity(existing, allowingLegacyRecord: true)
+            guard existing.normalizedAttemptNumber < Self.maximumAttempts else {
+                throw SecureFilesystemServiceLifecycleError.lifecycleResolutionRequired
+            }
+            let action: SecureFilesystemServiceLifecycleRecoveryAction
+            let phase: SecureFilesystemServiceLifecycleRecordPhase
+            switch existing.phase {
+            case .registering, .registrationPending:
+                action = .register
+                phase = .registering
+            case .unregistering, .outcomeUncertain:
+                action = .unregister
+                phase = .unregistering
+            }
+            let recovered = replacing(
+                existing,
+                attemptID: UUID().uuidString.lowercased(),
+                phase: phase,
+                attemptNumber: existing.normalizedAttemptNumber + 1,
+                lease: lease
+            )
+            try persistUnlocked(recovered)
+            return SecureFilesystemServiceLifecycleRecovery(
+                attempt: SecureFilesystemServiceLifecycleAttempt(
+                    record: recovered,
+                    lease: lease
+                ),
+                action: action
+            )
+        } catch {
+            lease.release()
+            throw error
+        }
+    }
+
+    func requireCurrent(_ attempt: SecureFilesystemServiceLifecycleAttempt) throws {
+        _ = try exactRecordUnlocked(for: attempt)
+    }
+
+    func transition(
+        _ attempt: SecureFilesystemServiceLifecycleAttempt,
+        to phase: SecureFilesystemServiceLifecycleRecordPhase
+    ) throws -> SecureFilesystemServiceLifecycleAttempt {
+        let existing = try exactRecordUnlocked(for: attempt)
+        let next = replacing(existing, phase: phase, lease: attempt.lease)
+        try persistUnlocked(next)
+        return SecureFilesystemServiceLifecycleAttempt(record: next, lease: attempt.lease)
+    }
+
+    func markUncertain(_ attempt: SecureFilesystemServiceLifecycleAttempt) throws {
+        if internallyReconciledAttemptID == attempt.record.attemptID {
+            internallyReconciledAttemptID = nil
+            return
+        }
+        let existing = try exactRecordUnlocked(for: attempt)
+        guard existing.phase == .unregistering else {
+            integrityFailure = true
+            throw SecureFilesystemServiceLifecycleError.lifecycleStateInvalid
+        }
+        try persistUnlocked(replacing(
+            existing,
+            phase: .outcomeUncertain,
+            lease: attempt.lease
+        ))
+    }
+
+    /// Reconciles a callback that arrived after timeout/cancellation had already
+    /// won the caller completion race. The bounded in-memory tombstone makes
+    /// callback-first and uncertainty-first actor scheduling equivalent while
+    /// preserving fail-closed behavior for an externally removed record.
+    func reconcileLateUnregisterCallback(
+        _ attempt: SecureFilesystemServiceLifecycleAttempt,
+        registrationAfterSuccess: Bool,
+        succeeded: Bool
+    ) throws {
+        if registrationAfterSuccess, succeeded {
+            _ = try transition(attempt, to: .registrationPending)
+        } else {
+            try resolve(attempt)
+        }
+        internallyReconciledAttemptID = attempt.record.attemptID
+    }
+
+    func resolve(_ attempt: SecureFilesystemServiceLifecycleAttempt) throws {
+        _ = try exactRecordUnlocked(for: attempt)
+        if let recordURL {
+            do {
+                try OwnerOnlyAtomicFile.removeIfExists(at: recordURL)
+            } catch {
+                integrityFailure = true
+                throw SecureFilesystemServiceLifecycleError.lifecycleStateInvalid
+            }
+        } else {
+            inMemoryRecord = nil
+        }
+    }
+
+    private func exactRecordUnlocked(
+        for attempt: SecureFilesystemServiceLifecycleAttempt
+    ) throws -> SecureFilesystemServiceLifecycleRecord {
+        do {
+            try attempt.lease.validateLinkedIdentity()
+        } catch {
+            integrityFailure = true
+            throw SecureFilesystemServiceLifecycleError.lifecycleStateInvalid
+        }
+        guard let existing = try validatedRecordUnlocked() else {
+            integrityFailure = true
+            throw SecureFilesystemServiceLifecycleError.lifecycleStateInvalid
+        }
+        guard existing.operationID == attempt.record.operationID,
+              existing.attemptID == attempt.record.attemptID else {
+            integrityFailure = true
+            throw SecureFilesystemServiceLifecycleError.superseded
+        }
+        guard existing.leaseDevice == attempt.lease.device,
+              existing.leaseInode == attempt.lease.inode else {
+            integrityFailure = true
+            throw SecureFilesystemServiceLifecycleError.lifecycleStateInvalid
+        }
+        return existing
+    }
+
+    private func replacing(
+        _ record: SecureFilesystemServiceLifecycleRecord,
+        attemptID: String? = nil,
+        phase: SecureFilesystemServiceLifecycleRecordPhase? = nil,
+        attemptNumber: Int? = nil,
+        lease: SecureFilesystemServiceLifecycleLease
+    ) -> SecureFilesystemServiceLifecycleRecord {
+        SecureFilesystemServiceLifecycleRecord(
+            schemaVersion: 2,
+            operationID: record.operationID,
+            attemptID: attemptID ?? record.attemptID,
+            intent: record.intent,
+            phase: phase ?? record.phase,
+            attemptNumber: attemptNumber ?? record.normalizedAttemptNumber,
+            leaseDevice: lease.device,
+            leaseInode: lease.inode,
+            createdAtMilliseconds: record.createdAtMilliseconds,
+            updatedAtMilliseconds: max(
+                record.createdAtMilliseconds,
+                Self.nowMilliseconds()
+            )
+        )
+    }
+
+    private func acquireLease() throws -> SecureFilesystemServiceLifecycleLease {
+        guard let recordURL else { return try memoryLeaseCoordinator.acquire() }
+        let lockURL = recordURL.appendingPathExtension("lock")
+        var created = false
+        var descriptor = lockURL.path.withCString {
+            Darwin.open(
+                $0,
+                O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK,
+                mode_t(S_IRUSR | S_IWUSR)
+            )
+        }
+        if descriptor >= 0 {
+            created = true
+        } else if errno == EEXIST {
+            descriptor = lockURL.path.withCString {
+                Darwin.open($0, O_RDWR | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK)
+            }
+        }
+        guard descriptor >= 0 else {
+            throw SecureFilesystemServiceLifecycleError.lifecycleStateInvalid
+        }
+        var mustClose = true
+        defer { if mustClose { _ = Darwin.close(descriptor) } }
+
+        if created {
+            guard Darwin.fchmod(descriptor, mode_t(S_IRUSR | S_IWUSR)) == 0,
+                  Darwin.fsync(descriptor) == 0 else {
+                throw SecureFilesystemServiceLifecycleError.lifecycleStateInvalid
+            }
+            do {
+                try OwnerOnlyAtomicFile.synchronizeDirectory(
+                    lockURL.deletingLastPathComponent()
+                )
+            } catch {
+                throw SecureFilesystemServiceLifecycleError.lifecycleStateInvalid
+            }
+        }
+
+        var information = stat()
+        guard Darwin.fstat(descriptor, &information) == 0,
+              information.st_mode & S_IFMT == S_IFREG,
+              information.st_uid == geteuid(),
+              information.st_nlink == 1,
+              information.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO)
+                == (S_IRUSR | S_IWUSR) else {
+            throw SecureFilesystemServiceLifecycleError.lifecycleStateInvalid
+        }
+        guard flock(descriptor, LOCK_EX | LOCK_NB) == 0 else {
+            if errno == EWOULDBLOCK || errno == EAGAIN {
+                throw SecureFilesystemServiceLifecycleError.lifecycleResolutionRequired
+            }
+            throw SecureFilesystemServiceLifecycleError.lifecycleStateInvalid
+        }
+        mustClose = false
+        let lease = SecureFilesystemServiceLifecycleLease(
+            descriptor: descriptor,
+            information: information,
+            lockURL: lockURL
+        )
+        do {
+            try lease.validateLinkedIdentity()
+            return lease
+        } catch {
+            lease.release()
+            throw error
+        }
+    }
+
+    private func validateRecordedLeaseIdentity(
+        _ record: SecureFilesystemServiceLifecycleRecord,
+        allowingLegacyRecord: Bool = false
+    ) throws {
+        guard let recordURL else { return }
+        if allowingLegacyRecord,
+           record.schemaVersion == 1,
+           record.leaseDevice == nil,
+           record.leaseInode == nil {
+            return
+        }
+        guard let expectedDevice = record.leaseDevice,
+              let expectedInode = record.leaseInode else {
+            throw SecureFilesystemServiceLifecycleError.lifecycleStateInvalid
+        }
+        let lockURL = recordURL.appendingPathExtension("lock")
+        var information = stat()
+        guard lockURL.path.withCString({ Darwin.lstat($0, &information) }) == 0,
+              information.st_mode & S_IFMT == S_IFREG,
+              information.st_uid == geteuid(),
+              information.st_nlink == 1,
+              information.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO)
+                == (S_IRUSR | S_IWUSR),
+              UInt64(information.st_dev) == expectedDevice,
+              UInt64(information.st_ino) == expectedInode else {
+            throw SecureFilesystemServiceLifecycleError.lifecycleStateInvalid
+        }
+    }
+
+    private func validatedRecordUnlocked() throws
+        -> SecureFilesystemServiceLifecycleRecord?
+    {
+        guard let record = try readRecordUnlocked() else { return nil }
+        guard record.projectedState != nil else {
+            throw SecureFilesystemServiceLifecycleError.lifecycleStateInvalid
+        }
+        return record
+    }
+
+    private func readRecordUnlocked() throws -> SecureFilesystemServiceLifecycleRecord? {
+        guard let recordURL else { return inMemoryRecord }
+        var information = stat()
+        let inspection = recordURL.path.withCString { Darwin.lstat($0, &information) }
+        if inspection != 0 {
+            guard errno == ENOENT else {
+                throw SecureFilesystemServiceLifecycleError.lifecycleStateInvalid
+            }
+            return nil
+        }
+        guard information.st_mode & S_IFMT == S_IFREG,
+              information.st_uid == geteuid(),
+              information.st_nlink == 1,
+              information.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO)
+                == (S_IRUSR | S_IWUSR) else {
+            throw SecureFilesystemServiceLifecycleError.lifecycleStateInvalid
+        }
+        do {
+            let data = try OwnerOnlyAtomicFile.read(
+                from: recordURL,
+                maximumBytes: Self.maximumRecordBytes
+            )
+            return try JSONDecoder().decode(
+                SecureFilesystemServiceLifecycleRecord.self,
+                from: data
+            )
+        } catch {
+            throw SecureFilesystemServiceLifecycleError.lifecycleStateInvalid
+        }
+    }
+
+    private func persistUnlocked(_ record: SecureFilesystemServiceLifecycleRecord) throws {
+        guard record.projectedState != nil else {
+            throw SecureFilesystemServiceLifecycleError.lifecycleStateInvalid
+        }
+        if let recordURL {
+            do {
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.sortedKeys]
+                let data = try encoder.encode(record)
+                guard data.count <= Self.maximumRecordBytes else {
+                    throw SecureFilesystemServiceLifecycleError.lifecycleStateInvalid
+                }
+                try OwnerOnlyAtomicFile.write(data, to: recordURL)
+            } catch let error as SecureFilesystemServiceLifecycleError {
+                throw error
+            } catch {
+                throw SecureFilesystemServiceLifecycleError.lifecycleStateInvalid
+            }
+        } else {
+            inMemoryRecord = record
+        }
+    }
+
+    private static func nowMilliseconds() -> Int64 {
+        let milliseconds = Date().timeIntervalSince1970 * 1_000
+        guard milliseconds.isFinite,
+              milliseconds >= 0,
+              milliseconds <= Double(Int64.max) else { return 0 }
+        return Int64(milliseconds.rounded(.down))
+    }
+}
+
+protocol SecureFilesystemServiceTimeoutScheduling: Sendable {
+    func schedule(
+        after timeoutSeconds: TimeInterval,
+        action: @escaping @Sendable () -> Void
+    ) -> @Sendable () -> Void
+}
+
+struct SecureFilesystemServiceTimeoutScheduler:
+    SecureFilesystemServiceTimeoutScheduling {
+    func schedule(
+        after timeoutSeconds: TimeInterval,
+        action: @escaping @Sendable () -> Void
+    ) -> @Sendable () -> Void {
+        let boundedSeconds = max(0.001, min(timeoutSeconds, 300))
+        let nanoseconds = UInt64(boundedSeconds * 1_000_000_000)
+        let timeoutTask = Task.detached(priority: .utility) {
+            do {
+                try await Task.sleep(nanoseconds: nanoseconds)
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else { return }
+            action()
+        }
+        return { timeoutTask.cancel() }
+    }
+}
+
+private final class SecureFilesystemServiceLifecycleCompletion<Value: Sendable>:
+    @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Value, Error>?
+    private var terminalResult: Result<Value, Error>?
+    private var cancelTimeout: (@Sendable () -> Void)?
+    private var claimed = false
+
+    func install(continuation: CheckedContinuation<Value, Error>) {
+        let result: Result<Value, Error>?
+        lock.lock()
+        if let terminalResult {
+            result = terminalResult
+        } else {
+            self.continuation = continuation
+            result = nil
+        }
+        lock.unlock()
+        if let result {
+            continuation.resume(with: result)
+        }
+    }
+
+    func installTimeoutCancellation(_ cancellation: @escaping @Sendable () -> Void) {
+        let shouldCancelImmediately: Bool
+        lock.lock()
+        if terminalResult == nil, !claimed {
+            cancelTimeout = cancellation
+            shouldCancelImmediately = false
+        } else {
+            shouldCancelImmediately = true
+        }
+        lock.unlock()
+        if shouldCancelImmediately {
+            cancellation()
+        }
+    }
+
+    func claim() -> Bool {
+        let timeoutCancellation: (@Sendable () -> Void)?
+        lock.lock()
+        guard terminalResult == nil, !claimed else {
+            lock.unlock()
+            return false
+        }
+        claimed = true
+        timeoutCancellation = cancelTimeout
+        cancelTimeout = nil
+        lock.unlock()
+        timeoutCancellation?()
+        return true
+    }
+
+    func completeClaim(with result: Result<Value, Error>) {
+        let continuationToResume: CheckedContinuation<Value, Error>?
+        let timeoutCancellation: (@Sendable () -> Void)?
+        lock.lock()
+        guard claimed, terminalResult == nil else {
+            lock.unlock()
+            return
+        }
+        terminalResult = result
+        continuationToResume = continuation
+        continuation = nil
+        timeoutCancellation = cancelTimeout
+        cancelTimeout = nil
+        lock.unlock()
+
+        timeoutCancellation?()
+        continuationToResume?.resume(with: result)
     }
 }
 
@@ -29,6 +1109,16 @@ protocol SecureFilesystemServiceRegistering: AnyObject {
 }
 
 extension SMAppService: SecureFilesystemServiceRegistering {}
+
+/// ServiceManagement's registration API is synchronous. The box is sent only
+/// to one bounded detached task at a time while the cross-process lease is held.
+private final class SecureFilesystemServiceRegistrationBox: @unchecked Sendable {
+    let service: any SecureFilesystemServiceRegistering
+
+    init(_ service: any SecureFilesystemServiceRegistering) {
+        self.service = service
+    }
+}
 
 enum SecureFilesystemServicePackageObservation: Error, Sendable, Equatable {
     case present
@@ -286,29 +1376,96 @@ struct SecureFilesystemServiceBundleInspector:
 @MainActor
 public final class SecureFilesystemServiceController {
     private var lifecycleGeneration: UInt64 = 0
+    private var activeLifecycleOperationID: UUID?
     private let registeredService: any SecureFilesystemServiceRegistering
+    private let registrationBox: SecureFilesystemServiceRegistrationBox
     private let packageInspector: any SecureFilesystemServicePackageInspecting
+    private let serviceUnregisterTimeoutSeconds: TimeInterval
+    private let timeoutScheduler: any SecureFilesystemServiceTimeoutScheduling
+    private let operationalTransport: any SecureFilesystemServiceTransport
+    private let lifecyclePhaseObserver:
+        (@Sendable (SecureFilesystemServiceLifecyclePhase) -> Void)?
+    private var lifecycleStateObserver:
+        (@MainActor @Sendable (SecureFilesystemServiceLifecycleObservation) -> Void)?
+    private let beforeUncertaintyPersistence: (@Sendable () async -> Void)?
     private var packageObservation: SecureFilesystemServicePackageObservation?
     private var packageInspectionTask:
         Task<SecureFilesystemServicePackageObservation, Never>?
     private var packageInspectionGeneration: UInt64 = 0
+    private var lifecycleFenceStore = SecureFilesystemServiceLifecycleFenceStore()
 
     public init() {
-        registeredService = SMAppService.daemon(
+        let service = SMAppService.daemon(
             plistName: ForgeFilesystemProtocolConstants.daemonPlistName
         )
+        registeredService = service
+        registrationBox = SecureFilesystemServiceRegistrationBox(service)
         packageInspector = SecureFilesystemServiceBundleInspector(
             applicationBundle: Bundle.main.bundleURL
+        )
+        serviceUnregisterTimeoutSeconds = 30
+        timeoutScheduler = SecureFilesystemServiceTimeoutScheduler()
+        operationalTransport = XPCSecureFilesystemServiceTransport()
+        lifecyclePhaseObserver = nil
+        lifecycleStateObserver = nil
+        beforeUncertaintyPersistence = nil
+        lifecycleFenceStore = SecureFilesystemServiceLifecycleFenceStore(
+            recordURL: Self.lifecycleFenceURL(paths: AppPaths())
         )
     }
 
     init(
         service: any SecureFilesystemServiceRegistering,
         packageInspector: any SecureFilesystemServicePackageInspecting =
-            MissingSecureFilesystemServicePackageInspector()
+            MissingSecureFilesystemServicePackageInspector(),
+        unregisterTimeoutSeconds: TimeInterval = 30,
+        timeoutScheduler: any SecureFilesystemServiceTimeoutScheduling =
+            SecureFilesystemServiceTimeoutScheduler(),
+        operationalTransport: any SecureFilesystemServiceTransport =
+            XPCSecureFilesystemServiceTransport(),
+        lifecycleFenceURL: URL? = nil,
+        lifecyclePhaseObserver:
+            (@Sendable (SecureFilesystemServiceLifecyclePhase) -> Void)? = nil,
+        beforeUncertaintyPersistence: (@Sendable () async -> Void)? = nil
     ) {
         registeredService = service
+        registrationBox = SecureFilesystemServiceRegistrationBox(service)
         self.packageInspector = packageInspector
+        serviceUnregisterTimeoutSeconds = unregisterTimeoutSeconds
+        self.timeoutScheduler = timeoutScheduler
+        self.operationalTransport = operationalTransport
+        self.lifecyclePhaseObserver = lifecyclePhaseObserver
+        lifecycleStateObserver = nil
+        self.beforeUncertaintyPersistence = beforeUncertaintyPersistence
+        lifecycleFenceStore = SecureFilesystemServiceLifecycleFenceStore(
+            recordURL: lifecycleFenceURL
+        )
+    }
+
+    /// Binds the controller to the exact application home before any lifecycle
+    /// action. Reading the returned state is observational; it never reconciles
+    /// filesystem recovery debt or invokes ServiceManagement.
+    public func configureLifecycleFence(
+        paths: AppPaths
+    ) async -> SecureFilesystemServiceLifecycleState {
+        guard activeLifecycleOperationID == nil else {
+            return SecureFilesystemServiceLifecycleState(phase: .stateInvalid)
+        }
+        lifecycleFenceStore = SecureFilesystemServiceLifecycleFenceStore(
+            recordURL: Self.lifecycleFenceURL(paths: paths)
+        )
+        return await lifecycleFenceStore.state()
+    }
+
+    public func lifecycleState() async -> SecureFilesystemServiceLifecycleState {
+        await lifecycleFenceStore.state()
+    }
+
+    public func setLifecycleStateObserver(
+        _ observer:
+            (@MainActor @Sendable (SecureFilesystemServiceLifecycleObservation) -> Void)?
+    ) {
+        lifecycleStateObserver = observer
     }
 
     public func status() -> SecureFilesystemServiceStatus {
@@ -349,17 +1506,96 @@ public final class SecureFilesystemServiceController {
         )
     }
 
-    @discardableResult
-    public func register() throws -> SecureFilesystemServiceStatus {
-        lifecycleGeneration &+= 1
-        try registeredService.register()
-        return status()
+    /// Reports the registration and authenticated runtime states separately,
+    /// while reconciling only identity-verifiable fixed-slot debt. No paths or
+    /// receipt contents leave the lifecycle boundary.
+    public func operationalHealth(
+        paths: AppPaths,
+        reconcile: Bool = false
+    ) async -> SecureFilesystemOperationalHealth {
+        let registrationStatus = await presentedStatus()
+        let transport = operationalTransport
+        return await Task.detached(priority: .utility) {
+            SecureFilesystemOperationalLifecycle.evaluate(
+                registrationStatus: registrationStatus,
+                paths: paths,
+                transport: transport,
+                reconcile: reconcile
+            )
+        }.value
     }
 
     @discardableResult
-    public func unregister() throws -> SecureFilesystemServiceStatus {
-        lifecycleGeneration &+= 1
-        try registeredService.unregister()
+    public func register() async throws -> SecureFilesystemServiceStatus {
+        try await register(observationContext: nil)
+    }
+
+    @discardableResult
+    public func register(
+        lifecycleObservationContext context:
+            SecureFilesystemServiceLifecycleObservationContext
+    ) async throws -> SecureFilesystemServiceStatus {
+        try await register(observationContext: context)
+    }
+
+    private func register(
+        observationContext:
+            SecureFilesystemServiceLifecycleObservationContext?
+    ) async throws -> SecureFilesystemServiceStatus {
+        let operationID = try beginLifecycleOperation()
+        defer { finishLifecycleOperation(operationID) }
+        let attempt = try await lifecycleFenceStore.begin(
+            intent: .enable,
+            phase: .registering
+        )
+        publishLifecycleState(
+            attempt,
+            phase: .registering,
+            observationContext: observationContext
+        )
+        return try await waitForServiceRegister(
+            attempt: attempt,
+            observationContext: observationContext
+        )
+    }
+
+    /// Disables the service only after ServiceManagement reports that its
+    /// asynchronous unregister operation completed. A timeout or task
+    /// cancellation leaves a durable fence instead of treating cancellation as
+    /// cancellation of the operating-system request.
+    @discardableResult
+    public func unregister() async throws -> SecureFilesystemServiceStatus {
+        try await unregister(observationContext: nil)
+    }
+
+    @discardableResult
+    public func unregister(
+        lifecycleObservationContext context:
+            SecureFilesystemServiceLifecycleObservationContext
+    ) async throws -> SecureFilesystemServiceStatus {
+        try await unregister(observationContext: context)
+    }
+
+    private func unregister(
+        observationContext:
+            SecureFilesystemServiceLifecycleObservationContext?
+    ) async throws -> SecureFilesystemServiceStatus {
+        let operationID = try beginLifecycleOperation()
+        defer { finishLifecycleOperation(operationID) }
+        let attempt = try await lifecycleFenceStore.begin(
+            intent: .disable,
+            phase: .unregistering
+        )
+        publishLifecycleState(
+            attempt,
+            phase: .unregistering,
+            observationContext: observationContext
+        )
+        _ = try await waitForServiceUnregister(
+            attempt: attempt,
+            registrationAfterSuccess: false,
+            observationContext: observationContext
+        )
         return status()
     }
 
@@ -370,31 +1606,506 @@ public final class SecureFilesystemServiceController {
     /// therefore the only safe transition point for registering the replacement.
     @discardableResult
     public func reinstall() async throws -> SecureFilesystemServiceStatus {
-        lifecycleGeneration &+= 1
-        let operationGeneration = lifecycleGeneration
+        try await reinstall(observationContext: nil)
+    }
+
+    @discardableResult
+    public func reinstall(
+        lifecycleObservationContext context:
+            SecureFilesystemServiceLifecycleObservationContext
+    ) async throws -> SecureFilesystemServiceStatus {
+        try await reinstall(observationContext: context)
+    }
+
+    private func reinstall(
+        observationContext:
+            SecureFilesystemServiceLifecycleObservationContext?
+    ) async throws -> SecureFilesystemServiceStatus {
+        let operationID = try beginLifecycleOperation()
+        defer { finishLifecycleOperation(operationID) }
+        var attempt = try await lifecycleFenceStore.begin(
+            intent: .update,
+            phase: .unregistering
+        )
         switch registeredService.status {
         case .enabled, .requiresApproval:
-            try await withCheckedThrowingContinuation {
-                (continuation: CheckedContinuation<Void, Error>) in
-                registeredService.unregister { error in
-                    if let error {
-                        continuation.resume(throwing: error)
-                    } else {
-                        continuation.resume()
-                    }
-                }
-            }
+            publishLifecycleState(
+                attempt,
+                phase: .unregistering,
+                observationContext: observationContext
+            )
+            attempt = try await waitForServiceUnregister(
+                attempt: attempt,
+                registrationAfterSuccess: true,
+                observationContext: observationContext
+            ) ?? attempt
         case .notRegistered, .notFound:
-            break
+            attempt = try await lifecycleFenceStore.transition(
+                attempt,
+                to: .registering
+            )
+            publishLifecycleState(
+                attempt,
+                phase: .registering,
+                observationContext: observationContext
+            )
         @unknown default:
-            break
+            attempt = try await lifecycleFenceStore.transition(
+                attempt,
+                to: .registering
+            )
+            publishLifecycleState(
+                attempt,
+                phase: .registering,
+                observationContext: observationContext
+            )
         }
-        try Task.checkCancellation()
-        guard lifecycleGeneration == operationGeneration else {
+        if Task.isCancelled {
+            // The reap may already have committed registration_pending, or a
+            // no-longer-registered service may already be in registering.
+            // Cancellation must preserve that durable Update intent for the
+            // next recovery owner instead of silently abandoning replacement.
+            attempt.lease.release()
+            throw CancellationError()
+        }
+        guard activeLifecycleOperationID == operationID else {
+            attempt.lease.release()
             throw SecureFilesystemServiceLifecycleError.superseded
         }
-        try registeredService.register()
-        return Self.status(of: registeredService)
+        if attempt.record.phase != .registering {
+            attempt = try await lifecycleFenceStore.transition(
+                attempt,
+                to: .registering
+            )
+            publishLifecycleState(
+                attempt,
+                phase: .registering,
+                observationContext: observationContext
+            )
+        }
+        return try await waitForServiceRegister(
+            attempt: attempt,
+            observationContext: observationContext
+        )
+    }
+
+    /// Recovers one durable lifecycle phase only after obtaining the same stable
+    /// cross-process lease. Uncertain Update recovery remains unregister-only;
+    /// only a durable registration-pending/registering phase can authorize a
+    /// registration retry.
+    @discardableResult
+    public func recoverInterruptedUnregister() async throws
+        -> SecureFilesystemServiceStatus
+    {
+        try await recoverInterruptedUnregister(observationContext: nil)
+    }
+
+    @discardableResult
+    private func recoverInterruptedUnregister(
+        observationContext:
+            SecureFilesystemServiceLifecycleObservationContext?
+    ) async throws -> SecureFilesystemServiceStatus {
+        let operationID = try beginLifecycleOperation()
+        defer { finishLifecycleOperation(operationID) }
+        guard let recovery = try await lifecycleFenceStore.prepareRecovery() else {
+            return status()
+        }
+        switch recovery.action {
+        case .unregister:
+            publishLifecycleState(
+                recovery.attempt,
+                phase: .unregistering,
+                observationContext: observationContext
+            )
+            let registrationPending = try await waitForServiceUnregister(
+                attempt: recovery.attempt,
+                registrationAfterSuccess:
+                    recovery.attempt.record.intent
+                        == SecureFilesystemServiceLifecycleIntent.update.rawValue,
+                observationContext: observationContext
+            )
+            // Update recovery intentionally advances one durable phase per
+            // call. A second recovery owner may register only from the
+            // registration_pending record created after the successful reap.
+            registrationPending?.lease.release()
+            return status()
+        case .register:
+            publishLifecycleState(
+                recovery.attempt,
+                phase: .registering,
+                observationContext: observationContext
+            )
+            switch registeredService.status {
+            case .enabled, .requiresApproval:
+                do {
+                    try await lifecycleFenceStore.resolve(recovery.attempt)
+                } catch {
+                    recovery.attempt.lease.release()
+                    throw error
+                }
+                recovery.attempt.lease.release()
+                publishLifecycleObservation(
+                    .settled,
+                    observationContext: observationContext
+                )
+                return status()
+            case .notRegistered, .notFound:
+                return try await waitForServiceRegister(
+                    attempt: recovery.attempt,
+                    observationContext: observationContext
+                )
+            @unknown default:
+                return try await waitForServiceRegister(
+                    attempt: recovery.attempt,
+                    observationContext: observationContext
+                )
+            }
+        }
+    }
+
+    /// Drives at most the two durable phases needed to recover an interrupted
+    /// Update (reap, then register). Each phase retains the exact one-side-effect
+    /// recovery semantics above, and any timeout/error stops the bounded loop.
+    @discardableResult
+    public func recoverInterruptedLifecycle(
+        maximumPhases: Int = 2
+    ) async throws -> SecureFilesystemServiceStatus {
+        try await recoverInterruptedLifecycle(
+            maximumPhases: maximumPhases,
+            observationContext: nil
+        )
+    }
+
+    @discardableResult
+    public func recoverInterruptedLifecycle(
+        maximumPhases: Int = 2,
+        lifecycleObservationContext context:
+            SecureFilesystemServiceLifecycleObservationContext
+    ) async throws -> SecureFilesystemServiceStatus {
+        try await recoverInterruptedLifecycle(
+            maximumPhases: maximumPhases,
+            observationContext: context
+        )
+    }
+
+    private func recoverInterruptedLifecycle(
+        maximumPhases: Int,
+        observationContext:
+            SecureFilesystemServiceLifecycleObservationContext?
+    ) async throws -> SecureFilesystemServiceStatus {
+        let boundedPhases = max(1, min(maximumPhases, 2))
+        var recoveredStatus = status()
+        for _ in 0..<boundedPhases {
+            let durableState = await lifecycleState()
+            guard durableState.canRetryResolution else { return recoveredStatus }
+            recoveredStatus = try await recoverInterruptedUnregister(
+                observationContext: observationContext
+            )
+        }
+        return recoveredStatus
+    }
+
+    private func waitForServiceUnregister(
+        attempt: SecureFilesystemServiceLifecycleAttempt,
+        registrationAfterSuccess: Bool,
+        observationContext:
+            SecureFilesystemServiceLifecycleObservationContext?
+    ) async throws -> SecureFilesystemServiceLifecycleAttempt? {
+        let completion = SecureFilesystemServiceLifecycleCompletion<
+            SecureFilesystemServiceLifecycleAttempt?
+        >()
+        let store = lifecycleFenceStore
+        let phaseObserver = lifecyclePhaseObserver
+        let stateObserver = lifecycleStateObserver
+        let uncertaintyHook = beforeUncertaintyPersistence
+        try await store.requireCurrent(attempt)
+        return try await withTaskCancellationHandler(operation: {
+            try await withCheckedThrowingContinuation {
+                (continuation: CheckedContinuation<
+                    SecureFilesystemServiceLifecycleAttempt?, Error
+                >) in
+                completion.install(continuation: continuation)
+                registeredService.unregister { error in
+                    Task { @MainActor in
+                        guard completion.claim() else {
+                            let observedState:
+                                SecureFilesystemServiceLifecycleState?
+                            do {
+                                try await store.reconcileLateUnregisterCallback(
+                                    attempt,
+                                    registrationAfterSuccess: registrationAfterSuccess,
+                                    succeeded: error == nil
+                                )
+                                if registrationAfterSuccess, error == nil {
+                                    phaseObserver?(.registrationPending)
+                                }
+                                observedState = observationContext == nil
+                                    ? nil
+                                    : await store.state()
+                            } catch {
+                                // A missing, replaced, or superseded exact record
+                                // remains fail-closed in the store's invalid latch.
+                                observedState = observationContext == nil
+                                    ? nil
+                                    : await store.state()
+                            }
+                            attempt.lease.release()
+                            if let observationContext, let observedState {
+                                stateObserver?(SecureFilesystemServiceLifecycleObservation(
+                                    context: observationContext,
+                                    state: observedState
+                                ))
+                            }
+                            return
+                        }
+                        do {
+                            if let error {
+                                try await store.resolve(attempt)
+                                attempt.lease.release()
+                                if let observationContext {
+                                    stateObserver?(SecureFilesystemServiceLifecycleObservation(
+                                        context: observationContext,
+                                        state: .settled
+                                    ))
+                                }
+                                completion.completeClaim(with: .failure(error))
+                            } else if registrationAfterSuccess {
+                                let next = try await store.transition(
+                                    attempt,
+                                    to: .registrationPending
+                                )
+                                phaseObserver?(.registrationPending)
+                                if let observationContext,
+                                   let state = next.record.projectedState {
+                                    stateObserver?(SecureFilesystemServiceLifecycleObservation(
+                                        context: observationContext,
+                                        state: state
+                                    ))
+                                }
+                                completion.completeClaim(with: .success(next))
+                            } else {
+                                try await store.resolve(attempt)
+                                attempt.lease.release()
+                                if let observationContext {
+                                    stateObserver?(SecureFilesystemServiceLifecycleObservation(
+                                        context: observationContext,
+                                        state: .settled
+                                    ))
+                                }
+                                completion.completeClaim(with: .success(nil))
+                            }
+                        } catch {
+                            let observedState = observationContext == nil
+                                ? nil
+                                : await store.state()
+                            attempt.lease.release()
+                            if let observationContext, let observedState {
+                                stateObserver?(SecureFilesystemServiceLifecycleObservation(
+                                    context: observationContext,
+                                    state: observedState
+                                ))
+                            }
+                            completion.completeClaim(with: .failure(error))
+                        }
+                    }
+                }
+                let cancelTimeout = timeoutScheduler.schedule(
+                    after: serviceUnregisterTimeoutSeconds
+                ) {
+                    guard completion.claim() else { return }
+                    Task { @MainActor in
+                        await uncertaintyHook?()
+                        do {
+                            try await store.markUncertain(attempt)
+                            if let observationContext {
+                                let state = await store.state()
+                                stateObserver?(SecureFilesystemServiceLifecycleObservation(
+                                    context: observationContext,
+                                    state: state
+                                ))
+                            }
+                            completion.completeClaim(with: .failure(
+                                SecureFilesystemServiceLifecycleError.unregisterTimedOut
+                            ))
+                        } catch {
+                            if let observationContext {
+                                let state = await store.state()
+                                stateObserver?(SecureFilesystemServiceLifecycleObservation(
+                                    context: observationContext,
+                                    state: state
+                                ))
+                            }
+                            attempt.lease.release()
+                            completion.completeClaim(with: .failure(error))
+                        }
+                    }
+                }
+                completion.installTimeoutCancellation(cancelTimeout)
+            }
+        }, onCancel: {
+            guard completion.claim() else { return }
+            Task { @MainActor in
+                await uncertaintyHook?()
+                do {
+                    try await store.markUncertain(attempt)
+                    if let observationContext {
+                        let state = await store.state()
+                        stateObserver?(SecureFilesystemServiceLifecycleObservation(
+                            context: observationContext,
+                            state: state
+                        ))
+                    }
+                    completion.completeClaim(with: .failure(CancellationError()))
+                } catch {
+                    if let observationContext {
+                        let state = await store.state()
+                        stateObserver?(SecureFilesystemServiceLifecycleObservation(
+                            context: observationContext,
+                            state: state
+                        ))
+                    }
+                    attempt.lease.release()
+                    completion.completeClaim(with: .failure(error))
+                }
+            }
+        })
+    }
+
+    /// Runs synchronous ServiceManagement registration outside the main actor.
+    /// Timeout/cancellation returns to the caller while the single bounded worker
+    /// and its lease remain alive until the system call's exact result is reconciled.
+    private func waitForServiceRegister(
+        attempt: SecureFilesystemServiceLifecycleAttempt,
+        observationContext:
+            SecureFilesystemServiceLifecycleObservationContext?
+    ) async throws -> SecureFilesystemServiceStatus {
+        let completion = SecureFilesystemServiceLifecycleCompletion<
+            SecureFilesystemServiceStatus
+        >()
+        let store = lifecycleFenceStore
+        let box = registrationBox
+        let stateObserver = lifecycleStateObserver
+        try await store.requireCurrent(attempt)
+        return try await withTaskCancellationHandler(operation: {
+            try await withCheckedThrowingContinuation {
+                (continuation: CheckedContinuation<SecureFilesystemServiceStatus, Error>) in
+                completion.install(continuation: continuation)
+                Task.detached(priority: .userInitiated) {
+                    let registrationResult: Result<SecureFilesystemServiceStatus, Error>
+                    do {
+                        try box.service.register()
+                        registrationResult = .success(Self.status(of: box.service))
+                    } catch {
+                        registrationResult = .failure(error)
+                    }
+
+                    guard completion.claim() else {
+                        do {
+                            try await store.resolve(attempt)
+                        } catch {
+                            // Preserve the fail-closed invalid latch on mismatch.
+                        }
+                        if let observationContext {
+                            let state = await store.state()
+                            attempt.lease.release()
+                            await stateObserver?(SecureFilesystemServiceLifecycleObservation(
+                                context: observationContext,
+                                state: state
+                            ))
+                        } else {
+                            attempt.lease.release()
+                        }
+                        return
+                    }
+                    do {
+                        try await store.resolve(attempt)
+                        attempt.lease.release()
+                        if let observationContext {
+                            await stateObserver?(SecureFilesystemServiceLifecycleObservation(
+                                context: observationContext,
+                                state: .settled
+                            ))
+                        }
+                        completion.completeClaim(with: registrationResult)
+                    } catch {
+                        let observedState = observationContext == nil
+                            ? nil
+                            : await store.state()
+                        attempt.lease.release()
+                        if let observationContext, let observedState {
+                            await stateObserver?(SecureFilesystemServiceLifecycleObservation(
+                                context: observationContext,
+                                state: observedState
+                            ))
+                        }
+                        completion.completeClaim(with: .failure(error))
+                    }
+                }
+                let cancelTimeout = timeoutScheduler.schedule(
+                    after: serviceUnregisterTimeoutSeconds
+                ) {
+                    guard completion.claim() else { return }
+                    completion.completeClaim(with: .failure(
+                        SecureFilesystemServiceLifecycleError.registerTimedOut
+                    ))
+                }
+                completion.installTimeoutCancellation(cancelTimeout)
+            }
+        }, onCancel: {
+            guard completion.claim() else { return }
+            completion.completeClaim(with: .failure(CancellationError()))
+        })
+    }
+
+    private func publishLifecycleState(
+        _ attempt: SecureFilesystemServiceLifecycleAttempt,
+        phase: SecureFilesystemServiceLifecyclePhase,
+        observationContext:
+            SecureFilesystemServiceLifecycleObservationContext?
+    ) {
+        lifecyclePhaseObserver?(phase)
+        guard let observationContext,
+              let state = attempt.record.projectedState else { return }
+        lifecycleStateObserver?(SecureFilesystemServiceLifecycleObservation(
+            context: observationContext,
+            state: state
+        ))
+    }
+
+    private func publishLifecycleObservation(
+        _ state: SecureFilesystemServiceLifecycleState,
+        observationContext:
+            SecureFilesystemServiceLifecycleObservationContext?
+    ) {
+        guard let observationContext else { return }
+        lifecycleStateObserver?(SecureFilesystemServiceLifecycleObservation(
+            context: observationContext,
+            state: state
+        ))
+    }
+
+    private func beginLifecycleOperation() throws -> UUID {
+        guard activeLifecycleOperationID == nil,
+              lifecycleGeneration < UInt64.max else {
+            throw SecureFilesystemServiceLifecycleError.lifecycleResolutionRequired
+        }
+        lifecycleGeneration += 1
+        let operationID = UUID()
+        activeLifecycleOperationID = operationID
+        return operationID
+    }
+
+    private func finishLifecycleOperation(_ operationID: UUID) {
+        guard activeLifecycleOperationID == operationID else { return }
+        activeLifecycleOperationID = nil
+    }
+
+    private nonisolated static func lifecycleFenceURL(paths: AppPaths) -> URL {
+        paths.home
+            .appendingPathComponent(
+                ".protected-filesystem-unregister-v1.json",
+                isDirectory: false
+            )
     }
 
     public func openApprovalSettings() {
@@ -435,6 +2146,7 @@ public final class SecureFilesystemServiceController {
 
 protocol SecureFilesystemServiceTransport: Sendable {
     func serviceStatus() -> SecureFilesystemServiceStatus
+    func operationalProbe(timeout: TimeInterval) -> SecureFilesystemServiceOperationalProbe
     func deleteLeaf(
         request: ForgeFilesystemMutationRequest,
         authorizedRoot: FileHandle,
@@ -707,6 +2419,84 @@ final class XPCSecureFilesystemServiceTransport: SecureFilesystemServiceTranspor
         return Self.transportStatus(
             reportedStatus: reportedStatus,
             securedInfoDictionary: ForgeFilesystemCodeIdentity.currentSecuredInfoDictionary()
+        )
+    }
+
+    func operationalProbe(timeout: TimeInterval) -> SecureFilesystemServiceOperationalProbe {
+        guard let configuration = authenticatedPeerConfiguration() else {
+            return SecureFilesystemServiceOperationalProbe(
+                operational: false,
+                code: ForgeFilesystemErrorCode.helperIdentityMismatch,
+                message: "The packaged secure filesystem service identity is unavailable"
+            )
+        }
+        let connection = NSXPCConnection(
+            machServiceName: ForgeFilesystemProtocolConstants.serviceName,
+            options: .privileged
+        )
+        connection.remoteObjectInterface = NSXPCInterface(
+            with: ForgeFilesystemServiceXPC.self
+        )
+        connection.setCodeSigningRequirement(configuration.signingRequirement)
+        let coordinator = SecureFilesystemHandshakeCoordinator(
+            transactionID: UUID().uuidString.lowercased()
+        )
+        connection.interruptionHandler = {
+            coordinator.completeWithoutReply(
+                code: ForgeFilesystemErrorCode.helperUnavailable,
+                message: "Secure filesystem service connection was interrupted"
+            )
+        }
+        connection.invalidationHandler = {
+            coordinator.completeWithoutReply(
+                code: ForgeFilesystemErrorCode.helperUnavailable,
+                message: "Secure filesystem service connection was invalidated"
+            )
+        }
+        connection.activate()
+        guard let proxy = connection.remoteObjectProxyWithErrorHandler({ error in
+            let failure = Self.connectionFailure(error)
+            coordinator.completeWithoutReply(code: failure.code, message: failure.message)
+        }) as? ForgeFilesystemServiceXPC else {
+            connection.invalidate()
+            return SecureFilesystemServiceOperationalProbe(
+                operational: false,
+                code: ForgeFilesystemErrorCode.helperUnavailable,
+                message: "Secure filesystem service proxy is unavailable"
+            )
+        }
+        proxy.serviceInfo { information in
+            let disposition = coordinator.receiveServiceInfo(
+                information,
+                allowedCodeDirectoryHashes: configuration.allowedCodeDirectoryHashes
+            )
+            guard disposition == .prepareDispatch else { return }
+            _ = coordinator.dispatchIfAuthorized {
+                proxy.status { response in coordinator.completeReply(response) }
+            }
+        }
+        let boundedTimeout = max(0.001, min(10, timeout))
+        if coordinator.wait(timeout: boundedTimeout) == .timedOut {
+            coordinator.completeWithoutReply(
+                code: ForgeFilesystemErrorCode.helperUnavailable,
+                message: "Secure filesystem service status probe timed out"
+            )
+        }
+        let response = coordinator.terminalResponse
+        connection.invalidate()
+        guard let response, response.validationError() == nil else {
+            return SecureFilesystemServiceOperationalProbe(
+                operational: false,
+                code: ForgeFilesystemErrorCode.protocolMismatch,
+                message: "Secure filesystem service returned invalid status"
+            )
+        }
+        return SecureFilesystemServiceOperationalProbe(
+            operational: response.ok
+                && response.code == "ok"
+                && response.durabilityConfirmed,
+            code: response.code,
+            message: response.message
         )
     }
 
@@ -1101,6 +2891,38 @@ final class SecureFilesystemMutationClient: @unchecked Sendable {
             )
         }
         try cancellation?.checkCancellation()
+        let operationalProbe = transport.operationalProbe(
+            timeout: min(2, max(0.001, cancellation?.remainingTimeInterval ?? 2))
+        )
+        guard operationalProbe.operational else {
+            return .failure(
+                code: operationalProbe.code,
+                message: operationalProbe.message,
+                retryable: operationalProbe.code == ForgeFilesystemErrorCode.helperUnavailable
+            )
+        }
+        retentionAttemptObserver?()
+        let reconciliation = reconcileRecoveryLedger(
+            recoveryLedger: recoveryLedger,
+            cancellation: cancellation,
+            purgeTerminalReceipts: true
+        )
+        guard reconciliation.available else {
+            return .failure(
+                code: ForgeFilesystemErrorCode.transactionUnavailable,
+                message: "Protected filesystem recovery debt could not be verified"
+            )
+        }
+        guard reconciliation.retainedCount < SecureFilesystemRecoveryLedger.maximumRecords else {
+            var result = ToolResult.failure(
+                code: ForgeFilesystemErrorCode.protectedNamespaceUnavailable,
+                message: "Protected filesystem recovery is full; reconcile or recover retained transactions before another mutation"
+            )
+            result.payload["recovery_debt_count"] = reconciliation.retainedCount
+            result.payload["recovery_debt_capacity"] =
+                SecureFilesystemRecoveryLedger.maximumRecords
+            return result
+        }
         let requestedTarget = url.standardizedFileURL
         guard let target = Self.canonicalizedLeafPath(requestedTarget) else {
             return .failure(
@@ -1169,7 +2991,6 @@ final class SecureFilesystemMutationClient: @unchecked Sendable {
             )
         }
         do {
-            retentionAttemptObserver?()
             try recoveryLedger.retain(
                 SecureFilesystemRecoveryRecord(
                     request: request,
@@ -1431,6 +3252,124 @@ final class SecureFilesystemMutationClient: @unchecked Sendable {
         }
     }
 
+    /// Bounded startup/pre-mutation reconciliation. This deliberately does not
+    /// resume a nonterminal delete or restore a quarantined leaf. It only asks
+    /// the authenticated daemon to acknowledge terminal or absent transactions,
+    /// then releases caller authority if the exact retained record still matches.
+    func reconcileRecoveryLedger(
+        recoveryLedger: SecureFilesystemRecoveryLedger,
+        cancellation: ToolCallCancellation?,
+        purgeTerminalReceipts: Bool,
+        maximumSeconds: TimeInterval = 5
+    ) -> SecureFilesystemRecoveryReconciliation {
+        let initialRecords: [SecureFilesystemRecoveryRecord]
+        do {
+            if purgeTerminalReceipts {
+                initialRecords = try recoveryLedger.records()
+            } else {
+                initialRecords = try recoveryLedger.snapshotRecords()
+            }
+        } catch {
+            return .unavailable
+        }
+        guard purgeTerminalReceipts, !initialRecords.isEmpty else {
+            return SecureFilesystemRecoveryReconciliation(
+                retainedCount: initialRecords.count,
+                releasedCount: 0,
+                available: true
+            )
+        }
+
+        let boundedSeconds = max(0.001, min(10, maximumSeconds))
+        let deadline = Date().addingTimeInterval(
+            min(boundedSeconds, cancellation?.remainingTimeInterval ?? boundedSeconds)
+        )
+        var releasedCount = 0
+        for record in initialRecords {
+            do {
+                try cancellation?.checkCancellation()
+            } catch {
+                break
+            }
+            let remaining = deadline.timeIntervalSinceNow
+            guard remaining > 0,
+                  record.requesterUID == UInt32(geteuid()),
+                  let queryRoot = Self.reopenRetainedRoot(for: record) else {
+                continue
+            }
+            let request = ForgeFilesystemTransactionControlRequest(
+                transactionID: record.transactionID,
+                projectID: record.projectID,
+                projectGeneration: record.projectGeneration,
+                rootID: record.rootID,
+                rootIdentity: record.rootIdentity.protocolIdentity
+            )
+            guard request.validationError() == nil else {
+                try? queryRoot.close()
+                continue
+            }
+            let queryTimeout = min(1, max(0.001, remaining))
+            let status = transport.queryTransaction(
+                request: request,
+                authorizedRoot: queryRoot,
+                timeout: queryTimeout
+            )
+            try? queryRoot.close()
+            guard status.validationError() == nil,
+                  status.transactionID == nil
+                    || status.transactionID?.caseInsensitiveCompare(
+                        record.transactionID
+                    ) == .orderedSame else {
+                continue
+            }
+            let canPurgeTerminal = status.terminal
+                && status.acknowledgementRequired
+                && !status.recoveryRequired
+            let canFinishMissingOrAcknowledging = status.disposition == .unavailable
+                && status.code == ForgeFilesystemErrorCode.transactionUnavailable
+            guard canPurgeTerminal || canFinishMissingOrAcknowledging,
+                  deadline.timeIntervalSinceNow > 0,
+                  let acknowledgeRoot = Self.reopenRetainedRoot(for: record) else {
+                continue
+            }
+            let response = transport.acknowledgeTransaction(
+                request: request,
+                authorizedRoot: acknowledgeRoot,
+                timeout: min(1, max(0.001, deadline.timeIntervalSinceNow))
+            )
+            try? acknowledgeRoot.close()
+            guard Self.responseMatchesTransaction(
+                response,
+                transactionID: record.transactionID,
+                terminalRequiresAcknowledgement: false
+            ), response.ok,
+               response.durabilityConfirmed,
+               !response.acknowledgementRequired else {
+                continue
+            }
+            do {
+                if try recoveryLedger.remove(
+                    transactionID: record.transactionID,
+                    ifMatching: record
+                ) {
+                    releasedCount += 1
+                }
+            } catch {
+                continue
+            }
+        }
+
+        do {
+            return SecureFilesystemRecoveryReconciliation(
+                retainedCount: try recoveryLedger.records().count,
+                releasedCount: releasedCount,
+                available: true
+            )
+        } catch {
+            return .unavailable
+        }
+    }
+
     private enum RecoveryAction: String {
         case query
         case resume
@@ -1539,6 +3478,28 @@ final class SecureFilesystemMutationClient: @unchecked Sendable {
         return nil
     }
 
+    private static func reopenRetainedRoot(
+        for record: SecureFilesystemRecoveryRecord
+    ) -> FileHandle? {
+        guard record.requesterUID == UInt32(geteuid()),
+              let canonicalRoot = canonicalExistingDirectory(
+                  URL(fileURLWithPath: record.rootPath, isDirectory: true)
+              ),
+              canonicalRoot.path == record.rootPath else {
+            return nil
+        }
+        let descriptor = openPinnedDirectory(canonicalRoot)
+        guard descriptor >= 0 else { return nil }
+        var information = stat()
+        guard Darwin.fstat(descriptor, &information) == 0,
+              record.rootIdentity.matchesRoot(information),
+              record.rootID == "\(UInt64(information.st_dev)):\(UInt64(information.st_ino))" else {
+            _ = Darwin.close(descriptor)
+            return nil
+        }
+        return FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+    }
+
     private static func identity(_ information: stat) -> ForgeFilesystemIdentity {
         ForgeFilesystemIdentity(
             device: UInt64(information.st_dev),
@@ -1607,5 +3568,61 @@ final class SecureFilesystemMutationClient: @unchecked Sendable {
             currentDescriptor = nextDescriptor
         }
         return currentDescriptor
+    }
+}
+
+private enum SecureFilesystemOperationalLifecycle {
+    static func evaluate(
+        registrationStatus: SecureFilesystemServiceStatus,
+        paths: AppPaths,
+        transport: any SecureFilesystemServiceTransport,
+        reconcile: Bool
+    ) -> SecureFilesystemOperationalHealth {
+        let operationalState: SecureFilesystemServiceOperationalState
+        let daemonOperational: Bool
+        switch registrationStatus {
+        case .enabled:
+            let probe = transport.operationalProbe(timeout: 2)
+            daemonOperational = probe.operational
+            operationalState = probe.operational ? .operational : .registeredUnavailable
+        case .requiresApproval:
+            daemonOperational = false
+            operationalState = .requiresApproval
+        case .notRegistered:
+            daemonOperational = false
+            operationalState = .notRegistered
+        case .notFound:
+            daemonOperational = false
+            operationalState = .notPackaged
+        }
+
+        let localStatus: FilesystemQuarantineLedgerStatus?
+        do {
+            let ledger = FilesystemQuarantineLedger(paths: paths)
+            localStatus = reconcile
+                ? try ledger.status()
+                : try ledger.snapshotStatus()
+        } catch {
+            localStatus = nil
+        }
+
+        let privilegedStatus = SecureFilesystemMutationClient(
+            transport: transport
+        ).reconcileRecoveryLedger(
+            recoveryLedger: SecureFilesystemRecoveryLedger(paths: paths),
+            cancellation: nil,
+            purgeTerminalReceipts: reconcile && daemonOperational
+        )
+        return SecureFilesystemOperationalHealth(
+            registrationStatus: registrationStatus,
+            operationalState: operationalState,
+            localQuarantineOccupied: localStatus?.occupiedCount ?? 0,
+            localQuarantineCapacity: FilesystemQuarantineLedger.maximumReservations,
+            privilegedRecoveryRetained: privilegedStatus.retainedCount,
+            privilegedRecoveryCapacity: SecureFilesystemRecoveryLedger.maximumRecords,
+            releasedDuringReconciliation: (localStatus?.releasedCount ?? 0)
+                + privilegedStatus.releasedCount,
+            debtStatusAvailable: localStatus != nil && privilegedStatus.available
+        )
     }
 }

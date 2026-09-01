@@ -202,11 +202,14 @@ final class ToolRouterDeadlineTests: XCTestCase {
 
     func testBootstrapAttachmentFailureDoesNotConcealPrimarySuccess() throws {
         try withApp("bootstrap-reconciliation") { app in
-            let router = ToolRouter(app: app, packs: [CommittedBootstrapToolPack()])
+            let projectRoot = app.paths.home.appendingPathComponent("bootstrap-project", isDirectory: true)
+            try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+            let router = ToolRouter(app: app)
+
             let result = try router.call(
                 name: "project_memory.initialize",
-                arguments: ["project_path": FileManager.default.temporaryDirectory.path],
-                clientID: ClientID("bootstrap-reconciliation")
+                arguments: ["project_path": projectRoot.path],
+                clientID: ClientID(" bootstrap-reconciliation")
             )
 
             XCTAssertTrue(result.ok, "\(result.payload)")
@@ -216,7 +219,88 @@ final class ToolRouterDeadlineTests: XCTestCase {
                 result.payload["project_context_error"] as? String,
                 "project_context_attachment_failed"
             )
-            XCTAssertEqual(result.payload["reconciled"] as? Bool, true)
+            XCTAssertEqual(result.payload["reconciled"] as? Bool, false)
+            XCTAssertEqual(result.payload["reconciliation_required"] as? Bool, true)
+            let committedProjectID = try XCTUnwrap(result.payload["project_id"] as? String)
+
+            let retry = try router.call(
+                name: "project_memory.initialize",
+                arguments: [
+                    "project_path": projectRoot.path,
+                    "project_id": committedProjectID,
+                ],
+                clientID: ClientID("bootstrap-reconciliation-retry")
+            )
+            XCTAssertTrue(retry.ok, "\(retry.payload)")
+            XCTAssertEqual(retry.payload["project_id"] as? String, committedProjectID)
+            XCTAssertEqual(retry.payload["project_context_attached"] as? Bool, true)
+        }
+    }
+
+    func testIdentityCommitBeforeRepositoryOpenReportsPendingAndExactRetryActivates() throws {
+        try withApp("bootstrap-repository-open") { app in
+            let projectRoot = app.paths.home.appendingPathComponent("repository-open-project", isDirectory: true)
+            try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+            let target = try app.projectMemory.identities.discoverTarget(path: projectRoot.path)
+            let preparation = try app.projectContexts.prepareControlledRegistration(
+                identities: app.projectMemory.identities,
+                target: target,
+                requestedProjectID: nil,
+                displayName: nil
+            )
+            let projectDirectory = app.paths.projectsDir
+                .appendingPathComponent(preparation.descriptor.id, isDirectory: true)
+            try FileManager.default.createDirectory(at: projectDirectory, withIntermediateDirectories: true)
+            let blockedDatabase = projectDirectory.appendingPathComponent("memory.sqlite3", isDirectory: true)
+            try FileManager.default.createDirectory(at: blockedDatabase, withIntermediateDirectories: true)
+
+            let router = ToolRouter(app: app)
+            let first = try router.call(
+                name: "project_memory.initialize",
+                arguments: ["project_path": projectRoot.path],
+                clientID: ClientID("bootstrap-repository-open")
+            )
+
+            XCTAssertTrue(first.ok, "\(first.payload)")
+            XCTAssertEqual(first.payload["primary_committed"] as? Bool, true)
+            XCTAssertEqual(first.payload["primary_commit_phase"] as? String, "identity_published")
+            XCTAssertEqual(first.payload["project_memory_initialization"] as? String, "pending")
+            XCTAssertEqual(first.payload["project_context_attachment"] as? String, "pending")
+            XCTAssertEqual(first.payload["reconciled"] as? Bool, false)
+            XCTAssertEqual(first.payload["reconciliation_required"] as? Bool, true)
+            XCTAssertEqual(
+                first.payload["project_context_error"] as? String,
+                "project_memory_initialization_failed"
+            )
+            XCTAssertEqual(first.payload["project_id"] as? String, preparation.descriptor.id)
+
+            let descriptor = try app.projectMemory.identities.descriptor(
+                projectID: preparation.descriptor.id
+            )
+            XCTAssertTrue(descriptor.aliases.contains(projectRoot.path))
+            let projectID = ProjectID(try XCTUnwrap(UUID(uuidString: preparation.descriptor.id)))
+            let controlRecord = try XCTUnwrap(app.projectContexts.project(projectID))
+            XCTAssertEqual(controlRecord.lifecycleState, .maintenance)
+            XCTAssertThrowsError(
+                try app.projectContexts.invocationContext(
+                    for: ClientID("bootstrap-repository-open")
+                )
+            )
+
+            try FileManager.default.removeItem(at: blockedDatabase)
+            let retry = try router.call(
+                name: "project_memory.initialize",
+                arguments: [
+                    "project_path": projectRoot.path,
+                    "project_id": preparation.descriptor.id,
+                ],
+                clientID: ClientID("bootstrap-repository-open")
+            )
+            XCTAssertTrue(retry.ok, "\(retry.payload)")
+            XCTAssertEqual(retry.payload["project_id"] as? String, preparation.descriptor.id)
+            XCTAssertEqual(retry.payload["migration_status"] as? String, "current")
+            XCTAssertEqual(retry.payload["project_context_attached"] as? Bool, true)
+            XCTAssertEqual(try app.projectContexts.project(projectID)?.lifecycleState, .active)
         }
     }
 
@@ -237,30 +321,6 @@ final class ToolRouterDeadlineTests: XCTestCase {
             try? FileManager.default.removeItem(at: home)
         }
         try operation(app)
-    }
-}
-
-private struct CommittedBootstrapToolPack: ToolPackHandling {
-    let toolNames = ["project_memory.initialize"]
-
-    func handle(
-        name: String,
-        arguments: [String: Any],
-        context: ToolInvocationContext?,
-        clientID: ClientID,
-        app: ForgeApp,
-        cancellation: ToolCallCancellation?
-    ) throws -> ToolResult? {
-        guard name == "project_memory.initialize" else { return nil }
-        return ToolResult(
-            ok: true,
-            payload: [
-                "ok": true,
-                "primary_committed": true,
-                "project_id": UUID().uuidString.lowercased(),
-            ],
-            isError: false
-        )
     }
 }
 

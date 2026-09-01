@@ -45,6 +45,10 @@ public enum RuntimeJobState: String, Codable, Sendable, CaseIterable {
             false
         }
     }
+
+    public var isOperatorCancellable: Bool {
+        self == .queued || self == .running
+    }
 }
 
 public enum RuntimeOutputStream: String, Codable, Sendable, CaseIterable {

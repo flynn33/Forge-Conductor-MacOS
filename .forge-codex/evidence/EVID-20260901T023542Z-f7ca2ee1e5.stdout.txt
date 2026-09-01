@@ -1,0 +1,27 @@
+Test Suite 'Selected tests' started at 2026-08-31 21:35:43.015.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-31 21:35:43.015.
+Test Suite 'DashboardTests' started at 2026-08-31 21:35:43.015.
+Test Case '-[ForgeConductorTests.DashboardTests testControlSurfaceHasManagerControls]' started.
+Test Case '-[ForgeConductorTests.DashboardTests testControlSurfaceHasManagerControls]' passed (0.374 seconds).
+Test Case '-[ForgeConductorTests.DashboardTests testDashboardIndexHTML]' started.
+Test Case '-[ForgeConductorTests.DashboardTests testDashboardIndexHTML]' passed (0.361 seconds).
+Test Case '-[ForgeConductorTests.DashboardTests testDashboardStartsAndServesStatus]' started.
+Test Case '-[ForgeConductorTests.DashboardTests testDashboardStartsAndServesStatus]' passed (0.360 seconds).
+Test Case '-[ForgeConductorTests.DashboardTests testGracefulReplacementDrainHasHardDeadlineWhileImmediateStopRemainsAvailable]' started.
+Test Case '-[ForgeConductorTests.DashboardTests testGracefulReplacementDrainHasHardDeadlineWhileImmediateStopRemainsAvailable]' passed (0.364 seconds).
+Test Case '-[ForgeConductorTests.DashboardTests testIncompleteConnectionsAreCappedAndExpire]' started.
+Test Case '-[ForgeConductorTests.DashboardTests testIncompleteConnectionsAreCappedAndExpire]' passed (1.027 seconds).
+Test Case '-[ForgeConductorTests.DashboardTests testPeerCancellationReleasesConnectionSlot]' started.
+Test Case '-[ForgeConductorTests.DashboardTests testPeerCancellationReleasesConnectionSlot]' passed (0.228 seconds).
+Test Case '-[ForgeConductorTests.DashboardTests testStopCancelsAndDrainsIncompleteConnections]' started.
+Test Case '-[ForgeConductorTests.DashboardTests testStopCancelsAndDrainsIncompleteConnections]' passed (0.209 seconds).
+Test Suite 'DashboardTests' passed at 2026-08-31 21:35:45.940.
+	 Executed 7 tests, with 0 failures (0 unexpected) in 2.924 (2.925) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-08-31 21:35:45.940.
+	 Executed 7 tests, with 0 failures (0 unexpected) in 2.924 (2.925) seconds
+Test Suite 'Selected tests' passed at 2026-08-31 21:35:45.940.
+	 Executed 7 tests, with 0 failures (0 unexpected) in 2.924 (2.925) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

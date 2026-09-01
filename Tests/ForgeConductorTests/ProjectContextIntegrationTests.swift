@@ -89,6 +89,88 @@ final class ProjectContextIntegrationTests: XCTestCase {
         }
     }
 
+    func testFCProjectBootstrapAuthorityContextCannotBroadenSettingsRoots() throws {
+        try withApplication { app, configuredRoot in
+            let approvedProject = try makeProject(
+                root: configuredRoot,
+                name: "approved-context-project"
+            )
+            let outsideProject = configuredRoot.deletingLastPathComponent()
+                .appendingPathComponent(
+                    "outside-context-\(UUID().uuidString.lowercased())",
+                    isDirectory: true
+                )
+            try FileManager.default.createDirectory(
+                at: outsideProject,
+                withIntermediateDirectories: true
+            )
+            defer { try? FileManager.default.removeItem(at: outsideProject) }
+            let escapeAlias = configuredRoot.appendingPathComponent(
+                "outside-context-alias",
+                isDirectory: true
+            )
+            try FileManager.default.createSymbolicLink(
+                at: escapeAlias,
+                withDestinationURL: outsideProject
+            )
+
+            let authorization = ToolAuthorizationService(
+                paths: app.paths,
+                config: app.config
+            )
+            let clientID = ClientID("project-root-authority-context")
+            func context(root: URL) -> ToolInvocationContext {
+                ToolInvocationContext(
+                    projectID: ProjectID(),
+                    projectGeneration: .initial,
+                    clientID: clientID,
+                    authorizationScope: ToolAuthorizationScope(
+                        canonicalRoots: [root],
+                        allowedTools: ["fs_read", "shell_exec"],
+                        networkAllowed: false,
+                        maximumInlineOutputBytes: 1_024
+                    )
+                )
+            }
+
+            for unauthorizedRoot in [outsideProject, escapeAlias] {
+                for (tool, arguments) in [
+                    ("fs_read", ["path": unauthorizedRoot.appendingPathComponent("leaf").path]),
+                    ("shell_exec", ["command": "pwd", "cwd": unauthorizedRoot.path]),
+                ] {
+                    let decision = authorization.authorize(
+                        tool: tool,
+                        arguments: arguments,
+                        context: context(root: unauthorizedRoot),
+                        clientID: clientID,
+                        binding: nil
+                    )
+                    guard case let .denied(code, _) = decision else {
+                        return XCTFail(
+                            "A durable context outside Settings authority must be denied"
+                        )
+                    }
+                    XCTAssertEqual(code, "path_outside_allowed_roots")
+                }
+            }
+
+            let approved = authorization.authorize(
+                tool: "shell_exec",
+                arguments: ["command": "pwd", "cwd": approvedProject.path],
+                context: context(root: approvedProject),
+                clientID: clientID,
+                binding: nil
+            )
+            guard case let .allowed(arguments) = approved else {
+                return XCTFail("A project contained by a Settings root must remain authorized")
+            }
+            XCTAssertEqual(
+                arguments["cwd"] as? String,
+                approvedProject.resolvingSymlinksInPath().standardizedFileURL.path
+            )
+        }
+    }
+
     func testGenerationResetRejectsExplicitStaleContextAndInvalidatesCompatibilityBinding() throws {
         try withApplication { app, root in
             let client = ClientID("generation-client")

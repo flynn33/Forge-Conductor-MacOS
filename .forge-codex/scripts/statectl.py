@@ -1605,9 +1605,7 @@ def require_g12_completion_report_contract(
         "current-source-identity-stable",
         "source-identity-unchanged-through-evaluation",
         "completion-gate-plan-valid",
-        "feature-runtime-inventory-complete",
-        "feature-parity-counters-zero",
-        "all-feature-statuses-valid",
+        "feature-baseline-valid",
         "findings-resolution-structure",
         "run-state-issues-structure",
         "critical-high-findings-resolved",
@@ -1630,6 +1628,7 @@ def require_g12_completion_report_contract(
         )
         if gate_identifier in {f"G{index:02d}" for index in range(2, 12)}:
             required_checks.add(f"gate-current-release-authority:{gate_identifier}")
+    required_checks.add("g10-p10-feature-evidence-binding")
     if check_names != required_checks:
         missing = sorted(required_checks - check_names)
         unexpected = sorted(check_names - required_checks)
@@ -1743,6 +1742,39 @@ def require_g12_completion_contract(
         )
         validated_results[gate_identifier] = gate_result
         validated_bindings[gate_identifier] = gate_binding
+        if gate_identifier == "G10":
+            criteria_document = gate_binding.get("criteria_document")
+            if not isinstance(criteria_document, dict) or set(criteria_document) != {
+                "criteria_results",
+                "valid",
+                "errors",
+                "p10_feature_binding",
+            }:
+                raise EvidenceSupportError(
+                    "G10 criteria has no exact P10 feature binding"
+                )
+            try:
+                from p10_feature_evidence import validate_p10_feature_binding
+            except ImportError as error:
+                raise EvidenceSupportError(
+                    f"P10 feature binding validator is unavailable: {error}"
+                ) from error
+            binding_failures = validate_p10_feature_binding(
+                repo,
+                criteria_document.get("p10_feature_binding"),
+                current_manifest=current_manifest,
+                current_git_head=current_head,
+                ledger_evidence_ids={
+                    item
+                    for item in state.get("evidence", [])
+                    if isinstance(item, str)
+                },
+            )
+            if binding_failures:
+                raise EvidenceSupportError(
+                    "G10 P10 feature binding is stale or invalid: "
+                    + "; ".join(binding_failures[:8])
+                )
         if gate_identifier != "G12":
             prerequisite_bindings.append(
                 {

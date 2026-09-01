@@ -1,4 +1,8 @@
-# G1–G7 status after 0.5.1 gap-close work
+# Historical G1–G7 status after 0.5.1 gap-close work
+
+> This record applies to the 0.5.1 source line. The current product identity is
+> **0.9.0**, build **1**, and no current package or release gate is passed by
+> this historical matrix.
 
 | ID | Goal | Project status (0.5.1) | Operator still owns |
 |----|------|------------------------|---------------------|

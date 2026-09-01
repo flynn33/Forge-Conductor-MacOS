@@ -65,6 +65,9 @@ rename a final component.
 | `openat` with a directory descriptor, `O_SEARCH`, `O_NOFOLLOW_ANY`, and `O_RESOLVE_BENEATH` | Pins a searchable directory and prevents symlink traversal or resolution above that starting directory. | Selected for parent and intermediate-directory anchoring. It does not pin the binding between a final-component name and a leaf for a later mutation. macOS has no `unlinkat(..., AT_EMPTY_PATH)` equivalent that removes the object named by an already-open leaf descriptor. |
 | `openat(..., O_UNIQUE)` | Refuses a leaf that has more than one hard link. | Not an identity predicate. A competing single-link object can still replace the name, and rejecting valid hard-linked project content would change established behavior. |
 | `fstat`, `fstatat`, and `AT_SYMLINK_NOFOLLOW`, `AT_SYMLINK_NOFOLLOW_ANY`, `AT_RESOLVE_BENEATH`, or `AT_FDONLY` | Observe descriptor or descriptor-relative status and can constrain lookup. | Used for device/inode/type/owner/mode/link-count/timestamp comparisons, but the result is a snapshot. None combines the comparison with a later unlink or rename. |
+| `stat.st_gen` | Exposes the filesystem's inode generation value to a superuser on macOS and can strengthen an observed identity tuple when the filesystem supplies a meaningful value. | Evaluated as an additional observation only. It is not an argument to `unlinkat`, `renameat`, or `renameatx_np`; generation reuse semantics remain filesystem-specific, and a matching snapshot can be rebound before a later mutation. |
+| `fcntl(F_GETPATH)` and `F_GETPATH_NOFIRMLINK` | Ask the kernel for a pathname associated with an open descriptor. | Useful for diagnostics, not authority. A descriptor may have no usable current path, the returned path is a sequential observation, and neither command mutates nor conditions a later namespace operation on the descriptor's identity. |
+| `flock`, POSIX `fcntl(F_SETLK/F_SETLKW)`, and open-file-description `fcntl(F_OFD_SETLK/F_OFD_SETLKW)` locks | Coordinate whole-file or byte-range access among processes that honor the advisory lock protocol. | Used only for bounded cooperating-ledger serialization where applicable. The locks are advisory: a same-UID adversary can rename or unlink without taking them, and the lock has no effect on which occupant a later namespace syscall resolves. |
 | `readlinkat` and descriptor-relative content/digest reads | Read a symlink value or content through a pinned parent without depending on the process working directory. | Useful verification evidence only. The verified name can be rebound before the terminal namespace syscall. |
 | `unlinkat(parentFD, name, ...)` with `AT_REMOVEDIR`, `AT_SYMLINK_NOFOLLOW_ANY`, or `AT_RESOLVE_BENEATH` | Removes the entry currently named relative to the pinned parent; flags constrain type and traversal. | Selected for the terminal removal of a quarantined entry. It has no expected-identity operand and therefore removes the current occupant of that quarantine name. |
 | `unlinkat` with `AT_UNIQUE` or `AT_NODELETEBUSY` | `AT_UNIQUE` rejects multiply linked vnodes; `AT_NODELETEBUSY` rejects a vnode with open descriptors. | Neither compares the current occupant with the object Forge verified. Keeping Forge's expected leaf descriptor open makes the desired `AT_NODELETEBUSY` removal fail; closing it restores the race. Both flags also exclude valid states rather than conditionally mutating the verified identity. |
@@ -73,6 +76,12 @@ rename a final component.
 | `RENAME_NOFOLLOW_ANY` and `RENAME_RESOLVE_BENEATH` | Reject symlink traversal and resolution outside the starting hierarchy. | Useful confinement controls, but neither supplies an identity precondition for either final component. |
 | `RENAME_SECLUDE` | The current SDK exposes the flag, while the installed `rename(2)` manual does not document its user contract. Public XNU describes its internal condition as refusing rename when the selected source is hard-linked, open, or memory mapped. | Not selected. The condition applies to the source object resolved at syscall time, has no expected-identity argument, is not a portable documented contract for supported filesystems, and would reject the evaluated open-leaf-descriptor strategy. Closing that descriptor restores the substitution window. |
 | `fsync` on pinned parent descriptors | Makes completed namespace changes durable according to the filesystem contract. | Selected for crash durability. It cannot make the preceding verification and mutation atomic or validate which leaf was mutated. |
+
+The evaluated `renameatx_np` flag set therefore covers `RENAME_EXCL`,
+`RENAME_SWAP`, `RENAME_NOFOLLOW_ANY`, `RENAME_RESOLVE_BENEATH`, and
+`RENAME_SECLUDE`. The flags provide exclusivity, atomic exchange, traversal
+constraints, or source-state exclusions, but none accepts an expected
+device/inode/generation tuple or open descriptor as a mutation precondition.
 
 The legacy same-UID filesystem implementation uses bounded quarantine-and-
 verify. It remains relevant to nonprivileged compatibility paths and historical
@@ -142,15 +151,31 @@ tests prove the bounded mitigation fails closed at the exercised windows. A
 separate post-quarantine substitution regression proves rollback refuses an
 occupant whose identity differs from the receipt. These tests mitigate specific
 windows; they do not prove the residual final verifier-to-terminal-syscall
-window unreachable. Two additional publication regressions atomically destabilize
-the destination after rename while forcing directory synchronization to fail;
-they prove that same- and cross-volume results retain their live recovery receipt
-under the combined namespace-instability and durability-unconfirmed state. A
-cross-volume cleanup-failure variant proves that an additional retained staging
-receipt is merged into the same bounded recovery result rather than suppressed.
+window unreachable. Deterministic final-window regressions also invoke real
+`renameatx_np(..., RENAME_SWAP)` immediately after the ledger's last identity
+verifier and before terminal file `unlinkat`, same- and cross-volume destination
+publication, source cleanup, and rollback. The exercised outcomes do not report
+false success and retain the exact live recovery receipt. That is detection and
+recovery-state mitigation, not elimination: the namespace syscall can still
+mutate a substituted entry, and a same-UID writer can race the sequential
+post-mutation observation as well as the preceding verifier. Directory unlink
+has no equivalent link-count observation and remains disabled in the production
+secure-client path. One winning unlink race can remove a substituted file's
+final link with no byte bound; one winning rename race can relocate a substituted
+directory with no bound on subtree bytes or descendants. The deterministic unit
+matrix does not substitute for the signed 57-row distinct-process qualification,
+so `FC-FILESYSTEM-PATH-TOCTOU-001` remains E2.
+
+Two additional publication regressions atomically destabilize the destination
+after rename while forcing directory synchronization to fail; they prove that
+same- and cross-volume results retain their live recovery receipt under the
+combined namespace-instability and durability-unconfirmed state. A cross-volume
+cleanup-failure variant proves that an additional retained staging receipt is
+merged into the same bounded recovery result rather than suppressed.
 
 API interpretation is based on the installed macOS `open(2)`, `stat(2)`,
-`readlink(2)`, `unlink(2)`, and `rename(2)` manuals and SDK headers. The
+`readlink(2)`, `unlink(2)`, `rename(2)`, `fcntl(2)`, and `flock(2)` manuals
+and SDK headers. The
 `RENAME_SECLUDE` limitation is cross-checked against Apple's public
 [`namei.h`](https://raw.githubusercontent.com/apple-oss-distributions/xnu/main/bsd/sys/namei.h)
 and [`renameatx_np` implementation](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/vfs/vfs_syscalls.c).
@@ -168,6 +193,70 @@ qualified volume becomes the only location from which a terminal unlink may
 occur. The manager has no same-UID production fallback: unavailable,
 unapproved, identity-mismatched, unqualified-volume, or unavailable-namespace
 states return their required typed errors.
+
+ServiceManagement lifecycle changes use a separate durable fail-closed fence.
+Forge writes an owner-only, atomically replaced Enable, Disable, or Update
+intent before the corresponding registration or unregister side effect. One
+descriptor-backed, nonblocking `flock` lease is retained across the complete
+synchronous register worker or asynchronous unregister callback, including
+after caller timeout or cancellation. Disable and Update use the completion-
+handler form of `SMAppService.unregister`; the synchronous form is not used by
+the Settings production path because its return does not mean the prior daemon
+has been reaped. A timeout or Swift task cancellation does not pretend to cancel
+the operating-system request. Lifecycle mutation, approval, and recovery-ledger
+Reconcile controls remain disabled, while read-only Refresh remains available.
+
+Every recovery has a fresh attempt identifier under the same durable operation
+identifier and is capped at eight attempts. Record transitions require the exact
+attempt plus the recorded lock device and inode. Recovery must first acquire the
+same lease, so a cooperating Forge process cannot take over while the predecessor
+is live. A late successful Update reap advances only to
+`registration_pending`; it does not register from the stale callback. The next
+lease owner may register from that durable phase. Startup executes at most the
+two bounded phases required for Update recovery (reap, then register). An active
+attempt whose expected record is missing or mismatched fails closed. Malformed,
+non-regular, multiply linked, or unavailable state/lock files also fail closed.
+Callback-before-uncertainty ordering uses one single-slot in-memory tombstone
+containing at most the exact reconciled attempt identifier; it is cleared when
+that attempt's delayed uncertainty write observes it and is never a history.
+
+Pathname replacement remains an E2 same-UID namespace risk. Exact attempt and
+lease-inode checks detect a replaced record or lock observed by the current
+owner, and one stable descriptor lease limits each cooperating lease owner to
+one ServiceManagement side effect at a time. An untampered operation lineage is
+capped at eight total attempts, and one automatic bootstrap is capped at the two
+durable phases needed to recover Update (reap, then register). Those are local
+bounds, not a global adversarial bound. `flock` is advisory, and no evaluated
+macOS filesystem API makes replacement of both pathname objects identity-
+conditional. A hostile same-UID peer can repeatedly install coherent fresh
+record and lock pathnames with fresh operation and attempt identifiers and an
+independent lock inode. It can therefore authorize sequential and potentially
+concurrent lifecycle requests without limit over time despite the per-lineage
+and per-bootstrap caps.
+
+The maximum residual impact is consequently one side effect per cooperating
+lease owner, eight side-effect attempts per untampered lineage, and two
+automatic recovery phases per bootstrap, but no finite maximum across repeated
+hostile coherent namespace replacement. Repeated wins can produce indefinite
+service registration/unregistration churn and persistent uncertainty requiring
+trusted repair. They add no direct protected-filesystem mutation authority;
+that remains confined to the separately authenticated privileged request
+boundary. The stable lease mitigates overlapping requests from cooperating
+processes, but does not eliminate replacement by a peer that bypasses the
+namespace protocol. After process death, deletion of the only record is
+indistinguishable from a normally settled state; that crash-window removal is
+part of the same open E2 residual.
+
+Startup service health collection is read-only: it calls operational health
+with `reconcile: false`. Enable, Disable, Update, lifecycle recovery, and Refresh
+also observe recovery debt without releasing it. Only the explicit **Reconcile
+recovery** control invokes identity-verifiable fixed-slot debt reconciliation.
+Automatic lifecycle recovery is limited to the two durable ServiceManagement
+phases and does not alter either filesystem recovery ledger. These controls
+mitigate overlapping service lifecycle requests. Native `SMAppService`
+registration/unregister/restart behavior, distinct signing, approval UI, and E2
+filesystem-boundary evidence remain deferred and release-blocking; component,
+stub, and nested-xctest process results do not satisfy those native gates.
 
 The qualification-report checker is not itself boundary proof. Report schema
 v2 and artifact-binding schema v1 bind every recorder-preserved read-only JSON
@@ -507,18 +596,24 @@ bundle checker rejects a cross-paired CLI whose seal differs.
 
 The installed login-manager path validates the exact app main executable and
 embedded CLI, stages only the embedded CLI rather than extracting the app main,
-and transactionally stages the signed core framework beside the installed raw
-CLI. A complete privileged payload requires the daemon, LaunchDaemon plist,
-embedded CLI, and app framework; missing, symlinked, mismatched, or invalidly
-signed artifacts fail before replacement. A separately signed raw CLI may
-probe the app-owned service only with valid caller-sealed hashes. The clean
-signed Debug arm64 build and runtime checker are supporting package evidence,
-not distinct installed-process or live XPC qualification. Static outer-bundle
-validation also remains valid only while the filesystem object is unmodified.
+and transactionally stages the signed runtime launcher and core framework
+beside the installed raw CLI. A complete privileged payload requires the
+daemon, LaunchDaemon plist, embedded CLI, runtime launcher, and app framework;
+missing, symlinked, mismatched, or invalidly signed artifacts fail before
+replacement. Each team is bound to one exact Apple certificate class:
+`9AQ2C2838M` requires Apple Development and `2Y25RTLZET` requires Developer ID
+Application. Security.framework and the outer verifier enforce the exact Apple
+anchor, identifier, team, and certificate class for the app, CLI, daemon,
+runtime launcher, and core framework across every architecture. A separately
+signed raw CLI may probe the app-owned service only with valid caller-sealed
+hashes. The Apple Development-signed Release build, five-artifact checker, and
+bounded installed-app/manager execution are supporting evidence, not live XPC,
+Developer ID, or native lifecycle qualification. Static outer-bundle validation
+also remains valid only while the filesystem object is unmodified.
 Code signing does not establish freshness: preventing rollback of the entire
 validly signed caller, expectation, and helper requires a monotonic root-owned
-version receipt. Full signed app/manager/CLI, stale-helper, upgrade, restart,
-negative-signature, Release, and notarization evidence is still absent, so
+version receipt. Stale-helper, upgrade, negative-signature, live service,
+Developer ID Release, and notarization evidence is still absent, so
 `FC-PRIVILEGED-CALLER-IDENTITY-001` remains open.
 
 Distinct-process signing identity, signed adversarial and crash recovery, full
@@ -543,7 +638,7 @@ The complete signed-host case inventory and pass predicates are maintained in
 
 ## Managed runtime execution
 
-Managed shell and interpreter jobs execute only through the native runtime launcher. Production app and CLI builds require an exact, signed product identity, enclosing application seal where applicable, and a matching staged-helper code-directory hash. Exact-path, ad-hoc SwiftPM pairings are accepted only for local development products with allowlisted identifiers; they are not distribution authority.
+Managed shell and interpreter jobs execute only through the native runtime launcher. Production app and CLI builds require an exact, signed product identity, enclosing application seal where applicable, and a matching staged-helper code-directory hash. A team-signed product must also satisfy its exact Apple anchor and certificate class: Apple Development for `9AQ2C2838M`, or Developer ID Application for `2Y25RTLZET`. Exact-path, ad-hoc SwiftPM pairings are accepted only for local development products with allowlisted identifiers; they are not distribution authority.
 
 Each job has independently authorized canonical read and write roots. Write roots must be a subset of read authority. Manager-owned stdout and stderr artifacts are outside the child-writable scratch directory. Artifact reads revalidate the regular-file type, owner, link count, device, inode, bounded size, and digest so replacement or mutation fails closed.
 

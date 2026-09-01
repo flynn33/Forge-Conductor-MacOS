@@ -6,6 +6,16 @@
 
 import Foundation
 
+struct ManagerProviderProbeState: Sendable, Equatable {
+    let adapterID: String
+    let mode: ManagerProviderProbeMode
+    let health: String
+    let completedAt: String?
+    let capabilities: ProviderCapabilities?
+    let lifecycleManagementEnabled: Bool?
+    let errorSummary: String?
+}
+
 /// Mutable runtime state for the manager process (thread-safe via owner lock).
 /// Extracted so `ManagerNode` is orchestration-only, not a god object of fields + timers.
 public final class ManagerRuntime: @unchecked Sendable {
@@ -17,6 +27,8 @@ public final class ManagerRuntime: @unchecked Sendable {
     public var restartCount = 0
     public var watchdog: DispatchSourceTimer?
     public var autonomyTickPending = false
+    var providerProbeInProgress = false
+    var providerProbeState: ManagerProviderProbeState?
     public var lastPresencePruneAt: Date?
     public var shutdownRequested = false
     public var signalSources: [any DispatchSourceSignal] = []

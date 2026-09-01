@@ -45,9 +45,14 @@ service listener frames, multi-event SSE).
 
 Telemetry contract and stream tests qualify only this subsystem. They do not
 close P10, filesystem E2, current G09-G12, Developer ID Release signing and
-native UI execution, the live shell app/installed-manager restart scenario,
+the full native UI/settings/service matrix, the live shell app/installed-
+manager restart scenario,
 manager-owned real-provider autonomous continuity, or owner-deferred
 representative physical-hardware qualification.
+
+The earlier exact-revision Apple Development-signed 100-cycle Rig/MCP navigation
+test is supporting evidence; the final current-source rerun and broader release
+runs remain required.
 
 ## Version
 

@@ -553,7 +553,13 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
             // a late deadline must not conceal an irreversible committed mutation.
             try cancellation.checkCancellation()
             let dispatched: ToolResult
-            if let context, Self.projectMemoryMutatingTools.contains(name) {
+            if name == "project_memory.initialize" {
+                dispatched = try projectMemoryInitializationResult(
+                    arguments: routedArguments,
+                    clientID: clientID,
+                    cancellation: cancellation
+                )
+            } else if let context, Self.projectMemoryMutatingTools.contains(name) {
                 let serializedArguments = try SerializedToolArguments(routedArguments)
                 dispatched = try app.projectContexts.commitIfCurrent(
                     context: context,
@@ -1056,58 +1062,268 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         cancellation: ToolCallCancellation?
     ) throws -> ToolResult {
         guard result.ok else { return result }
-        let descriptor: ProjectMemoryDescriptor
-        let root: URL
         switch tool {
-        case "project_memory.initialize":
-            guard let projectID = result.payload["project_id"] as? String,
-                  let rawPath = ToolArgHelpers.string(arguments, "project_path")
-                    ?? ToolArgHelpers.string(arguments, "path") else {
-                throw ProjectContextError.invalidIdentifier("initialized project context")
-            }
-            descriptor = try app.projectMemory.identities.descriptor(
-                projectID: projectID,
-                cancellation: cancellation
-            )
-            root = ToolArgHelpers.resolvePath(rawPath)
         case "agent_run_start":
             guard let rawPath = ToolArgHelpers.string(arguments, "cwd") else {
                 return result
             }
-            root = ToolArgHelpers.resolvePath(rawPath)
-            let initialized = try app.projectMemory.initialize(
-                path: root.path,
+            let registered = try registerBootstrapProject(
+                path: rawPath,
+                requestedProjectID: nil,
+                displayName: nil,
+                repositoryIdentityAssertion: nil,
+                clientID: clientID,
                 cancellation: cancellation
             )
-            guard let projectID = initialized["project_id"] as? String else {
-                throw ProjectContextError.invalidIdentifier("agent project context")
-            }
-            descriptor = try app.projectMemory.identities.descriptor(
-                projectID: projectID,
-                cancellation: cancellation
-            )
+            var payload = result.payload
+            payload["project_context_attached"] = true
+            payload["project_id"] = registered.context.projectID.description
+            payload["project_generation"] = registered.context.projectGeneration.rawValue
+            payload["project_context"] = projectContextDictionary(registered.context)
+            return ToolResult(ok: result.ok, payload: payload, isError: result.isError)
         default:
             return result
         }
+    }
 
-        let context = try app.projectContexts.registerAndBindMCPClient(
-            descriptor: descriptor,
-            canonicalRoot: root,
-            clientID: clientID,
+    private func projectMemoryInitializationResult(
+        arguments: [String: Any],
+        clientID: ClientID,
+        cancellation: ToolCallCancellation
+    ) throws -> ToolResult {
+        guard let rawPath = ToolArgHelpers.string(arguments, "project_path")
+                ?? ToolArgHelpers.string(arguments, "path") else {
+            return .failure(
+                code: ProjectMemoryError.invalidRequest("").code,
+                message: "project_path is required",
+                retryable: false
+            )
+        }
+        var committedIdentity: ProjectMemoryDescriptor?
+        var committedInitialization: [String: Any]?
+        do {
+            let registered = try registerBootstrapProject(
+                path: rawPath,
+                requestedProjectID: ToolArgHelpers.string(arguments, "project_id"),
+                displayName: ToolArgHelpers.string(arguments, "display_name"),
+                repositoryIdentityAssertion: ToolArgHelpers.string(
+                    arguments,
+                    "repository_identity"
+                ),
+                clientID: clientID,
+                cancellation: cancellation,
+                onIdentityCommitted: { descriptor in
+                    committedIdentity = descriptor
+                },
+                onInitializationCommitted: { payload in
+                    committedInitialization = payload
+                }
+            )
+            var payload = registered.initialization
+            payload["project_context_attached"] = true
+            payload["project_id"] = registered.context.projectID.description
+            payload["project_generation"] = registered.context.projectGeneration.rawValue
+            payload["project_context"] = projectContextDictionary(registered.context)
+            return .success(payload)
+        } catch is CancellationError {
+            if let committed = committedProjectMemoryResult(
+                initialization: committedInitialization,
+                identity: committedIdentity,
+                code: "request_cancelled"
+            ) {
+                return committed
+            }
+            throw CancellationError()
+        } catch let error as ToolCallDeadlineExceeded {
+            if let committed = committedProjectMemoryResult(
+                initialization: committedInitialization,
+                identity: committedIdentity,
+                code: "deadline_exceeded"
+            ) {
+                return committed
+            }
+            throw error
+        } catch let error as ProjectContextError {
+            if committedInitialization != nil || committedIdentity != nil {
+                app.diagnostics.warn("project_context_attachment_pending", [
+                    "tool": "project_memory.initialize",
+                    "client_id": clientID.rawValue,
+                    "error": "\(error)",
+                ], category: .tools)
+            }
+            if let committed = committedProjectMemoryResult(
+                initialization: committedInitialization,
+                identity: committedIdentity,
+                code: committedInitialization == nil
+                    ? "project_memory_initialization_failed"
+                    : "project_context_attachment_failed"
+            ) {
+                return committed
+            }
+            return .failure(
+                code: error.code,
+                message: error.localizedDescription,
+                retryable: error == .databaseBusy
+            )
+        } catch let error as ProjectMemoryError {
+            if let committed = committedProjectMemoryResult(
+                initialization: committedInitialization,
+                identity: committedIdentity,
+                code: "project_memory_initialization_failed",
+                initializationError: error
+            ) {
+                return committed
+            }
+            return .failure(
+                code: error.code,
+                message: error.localizedDescription,
+                retryable: error == .databaseBusy
+            )
+        } catch {
+            if let committed = committedProjectMemoryResult(
+                initialization: committedInitialization,
+                identity: committedIdentity,
+                code: committedInitialization == nil
+                    ? "project_memory_initialization_failed"
+                    : "project_context_attachment_failed"
+            ) {
+                return committed
+            }
+            return .failure(
+                code: "project_memory_initialization_failed",
+                message: "\(error)",
+                retryable: false
+            )
+        }
+    }
+
+    private func registerBootstrapProject(
+        path: String,
+        requestedProjectID: String?,
+        displayName: String?,
+        repositoryIdentityAssertion: String?,
+        clientID: ClientID,
+        cancellation: ToolCallCancellation?,
+        onIdentityCommitted: ((ProjectMemoryDescriptor) -> Void)? = nil,
+        onInitializationCommitted: (([String: Any]) -> Void)? = nil
+    ) throws -> (
+        preparation: ProjectRegistrationIdentityPreparation,
+        context: ToolInvocationContext,
+        initialization: [String: Any]
+    ) {
+        let target = try app.projectMemory.identities.discoverTarget(
+            path: path,
+            repositoryIdentityAssertion: repositoryIdentityAssertion,
             cancellation: cancellation
         )
-        var payload = result.payload
-        payload["project_context_attached"] = true
-        payload["project_id"] = context.projectID.description
-        payload["project_generation"] = context.projectGeneration.rawValue
-        payload["project_context"] = [
+        let preparation = try app.projectContexts.prepareControlledRegistration(
+            identities: app.projectMemory.identities,
+            target: target,
+            requestedProjectID: requestedProjectID,
+            displayName: displayName,
+            cancellation: cancellation
+        )
+        guard let projectUUID = UUID(uuidString: preparation.descriptor.id) else {
+            throw ProjectContextError.invalidIdentifier("project identifier")
+        }
+
+        let recovery = SecureFilesystemRecoveryLedger(paths: app.paths)
+        do {
+            return try recovery.withRetainedAuthorityFence(
+                projectID: ProjectID(projectUUID),
+                generation: preparation.expectedControlGeneration ?? .initial
+            ) { _ in
+                try app.projectContexts.validateControlledRegistration(
+                    preparation,
+                    identities: app.projectMemory.identities,
+                    requestedProjectID: requestedProjectID,
+                    displayName: displayName,
+                    cancellation: cancellation
+                )
+                let accepted = try app.projectContexts.registerProject(
+                    preparation: preparation,
+                    cancellation: cancellation
+                )
+                let initialization = try app.projectMemory.commitInitialization(
+                    preparation,
+                    cancellation: nil,
+                    onIdentityCommitted: onIdentityCommitted
+                )
+                onInitializationCommitted?(initialization)
+                let activated = try app.projectContexts.finalizeRegistration(
+                    preparation: preparation,
+                    cancellation: nil
+                )
+                let context = try app.projectContexts.bindMCPClient(
+                    project: activated,
+                    clientID: clientID,
+                    cancellation: nil
+                )
+                guard context.projectID.description.caseInsensitiveCompare(
+                    preparation.descriptor.id
+                ) == .orderedSame,
+                      accepted.projectID == activated.projectID,
+                      accepted.generation == activated.generation,
+                      context.authorizationScope.canonicalRoots == [
+                          preparation.target.canonicalRoot
+                      ] else {
+                    throw ProjectContextError.projectScopeMismatch
+                }
+                return (preparation, context, initialization)
+            }
+        } catch SecureFilesystemRecoveryLedgerError.retainedAuthority {
+            throw ProjectContextError.retainedFilesystemRecovery(
+                ProjectID(projectUUID)
+            )
+        } catch is SecureFilesystemRecoveryLedgerError {
+            throw ProjectContextError.databaseBusy
+        }
+    }
+
+    private func committedProjectMemoryResult(
+        initialization: [String: Any]?,
+        identity: ProjectMemoryDescriptor?,
+        code: String,
+        initializationError: ProjectMemoryError? = nil
+    ) -> ToolResult? {
+        if let initialization {
+            return committedBootstrapResult(
+                .success(initialization),
+                tool: "project_memory.initialize",
+                code: code
+            )
+        }
+        guard let identity else { return nil }
+        var payload: [String: Any] = [
+            "ok": true,
+            "project_id": identity.id,
+            "capability_version": ProjectMemoryService.capabilityVersion,
+            "limits": app.projectMemory.limits.asDictionary(),
+            "migration_status": "pending",
+            "project": identity.asDictionary(),
+            "project_memory_initialization": "pending",
+        ]
+        payload["primary_commit_phase"] = "identity_published"
+        if let initializationError {
+            payload["project_memory_initialization_error"] = initializationError.code
+        }
+        return committedBootstrapResult(
+            .success(payload),
+            tool: "project_memory.initialize",
+            code: code
+        )
+    }
+
+    private func projectContextDictionary(
+        _ context: ToolInvocationContext
+    ) -> [String: Any] {
+        [
             "project_id": context.projectID.description,
             "project_generation": context.projectGeneration.rawValue,
             "client_id": context.clientID.rawValue,
             "authorization_roots": context.authorizationScope.canonicalRoots.map(\.path),
             "maximum_inline_output_bytes": context.authorizationScope.maximumInlineOutputBytes,
-        ] as [String: Any]
-        return ToolResult(ok: result.ok, payload: payload, isError: result.isError)
+        ]
     }
 
     private func committedBootstrapResult(
@@ -1120,13 +1336,22 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
             return result
         }
         var payload = result.payload
+        payload["primary_committed"] = true
         payload["project_context_attached"] = false
         payload["project_context_attachment"] = "pending"
         payload["project_context_error"] = code
-        payload["project_context_note"] =
-            "The primary operation committed before project-context attachment stopped. " +
-            "Retry project_memory.initialize for the same workspace to complete attachment."
-        payload["reconciled"] = true
+        if payload["project_memory_initialization"] as? String == "pending" {
+            payload["project_context_note"] =
+                "The project identity was durably published before project-memory " +
+                "initialization stopped. Retry project_memory.initialize for the same " +
+                "workspace and project ID to initialize storage and attach the context."
+        } else {
+            payload["project_context_note"] =
+                "The primary operation committed before project-context attachment stopped. " +
+                "Retry project_memory.initialize for the same workspace to complete attachment."
+        }
+        payload["reconciled"] = false
+        payload["reconciliation_required"] = true
         return ToolResult(ok: true, payload: payload, isError: false)
     }
 

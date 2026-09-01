@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T23:03:59.165143+00:00",
+  "captured_at": "2026-09-01T10:57:58.725674+00:00",
   "environment_keys_present": [
     "CODEX_APP_TOOLS_PIPE_PATH",
     "CODEX_CI",
@@ -13,27 +13,18 @@
   "execution_state": {
     "available": true,
     "checkpoint_identity": {
-      "active_branch": "repair/e2-qualification-next",
+      "active_branch": "release/0.9.0-product-readiness",
       "base_branch": "main",
-      "base_sha": "3e4fe44b3d96938c30d6b83f7d92d417489a97be",
+      "base_sha": "2e2ad93228c47e1fd16fb034e528d9a70cb61417",
       "github_readback_verified": false,
-      "head_sha": "44022da950e75362dfe5120bfd2d92d474ea0ce6",
-      "identity_resolution": "pull_request_readback_mismatch",
+      "head_sha": "2e2ad93228c47e1fd16fb034e528d9a70cb61417",
+      "identity_resolution": "open_pull_request_not_found",
       "main_branch": "main",
-      "main_sha": "3e4fe44b3d96938c30d6b83f7d92d417489a97be",
-      "publication_head_branch": "security/e2-harness-controls",
+      "main_sha": "2e2ad93228c47e1fd16fb034e528d9a70cb61417",
+      "publication_head_branch": "main",
       "publication_remote": "origin",
-      "pull_request": {
-        "baseRefName": "main",
-        "baseRefOid": "3e4fe44b3d96938c30d6b83f7d92d417489a97be",
-        "headRefName": "security/e2-harness-controls",
-        "headRefOid": "57ca6f46e1e0d4530b1b931ee79438c99a0ce1da",
-        "isDraft": true,
-        "number": 19,
-        "state": "OPEN",
-        "url": "https://github.com/flynn33/Forge-Conductor-MacOS/pull/19"
-      },
-      "remote_head_sha": "57ca6f46e1e0d4530b1b931ee79438c99a0ce1da"
+      "pull_request": null,
+      "remote_head_sha": "2e2ad93228c47e1fd16fb034e528d9a70cb61417"
     },
     "completion_authority_current": false,
     "current_work": "P10",
@@ -41,7 +32,7 @@
       {
         "evidence_class": "E0",
         "id": "FC-UI-QUALIFICATION-001",
-        "notes": "Developer Mode is enabled and the James Daley Apple Development identity for team 9AQ2C2838M is available. Current-source signed Debug build EVID-20260831T035531Z-84cae78f36, strict codesign EVID-20260831T035553Z-f911396f21, and bundle inspection EVID-20260831T035559Z-99588acd84 passed. Bounded signed lifecycle evidence EVID-20260831T035638Z-5798086c52 proves shell execution across real app relaunch and installed-manager PID replacement but deliberately reports Settings UI blocked and cannot qualify native UI. Current-source XCUI attempts EVID-20260831T031230Z-106eaea0df and EVID-20260831T031815Z-60354310b5 failed before all test methods while enabling automation mode, providing zero current-source UI passes. Earlier exact-revision signed Debug XCUI EVID-20260830T153118Z-752f058222 remains supporting evidence for six bounded Settings and relaunch cases only; its chooser cases use a test-only hook and do not prove production NSOpenPanel. Source checkpoint e1bbd951e180e2447d3951d916e5e223f331045e changes presentation only: raw SMAppService and CLI status stay notFound, while Settings maps notFound plus a descriptor-validated packaged service to Not enabled. Exact-source full Swift tests EVID-20260831T145706Z-1b8412d80c passed 832 tests with two declared environment skips; signed Debug build EVID-20260831T145956Z-647f827104 and bundle inspection EVID-20260831T150026Z-f31348bd2e passed. Read-only live Settings observation EVID-20260831T150550Z-7d7a228973 on the exact signed app showed version 0.9.0, project shell enabled, service state Not enabled, and visible Enable, Update or Reinstall, Open System Settings, and Refresh controls. It did not invoke registration, update, disable, approval, or System Settings and is not lifecycle qualification. XCUI diagnostic EVID-20260831T150645Z-b55e2eccac records zero passed tests and one pre-assertion failure because testmanagerd disconnected. No usable Developer ID identity is installed. Real SMAppService approval, denial, update, disable and installed-helper identity; production Settings lifecycle interaction; Release signing; archive; notarization; staple; and Gatekeeper remain unproven. Native qualification remains deferred and release-blocking and is never passed by build-only, unit, simulator, synthetic-host, failed-initialization, read-only, or partial XCUI evidence. Exact-source signed single-test retry EVID-20260831T152355Z-ba848a2a2e and xcresult summary EVID-20260831T152426Z-4b004d7d5b passed 1 of 1 with zero failures. The test launched the signed app, opened native Settings, observed Not enabled, asserted Enable and Update or Reinstall enabled, Disable disabled, and verified approval, refresh, and authorized-folder controls. This is bounded presentation and accessibility evidence only. It did not register, approve or deny, update, disable, restart, exercise production NSOpenPanel, run the full UI matrix, or provide Release signing and notarization evidence, so native qualification remains deferred and release-blocking.",
+        "notes": "Apple Development signing with James Daley on team 9AQ2C2838M is available. The current working-tree Release regression executes 1,001 tests with 5 declared environment skips and 0 failures under warnings-as-errors. A dedicated Apple Development-signed app-hosted Xcode contract suite executes 2 tests with 0 failures from fresh DerivedData. These are supporting non-UI proofs only. The current-source full native navigation and action matrix, production Settings shell control and post-enable flow, production folder panel, real SMAppService approval/update/disable/restart, privileged service lifecycle, Developer ID Release identity, archive, notarization, staple, and Gatekeeper remain unproven. Native qualification remains deferred and release-blocking and cannot pass from build-only, unit, app-hosted, synthetic, failed-initialization, read-only, or partial UI evidence.",
         "severity": "High",
         "status": "deferred",
         "title": "Native signed UI qualification is deferred and release-blocking"
@@ -53,6 +44,14 @@
         "severity": "High",
         "status": "patching",
         "title": "Privileged filesystem boundary remains mitigated but not identity-conditionally closed"
+      },
+      {
+        "evidence_class": "E0",
+        "id": "FC-SHELL-COMPAT-QUALIFICATION-001",
+        "notes": "The current working-tree Release regression executes 1,001 tests with 5 declared environment skips and 0 failures under warnings-as-errors. Bounded Apple Development-signed installed-app evidence preserves clean-install default enablement, accidental legacy-disabled migration, explicit opt-out and denial, exactly one shell_exec in MCP tools/list, established synchronous login Bash behavior and result contract through app and installed raw CLI, app relaunch, manager PID replacement with predecessor exit, and opt-out survival. shell_exec remains unchanged and bash.run remains additive. Production Settings control and post-Settings re-enable have not executed in the required XCUI lane. Developer ID Release, exact P10 production binding, native UI, archive, notarization, staple, and Gatekeeper remain open. This issue remains validating and release-blocking.",
+        "severity": "High",
+        "status": "validating",
+        "title": "Shell compatibility requires native Settings qualification"
       },
       {
         "evidence_class": "E0",
@@ -73,7 +72,7 @@
       {
         "evidence_class": "E0",
         "id": "FC-PROJECT-ROOT-SETTINGS-001",
-        "notes": "Native Settings implements operator-visible add and remove folder controls backed by NSOpenPanel, canonical symlink-resolved display, stable sorting and deduplication, filesystem-root, relative, missing and file rejection, typed manager settings, persistence, live application, accessibility identifiers, and restart survival. Current-source strict Debug EVID-20260831T035742Z-50132edfb8 and Release EVID-20260831T040038Z-09ae71112e each passed 776 tests with two declared host skips and zero failures. Earlier exact-revision signed Debug XCUI EVID-20260830T153118Z-752f058222 passed six bounded Settings and relaunch cases, including two root-control cases, but chooser cases used a deterministic test-only selection hook. Current-source XCUI attempts EVID-20260831T031230Z-106eaea0df and EVID-20260831T031815Z-60354310b5 failed during automation-mode initialization before any test method. Production NSOpenPanel observation and the broader signed native gate remain required before resolution.",
+        "notes": "Native Settings implements operator-visible add and remove folder controls backed by NSOpenPanel, canonical symlink-resolved display, stable sorting and deduplication, filesystem-root, relative, missing and file rejection, typed manager settings, persistence, live application, accessibility identifiers, and restart survival. Earlier exact-revision strict Debug EVID-20260831T035742Z-50132edfb8 and Release EVID-20260831T040038Z-09ae71112e each passed 776 tests with two declared host skips and zero failures. Earlier exact-revision signed Debug XCUI EVID-20260830T153118Z-752f058222 passed six bounded Settings and relaunch cases, including two root-control cases, but chooser cases used a deterministic test-only selection hook. Exact-revision XCUI attempts EVID-20260831T031230Z-106eaea0df and EVID-20260831T031815Z-60354310b5 failed during automation-mode initialization before any test method. The current working-tree Release regression executes 1,001 tests with 5 declared environment skips and 0 failures, and the dedicated signed app-hosted contract suite executes 2 tests with 0 failures; neither exercises the production NSOpenPanel. Production NSOpenPanel observation and the broader signed native gate remain required before resolution.",
         "severity": "High",
         "status": "validating",
         "title": "Clean-install project root authority lacks a native Settings control"
@@ -89,10 +88,26 @@
       {
         "evidence_class": "E2",
         "id": "FC-PRIVILEGED-CALLER-IDENTITY-001",
-        "notes": "Protocol v5 obtains expected per-architecture daemon CodeDirectory hashes from each caller validated running signature, composes them into the NSXPC requirement before activation, and repeats the exact running-hash and protocol handshake before every mutation or transaction-control message. The canonical app graph builds one app, embedded CLI, and daemon artifact set. Prior-manifest signed Debug build EVID-20260830T211007Z-760c293557 and bundle check EVID-20260830T211029Z-ae82e789b1 verify static same-build identities only. They do not execute signed app, installed manager, raw CLI, or standalone CLI calls or stale-helper, wrong-team, wrong-identifier, timeout, upgrade, restart, Release, and notarization cases. Whole-product rollback still lacks a monotonic root-owned receipt; an older allowlisted daemon retains its bounded root mutation authority and vulnerabilities. This is mitigation, not elimination. Caller identity, service lifecycle, E2, P10, G10, and G12 remain open. Source checkpoint 9e695f514caa7894903f54a92139c33eb43eb46d adds a private read-only serviceInfo/status health interface, caller-sealed exact daemon CDHash reporting, an exact wrong-identifier admission probe, absolute two-second deadline arbitration, and a fail-closed paired-control recorder. Unit, source, and recorder tests pass, but no live signed daemon observation has executed. A future explicit invalidation remains candidate evidence only and cannot establish caller rejection, freshness, whole-product provenance, Release identity, or close E2/P10/G10/G12. The runner also lacks a cryptographic source-manifest-to-built-binary attestation and retains the documented fail-closed invalid-input report gap.",
+        "notes": "Protocol v5 obtains expected per-architecture daemon CodeDirectory hashes from each caller validated running signature and repeats the exact running-hash and protocol handshake before mutation or transaction control. Product staging and runtime launch now compile and enforce exact Security.framework requirements: team 9AQ2C2838M requires Apple Development and team 2Y25RTLZET requires Developer ID Application, with the exact Apple anchor and role identifier for the app, CLI, daemon, runtime launcher, and core framework. A fresh Apple Development-signed 0.9.0 build 1 Release product passes the five-artifact checker, and the bounded installed app and manager path validates the coherent installed CLI, adjacent launcher, and framework. These are supporting working-tree results, not live signed-daemon or exact committed-source release evidence. No live signed daemon observation, wrong-team or wrong-certificate rejection matrix, upgrade and stale-helper matrix, Developer ID Release, or notarization has executed. Whole-product rollback still lacks a monotonic root-owned receipt; an older allowlisted coherent product can retain its bounded authority and vulnerabilities. This is mitigation, not elimination. Caller identity, freshness, service lifecycle, E2, P10, G10, and G12 remain open and release-blocking.",
         "severity": "High",
         "status": "patching",
         "title": "Caller-sealed helper identity requires signed-process and freshness qualification"
+      },
+      {
+        "evidence_class": "E0",
+        "id": "FC-FEATURE-OPERABILITY-001",
+        "notes": "Feature complete requires successful production-path behavior, not source presence or a green unit suite. The canonical P10 registry contains 104 features and 259 required assertions; its production-probe registry still has 0 implemented scenarios, so no complete P10 production qualification is claimed. The current working-tree Release regression executes 1,001 tests with 5 declared environment skips and 0 failures under warnings-as-errors, and the dedicated signed app-hosted Xcode contract suite executes 2 tests with 0 failures from fresh DerivedData. Production fs_move and recursive directory fs_delete remain unavailable. Clean-install provider create/update control remains missing. Current native UI, real-provider forced rollover, signed distinct-process filesystem E2, privileged service lifecycle, coherent installation and migration, exact production MCP behavior, and owner-deferred hardware qualification must execute successfully before this issue can resolve. P10, G10, G12, E2, native signing, shell UI, continuity, and hardware gates remain open.",
+        "severity": "High",
+        "status": "patching",
+        "title": "Advertised features require current production-path operability evidence"
+      },
+      {
+        "evidence_class": "E1",
+        "id": "FC-PROVIDER-CONFIG-OPERABILITY-001",
+        "notes": "Production loads managed-providers/forge-native-session-host/lmstudio-provider.json only when it already exists; no supported app, CLI, or manager control creates or updates it on a clean install. Implement typed redacted configuration controls, atomic persistence and migration, health-aware UI gating, restart survival, and real manager/provider tests. Provider probes now run outside dashboard serialization with a bounded timeout and single-probe admission. On timeout, admission remains fail-closed until the exact task exits, so a cancellation-ignoring provider cannot accumulate work; a provider that never terminates blocks further probes for that ManagerNode lifetime and requires manager restart. This is bounded mitigation, not provider-operability completion.",
+        "severity": "High",
+        "status": "patching",
+        "title": "Clean install lacks a supported managed-provider configuration path"
       }
     ],
     "nonpassing_hard_gates": [
@@ -125,7 +140,7 @@
       {
         "evidence_class": "E0",
         "id": "FC-UI-QUALIFICATION-001",
-        "notes": "Developer Mode is enabled and the James Daley Apple Development identity for team 9AQ2C2838M is available. Current-source signed Debug build EVID-20260831T035531Z-84cae78f36, strict codesign EVID-20260831T035553Z-f911396f21, and bundle inspection EVID-20260831T035559Z-99588acd84 passed. Bounded signed lifecycle evidence EVID-20260831T035638Z-5798086c52 proves shell execution across real app relaunch and installed-manager PID replacement but deliberately reports Settings UI blocked and cannot qualify native UI. Current-source XCUI attempts EVID-20260831T031230Z-106eaea0df and EVID-20260831T031815Z-60354310b5 failed before all test methods while enabling automation mode, providing zero current-source UI passes. Earlier exact-revision signed Debug XCUI EVID-20260830T153118Z-752f058222 remains supporting evidence for six bounded Settings and relaunch cases only; its chooser cases use a test-only hook and do not prove production NSOpenPanel. Source checkpoint e1bbd951e180e2447d3951d916e5e223f331045e changes presentation only: raw SMAppService and CLI status stay notFound, while Settings maps notFound plus a descriptor-validated packaged service to Not enabled. Exact-source full Swift tests EVID-20260831T145706Z-1b8412d80c passed 832 tests with two declared environment skips; signed Debug build EVID-20260831T145956Z-647f827104 and bundle inspection EVID-20260831T150026Z-f31348bd2e passed. Read-only live Settings observation EVID-20260831T150550Z-7d7a228973 on the exact signed app showed version 0.9.0, project shell enabled, service state Not enabled, and visible Enable, Update or Reinstall, Open System Settings, and Refresh controls. It did not invoke registration, update, disable, approval, or System Settings and is not lifecycle qualification. XCUI diagnostic EVID-20260831T150645Z-b55e2eccac records zero passed tests and one pre-assertion failure because testmanagerd disconnected. No usable Developer ID identity is installed. Real SMAppService approval, denial, update, disable and installed-helper identity; production Settings lifecycle interaction; Release signing; archive; notarization; staple; and Gatekeeper remain unproven. Native qualification remains deferred and release-blocking and is never passed by build-only, unit, simulator, synthetic-host, failed-initialization, read-only, or partial XCUI evidence. Exact-source signed single-test retry EVID-20260831T152355Z-ba848a2a2e and xcresult summary EVID-20260831T152426Z-4b004d7d5b passed 1 of 1 with zero failures. The test launched the signed app, opened native Settings, observed Not enabled, asserted Enable and Update or Reinstall enabled, Disable disabled, and verified approval, refresh, and authorized-folder controls. This is bounded presentation and accessibility evidence only. It did not register, approve or deny, update, disable, restart, exercise production NSOpenPanel, run the full UI matrix, or provide Release signing and notarization evidence, so native qualification remains deferred and release-blocking.",
+        "notes": "Apple Development signing with James Daley on team 9AQ2C2838M is available. The current working-tree Release regression executes 1,001 tests with 5 declared environment skips and 0 failures under warnings-as-errors. A dedicated Apple Development-signed app-hosted Xcode contract suite executes 2 tests with 0 failures from fresh DerivedData. These are supporting non-UI proofs only. The current-source full native navigation and action matrix, production Settings shell control and post-enable flow, production folder panel, real SMAppService approval/update/disable/restart, privileged service lifecycle, Developer ID Release identity, archive, notarization, staple, and Gatekeeper remain unproven. Native qualification remains deferred and release-blocking and cannot pass from build-only, unit, app-hosted, synthetic, failed-initialization, read-only, or partial UI evidence.",
         "severity": "High",
         "status": "deferred",
         "title": "Native signed UI qualification is deferred and release-blocking"
@@ -137,6 +152,14 @@
         "severity": "High",
         "status": "patching",
         "title": "Privileged filesystem boundary remains mitigated but not identity-conditionally closed"
+      },
+      {
+        "evidence_class": "E0",
+        "id": "FC-SHELL-COMPAT-QUALIFICATION-001",
+        "notes": "The current working-tree Release regression executes 1,001 tests with 5 declared environment skips and 0 failures under warnings-as-errors. Bounded Apple Development-signed installed-app evidence preserves clean-install default enablement, accidental legacy-disabled migration, explicit opt-out and denial, exactly one shell_exec in MCP tools/list, established synchronous login Bash behavior and result contract through app and installed raw CLI, app relaunch, manager PID replacement with predecessor exit, and opt-out survival. shell_exec remains unchanged and bash.run remains additive. Production Settings control and post-Settings re-enable have not executed in the required XCUI lane. Developer ID Release, exact P10 production binding, native UI, archive, notarization, staple, and Gatekeeper remain open. This issue remains validating and release-blocking.",
+        "severity": "High",
+        "status": "validating",
+        "title": "Shell compatibility requires native Settings qualification"
       },
       {
         "evidence_class": "E0",
@@ -157,7 +180,7 @@
       {
         "evidence_class": "E0",
         "id": "FC-PROJECT-ROOT-SETTINGS-001",
-        "notes": "Native Settings implements operator-visible add and remove folder controls backed by NSOpenPanel, canonical symlink-resolved display, stable sorting and deduplication, filesystem-root, relative, missing and file rejection, typed manager settings, persistence, live application, accessibility identifiers, and restart survival. Current-source strict Debug EVID-20260831T035742Z-50132edfb8 and Release EVID-20260831T040038Z-09ae71112e each passed 776 tests with two declared host skips and zero failures. Earlier exact-revision signed Debug XCUI EVID-20260830T153118Z-752f058222 passed six bounded Settings and relaunch cases, including two root-control cases, but chooser cases used a deterministic test-only selection hook. Current-source XCUI attempts EVID-20260831T031230Z-106eaea0df and EVID-20260831T031815Z-60354310b5 failed during automation-mode initialization before any test method. Production NSOpenPanel observation and the broader signed native gate remain required before resolution.",
+        "notes": "Native Settings implements operator-visible add and remove folder controls backed by NSOpenPanel, canonical symlink-resolved display, stable sorting and deduplication, filesystem-root, relative, missing and file rejection, typed manager settings, persistence, live application, accessibility identifiers, and restart survival. Earlier exact-revision strict Debug EVID-20260831T035742Z-50132edfb8 and Release EVID-20260831T040038Z-09ae71112e each passed 776 tests with two declared host skips and zero failures. Earlier exact-revision signed Debug XCUI EVID-20260830T153118Z-752f058222 passed six bounded Settings and relaunch cases, including two root-control cases, but chooser cases used a deterministic test-only selection hook. Exact-revision XCUI attempts EVID-20260831T031230Z-106eaea0df and EVID-20260831T031815Z-60354310b5 failed during automation-mode initialization before any test method. The current working-tree Release regression executes 1,001 tests with 5 declared environment skips and 0 failures, and the dedicated signed app-hosted contract suite executes 2 tests with 0 failures; neither exercises the production NSOpenPanel. Production NSOpenPanel observation and the broader signed native gate remain required before resolution.",
         "severity": "High",
         "status": "validating",
         "title": "Clean-install project root authority lacks a native Settings control"
@@ -173,10 +196,26 @@
       {
         "evidence_class": "E2",
         "id": "FC-PRIVILEGED-CALLER-IDENTITY-001",
-        "notes": "Protocol v5 obtains expected per-architecture daemon CodeDirectory hashes from each caller validated running signature, composes them into the NSXPC requirement before activation, and repeats the exact running-hash and protocol handshake before every mutation or transaction-control message. The canonical app graph builds one app, embedded CLI, and daemon artifact set. Prior-manifest signed Debug build EVID-20260830T211007Z-760c293557 and bundle check EVID-20260830T211029Z-ae82e789b1 verify static same-build identities only. They do not execute signed app, installed manager, raw CLI, or standalone CLI calls or stale-helper, wrong-team, wrong-identifier, timeout, upgrade, restart, Release, and notarization cases. Whole-product rollback still lacks a monotonic root-owned receipt; an older allowlisted daemon retains its bounded root mutation authority and vulnerabilities. This is mitigation, not elimination. Caller identity, service lifecycle, E2, P10, G10, and G12 remain open. Source checkpoint 9e695f514caa7894903f54a92139c33eb43eb46d adds a private read-only serviceInfo/status health interface, caller-sealed exact daemon CDHash reporting, an exact wrong-identifier admission probe, absolute two-second deadline arbitration, and a fail-closed paired-control recorder. Unit, source, and recorder tests pass, but no live signed daemon observation has executed. A future explicit invalidation remains candidate evidence only and cannot establish caller rejection, freshness, whole-product provenance, Release identity, or close E2/P10/G10/G12. The runner also lacks a cryptographic source-manifest-to-built-binary attestation and retains the documented fail-closed invalid-input report gap.",
+        "notes": "Protocol v5 obtains expected per-architecture daemon CodeDirectory hashes from each caller validated running signature and repeats the exact running-hash and protocol handshake before mutation or transaction control. Product staging and runtime launch now compile and enforce exact Security.framework requirements: team 9AQ2C2838M requires Apple Development and team 2Y25RTLZET requires Developer ID Application, with the exact Apple anchor and role identifier for the app, CLI, daemon, runtime launcher, and core framework. A fresh Apple Development-signed 0.9.0 build 1 Release product passes the five-artifact checker, and the bounded installed app and manager path validates the coherent installed CLI, adjacent launcher, and framework. These are supporting working-tree results, not live signed-daemon or exact committed-source release evidence. No live signed daemon observation, wrong-team or wrong-certificate rejection matrix, upgrade and stale-helper matrix, Developer ID Release, or notarization has executed. Whole-product rollback still lacks a monotonic root-owned receipt; an older allowlisted coherent product can retain its bounded authority and vulnerabilities. This is mitigation, not elimination. Caller identity, freshness, service lifecycle, E2, P10, G10, and G12 remain open and release-blocking.",
         "severity": "High",
         "status": "patching",
         "title": "Caller-sealed helper identity requires signed-process and freshness qualification"
+      },
+      {
+        "evidence_class": "E0",
+        "id": "FC-FEATURE-OPERABILITY-001",
+        "notes": "Feature complete requires successful production-path behavior, not source presence or a green unit suite. The canonical P10 registry contains 104 features and 259 required assertions; its production-probe registry still has 0 implemented scenarios, so no complete P10 production qualification is claimed. The current working-tree Release regression executes 1,001 tests with 5 declared environment skips and 0 failures under warnings-as-errors, and the dedicated signed app-hosted Xcode contract suite executes 2 tests with 0 failures from fresh DerivedData. Production fs_move and recursive directory fs_delete remain unavailable. Clean-install provider create/update control remains missing. Current native UI, real-provider forced rollover, signed distinct-process filesystem E2, privileged service lifecycle, coherent installation and migration, exact production MCP behavior, and owner-deferred hardware qualification must execute successfully before this issue can resolve. P10, G10, G12, E2, native signing, shell UI, continuity, and hardware gates remain open.",
+        "severity": "High",
+        "status": "patching",
+        "title": "Advertised features require current production-path operability evidence"
+      },
+      {
+        "evidence_class": "E1",
+        "id": "FC-PROVIDER-CONFIG-OPERABILITY-001",
+        "notes": "Production loads managed-providers/forge-native-session-host/lmstudio-provider.json only when it already exists; no supported app, CLI, or manager control creates or updates it on a clean install. Implement typed redacted configuration controls, atomic persistence and migration, health-aware UI gating, restart survival, and real manager/provider tests. Provider probes now run outside dashboard serialization with a bounded timeout and single-probe admission. On timeout, admission remains fail-closed until the exact task exits, so a cancellation-ignoring provider cannot accumulate work; a provider that never terminates blocks further probes for that ManagerNode lifetime and requires manager restart. This is bounded mitigation, not provider-operability completion.",
+        "severity": "High",
+        "status": "patching",
+        "title": "Clean install lacks a supported managed-provider configuration path"
       }
     ],
     "partial_security_pr_policy": {
@@ -188,8 +227,8 @@
     },
     "release_authorized": false,
     "repository": {
-      "branch": "repair/e2-qualification-next",
-      "commit": "44022da950e75362dfe5120bfd2d92d474ea0ce6",
+      "branch": "release/0.9.0-product-readiness",
+      "commit": "2e2ad93228c47e1fd16fb034e528d9a70cb61417",
       "dirty": true,
       "root": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next"
     },

@@ -9,12 +9,24 @@ protocol OperatorManagerClientProtocol: Sendable {
     func autonomyStatus() async throws -> OperatorAutonomySummary
     func settings() async throws -> ManagerSettings
     func updateSettings(_ patch: ManagerSettingsPatch) async throws -> ManagerSettings
-    func registerProject(_ request: OperatorProjectRegistrationRequest) async throws -> OperatorProject
+    func registerProject(
+        _ request: OperatorProjectRegistrationRequest
+    ) async throws -> OperatorProjectRegistrationOutcome
     func projectStatus(projectID: String) async throws -> OperatorProject
     func resetProject(projectID: String, generation: UInt64) async throws -> OperatorResetReceipt
+    func relinkProject(
+        projectID: String,
+        generation: UInt64,
+        path: String
+    ) async throws -> OperatorRelinkReceipt
     func startRun(_ request: OperatorRunStartRequest) async throws -> OperatorRun
     func runStatus(runID: String) async throws -> OperatorRun
     func controlRun(runID: String, action: OperatorRunControlAction) async throws -> OperatorRun
+    func cancelRuntimeJob(jobID: String) async throws -> OperatorRuntimeJob
+    func probeProvider(
+        adapterID: String,
+        mode: OperatorProviderProbeMode
+    ) async throws -> OperatorProvider
 }
 
 extension OperatorManagerClientProtocol {
@@ -29,7 +41,9 @@ enum OperatorManagerClientError: Error, LocalizedError, Sendable, Equatable {
     case invalidResponse
     case responseTooLarge(maximumBytes: Int)
     case capabilityUnavailable(String)
+    case configurationRejected(code: String, message: String)
     case rejected(status: Int, message: String)
+    case reconciliationRequired(code: String, message: String)
     case invalidPayload(String)
 
     var errorDescription: String? {
@@ -44,8 +58,12 @@ enum OperatorManagerClientError: Error, LocalizedError, Sendable, Equatable {
             "The manager response exceeded the bounded \(maximumBytes)-byte UI limit."
         case .capabilityUnavailable(let detail):
             detail
+        case .configurationRejected(let code, let message):
+            "Run configuration was rejected (\(code)): \(message)"
         case .rejected(let status, let message):
             "Manager request failed with HTTP \(status): \(message)"
+        case .reconciliationRequired(let code, let message):
+            "Project reconciliation is required (\(code)): \(message)"
         case .invalidPayload(let detail):
             "The manager returned an invalid operator payload: \(detail)"
         }
@@ -112,20 +130,87 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
         try await managerClient.updateSettings(patch, apply: true)
     }
 
-    func registerProject(_ request: OperatorProjectRegistrationRequest) async throws -> OperatorProject {
-        try await self.request(
-            method: "POST",
-            path: "/api/manager/projects/register",
-            body: request
-        )
+    func registerProject(
+        _ request: OperatorProjectRegistrationRequest
+    ) async throws -> OperatorProjectRegistrationOutcome {
+        do {
+            let result = try await managerClient.registerProject(
+                path: request.path,
+                displayName: request.displayName,
+                repositoryIdentity: request.repositoryIdentity
+            )
+            switch result.registrationState {
+            case .committed:
+                guard let projectID = result.projectID,
+                      let projectGeneration = result.projectGeneration,
+                      result.lifecycleState == "active" else {
+                    throw OperatorManagerClientError.invalidPayload(
+                        "committed project registration omitted its active project identity"
+                    )
+                }
+                let project = try await projectStatus(projectID: projectID)
+                guard project.projectID.caseInsensitiveCompare(projectID) == .orderedSame,
+                      project.projectGeneration == projectGeneration,
+                      project.lifecycleState == "active",
+                      result.canonicalRoot == nil
+                        || project.canonicalRoot == result.canonicalRoot,
+                      result.displayName == nil
+                        || project.displayName == result.displayName else {
+                    throw OperatorManagerClientError.invalidPayload(
+                        "committed project registration status did not match its receipt"
+                    )
+                }
+                return .committed(project: project, reconciled: result.reconciled)
+            case .reconciliationRequired:
+                guard !result.requestPath.isEmpty else {
+                    throw OperatorManagerClientError.invalidPayload(
+                        "pending project registration omitted its exact request path"
+                    )
+                }
+                return .reconciliationRequired(
+                    OperatorPendingProjectRegistration(
+                        request: OperatorProjectRegistrationRequest(
+                            path: result.requestPath,
+                            displayName: result.requestedDisplayName,
+                            repositoryIdentity: result.repositoryIdentityAssertion
+                        ),
+                        projectID: result.projectID,
+                        code: result.code ?? "project_registration_reconciliation_required",
+                        message: result.message ?? "Registration outcome remains ambiguous"
+                    )
+                )
+            }
+        } catch let error as ManagerDashboardClient.ClientError {
+            switch error {
+            case .invalidEndpoint:
+                throw OperatorManagerClientError.invalidEndpoint
+            case .invalidResponse:
+                throw OperatorManagerClientError.invalidResponse
+            case .invalidRequest(let message):
+                throw OperatorManagerClientError.invalidPayload(message)
+            case .rejected(let status, let message):
+                throw OperatorManagerClientError.rejected(status: status, message: message)
+            case .reconciliationRequired(_, let code, let message):
+                throw OperatorManagerClientError.reconciliationRequired(
+                    code: code,
+                    message: message
+                )
+            }
+        }
     }
 
     func projectStatus(projectID: String) async throws -> OperatorProject {
-        try await request(
+        let project: OperatorProject = try await request(
             method: "POST",
             path: "/api/manager/projects/status",
             body: ProjectIdentityBody(projectID: projectID)
         )
+        guard project.projectID.caseInsensitiveCompare(projectID) == .orderedSame else {
+            throw OperatorManagerClientError.invalidPayload(
+                "project status did not match the requested project identity"
+            )
+        }
+        return project
     }
 
     func resetProject(projectID: String, generation: UInt64) async throws -> OperatorResetReceipt {
@@ -134,6 +219,55 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
             path: "/api/manager/projects/reset-generation",
             body: ProjectGenerationBody(projectID: projectID, projectGeneration: generation)
         )
+    }
+
+    func relinkProject(
+        projectID: String,
+        generation: UInt64,
+        path: String
+    ) async throws -> OperatorRelinkReceipt {
+        guard let identifier = UUID(uuidString: projectID),
+              generation > 0,
+              generation < UInt64(Int64.max),
+              !path.isEmpty,
+              path.utf8.count <= ManagerRoutes.maximumProjectRelinkPathBytes,
+              (path as NSString).isAbsolutePath else {
+            throw OperatorManagerClientError.invalidPayload(
+                "project relink requires one project UUID, generation, and absolute path"
+            )
+        }
+        do {
+            let receipt = try await managerClient.relinkProject(
+                projectID: identifier,
+                expectedGeneration: generation,
+                path: path
+            )
+            return OperatorRelinkReceipt(
+                projectID: receipt.projectID,
+                canonicalRoot: receipt.canonicalRoot,
+                priorGeneration: receipt.priorGeneration,
+                newGeneration: receipt.newGeneration,
+                invalidatedBindingCount: receipt.invalidatedBindingCount,
+                completedAt: receipt.completedAt,
+                reconciled: receipt.reconciled
+            )
+        } catch let error as ManagerDashboardClient.ClientError {
+            switch error {
+            case .invalidEndpoint:
+                throw OperatorManagerClientError.invalidEndpoint
+            case .invalidResponse:
+                throw OperatorManagerClientError.invalidResponse
+            case .invalidRequest(let message):
+                throw OperatorManagerClientError.invalidPayload(message)
+            case .rejected(let status, let message):
+                throw OperatorManagerClientError.rejected(status: status, message: message)
+            case .reconciliationRequired(_, let code, let message):
+                throw OperatorManagerClientError.reconciliationRequired(
+                    code: code,
+                    message: message
+                )
+            }
+        }
     }
 
     func startRun(_ request: OperatorRunStartRequest) async throws -> OperatorRun {
@@ -154,11 +288,49 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
     }
 
     func controlRun(runID: String, action: OperatorRunControlAction) async throws -> OperatorRun {
-        try await request(
+        guard let identifier = UUID(uuidString: runID), runID.utf8.count <= 36 else {
+            throw OperatorManagerClientError.invalidPayload("run identifier must be a UUID")
+        }
+        return try await request(
             method: "POST",
             path: "/api/manager/runs/control",
-            body: RunControlBody(runID: runID, action: action),
+            body: RunControlBody(
+                runID: identifier.uuidString.lowercased(),
+                action: action
+            ),
             timeoutInterval: 18
+        )
+    }
+
+    func cancelRuntimeJob(jobID: String) async throws -> OperatorRuntimeJob {
+        guard let identifier = UUID(uuidString: jobID), jobID.utf8.count <= 36 else {
+            throw OperatorManagerClientError.invalidPayload("runtime job identifier must be a UUID")
+        }
+        return try await request(
+            method: "POST",
+            path: "/api/manager/runtime-jobs/cancel",
+            body: RuntimeJobIdentityBody(jobID: identifier.uuidString.lowercased()),
+            timeoutInterval: 18
+        )
+    }
+
+    func probeProvider(
+        adapterID: String,
+        mode: OperatorProviderProbeMode
+    ) async throws -> OperatorProvider {
+        let bytes = Array(adapterID.utf8)
+        guard !bytes.isEmpty,
+              bytes.count <= ManagerNode.maximumProviderAdapterIDBytes,
+              adapterID == ManagerNode.nativeSessionHostAdapterID else {
+            throw OperatorManagerClientError.invalidPayload(
+                "provider adapter identifier must name the registered native session host"
+            )
+        }
+        return try await request(
+            method: "POST",
+            path: "/api/manager/provider/probe",
+            body: ProviderProbeBody(adapterID: adapterID, mode: mode),
+            timeoutInterval: 35
         )
     }
 
@@ -245,6 +417,15 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
             if http.statusCode == 404, let unavailableMessage {
                 throw OperatorManagerClientError.capabilityUnavailable(unavailableMessage)
             }
+            if http.statusCode == 422,
+               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               object["code"] as? String == "autonomy_tool_configuration_invalid",
+               object["retryable"] as? Bool == false {
+                throw OperatorManagerClientError.configurationRejected(
+                    code: "autonomy_tool_configuration_invalid",
+                    message: (object["message"] as? String) ?? "Allowed tools are invalid"
+                )
+            }
             throw OperatorManagerClientError.rejected(
                 status: http.statusCode,
                 message: Self.errorMessage(from: data)
@@ -279,14 +460,26 @@ final class UnavailableOperatorManagerClient: OperatorManagerClientProtocol, @un
     func autonomyStatus() async throws -> OperatorAutonomySummary { throw error }
     func settings() async throws -> ManagerSettings { throw error }
     func updateSettings(_ patch: ManagerSettingsPatch) async throws -> ManagerSettings { throw error }
-    func registerProject(_ request: OperatorProjectRegistrationRequest) async throws -> OperatorProject {
+    func registerProject(
+        _ request: OperatorProjectRegistrationRequest
+    ) async throws -> OperatorProjectRegistrationOutcome {
         throw error
     }
     func projectStatus(projectID: String) async throws -> OperatorProject { throw error }
     func resetProject(projectID: String, generation: UInt64) async throws -> OperatorResetReceipt { throw error }
+    func relinkProject(
+        projectID: String,
+        generation: UInt64,
+        path: String
+    ) async throws -> OperatorRelinkReceipt { throw error }
     func startRun(_ request: OperatorRunStartRequest) async throws -> OperatorRun { throw error }
     func runStatus(runID: String) async throws -> OperatorRun { throw error }
     func controlRun(runID: String, action: OperatorRunControlAction) async throws -> OperatorRun { throw error }
+    func cancelRuntimeJob(jobID: String) async throws -> OperatorRuntimeJob { throw error }
+    func probeProvider(
+        adapterID: String,
+        mode: OperatorProviderProbeMode
+    ) async throws -> OperatorProvider { throw error }
 
     private var error: OperatorManagerClientError { .disabled(reason) }
 }
@@ -324,7 +517,9 @@ final class OperatorManagerClientRouter: OperatorManagerClientProtocol, @uncheck
         try await current.updateSettings(patch)
     }
 
-    func registerProject(_ request: OperatorProjectRegistrationRequest) async throws -> OperatorProject {
+    func registerProject(
+        _ request: OperatorProjectRegistrationRequest
+    ) async throws -> OperatorProjectRegistrationOutcome {
         try await current.registerProject(request)
     }
 
@@ -334,6 +529,18 @@ final class OperatorManagerClientRouter: OperatorManagerClientProtocol, @uncheck
 
     func resetProject(projectID: String, generation: UInt64) async throws -> OperatorResetReceipt {
         try await current.resetProject(projectID: projectID, generation: generation)
+    }
+
+    func relinkProject(
+        projectID: String,
+        generation: UInt64,
+        path: String
+    ) async throws -> OperatorRelinkReceipt {
+        try await current.relinkProject(
+            projectID: projectID,
+            generation: generation,
+            path: path
+        )
     }
 
     func startRun(_ request: OperatorRunStartRequest) async throws -> OperatorRun {
@@ -346,6 +553,17 @@ final class OperatorManagerClientRouter: OperatorManagerClientProtocol, @uncheck
 
     func controlRun(runID: String, action: OperatorRunControlAction) async throws -> OperatorRun {
         try await current.controlRun(runID: runID, action: action)
+    }
+
+    func cancelRuntimeJob(jobID: String) async throws -> OperatorRuntimeJob {
+        try await current.cancelRuntimeJob(jobID: jobID)
+    }
+
+    func probeProvider(
+        adapterID: String,
+        mode: OperatorProviderProbeMode
+    ) async throws -> OperatorProvider {
+        try await current.probeProvider(adapterID: adapterID, mode: mode)
     }
 
     private var current: any OperatorManagerClientProtocol {
@@ -381,5 +599,20 @@ private struct RunControlBody: Encodable {
     enum CodingKeys: String, CodingKey {
         case runID = "run_id"
         case action
+    }
+}
+
+private struct RuntimeJobIdentityBody: Encodable {
+    let jobID: String
+    enum CodingKeys: String, CodingKey { case jobID = "job_id" }
+}
+
+private struct ProviderProbeBody: Encodable {
+    let adapterID: String
+    let mode: OperatorProviderProbeMode
+
+    enum CodingKeys: String, CodingKey {
+        case adapterID = "adapter_id"
+        case mode
     }
 }

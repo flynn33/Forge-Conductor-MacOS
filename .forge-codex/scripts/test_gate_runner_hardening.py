@@ -733,7 +733,7 @@ class GateRunnerHardeningTests(unittest.TestCase):
 
                 self.assertEqual(
                     completed.returncode,
-                    0,
+                    1 if gate == "G10" else 0,
                     completed.stdout + completed.stderr,
                 )
                 if gate == "G00":
@@ -752,6 +752,7 @@ class GateRunnerHardeningTests(unittest.TestCase):
                             (root / "G10.check-root").read_text(encoding="utf-8"),
                             str(root),
                         )
+                        self.assertIn("no exact P10 feature binding", completed.stdout)
 
     def test_handler_swap_and_restore_cannot_change_executed_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

@@ -18,6 +18,7 @@ public struct FilesystemToolPack: ToolPackHandling {
     private let deletionStepObserver: (@Sendable (Int) -> Void)?
     private let deletionMutationObserver: (@Sendable (DeletionMutationStep) -> Void)?
     private let moveStepObserver: (@Sendable (MoveStep) -> Void)?
+    private let terminalMutationObserver: (@Sendable (TerminalMutationStep) -> Void)?
     private let forceCrossVolumeMove: Bool
     private let directorySynchronizer: @Sendable (URL) throws -> Void
     private let quarantineDirectorySynchronizer: @Sendable (Int32, URL) throws -> Void
@@ -48,10 +49,18 @@ public struct FilesystemToolPack: ToolPackHandling {
         case afterQuarantining(String)
     }
 
+    enum TerminalMutationStep: Sendable, Equatable {
+        case beforeDeleteUnlink(String)
+        case beforeDestinationPublish(source: String, destination: String)
+        case beforeSourceCleanup(String)
+        case beforeRollback(source: String, destination: String)
+    }
+
     public init() {
         deletionStepObserver = nil
         deletionMutationObserver = nil
         moveStepObserver = nil
+        terminalMutationObserver = nil
         forceCrossVolumeMove = false
         directorySynchronizer = { try Self.synchronizeDirectory($0) }
         quarantineDirectorySynchronizer = {
@@ -64,6 +73,7 @@ public struct FilesystemToolPack: ToolPackHandling {
         self.deletionStepObserver = deletionStepObserver
         deletionMutationObserver = nil
         moveStepObserver = nil
+        terminalMutationObserver = nil
         forceCrossVolumeMove = false
         directorySynchronizer = { try Self.synchronizeDirectory($0) }
         quarantineDirectorySynchronizer = {
@@ -75,11 +85,13 @@ public struct FilesystemToolPack: ToolPackHandling {
     init(
         deletionStepObserver: (@Sendable (Int) -> Void)?,
         moveStepObserver: (@Sendable (MoveStep) -> Void)?,
-        forceCrossVolumeMove: Bool
+        forceCrossVolumeMove: Bool,
+        terminalMutationObserver: (@Sendable (TerminalMutationStep) -> Void)? = nil
     ) {
         self.deletionStepObserver = deletionStepObserver
         deletionMutationObserver = nil
         self.moveStepObserver = moveStepObserver
+        self.terminalMutationObserver = terminalMutationObserver
         self.forceCrossVolumeMove = forceCrossVolumeMove
         directorySynchronizer = { try Self.synchronizeDirectory($0) }
         quarantineDirectorySynchronizer = {
@@ -95,11 +107,13 @@ public struct FilesystemToolPack: ToolPackHandling {
         directorySynchronizer: @escaping @Sendable (URL) throws -> Void,
         quarantineDirectorySynchronizer: @escaping @Sendable (Int32, URL) throws -> Void = {
             try Self.synchronizeDirectoryDescriptor($0, path: $1)
-        }
+        },
+        terminalMutationObserver: (@Sendable (TerminalMutationStep) -> Void)? = nil
     ) {
         self.deletionStepObserver = deletionStepObserver
         deletionMutationObserver = nil
         self.moveStepObserver = moveStepObserver
+        self.terminalMutationObserver = terminalMutationObserver
         self.forceCrossVolumeMove = forceCrossVolumeMove
         self.directorySynchronizer = directorySynchronizer
         self.quarantineDirectorySynchronizer = quarantineDirectorySynchronizer
@@ -108,6 +122,7 @@ public struct FilesystemToolPack: ToolPackHandling {
 
     init(
         deletionMutationObserver: (@Sendable (DeletionMutationStep) -> Void)?,
+        terminalMutationObserver: (@Sendable (TerminalMutationStep) -> Void)? = nil,
         quarantineDirectorySynchronizer: @escaping @Sendable (Int32, URL) throws -> Void = {
             try Self.synchronizeDirectoryDescriptor($0, path: $1)
         }
@@ -115,10 +130,24 @@ public struct FilesystemToolPack: ToolPackHandling {
         deletionStepObserver = nil
         self.deletionMutationObserver = deletionMutationObserver
         moveStepObserver = nil
+        self.terminalMutationObserver = terminalMutationObserver
         forceCrossVolumeMove = false
         directorySynchronizer = { try Self.synchronizeDirectory($0) }
         self.quarantineDirectorySynchronizer = quarantineDirectorySynchronizer
         secureMutationClient = nil
+    }
+
+    init(secureMutationClient: SecureFilesystemMutationClient) {
+        deletionStepObserver = nil
+        deletionMutationObserver = nil
+        moveStepObserver = nil
+        terminalMutationObserver = nil
+        forceCrossVolumeMove = false
+        directorySynchronizer = { try Self.synchronizeDirectory($0) }
+        quarantineDirectorySynchronizer = {
+            try Self.synchronizeDirectoryDescriptor($0, path: $1)
+        }
+        self.secureMutationClient = secureMutationClient
     }
 
     public var toolNames: [String] {
@@ -527,6 +556,15 @@ public struct FilesystemToolPack: ToolPackHandling {
                     },
                     afterQuarantine: { quarantinePath in
                         deletionMutationObserver?(.afterQuarantining(quarantinePath))
+                    },
+                    afterFinalIdentityVerification: { quarantinePath in
+                        terminalMutationObserver?(.beforeDeleteUnlink(quarantinePath))
+                    },
+                    beforeRollback: { quarantinePath, originalPath in
+                        terminalMutationObserver?(.beforeRollback(
+                            source: quarantinePath,
+                            destination: originalPath
+                        ))
                     }
                 )
             } catch {
@@ -534,6 +572,20 @@ public struct FilesystemToolPack: ToolPackHandling {
                     return Self.sourceChangedFailure(error)
                 }
                 guard removedCount > 0 else { throw error }
+                return Self.partialMutationResult(
+                    operation: "delete",
+                    source: url,
+                    destination: nil,
+                    completedEntries: removedCount,
+                    error: error
+                )
+            }
+            guard terminalOutcome.requestedMutationConfirmed else {
+                let recoveryPath = terminalOutcome.retainedReceiptPath ?? "unknown"
+                let error = SourceFenceError.terminalIdentityUnconfirmed(recoveryPath)
+                if removedCount == 0 {
+                    return Self.sourceChangedFailure(error)
+                }
                 return Self.partialMutationResult(
                     operation: "delete",
                     source: url,
@@ -658,6 +710,18 @@ public struct FilesystemToolPack: ToolPackHandling {
                     },
                     afterRename: {
                         moveStepObserver?(.afterPublishingSameVolumeDestination)
+                    },
+                    afterFinalIdentityVerification: { sourcePath, destinationPath in
+                        terminalMutationObserver?(.beforeDestinationPublish(
+                            source: sourcePath,
+                            destination: destinationPath
+                        ))
+                    },
+                    beforeRollback: { quarantinePath, originalPath in
+                        terminalMutationObserver?(.beforeRollback(
+                            source: quarantinePath,
+                            destination: originalPath
+                        ))
                     }
                 )
             } catch {
@@ -993,6 +1057,18 @@ public struct FilesystemToolPack: ToolPackHandling {
                 },
                 afterRename: {
                     moveStepObserver?(.afterPublishingStagingPayload)
+                },
+                afterFinalIdentityVerification: { sourcePath, destinationPath in
+                    terminalMutationObserver?(.beforeDestinationPublish(
+                        source: sourcePath,
+                        destination: destinationPath
+                    ))
+                },
+                beforeRollback: { quarantinePath, originalPath in
+                    terminalMutationObserver?(.beforeRollback(
+                        source: quarantinePath,
+                        destination: originalPath
+                    ))
                 }
             )
         } catch {
@@ -1209,8 +1285,22 @@ public struct FilesystemToolPack: ToolPackHandling {
                     },
                     afterVerification: {
                         moveStepObserver?(.afterVerifyingSourceEntry(entry.relativePath))
+                    },
+                    afterFinalIdentityVerification: { quarantinePath in
+                        terminalMutationObserver?(.beforeSourceCleanup(quarantinePath))
+                    },
+                    beforeRollback: { quarantinePath, originalPath in
+                        terminalMutationObserver?(.beforeRollback(
+                            source: quarantinePath,
+                            destination: originalPath
+                        ))
                     }
                 )
+                guard removal.terminal.requestedMutationConfirmed else {
+                    throw SourceFenceError.terminalIdentityUnconfirmed(
+                        removal.terminal.retainedReceiptPath ?? "unknown"
+                    )
+                }
                 removedCount += 1
                 if !removal.terminal.durabilityConfirmed {
                     let recoveryPath = removal.terminal.retainedReceiptPath ?? "unknown"
@@ -1508,7 +1598,9 @@ public struct FilesystemToolPack: ToolPackHandling {
         case quarantineCapacityExhausted([String])
         case quarantineTransitionRetained(String)
         case quarantineRetained(String)
+        case terminalIdentityUnconfirmed(String)
         case terminalReceiptRetained(String)
+        case rollbackIdentityUnconfirmed(String)
         case rollbackReceiptRetained(String)
         case quarantineUnavailable(String, String?)
         case unsupported(String)
@@ -1521,7 +1613,11 @@ public struct FilesystemToolPack: ToolPackHandling {
                 return [path]
             case .quarantineRetained(let path):
                 return [path]
+            case .terminalIdentityUnconfirmed(let path):
+                return [path]
             case .terminalReceiptRetained(let path):
+                return [path]
+            case .rollbackIdentityUnconfirmed(let path):
                 return [path]
             case .rollbackReceiptRetained(let path):
                 return [path]
@@ -1544,8 +1640,12 @@ public struct FilesystemToolPack: ToolPackHandling {
                 return "The initial filesystem quarantine transition committed without confirmed durability; recovery is required at \(path)"
             case .quarantineRetained(let path):
                 return "The filesystem quarantine transition requires recovery at \(path)"
+            case .terminalIdentityUnconfirmed(let path):
+                return "The terminal namespace mutation did not prove removal of the verified entry; recovery is required at \(path)"
             case .terminalReceiptRetained(let path):
                 return "The filesystem mutation committed, but durability or receipt cleanup was not confirmed; recovery is required at \(path)"
+            case .rollbackIdentityUnconfirmed(let path):
+                return "The filesystem rollback did not restore the verified entry; recovery is required at \(path)"
             case .rollbackReceiptRetained(let path):
                 return "The filesystem rollback restored the requested namespace, but durability or receipt cleanup was not confirmed; recovery is required at \(path)"
             case .quarantineUnavailable(let message, _):
@@ -1565,6 +1665,72 @@ public struct FilesystemToolPack: ToolPackHandling {
 
         deinit {
             _ = Darwin.close(rawValue)
+        }
+    }
+
+    /// Retains the verified non-directory vnode across the final namespace
+    /// syscall and checks the link-count effect afterward. This detects the
+    /// deterministic swap regression, but it is observational and does not make
+    /// unlink identity-conditional. Directory deletion remains unavailable in
+    /// the production secure-client path and has no equivalent link-count proof.
+    private struct TerminalUnlinkWitness {
+        let descriptor: PinnedFileDescriptor
+        let expectedIdentity: FilesystemQuarantineIdentity
+        let initialLinkCount: UInt64
+        let supportsLinkCountProof: Bool
+
+        init(
+            parentDescriptor: Int32,
+            entryName: String,
+            expectedIdentity: FilesystemQuarantineIdentity
+        ) throws {
+            let kind = mode_t(expectedIdentity.mode) & S_IFMT
+            let accessFlags: Int32
+            if kind == S_IFDIR {
+                accessFlags = O_RDONLY | O_DIRECTORY
+            } else if kind == S_IFLNK {
+                accessFlags = O_RDONLY | O_SYMLINK
+            } else {
+                accessFlags = O_RDONLY | O_NONBLOCK
+            }
+            let opened = entryName.withCString {
+                Darwin.openat(
+                    parentDescriptor,
+                    $0,
+                    accessFlags | O_CLOEXEC | O_NOFOLLOW_ANY | O_RESOLVE_BENEATH
+                )
+            }
+            guard opened >= 0 else { throw SourceFenceError.changed }
+            let descriptor = PinnedFileDescriptor(opened)
+            var information = stat()
+            guard Darwin.fstat(descriptor.rawValue, &information) == 0,
+                  expectedIdentity.matches(information) else {
+                throw SourceFenceError.changed
+            }
+            self.descriptor = descriptor
+            self.expectedIdentity = expectedIdentity
+            initialLinkCount = UInt64(information.st_nlink)
+            supportsLinkCountProof = kind != S_IFDIR
+        }
+
+        func confirmsExpectedUnlink() -> Bool {
+            guard supportsLinkCountProof else {
+                // APFS does not expose an unlink effect through st_nlink on an
+                // open directory descriptor. Production directory delete is
+                // therefore disabled instead of promoted by this observation.
+                return true
+            }
+            var information = stat()
+            guard initialLinkCount > 0,
+                  Darwin.fstat(descriptor.rawValue, &information) == 0,
+                  expectedIdentity.device == Int64(information.st_dev),
+                  expectedIdentity.inode == UInt64(information.st_ino),
+                  expectedIdentity.mode == UInt32(information.st_mode),
+                  expectedIdentity.owner == UInt32(information.st_uid),
+                  expectedIdentity.group == UInt32(information.st_gid) else {
+                return false
+            }
+            return UInt64(information.st_nlink) == initialLinkCount - 1
         }
     }
 
@@ -1593,6 +1759,7 @@ public struct FilesystemToolPack: ToolPackHandling {
     }
 
     private struct QuarantineTerminalOutcome {
+        let requestedMutationConfirmed: Bool
         let durabilityConfirmed: Bool
         let retainedReceiptPath: String?
     }
@@ -2062,7 +2229,9 @@ public struct FilesystemToolPack: ToolPackHandling {
         cancellation: ToolCallCancellation?,
         deadline: TimeInterval,
         beforeRemoval: () -> Void,
-        afterVerification: () -> Void
+        afterVerification: () -> Void,
+        afterFinalIdentityVerification: @escaping (String) -> Void,
+        beforeRollback: @escaping (String, String) -> Void
     ) throws -> VerifiedRemovalOutcome {
         do {
             let relativePath = deletionEntry.relativePath
@@ -2136,7 +2305,8 @@ public struct FilesystemToolPack: ToolPackHandling {
                         parentPath: deletionEntry.url.deletingLastPathComponent(),
                         originalName: entryName,
                         reservation: reservation,
-                        quarantineLedger: quarantineLedger
+                        quarantineLedger: quarantineLedger,
+                        beforeFinalRename: beforeRollback
                     )
                     throw translatedQuarantineError(error)
                 }
@@ -2146,7 +2316,8 @@ public struct FilesystemToolPack: ToolPackHandling {
                         parentPath: deletionEntry.url.deletingLastPathComponent(),
                         originalName: entryName,
                         reservation: reservation,
-                        quarantineLedger: quarantineLedger
+                        quarantineLedger: quarantineLedger,
+                        beforeFinalRename: beforeRollback
                     )
                     throw SourceFenceError.changed
                 }
@@ -2158,6 +2329,7 @@ public struct FilesystemToolPack: ToolPackHandling {
                     group: quarantined.group
                 )
                 do {
+                    var terminalWitness: TerminalUnlinkWitness?
                     let terminal = try quarantineLedger.performTerminal(
                         reservation,
                         expectedLeafIdentity: quarantinedIdentity,
@@ -2168,11 +2340,20 @@ public struct FilesystemToolPack: ToolPackHandling {
                             )
                         },
                         leafIdentityVerifier: {
-                            namedEntry(
+                            guard namedEntry(
                                 named: reservation.quarantineName,
                                 in: parentDescriptor,
                                 matches: quarantinedIdentity
+                            ) else { return false }
+                            terminalWitness = try? TerminalUnlinkWitness(
+                                parentDescriptor: parentDescriptor,
+                                entryName: reservation.quarantineName,
+                                expectedIdentity: quarantinedIdentity
                             )
+                            return terminalWitness != nil
+                        },
+                        afterFinalIdentityVerification: {
+                            afterFinalIdentityVerification(reservation.quarantineURL.path)
                         }
                     ) {
                         let flags = deletionEntry.isDirectory ? AT_REMOVEDIR : 0
@@ -2186,11 +2367,17 @@ public struct FilesystemToolPack: ToolPackHandling {
                             parentDescriptor,
                             path: deletionEntry.url.deletingLastPathComponent()
                         )) != nil
-                        return ((), durabilityConfirmed)
+                        let requestedMutationConfirmed = terminalWitness?
+                            .confirmsExpectedUnlink() == true
+                        return (
+                            requestedMutationConfirmed,
+                            requestedMutationConfirmed && durabilityConfirmed
+                        )
                     }
                     return VerifiedRemovalOutcome(
                         relativePath: relativePath,
                         terminal: QuarantineTerminalOutcome(
+                            requestedMutationConfirmed: terminal.value,
                             durabilityConfirmed: terminal.durabilityConfirmed,
                             retainedReceiptPath: terminal.durabilityConfirmed
                                 ? nil
@@ -2203,7 +2390,8 @@ public struct FilesystemToolPack: ToolPackHandling {
                         parentPath: deletionEntry.url.deletingLastPathComponent(),
                         originalName: entryName,
                         reservation: reservation,
-                        quarantineLedger: quarantineLedger
+                        quarantineLedger: quarantineLedger,
+                        beforeFinalRename: beforeRollback
                     )
                     throw translatedQuarantineError(error)
                 }
@@ -2642,6 +2830,13 @@ public struct FilesystemToolPack: ToolPackHandling {
             result.payload["durability_confirmed"] = false
             result.payload["ledger_cleanup_required"] = true
         }
+        if case .terminalIdentityUnconfirmed = error as? SourceFenceError {
+            result.payload["committed"] = false
+            result.payload["namespace_mutated"] = true
+            result.payload["requested_mutation_confirmed"] = false
+            result.payload["durability_confirmed"] = false
+            result.payload["ledger_cleanup_required"] = true
+        }
         if case .terminalReceiptRetained = error as? SourceFenceError {
             result.payload["committed"] = true
             result.payload["namespace_mutated"] = true
@@ -2651,6 +2846,15 @@ public struct FilesystemToolPack: ToolPackHandling {
         if case .rollbackReceiptRetained = error as? SourceFenceError {
             result.payload["committed"] = false
             result.payload["namespace_mutated"] = true
+            result.payload["rollback_attempted"] = true
+            result.payload["rollback_confirmed"] = false
+            result.payload["durability_confirmed"] = false
+            result.payload["ledger_cleanup_required"] = true
+        }
+        if case .rollbackIdentityUnconfirmed = error as? SourceFenceError {
+            result.payload["committed"] = false
+            result.payload["namespace_mutated"] = true
+            result.payload["requested_mutation_confirmed"] = false
             result.payload["rollback_attempted"] = true
             result.payload["rollback_confirmed"] = false
             result.payload["durability_confirmed"] = false
@@ -2676,6 +2880,8 @@ public struct FilesystemToolPack: ToolPackHandling {
             createdDirectories: createdDirectories
         )
         result.payload["committed"] = true
+        result.payload["namespace_mutated"] = true
+        result.payload["requested_mutation_confirmed"] = false
         result.payload["requested_namespace_stable"] = false
         result.payload["durability_confirmed"] = durabilityConfirmed
         if !durabilityConfirmed {
@@ -2769,6 +2975,11 @@ public struct FilesystemToolPack: ToolPackHandling {
     private static func requireDurableRemoval(
         _ outcome: QuarantineTerminalOutcome
     ) throws {
+        guard outcome.requestedMutationConfirmed else {
+            throw SourceFenceError.terminalIdentityUnconfirmed(
+                outcome.retainedReceiptPath ?? "unknown"
+            )
+        }
         guard outcome.durabilityConfirmed else {
             throw SourceFenceError.terminalReceiptRetained(
                 outcome.retainedReceiptPath ?? "unknown"
@@ -2784,7 +2995,9 @@ public struct FilesystemToolPack: ToolPackHandling {
         quarantineDirectorySynchronizer: ((Int32, URL) throws -> Void)? = nil,
         beforeRemoval: () -> Void = {},
         afterVerification: () -> Void = {},
-        afterQuarantine: (String) -> Void = { _ in }
+        afterQuarantine: (String) -> Void = { _ in },
+        afterFinalIdentityVerification: @escaping (String) -> Void = { _ in },
+        beforeRollback: @escaping (String, String) -> Void = { _, _ in }
     ) throws -> QuarantineTerminalOutcome {
         try withPinnedEntryParent(
             relativePath: entry.relativePath,
@@ -2823,7 +3036,8 @@ public struct FilesystemToolPack: ToolPackHandling {
                     parentPath: parentPath,
                     originalName: entryName,
                     reservation: reservation,
-                    quarantineLedger: quarantineLedger
+                    quarantineLedger: quarantineLedger,
+                    beforeFinalRename: beforeRollback
                 )
                 throw translatedQuarantineError(error)
             }
@@ -2833,12 +3047,14 @@ public struct FilesystemToolPack: ToolPackHandling {
                     parentPath: parentPath,
                     originalName: entryName,
                     reservation: reservation,
-                    quarantineLedger: quarantineLedger
+                    quarantineLedger: quarantineLedger,
+                    beforeFinalRename: beforeRollback
                 )
                 throw SourceFenceError.changed
             }
             let quarantinedIdentity = FilesystemQuarantineIdentity(quarantinedInformation)
             do {
+                var terminalWitness: TerminalUnlinkWitness?
                 let terminal = try quarantineLedger.performTerminal(
                     reservation,
                     expectedLeafIdentity: quarantinedIdentity,
@@ -2849,11 +3065,20 @@ public struct FilesystemToolPack: ToolPackHandling {
                         )
                     },
                     leafIdentityVerifier: {
-                        namedEntry(
+                        guard namedEntry(
                             named: reservation.quarantineName,
                             in: parentDescriptor,
                             matches: quarantinedIdentity
+                        ) else { return false }
+                        terminalWitness = try? TerminalUnlinkWitness(
+                            parentDescriptor: parentDescriptor,
+                            entryName: reservation.quarantineName,
+                            expectedIdentity: quarantinedIdentity
                         )
+                        return terminalWitness != nil
+                    },
+                    afterFinalIdentityVerification: {
+                        afterFinalIdentityVerification(reservation.quarantineURL.path)
                     }
                 ) {
                     let flags = entry.isDirectory ? AT_REMOVEDIR : 0
@@ -2867,9 +3092,15 @@ public struct FilesystemToolPack: ToolPackHandling {
                         parentDescriptor,
                         path: parentPath
                     )) != nil
-                    return ((), durabilityConfirmed)
+                    let requestedMutationConfirmed = terminalWitness?
+                        .confirmsExpectedUnlink() == true
+                    return (
+                        requestedMutationConfirmed,
+                        requestedMutationConfirmed && durabilityConfirmed
+                    )
                 }
                 return QuarantineTerminalOutcome(
+                    requestedMutationConfirmed: terminal.value,
                     durabilityConfirmed: terminal.durabilityConfirmed,
                     retainedReceiptPath: terminal.durabilityConfirmed
                         ? nil
@@ -2881,7 +3112,8 @@ public struct FilesystemToolPack: ToolPackHandling {
                     parentPath: parentPath,
                     originalName: entryName,
                     reservation: reservation,
-                    quarantineLedger: quarantineLedger
+                    quarantineLedger: quarantineLedger,
+                    beforeFinalRename: beforeRollback
                 )
                 throw translatedQuarantineError(error)
             }
@@ -2896,7 +3128,9 @@ public struct FilesystemToolPack: ToolPackHandling {
         directorySynchronizer: (URL) throws -> Void,
         beforeRename: () throws -> Void,
         afterVerification: () -> Void,
-        afterRename: () -> Void
+        afterRename: () -> Void,
+        afterFinalIdentityVerification: @escaping (String, String) -> Void,
+        beforeRollback: @escaping (String, String) -> Void
     ) throws -> PinnedRenameReceipt {
         let sourceParent = try pinnedParent(of: source)
 
@@ -2934,7 +3168,8 @@ public struct FilesystemToolPack: ToolPackHandling {
                     parentPath: sourceParent.path,
                     originalName: sourceParent.entryName,
                     reservation: reservation,
-                    quarantineLedger: quarantineLedger
+                    quarantineLedger: quarantineLedger,
+                    beforeFinalRename: beforeRollback
                 )
                 throw translatedQuarantineError(error)
             }
@@ -2944,7 +3179,8 @@ public struct FilesystemToolPack: ToolPackHandling {
                     parentPath: sourceParent.path,
                     originalName: sourceParent.entryName,
                     reservation: reservation,
-                    quarantineLedger: quarantineLedger
+                    quarantineLedger: quarantineLedger,
+                    beforeFinalRename: beforeRollback
                 )
                 throw SourceFenceError.changed
             }
@@ -2965,6 +3201,12 @@ public struct FilesystemToolPack: ToolPackHandling {
                             named: reservation.quarantineName,
                             in: sourceParent.directory.rawValue,
                             matches: quarantinedIdentity
+                        )
+                    },
+                    afterFinalIdentityVerification: {
+                        afterFinalIdentityVerification(
+                            reservation.quarantineURL.path,
+                            destination.path
                         )
                     }
                 ) {
@@ -3019,7 +3261,10 @@ public struct FilesystemToolPack: ToolPackHandling {
                     } catch {
                         durabilityConfirmed = false
                     }
-                    return (requestedNamespaceStable, durabilityConfirmed)
+                    return (
+                        requestedNamespaceStable,
+                        requestedNamespaceStable && durabilityConfirmed
+                    )
                 }
             } catch {
                 try restoreQuarantinedEntry(
@@ -3027,7 +3272,8 @@ public struct FilesystemToolPack: ToolPackHandling {
                     parentPath: sourceParent.path,
                     originalName: sourceParent.entryName,
                     reservation: reservation,
-                    quarantineLedger: quarantineLedger
+                    quarantineLedger: quarantineLedger,
+                    beforeFinalRename: beforeRollback
                 )
                 throw translatedQuarantineError(error)
             }
@@ -3125,7 +3371,8 @@ public struct FilesystemToolPack: ToolPackHandling {
         parentPath: URL,
         originalName: String,
         reservation: FilesystemQuarantineReservation,
-        quarantineLedger: FilesystemQuarantineLedger
+        quarantineLedger: FilesystemQuarantineLedger,
+        beforeFinalRename: @escaping (String, String) -> Void = { _, _ in }
     ) throws {
         let quarantinedIdentity: FilesystemQuarantineIdentity
         do {
@@ -3157,6 +3404,12 @@ public struct FilesystemToolPack: ToolPackHandling {
                         in: parentDescriptor,
                         matches: reservation.leafIdentity
                     )
+                },
+                afterFinalIdentityVerification: {
+                    beforeFinalRename(
+                        reservation.quarantineURL.path,
+                        reservation.originalURL.path
+                    )
                 }
             ) {
                 let result = reservation.quarantineName.withCString { sourceName in
@@ -3180,7 +3433,23 @@ public struct FilesystemToolPack: ToolPackHandling {
                     parentDescriptor,
                     path: parentPath
                 )) != nil
-                return ((), durabilityConfirmed)
+                let requestedNamespaceStable = namedEntry(
+                    named: originalName,
+                    in: parentDescriptor,
+                    matches: reservation.leafIdentity
+                ) && !namedEntryExists(
+                    named: reservation.quarantineName,
+                    in: parentDescriptor
+                )
+                return (
+                    requestedNamespaceStable,
+                    requestedNamespaceStable && durabilityConfirmed
+                )
+            }
+            guard terminal.value else {
+                throw SourceFenceError.rollbackIdentityUnconfirmed(
+                    reservation.receiptURL.path
+                )
             }
             guard terminal.durabilityConfirmed else {
                 throw SourceFenceError.rollbackReceiptRetained(
@@ -3231,6 +3500,18 @@ public struct FilesystemToolPack: ToolPackHandling {
             return false
         }
         return identity.matches(information)
+    }
+
+    private static func namedEntryExists(named name: String, in descriptor: Int32) -> Bool {
+        do {
+            return try fstatatInformationIfExists(
+                parentDescriptor: descriptor,
+                entryName: name
+            ) != nil
+        } catch {
+            // An inspection failure is never treated as proof of absence.
+            return true
+        }
     }
 
     private static func synchronizePinnedDirectory(_ parent: PinnedPathParent) throws {
@@ -3618,6 +3899,13 @@ public struct FilesystemToolPack: ToolPackHandling {
             payload["durability_confirmed"] = false
             payload["ledger_cleanup_required"] = true
         }
+        if case .terminalIdentityUnconfirmed = error as? SourceFenceError {
+            payload["committed"] = false
+            payload["namespace_mutated"] = true
+            payload["requested_mutation_confirmed"] = false
+            payload["durability_confirmed"] = false
+            payload["ledger_cleanup_required"] = true
+        }
         if case .terminalReceiptRetained = error as? SourceFenceError {
             payload["committed"] = true
             payload["namespace_mutated"] = true
@@ -3627,6 +3915,15 @@ public struct FilesystemToolPack: ToolPackHandling {
         if case .rollbackReceiptRetained = error as? SourceFenceError {
             payload["committed"] = false
             payload["namespace_mutated"] = true
+            payload["rollback_attempted"] = true
+            payload["rollback_confirmed"] = false
+            payload["durability_confirmed"] = false
+            payload["ledger_cleanup_required"] = true
+        }
+        if case .rollbackIdentityUnconfirmed = error as? SourceFenceError {
+            payload["committed"] = false
+            payload["namespace_mutated"] = true
+            payload["requested_mutation_confirmed"] = false
             payload["rollback_attempted"] = true
             payload["rollback_confirmed"] = false
             payload["durability_confirmed"] = false

@@ -170,6 +170,46 @@ final class FilesystemCancellationTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: removedFirst.path))
     }
 
+    func testFinalWindowDeleteSwapNeverReportsSuccessAndRetainsExactRecovery() throws {
+        let victim = home.appendingPathComponent("final-window-delete-victim.txt")
+        let peer = home.appendingPathComponent("final-window-delete-peer.txt")
+        try Data("original".utf8).write(to: victim)
+        try Data("replacement".utf8).write(to: peer)
+        let mutation = AtomicLeafSwapMutation(peer: peer)
+        let pack = FilesystemToolPack(
+            deletionMutationObserver: nil,
+            terminalMutationObserver: { step in
+                guard case .beforeDeleteUnlink(let quarantinePath) = step else { return }
+                mutation.apply(to: URL(fileURLWithPath: quarantinePath))
+            }
+        )
+
+        let result = try XCTUnwrap(try pack.handle(
+            name: "fs_delete",
+            arguments: ["path": victim.path],
+            context: nil,
+            clientID: ClientID("final-window-delete-swap"),
+            app: app,
+            cancellation: ToolCallCancellation(timeoutSeconds: 5)
+        ))
+
+        XCTAssertNil(mutation.error)
+        XCTAssertFalse(result.ok)
+        XCTAssertEqual(result.payload["code"] as? String, "source_changed")
+        XCTAssertEqual(result.payload["committed"] as? Bool, false)
+        XCTAssertEqual(result.payload["namespace_mutated"] as? Bool, true)
+        XCTAssertEqual(result.payload["requested_mutation_confirmed"] as? Bool, false)
+        XCTAssertEqual(result.payload["durability_confirmed"] as? Bool, false)
+        XCTAssertEqual(result.payload["ledger_cleanup_required"] as? Bool, true)
+        XCTAssertEqual(result.payload["recovery_required"] as? Bool, true)
+        let recoveryPath = try XCTUnwrap(result.payload["recovery_path"] as? String)
+        XCTAssertEqual(result.payload["recovery_paths"] as? [String], [recoveryPath])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: recoveryPath))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: victim.path))
+        XCTAssertEqual(try Data(contentsOf: peer), Data("original".utf8))
+        XCTAssertNil(try retainedQuarantineURL(in: home))
+    }
+
     func testInitialQuarantineSyncFailureReportsRetainedTransitionWithoutRollback() throws {
         let parent = home.appendingPathComponent("quarantine-sync-failure", isDirectory: true)
         let victim = parent.appendingPathComponent("victim.txt")
@@ -285,6 +325,46 @@ final class FilesystemCancellationTests: XCTestCase {
             Data("replacement".utf8)
         )
         XCTAssertEqual(try Data(contentsOf: peer), Data("original".utf8))
+    }
+
+    func testFinalWindowRollbackSwapNeverReportsRestorationAndRetainsRecovery() throws {
+        let victim = home.appendingPathComponent("final-window-rollback-victim.txt")
+        let peer = home.appendingPathComponent("final-window-rollback-peer.txt")
+        try Data("original".utf8).write(to: victim)
+        try Data("replacement".utf8).write(to: peer)
+        let mutation = FinalWindowRollbackSwapMutation(peer: peer)
+        defer { mutation.clearFlags() }
+        let pack = FilesystemToolPack(
+            deletionMutationObserver: nil,
+            terminalMutationObserver: { mutation.apply($0) }
+        )
+
+        let result = try XCTUnwrap(try pack.handle(
+            name: "fs_delete",
+            arguments: ["path": victim.path],
+            context: nil,
+            clientID: ClientID("final-window-rollback-swap"),
+            app: app,
+            cancellation: ToolCallCancellation(timeoutSeconds: 5)
+        ))
+
+        XCTAssertNil(mutation.error)
+        XCTAssertFalse(result.ok)
+        XCTAssertEqual(result.payload["code"] as? String, "source_changed")
+        XCTAssertEqual(result.payload["committed"] as? Bool, false)
+        XCTAssertEqual(result.payload["namespace_mutated"] as? Bool, true)
+        XCTAssertEqual(result.payload["requested_mutation_confirmed"] as? Bool, false)
+        XCTAssertEqual(result.payload["rollback_attempted"] as? Bool, true)
+        XCTAssertEqual(result.payload["rollback_confirmed"] as? Bool, false)
+        XCTAssertEqual(result.payload["durability_confirmed"] as? Bool, false)
+        XCTAssertEqual(result.payload["ledger_cleanup_required"] as? Bool, true)
+        XCTAssertEqual(result.payload["recovery_required"] as? Bool, true)
+        let recoveryPath = try XCTUnwrap(result.payload["recovery_path"] as? String)
+        XCTAssertEqual(result.payload["recovery_paths"] as? [String], [recoveryPath])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: recoveryPath))
+        XCTAssertEqual(try Data(contentsOf: victim), Data("replacement".utf8))
+        XCTAssertEqual(try Data(contentsOf: peer), Data("original".utf8))
+        XCTAssertNil(try retainedQuarantineURL(in: home))
     }
 
     func testUnavailableQuarantineLedgerFailsClosedBeforeNamespaceMutation() throws {
@@ -472,6 +552,54 @@ final class FilesystemCancellationTests: XCTestCase {
         ))
         XCTAssertTrue(retry.ok, "\(retry.payload)")
         XCTAssertFalse(FileManager.default.fileExists(atPath: victim.path))
+    }
+
+    func testQuarantineStatusKeepsUnresolvedDebtAndReleasesOnlyExactRestoredIdentity() throws {
+        let ledgerRoot = home.appendingPathComponent(
+            "quarantine-status-restart",
+            isDirectory: true
+        )
+        let parent = home.appendingPathComponent(
+            "quarantine-status-parent",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
+        let source = parent.appendingPathComponent("victim.txt")
+        try Data("preserve".utf8).write(to: source)
+        let initialLedger = FilesystemQuarantineLedger(
+            root: ledgerRoot,
+            processInstanceID: "before-status-restart"
+        )
+        let reservation = try initialLedger.reserveAndQuarantine(
+            parent: parent,
+            originalName: source.lastPathComponent,
+            parentIdentity: try quarantineIdentity(at: parent),
+            leafIdentity: try quarantineIdentity(at: source),
+            operation: "test_status_reconciliation"
+        ) { reservation in
+            try FileManager.default.moveItem(at: source, to: reservation.quarantineURL)
+        }
+
+        let unresolved = try FilesystemQuarantineLedger(
+            root: ledgerRoot,
+            processInstanceID: "after-status-restart"
+        ).status()
+        XCTAssertEqual(unresolved.occupiedCount, 1)
+        XCTAssertEqual(unresolved.releasedCount, 0)
+        XCTAssertEqual(unresolved.capacity, FilesystemQuarantineLedger.maximumReservations)
+
+        try FileManager.default.moveItem(
+            at: reservation.quarantineURL,
+            to: reservation.originalURL
+        )
+        let reconciled = try FilesystemQuarantineLedger(
+            root: ledgerRoot,
+            processInstanceID: "after-exact-restore"
+        ).status()
+        XCTAssertEqual(reconciled.occupiedCount, 0)
+        XCTAssertEqual(reconciled.releasedCount, 1)
+        XCTAssertFalse(reconciled.isExhausted)
+        XCTAssertEqual(try Data(contentsOf: source), Data("preserve".utf8))
     }
 
     func testCorruptQuarantineReceiptRemainsOccupiedAndRecoveryVisible() throws {
@@ -919,6 +1047,53 @@ final class FilesystemCancellationTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
     }
 
+    func testFinalWindowSameVolumePublishSwapNeverReportsSuccessAndRetainsRecovery() throws {
+        let source = home.appendingPathComponent("final-window-same-volume-source.txt")
+        let destination = home.appendingPathComponent("final-window-same-volume-destination.txt")
+        let peer = home.appendingPathComponent("final-window-same-volume-peer.txt")
+        try Data("original".utf8).write(to: source)
+        try Data("replacement".utf8).write(to: peer)
+        let mutation = AtomicLeafSwapMutation(peer: peer)
+        let pack = FilesystemToolPack(
+            deletionStepObserver: nil,
+            moveStepObserver: nil,
+            forceCrossVolumeMove: false,
+            terminalMutationObserver: { step in
+                guard case .beforeDestinationPublish(let quarantinePath, let publishedPath) = step,
+                      publishedPath == destination.path else { return }
+                mutation.apply(to: URL(fileURLWithPath: quarantinePath))
+            }
+        )
+
+        let result = try XCTUnwrap(try pack.handle(
+            name: "fs_move",
+            arguments: ["path": source.path, "dest": destination.path],
+            context: nil,
+            clientID: ClientID("final-window-same-volume-publish"),
+            app: app,
+            cancellation: ToolCallCancellation(timeoutSeconds: 5)
+        ))
+
+        XCTAssertNil(mutation.error)
+        XCTAssertFalse(result.ok)
+        XCTAssertEqual(result.payload["code"] as? String, "partial_filesystem_mutation")
+        XCTAssertEqual(result.payload["control_code"] as? String, "source_changed")
+        XCTAssertEqual(result.payload["committed"] as? Bool, true)
+        XCTAssertEqual(result.payload["namespace_mutated"] as? Bool, true)
+        XCTAssertEqual(result.payload["requested_mutation_confirmed"] as? Bool, false)
+        XCTAssertEqual(result.payload["requested_namespace_stable"] as? Bool, false)
+        XCTAssertEqual(result.payload["durability_confirmed"] as? Bool, false)
+        XCTAssertEqual(result.payload["ledger_cleanup_required"] as? Bool, true)
+        XCTAssertEqual(result.payload["recovery_required"] as? Bool, true)
+        let recoveryPath = try XCTUnwrap(result.payload["recovery_path"] as? String)
+        XCTAssertEqual(result.payload["recovery_paths"] as? [String], [recoveryPath])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: recoveryPath))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: source.path))
+        XCTAssertEqual(try Data(contentsOf: destination), Data("replacement".utf8))
+        XCTAssertEqual(try Data(contentsOf: peer), Data("original".utf8))
+        XCTAssertNil(try retainedQuarantineURL(in: home))
+    }
+
     func testSameVolumeNamespaceInstabilityWithUnconfirmedDurabilityRetainsRecoveryReceipt() throws {
         let source = home.appendingPathComponent("same-volume-unstable-source.txt")
         let destination = home.appendingPathComponent("same-volume-unstable-destination.txt")
@@ -1113,6 +1288,53 @@ final class FilesystemCancellationTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: source), Data("original".utf8))
         XCTAssertEqual(try Data(contentsOf: peer), Data("original".utf8))
         XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+    }
+
+    func testFinalWindowCrossVolumePublishSwapNeverReportsSuccessAndRetainsRecovery() throws {
+        let source = home.appendingPathComponent("final-window-cross-volume-source.txt")
+        let destination = home.appendingPathComponent("final-window-cross-volume-destination.txt")
+        let peer = home.appendingPathComponent("final-window-cross-volume-peer.txt")
+        try Data("original".utf8).write(to: source)
+        try Data("replacement".utf8).write(to: peer)
+        let mutation = AtomicLeafSwapMutation(peer: peer)
+        let pack = FilesystemToolPack(
+            deletionStepObserver: nil,
+            moveStepObserver: nil,
+            forceCrossVolumeMove: true,
+            terminalMutationObserver: { step in
+                guard case .beforeDestinationPublish(let quarantinePath, let publishedPath) = step,
+                      publishedPath == destination.path else { return }
+                mutation.apply(to: URL(fileURLWithPath: quarantinePath))
+            }
+        )
+
+        let result = try XCTUnwrap(try pack.handle(
+            name: "fs_move",
+            arguments: ["path": source.path, "dest": destination.path],
+            context: nil,
+            clientID: ClientID("final-window-cross-volume-publish"),
+            app: app,
+            cancellation: ToolCallCancellation(timeoutSeconds: 5)
+        ))
+
+        XCTAssertNil(mutation.error)
+        XCTAssertFalse(result.ok)
+        XCTAssertEqual(result.payload["code"] as? String, "partial_filesystem_mutation")
+        XCTAssertEqual(result.payload["control_code"] as? String, "source_changed")
+        XCTAssertEqual(result.payload["committed"] as? Bool, true)
+        XCTAssertEqual(result.payload["namespace_mutated"] as? Bool, true)
+        XCTAssertEqual(result.payload["requested_mutation_confirmed"] as? Bool, false)
+        XCTAssertEqual(result.payload["requested_namespace_stable"] as? Bool, false)
+        XCTAssertEqual(result.payload["durability_confirmed"] as? Bool, false)
+        XCTAssertEqual(result.payload["ledger_cleanup_required"] as? Bool, true)
+        XCTAssertEqual(result.payload["recovery_required"] as? Bool, true)
+        let recoveryPath = try XCTUnwrap(result.payload["recovery_path"] as? String)
+        XCTAssertEqual(result.payload["recovery_paths"] as? [String], [recoveryPath])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: recoveryPath))
+        XCTAssertEqual(try Data(contentsOf: source), Data("original".utf8))
+        XCTAssertEqual(try Data(contentsOf: destination), Data("replacement".utf8))
+        XCTAssertEqual(try Data(contentsOf: peer), Data("original".utf8))
+        XCTAssertNil(try retainedQuarantineURL(in: home))
     }
 
     func testCrossVolumeNamespaceInstabilityWithUnconfirmedDurabilityRetainsRecoveryReceipt() throws {
@@ -1410,6 +1632,53 @@ final class FilesystemCancellationTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: quarantine), Data("replacement".utf8))
         XCTAssertEqual(try Data(contentsOf: peer), Data("original".utf8))
         XCTAssertEqual(try Data(contentsOf: destination), Data("original".utf8))
+    }
+
+    func testFinalWindowSourceCleanupSwapNeverReportsSuccessAndRetainsRecovery() throws {
+        let source = home.appendingPathComponent("final-window-source-cleanup.txt")
+        let destination = home.appendingPathComponent("final-window-source-cleanup-destination.txt")
+        let peer = home.appendingPathComponent("final-window-source-cleanup-peer.txt")
+        try Data("original".utf8).write(to: source)
+        try Data("replacement".utf8).write(to: peer)
+        let mutation = AtomicLeafSwapMutation(peer: peer)
+        let pack = FilesystemToolPack(
+            deletionStepObserver: nil,
+            moveStepObserver: nil,
+            forceCrossVolumeMove: true,
+            terminalMutationObserver: { step in
+                guard case .beforeSourceCleanup(let quarantinePath) = step else { return }
+                mutation.apply(to: URL(fileURLWithPath: quarantinePath))
+            }
+        )
+
+        let result = try XCTUnwrap(try pack.handle(
+            name: "fs_move",
+            arguments: ["path": source.path, "dest": destination.path],
+            context: nil,
+            clientID: ClientID("final-window-source-cleanup"),
+            app: app,
+            cancellation: ToolCallCancellation(timeoutSeconds: 5)
+        ))
+
+        XCTAssertNil(mutation.error)
+        XCTAssertFalse(result.ok)
+        XCTAssertEqual(result.payload["code"] as? String, "partial_filesystem_mutation")
+        XCTAssertEqual(result.payload["control_code"] as? String, "source_changed")
+        XCTAssertEqual(result.payload["completed_entries"] as? Int, 0)
+        XCTAssertEqual(result.payload["source_fence_verified"] as? Bool, false)
+        XCTAssertEqual(result.payload["destination_complete"] as? Bool, true)
+        XCTAssertEqual(result.payload["committed"] as? Bool, false)
+        XCTAssertEqual(result.payload["requested_mutation_confirmed"] as? Bool, false)
+        XCTAssertEqual(result.payload["durability_confirmed"] as? Bool, false)
+        XCTAssertEqual(result.payload["ledger_cleanup_required"] as? Bool, true)
+        XCTAssertEqual(result.payload["recovery_required"] as? Bool, true)
+        let recoveryPath = try XCTUnwrap(result.payload["recovery_path"] as? String)
+        XCTAssertEqual(result.payload["recovery_paths"] as? [String], [recoveryPath])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: recoveryPath))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: source.path))
+        XCTAssertEqual(try Data(contentsOf: destination), Data("original".utf8))
+        XCTAssertEqual(try Data(contentsOf: peer), Data("original".utf8))
+        XCTAssertNil(try retainedQuarantineURL(in: home))
     }
 
     func testCrossVolumeMovePreservesMetadataChangedSourceEntryAfterDeletionStarts() throws {
@@ -2274,6 +2543,81 @@ private final class AtomicLeafSwapMutation: @unchecked Sendable {
             lock.unlock()
             return
         }
+    }
+}
+
+private final class FinalWindowRollbackSwapMutation: @unchecked Sendable {
+    private let lock = NSLock()
+    private let peer: URL
+    private let swap: AtomicLeafSwapMutation
+    private var phase = 0
+    private var storedError: Error?
+    private var flaggedPath: String?
+
+    init(peer: URL) {
+        self.peer = peer
+        swap = AtomicLeafSwapMutation(peer: peer)
+    }
+
+    var error: Error? {
+        lock.lock()
+        defer { lock.unlock() }
+        return storedError ?? swap.error
+    }
+
+    func apply(_ step: FilesystemToolPack.TerminalMutationStep) {
+        switch step {
+        case .beforeDeleteUnlink(let quarantinePath):
+            lock.lock()
+            guard phase == 0 else {
+                lock.unlock()
+                return
+            }
+            phase = 1
+            flaggedPath = quarantinePath
+            lock.unlock()
+            guard quarantinePath.withCString({ Darwin.chflags($0, UInt32(UF_IMMUTABLE)) }) == 0 else {
+                recordPOSIXError(path: quarantinePath)
+                return
+            }
+
+        case .beforeRollback(let quarantinePath, _):
+            lock.lock()
+            guard phase == 1 else {
+                lock.unlock()
+                return
+            }
+            phase = 2
+            lock.unlock()
+            guard quarantinePath.withCString({ Darwin.chflags($0, 0) }) == 0 else {
+                recordPOSIXError(path: quarantinePath)
+                return
+            }
+            swap.apply(to: URL(fileURLWithPath: quarantinePath))
+
+        default:
+            return
+        }
+    }
+
+    func clearFlags() {
+        lock.lock()
+        let paths = [flaggedPath, swap.targetPath, peer.path].compactMap { $0 }
+        lock.unlock()
+        for path in Set(paths) {
+            _ = path.withCString { Darwin.chflags($0, 0) }
+        }
+    }
+
+    private func recordPOSIXError(path: String) {
+        let error = NSError(
+            domain: NSPOSIXErrorDomain,
+            code: Int(errno),
+            userInfo: [NSFilePathErrorKey: path]
+        )
+        lock.lock()
+        storedError = error
+        lock.unlock()
     }
 }
 

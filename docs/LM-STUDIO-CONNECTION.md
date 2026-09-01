@@ -200,10 +200,22 @@ The two registrations are separate LM Studio-hosted processes with distinct `ser
 
 Completing this connector checklist proves only the LM Studio registration and
 stdio path. It does not close P10, filesystem E2, current G09-G12, Developer ID
-Release signing/native UI/notarization, live `shell_exec` after app and installed-
-manager restart, manager-owned real-provider forced rollover, or owner-deferred
-representative physical-hardware qualification. Unit, synthetic-host, simulator,
-and connector-smoke evidence cannot substitute for those release-blocking runs.
+Release signing/full native UI and service lifecycle/notarization, raw
+installed-CLI and production Settings shell qualification, manager-owned real-
+provider forced rollover, or owner-deferred representative physical-hardware
+qualification. A bounded Apple Development-signed installed-app scenario has
+passed `shell_exec` after app relaunch and installed-manager PID replacement,
+but it is not P10 or Release authority. The earlier exact-revision Apple
+Development-signed 100-cycle
+navigation test is supporting evidence only; the final current-source rerun is
+open. Unit, synthetic-host, simulator, focused UI, and
+connector-smoke evidence cannot substitute for those release-blocking runs.
+
+Managed Autonomy uses a separate typed LM Studio provider configuration from
+the MCP plugin registration described above. The adapter can read a valid
+configuration, but this snapshot does not yet expose a supported clean-install
+app, CLI, or manager control that creates or updates it. Tests that write the
+file directly do not establish an operator workflow.
 
 ## Auto-heal
 

@@ -2,7 +2,7 @@
 set -euo pipefail
 export LC_ALL=C
 
-USAGE="usage: check_privileged_filesystem_bundle.sh APP_BUNDLE [Debug|Release] [CLI_EXECUTABLE]"
+USAGE="usage: check_privileged_filesystem_bundle.sh APP_BUNDLE [Debug|DevelopmentRelease|Release] [CLI_EXECUTABLE]"
 if (( $# < 1 || $# > 3 )); then
   printf '%s\n' "$USAGE" >&2
   exit 2
@@ -20,6 +20,8 @@ DAEMON_PLIST="$APP_BUNDLE/Contents/Library/LaunchDaemons/com.forge-conductor.fil
 APP_INFO_PLIST="$APP_BUNDLE/Contents/Info.plist"
 APP_EXECUTABLE="$APP_BUNDLE/Contents/MacOS/Forge Conductor"
 EMBEDDED_CLI="$APP_BUNDLE/Contents/Helpers/forge-conductor"
+RUNTIME_LAUNCHER="$APP_BUNDLE/Contents/Helpers/forge-runtime-launcher"
+CORE_FRAMEWORK="$APP_BUNDLE/Contents/Frameworks/ForgeConductorCore.framework"
 
 fail() {
   printf '%s\n' "$1" >&2
@@ -208,7 +210,7 @@ daemon_code_directory_hash() {
 }
 
 case "$CONFIGURATION" in
-  Debug)
+  Debug|DevelopmentRelease)
     TEAM_IDENTIFIER="9AQ2C2838M"
     CERTIFICATE_REQUIREMENT='certificate leaf[field.1.2.840.113635.100.6.1.12] exists'
     ;;
@@ -229,7 +231,13 @@ esac
 [[ -f "$APP_EXECUTABLE" ]] || fail "app main executable is missing or not a regular file: $APP_EXECUTABLE"
 [[ ! -L "$APP_EXECUTABLE" ]] || fail "app main executable must not be a symbolic link: $APP_EXECUTABLE"
 [[ -x "$APP_EXECUTABLE" ]] || fail "app main executable is not executable: $APP_EXECUTABLE"
+[[ -f "$RUNTIME_LAUNCHER" ]] || fail "runtime launcher is missing or not a regular file: $RUNTIME_LAUNCHER"
+[[ ! -L "$RUNTIME_LAUNCHER" ]] || fail "runtime launcher must not be a symbolic link: $RUNTIME_LAUNCHER"
+[[ -x "$RUNTIME_LAUNCHER" ]] || fail "runtime launcher is not executable: $RUNTIME_LAUNCHER"
+[[ -d "$CORE_FRAMEWORK" ]] || fail "core framework is missing: $CORE_FRAMEWORK"
+[[ ! -L "$CORE_FRAMEWORK" ]] || fail "core framework must not be a symbolic link: $CORE_FRAMEWORK"
 supported_architectures "app main executable" "$APP_EXECUTABLE" >/dev/null
+supported_architectures "runtime launcher" "$RUNTIME_LAUNCHER" >/dev/null
 
 /usr/bin/plutil -lint "$DAEMON_PLIST"
 [[ "$(/usr/libexec/PlistBuddy -c 'Print :Label' "$DAEMON_PLIST")" == "com.forge-conductor.filesystem-daemon" ]]
@@ -249,11 +257,18 @@ fi
 APP_REQUIREMENT="anchor apple generic and identifier \"com.forge-conductor.app\" and certificate leaf[subject.OU] = \"$TEAM_IDENTIFIER\" and $CERTIFICATE_REQUIREMENT"
 DAEMON_REQUIREMENT="anchor apple generic and identifier \"com.forge-conductor.filesystem-daemon\" and certificate leaf[subject.OU] = \"$TEAM_IDENTIFIER\" and $CERTIFICATE_REQUIREMENT"
 CLI_REQUIREMENT="anchor apple generic and identifier \"com.forge-conductor.cli\" and certificate leaf[subject.OU] = \"$TEAM_IDENTIFIER\" and $CERTIFICATE_REQUIREMENT"
+RUNTIME_LAUNCHER_REQUIREMENT="anchor apple generic and identifier \"com.forge-conductor.runtime-launcher\" and certificate leaf[subject.OU] = \"$TEAM_IDENTIFIER\" and $CERTIFICATE_REQUIREMENT"
+CORE_FRAMEWORK_REQUIREMENT="anchor apple generic and identifier \"com.forge-conductor.core\" and certificate leaf[subject.OU] = \"$TEAM_IDENTIFIER\" and $CERTIFICATE_REQUIREMENT"
 
 /usr/bin/codesign --verify --deep --strict --all-architectures --verbose=4 "$APP_BUNDLE"
 /usr/bin/codesign --verify --strict --all-architectures --verbose=4 \
   "-R=$APP_REQUIREMENT" "$APP_BUNDLE"
-/usr/bin/codesign --verify --strict --verbose=4 "-R=$DAEMON_REQUIREMENT" "$DAEMON"
+/usr/bin/codesign --verify --strict --all-architectures --verbose=4 \
+  "-R=$DAEMON_REQUIREMENT" "$DAEMON"
+/usr/bin/codesign --verify --strict --all-architectures --verbose=4 \
+  "-R=$RUNTIME_LAUNCHER_REQUIREMENT" "$RUNTIME_LAUNCHER"
+/usr/bin/codesign --verify --strict --all-architectures --verbose=4 \
+  "-R=$CORE_FRAMEWORK_REQUIREMENT" "$CORE_FRAMEWORK"
 
 TEMPORARY_DIRECTORY="$(mktemp -d /tmp/forge-filesystem-bundle-check.XXXXXX)"
 trap 'rm -rf "$TEMPORARY_DIRECTORY"' EXIT
@@ -329,6 +344,8 @@ done
 /usr/bin/codesign -d --verbose=4 -r- "$APP_BUNDLE" 2>&1
 /usr/bin/codesign -d --verbose=4 -r- "$DAEMON" 2>&1
 /usr/bin/codesign -d --verbose=4 -r- "$EMBEDDED_CLI" 2>&1
+/usr/bin/codesign -d --verbose=4 -r- "$RUNTIME_LAUNCHER" 2>&1
+/usr/bin/codesign -d --verbose=4 -r- "$CORE_FRAMEWORK" 2>&1
 if (( CLI_ARGUMENT_SUPPLIED == 1 )); then
   /usr/bin/codesign -d --verbose=4 -r- "$CLI_EXECUTABLE" 2>&1
 fi

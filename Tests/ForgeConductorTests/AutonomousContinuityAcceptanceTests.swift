@@ -22,6 +22,7 @@ final class AutonomousContinuityAcceptanceTests: XCTestCase {
     func testThresholdRolloverAutomaticallyContinuesFreshSuccessorsAcrossProjects() async throws {
         let app = try ForgeApp.bootstrap(home: home)
         defer { app.shutdown() }
+        _ = try app.config.update(["allowed_roots": [root.path]], save: true)
         let alpha = try registerProject(app: app, name: "alpha")
         let beta = try registerProject(app: app, name: "beta")
         let alphaFile = try fixtureFile(in: alpha.root, contents: "alpha acceptance\n")
@@ -226,13 +227,13 @@ final class AutonomousContinuityAcceptanceTests: XCTestCase {
     private func registerProject(app: ForgeApp, name: String) throws -> AcceptanceProject {
         let projectRoot = root.appendingPathComponent(name, isDirectory: true)
         try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
-        let initialized = try app.projectMemory.initialize(
+        let initialized = try app.projectMemory.initializeUnchecked(
             path: projectRoot.path,
             displayName: "Acceptance \(name.capitalized)"
         )
         let projectID = try XCTUnwrap(initialized["project_id"] as? String)
         let descriptor = try app.projectMemory.identities.descriptor(projectID: projectID)
-        let record = try app.projectContexts.registerProject(
+        let record = try app.projectContexts.registerProjectUnchecked(
             descriptor: descriptor,
             canonicalRoot: projectRoot
         )

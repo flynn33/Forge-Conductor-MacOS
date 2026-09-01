@@ -15,13 +15,11 @@ Forge Conductor is purpose-built for LM Studio and its local MCP runtime.
 | **Wiki** | [Project wiki](https://github.com/flynn33/Forge-Conductor-MacOS/wiki) |
 | **Contributions** | **Closed** — see [CONTRIBUTING.md](CONTRIBUTING.md) |
 
-> **Current qualification boundary:** this source line is an in-progress P10
-> checkpoint, not a qualified release. Filesystem E2, signed native UI and
-> release validation, live shell compatibility, manager-owned autonomous
-> continuity, owner-deferred representative physical-hardware qualification,
-> and current G09-G12 remain open and release-blocking. See
-> [`.forge-codex/state/release-handoff.md`](.forge-codex/state/release-handoff.md)
-> for the active state.
+> **Current status:** this is a 0.9.0 development snapshot, not a ship-authorized
+> release. The Swift runtime, Xcode app, and built app bundle all report 0.9.0
+> build 1. Implemented behavior and remaining release work are listed separately
+> below. Package P10/G10 records remain open; this documentation does not mark
+> any package gate complete.
 
 ### How LM Studio connects
 
@@ -34,7 +32,7 @@ LM Studio is the MCP **host**. It spawns a Forge **stdio** server:
 | App (LaunchAgent) | `manager run --home …` | Dashboard manager (`install-login`) |
 | App (double-click) | _(none)_ | SwiftUI GUI |
 
-**Product path (v0.5+):** GUI → **LM Studio MCP** → **Deploy to LM Studio**. Forge transactionally writes primary + failover configuration, triggers LM Studio reload (relaunching it only if needed), verifies LM Studio synchronized the exact revision, and independently smokes both tool servers. Details: [`docs/LM-STUDIO-CONNECTION.md`](docs/LM-STUDIO-CONNECTION.md). Current qualification status is recorded in [CHANGELOG.md](CHANGELOG.md) and the active [release handoff](.forge-codex/state/release-handoff.md); historical release test plans are not current ship authority.
+**Product path (v0.5+):** GUI → **LM Studio MCP** → **Deploy to LM Studio**. Forge transactionally writes primary + failover configuration, triggers LM Studio reload (relaunching it only if needed), verifies LM Studio synchronized the exact revision, and independently smokes both tool servers. Details: [`docs/LM-STUDIO-CONNECTION.md`](docs/LM-STUDIO-CONNECTION.md). Current product behavior and open shipment work are recorded in [CHANGELOG.md](CHANGELOG.md). The [package qualification ledger](.forge-codex/state/release-handoff.md) retains gate evidence but is not product-feature authority; historical release test plans are not current ship authority.
 
 ```bash
 # After building products — does NOT write LM Studio by itself:
@@ -78,7 +76,11 @@ forge-conductor manager start --open   # native dashboard / manager
 | **FORGE RIG** | Host telemetry (CPU/GPU/RAM/disk) + LM Studio-oriented load |
 | **LM Studio MCP** | LM Studio host, model backends, Forge MCP from `mcp.json` / live processes |
 | **Agents / Tools / Feed** | Playbooks and tool audit for local-model agent runs |
-| **Manager / Settings** | Start/Stop HTTP control plane, doctor, authorized folders, and project-shell policy |
+| **Projects** | Durable project identity, generation, bindings, memory, and continuity state |
+| **Autonomy / Continuity** | Manager-owned runs, provider leases, budgets, handoffs, successor acknowledgment, and fencing state |
+| **Runtimes / Provider** | Effective shell policy, durable jobs, redacted provider configuration, and contract health |
+| **Events & Evidence / Diagnostics** | Bounded manager events, durable evidence references, logs, and doctor signals |
+| **Manager** | Start/Stop/Restart control, authorized folders, project-shell policy, protected-filesystem service controls, maintenance, and doctor |
 
 Only Forge-managed LM Studio runtime entries appear in these surfaces; unrelated
 processes and foreign-project continuity remain excluded.
@@ -104,31 +106,80 @@ Context and agent handoffs: SQLite `context_handoffs` with rebuildable JSON/Mark
 
 More detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and the [project wiki](https://github.com/flynn33/Forge-Conductor-MacOS/wiki).
 
-## 0.9.0 baseline and the current P10 checkpoint
+## 0.9.0 behavior and current qualification
 
 The historical 0.9.0 baseline introduced durable, project-scoped memory and the
 runtime reliability implementation around continuity, resource ownership,
 telemetry, and local tool authorization. The current tree contains additional
-P10 work recorded under **Unreleased** in the changelog; that work is not yet
-release-qualified.
+work recorded under **Unreleased** in the changelog.
 
-| Area | What changed |
-|------|--------------|
-| **Project memory** | Twelve `project_memory.*` tools provide bounded search, optimistic updates, links, batch writes, health, and checksummed import/export. |
-| **Continuity** | A serialized coordinator and native session-host adapter preserve handoff state across process and chat boundaries. Manager-owned autonomous rollover still requires the recorded real-provider forced-rollover authority scenario. |
-| **Runtime** | Resource policy, lifecycle ownership, diagnostics, bounded latest-value telemetry, and shared Metal resources reduce unbounded work and retained state. |
-| **Filesystem** | Protocol-v5 capture, bounded protected quarantine, and additive `fs_delete_recovery` mitigate destructive-path substitution races; the signed 57-case E2 matrix and formal closure remain unexecuted. This is mitigation, not elimination. |
-| **Shell** | Project shell tools are enabled by default, remain limited to authorized workspace roots, expose an explicit native opt-out, and keep the established synchronous `shell_exec` contract capped at 120 seconds. Clean-profile `bash.run` is additive. |
+### Implemented and test-backed in the current tree
+
+| Area | Implemented behavior |
+|------|----------------------|
+| **Product identity** | The CLI reports marketing version **0.9.0**. Swift constants, Xcode configurations, and the built app bundle report version **0.9.0**, build **1**. |
+| **Operator app** | The native SwiftUI app exposes Rig, MCP, Agents, Tools, Feed, Projects, Autonomy, Continuity, Runtimes, Provider, Evidence, Diagnostics, and Manager surfaces. An earlier exact-revision Apple Development-signed 100-cycle Rig/MCP result is supporting evidence; the final current-source signed navigation and action matrix remains open. |
+| **Project memory** | Twelve `project_memory.*` tools provide bounded search, optimistic updates, links, batch writes, health, and checksummed import/export while legacy `memory_*` tools remain available. |
+| **Shell** | Project shell tools are enabled on clean installs, ambiguous legacy disabled state migrates to enabled, explicit opt-out persists, and `shell_exec` retains its registered name, authorized `/bin/bash -lc` behavior, 120-second ceiling, and established result contract. Clean-profile `bash.run` is additive. |
+| **Continuity** | Durable checkpoints, handoffs, successor state, fencing, and a native LM Studio provider adapter are implemented and covered by deterministic recovery tests. Real-provider threshold rollover and the full crash-state matrix remain open below. |
+| **Runtime and telemetry** | Resource policy, lifecycle ownership, diagnostics, bounded latest-value telemetry, shared Metal resources, and durable bounded jobs are implemented. |
+| **Filesystem mitigation** | Protocol-v5 capture, bounded protected quarantine, durable receipts, and additive `fs_delete_recovery` narrow and record regular-file/symlink deletion race impact. Move and recursive directory deletion remain unavailable in production. |
+
+The current-source SwiftPM Release regression executes 1,001 tests
+with 5 declared environment skips and 0 failures, with compiler warnings treated
+as errors. A dedicated Apple Development-signed Xcode app-hosted contract suite
+also executes 2 tests with 0 failures. This is broad regression evidence, not
+production-path qualification for every feature listed below.
+
+### Open or deferred before shipment
+
+- **Filesystem E2:** the signed distinct-process 57-row matrix, durable-crash
+  recovery matrix, terminal receipt/physical-leaf reconciliation, and formal
+  closure remain required. Production `fs_move` and recursive directory
+  `fs_delete` are currently unavailable; their hardened internal paths and
+  tests are not a production capability. Quarantine is mitigation, not
+  elimination.
+- **Native release:** the focused signed Debug navigation test is supporting
+  evidence only. Developer ID Release build, full native/settings/service
+  lifecycle, archive, notarization, stapling, and Gatekeeper execution remain
+  open.
+- **Shell qualification:** a bounded Apple Development-signed installed-app
+  scenario executed the established `shell_exec` contract through both the app
+  executable and installed raw CLI. It proved clean-install enablement,
+  accidental legacy-disabled migration, explicit opt-out and denial,
+  `tools/list` presence, login-Bash/result compatibility, app close/reopen, and
+  installed LaunchAgent manager PID replacement with predecessor exit. The
+  current-source Apple Development-signed Release layout also passes raw
+  installed-CLI `version`, `status`, and `doctor` with its adjacent signed
+  runtime launcher. The run deliberately did not invoke System Events; native
+  Settings control and post-Settings re-enable remain blocked for the Xcode XCUI
+  lane. Developer ID Release signing and P10 exact-production qualification also
+  remain open.
+- **Managed provider setup:** the adapter can load a valid LM Studio provider
+  configuration, but a clean installation currently has no supported app, CLI,
+  or manager control that creates it. Test-only file provisioning is not a
+  working product setup path, so Provider and managed Autonomy configuration
+  remain release-blocking.
+- **Provider continuity:** an unresolved provider-response crash is fenced for
+  660 seconds. LM Studio exposes no request-ID receipt lookup; after the fence,
+  each retry can create at most one duplicate model inference, and repeated
+  operator or recovery retries can repeat inference. Tool-effect reconciliation
+  prevents duplicate tool execution, but the inference race is not eliminated.
+  Release authority still requires the manager-owned threshold-forced real-
+  provider rollover with exact successor acknowledgment, predecessor fencing,
+  automatic continuation, GUI-closed operation, and durable crash recovery.
+- **Hardware and completion:** representative physical-hardware qualification
+  is owner-deferred. The full clean release matrix, current package P10/G10 and
+  G09-G12 evidence, and final completion validation remain open.
 
 Legacy `memory_*` and `session_*`/`context_*` tools remain compatible. Current
-qualification boundaries are in **[CHANGELOG.md](CHANGELOG.md)** and the active
-[checkpoint handoff](.forge-codex/state/release-handoff.md).
+product behavior and qualification boundaries are in
+**[CHANGELOG.md](CHANGELOG.md)**. The [package qualification ledger](.forge-codex/state/release-handoff.md)
+records its own still-open evidence state and does not override current source
+or executable behavior.
 
-No implementation or unit-test result in this checkpoint closes P10 or E2.
-Developer ID Release signing and native UI execution, successful `shell_exec`
-after both app and installed-manager restart, the required real-provider forced
-rollover, owner-deferred representative physical-hardware testing, and current
-G09-G12 must all produce their required evidence before release qualification.
+No implementation, unit test, focused UI test, or synthetic-provider result in
+this snapshot closes P10, G10, filesystem E2, or final release qualification.
 
 ## Design principles
 

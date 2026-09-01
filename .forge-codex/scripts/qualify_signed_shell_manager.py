@@ -2,10 +2,12 @@
 """Qualify signed shell access through an isolated installed manager lifecycle.
 
 The default mode is read-only. Passing --execute authorizes the bounded per-user
-LaunchAgent install described in the JSON preflight. The canonical launchd label
-and plist must be absent before execution; the runner never takes over an existing
-manager. Cleanup is scoped to artifacts whose ownership is proven from the
-isolated qualification home.
+LaunchAgent install described in the JSON preflight. System Events UI mutation
+requires its own explicit flag; without it the signed non-UI lifecycle is retained
+as partial evidence and native Settings remains blocked for the Xcode XCUI lane.
+The canonical launchd label and plist must be absent before execution; the runner
+never takes over an existing manager. Cleanup is scoped to artifacts whose
+ownership is proven from the isolated qualification home.
 """
 
 from __future__ import annotations
@@ -51,6 +53,21 @@ CLI_IDENTIFIER = "com.forge-conductor.cli"
 RUNTIME_LAUNCHER_IDENTIFIER = "com.forge-conductor.runtime-launcher"
 DAEMON_IDENTIFIER = "com.forge-conductor.filesystem-daemon"
 FRAMEWORK_IDENTIFIER = "com.forge-conductor.core"
+DEVELOPMENT_TEAM_IDENTIFIER = "9AQ2C2838M"
+DISTRIBUTION_TEAM_IDENTIFIER = "2Y25RTLZET"
+PRODUCT_IDENTIFIERS = {
+    APP_IDENTIFIER,
+    CLI_IDENTIFIER,
+    RUNTIME_LAUNCHER_IDENTIFIER,
+    DAEMON_IDENTIFIER,
+    FRAMEWORK_IDENTIFIER,
+}
+CERTIFICATE_REQUIREMENT_BY_TEAM = {
+    DEVELOPMENT_TEAM_IDENTIFIER:
+        "certificate leaf[field.1.2.840.113635.100.6.1.12] exists",
+    DISTRIBUTION_TEAM_IDENTIFIER:
+        "certificate leaf[field.1.2.840.113635.100.6.1.13] exists",
+}
 APP_NAME = "Forge Conductor.app"
 SHELL_COMMAND = (
     "shopt -q login_shell || exit 97; "
@@ -137,7 +154,11 @@ def run_command(
             timeout=timeout,
             env=environment,
         )
-    except (OSError, subprocess.TimeoutExpired) as error:
+    except subprocess.TimeoutExpired as error:
+        raise QualificationError(
+            f"command timed out: {arguments[0]} after {timeout:.1f} seconds"
+        ) from error
+    except OSError as error:
         raise QualificationError(f"command failed to run: {arguments[0]}: {error}") from error
 
 
@@ -159,22 +180,28 @@ def parse_codesign_details(output: str) -> dict[str, Any]:
     return details
 
 
+def product_signing_requirement(identifier: str, team_identifier: str) -> str:
+    require(identifier in PRODUCT_IDENTIFIERS, f"unsupported product identifier: {identifier}")
+    certificate_requirement = CERTIFICATE_REQUIREMENT_BY_TEAM.get(team_identifier)
+    require(
+        certificate_requirement is not None,
+        f"unsupported product signing team: {team_identifier}",
+    )
+    return (
+        f'anchor apple generic and identifier "{identifier}" '
+        f'and certificate leaf[subject.OU] = "{team_identifier}" '
+        f"and {certificate_requirement}"
+    )
+
+
 def inspect_signature(
     path: pathlib.Path,
     *,
     expected_identifier: str,
     expected_team: str | None = None,
+    expected_authority: str | None = None,
     deep: bool = False,
 ) -> dict[str, Any]:
-    verify_arguments = ["/usr/bin/codesign", "--verify", "--strict", "--verbose=4"]
-    if deep:
-        verify_arguments.insert(2, "--deep")
-    verify_arguments.append(str(path))
-    verified = run_command(verify_arguments)
-    require(
-        verified.returncode == 0,
-        f"code signature validation failed for {path}: {bounded_text(verified.stderr)}",
-    )
     displayed = run_command(["/usr/bin/codesign", "-d", "--verbose=4", str(path)])
     require(displayed.returncode == 0, f"cannot inspect code signature for {path}")
     details = parse_codesign_details(displayed.stdout + displayed.stderr)
@@ -184,6 +211,28 @@ def inspect_signature(
     if expected_team is not None:
         require(team == expected_team, f"wrong signing team for {path}")
     require(details.get("authorities"), f"missing CMS signing authority for {path}")
+    if expected_authority is not None:
+        require(
+            expected_authority in details["authorities"],
+            f"wrong signing authority for {path}",
+        )
+    requirement = product_signing_requirement(expected_identifier, team)
+    verify_arguments = [
+        "/usr/bin/codesign",
+        "--verify",
+        "--strict",
+        "--all-architectures",
+        "--verbose=4",
+        f"-R={requirement}",
+        str(path),
+    ]
+    if deep:
+        verify_arguments.insert(2, "--deep")
+    verified = run_command(verify_arguments)
+    require(
+        verified.returncode == 0,
+        f"code signature validation failed for {path}: {bounded_text(verified.stderr)}",
+    )
     require(isinstance(details.get("cdhash"), str), f"missing CDHash for {path}")
     require("runtime" in details.get("code_directory", ""), f"hardened runtime is absent for {path}")
     return {
@@ -193,6 +242,7 @@ def inspect_signature(
         "cdhash": details["cdhash"],
         "authorities": details["authorities"],
         "runtime_version": details.get("runtime_version"),
+        "signing_requirement": requirement,
         "sha256": sha256_file(path) if path.is_file() else None,
     }
 
@@ -231,7 +281,24 @@ def embedded_cli_rpaths(path: pathlib.Path) -> list[str]:
     return paths
 
 
-def validate_application_bundle(app: pathlib.Path) -> dict[str, Any]:
+def signing_leaf_authority(signature: dict[str, Any]) -> str:
+    authorities = signature.get("authorities")
+    require(
+        isinstance(authorities, list)
+        and authorities
+        and isinstance(authorities[0], str)
+        and bool(authorities[0]),
+        "missing leaf signing authority",
+    )
+    return authorities[0]
+
+
+def validate_application_bundle(
+    app: pathlib.Path,
+    *,
+    expected_team: str | None = None,
+    expected_authority: str | None = None,
+) -> dict[str, Any]:
     original = app
     require(original.exists(), f"application bundle is missing: {original}")
     require(not original.is_symlink(), f"application bundle must not be a symlink: {original}")
@@ -259,25 +326,40 @@ def validate_application_bundle(app: pathlib.Path) -> dict[str, Any]:
         require_regular_executable(path, label)
     require(framework.is_dir() and not framework.is_symlink(), f"framework is missing: {framework}")
 
-    app_signature = inspect_signature(app, expected_identifier=APP_IDENTIFIER, deep=True)
+    app_signature = inspect_signature(
+        app,
+        expected_identifier=APP_IDENTIFIER,
+        expected_team=expected_team,
+        expected_authority=expected_authority,
+        deep=True,
+    )
     team = app_signature["team_identifier"]
+    authority = signing_leaf_authority(app_signature)
     signatures = {
         "application": app_signature,
-        "embedded_cli": inspect_signature(cli, expected_identifier=CLI_IDENTIFIER, expected_team=team),
+        "embedded_cli": inspect_signature(
+            cli,
+            expected_identifier=CLI_IDENTIFIER,
+            expected_team=team,
+            expected_authority=authority,
+        ),
         "runtime_launcher": inspect_signature(
             launcher,
             expected_identifier=RUNTIME_LAUNCHER_IDENTIFIER,
             expected_team=team,
+            expected_authority=authority,
         ),
         "filesystem_daemon": inspect_signature(
             daemon,
             expected_identifier=DAEMON_IDENTIFIER,
             expected_team=team,
+            expected_authority=authority,
         ),
         "framework": inspect_signature(
             framework,
             expected_identifier=FRAMEWORK_IDENTIFIER,
             expected_team=team,
+            expected_authority=authority,
         ),
     }
     daemon_hash = signatures["filesystem_daemon"]["cdhash"]
@@ -304,6 +386,7 @@ def validate_application_bundle(app: pathlib.Path) -> dict[str, Any]:
         "version": info.get("CFBundleShortVersionString"),
         "build": info.get("CFBundleVersion"),
         "team_identifier": team,
+        "signing_authority": authority,
         "signatures": signatures,
         "sealed_daemon_hashes": sealed_hashes,
         "embedded_cli_rpaths": rpaths,
@@ -415,6 +498,19 @@ def account_home() -> pathlib.Path:
     return pathlib.Path(pwd.getpwuid(os.getuid()).pw_dir)
 
 
+def validate_qualification_home_isolation(home: pathlib.Path) -> dict[str, Any]:
+    home = home.resolve(strict=False)
+    default_home = (account_home() / ".forge-conductor").resolve(strict=False)
+    require(home != default_home, "qualification home cannot be the default Forge home")
+    require(default_home not in home.parents, "qualification home cannot be inside the default Forge home")
+    require(home not in default_home.parents, "qualification home cannot contain the default Forge home")
+    return {
+        "qualification_home": str(home),
+        "default_forge_home": str(default_home),
+        "default_forge_home_excluded": True,
+    }
+
+
 def product_gui_processes() -> list[dict[str, Any]]:
     result = run_command(["/bin/ps", "-axo", "pid=,comm="], timeout=10)
     require(result.returncode == 0, "cannot inspect existing product processes")
@@ -478,7 +574,7 @@ def sandboxed_install_command(cli: pathlib.Path, qualification_home: pathlib.Pat
 def normalized_launchagent_path(value: str | pathlib.Path) -> pathlib.PurePath:
     normalized = os.path.normpath(os.fspath(value))
     require(os.path.isabs(normalized), "LaunchAgent path must be absolute")
-    if normalized == "/tmp" or normalized.startswith("/tmp/"):
+    if normalized in {"/tmp", "/var"} or normalized.startswith(("/tmp/", "/var/")):
         normalized = "/private" + normalized
     return pathlib.PurePath(normalized)
 
@@ -580,16 +676,33 @@ def wait_until(predicate: Callable[[], Any], timeout: float, message: str) -> An
 
 
 def manager_process_identity(uid: int, expected_executable: pathlib.Path, timeout: float) -> dict[str, Any]:
-    def ready() -> dict[str, Any] | None:
+    expected = expected_executable.resolve()
+    deadline = time.monotonic() + timeout
+    job: dict[str, Any] | None = None
+    executable: pathlib.Path | None = None
+    pid: int | None = None
+    while time.monotonic() < deadline:
         job = launchctl_job(uid)
         if job is None or not isinstance(job.get("pid"), int):
-            return None
-        return job
-
-    job = wait_until(ready, timeout, "manager LaunchAgent did not reach a running PID")
-    pid = int(job["pid"])
-    executable = process_executable(pid)
-    require(executable == expected_executable.resolve(), "manager PID is running an unexpected executable")
+            time.sleep(0.15)
+            continue
+        pid = int(job["pid"])
+        try:
+            executable = process_executable(pid)
+        except QualificationError:
+            time.sleep(0.15)
+            continue
+        if executable == expected:
+            break
+        require(
+            executable == pathlib.Path("/usr/libexec/xpcproxy"),
+            f"manager PID is running an unexpected executable: expected {expected}, observed {executable}",
+        )
+        time.sleep(0.15)
+    require(
+        job is not None and pid is not None and executable == expected,
+        f"manager LaunchAgent did not exec its installed binary: expected {expected}, observed {executable}",
+    )
     arguments = run_command(["/bin/ps", "-ww", "-p", str(pid), "-o", "command="], timeout=5)
     require(arguments.returncode == 0 and arguments.stdout.strip(), "cannot inspect manager process arguments")
     return {
@@ -767,6 +880,58 @@ def validate_tools_list(response: dict[str, Any]) -> dict[str, Any]:
     tools = tool_map(response, "signed manager qualification")
     require("shell_exec" in tools, "shell_exec is absent from MCP tools/list")
     return {"tool_count": len(tools), "shell_exec_count": list(tools).count("shell_exec")}
+
+
+def validate_raw_cli_commands(
+    binary: pathlib.Path,
+    home: pathlib.Path,
+    *,
+    expected_version: str,
+) -> dict[str, Any]:
+    environment = qualification_environment(home, "raw-cli")
+
+    version = run_command([str(binary), "version"], environment=environment)
+    require(version.returncode == 0, f"installed raw CLI version failed: {version.stderr}")
+    require(version.stdout.strip() == expected_version, "installed raw CLI version changed")
+
+    payloads: dict[str, dict[str, Any]] = {}
+    for command in ("status", "doctor"):
+        result = run_command(
+            [str(binary), command, "--home", str(home)],
+            timeout=30,
+            environment=environment,
+        )
+        require(
+            result.returncode == 0,
+            f"installed raw CLI {command} failed: {bounded_text(result.stderr)}",
+        )
+        try:
+            payload = json.loads(result.stdout)
+        except (json.JSONDecodeError, UnicodeDecodeError) as error:
+            raise QualificationError(
+                f"installed raw CLI {command} returned invalid JSON"
+            ) from error
+        require(isinstance(payload, dict), f"installed raw CLI {command} is not an object")
+        require(payload.get("ok") is True, f"installed raw CLI {command} reported failure")
+        require(payload.get("version") == expected_version, f"installed raw CLI {command} version changed")
+        payloads[command] = payload
+
+    binary_report = payloads["doctor"].get("binary")
+    require(isinstance(binary_report, dict), "installed raw CLI doctor has no binary report")
+    require(binary_report.get("installed") is True, "installed raw CLI doctor cannot find itself")
+    shell_report = payloads["status"].get("shell")
+    require(isinstance(shell_report, dict), "installed raw CLI status has no shell report")
+    require(shell_report.get("enabled") is True, "installed raw CLI status reports shell disabled")
+
+    return {
+        "status": "passed",
+        "executable": str(binary.resolve()),
+        "version": version.stdout.strip(),
+        "status_ok": payloads["status"]["ok"],
+        "doctor_ok": payloads["doctor"]["ok"],
+        "doctor_binary_installed": binary_report["installed"],
+        "shell_enabled": shell_report["enabled"],
+    }
 
 
 def validate_shell_result(payload: dict[str, Any], cwd: pathlib.Path) -> dict[str, Any]:
@@ -980,14 +1145,371 @@ def launch_and_close_gui(
     }
 
 
-def read_clean_default_config(home: pathlib.Path) -> dict[str, Any]:
+def accessibility_script(pid: int, operation: str, identifier: str | None = None) -> str:
+    require(pid > 0, "accessibility target PID must be positive")
+    require(
+        operation in {"process_ready", "open_settings", "query", "press"},
+        "unsupported accessibility operation",
+    )
+    if operation == "process_ready":
+        return f'''
+tell application "System Events"
+    set matchingProcesses to every application process whose unix id is {pid}
+    if (count of matchingProcesses) is 0 then return "NOT_READY"
+end tell
+return "READY"
+'''
+    if operation == "open_settings":
+        return f'''
+tell application "System Events"
+    set targetProcess to first application process whose unix id is {pid}
+    set frontmost of targetProcess to true
+    tell targetProcess to keystroke "," using command down
+end tell
+return "OPENED"
+'''
+
+    element_classes = {
+        "settings-shell-enabled": ("checkbox", "checkboxes"),
+        "settings-save": ("button", "buttons"),
+    }
+    require(identifier in element_classes, "invalid accessibility identifier")
+    element_class, element_collection = element_classes[identifier]
+    action = (
+        'return "FOUND" & tab & roleValue & tab & enabledValue & tab & '
+        'valueValue & tab & titleValue'
+        if operation == "query"
+        else 'perform action "AXPress" of candidateElement\n'
+        '                    return "PRESSED"'
+    )
+    return f'''
+tell application "System Events"
+    set targetProcess to first application process whose unix id is {pid}
+    tell targetProcess
+        set settingsWindows to every window whose name contains "Settings"
+        if (count of settingsWindows) is 0 then return "NOT_FOUND"
+        set targetWindow to first window whose name contains "Settings"
+        tell scroll area 1 of group 1 of targetWindow
+            repeat with groupIndex from 1 to count of groups
+                set candidateCount to count of {element_collection} of group groupIndex
+                repeat with candidateIndex from 1 to candidateCount
+                    set candidateElement to {element_class} candidateIndex of group groupIndex
+                    try
+                        set identifierValue to (value of attribute "AXIdentifier" of candidateElement) as text
+                        if identifierValue is "{identifier}" then
+                            set roleValue to role of candidateElement as text
+                            set enabledValue to enabled of candidateElement as text
+                            set valueValue to ""
+                            try
+                                set valueValue to value of candidateElement as text
+                            end try
+                            set titleValue to ""
+                            try
+                                set titleValue to name of candidateElement as text
+                            end try
+                            if titleValue is "" then
+                                try
+                                    set titleValue to description of candidateElement as text
+                                end try
+                            end if
+                            {action}
+                        end if
+                    end try
+                end repeat
+            end repeat
+        end tell
+    end tell
+end tell
+return "NOT_FOUND"
+'''
+
+
+def run_accessibility_script(script: str, timeout: float) -> str:
+    result = run_command(["/usr/bin/osascript", "-e", script], timeout=timeout)
+    require(
+        result.returncode == 0,
+        f"Settings accessibility command failed: {bounded_text(result.stderr)}",
+    )
+    return result.stdout.strip()
+
+
+def parse_accessibility_snapshot(raw: str, identifier: str) -> dict[str, Any]:
+    fields = raw.split("\t", 4)
+    require(len(fields) == 5 and fields[0] == "FOUND", f"Settings control is unavailable: {identifier}")
+    role, enabled, value, title = fields[1:]
+    return {
+        "identifier": identifier,
+        "role": role,
+        "enabled": enabled.lower() in {"true", "yes", "1"},
+        "value": value,
+        "title": title,
+    }
+
+
+def wait_for_accessibility_snapshot(
+    pid: int,
+    identifier: str,
+    timeout: float,
+) -> dict[str, Any]:
+    deadline = time.monotonic() + timeout
+    last_error = "control was not found"
+    while time.monotonic() < deadline:
+        try:
+            raw = run_accessibility_script(
+                accessibility_script(pid, "query", identifier),
+                timeout=min(15, max(1, deadline - time.monotonic())),
+            )
+            if raw.startswith("FOUND\t"):
+                return parse_accessibility_snapshot(raw, identifier)
+            last_error = raw or last_error
+        except QualificationError as error:
+            last_error = str(error)
+        time.sleep(0.2)
+    raise QualificationError(f"Settings control {identifier} did not become visible: {last_error}")
+
+
+def wait_for_accessibility_process(pid: int, timeout: float) -> None:
+    deadline = time.monotonic() + timeout
+    last_error = "application process was not registered"
+    while time.monotonic() < deadline:
+        try:
+            value = run_accessibility_script(
+                accessibility_script(pid, "process_ready"),
+                timeout=min(5, max(1, deadline - time.monotonic())),
+            )
+            if value == "READY":
+                return
+            last_error = value or last_error
+        except QualificationError as error:
+            last_error = str(error)
+        time.sleep(0.2)
+    raise QualificationError(f"Settings app did not register with System Events: {last_error}")
+
+
+def accessibility_value_is_enabled(snapshot: dict[str, Any]) -> bool:
+    return str(snapshot.get("value", "")).strip().lower() in {"1", "true", "on", "yes"}
+
+
+def press_accessibility_element(pid: int, identifier: str, timeout: float) -> None:
+    result = run_accessibility_script(
+        accessibility_script(pid, "press", identifier),
+        timeout=timeout,
+    )
+    require(result == "PRESSED", f"Settings control could not be pressed: {identifier}")
+
+
+def settings_ui_reenable(
+    binary: pathlib.Path,
+    home: pathlib.Path,
+    *,
+    startup_timeout: float,
+    response_timeout: float,
+) -> dict[str, Any]:
+    log_directory = home / "qualification-logs"
+    log_directory.mkdir(parents=True, exist_ok=True)
+    stdout_path = log_directory / "settings-ui.stdout.log"
+    stderr_path = log_directory / "settings-ui.stderr.log"
+    with stdout_path.open("wb") as stdout_stream, stderr_path.open("wb") as stderr_stream:
+        process = subprocess.Popen(
+            [str(binary)],
+            stdout=stdout_stream,
+            stderr=stderr_stream,
+            env=qualification_environment(home, "settings-ui"),
+        )
+        try:
+            wait_until(
+                lambda: process.poll() is None and process_executable(process.pid) == binary.resolve(),
+                startup_timeout,
+                "Settings UI app did not reach a live signed process",
+            )
+            wait_for_accessibility_process(process.pid, startup_timeout)
+            opened = run_accessibility_script(
+                accessibility_script(process.pid, "open_settings"),
+                timeout=min(10, startup_timeout),
+            )
+            require(opened == "OPENED", "Settings keyboard command was not delivered")
+
+            disabled = wait_for_accessibility_snapshot(
+                process.pid,
+                "settings-shell-enabled",
+                startup_timeout,
+            )
+            require(disabled["role"] in {"AXCheckBox", "AXSwitch"}, "shell Settings control role changed")
+            require(disabled["enabled"] is True, "shell Settings control is disabled")
+            require(not accessibility_value_is_enabled(disabled), "Settings did not display the persisted opt-out")
+
+            press_accessibility_element(process.pid, "settings-shell-enabled", response_timeout)
+            staged = wait_until(
+                lambda: (
+                    snapshot
+                    if accessibility_value_is_enabled(snapshot := wait_for_accessibility_snapshot(
+                        process.pid,
+                        "settings-shell-enabled",
+                        min(15, response_timeout),
+                    ))
+                    else None
+                ),
+                response_timeout,
+                "Settings toggle did not visibly stage shell re-enable",
+            )
+            save = wait_for_accessibility_snapshot(process.pid, "settings-save", response_timeout)
+            require(save["role"] == "AXButton", "Settings save control role changed")
+            require(save["enabled"] is True, "Settings save control is disabled")
+            press_accessibility_element(process.pid, "settings-save", response_timeout)
+
+            persisted = wait_until(
+                lambda: (
+                    shell
+                    if (shell := settings_shell(
+                        manager_request("GET", "/api/manager/settings", home=home)
+                    )).get("enabled") is True
+                    and shell.get("user_disabled") is False
+                    else None
+                ),
+                response_timeout,
+                "Settings did not persist shell re-enable through the installed manager",
+            )
+            require(persisted.get("policy_origin") == "user_enabled", "Settings re-enable origin changed")
+            final = wait_for_accessibility_snapshot(
+                process.pid,
+                "settings-shell-enabled",
+                response_timeout,
+            )
+            require(accessibility_value_is_enabled(final), "Settings did not display the saved enabled state")
+
+            pid = process.pid
+            process.send_signal(signal.SIGTERM)
+            try:
+                return_code = process.wait(timeout=10)
+            except subprocess.TimeoutExpired as error:
+                process.kill()
+                process.wait(timeout=5)
+                raise QualificationError("Settings UI app required SIGKILL") from error
+            require(not process_is_alive(pid), "Settings UI app PID remained alive")
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait(timeout=5)
+
+    return {
+        "status": "passed",
+        "pid": pid,
+        "executable": str(binary.resolve()),
+        "settings_scene_opened": True,
+        "control_before": disabled,
+        "control_staged": staged,
+        "save_control": save,
+        "control_after": final,
+        "manager_readback": persisted,
+        "return_code": return_code,
+        "stdout_log": str(stdout_path),
+        "stderr_log": str(stderr_path),
+        "stderr_tail": bounded_text(stderr_path.read_bytes()),
+    }
+
+
+def write_legacy_disabled_fixture(home: pathlib.Path, project: pathlib.Path) -> dict[str, Any]:
+    require(not home.exists(), f"legacy migration home already exists: {home}")
+    home.mkdir(parents=True, mode=0o700)
     path = home / "config.json"
-    require(path.exists() and not path.is_symlink(), "clean install config is missing")
+    payload = {
+        "log_level": "info",
+        "allowed_roots": [str(project)],
+        "shell": {
+            "enabled": False,
+            "default_timeout_sec": 41,
+        },
+        "dashboard": {
+            "host": "127.0.0.1",
+            "port": 7788,
+            "refresh_interval_sec": 8,
+        },
+    }
+    encoded = (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        with os.fdopen(descriptor, "wb", closefd=False) as stream:
+            stream.write(encoded)
+            stream.flush()
+            os.fsync(stream.fileno())
+    finally:
+        os.close(descriptor)
+    return {
+        "path": str(path),
+        "sha256": sha256_bytes(encoded),
+        "enabled": False,
+        "schema_version": "absent",
+    }
+
+
+def read_json_object(path: pathlib.Path, label: str) -> dict[str, Any]:
+    require(path.exists() and not path.is_symlink(), f"{label} is missing")
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        raise QualificationError(f"cannot read clean install config: {error}") from error
-    require(isinstance(value, dict), "clean install config is not an object")
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise QualificationError(f"cannot read {label}: {error}") from error
+    require(isinstance(value, dict), f"{label} is not an object")
+    return value
+
+
+def validate_legacy_disabled_migration(
+    home: pathlib.Path,
+    fixture: dict[str, Any],
+) -> dict[str, Any]:
+    config_path = home / "config.json"
+    config = read_json_object(config_path, "migrated shell config")
+    shell = settings_shell(config)
+    require(config.get("config_schema_version") == 2, "legacy shell config did not reach schema v2")
+    require(shell.get("enabled") is True, "accidental legacy disabled state did not migrate to enabled")
+    require(shell.get("user_disabled") is False, "legacy migration created an explicit opt-out")
+    require(
+        shell.get("policy_origin") == "legacy_disabled_default_migrated",
+        "legacy shell migration origin changed",
+    )
+    require(shell.get("default_timeout_sec") == 41, "legacy shell timeout changed during migration")
+
+    receipt_path = home / "config-migrations/shell-policy-v2.json"
+    receipt = read_json_object(receipt_path, "shell migration receipt")
+    require(receipt.get("status") == "completed", "shell migration receipt is not complete")
+    require(receipt.get("backup_sha256") == fixture["sha256"], "shell migration backup digest changed")
+    backup_name = receipt.get("backup_filename")
+    target_name = receipt.get("target_filename")
+    require(isinstance(backup_name, str) and backup_name, "shell migration backup name is missing")
+    require(isinstance(target_name, str) and target_name, "shell migration target name is missing")
+    backup_path = home / "config-migrations" / backup_name
+    target_path = home / "config-migrations" / target_name
+    require(sha256_file(backup_path) == fixture["sha256"], "shell migration backup bytes changed")
+    require(
+        sha256_file(target_path) == receipt.get("target_sha256"),
+        "shell migration target digest changed",
+    )
+    return {
+        "status": "passed",
+        "home": str(home),
+        "fixture": fixture,
+        "config": {
+            "path": str(config_path),
+            "sha256": sha256_file(config_path),
+            "enabled": shell["enabled"],
+            "user_disabled": shell["user_disabled"],
+            "policy_origin": shell["policy_origin"],
+            "default_timeout_sec": shell["default_timeout_sec"],
+        },
+        "receipt": {
+            "path": str(receipt_path),
+            "sha256": sha256_file(receipt_path),
+            "status": receipt["status"],
+            "backup_path": str(backup_path),
+            "backup_sha256": receipt["backup_sha256"],
+            "target_path": str(target_path),
+            "target_sha256": receipt["target_sha256"],
+        },
+    }
+
+
+def read_clean_default_config(home: pathlib.Path) -> dict[str, Any]:
+    path = home / "config.json"
+    value = read_json_object(path, "clean install config")
     shell = value.get("shell")
     require(isinstance(shell, dict), "clean install config has no shell policy")
     require(shell.get("enabled") is True, "clean install did not enable shell access")
@@ -1005,7 +1527,11 @@ def read_clean_default_config(home: pathlib.Path) -> dict[str, Any]:
 
 def validate_staged_artifacts(home: pathlib.Path, source: dict[str, Any]) -> dict[str, Any]:
     installed_app = home / APP_NAME
-    staged = validate_application_bundle(installed_app)
+    staged = validate_application_bundle(
+        installed_app,
+        expected_team=source["team_identifier"],
+        expected_authority=source["signing_authority"],
+    )
     source_signatures = source["signatures"]
     for key in ("embedded_cli", "runtime_launcher", "filesystem_daemon"):
         require(
@@ -1018,6 +1544,7 @@ def validate_staged_artifacts(home: pathlib.Path, source: dict[str, Any]) -> dic
         raw_cli,
         expected_identifier=CLI_IDENTIFIER,
         expected_team=source["team_identifier"],
+        expected_authority=source["signing_authority"],
     )
     require(
         raw_signature["cdhash"] == source_signatures["embedded_cli"]["cdhash"],
@@ -1029,15 +1556,16 @@ def validate_staged_artifacts(home: pathlib.Path, source: dict[str, Any]) -> dic
         sibling_framework,
         expected_identifier=FRAMEWORK_IDENTIFIER,
         expected_team=source["team_identifier"],
+        expected_authority=source["signing_authority"],
     )
     raw_launcher = home / "bin/forge-runtime-launcher"
     standalone_runtime = {
         "path": str(raw_launcher),
-        "status": "present_unqualified" if raw_launcher.exists() else "blocked",
+        "status": "signature_verified" if raw_launcher.exists() else "not_applicable",
         "reason": (
-            "runtime launcher is present but standalone raw-CLI shell execution was not part of this bounded scenario"
+            "runtime launcher identity is verified here; raw-CLI commands and shell execution are exercised by the enclosing scenario"
             if raw_launcher.exists()
-            else "installed raw CLI has no adjacent forge-runtime-launcher; use the installed app main executable for this qualification"
+            else "the installed app main executable is the only available shell host"
         ),
     }
     if raw_launcher.exists():
@@ -1046,6 +1574,7 @@ def validate_staged_artifacts(home: pathlib.Path, source: dict[str, Any]) -> dic
             raw_launcher,
             expected_identifier=RUNTIME_LAUNCHER_IDENTIFIER,
             expected_team=source["team_identifier"],
+            expected_authority=source["signing_authority"],
         )
     return {
         "application": staged,
@@ -1066,6 +1595,7 @@ class QualificationRun:
         startup_timeout: float,
         response_timeout: float,
         gui_hold_seconds: float,
+        allow_system_events_ui: bool,
     ) -> None:
         self.uid = uid
         self.source = source
@@ -1074,6 +1604,7 @@ class QualificationRun:
         self.startup_timeout = startup_timeout
         self.response_timeout = response_timeout
         self.gui_hold_seconds = gui_hold_seconds
+        self.allow_system_events_ui = allow_system_events_ui
         self.account_home = account_home()
         self.plist = self.account_home / "Library/LaunchAgents" / f"{LABEL}.plist"
         self.command_link = self.account_home / ".local/bin/forge-conductor-swift"
@@ -1088,9 +1619,23 @@ class QualificationRun:
         }
         self.install_started = False
         self.expected_app_main = self.home / APP_NAME / "Contents/MacOS/Forge Conductor"
+        self.home_isolation = validate_qualification_home_isolation(self.home)
+        self.scenario: dict[str, Any] = {
+            "status": "not_run",
+            "qualification_home": str(self.home),
+            "home_isolation": self.home_isolation,
+            "shell_probes": {},
+        }
+
+    def blocked_scenario(self, reason: str) -> dict[str, Any]:
+        result = dict(self.scenario)
+        result["status"] = "blocked"
+        result["reason"] = reason
+        return result
 
     def execute(self) -> dict[str, Any]:
         require(not self.home.exists(), f"qualification home already exists: {self.home}")
+        self.scenario["status"] = "running"
         self.home.mkdir(parents=True, mode=0o700)
         project = self.home / "project"
         project.mkdir(mode=0o700)
@@ -1119,14 +1664,28 @@ class QualificationRun:
             installed.returncode == 0,
             f"signed login-agent install failed: {bounded_text(installed.stdout + installed.stderr)}",
         )
+        self.scenario["install"] = {
+            "status": "passed",
+            "command": install_command,
+            "exit_code": installed.returncode,
+            "stdout_tail": bounded_text(installed.stdout),
+            "stderr_tail": bounded_text(installed.stderr),
+            "firewall_exec_denied_by_profile": True,
+            "stale_launchagent_cleanup_skipped": True,
+        }
 
         login_plist = validate_login_plist(self.plist, self.home)
+        self.scenario["launchagent_plist"] = login_plist
         staged = validate_staged_artifacts(self.home, self.source)
+        self.scenario["staged_artifacts"] = staged
         manager_initial = manager_process_identity(self.uid, self.expected_app_main, self.startup_timeout)
         manager_status = wait_for_manager_api(self.home, self.startup_timeout)
+        self.scenario["manager_status"] = manager_status
         manager_credential = prime_manager_credential(self.home, self.response_timeout)
+        self.scenario["manager_control_credential"] = manager_credential
 
         clean_default = read_clean_default_config(self.home)
+        self.scenario["clean_install_default"] = clean_default
         default_settings = manager_request("GET", "/api/manager/settings", home=self.home)
         default_shell = settings_shell(default_settings)
         require(default_shell.get("enabled") is True, "manager did not expose clean enabled shell state")
@@ -1139,6 +1698,13 @@ class QualificationRun:
             manager_request("GET", "/api/manager/settings", home=self.home),
             project,
         )
+        raw_cli = self.home / "bin/forge-conductor"
+        raw_cli_commands = validate_raw_cli_commands(
+            raw_cli,
+            self.home,
+            expected_version=str(self.source["version"]),
+        )
+        self.scenario["installed_raw_cli_commands"] = raw_cli_commands
         first_success = mcp_shell_probe(
             self.expected_app_main,
             self.home,
@@ -1147,6 +1713,30 @@ class QualificationRun:
             label="clean-default",
             response_timeout=self.response_timeout,
         )
+        self.scenario["shell_probes"]["clean_default_success"] = first_success
+        raw_cli_success = mcp_shell_probe(
+            raw_cli,
+            self.home,
+            project,
+            expect_enabled=True,
+            label="installed-raw-cli",
+            response_timeout=self.response_timeout,
+        )
+        self.scenario["shell_probes"]["installed_raw_cli_success"] = raw_cli_success
+
+        legacy_home = self.home / "legacy-disabled-migration"
+        legacy_fixture = write_legacy_disabled_fixture(legacy_home, project)
+        legacy_success = mcp_shell_probe(
+            self.expected_app_main,
+            legacy_home,
+            project,
+            expect_enabled=True,
+            label="legacy-disabled-migrated",
+            response_timeout=self.response_timeout,
+        )
+        self.scenario["shell_probes"]["legacy_disabled_migrated_success"] = legacy_success
+        legacy_migration = validate_legacy_disabled_migration(legacy_home, legacy_fixture)
+        self.scenario["legacy_disabled_migration"] = legacy_migration
 
         disabled = update_settings(self.home, {"shell": {"enabled": False}})
         disabled_shell = settings_shell(disabled)
@@ -1161,6 +1751,7 @@ class QualificationRun:
             label="explicit-opt-out",
             response_timeout=self.response_timeout,
         )
+        self.scenario["shell_probes"]["explicit_opt_out_denial"] = first_denial
 
         gui_first = launch_and_close_gui(
             self.expected_app_main,
@@ -1183,6 +1774,11 @@ class QualificationRun:
             manager_request("GET", "/api/manager/settings", home=self.home)
         )
         require(persisted_after_reopen.get("user_disabled") is True, "opt-out changed after app reopen")
+        self.scenario["app_process_restart"] = {
+            "status": "in_progress",
+            "first": gui_first,
+            "reopened": gui_reopened,
+        }
 
         old_pid = int(manager_initial["pid"])
         restarted = run_command(
@@ -1207,6 +1803,27 @@ class QualificationRun:
             label="post-manager-restart-opt-out",
             response_timeout=self.response_timeout,
         )
+        self.scenario["shell_probes"]["post_manager_restart_opt_out_denial"] = restarted_denial
+        self.scenario["manager_process_restart"] = {
+            "status": "passed",
+            "predecessor": manager_initial,
+            "successor": manager_restarted,
+            "predecessor_gone": True,
+            "successor_pid_changed": True,
+            "opt_out_survived": True,
+        }
+        self.scenario["settings_control_plane"] = {
+            "status": "in_progress",
+            "clean_default_enabled": True,
+            "explicit_opt_out": True,
+            "opt_out_survived_app_restart": True,
+            "opt_out_survived_manager_restart": True,
+            "reenabled": False,
+            "allowed_project_root": {
+                "update_response": configured_root,
+                "persisted_readback": persisted_root,
+            },
+        }
 
         gui_after_manager_restart = launch_and_close_gui(
             self.expected_app_main,
@@ -1214,8 +1831,59 @@ class QualificationRun:
             "gui-after-manager-restart",
             self.gui_hold_seconds,
         )
-        enabled = update_settings(self.home, {"shell": {"enabled": True}})
-        enabled_shell = settings_shell(enabled)
+        self.scenario["app_process_restart"] = {
+            "status": "passed",
+            "first": gui_first,
+            "reopened": gui_reopened,
+            "after_manager_restart": gui_after_manager_restart,
+        }
+        if not self.allow_system_events_ui:
+            reason = (
+                "Settings UI mutation was not attempted because System Events access was not "
+                "explicitly authorized; use the Xcode XCUI production-app test lane"
+            )
+            self.scenario["settings_ui"] = {
+                "status": "blocked",
+                "reason": reason,
+                "automation_route": "xcode_xcui_required",
+                "used_test_fixture": False,
+                "used_uitesting_argument": False,
+                "used_system_events": False,
+            }
+            self.scenario["post_settings_shell_probe"] = {
+                "status": "not_run",
+                "reason": "Settings UI did not persist the required shell re-enable",
+            }
+            return self.blocked_scenario(reason)
+        try:
+            settings_ui = settings_ui_reenable(
+                self.expected_app_main,
+                self.home,
+                startup_timeout=self.startup_timeout,
+                response_timeout=self.response_timeout,
+            )
+        except QualificationError as error:
+            self.scenario["settings_ui"] = {
+                "status": "blocked",
+                "reason": str(error),
+                "used_test_fixture": False,
+                "used_uitesting_argument": False,
+                "used_system_events": True,
+            }
+            self.scenario["post_settings_shell_probe"] = {
+                "status": "not_run",
+                "reason": "Settings UI did not persist the required shell re-enable",
+            }
+            return self.blocked_scenario(str(error))
+        self.scenario["settings_ui"] = {
+            **settings_ui,
+            "used_test_fixture": False,
+            "used_uitesting_argument": False,
+            "used_system_events": True,
+        }
+        enabled_shell = settings_shell(
+            manager_request("GET", "/api/manager/settings", home=self.home)
+        )
         require(enabled_shell.get("enabled") is True, "shell re-enable failed")
         require(enabled_shell.get("user_disabled") is False, "shell re-enable retained opt-out metadata")
         require(enabled_shell.get("policy_origin") == "user_enabled", "shell re-enable origin changed")
@@ -1227,67 +1895,20 @@ class QualificationRun:
             label="post-manager-restart-enabled",
             response_timeout=self.response_timeout,
         )
+        self.scenario["shell_probes"]["post_manager_restart_reenabled_success"] = final_success
+        self.scenario["settings_control_plane"]["status"] = "passed"
+        self.scenario["settings_control_plane"]["reenabled"] = True
 
-        return {
-            "status": "passed",
-            "qualification_home": str(self.home),
-            "install": {
-                "status": "passed",
-                "command": install_command,
-                "exit_code": installed.returncode,
-                "stdout_tail": bounded_text(installed.stdout),
-                "stderr_tail": bounded_text(installed.stderr),
-                "firewall_exec_denied_by_profile": True,
-                "stale_launchagent_cleanup_skipped": True,
-            },
-            "launchagent_plist": login_plist,
-            "staged_artifacts": staged,
-            "clean_install_default": clean_default,
-            "manager_status": manager_status,
-            "manager_control_credential": manager_credential,
-            "shell_probes": {
-                "clean_default_success": first_success,
-                "explicit_opt_out_denial": first_denial,
-                "post_manager_restart_opt_out_denial": restarted_denial,
-                "post_manager_restart_reenabled_success": final_success,
-            },
-            "app_process_restart": {
-                "status": "passed",
-                "first": gui_first,
-                "reopened": gui_reopened,
-                "after_manager_restart": gui_after_manager_restart,
-            },
-            "manager_process_restart": {
-                "status": "passed",
-                "predecessor": manager_initial,
-                "successor": manager_restarted,
-                "predecessor_gone": True,
-                "successor_pid_changed": True,
-                "opt_out_survived": True,
-            },
-            "settings_control_plane": {
-                "status": "passed",
-                "clean_default_enabled": True,
-                "explicit_opt_out": True,
-                "opt_out_survived_app_restart": True,
-                "opt_out_survived_manager_restart": True,
-                "reenabled": True,
-                "allowed_project_root": {
-                    "update_response": configured_root,
-                    "persisted_readback": persisted_root,
-                },
-            },
-            "settings_ui": {
-                "status": "blocked",
-                "reason": (
-                    "the ordinary signed app exposes no supported production UI-test hook; "
-                    "synthetic --uitesting manager fixtures cannot qualify this installed manager"
-                ),
-            },
-        }
+        self.scenario["status"] = "passed"
+        return dict(self.scenario)
 
     def cleanup(self) -> dict[str, Any]:
-        result: dict[str, Any] = {"status": "restored", "steps": [], "residuals": []}
+        result: dict[str, Any] = {
+            "status": "restored",
+            "steps": [],
+            "residuals": [],
+            "notes": [],
+        }
         if not self.install_started:
             return result
 
@@ -1365,7 +1986,7 @@ class QualificationRun:
                 result["residuals"].append(f"new parent retained because it is not empty: {path}")
 
         result["qualification_home_retained"] = str(self.home)
-        result["residuals"].append(
+        result["notes"].append(
             "macOS Background Task Management may retain display history until logout even after scoped bootout and plist removal"
         )
         try:
@@ -1377,7 +1998,6 @@ class QualificationRun:
         except QualificationError as error:
             result["status"] = "blocked"
             result["residuals"].append(str(error))
-        result["status"] = "partial" if result["status"] == "restored" else result["status"]
         return result
 
 
@@ -1443,6 +2063,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--app", required=True, type=pathlib.Path, help="ordinary signed Forge Conductor.app")
     parser.add_argument("--execute", action="store_true", help="authorize the guarded state-changing scenario")
     parser.add_argument(
+        "--expected-team-identifier",
+        help="optional exact signing team constraint; otherwise derive it from the validated app",
+    )
+    parser.add_argument(
+        "--expected-signing-authority",
+        help="optional exact leaf signing authority constraint; otherwise derive it from the validated app",
+    )
+    parser.add_argument(
         "--qualification-home",
         type=pathlib.Path,
         help="new isolated Forge home; must not exist (default: unique directory under the system temp root)",
@@ -1451,6 +2079,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--startup-timeout", type=float, default=30.0)
     parser.add_argument("--response-timeout", type=float, default=30.0)
     parser.add_argument("--gui-hold-seconds", type=float, default=2.0)
+    parser.add_argument(
+        "--allow-system-events-ui",
+        action="store_true",
+        help=(
+            "explicitly authorize the optional System Events Settings mutation; omitted by "
+            "default so the product lifecycle runs without requesting Accessibility access"
+        ),
+    )
     return parser.parse_args()
 
 
@@ -1471,9 +2107,39 @@ def main() -> int:
         require(args.startup_timeout > 0 and args.response_timeout > 0, "timeouts must be positive")
         require(args.gui_hold_seconds >= 0, "GUI hold time cannot be negative")
         require(SANDBOX_EXEC.is_file() and os.access(SANDBOX_EXEC, os.X_OK), "sandbox-exec is unavailable")
-        source = validate_application_bundle(args.app)
+        expected_team = (
+            args.expected_team_identifier.strip()
+            if args.expected_team_identifier is not None
+            else None
+        )
+        expected_authority = (
+            args.expected_signing_authority.strip()
+            if args.expected_signing_authority is not None
+            else None
+        )
+        require(
+            args.expected_team_identifier is None or bool(expected_team),
+            "expected signing team cannot be empty",
+        )
+        require(
+            args.expected_signing_authority is None or bool(expected_authority),
+            "expected signing authority cannot be empty",
+        )
+        source = validate_application_bundle(
+            args.app,
+            expected_team=expected_team,
+            expected_authority=expected_authority,
+        )
         shared = preflight_shared_state(uid, account_home())
         report["source_application"] = source
+        report["signing_identity_constraint"] = {
+            "mode": "explicit" if expected_team is not None or expected_authority is not None else "derived",
+            "expected_team_identifier": expected_team,
+            "expected_signing_authority": expected_authority,
+            "observed_team_identifier": source["team_identifier"],
+            "observed_signing_authority": source["signing_authority"],
+            "matched": True,
+        }
         report["shared_state_preflight"] = shared
         report["overall_status"] = "ready"
     except QualificationError as error:
@@ -1487,9 +2153,6 @@ def main() -> int:
         report["blocking_reasons"].append(
             "state-changing installation and lifecycle checks require an explicit --execute"
         )
-        report["blocking_reasons"].append(
-            "Settings UI visibility is not safely automatable against the ordinary installed app"
-        )
         emit_report(report, args.output)
         return 3
 
@@ -1497,9 +2160,10 @@ def main() -> int:
         qualification_home = default_qualification_home()
     else:
         qualification_home = args.qualification_home.expanduser().resolve(strict=False)
-    require(qualification_home.is_absolute(), "qualification home must be absolute")
 
     try:
+        require(qualification_home.is_absolute(), "qualification home must be absolute")
+        validate_qualification_home_isolation(qualification_home)
         run = QualificationRun(
             uid=uid,
             source=source,
@@ -1508,6 +2172,7 @@ def main() -> int:
             startup_timeout=args.startup_timeout,
             response_timeout=args.response_timeout,
             gui_hold_seconds=args.gui_hold_seconds,
+            allow_system_events_ui=args.allow_system_events_ui,
         )
     except QualificationError as error:
         report["overall_status"] = "blocked"
@@ -1519,7 +2184,7 @@ def main() -> int:
         report["scenario"] = run.execute()
     except (QualificationError, OSError) as error:
         scenario_error = str(error)
-        report["scenario"] = {"status": "blocked", "reason": scenario_error}
+        report["scenario"] = run.blocked_scenario(scenario_error)
         report["blocking_reasons"].append(scenario_error)
     finally:
         report["cleanup"] = run.cleanup()
@@ -1539,6 +2204,9 @@ def main() -> int:
     if scenario_error is not None or report["cleanup"].get("status") == "blocked":
         report["overall_status"] = "blocked"
         exit_code = 2
+    elif report.get("scenario", {}).get("status") == "passed":
+        report["overall_status"] = "passed"
+        exit_code = 0
     else:
         report["overall_status"] = "partial"
         exit_code = 4

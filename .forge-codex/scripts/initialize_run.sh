@@ -37,6 +37,6 @@ fi
 
 "$PKG/scripts/statectl.py" --repo "$ROOT" init
 "$PKG/scripts/doctor.sh"
-"$PKG/scripts/feature_inventory.py" --repo "$ROOT"
+python3 "$PKG/scripts/test_p10_feature_baseline.py"
 "$PKG/scripts/source_risk_scan.py" --repo "$ROOT"
 "$PKG/scripts/statectl.py" --repo "$ROOT" validate

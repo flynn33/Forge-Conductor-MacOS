@@ -65,7 +65,7 @@ final class ReleaseStressTests: XCTestCase {
             let project = root.appendingPathComponent("cycle-project-\(index)", isDirectory: true)
             try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
             let started = ContinuousClock.now
-            let initialized = try running!.projectMemory.initialize(path: project.path)
+            let initialized = try running!.projectMemory.initializeUnchecked(path: project.path)
             let projectID = try XCTUnwrap(initialized["project_id"] as? String)
             _ = try running!.projectMemory.status(projectID: projectID)
             running!.projectMemory.closeAll()
@@ -77,7 +77,7 @@ final class ReleaseStressTests: XCTestCase {
         // Large bounded corpus, search, update, and export.
         let memoryProject = root.appendingPathComponent("memory-project", isDirectory: true)
         try FileManager.default.createDirectory(at: memoryProject, withIntermediateDirectories: true)
-        let initialized = try running!.projectMemory.initialize(path: memoryProject.path)
+        let initialized = try running!.projectMemory.initializeUnchecked(path: memoryProject.path)
         let projectID = try XCTUnwrap(initialized["project_id"] as? String)
         var recordIDs: [String] = []
         for batch in 0..<10 {
@@ -179,7 +179,7 @@ final class ReleaseStressTests: XCTestCase {
             at: recoveryRoot,
             withIntermediateDirectories: true
         )
-        let recoveryProject = try await running!.projectContexts.repository.registerProject(
+        let recoveryProject = try await running!.projectContexts.repository.registerProjectUnchecked(
             projectID: ProjectID(),
             displayName: "Release Recovery Matrix",
             canonicalRoot: recoveryRoot

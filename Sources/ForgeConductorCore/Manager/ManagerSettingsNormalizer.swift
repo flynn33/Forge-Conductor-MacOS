@@ -86,6 +86,38 @@ public enum ManagerSettingsNormalizer {
         Array(Set(roots.compactMap(canonicalAllowedRoot))).sorted()
     }
 
+    /// Returns the exact canonical project root only when it is equal to or
+    /// contained by a root explicitly authorized in Settings. A project root
+    /// narrows configured authority; registration metadata never expands it.
+    static func authorizedProjectRoot(
+        _ projectRoot: URL,
+        allowedRoots: [String]
+    ) -> URL? {
+        guard let canonicalProjectPath = canonicalAllowedRoot(projectRoot.path) else {
+            return nil
+        }
+        let canonicalProjectRoot = URL(
+            fileURLWithPath: canonicalProjectPath,
+            isDirectory: true
+        ).standardizedFileURL
+        let configuredRoots = canonicalAllowedRoots(allowedRoots).map {
+            URL(fileURLWithPath: $0, isDirectory: true).standardizedFileURL
+        }
+        guard configuredRoots.contains(where: {
+            contains(canonicalProjectRoot, root: $0)
+        }) else {
+            return nil
+        }
+        return canonicalProjectRoot
+    }
+
+    private static func contains(_ candidate: URL, root: URL) -> Bool {
+        let candidateComponents = candidate.standardizedFileURL.pathComponents
+        let rootComponents = root.standardizedFileURL.pathComponents
+        guard candidateComponents.count >= rootComponents.count else { return false }
+        return Array(candidateComponents.prefix(rootComponents.count)) == rootComponents
+    }
+
     public static func intValue(_ any: Any?) -> Int? {
         if let i = any as? Int { return i }
         if let d = any as? Double { return Int(d) }

@@ -160,16 +160,67 @@ struct ManagerSettingsView: View {
 
             Section("Protected filesystem service") {
                 LabeledContent(
-                    "State",
+                    "Registration",
                     value: model.secureFilesystemServiceStatusLabel
                 )
                 .accessibilityIdentifier("settings-filesystem-service-status")
 
+                LabeledContent(
+                    "Operational health",
+                    value: model.secureFilesystemOperationalStatusLabel
+                )
+                .accessibilityIdentifier("settings-filesystem-service-operational-health")
+
+                LabeledContent(
+                    "Unresolved recovery debt",
+                    value: model.secureFilesystemRecoveryDebtLabel
+                )
+                .accessibilityIdentifier("settings-filesystem-recovery-debt")
+
+                LabeledContent(
+                    "Operation",
+                    value: model.secureFilesystemServiceOperationStatusLabel
+                )
+                .accessibilityIdentifier("settings-filesystem-operation-status")
+
+                LabeledContent(
+                    "Lifecycle fence",
+                    value: model.secureFilesystemServiceLifecycleStatusLabel
+                )
+                .accessibilityIdentifier("settings-filesystem-lifecycle-fence-status")
+
+                if model.secureFilesystemServiceLifecycleState.blocksLifecycleMutation {
+                    Label(
+                        "Service lifecycle changes are blocked until the pending macOS lifecycle action is resolved.",
+                        systemImage: "lock.trianglebadge.exclamationmark"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .accessibilityIdentifier("settings-filesystem-lifecycle-fence-warning")
+                }
+
                 Text(
-                    "Delete and move operations fail closed unless the separately signed service is enabled and the requested operation is qualified. Shell tools remain nonprivileged and are controlled independently above."
+                    "Protected regular-file and symbolic-link deletes require the separately signed service. Production move and recursive directory delete remain unavailable until their signed-helper recovery protocols are implemented and qualified. Shell tools remain nonprivileged and are controlled independently above."
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
+                Text(
+                    "Reconcile verifies fixed-slot receipts and releases only terminal or exact-identity restored entries. Restoring retained quarantine entries to their original path is not supported."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("settings-filesystem-recovery-policy")
+
+                if model.secureFilesystemOperationalHealth.hasExhaustedLedger {
+                    Label(
+                        "A recovery ledger is full. New protected mutations remain blocked until verified debt is released.",
+                        systemImage: "exclamationmark.triangle.fill"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .accessibilityIdentifier("settings-filesystem-recovery-exhausted")
+                }
 
                 if let message = model.secureFilesystemServiceMessage {
                     Text(message)
@@ -181,35 +232,45 @@ struct ManagerSettingsView: View {
                 HStack(spacing: 10) {
                     Button("Enable") { model.enableSecureFilesystemService() }
                         .buttonStyle(.borderedProminent)
-                        .disabled(
-                            model.secureFilesystemServiceStatus == .enabled
-                                || model.isUpdatingSecureFilesystemService
-                        )
+                        .disabled(!model.secureFilesystemSettingsControlAvailability.enable)
                         .accessibilityIdentifier("settings-filesystem-service-enable")
                     Button("Update / Reinstall") {
                         model.reinstallSecureFilesystemService()
                     }
-                    .disabled(
-                        model.secureFilesystemServiceStatus == .notFound
-                            || model.isUpdatingSecureFilesystemService
-                    )
+                    .disabled(!model.secureFilesystemSettingsControlAvailability.update)
                     .accessibilityIdentifier("settings-filesystem-service-reinstall")
                     Button("Disable") { model.disableSecureFilesystemService() }
-                        .disabled(
-                            model.secureFilesystemServiceStatus == .notRegistered
-                                || model.secureFilesystemServiceStatus == .notFound
-                        )
+                        .disabled(!model.secureFilesystemSettingsControlAvailability.disable)
                         .accessibilityIdentifier("settings-filesystem-service-disable")
                     Button("Open System Settings") {
                         model.openSecureFilesystemApprovalSettings()
                     }
+                    .disabled(!model.secureFilesystemSettingsControlAvailability.approval)
                     .accessibilityIdentifier("settings-filesystem-service-approval")
                     Button("Refresh") { model.refreshSecureFilesystemServiceStatus() }
+                        .disabled(!model.secureFilesystemSettingsControlAvailability.refresh)
                         .accessibilityIdentifier("settings-filesystem-service-refresh")
-                    if model.isUpdatingSecureFilesystemService {
+                    Button("Reconcile recovery") {
+                        model.reconcileSecureFilesystemRecovery()
+                    }
+                    .disabled(!model.secureFilesystemSettingsControlAvailability.reconcile)
+                    .accessibilityIdentifier("settings-filesystem-recovery-reconcile")
+                    if model.secureFilesystemServiceLifecycleState.canRetryResolution {
+                        Button(model.secureFilesystemServiceLifecycleRecoveryActionLabel) {
+                            model.recoverSecureFilesystemServiceLifecycle()
+                        }
+                        .disabled(
+                            !model.secureFilesystemSettingsControlAvailability.lifecycleRecovery
+                        )
+                        .accessibilityIdentifier(
+                            "settings-filesystem-lifecycle-recovery"
+                        )
+                    }
+                    if model.isSecureFilesystemServiceOperationActive {
                         ProgressView()
                             .controlSize(.small)
-                            .accessibilityLabel("Updating protected filesystem service")
+                            .accessibilityLabel(model.secureFilesystemServiceOperationStatusLabel)
+                            .accessibilityIdentifier("settings-filesystem-operation-progress")
                     }
                 }
                 .padding(.vertical, 2)
