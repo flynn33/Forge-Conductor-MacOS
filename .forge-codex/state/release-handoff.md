@@ -4,9 +4,11 @@
 
 The active branch is `release/0.9.0-product-readiness`. Its immutable source
 checkpoint is `2cc41ee2d95255761582792ed6c70c00702ff2f6`, based on `main` at
-`2e2ad93228c47e1fd16fb034e528d9a70cb61417`. A draft pull request is pending
-creation and GitHub readback; until its number, head, and base are recorded,
-this checkpoint is not reviewable, merge-authorized, or release-authorized.
+`2e2ad93228c47e1fd16fb034e528d9a70cb61417`. Draft pull request #20 was read
+back from GitHub with publication branch `release/0.9.0-product-readiness`,
+transport HEAD `ea52c2779dd1f90ad718e93faa07459fc4ead511`, and base `main` at
+`2e2ad93228c47e1fd16fb034e528d9a70cb61417`. It is reviewable only as a
+partial checkpoint. It is not merge-authorized or release-authorized.
 
 Exact-checkpoint evidence `EVID-20260901T105839Z-6eed3d3434` executed 1,001
 Release tests with 5 declared environment skips and 0 failures.
@@ -346,11 +348,17 @@ qualification remain open and release-blocking.
 
 - Active and publication branch: `release/0.9.0-product-readiness`.
 - Source checkpoint: `2cc41ee2d95255761582792ed6c70c00702ff2f6`.
+- GitHub-read transport checkpoint:
+  `ea52c2779dd1f90ad718e93faa07459fc4ead511`.
 - Pull-request base: `main` at
   `2e2ad93228c47e1fd16fb034e528d9a70cb61417`.
-- Current pull request: pending creation and exact GitHub readback. A later
-  evidence, handoff, doctor, selector, or publication-readback commit may move
-  the transport HEAD without changing the immutable source checkpoint.
+- Current pull request: draft #20,
+  `https://github.com/flynn33/Forge-Conductor-MacOS/pull/20`. Exact GitHub
+  readback verified the branch, transport checkpoint, base, draft state, and
+  open state. The pull request is conflict-free but blocked from merge. This
+  state-only disclosure commit may move the transport HEAD without changing
+  the immutable source checkpoint; live checkpoint identity must be read from
+  doctor or the next-work selector before another publication transition.
 - Pull request #9, head `repair/autonomous-continuity` at
   `6321bd98012e5f60b2779bbb401cc2827f372b16`, was closed without merge.
 - Pull request #10, head `repair/cancellation-recovery` at

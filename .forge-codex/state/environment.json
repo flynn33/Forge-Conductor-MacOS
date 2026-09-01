@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-09-01T11:19:49.554705+00:00",
+  "captured_at": "2026-09-01T11:26:46.545170+00:00",
   "environment_keys_present": [
     "CODEX_APP_TOOLS_PIPE_PATH",
     "CODEX_CI",
@@ -16,15 +16,24 @@
       "active_branch": "release/0.9.0-product-readiness",
       "base_branch": "main",
       "base_sha": "2e2ad93228c47e1fd16fb034e528d9a70cb61417",
-      "github_readback_verified": false,
-      "head_sha": "2cc41ee2d95255761582792ed6c70c00702ff2f6",
-      "identity_resolution": "open_pull_request_not_found",
+      "github_readback_verified": true,
+      "head_sha": "ea52c2779dd1f90ad718e93faa07459fc4ead511",
+      "identity_resolution": "verified",
       "main_branch": "main",
       "main_sha": "2e2ad93228c47e1fd16fb034e528d9a70cb61417",
-      "publication_head_branch": "main",
+      "publication_head_branch": "release/0.9.0-product-readiness",
       "publication_remote": "origin",
-      "pull_request": null,
-      "remote_head_sha": "2e2ad93228c47e1fd16fb034e528d9a70cb61417"
+      "pull_request": {
+        "baseRefName": "main",
+        "baseRefOid": "2e2ad93228c47e1fd16fb034e528d9a70cb61417",
+        "headRefName": "release/0.9.0-product-readiness",
+        "headRefOid": "ea52c2779dd1f90ad718e93faa07459fc4ead511",
+        "isDraft": true,
+        "number": 20,
+        "state": "OPEN",
+        "url": "https://github.com/flynn33/Forge-Conductor-MacOS/pull/20"
+      },
+      "remote_head_sha": "ea52c2779dd1f90ad718e93faa07459fc4ead511"
     },
     "completion_authority_current": false,
     "current_work": "P10",
@@ -222,14 +231,14 @@
       "does_not_close_p10_e2_native_continuity_or_hardware": true,
       "merge_authorized": false,
       "merge_requires_residuals_in_pr_state_doctor_and_selector": true,
-      "reviewable": false,
+      "reviewable": true,
       "simulator_or_current_host_results_do_not_pass_owner_deferred_g11": true
     },
     "release_authorized": false,
     "repository": {
       "branch": "release/0.9.0-product-readiness",
-      "commit": "2cc41ee2d95255761582792ed6c70c00702ff2f6",
-      "dirty": true,
+      "commit": "ea52c2779dd1f90ad718e93faa07459fc4ead511",
+      "dirty": false,
       "root": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next"
     },
     "run_status": "active"

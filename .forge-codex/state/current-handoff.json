@@ -98,7 +98,7 @@
     "Do not request operator decisions.",
     "Do not add automated authorship credits."
   ],
-  "created_at": "2026-09-01T11:15:42.865040+00:00",
+  "created_at": "2026-09-01T11:26:56.042813+00:00",
   "current_work": {
     "active_files": [],
     "phase_id": "P10",
@@ -688,7 +688,7 @@
     "f1d06d7dd23bf3bd71f138fc1a9a5799dc4aa0e474e9a60552dfcecb68f41dc2",
     "fa52a67ada4051cdaf064cb6fc52cdd72cd7957006924443b4e414e2f5abda61"
   ],
-  "handoff_id": "3c3f8276-8d3c-403f-bc21-eefea956e182",
+  "handoff_id": "908fd0b4-28df-4440-8886-1f3a0fce1544",
   "host_state": {
     "adapter_id": null,
     "context_budget_source": null,
@@ -697,26 +697,26 @@
     "retry": null
   },
   "integrity": {
-    "content_sha256": "40c1159cb6c786b69ae90761c6674bc5f6a0a3b36aa4dabd72582262a3f18530",
+    "content_sha256": "4ac2ee2a95bf83435c42e1397953fa421c27288e19a538df0ded53236336f285",
     "redaction_complete": true
   },
   "memory_references": [],
   "mission": "# Execution directive\n\nExecute the Forge Conductor repair and extension package end to end.\n\n1. Read the repository root `AGENTS.md` and every document it marks as required.\n2. Load `.forge-codex/state/run-state.json`; initialize it only if absent.\n3. Use the included audit evidence as the starting hypothesis set, then prove runtime reachability before labeling source-level lifecycle risks as live leaks.\n4. Preserve every current capability and compatibility surface. Build a feature baseline and executable parity tests before behavior-changing refactors.\n5. Repair the known telemetry, gauge, lifecycle, concurrency, and performance defects.\n6. implement the project-scoped memory MCP and autonomous continuity system described by the contracts.\n7. Build a supported host adapter as an internal plugin target when automatic session creation is not already supplied by the host. Never use private UI scripting as a substitute for a supported session API.\n8. Build, test, profile, debug, repair, and repeat until every hard gate passes.\n9. Persist progress, evidence, decisions, and handoffs after every material step. Resume automatically after interruption.\n10. Do not ask the operator for decisions. Follow the fail-forward and decision policies.\n11. Do not add generator credits, automated-author notices, watermarks, or authorship trailers to source, documentation, commits, assets, or metadata.\n12. Do not declare completion until `.forge-codex/scripts/verify_completion.py` exits successfully and the resulting completion report points to the underlying evidence.\n\nBegin with phase P00 and continue through P12 in dependency order, while executing independent ready work whenever a non-global gate is blocked.\n",
   "next_actions": [
     {
-      "action": "Publish draft pull request from release/0.9.0-product-readiness into main, record the exact pull-request number and GitHub head/base readback, and keep merge authority false.",
+      "action": "Continue P10 by implementing and executing the next bounded production-path feature slice; do not promote features from source presence, unit, fixture, app-hosted, build-only, or synthetic evidence.",
       "command": null,
       "order": 1,
       "success_condition": null
     },
     {
-      "action": "Continue P10 by implementing and executing bounded production-path probes for the next selected feature slice; do not promote features from unit or app-hosted evidence.",
+      "action": "Keep filesystem E2, native UI and signing, shell Settings qualification, real-provider continuity, privileged lifecycle, provider configuration, and owner-deferred hardware open until their required evidence exists.",
       "command": null,
       "order": 2,
       "success_condition": null
     },
     {
-      "action": "Keep filesystem E2, native UI and signing, shell Settings qualification, real-provider continuity, privileged lifecycle, provider configuration, and owner-deferred hardware open until their required evidence exists.",
+      "action": "Before the next checkpoint push, read back draft PR #20 head and base from GitHub, record any state-only transport advance, and keep merge and release authority false.",
       "command": null,
       "order": 3,
       "success_condition": null
@@ -784,51 +784,19 @@
       "summary": "Clean install lacks a supported managed-provider configuration path"
     }
   ],
-  "operation_id": "f86d186e-fd94-4063-8f6f-ed8baba591c2",
+  "operation_id": "ee767d3a-884c-49ca-82ca-49abdd8c5085",
   "predecessor_session": {
     "model": null,
     "provider_session_id": null,
-    "session_id": "forge-product-readiness-checkpoint"
+    "session_id": "codex-current"
   },
   "project": {
     "branch": "release/0.9.0-product-readiness",
-    "commit": "2cc41ee2d95255761582792ed6c70c00702ff2f6",
+    "commit": "ea52c2779dd1f90ad718e93faa07459fc4ead511",
     "dirty_summary": [
-      "M .forge-codex/state/events.jsonl",
-      " M .forge-codex/state/evidence-index.json",
-      " M .forge-codex/state/run-state.json",
-      "?? .forge-codex/evidence/EVID-20260901T105839Z-6eed3d3434.json",
-      "?? .forge-codex/evidence/EVID-20260901T105839Z-6eed3d3434.stderr.txt",
-      "?? .forge-codex/evidence/EVID-20260901T105839Z-6eed3d3434.stdout.txt",
-      "?? .forge-codex/evidence/EVID-20260901T110446Z-c086c18d86.json",
-      "?? .forge-codex/evidence/EVID-20260901T110446Z-c086c18d86.stderr.txt",
-      "?? .forge-codex/evidence/EVID-20260901T110446Z-c086c18d86.stdout.txt",
-      "?? .forge-codex/evidence/EVID-20260901T110510Z-b1be977c99.json",
-      "?? .forge-codex/evidence/EVID-20260901T110510Z-b1be977c99.stderr.txt",
-      "?? .forge-codex/evidence/EVID-20260901T110510Z-b1be977c99.stdout.txt",
-      "?? .forge-codex/evidence/EVID-20260901T110524Z-fbccc4bb44.json",
-      "?? .forge-codex/evidence/EVID-20260901T110524Z-fbccc4bb44.stderr.txt",
-      "?? .forge-codex/evidence/EVID-20260901T110524Z-fbccc4bb44.stdout.txt",
-      "?? .forge-codex/evidence/EVID-20260901T110712Z-3626a5245c.json",
-      "?? .forge-codex/evidence/EVID-20260901T110712Z-3626a5245c.stderr.txt",
-      "?? .forge-codex/evidence/EVID-20260901T110712Z-3626a5245c.stdout.txt",
-      "?? .forge-codex/evidence/EVID-20260901T110721Z-924f41ac96.json",
-      "?? .forge-codex/evidence/EVID-20260901T110721Z-924f41ac96.stderr.txt",
-      "?? .forge-codex/evidence/EVID-20260901T110721Z-924f41ac96.stdout.txt",
-      "?? .forge-codex/evidence/EVID-20260901T110805Z-a977abdfeb.artifact-000-.signed-shell-staging-2cc41ee2d952.json",
-      "?? .forge-codex/evidence/EVID-20260901T110805Z-a977abdfeb.json",
-      "?? .forge-codex/evidence/EVID-20260901T110805Z-a977abdfeb.stderr.txt",
-      "?? .forge-codex/evidence/EVID-20260901T110805Z-a977abdfeb.stdout.txt",
-      "?? .forge-codex/evidence/EVID-20260901T111032Z-3e4b6e0d96.json",
-      "?? .forge-codex/evidence/EVID-20260901T111032Z-3e4b6e0d96.stderr.txt",
-      "?? .forge-codex/evidence/EVID-20260901T111032Z-3e4b6e0d96.stdout.txt",
-      "?? .forge-codex/evidence/EVID-20260901T111225Z-c749bdbf18.json",
-      "?? .forge-codex/evidence/EVID-20260901T111225Z-c749bdbf18.stderr.txt",
-      "?? .forge-codex/evidence/EVID-20260901T111225Z-c749bdbf18.stdout.txt",
-      "?? .forge-codex/evidence/EVID-20260901T111318Z-c887522fd4.artifact-000-.signed-shell-staging-2cc41ee2d952.json",
-      "?? .forge-codex/evidence/EVID-20260901T111318Z-c887522fd4.json",
-      "?? .forge-codex/evidence/EVID-20260901T111318Z-c887522fd4.stderr.txt",
-      "?? .forge-codex/evidence/EVID-20260901T111318Z-c887522fd4.stdout.txt"
+      "M .forge-codex/state/environment.json",
+      " M .forge-codex/state/events.jsonl",
+      " M .forge-codex/state/run-state.json"
     ],
     "display_name": "Forge-Conductor-E2-Next",
     "project_id": "0ece4408-5617-5b9a-87cb-ae1d75a5c8a8",
