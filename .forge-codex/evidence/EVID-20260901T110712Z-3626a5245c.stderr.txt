@@ -1,0 +1,39 @@
+--prepared:/private/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon
+--validated:/private/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon
+--prepared:/private/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher
+--validated:/private/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher
+--prepared:/private/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-conductor
+--validated:/private/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-conductor
+--prepared:/private/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework/Versions/Current/.
+--validated:/private/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework/Versions/Current/.
+/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app: valid on disk
+/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app: satisfies its Designated Requirement
+--prepared:/private/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon
+--validated:/private/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon
+--prepared:/private/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher
+--validated:/private/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher
+--prepared:/private/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-conductor
+--validated:/private/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-conductor
+--prepared:/private/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework/Versions/Current/.
+--validated:/private/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework/Versions/Current/.
+/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app: valid on disk
+/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app: satisfies its Designated Requirement
+/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app: explicit requirement satisfied
+/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon: valid on disk
+/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon: satisfies its Designated Requirement
+/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon: explicit requirement satisfied
+/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher: valid on disk
+/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher: satisfies its Designated Requirement
+/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher: explicit requirement satisfied
+/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework: valid on disk
+/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework: satisfies its Designated Requirement
+/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework: explicit requirement satisfied
+/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon: valid on disk
+/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon: satisfies its Designated Requirement
+/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon: explicit requirement satisfied
+/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-conductor: valid on disk
+/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-conductor: satisfies its Designated Requirement
+/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-conductor: explicit requirement satisfied
+/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/forge-conductor: valid on disk
+/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/forge-conductor: satisfies its Designated Requirement
+/tmp/forge-checkpoint-xcode-2cc41ee2d952/Build/Products/Release/forge-conductor: explicit requirement satisfied
