@@ -82,14 +82,16 @@ private actor ScriptedManagedTransport: LMStudioManagedTransporting {
 
     private let mode: Mode
     private let ledgerURL: URL
+    private let responseModel: String?
     private var attempts = 0
     private var receipts: [String: LMStudioResponseTurn] = [:]
     private var sawPersistedIntent = false
     private var bootstrapSystemPrompt: String?
 
-    init(mode: Mode, ledgerURL: URL) {
+    init(mode: Mode, ledgerURL: URL, responseModel: String? = nil) {
         self.mode = mode
         self.ledgerURL = ledgerURL
+        self.responseModel = responseModel
     }
 
     func probe() async throws -> LMStudioProviderCapabilities {
@@ -118,7 +120,7 @@ private actor ScriptedManagedTransport: LMStudioManagedTransporting {
             sawPersistedIntent = true
         }
         if case .unauthorized = mode { throw LMStudioProviderError.unauthorized }
-        let turn = try Self.turn(for: request)
+        let turn = try Self.turn(for: request, responseModel: responseModel)
         receipts[request.idempotencyKey] = turn
         if case .ambiguousFirstResponse = mode, attempts == 1 {
             throw LMStudioProviderError.deadlineExceeded(phase: "total")
@@ -144,7 +146,10 @@ private actor ScriptedManagedTransport: LMStudioManagedTransporting {
         (attempts, sawPersistedIntent, bootstrapSystemPrompt)
     }
 
-    private static func turn(for request: LMStudioRootRequest) throws -> LMStudioResponseTurn {
+    private static func turn(
+        for request: LMStudioRootRequest,
+        responseModel: String?
+    ) throws -> LMStudioResponseTurn {
         guard let data = request.userInput.data(using: .utf8),
               let handoff = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let project = handoff["project"] as? [String: Any],
@@ -176,7 +181,7 @@ private actor ScriptedManagedTransport: LMStudioManagedTransporting {
         return LMStudioResponseTurn(
             responseID: "resp_lms_scripted_" + operationID.replacingOccurrences(of: "-", with: ""),
             previousResponseID: nil,
-            model: request.modelKey ?? "fixture/tool-model",
+            model: responseModel ?? request.modelKey ?? "fixture/tool-model",
             status: "completed",
             assistantText: "",
             functionCalls: [LMStudioFunctionCall(
@@ -581,6 +586,42 @@ final class NativeSessionHostPluginTests: XCTestCase {
             forIdempotencyKey: fixture.request.idempotencyKey
         )
         XCTAssertEqual(acceptedStatus, "accepted")
+    }
+
+    func testV2AcceptsExactProbedLoadedInstanceAliasAndPersistsCanonicalModelKey() async throws {
+        let root = temporaryRoot("v2-loaded-instance-alias")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let transport = ScriptedManagedTransport(
+            mode: .normal,
+            ledgerURL: root.appendingPathComponent("native-session-ledger.json"),
+            responseModel: "fixture/tool-model@32768"
+        )
+        let fixture = try makeV2Fixture(
+            mission: "Bind the exact loaded instance without changing the model key.",
+            idempotencyKey: "v2-loaded-instance-alias"
+        )
+        let adapter = try LMStudioManagedSessionHostAdapterV2(
+            storageDirectory: root,
+            transport: transport
+        )
+        let receipt = try await adapter.createAndBootstrap(
+            request: fixture.request,
+            handoffJSON: fixture.handoffJSON,
+            challenge: fixture.challenge
+        )
+        XCTAssertEqual(receipt.modelKey, fixture.request.modelKey)
+        XCTAssertTrue(receipt.acknowledgement.accepted)
+
+        let reopened = try LMStudioManagedSessionHostAdapterV2(
+            storageDirectory: root,
+            transport: transport
+        )
+        let replay = try await reopened.receipt(
+            forIdempotencyKey: fixture.request.idempotencyKey
+        )
+        XCTAssertEqual(replay, receipt)
+        XCTAssertEqual(replay?.modelKey, fixture.request.modelKey)
     }
 
     func testV2QuarantinesAcknowledgementMismatchDuplicateAndSyntheticCandidate() async throws {
@@ -1464,7 +1505,7 @@ final class NativeSessionHostPluginTests: XCTestCase {
         let paths = AppPaths(home: home)
         try paths.ensureLayout()
         let memory = ProjectMemoryService(paths: paths)
-        let initialized = try memory.initialize(path: project.path)
+        let initialized = try memory.initializeUnchecked(path: project.path)
         return (root, home, try XCTUnwrap(initialized["project_id"] as? String), memory)
     }
 

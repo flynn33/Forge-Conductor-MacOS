@@ -16,7 +16,9 @@ private final class DashboardBindResult: @unchecked Sendable {
 
     func record(error: Error) {
         lock.lock()
-        self.error = error
+        if self.error == nil {
+            self.error = error
+        }
         lock.unlock()
     }
 
@@ -30,14 +32,45 @@ private final class DashboardBindResult: @unchecked Sendable {
 /// Loopback HTTP control surface: status, agents, sessions, audit, diagnostics, manager controls.
 /// Routing is delegated to modular route handlers (Telemetry / Manager / Operational).
 public final class DashboardServer: @unchecked Sendable {
+    static let maximumActiveConnections = 64
+    static let incompleteRequestTimeoutSeconds: TimeInterval = 10
+    static let bindTimeoutSeconds: TimeInterval = 3
+    /// Covers one failed three-second bind, the five-second durable-config lock,
+    /// one three-second restoration bind, and response scheduling, then fails closed.
+    static let gracefulResponseDrainTimeoutSeconds: TimeInterval = 12
+    private static let minimumIncompleteRequestTimeoutSeconds: TimeInterval = 0.05
+
+    private struct ActiveConnection {
+        let connection: NWConnection
+        var incompleteRequestDeadlineUptimeNanoseconds: UInt64?
+    }
+
     private let app: ForgeApp
     private let host: String
     private let port: UInt16
+    private let activeConnectionLimit: Int
+    private let incompleteRequestTimeout: TimeInterval
     private var listener: NWListener?
+    private var incompleteRequestTimer: DispatchSourceTimer?
+    private var gracefulDrainTimer: DispatchSourceTimer?
+    private var gracefulDrainRetain: DashboardServer?
     private let queue = DispatchQueue(label: "forge.dashboard", qos: .userInitiated)
+    private let gracefulDrainQueue = DispatchQueue(
+        label: "forge.dashboard.response-drain",
+        qos: .utility
+    )
     private let lock = NSLock()
     private let http = HTTPResponder()
-    public private(set) var isRunning = false
+    private var acceptingConnections = false
+    private var isGracefullyDraining = false
+    private var activeConnections: [ObjectIdentifier: ActiveConnection] = [:]
+    private var running = false
+
+    public var isRunning: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return running
+    }
 
     /// Optional supervisor; when set, manager control APIs are available.
     public weak var manager: ManagerNode?
@@ -45,11 +78,41 @@ public final class DashboardServer: @unchecked Sendable {
     public var boundHost: String { host }
     public var boundPort: UInt16 { port }
 
+    var activeConnectionCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return activeConnections.count
+    }
+
     public init(app: ForgeApp, host: String? = nil, port: UInt16? = nil) {
         self.app = app
         self.host = host ?? app.config.string("dashboard", "host", default: "127.0.0.1")
         let cfgPort = app.config.int("dashboard", "port", default: 7788)
         self.port = port ?? UInt16(clamping: cfgPort)
+        activeConnectionLimit = Self.maximumActiveConnections
+        incompleteRequestTimeout = Self.incompleteRequestTimeoutSeconds
+    }
+
+    init(
+        app: ForgeApp,
+        host: String? = nil,
+        port: UInt16? = nil,
+        activeConnectionLimit: Int,
+        incompleteRequestTimeout: TimeInterval
+    ) {
+        self.app = app
+        self.host = host ?? app.config.string("dashboard", "host", default: "127.0.0.1")
+        let cfgPort = app.config.int("dashboard", "port", default: 7788)
+        self.port = port ?? UInt16(clamping: cfgPort)
+        self.activeConnectionLimit = min(max(activeConnectionLimit, 1), Self.maximumActiveConnections)
+        self.incompleteRequestTimeout = min(
+            max(incompleteRequestTimeout, Self.minimumIncompleteRequestTimeoutSeconds),
+            Self.incompleteRequestTimeoutSeconds
+        )
+    }
+
+    deinit {
+        stop()
     }
 
     public var baseURL: URL {
@@ -58,7 +121,7 @@ public final class DashboardServer: @unchecked Sendable {
 
     public func start() throws {
         lock.lock()
-        guard !isRunning else {
+        guard !running else {
             lock.unlock()
             return
         }
@@ -101,6 +164,12 @@ public final class DashboardServer: @unchecked Sendable {
         }
 
         let listener = try NWListener(using: params, on: NWEndpoint.Port(rawValue: port)!)
+        let incompleteRequestTimer = DispatchSource.makeTimerSource(queue: queue)
+        incompleteRequestTimer.schedule(deadline: .distantFuture)
+        incompleteRequestTimer.setEventHandler { [weak self] in
+            self?.expireIncompleteConnections()
+        }
+        incompleteRequestTimer.resume()
         let gate = DispatchSemaphore(value: 0)
         let bindResult = DashboardBindResult()
         listener.newConnectionHandler = { [weak self] conn in
@@ -121,36 +190,125 @@ public final class DashboardServer: @unchecked Sendable {
                 ], category: .manager)
                 bindResult.record(error: err)
                 gate.signal()
+            case .waiting(let err):
+                bindResult.record(error: err)
+                gate.signal()
             case .cancelled:
-                break
+                bindResult.record(error: DashboardError.startCancelled)
+                gate.signal()
             default:
                 break
             }
         }
-        listener.start(queue: queue)
-        let wait = gate.wait(timeout: .now() + 3)
-        if wait == .timedOut {
+        lock.lock()
+        guard self.listener == nil else {
+            lock.unlock()
+            incompleteRequestTimer.cancel()
             listener.cancel()
+            return
+        }
+        self.listener = listener
+        self.incompleteRequestTimer = incompleteRequestTimer
+        acceptingConnections = true
+        lock.unlock()
+
+        listener.start(queue: queue)
+        let wait = gate.wait(timeout: .now() + Self.bindTimeoutSeconds)
+        if wait == .timedOut {
+            stop()
             app.diagnostics.error("dashboard_bind_timeout", ["port": "\(port)"], category: .manager)
             throw DashboardError.bindTimeout(port)
         }
         if let bindError = bindResult.recordedError() {
-            listener.cancel()
+            stop()
             throw bindError
         }
 
         lock.lock()
-        self.listener = listener
-        isRunning = true
+        guard self.listener === listener, acceptingConnections else {
+            lock.unlock()
+            listener.cancel()
+            throw DashboardError.startCancelled
+        }
+        running = true
         lock.unlock()
     }
 
     public func stop() {
         lock.lock()
-        defer { lock.unlock() }
-        listener?.cancel()
+        acceptingConnections = false
+        let activeListener = listener
+        let activeIncompleteRequestTimer = incompleteRequestTimer
+        let activeGracefulDrainTimer = gracefulDrainTimer
         listener = nil
-        isRunning = false
+        self.incompleteRequestTimer = nil
+        gracefulDrainTimer = nil
+        gracefulDrainRetain = nil
+        isGracefullyDraining = false
+        running = false
+        let connections = Array(activeConnections.values)
+        activeConnections.removeAll(keepingCapacity: false)
+        lock.unlock()
+
+        activeListener?.newConnectionHandler = nil
+        activeListener?.cancel()
+        activeIncompleteRequestTimer?.cancel()
+        activeGracefulDrainTimer?.setEventHandler {}
+        activeGracefulDrainTimer?.cancel()
+        for record in connections {
+            record.connection.cancel()
+        }
+    }
+
+    /// Stops accepting immediately while allowing only requests that have already
+    /// parsed completely to send their final response. The active registry is
+    /// strictly capped, incomplete clients are cancelled synchronously, and one
+    /// deadline force-closes any response that does not finish on its own.
+    func stopAllowingCompletedResponses(
+        timeout: TimeInterval = DashboardServer.gracefulResponseDrainTimeoutSeconds
+    ) {
+        let boundedTimeout = min(
+            max(timeout, Self.minimumIncompleteRequestTimeoutSeconds),
+            Self.gracefulResponseDrainTimeoutSeconds
+        )
+
+        lock.lock()
+        acceptingConnections = false
+        let activeListener = listener
+        let activeIncompleteRequestTimer = incompleteRequestTimer
+        listener = nil
+        self.incompleteRequestTimer = nil
+        running = false
+
+        let incompleteIdentifiers = activeConnections.compactMap { element in
+            element.value.incompleteRequestDeadlineUptimeNanoseconds == nil
+                ? nil
+                : element.key
+        }
+        let incompleteConnections = incompleteIdentifiers.compactMap {
+            activeConnections.removeValue(forKey: $0)?.connection
+        }
+
+        if !activeConnections.isEmpty, !isGracefullyDraining {
+            isGracefullyDraining = true
+            gracefulDrainRetain = self
+            let timer = DispatchSource.makeTimerSource(queue: gracefulDrainQueue)
+            timer.schedule(
+                deadline: .now() + boundedTimeout,
+                leeway: .milliseconds(20)
+            )
+            timer.setEventHandler { [weak self] in
+                self?.forceCloseGracefulDrain(timeout: boundedTimeout)
+            }
+            gracefulDrainTimer = timer
+            timer.resume()
+        }
+        lock.unlock()
+
+        activeListener?.newConnectionHandler = nil
+        activeListener?.cancel()
+        activeIncompleteRequestTimer?.cancel()
+        incompleteConnections.forEach { $0.cancel() }
     }
 
     /// Run until interrupted (SIGINT/SIGTERM).
@@ -179,11 +337,52 @@ public final class DashboardServer: @unchecked Sendable {
     // MARK: - Connection
 
     private func handle(connection: NWConnection) {
+        let identifier = ObjectIdentifier(connection)
+        let timeoutNanoseconds = UInt64((incompleteRequestTimeout * 1_000_000_000).rounded(.up))
+        let deadline = DispatchTime.now().uptimeNanoseconds + timeoutNanoseconds
+
+        lock.lock()
+        guard acceptingConnections, activeConnections.count < activeConnectionLimit else {
+            let activeCount = activeConnections.count
+            lock.unlock()
+            app.diagnostics.warn("dashboard_connection_capacity_rejected", [
+                "active": "\(activeCount)",
+                "limit": "\(activeConnectionLimit)",
+            ], category: .manager)
+            connection.cancel()
+            return
+        }
+        activeConnections[identifier] = ActiveConnection(
+            connection: connection,
+            incompleteRequestDeadlineUptimeNanoseconds: deadline
+        )
+        scheduleNextIncompleteRequestDeadlineLocked()
+        lock.unlock()
+
+        connection.stateUpdateHandler = { [weak self] state in
+            switch state {
+            case .failed(let error):
+                self?.app.diagnostics.warn(
+                    "dashboard_connection_failed",
+                    ["error": "\(error)"],
+                    category: .manager
+                )
+                self?.removeConnection(identifier)
+            case .cancelled:
+                self?.removeConnection(identifier)
+            default:
+                break
+            }
+        }
         connection.start(queue: queue)
-        receive(on: connection, buffer: Data())
+        receive(on: connection, identifier: identifier, buffer: Data())
     }
 
-    private func receive(on connection: NWConnection, buffer: Data) {
+    private func receive(
+        on connection: NWConnection,
+        identifier: ObjectIdentifier,
+        buffer: Data
+    ) {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { [weak self] data, _, isComplete, error in
             guard let self else {
                 connection.cancel()
@@ -191,6 +390,7 @@ public final class DashboardServer: @unchecked Sendable {
             }
             if let error {
                 self.app.diagnostics.warn("dashboard_recv_error", ["error": "\(error)"])
+                self.removeConnection(identifier)
                 connection.cancel()
                 return
             }
@@ -198,10 +398,18 @@ public final class DashboardServer: @unchecked Sendable {
             if let data { buf.append(data) }
             switch DashboardHTTPRequestParser.parse(buf, streamComplete: isComplete) {
             case .incomplete:
-                self.receive(on: connection, buffer: buf)
+                self.receive(on: connection, identifier: identifier, buffer: buf)
             case .rejected(let status, let message):
+                guard self.markRequestComplete(identifier) else {
+                    connection.cancel()
+                    return
+                }
                 self.http.respond(connection, status: status, body: message, contentType: "text/plain")
             case .request(let request):
+                guard self.markRequestComplete(identifier) else {
+                    connection.cancel()
+                    return
+                }
                 if let rejection = DashboardRequestPolicy.rejection(for: request, serverPort: self.port) {
                     self.http.respond(
                         connection,
@@ -213,6 +421,103 @@ public final class DashboardServer: @unchecked Sendable {
                 }
                 self.route(request: request, connection: connection)
             }
+        }
+    }
+
+    private func markRequestComplete(_ identifier: ObjectIdentifier) -> Bool {
+        lock.lock()
+        guard var record = activeConnections[identifier] else {
+            lock.unlock()
+            return false
+        }
+        record.incompleteRequestDeadlineUptimeNanoseconds = nil
+        activeConnections[identifier] = record
+        scheduleNextIncompleteRequestDeadlineLocked()
+        lock.unlock()
+        return true
+    }
+
+    private func expireIncompleteConnections() {
+        let now = DispatchTime.now().uptimeNanoseconds
+        lock.lock()
+        let expiredRecords: [(ObjectIdentifier, NWConnection)] = activeConnections.compactMap { element in
+            let (identifier, record) = element
+            guard let deadline = record.incompleteRequestDeadlineUptimeNanoseconds,
+                  deadline <= now else { return nil }
+            return (identifier, record.connection)
+        }
+        expiredRecords.forEach { activeConnections[$0.0] = nil }
+        scheduleNextIncompleteRequestDeadlineLocked()
+        lock.unlock()
+
+        guard !expiredRecords.isEmpty else { return }
+        app.diagnostics.warn("dashboard_incomplete_request_timeout", [
+            "deadline_ms": "\(Int(incompleteRequestTimeout * 1_000))",
+            "expired_count": "\(expiredRecords.count)",
+        ], category: .manager)
+        expiredRecords.forEach { $0.1.cancel() }
+    }
+
+    private func removeConnection(_ identifier: ObjectIdentifier) {
+        lock.lock()
+        activeConnections[identifier] = nil
+        scheduleNextIncompleteRequestDeadlineLocked()
+        let completedDrainTimer = completeGracefulDrainIfEmptyLocked()
+        lock.unlock()
+        completedDrainTimer?.setEventHandler {}
+        completedDrainTimer?.cancel()
+    }
+
+    private func forceCloseGracefulDrain(timeout: TimeInterval) {
+        lock.lock()
+        guard isGracefullyDraining else {
+            lock.unlock()
+            return
+        }
+        let connections = activeConnections.values.map(\.connection)
+        activeConnections.removeAll(keepingCapacity: false)
+        let timer = gracefulDrainTimer
+        gracefulDrainTimer = nil
+        gracefulDrainRetain = nil
+        isGracefullyDraining = false
+        lock.unlock()
+
+        timer?.setEventHandler {}
+        timer?.cancel()
+        if !connections.isEmpty {
+            app.diagnostics.warn("dashboard_graceful_drain_timeout", [
+                "deadline_ms": "\(Int(timeout * 1_000))",
+                "forced_count": "\(connections.count)",
+            ], category: .manager)
+        }
+        connections.forEach { $0.cancel() }
+    }
+
+    /// Must be called with `lock` held. Returning the source lets the caller
+    /// cancel it after unlocking while the method's strong `self` keeps teardown safe.
+    private func completeGracefulDrainIfEmptyLocked() -> DispatchSourceTimer? {
+        guard isGracefullyDraining, activeConnections.isEmpty else { return nil }
+        let timer = gracefulDrainTimer
+        gracefulDrainTimer = nil
+        gracefulDrainRetain = nil
+        isGracefullyDraining = false
+        return timer
+    }
+
+    /// Must be called with `lock` held. A single one-shot source owns every
+    /// request deadline so rapid completed requests cannot accumulate delayed blocks.
+    private func scheduleNextIncompleteRequestDeadlineLocked() {
+        guard let incompleteRequestTimer else { return }
+        let deadline = activeConnections.values.compactMap {
+            $0.incompleteRequestDeadlineUptimeNanoseconds
+        }.min()
+        if let deadline {
+            incompleteRequestTimer.schedule(
+                deadline: DispatchTime(uptimeNanoseconds: deadline),
+                leeway: .milliseconds(10)
+            )
+        } else {
+            incompleteRequestTimer.schedule(deadline: .distantFuture)
         }
     }
 
@@ -298,12 +603,14 @@ public final class DashboardServer: @unchecked Sendable {
 public enum DashboardError: Error, LocalizedError {
     case portInUse(String)
     case bindTimeout(UInt16)
+    case startCancelled
     case nonLoopbackHost(String)
 
     public var errorDescription: String? {
         switch self {
         case .portInUse(let msg): msg
         case .bindTimeout(let p): "Timed out binding dashboard on port \(p)"
+        case .startCancelled: "Dashboard startup was cancelled"
         case .nonLoopbackHost(let host):
             "Dashboard host must be loopback-only (localhost, 127.0.0.1, or ::1); got \(host)"
         }

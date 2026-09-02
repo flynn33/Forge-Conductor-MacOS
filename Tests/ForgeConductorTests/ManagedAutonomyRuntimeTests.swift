@@ -20,7 +20,7 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
         defer { app.shutdown() }
         let projectRoot = home.appendingPathComponent("project", isDirectory: true)
         try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
-        let project = try await app.projectContexts.repository.registerProject(
+        let project = try await app.projectContexts.repository.registerProjectUnchecked(
             projectID: ProjectID(),
             displayName: "Run Identity Fixture",
             canonicalRoot: projectRoot
@@ -60,6 +60,7 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
         let app = try ForgeApp.bootstrap(home: home)
         let projectRoot = home.appendingPathComponent("project", isDirectory: true)
         try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+        _ = try app.config.update(["allowed_roots": [projectRoot.path]], save: true)
         let fixtureURL = projectRoot.appendingPathComponent("fixture.txt")
         try Data("durable manager fixture\n".utf8).write(to: fixtureURL, options: .atomic)
 
@@ -113,6 +114,7 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
         ], save: true)
         let projectRoot = home.appendingPathComponent("project", isDirectory: true)
         try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+        _ = try app.config.update(["allowed_roots": [projectRoot.path]], save: true)
         let fixtureURL = projectRoot.appendingPathComponent("fixture.txt")
         try Data("dashboard-independent fixture\n".utf8).write(to: fixtureURL, options: .atomic)
 
@@ -171,7 +173,7 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
         let fixtureURL = projectRoot.appendingPathComponent("fixture.txt")
         try Data("operator control fixture\n".utf8).write(to: fixtureURL, options: .atomic)
         let projectID = ProjectID()
-        let registered = try await app.projectContexts.repository.registerProject(
+        let registered = try await app.projectContexts.repository.registerProjectUnchecked(
             projectID: projectID,
             displayName: "Operator Control Fixture",
             canonicalRoot: projectRoot
@@ -221,6 +223,214 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
         await runtime.shutdown()
     }
 
+    func testOperatorCheckpointUsesExactCurrentObservationAndReactivatesContinuity() async throws {
+        try await assertOperatorContinuityControl(
+            action: .checkpoint,
+            expectedState: .checkpointing,
+            expectedBudgetAction: .checkpoint,
+            expectedEvent: "autonomous_run_operator_checkpoint_requested"
+        )
+    }
+
+    func testOperatorRolloverUsesExactCurrentObservationAndReactivatesContinuity() async throws {
+        try await assertOperatorContinuityControl(
+            action: .rollover,
+            expectedState: .rollingOver,
+            expectedBudgetAction: .rollover,
+            expectedEvent: "autonomous_run_operator_rollover_requested"
+        )
+    }
+
+    func testOperatorContinuityRejectsAmbiguousPendingProviderIntentWithoutMutation() async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let recorder = ManagedRuntimeOperatorContinuityRecorder()
+        let runtime = try ManagedAutonomyRuntime(
+            app: app,
+            managerID: "managed-runtime-operator-rejection",
+            maximumConcurrentRuns: 1,
+            continuityFactory: { _ in recorder }
+        )
+        _ = try await runtime.start()
+        let fixture = try await makeOperatorReadyRun(app: app, label: "unsafe-pending-intent")
+        let lease = try await app.projectContexts.repository.acquireRunLease(
+            runID: fixture.run.runID,
+            ownerID: "operator-rejection-fixture"
+        )
+        let intent = RunSideEffectIntent(
+            kind: .providerTurn,
+            idempotencyKey: "operator-rejection-provider-turn",
+            payloadSHA256: JSONSupport.sha256Hex("operator-rejection-provider-turn"),
+            summary: "Ambiguous provider turn must be reconciled before operator continuity"
+        )
+        _ = try await app.projectContexts.repository.persistRunSideEffectIntent(
+            runID: fixture.run.runID,
+            lease: lease,
+            expectedRevision: fixture.run.revision,
+            intent: intent
+        )
+        _ = try await app.projectContexts.repository.releaseRunLease(lease)
+
+        do {
+            _ = try await runtime.controlRun(fixture.run.runID, action: .checkpoint)
+            XCTFail("Expected an ambiguous provider turn to reject operator continuity")
+        } catch let error as AutonomyError {
+            guard case .invalidRequest = error else {
+                return XCTFail("Unexpected operator-control error: \(error)")
+            }
+        }
+
+        let unchangedValue = try await app.projectContexts.repository.autonomousRun(
+            fixture.run.runID
+        )
+        let unchanged = try XCTUnwrap(unchangedValue)
+        XCTAssertEqual(unchanged.state, .running)
+        XCTAssertEqual(unchanged.activeSessionID, fixture.sessionID)
+        XCTAssertEqual(unchanged.specification.work.pendingIntent, intent)
+        let request = try await app.projectContexts.repository.pendingContextBudgetActionRequest(
+            runID: fixture.run.runID
+        )
+        XCTAssertNil(request)
+        let recordedCalls = await recorder.snapshot()
+        XCTAssertTrue(recordedCalls.isEmpty)
+        await runtime.shutdown()
+    }
+
+    func testOperatorContinuityFailsClosedWithoutExactCurrentBudgetObservation() async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let recorder = ManagedRuntimeOperatorContinuityRecorder()
+        let runtime = try ManagedAutonomyRuntime(
+            app: app,
+            managerID: "managed-runtime-operator-no-observation",
+            maximumConcurrentRuns: 1,
+            continuityFactory: { _ in recorder }
+        )
+        _ = try await runtime.start()
+        let fixture = try await makeOperatorRunningRun(app: app, label: "no-observation")
+
+        do {
+            _ = try await runtime.controlRun(fixture.run.runID, action: .rollover)
+            XCTFail("Expected missing current budget evidence to reject operator rollover")
+        } catch let error as ContextBudgetError {
+            XCTAssertEqual(error, .currentObservationRequired)
+        }
+
+        let unchangedValue = try await app.projectContexts.repository.autonomousRun(
+            fixture.run.runID
+        )
+        let unchanged = try XCTUnwrap(unchangedValue)
+        XCTAssertEqual(unchanged.state, .running)
+        XCTAssertEqual(unchanged.activeSessionID, fixture.sessionID)
+        XCTAssertNil(unchanged.specification.work.metadata["operator_continuity_action"])
+        let recordedCalls = await recorder.snapshot()
+        XCTAssertTrue(recordedCalls.isEmpty)
+        await runtime.shutdown()
+    }
+
+    func testManagerRestartMaterializesDurableOperatorCheckpointBeforeContinuityAdvances() async throws {
+        let firstApp = try ForgeApp.bootstrap(home: home)
+        let blockerRoot = home.appendingPathComponent("restart-blocker", isDirectory: true)
+        try FileManager.default.createDirectory(at: blockerRoot, withIntermediateDirectories: true)
+        let blockerFile = blockerRoot.appendingPathComponent("fixture.txt")
+        try Data("restart blocker\n".utf8).write(to: blockerFile, options: .atomic)
+        let blockerProject = try await firstApp.projectContexts.repository.registerProjectUnchecked(
+            projectID: ProjectID(),
+            displayName: "Restart Blocker",
+            canonicalRoot: blockerRoot
+        )
+        let provider = ManagedRuntimeFixtureProvider(
+            fixturePath: blockerFile.path,
+            rootDelay: .seconds(30)
+        )
+        let firstRecorder = ManagedRuntimeOperatorContinuityRecorder()
+        let firstRuntime = try ManagedAutonomyRuntime(
+            app: firstApp,
+            registry: managedRuntimeFixtureRegistry(provider: provider),
+            managerID: "managed-runtime-operator-restart-first",
+            maximumConcurrentRuns: 1,
+            continuityFactory: { _ in firstRecorder }
+        )
+        _ = try await firstRuntime.start()
+        let blocker = try await firstRuntime.createRun(managedRuntimeRunRequest(
+            projectID: blockerProject.projectID,
+            generation: blockerProject.generation,
+            projectRoot: blockerRoot
+        ))
+        try await waitForActiveRun(runtime: firstRuntime, runID: blocker.runID)
+
+        let target = try await makeOperatorReadyRun(app: firstApp, label: "restart-target")
+        let transitioned = try await firstRuntime.controlRun(
+            target.run.runID,
+            action: .checkpoint
+        )
+        XCTAssertEqual(transitioned.state, .checkpointing)
+        let beforeRestart = try await firstApp.projectContexts.repository
+            .pendingContextBudgetActionRequest(runID: target.run.runID)
+        XCTAssertNil(beforeRestart, "deferred activation must leave the restart seam unmaterialized")
+        let firstSnapshot = await firstRuntime.snapshot()
+        XCTAssertTrue(firstSnapshot.supervisor.deferredRunIDs.contains(target.run.runID))
+
+        await firstRuntime.shutdown()
+        let stoppedBlockerValue = try await firstApp.projectContexts.repository.autonomousRun(
+            blocker.runID
+        )
+        let stoppedBlocker = try XCTUnwrap(stoppedBlockerValue)
+        let blockerLease = try await firstApp.projectContexts.repository.acquireRunLease(
+            runID: blocker.runID,
+            ownerID: "operator-restart-pause-blocker"
+        )
+        _ = try await firstApp.projectContexts.repository.transitionAutonomousRun(
+            runID: blocker.runID,
+            lease: blockerLease,
+            transition: AutonomousRunTransition(
+                expectedState: stoppedBlocker.state,
+                expectedRevision: stoppedBlocker.revision,
+                nextState: .paused,
+                eventType: "operator_restart_fixture_paused",
+                eventSummary: "Pause the restart fixture before manager recovery"
+            )
+        )
+        _ = try await firstApp.projectContexts.repository.releaseRunLease(blockerLease)
+        firstApp.shutdown()
+
+        let secondApp = try ForgeApp.bootstrap(home: home)
+        defer { secondApp.shutdown() }
+        let secondRecorder = ManagedRuntimeOperatorContinuityRecorder()
+        let secondRuntime = try ManagedAutonomyRuntime(
+            app: secondApp,
+            registry: managedRuntimeFixtureRegistry(provider: provider),
+            managerID: "managed-runtime-operator-restart-second",
+            maximumConcurrentRuns: 1,
+            continuityFactory: { _ in secondRecorder }
+        )
+        let report = try await secondRuntime.start()
+        XCTAssertTrue(report.activatedRuns.contains(target.run.runID))
+        try await waitForOperatorContinuity(recorder: secondRecorder, count: 1)
+
+        let requestValue = try await secondApp.projectContexts.repository
+            .pendingContextBudgetActionRequest(runID: target.run.runID)
+        let request = try XCTUnwrap(requestValue)
+        XCTAssertEqual(request.requestedAction, .checkpoint)
+        XCTAssertEqual(request.identity.runID, target.run.runID)
+        XCTAssertEqual(request.identity.projectID, target.run.projectID)
+        XCTAssertEqual(request.identity.projectGeneration, target.run.projectGeneration)
+        XCTAssertEqual(request.identity.sessionID, target.sessionID)
+        XCTAssertEqual(request.actionEpoch, target.observation.actionEpoch + 1)
+        let recoveredObservationValue = try await secondApp.projectContexts.repository
+            .contextBudgetObservation(observationID: request.observationID)
+        let recoveredObservation = try XCTUnwrap(recoveredObservationValue)
+        assertOperatorObservation(recoveredObservation, preserves: target.observation)
+
+        await secondRecorder.release()
+        _ = try await waitForRun(
+            repository: secondApp.projectContexts.repository,
+            runID: target.run.runID,
+            state: .running
+        )
+        await secondRuntime.shutdown()
+    }
+
     func testHTTPRunControlRoutePersistsExactActionsAndRejectsUnknownActions() async throws {
         let app = try ForgeApp.bootstrap(home: home)
         let port = Int.random(in: 29_000...39_000)
@@ -229,6 +439,7 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
         ], save: true)
         let projectRoot = home.appendingPathComponent("project", isDirectory: true)
         try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+        _ = try app.config.update(["allowed_roots": [projectRoot.path]], save: true)
         let fixtureURL = projectRoot.appendingPathComponent("fixture.txt")
         try Data("HTTP control fixture\n".utf8).write(to: fixtureURL, options: .atomic)
         let provider = ManagedRuntimeFixtureProvider(
@@ -273,6 +484,32 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
         let unauthorizedStart = try postJSON(endpoint, object: startRequest)
         XCTAssertEqual(unauthorizedStart.status, 401)
         XCTAssertEqual(unauthorizedStart.object["code"] as? String, "manager_mutation_unauthorized")
+
+        let invalidRunUUID = UUID()
+        var invalidToolRequest = startRequest
+        invalidToolRequest["run_id"] = invalidRunUUID.uuidString.lowercased()
+        invalidToolRequest["allowed_tools"] = ["project.memory.search"]
+        let invalidToolStart = try postJSON(
+            endpoint,
+            object: invalidToolRequest,
+            bearerToken: bearerToken
+        )
+        XCTAssertEqual(invalidToolStart.status, 422)
+        XCTAssertEqual(
+            invalidToolStart.object["code"] as? String,
+            "autonomy_tool_configuration_invalid"
+        )
+        XCTAssertEqual(invalidToolStart.object["retryable"] as? Bool, false)
+        XCTAssertTrue(
+            (invalidToolStart.object["message"] as? String)?.contains("project.memory.search") == true
+        )
+        let rejectedDurableRun = try await app.projectContexts.repository.autonomousRun(
+            RunID(invalidRunUUID)
+        )
+        XCTAssertNil(
+            rejectedDurableRun,
+            "An invalid tool policy must be rejected before the run is durably created"
+        )
 
         let started = try postJSON(endpoint, object: startRequest, bearerToken: bearerToken)
         XCTAssertEqual(started.status, 202)
@@ -338,6 +575,134 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
         )
     }
 
+    func testHTTPRunControlRouteInvokesCheckpointAndRolloverWithManagerOwnedEligibility() async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        let port = Int.random(in: 29_000...39_000)
+        try app.config.update([
+            "dashboard": ["port": port] as [String: Any],
+        ], save: true)
+        let recorder = ManagedRuntimeOperatorContinuityRecorder()
+        let node = ManagerNode(app: app) { app in
+            try ManagedAutonomyRuntime(
+                app: app,
+                managerID: "managed-runtime-http-continuity-controls",
+                maximumConcurrentRuns: 2,
+                continuityFactory: { _ in recorder }
+            )
+        }
+        defer {
+            node.shutdownManagedAutonomy()
+            _ = try? node.stopService()
+            app.shutdown()
+        }
+
+        _ = try node.recoverManagedAutonomy()
+        _ = try node.startService()
+        try await Task.sleep(for: .milliseconds(100))
+        let bearerToken = try ManagerControlCredentialStore(paths: app.paths).bearerToken()
+        let controlEndpoint = try XCTUnwrap(
+            URL(string: "http://127.0.0.1:\(port)/api/manager/runs/control")
+        )
+        let checkpointFixture = try await makeOperatorReadyRun(
+            app: app,
+            label: "http-checkpoint"
+        )
+        let rolloverFixture = try await makeOperatorReadyRun(
+            app: app,
+            label: "http-rollover"
+        )
+        let missingObservationFixture = try await makeOperatorRunningRun(
+            app: app,
+            label: "http-no-observation"
+        )
+
+        let checkpoint = try postJSON(controlEndpoint, object: [
+            "run_id": checkpointFixture.run.runID.description,
+            "action": "checkpoint",
+        ], bearerToken: bearerToken)
+        XCTAssertEqual(checkpoint.status, 200)
+        XCTAssertEqual(
+            checkpoint.object["run_id"] as? String,
+            checkpointFixture.run.runID.description
+        )
+        XCTAssertEqual(
+            checkpoint.object["state"] as? String,
+            AutonomousRunState.checkpointing.rawValue
+        )
+
+        let rollover = try postJSON(controlEndpoint, object: [
+            "run_id": rolloverFixture.run.runID.description,
+            "action": "rollover",
+        ], bearerToken: bearerToken)
+        XCTAssertEqual(rollover.status, 200)
+        XCTAssertEqual(
+            rollover.object["run_id"] as? String,
+            rolloverFixture.run.runID.description
+        )
+        XCTAssertEqual(
+            rollover.object["state"] as? String,
+            AutonomousRunState.rollingOver.rawValue
+        )
+
+        try await waitForOperatorContinuity(recorder: recorder, count: 2)
+        let calls = await recorder.snapshot()
+        XCTAssertEqual(
+            Set(calls.map(\.runID)),
+            Set([checkpointFixture.run.runID, rolloverFixture.run.runID])
+        )
+        XCTAssertEqual(
+            calls.first(where: { $0.runID == checkpointFixture.run.runID })?.state,
+            .checkpointing
+        )
+        XCTAssertEqual(
+            calls.first(where: { $0.runID == rolloverFixture.run.runID })?.state,
+            .rollingOver
+        )
+
+        let checkpointRequestValue = try await app.projectContexts.repository
+            .pendingContextBudgetActionRequest(runID: checkpointFixture.run.runID)
+        let checkpointRequest = try XCTUnwrap(checkpointRequestValue)
+        XCTAssertEqual(checkpointRequest.requestedAction, .checkpoint)
+        XCTAssertEqual(checkpointRequest.identity.sessionID, checkpointFixture.sessionID)
+        let rolloverRequestValue = try await app.projectContexts.repository
+            .pendingContextBudgetActionRequest(runID: rolloverFixture.run.runID)
+        let rolloverRequest = try XCTUnwrap(rolloverRequestValue)
+        XCTAssertEqual(rolloverRequest.requestedAction, .rollover)
+        XCTAssertEqual(rolloverRequest.identity.sessionID, rolloverFixture.sessionID)
+
+        let rejected = try postJSON(controlEndpoint, object: [
+            "run_id": missingObservationFixture.run.runID.description,
+            "action": "rollover",
+        ], bearerToken: bearerToken)
+        XCTAssertEqual(rejected.status, 409)
+        XCTAssertEqual(rejected.object["code"] as? String, "context_observation_required")
+        XCTAssertEqual(
+            rejected.object["message"] as? String,
+            "A current usage observation is required"
+        )
+        let unchangedValue = try await app.projectContexts.repository.autonomousRun(
+            missingObservationFixture.run.runID
+        )
+        let unchanged = try XCTUnwrap(unchangedValue)
+        XCTAssertEqual(unchanged.state, .running)
+        XCTAssertEqual(unchanged.activeSessionID, missingObservationFixture.sessionID)
+        let rejectedRequest = try await app.projectContexts.repository
+            .pendingContextBudgetActionRequest(runID: missingObservationFixture.run.runID)
+        XCTAssertNil(rejectedRequest)
+
+        let invalid = try postJSON(controlEndpoint, object: [
+            "run_id": checkpointFixture.run.runID.description,
+            "action": "restart",
+        ], bearerToken: bearerToken)
+        XCTAssertEqual(invalid.status, 400)
+        XCTAssertEqual(invalid.object["code"] as? String, "invalid_run_control")
+        let validationMessage = try XCTUnwrap(invalid.object["message"] as? String)
+        XCTAssertTrue(validationMessage.contains("checkpoint"))
+        XCTAssertTrue(validationMessage.contains("rollover"))
+
+        await recorder.release()
+    }
+
     func testRunCancellationReleasesOwnedRuntimeJobBeforeTerminalRunState() async throws {
         let app = try ForgeApp.bootstrap(home: home)
         defer { app.shutdown() }
@@ -346,7 +711,7 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
         let fixtureURL = projectRoot.appendingPathComponent("fixture.txt")
         try Data("runtime cancellation fixture\n".utf8).write(to: fixtureURL, options: .atomic)
         let projectID = ProjectID()
-        let project = try await app.projectContexts.repository.registerProject(
+        let project = try await app.projectContexts.repository.registerProjectUnchecked(
             projectID: projectID,
             displayName: "Runtime Cancellation Fixture",
             canonicalRoot: projectRoot
@@ -421,6 +786,479 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
         await runtime.shutdown()
     }
 
+    func testHTTPRunResponsesMatchOperatorSnapshotProjectionAndPreserveCompletionReceipt() async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        let port = Int.random(in: 29_000...39_000)
+        try app.config.update(["dashboard": ["port": port] as [String: Any]], save: true)
+        let projectRoot = home.appendingPathComponent("operator-run-contract", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+        _ = try app.config.update(["allowed_roots": [projectRoot.path]], save: true)
+        let fixtureURL = projectRoot.appendingPathComponent("fixture.txt")
+        try Data("operator response contract\n".utf8).write(to: fixtureURL, options: .atomic)
+        let provider = ManagedRuntimeFixtureProvider(fixturePath: fixtureURL.path, rootDelay: .seconds(30))
+        let node = ManagerNode(app: app) { app in
+            try ManagedAutonomyRuntime(
+                app: app,
+                registry: managedRuntimeFixtureRegistry(provider: provider),
+                managerID: "managed-runtime-operator-run-contract",
+                maximumConcurrentRuns: 1
+            )
+        }
+        defer {
+            node.shutdownManagedAutonomy()
+            _ = try? node.stopService()
+            app.shutdown()
+        }
+
+        let registered = try node.registerProject(path: projectRoot.path)
+        let projectIDValue = try XCTUnwrap(registered["project_id"] as? String)
+        let projectID = try ProjectID(XCTUnwrap(UUID(uuidString: projectIDValue)))
+        let generation = ProjectGeneration(try projectGeneration(registered))
+        let runID = RunID()
+        let repository = app.projectContexts.repository
+        let stagedRun = try await repository.createAutonomousRun(AutonomousRunRequest(
+            runID: runID,
+            projectID: projectID,
+            projectGeneration: generation,
+            assignmentID: "operator-contract-assignment",
+            mission: "Prove one exact operator run response contract",
+            providerID: "fixture-provider",
+            adapterID: "fixture-adapter",
+            modelKey: "fixture-model",
+            specification: AutonomousRunSpecification(
+                allowedTools: ["fs_read"],
+                completionGates: ["fixture_read"]
+            ),
+            authorizationScope: ToolAuthorizationScope(
+                canonicalRoots: [projectRoot],
+                allowedTools: ["fs_read"],
+                networkAllowed: false,
+                maximumInlineOutputBytes: ProjectContextService.defaultInlineOutputLimit
+            )
+        ))
+        let stagingLease = try await repository.acquireRunLease(
+            runID: runID,
+            ownerID: "operator-contract-staging"
+        )
+        _ = try await repository.transitionAutonomousRun(
+            runID: runID,
+            lease: stagingLease,
+            transition: AutonomousRunTransition(
+                expectedState: stagedRun.state,
+                expectedRevision: stagedRun.revision,
+                nextState: .paused,
+                eventType: "operator_contract_fixture_paused",
+                eventSummary: "Stage exact response fields before manager recovery"
+            )
+        )
+        _ = try await repository.releaseRunLease(stagingLease)
+        _ = try node.recoverManagedAutonomy()
+        _ = try node.startService()
+        try await Task.sleep(for: .milliseconds(100))
+        let token = try ManagerControlCredentialStore(paths: app.paths).bearerToken()
+        let base = "http://127.0.0.1:\(port)"
+        let startURL = try XCTUnwrap(URL(string: base + "/api/manager/runs/start"))
+        let statusURL = try XCTUnwrap(URL(string: base + "/api/manager/runs/status"))
+        let controlURL = try XCTUnwrap(URL(string: base + "/api/manager/runs/control"))
+        let snapshotURL = try XCTUnwrap(URL(string: base + "/api/manager/operator/snapshot?limit=100"))
+        let startRequest: [String: Any] = [
+            "run_id": runID.description,
+            "project_id": projectID.description,
+            "project_generation": generation.rawValue,
+            "assignment_id": "operator-contract-assignment",
+            "mission": "Prove one exact operator run response contract",
+            "provider_id": "fixture-provider",
+            "adapter_id": "fixture-adapter",
+            "model_key": "fixture-model",
+            "allowed_tools": ["fs_read"],
+            "completion_gates": ["fixture_read"],
+        ]
+        XCTAssertEqual(
+            try postJSON(startURL, object: startRequest, bearerToken: token).status,
+            202
+        )
+        let firstPause = try postJSON(
+            controlURL,
+            object: ["run_id": runID.description, "action": "pause"],
+            bearerToken: token
+        )
+        XCTAssertEqual(firstPause.status, 200)
+        XCTAssertEqual(firstPause.object["state"] as? String, AutonomousRunState.paused.rawValue)
+
+        let lease = try await repository.acquireRunLease(
+            runID: runID,
+            ownerID: "operator-contract-lease-owner"
+        )
+        let sessionID = "operator-contract-session"
+        try await repository.reserveProviderSession(
+            ProviderSessionIntent(
+                sessionID: sessionID,
+                runID: runID,
+                projectID: projectID,
+                projectGeneration: generation,
+                providerID: "fixture-provider",
+                adapterID: "fixture-adapter",
+                modelKey: "fixture-model",
+                providerResponseID: "operator-contract-response",
+                predecessorSessionID: "operator-contract-predecessor",
+                idempotencyKey: "operator-contract-session",
+                contextCapacity: 32_768
+            ),
+            lease: lease
+        )
+        let identity = ContextBudgetIdentity(
+            runID: runID,
+            projectID: projectID,
+            projectGeneration: generation,
+            sessionID: sessionID
+        )
+        let budget = try await ContextBudgetSupervisor.open(
+            repository: repository,
+            identity: identity,
+            configuration: try managedRuntimeOperatorBudgetConfiguration()
+        )
+        _ = try await budget.evaluate(ContextBudgetEvaluationRequest(
+            triggerPoint: .afterProviderTurn,
+            providerResponseID: "operator-contract-response",
+            measurement: .providerExact(usedTokens: 2_048)
+        ))
+        let turn = ProviderTurnIntent(
+            runID: runID,
+            sessionID: sessionID,
+            projectID: projectID,
+            projectGeneration: generation,
+            kind: .initialRoot,
+            idempotencyKey: "operator-contract-turn",
+            inputSHA256: JSONSupport.sha256Hex("operator-contract-input")
+        )
+        _ = try await repository.persistProviderTurnIntent(turn, lease: lease)
+        _ = try await repository.persistToolInvocationIntent(
+            ToolInvocationIntent(
+                turnID: turn.turnID,
+                runID: runID,
+                sessionID: sessionID,
+                projectID: projectID,
+                projectGeneration: generation,
+                providerCallID: "operator-contract-tool-call",
+                toolName: "fs_read",
+                replayClass: .readOnly,
+                idempotencyKey: nil,
+                argumentsSHA256: JSONSupport.sha256Hex("{}")
+            ),
+            lease: lease
+        )
+
+        let startReplay = try postJSON(startURL, object: startRequest, bearerToken: token)
+        let status = try postJSON(statusURL, object: ["run_id": runID.description])
+        let control = try postJSON(
+            controlURL,
+            object: ["run_id": runID.description, "action": "pause"],
+            bearerToken: token
+        )
+        let pausedSnapshot = try HTTPTestHelpers.fetchJSON(snapshotURL)
+        let pausedSnapshotRun = try operatorRun(runID: runID, snapshot: pausedSnapshot)
+        for response in [startReplay.object, status.object, control.object] {
+            XCTAssertEqual(response["ok"] as? Bool, true)
+            try assertExactOperatorRunProjection(response, equals: pausedSnapshotRun)
+            XCTAssertNotNil(response["revision"], "The established route revision remains additive")
+        }
+        XCTAssertEqual(status.object["provider_instance_id"] as? String, "fixture-instance")
+        XCTAssertEqual(status.object["predecessor_session_id"] as? String, "operator-contract-predecessor")
+        XCTAssertEqual(status.object["lease_owner"] as? String, "operator-contract-lease-owner")
+        XCTAssertNotNil(status.object["last_model_turn_at"] as? String)
+        XCTAssertNotNil(status.object["last_tool_activity_at"] as? String)
+
+        let currentValue = try await repository.autonomousRun(runID)
+        var current = try XCTUnwrap(currentValue)
+        current = try await repository.transitionAutonomousRun(
+            runID: runID,
+            lease: lease,
+            transition: AutonomousRunTransition(
+                expectedState: current.state,
+                expectedRevision: current.revision,
+                nextState: .validatingCompletion,
+                eventType: "operator_contract_completion_requested",
+                eventSummary: "Validate the exact operator response receipt"
+            )
+        )
+        let receipt = try CompletionValidationReceipt.make(
+            runID: runID,
+            expectedRevision: current.revision,
+            results: [CompletionGateResult(
+                gate: "fixture_read",
+                passed: true,
+                summary: "The production HTTP contract fixture passed",
+                evidenceReferences: ["fixture:operator-run-contract"]
+            )],
+            validatedAt: ISO8601.string(from: Date())
+        )
+        _ = try await repository.completeAutonomousRun(runID: runID, lease: lease, receipt: receipt)
+
+        let completedStatus = try postJSON(statusURL, object: ["run_id": runID.description])
+        let completedStart = try postJSON(startURL, object: startRequest, bearerToken: token)
+        let completedSnapshot = try HTTPTestHelpers.fetchJSON(snapshotURL)
+        let completedSnapshotRun = try operatorRun(runID: runID, snapshot: completedSnapshot)
+        XCTAssertEqual(completedStatus.object["state"] as? String, AutonomousRunState.completed.rawValue)
+        XCTAssertEqual(completedStatus.object["passed_gates"] as? [String], ["fixture_read"])
+        try assertExactOperatorRunProjection(completedStatus.object, equals: completedSnapshotRun)
+        try assertExactOperatorRunProjection(completedStart.object, equals: completedSnapshotRun)
+        XCTAssertEqual(completedStatus.object["lease_owner"] as? String, "operator-contract-lease-owner")
+        _ = try await repository.releaseRunLease(lease)
+    }
+
+    private func assertOperatorContinuityControl(
+        action: ManagedAutonomyControlAction,
+        expectedState: AutonomousRunState,
+        expectedBudgetAction: ContextBudgetAction,
+        expectedEvent: String
+    ) async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let recorder = ManagedRuntimeOperatorContinuityRecorder()
+        let runtime = try ManagedAutonomyRuntime(
+            app: app,
+            managerID: "managed-runtime-operator-\(action.rawValue)",
+            maximumConcurrentRuns: 1,
+            continuityFactory: { _ in recorder }
+        )
+        _ = try await runtime.start()
+        let fixture = try await makeOperatorReadyRun(app: app, label: action.rawValue)
+
+        let controlled = try await runtime.controlRun(fixture.run.runID, action: action)
+        XCTAssertEqual(controlled.state, expectedState)
+        XCTAssertEqual(controlled.activeSessionID, fixture.sessionID)
+        XCTAssertNil(controlled.activeOperationID)
+        XCTAssertEqual(
+            controlled.specification.work.metadata["operator_continuity_action"],
+            expectedBudgetAction.rawValue
+        )
+        try await waitForOperatorContinuity(recorder: recorder, count: 1)
+
+        let calls = await recorder.snapshot()
+        let call = try XCTUnwrap(calls.first)
+        XCTAssertEqual(call.runID, fixture.run.runID)
+        XCTAssertEqual(call.projectID, fixture.run.projectID)
+        XCTAssertEqual(call.projectGeneration, fixture.run.projectGeneration)
+        XCTAssertEqual(call.sessionID, fixture.sessionID)
+        XCTAssertEqual(call.state, expectedState)
+
+        let requestValue = try await app.projectContexts.repository
+            .pendingContextBudgetActionRequest(runID: fixture.run.runID)
+        let request = try XCTUnwrap(requestValue)
+        XCTAssertEqual(request.requestedAction, expectedBudgetAction)
+        XCTAssertEqual(request.identity.runID, fixture.run.runID)
+        XCTAssertEqual(request.identity.projectID, fixture.run.projectID)
+        XCTAssertEqual(request.identity.projectGeneration, fixture.run.projectGeneration)
+        XCTAssertEqual(request.identity.sessionID, fixture.sessionID)
+        XCTAssertEqual(request.actionEpoch, fixture.observation.actionEpoch + 1)
+        XCTAssertEqual(
+            request.continuityOperationID.uuidString.lowercased(),
+            controlled.specification.work.metadata["operator_continuity_operation_id"]
+        )
+        let operatorObservationValue = try await app.projectContexts.repository
+            .contextBudgetObservation(observationID: request.observationID)
+        let operatorObservation = try XCTUnwrap(operatorObservationValue)
+        assertOperatorObservation(operatorObservation, preserves: fixture.observation)
+        XCTAssertEqual(operatorObservation.action, expectedBudgetAction)
+        XCTAssertEqual(operatorObservation.actionEpoch, request.actionEpoch)
+
+        let events = try await app.projectContexts.repository.operatorAutonomyEvents(limit: 101)
+        XCTAssertTrue(events.contains {
+            $0.runID == fixture.run.runID && $0.eventType == expectedEvent
+        })
+        let duringExecutionValue = try await app.projectContexts.repository.autonomousRun(
+            fixture.run.runID
+        )
+        let duringExecution = try XCTUnwrap(duringExecutionValue)
+        XCTAssertEqual(duringExecution.activeSessionID, fixture.sessionID)
+        XCTAssertNil(duringExecution.activeOperationID)
+
+        await recorder.release()
+        let resumed = try await waitForRun(
+            repository: app.projectContexts.repository,
+            runID: fixture.run.runID,
+            state: .running
+        )
+        XCTAssertEqual(resumed.activeSessionID, fixture.sessionID)
+        XCTAssertNil(resumed.specification.work.metadata["operator_continuity_action"])
+        await runtime.shutdown()
+    }
+
+    private func makeOperatorReadyRun(
+        app: ForgeApp,
+        label: String
+    ) async throws -> ManagedRuntimeOperatorReadyFixture {
+        let running = try await makeOperatorRunningRun(app: app, label: label)
+        let identity = ContextBudgetIdentity(
+            runID: running.run.runID,
+            projectID: running.run.projectID,
+            projectGeneration: running.run.projectGeneration,
+            sessionID: running.sessionID
+        )
+        let budget = try await ContextBudgetSupervisor.open(
+            repository: app.projectContexts.repository,
+            identity: identity,
+            configuration: try managedRuntimeOperatorBudgetConfiguration()
+        )
+        let receipt = try await budget.evaluate(ContextBudgetEvaluationRequest(
+            triggerPoint: .afterProviderTurn,
+            providerResponseID: running.providerResponseID,
+            measurement: .providerExact(usedTokens: 1_024)
+        ))
+        XCTAssertEqual(receipt.observation.action, .normal)
+        return ManagedRuntimeOperatorReadyFixture(
+            run: running.run,
+            sessionID: running.sessionID,
+            observation: receipt.observation
+        )
+    }
+
+    private func makeOperatorRunningRun(
+        app: ForgeApp,
+        label: String
+    ) async throws -> ManagedRuntimeOperatorRunningFixture {
+        let projectRoot = home.appendingPathComponent(
+            "operator-ready-\(label)-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+        let project = try await app.projectContexts.repository.registerProjectUnchecked(
+            projectID: ProjectID(),
+            displayName: "Operator Ready \(label)",
+            canonicalRoot: projectRoot
+        )
+        var run = try await app.projectContexts.repository.createAutonomousRun(
+            managedRuntimeRunRequest(
+                projectID: project.projectID,
+                generation: project.generation,
+                projectRoot: projectRoot,
+                mission: "Exercise operator \(label) continuity"
+            )
+        )
+        let lease = try await app.projectContexts.repository.acquireRunLease(
+            runID: run.runID,
+            ownerID: "operator-ready-\(label)"
+        )
+        do {
+            let sessionID = "operator-session-\(UUID().uuidString.lowercased())"
+            let providerResponseID = "operator-response-\(label)"
+            try await app.projectContexts.repository.reserveProviderSession(
+                ProviderSessionIntent(
+                    sessionID: sessionID,
+                    runID: run.runID,
+                    projectID: run.projectID,
+                    projectGeneration: run.projectGeneration,
+                    providerID: "fixture-provider",
+                    adapterID: "fixture-adapter",
+                    modelKey: "fixture-model",
+                    providerResponseID: providerResponseID,
+                    idempotencyKey: "operator-session-\(run.runID.description)",
+                    contextCapacity: 32_768
+                ),
+                lease: lease
+            )
+            let reservedRun = try await app.projectContexts.repository.autonomousRun(run.runID)
+            run = try XCTUnwrap(reservedRun)
+            for state in [
+                AutonomousRunState.validating,
+                .ready,
+                .starting,
+                .running,
+            ] {
+                run = try await app.projectContexts.repository.transitionAutonomousRun(
+                    runID: run.runID,
+                    lease: lease,
+                    transition: AutonomousRunTransition(
+                        expectedState: run.state,
+                        expectedRevision: run.revision,
+                        nextState: state,
+                        eventType: "operator_fixture_\(state.rawValue)",
+                        eventSummary: "Operator fixture entered \(state.rawValue)"
+                    )
+                )
+            }
+            _ = try await app.projectContexts.repository.releaseRunLease(lease)
+            return ManagedRuntimeOperatorRunningFixture(
+                run: run,
+                sessionID: sessionID,
+                providerResponseID: providerResponseID
+            )
+        } catch {
+            _ = try? await app.projectContexts.repository.releaseRunLease(lease)
+            throw error
+        }
+    }
+
+    private func managedRuntimeOperatorBudgetConfiguration() throws -> ContextBudgetConfiguration {
+        try ContextBudgetConfiguration(
+            capacity: ContextCapacityResolution(
+                providerID: "fixture-provider",
+                providerVersionFingerprint: String(repeating: "b", count: 64),
+                modelKey: "fixture-model",
+                activeInstanceID: "fixture-instance",
+                capacity: 32_768,
+                maximumContextLength: 65_536,
+                requiresModelLoad: false
+            ),
+            reserves: ContextBudgetReserves(
+                outputTokens: 1_024,
+                schemaTokens: 512,
+                handoffTokens: 1_024,
+                recoveryTokens: 512
+            ),
+            policy: ContextBudgetPolicy(initialProjectedNextTurnTokens: 512)
+        ).validated()
+    }
+
+    private func assertOperatorObservation(
+        _ actual: ContextBudgetObservation,
+        preserves source: ContextBudgetObservation,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertEqual(actual.identity, source.identity, file: file, line: line)
+        XCTAssertEqual(actual.providerResponseID, source.providerResponseID, file: file, line: line)
+        XCTAssertEqual(actual.capacity, source.capacity, file: file, line: line)
+        XCTAssertEqual(actual.used, source.used, file: file, line: line)
+        XCTAssertEqual(actual.reserves, source.reserves, file: file, line: line)
+        XCTAssertEqual(actual.remaining, source.remaining, file: file, line: line)
+        XCTAssertEqual(actual.projectedNextTurn, source.projectedNextTurn, file: file, line: line)
+        XCTAssertEqual(actual.source, source.source, file: file, line: line)
+        XCTAssertEqual(actual.confidence, source.confidence, file: file, line: line)
+        XCTAssertEqual(actual.estimatorVersion, source.estimatorVersion, file: file, line: line)
+        XCTAssertEqual(actual.thresholds, source.thresholds, file: file, line: line)
+    }
+
+    private func waitForOperatorContinuity(
+        recorder: ManagedRuntimeOperatorContinuityRecorder,
+        count: Int,
+        timeout: Duration = .seconds(5)
+    ) async throws {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: timeout)
+        while clock.now < deadline {
+            let calls = await recorder.snapshot()
+            if calls.count >= count { return }
+            try await Task.sleep(for: .milliseconds(25))
+        }
+        XCTFail("Timed out waiting for operator continuity execution")
+    }
+
+    private func waitForActiveRun(
+        runtime: ManagedAutonomyRuntime,
+        runID: RunID,
+        timeout: Duration = .seconds(5)
+    ) async throws {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: timeout)
+        while clock.now < deadline {
+            let snapshot = await runtime.snapshot()
+            if snapshot.supervisor.activeRunIDs.contains(runID) { return }
+            try await Task.sleep(for: .milliseconds(25))
+        }
+        XCTFail("Timed out waiting for active managed run")
+    }
+
     private func managedRuntimeRunRequest(
         projectID: ProjectID,
         generation: ProjectGeneration,
@@ -492,6 +1330,39 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
         return try XCTUnwrap(nil as UInt64?)
     }
 
+    private func operatorRun(
+        runID: RunID,
+        snapshot: [String: Any]
+    ) throws -> [String: Any] {
+        let runs = try XCTUnwrap(snapshot["runs"] as? [[String: Any]])
+        return try XCTUnwrap(runs.first { $0["run_id"] as? String == runID.description })
+    }
+
+    private func assertExactOperatorRunProjection(
+        _ response: [String: Any],
+        equals snapshot: [String: Any],
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let keys: Set<String> = [
+            "run_id", "project_id", "project_generation", "assignment_id", "mission", "state",
+            "continuity_mode", "provider_id", "adapter_id", "model_key", "provider_instance_id",
+            "active_session_id", "predecessor_session_id", "active_operation_id",
+            "continuation_pending", "lease_owner", "work_item", "last_model_turn_at",
+            "last_tool_activity_at", "completion_gates", "passed_gates", "last_error_code",
+            "last_error_summary", "retry_at", "created_at", "updated_at",
+        ]
+        let responseData = try JSONSerialization.data(
+            withJSONObject: response.filter { keys.contains($0.key) },
+            options: [.sortedKeys]
+        )
+        let snapshotData = try JSONSerialization.data(
+            withJSONObject: snapshot.filter { keys.contains($0.key) },
+            options: [.sortedKeys]
+        )
+        XCTAssertEqual(responseData, snapshotData, file: file, line: line)
+    }
+
     private func postJSON(
         _ url: URL,
         object: [String: Any],
@@ -508,6 +1379,55 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
         let decoded = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
         return (decoded, response.statusCode)
     }
+}
+
+private struct ManagedRuntimeOperatorReadyFixture {
+    let run: AutonomousRunRecord
+    let sessionID: String
+    let observation: ContextBudgetObservation
+}
+
+private struct ManagedRuntimeOperatorRunningFixture {
+    let run: AutonomousRunRecord
+    let sessionID: String
+    let providerResponseID: String
+}
+
+private actor ManagedRuntimeOperatorContinuityRecorder: ManagedRunContinuityExecuting {
+    struct Call: Sendable {
+        let runID: RunID
+        let projectID: ProjectID
+        let projectGeneration: ProjectGeneration
+        let sessionID: String?
+        let state: AutonomousRunState
+    }
+
+    private var calls: [Call] = []
+    private var released = false
+
+    func executeContinuityStep(
+        intent: RunSideEffectIntent,
+        run: AutonomousRunRecord,
+        context: ToolInvocationContext,
+        lease: RunLease
+    ) async throws -> ProjectRunStepOutcome {
+        calls.append(Call(
+            runID: run.runID,
+            projectID: run.projectID,
+            projectGeneration: run.projectGeneration,
+            sessionID: run.activeSessionID,
+            state: run.state
+        ))
+        while !released {
+            try Task.checkCancellation()
+            try await Task.sleep(for: .milliseconds(25))
+        }
+        return .continued(run.specification.work)
+    }
+
+    func snapshot() -> [Call] { calls }
+
+    func release() { released = true }
 }
 
 private func managedRuntimeFixtureRegistry(

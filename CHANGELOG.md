@@ -11,14 +11,63 @@ under **Unreleased** is not a new qualified release.
 
 ## [Unreleased]
 
-This is an in-progress P10 checkpoint, not a qualified release. P10,
-filesystem E2, live shell compatibility, signed native UI and release validation,
-manager-owned real-provider autonomous continuity, owner-deferred representative
-physical-hardware qualification, and current G09-G12 remain open and
-release-blocking.
+This is a 0.9.0 development snapshot, not a qualified release. Product version
+surfaces remain 0.9.0 build 1. P10/G10, filesystem E2, production Settings shell
+qualification, Developer ID Release/native lifecycle
+validation, manager-owned
+real-provider autonomous continuity, owner-deferred representative physical-
+hardware qualification, and current G09-G12 remain open and release-blocking.
+Clean-install managed-provider configuration is also open: the adapter reads a
+validated LM Studio configuration when present, but the product does not yet
+provide a supported control that creates it.
+
+### Verified current-source evidence
+
+- The CLI `version` output reports marketing version **0.9.0**. The Swift
+  runtime constants, the versioned Xcode configurations, and the built app
+  bundle report marketing version **0.9.0**, build **1**.
+- The Xcode unit-test target now consumes `ForgeFilesystemProtocol` through
+  `ForgeConductorCore` instead of loading a second static copy. All seven
+  focused protocol tests pass without duplicate-class or decode warnings.
+- Persistent sidebar controls no longer rebuild for unrelated telemetry field
+  publications. An earlier exact-revision Apple Development-signed native UI
+  test completed 100 Rig-to-MCP and 100 MCP-to-Rig transitions with zero
+  failures. That record is supporting evidence only because this Unreleased
+  tree has since changed operator navigation and must be rerun from the final
+  source checkpoint.
+- Focused current-source protected-filesystem and managed-provider receipt/
+  recovery regressions pass. These are supporting source tests, not the signed
+  E2 matrix or real-provider rollover authority run; the final source matrix
+  must be rerun after all Unreleased changes settle.
+- The current-source SwiftPM Release configuration builds with
+  warnings treated as errors and executes 1,001 tests with 5 declared
+  environment skips and 0 failures. The dedicated Apple Development-signed
+  Xcode app-hosted project-contract suite executes 2 tests with 0 failures from
+  fresh DerivedData. Neither result replaces feature-specific production-path
+  evidence.
 
 ### Changed
 
+- Manager project and run responses now use complete shared read-model
+  projections. Project bind and run start authority is limited to roots
+  configured by the operator. Provider probes execute outside dashboard
+  serialization with bounded admission; after a timeout, admission remains
+  fail-closed until the exact provider task exits so a cancellation-ignoring
+  provider cannot accumulate work. Feature operability and native
+  qualification remain open.
+- Added a dedicated app-hosted Xcode contract-test target and isolated shared
+  scheme. It exercises the production operator client and view-model module
+  boundary without changing the existing main Xcode test scheme.
+
+- Product staging and runtime launch now enforce an explicit Security.framework
+  requirement for every signed app, manager CLI, filesystem daemon, runtime
+  launcher, and core framework. Team `9AQ2C2838M` is accepted only with the
+  Apple Development certificate class; team `2Y25RTLZET` is accepted only with
+  the Developer ID Application certificate class. The outer bundle checker
+  applies the same identifier, team, Apple anchor, and certificate-class policy
+  across every architecture. This closes the signer-class admission gap but
+  does not establish whole-product rollback freshness or pass Developer ID,
+  native lifecycle, notarization, P10, or E2 qualification.
 - Added nonshipping, non-archived signed qualification-harness and adversary
   targets plus a fail-closed H0 readiness runner. H0 binds repository, recorder,
   signing, live-process, command-result, and local-APFS inode/change-time facts,
@@ -44,6 +93,10 @@ release-blocking.
   whose requested namespace becomes unstable while durability is unconfirmed
   returns its live receipt as required ledger recovery, merging any additional
   retained staging-cleanup receipt into the same result.
+  The move and recursive-directory paths are hardened internal implementations
+  exercised by adversarial tests only in this snapshot. Production `fs_move`
+  and recursive directory `fs_delete` remain unavailable until an additive
+  signed-helper protocol and its recovery matrix are implemented and qualified.
 - The partial privileged leaf-delete boundary now uses protocol v5 and binds
   the daemon requirement to exact per-architecture CodeDirectory hashes sealed
   into each signed caller. The app-scheme build produces one matching
@@ -86,6 +139,38 @@ release-blocking.
   rollback reports restored only when the source still has the exact recorded
   identity, while an absent v5 protected capture or unprovable legacy restore
   becomes a durable conflict.
+- Accepted managed-provider receipts survive manager restart. An unresolved
+  provider-response crash is fenced for 660 seconds before retry. LM Studio
+  exposes no request-ID receipt lookup, so one retry can create at most one
+  duplicate model inference per attempt and repeated operator or recovery
+  retries can repeat inference. Manager reconciliation prevents duplicate tool
+  execution. This mitigates the race; it does not eliminate it.
+- Project registration and relink now stage bounded, owner-only recovery intents
+  before control-plane mutation. A dedicated bounded
+  `project_transition_authority` row, not diagnostic audit events, binds the
+  exact operation, generation, root, repository identity, and directory
+  device/inode in the same transaction as control state. Registration and
+  relink publish aliases only after that authority is accepted, activate only
+  the exact staged operation, and remove the intent only after active,
+  published authority is reverified. Lost native-client responses receive one
+  bounded retry using the same encoded body and captured authorization header;
+  exact concurrent registration requests converge on one durable project
+  identity. Restart and crash-boundary regressions cover control commit, alias
+  publication, activation, response loss, intent cleanup, and two concurrent
+  callers. A bounded top-level operator projection now reconstructs an exact
+  registration request after a crash between intent persistence and the first
+  control-plane row; it returns at most 100 intents and fails closed after a
+  4,096-entry project-directory scan. Same-UID mutation of the owner-only
+  recovery files or SQLite store remains outside this integrity boundary. A
+  same-UID writer can also remove or coherently replace an intent, or inflate
+  the directory to deny the operator snapshot. Signed native UI execution is
+  still required before shipment.
+- The project build entrypoint now builds and stages the manager CLI at
+  `Contents/Helpers/forge-conductor`, signs it before the enclosing app, and
+  performs strict signature verification of the CLI, runtime launcher,
+  filesystem daemon, and app bundle. Source and focused product-path tests are
+  green; an exact current-source installed, signed bundle execution remains an
+  open qualification step.
 
 ### Open qualification and security boundaries
 
@@ -132,16 +217,23 @@ release-blocking.
   execution and remain part of open E2.
 - The shell policy, migration, MCP registration, execution, compatibility
   contract, and restart paths pass current-source Debug and Release regressions.
-  Developer Mode is enabled, Apple Development signing uses James Daley on team
-  `9AQ2C2838M`, and the bounded signed Settings/relaunch matrix passes. Native
-  shell qualification still lacks one scenario that executes `shell_exec`
-  successfully after app closure/reopen and an actual installed-manager process
-  restart. The guarded installed-artifact harness has 14 passing self-tests, but
-  its current-host live run was denied at `launchctl bootstrap`; the legacy
-  `launchctl load` fallback returned without a running job, and the harness
-  failed closed and restored the prior manager state. A foreground Terminal run
-  and correction of that false-success fallback remain required. Production
-  folder-panel observation, privileged-service lifecycle,
+  Developer Mode is enabled and Apple Development signing uses James Daley on
+  team `9AQ2C2838M`. A bounded current-source signed Release installed-app run
+  corrected the false-success LaunchAgent fallback and passed clean-install
+  enablement, accidental legacy-disabled migration, explicit opt-out and denial,
+  `tools/list`, established login-Bash/result compatibility through both the app
+  and installed raw CLI, app relaunch, and installed-manager PID replacement
+  with predecessor exit. The guarded run deliberately did not invoke System
+  Events and restored the prior manager job, plist, command link, and launchd
+  enablement state exactly. Its result remains partial: native Settings control
+  and post-Settings re-enable are blocked for the Xcode XCUI lane. The installer
+  now stages, signs, verifies, and commits
+  the runtime launcher transactionally beside the raw CLI, embeds it in synthesized
+  app layouts, and fails closed on missing or symlinked launcher payloads. A
+  current-source Apple Development-signed Release smoke run also passed
+  installed raw-CLI `version`, `status`, and `doctor`. Production Settings UI,
+  exact current-source P10
+  qualification, production folder-panel observation, privileged-service lifecycle,
   release signing, and notarization also remain deferred and release-blocking.
 - Exact caller-sealed helper identity prevents helper-only substitution against
   a current caller, but it does not establish whole-product rollback freshness.
@@ -166,6 +258,11 @@ release-blocking.
   acknowledgment, predecessor fencing and idempotent sealing, automatic
   continuation, GUI-closed operation, and recovery from every durable crash
   state. Unit and synthetic-host tests do not satisfy this gate.
+- The managed-provider receipt fence does not prove exactly-once inference.
+  Accepted receipts are restart-durable and reconciled tool effects are not
+  executed twice, but an unresolved response has no LM Studio request-ID lookup.
+  Retrying after 660 seconds can repeat one inference per attempt; repeated
+  recovery attempts can therefore repeat inference.
 - Current G09-G12 remain nonpassing. Historical compatibility, direct-adapter,
   build, unit, synthetic-host, or simulator evidence does not replace the
   current-source parity, signed native, real-provider continuity, and

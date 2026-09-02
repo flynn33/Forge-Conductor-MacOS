@@ -98,7 +98,7 @@
     "Do not request operator decisions.",
     "Do not add automated authorship credits."
   ],
-  "created_at": "2026-08-31T13:42:17.473610+00:00",
+  "created_at": "2026-09-01T11:26:56.042813+00:00",
   "current_work": {
     "active_files": [],
     "phase_id": "P10",
@@ -107,6 +107,10 @@
   },
   "decisions": [],
   "evidence_references": [
+    ".forge-codex/evidence/EVID-20260831T155144Z-a97d2c3875.json",
+    ".forge-codex/evidence/EVID-20260831T155337Z-1bbc2b1864.json",
+    ".forge-codex/evidence/EVID-20260831T155338Z-9bfd542c3d.json",
+    ".forge-codex/evidence/EVID-20260831T155354Z-f3d44bd3b4.json",
     ".forge-codex/state/gate-results/G09.json",
     ".forge-codex/state/gate-results/G10.json",
     ".forge-codex/state/gate-results/G11.json",
@@ -139,6 +143,7 @@
     "7574917a10600271c1f4cfa7005c3573c8f449969ec130d96493cefde0f568ca",
     "79d30397c0eda07a0ca4cd4f251d9c827198dead61f3e66d253171f25ed46e2b",
     "7c0e43fefabe58792777d34b8f7836772185bce75d49ad9ec826c053078c3848",
+    "81d149d9b30ba056ac349898c1dcb4ed94063d37303bf3d1539729498ce28dca",
     "8567435662f008c740163ca3ad20bddd6d8c71f0fb892ed9c773157835c9afc5",
     "88711d133c06c28d1c6344846856bfac0c409fb3d2627616faa5a8da2d14af39",
     "88b956106fcf5c94378cde7a21279b53dd7681037ebebb87a2f18dea560e97fc",
@@ -622,8 +627,49 @@
     "EVID-20260831T133213Z-d4178c34a2",
     "EVID-20260831T133355Z-7f9c698548",
     "EVID-20260831T133355Z-948e5bec13",
+    "EVID-20260831T134706Z-9265df95e8",
+    "EVID-20260831T140104Z-247cf42f16",
+    "EVID-20260831T140414Z-989cb74463",
+    "EVID-20260831T140455Z-ad06149f25",
+    "EVID-20260831T141114Z-f11c3d17c1",
+    "EVID-20260831T145706Z-1b8412d80c",
+    "EVID-20260831T145956Z-647f827104",
+    "EVID-20260831T150026Z-f31348bd2e",
+    "EVID-20260831T150550Z-7d7a228973",
+    "EVID-20260831T150635Z-9d7e337de0",
+    "EVID-20260831T150645Z-b55e2eccac",
+    "EVID-20260831T151044Z-a080589d58",
+    "EVID-20260831T152355Z-ba848a2a2e",
+    "EVID-20260831T152426Z-4b004d7d5b",
+    "EVID-20260831T154350Z-41f3c8367a",
+    "EVID-20260831T155144Z-a97d2c3875",
+    "EVID-20260831T155337Z-1bbc2b1864",
+    "EVID-20260831T155337Z-39194939c9",
+    "EVID-20260831T155337Z-d1e8c01f4a",
+    "EVID-20260831T155338Z-9bfd542c3d",
+    "EVID-20260831T155354Z-f3d44bd3b4",
+    "EVID-20260831T225842Z-84f4ddc36e",
+    "EVID-20260831T230149Z-add6ee03da",
+    "EVID-20260831T230151Z-ab3c8296d0",
+    "EVID-20260831T230151Z-d9aa9c73d8",
+    "EVID-20260831T230202Z-06c8a0f1fe",
+    "EVID-20260831T230236Z-ddf311b066",
+    "EVID-20260901T023511Z-f363bb8595",
+    "EVID-20260901T023542Z-f7ca2ee1e5",
+    "EVID-20260901T023551Z-50162d1342",
+    "EVID-20260901T105839Z-6eed3d3434",
+    "EVID-20260901T110446Z-c086c18d86",
+    "EVID-20260901T110510Z-b1be977c99",
+    "EVID-20260901T110524Z-fbccc4bb44",
+    "EVID-20260901T110712Z-3626a5245c",
+    "EVID-20260901T110721Z-924f41ac96",
+    "EVID-20260901T110805Z-a977abdfeb",
+    "EVID-20260901T111032Z-3e4b6e0d96",
+    "EVID-20260901T111225Z-c749bdbf18",
+    "EVID-20260901T111318Z-c887522fd4",
     "a5466d4e5b4d7a10f87df64ddfdb58b6b8ca5159a57c20527e98802a822245d7",
     "a5d4276cbf14db3a91baa7f6b79fb8cdb3fb042a2eaf663d3219ff36b5451667",
+    "aae6f19ed3e2d7207dddc80cf4013ce72f7b0898f72f19a10a701d2ece7e7920",
     "b3dc11a8dc286fa33b6567ff62089692e64787b23a66718cfe1766dc27195724",
     "b4a2923d8277f49deb4efcc4b52802550f2d42e6e476ad7c42c8226f26da3385",
     "b73cca38f82eb1e02a02cd37a504653a7561c5ed02bdcdfffe9f3891eacddc88",
@@ -642,7 +688,7 @@
     "f1d06d7dd23bf3bd71f138fc1a9a5799dc4aa0e474e9a60552dfcecb68f41dc2",
     "fa52a67ada4051cdaf064cb6fc52cdd72cd7957006924443b4e414e2f5abda61"
   ],
-  "handoff_id": "67acb7fe-8c48-47fb-abc3-fa041129d402",
+  "handoff_id": "908fd0b4-28df-4440-8886-1f3a0fce1544",
   "host_state": {
     "adapter_id": null,
     "context_budget_source": null,
@@ -651,26 +697,26 @@
     "retry": null
   },
   "integrity": {
-    "content_sha256": "fa5d795eb54b25ab9414f2e8447fc458a8d41bab08c82205455fa04ca1723fea",
+    "content_sha256": "4ac2ee2a95bf83435c42e1397953fa421c27288e19a538df0ded53236336f285",
     "redaction_complete": true
   },
   "memory_references": [],
   "mission": "# Execution directive\n\nExecute the Forge Conductor repair and extension package end to end.\n\n1. Read the repository root `AGENTS.md` and every document it marks as required.\n2. Load `.forge-codex/state/run-state.json`; initialize it only if absent.\n3. Use the included audit evidence as the starting hypothesis set, then prove runtime reachability before labeling source-level lifecycle risks as live leaks.\n4. Preserve every current capability and compatibility surface. Build a feature baseline and executable parity tests before behavior-changing refactors.\n5. Repair the known telemetry, gauge, lifecycle, concurrency, and performance defects.\n6. implement the project-scoped memory MCP and autonomous continuity system described by the contracts.\n7. Build a supported host adapter as an internal plugin target when automatic session creation is not already supplied by the host. Never use private UI scripting as a substitute for a supported session API.\n8. Build, test, profile, debug, repair, and repeat until every hard gate passes.\n9. Persist progress, evidence, decisions, and handoffs after every material step. Resume automatically after interruption.\n10. Do not ask the operator for decisions. Follow the fail-forward and decision policies.\n11. Do not add generator credits, automated-author notices, watermarks, or authorship trailers to source, documentation, commits, assets, or metadata.\n12. Do not declare completion until `.forge-codex/scripts/verify_completion.py` exits successfully and the resulting completion report points to the underlying evidence.\n\nBegin with phase P00 and continue through P12 in dependency order, while executing independent ready work whenever a non-global gate is blocked.\n",
   "next_actions": [
     {
-      "action": "Publish the bounded PR #19 checkpoint and verify exact GitHub head/base/readback without merging.",
+      "action": "Continue P10 by implementing and executing the next bounded production-path feature slice; do not promote features from source presence, unit, fixture, app-hosted, build-only, or synthetic evidence.",
       "command": null,
       "order": 1,
       "success_condition": null
     },
     {
-      "action": "Build and development-sign the exact committed source in a dedicated DerivedData path, verify the bundle, and attempt the read-only signed admission observation through the native SMAppService lane.",
+      "action": "Keep filesystem E2, native UI and signing, shell Settings qualification, real-provider continuity, privileged lifecycle, provider configuration, and owner-deferred hardware open until their required evidence exists.",
       "command": null,
       "order": 2,
       "success_condition": null
     },
     {
-      "action": "Keep E2, P10, G09-G12, native UI/signing, real-provider continuity, and owner-deferred hardware open unless their required evidence is produced.",
+      "action": "Before the next checkpoint push, read back draft PR #20 head and base from GitHub, record any state-only transport advance, and keep merge and release authority false.",
       "command": null,
       "order": 3,
       "success_condition": null
@@ -688,6 +734,12 @@
       "id": "FC-FILESYSTEM-PATH-TOCTOU-001",
       "status": "patching",
       "summary": "Privileged filesystem boundary remains mitigated but not identity-conditionally closed"
+    },
+    {
+      "evidence_ids": [],
+      "id": "FC-SHELL-COMPAT-QUALIFICATION-001",
+      "status": "validating",
+      "summary": "Shell compatibility requires native Settings qualification"
     },
     {
       "evidence_ids": [],
@@ -718,42 +770,33 @@
       "id": "FC-PRIVILEGED-CALLER-IDENTITY-001",
       "status": "patching",
       "summary": "Caller-sealed helper identity requires signed-process and freshness qualification"
+    },
+    {
+      "evidence_ids": [],
+      "id": "FC-FEATURE-OPERABILITY-001",
+      "status": "patching",
+      "summary": "Advertised features require current production-path operability evidence"
+    },
+    {
+      "evidence_ids": [],
+      "id": "FC-PROVIDER-CONFIG-OPERABILITY-001",
+      "status": "patching",
+      "summary": "Clean install lacks a supported managed-provider configuration path"
     }
   ],
-  "operation_id": "cd316910-d341-45a4-88b6-b0355623581b",
+  "operation_id": "ee767d3a-884c-49ca-82ca-49abdd8c5085",
   "predecessor_session": {
     "model": null,
     "provider_session_id": null,
-    "session_id": "codex-p10-admission-checkpoint"
+    "session_id": "codex-current"
   },
   "project": {
-    "branch": "repair/e2-qualification-next",
-    "commit": "9e695f514caa7894903f54a92139c33eb43eb46d",
+    "branch": "release/0.9.0-product-readiness",
+    "commit": "ea52c2779dd1f90ad718e93faa07459fc4ead511",
     "dirty_summary": [
-      "M .forge-codex/PACKAGE_VALIDATION.json",
-      " M .forge-codex/state/completion-report.json",
-      " M .forge-codex/state/completion-report.md",
-      " M .forge-codex/state/current-handoff.json",
-      " M .forge-codex/state/environment.json",
+      "M .forge-codex/state/environment.json",
       " M .forge-codex/state/events.jsonl",
-      " M .forge-codex/state/evidence-index.json",
-      " M .forge-codex/state/release-handoff.md",
-      " M .forge-codex/state/run-state.json",
-      "?? .forge-codex/evidence/EVID-20260831T132827Z-ce9b22a5e0.json",
-      "?? .forge-codex/evidence/EVID-20260831T132827Z-ce9b22a5e0.stderr.txt",
-      "?? .forge-codex/evidence/EVID-20260831T132827Z-ce9b22a5e0.stdout.txt",
-      "?? .forge-codex/evidence/EVID-20260831T133202Z-1388f87b63.json",
-      "?? .forge-codex/evidence/EVID-20260831T133202Z-1388f87b63.stderr.txt",
-      "?? .forge-codex/evidence/EVID-20260831T133202Z-1388f87b63.stdout.txt",
-      "?? .forge-codex/evidence/EVID-20260831T133213Z-d4178c34a2.json",
-      "?? .forge-codex/evidence/EVID-20260831T133213Z-d4178c34a2.stderr.txt",
-      "?? .forge-codex/evidence/EVID-20260831T133213Z-d4178c34a2.stdout.txt",
-      "?? .forge-codex/evidence/EVID-20260831T133355Z-7f9c698548.json",
-      "?? .forge-codex/evidence/EVID-20260831T133355Z-7f9c698548.stderr.txt",
-      "?? .forge-codex/evidence/EVID-20260831T133355Z-7f9c698548.stdout.txt",
-      "?? .forge-codex/evidence/EVID-20260831T133355Z-948e5bec13.json",
-      "?? .forge-codex/evidence/EVID-20260831T133355Z-948e5bec13.stderr.txt",
-      "?? .forge-codex/evidence/EVID-20260831T133355Z-948e5bec13.stdout.txt"
+      " M .forge-codex/state/run-state.json"
     ],
     "display_name": "Forge-Conductor-E2-Next",
     "project_id": "0ece4408-5617-5b9a-87cb-ae1d75a5c8a8",

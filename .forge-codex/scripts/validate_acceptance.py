@@ -14,10 +14,13 @@ from typing import Any
 from evidence_support import (
     BoundedReadBudget,
     EvidenceSupportError,
+    current_git_head,
     load_bounded_repository_json_object,
     sha256_bounded_repository_file,
     sha256_bounded_regular_file,
+    source_manifest,
 )
+from p10_feature_evidence import validate_p10_feature_binding
 
 
 MAXIMUM_CONTROL_JSON_FILE_BYTES = 1024 * 1024
@@ -515,6 +518,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--repo")
     parser.add_argument("--acceptance")
     parser.add_argument("--criteria-output")
+    parser.add_argument("--p10-feature-binding")
     return parser
 
 
@@ -601,6 +605,49 @@ def main(arguments: list[str] | None = None) -> int:
         raise SystemExit(str(error)) from error
 
     errors: list[str] = []
+    p10_feature_binding: dict[str, Any] | None = None
+    if args.p10_feature_binding is not None:
+        canonical_binding = (
+            repository
+            / ".forge-codex/state/gate-results/G10.p10-feature-binding.json"
+        )
+        if args.gate != "G10" or args.p10_feature_binding != str(canonical_binding):
+            errors.append("P10 feature binding path or gate is not canonical")
+        else:
+            try:
+                p10_feature_binding = load_bounded_repository_json_object(
+                    repository,
+                    ".forge-codex/state/gate-results/G10.p10-feature-binding.json",
+                    label="P10 feature binding",
+                    maximum_bytes=MAXIMUM_CONTROL_JSON_FILE_BYTES,
+                    budget=control_budget,
+                )
+                run_state = load_bounded_repository_json_object(
+                    repository,
+                    ".forge-codex/state/run-state.json",
+                    label="P10 feature binding run state",
+                    maximum_bytes=MAXIMUM_CONTROL_JSON_FILE_BYTES,
+                    budget=control_budget,
+                )
+                head = current_git_head(repository)
+                if head is None:
+                    errors.append("P10 feature binding Git HEAD is unavailable")
+                else:
+                    errors.extend(
+                        validate_p10_feature_binding(
+                            repository,
+                            p10_feature_binding,
+                            current_manifest=source_manifest(repository),
+                            current_git_head=head,
+                            ledger_evidence_ids={
+                                item
+                                for item in run_state.get("evidence", [])
+                                if isinstance(item, str)
+                            },
+                        )
+                    )
+            except EvidenceSupportError as error:
+                errors.append(str(error))
     if record.get("gate_id") != args.gate:
         errors.append(
             f"acceptance record gate_id must be exactly {args.gate}"
@@ -786,6 +833,8 @@ def main(arguments: list[str] | None = None) -> int:
         "valid": not errors,
         "errors": errors,
     }
+    if p10_feature_binding is not None:
+        payload["p10_feature_binding"] = p10_feature_binding
     encoded_payload = (
         json.dumps(payload, indent=2, sort_keys=True) + "\n"
     ).encode("utf-8")

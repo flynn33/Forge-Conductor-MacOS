@@ -2,34 +2,40 @@
 
 ## Current checkpoint status — not release-qualified
 
-The active repair line is `security/e2-harness-controls` in draft pull request
-#19, now based directly on `main` at
-`3e4fe44b3d96938c30d6b83f7d92d417489a97be`. Pull request #17 was
-squash-merged into `main` at that commit from its former head
-`dfebd8e4b0fe4aea6c6ff33717b9dfce717617d4`; both commits have the exact tree
-`4e693995343b7115790b6beb849cc20b3518b8c4`. Pull request #19's tree-preserving
-base-ancestry repair is `57c0366b82b992853ddd967d46d726b56abf233e`.
-The H0 source checkpoint remains
-`399e6a84c4760ddf6c13e02319dc120b4b8998c4`, and its state-and-evidence
-transport checkpoint remains `63630658147c51af1c63a5c57b685bfd3d3c644b`.
-A later state-only handoff, doctor, or base-integration commit may advance the
-pull-request transport HEAD without changing the source checkpoint. Pull
-request #18 was squash-merged into #17 as
-`6ae3ca2b6abf4d67ce6b5ceb70bc5980794466a1`. No current claim is made that
-P10, the filesystem E2 finding, shell compatibility, native UI validation,
-autonomous continuity, representative hardware qualification, or final
-release qualification is complete. Earlier green suites remain exact-revision
-evidence only and do not confer release authority on this source tree.
+The active branch is `release/0.9.0-product-readiness`. Its immutable source
+checkpoint is `2cc41ee2d95255761582792ed6c70c00702ff2f6`, based on `main` at
+`2e2ad93228c47e1fd16fb034e528d9a70cb61417`. Draft pull request #20 was read
+back from GitHub with publication branch `release/0.9.0-product-readiness`,
+transport HEAD `ea52c2779dd1f90ad718e93faa07459fc4ead511`, and base `main` at
+`2e2ad93228c47e1fd16fb034e528d9a70cb61417`. It is reviewable only as a
+partial checkpoint. It is not merge-authorized or release-authorized.
 
-The nonshipping H0 readiness run is
-`EVID-20260831T060522Z-03c32cb838`. It binds the exact source checkpoint,
-source manifest, signed harness and adversary identities, live process
-CodeDirectory hashes, and four bounded describe/self-check commands. It
-performed no production mutation and received no semantic qualification
-context. All 57 E2 rows remain `not_run`, all 12 formal predicates remain false,
-and every P10, E2, G10, G12, and release claim remains false. Its tested
-inode/change-time replacement detection has a local-APFS precondition and is a
-same-UID mitigation, not elimination.
+Exact-checkpoint evidence `EVID-20260901T105839Z-6eed3d3434` executed 1,001
+Release tests with 5 declared environment skips and 0 failures.
+`EVID-20260901T110721Z-924f41ac96` executed 2 of 2 signed app-hosted operator
+contracts. `EVID-20260901T111032Z-3e4b6e0d96` built a coherent Apple
+Development-signed Release product with the development trust policy, and
+`EVID-20260901T111225Z-c749bdbf18` passed its five-artifact bundle check.
+`EVID-20260901T111318Z-c887522fd4` passed the bounded installed-app shell,
+raw-CLI, app-restart, and manager-restart checks, but remains intentionally
+partial because native Settings mutation and post-Settings re-enable did not
+run. Its completion claims are all false and cleanup restored scoped host
+state. The earlier `EVID-20260901T110805Z-a977abdfeb` is a nonqualifying
+fail-closed result from an incoherent evidence build; it is not positive proof.
+The zero-test selector record `EVID-20260901T110446Z-c086c18d86` is likewise
+not counted; the corrected eight-test filesystem support record is
+`EVID-20260901T110510Z-b1be977c99`.
+
+Feature completeness still requires successful production-path behavior. The
+P10 registry contains 104 features and 259 required assertions, while the
+production-probe registry implements zero scenarios. Unit, package, fixture,
+app-hosted, build-only, and synthetic-host evidence cannot promote those
+features to exact-current production-qualified. P10/G10, filesystem E2, native
+UI and signing, shell Settings qualification, privileged-service lifecycle,
+clean-install provider configuration, real-provider forced rollover,
+owner-deferred physical hardware, G09-G12, and final release qualification all
+remain open and release-blocking. The later historical checkpoint sections are
+retained for provenance only and do not override this current status.
 
 Current release blockers are:
 
@@ -340,51 +346,32 @@ qualification remain open and release-blocking.
 
 ## Current branch and pull-request lineage
 
-- Active isolated working branch: `repair/e2-qualification-next`.
-- Publication branch: `security/e2-harness-controls`.
-- Signed admission-observation source checkpoint:
-  `9e695f514caa7894903f54a92139c33eb43eb46d`.
-- A later commit containing only handoff, doctor, selector, or publication
-  readback does not change that source checkpoint; it is a distinct state-only
-  transport HEAD. Pull-request readback is authoritative for the transport HEAD.
-- Pull-request base branch and SHA: `main` at
-  `3e4fe44b3d96938c30d6b83f7d92d417489a97be`.
-- Current pull request: open draft #19,
-  `https://github.com/flynn33/Forge-Conductor-MacOS/pull/19`, from publication
-  branch `security/e2-harness-controls` into `main`. Before this checkpoint is
-  pushed, its remote head is `ac7724b090d67490794b48bfdda72add751e2ec0`;
-  post-push readback must match the new state-only transport HEAD. It remains a
-  nonshipping readiness checkpoint with neither merge nor release authority.
-- Pull request #18 was squash-merged into #17 as
-  `6ae3ca2b6abf4d67ce6b5ceb70bc5980794466a1`. Pull request #17 was then
-  squash-merged into `main` as
-  `3e4fe44b3d96938c30d6b83f7d92d417489a97be`.
-- Pull request #16 was merged into `main` as
-  `67181bc934216e28e005fe28d90c791bef07f9ff`; it is now in the ancestry of
-  both #17 and #19.
-- Pull request #9 (`repair/autonomous-continuity` at
-  `6321bd98012e5f60b2779bbb401cc2827f372b16`) was based on
-  `ae0ceace702274857afce3097ac7cde18b7a6c63` and closed without merge. Its tree is
-  `9c3b4fb924a81cce17d78f8356c3cd87af4a3002`.
-- Pull request #10 (`repair/cancellation-recovery` at
-  `4b887fcc423284d0a60f57baed3adab4b943a576`) used the same base, superseded
-  #9 with the same resulting tree
-  `9c3b4fb924a81cce17d78f8356c3cd87af4a3002`, and was squash-merged as
-  `7808790d9f52f4ec287434d45826bfa0e5586892` with that same tree.
-- Pull request #11 (`repair/filesystem-path-hardening` at
-  `92122970c54cf549cdc5002db23044ed0b3552cb`) was based directly on the #10
-  merge and has tree `b109d2ae6ec64ce5c4ce89c046301c4ac25a4672`.
-  It was squash-merged as
-  `6288210d82270b26add5f0e078d150bc4377bd62` with that same tree.
-- The historical remote head branches for #9, #10, #11, #14, #15, #16, and
-  #18 are deleted. No additional cleanup is required for those branches.
-- Pull request #14 was squash-merged as
-  `8bcc039a2f0d4d17b871d5e968b3b37a663c5ccb`. Pull request #15 was then
-  squash-merged as `cd7e84fed8ed0fe0a8ec90793e83388c8a451f09`, and pull
-  request #16 was merged as `67181bc934216e28e005fe28d90c791bef07f9ff`.
-- Those commits are ancestors of this branch. None of these relationships
-  closes P10, E2, shell compatibility, native validation,
-  autonomous continuity, representative hardware qualification, or G09-G12.
+- Active and publication branch: `release/0.9.0-product-readiness`.
+- Source checkpoint: `2cc41ee2d95255761582792ed6c70c00702ff2f6`.
+- GitHub-read transport checkpoint:
+  `ea52c2779dd1f90ad718e93faa07459fc4ead511`.
+- Pull-request base: `main` at
+  `2e2ad93228c47e1fd16fb034e528d9a70cb61417`.
+- Current pull request: draft #20,
+  `https://github.com/flynn33/Forge-Conductor-MacOS/pull/20`. Exact GitHub
+  readback verified the branch, transport checkpoint, base, draft state, and
+  open state. The pull request is conflict-free but blocked from merge. This
+  state-only disclosure commit may move the transport HEAD without changing
+  the immutable source checkpoint; live checkpoint identity must be read from
+  doctor or the next-work selector before another publication transition.
+- Pull request #9, head `repair/autonomous-continuity` at
+  `6321bd98012e5f60b2779bbb401cc2827f372b16`, was closed without merge.
+- Pull request #10, head `repair/cancellation-recovery` at
+  `4b887fcc423284d0a60f57baed3adab4b943a576`, superseded #9 with the same
+  resulting tree `9c3b4fb924a81cce17d78f8356c3cd87af4a3002` and was squash-merged as
+  `7808790d9f52f4ec287434d45826bfa0e5586892`.
+- Pull request #11, head `repair/filesystem-path-hardening` at
+  `92122970c54cf549cdc5002db23044ed0b3552cb`, was based on the #10 merge and
+  was squash-merged as `6288210d82270b26add5f0e078d150bc4377bd62`.
+  The #10 merge is an ancestor of #11, and the #11 merge is an ancestor of the
+  current `main` base.
+- These relationships close no P10, E2, shell Settings, native validation,
+  autonomous continuity, representative hardware, G09-G12, or release gate.
 
 ## Historical 0.9.0 outcome
 

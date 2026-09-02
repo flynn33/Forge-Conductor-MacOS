@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "registry_id": "forge-conductor-p10-production-probes",
+  "feature_registry_sha256": "d20b40d015e188e8be6f98a973cba1a382be6549cccf6de8a80f843b534756cb",
+  "qualifier": {
+    "name": "forge-p10-production-matrix",
+    "version": 2,
+    "source_path": ".forge-codex/scripts/qualify_p10_features.py",
+    "source_sha256": "735b2bdb1daf94bcf6395c96f21e448326d29d9b4a131fd7805eb1beadaa90e5"
+  },
+  "allowlisted_runner_kinds": [
+    "repository_qualification"
+  ],
+  "limits": {
+    "maximum_matrix_seconds": 1500,
+    "maximum_probe_stream_bytes": 65536,
+    "maximum_observation_bytes_per_scenario": 262144,
+    "maximum_total_raw_output_bytes": 8388608,
+    "maximum_unique_runners": 64
+  },
+  "implemented_scenarios": []
+}

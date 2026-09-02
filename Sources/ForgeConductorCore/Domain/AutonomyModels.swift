@@ -756,6 +756,7 @@ public struct AutonomyStartupReport: Sendable, Equatable {
 
 public enum AutonomyError: Error, LocalizedError, Equatable, Sendable {
     case invalidRequest(String)
+    case invalidToolConfiguration([String])
     case runNotFound(RunID)
     case runConflict(RunID)
     case invalidTransition(AutonomousRunState, AutonomousRunState)
@@ -778,6 +779,7 @@ public enum AutonomyError: Error, LocalizedError, Equatable, Sendable {
     public var code: String {
         switch self {
         case .invalidRequest: "autonomy_invalid_request"
+        case .invalidToolConfiguration: "autonomy_tool_configuration_invalid"
         case .runNotFound: "autonomous_run_not_found"
         case .runConflict: "autonomous_run_conflict"
         case .invalidTransition: "autonomous_run_invalid_transition"
@@ -802,6 +804,8 @@ public enum AutonomyError: Error, LocalizedError, Equatable, Sendable {
     public var errorDescription: String? {
         switch self {
         case .invalidRequest(let reason): reason
+        case .invalidToolConfiguration(let tools):
+            "Allowed tools are not registered in this build: \(Self.summarizedToolNames(tools))"
         case .runNotFound(let runID): "Autonomous run not found: \(runID)"
         case .runConflict(let runID): "Autonomous run identity conflicts with its durable record: \(runID)"
         case .invalidTransition(let from, let to): "Invalid autonomous run transition: \(from.rawValue) -> \(to.rawValue)"
@@ -821,5 +825,11 @@ public enum AutonomyError: Error, LocalizedError, Equatable, Sendable {
         case .resultTooLarge: "Tool result exceeds the durable inline result bound"
         case .shutdown: "Autonomy supervisor is shutting down"
         }
+    }
+
+    private static func summarizedToolNames(_ tools: [String]) -> String {
+        let displayed = tools.prefix(8).joined(separator: ", ")
+        let remaining = tools.count - min(tools.count, 8)
+        return remaining > 0 ? "\(displayed), and \(remaining) more" : displayed
     }
 }

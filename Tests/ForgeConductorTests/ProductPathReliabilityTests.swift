@@ -8,7 +8,57 @@ import Darwin
 
 /// G1/G7: product reliability — MCP negotiate + tools surface without LM Studio UI.
 final class ProductPathReliabilityTests: XCTestCase {
-    func testProtectedServiceSettingsUsePresentationStatusWithoutChangingRawStatus() throws {
+    func testRemoteSettingsCommitReplacesEveryAppModelManagerEndpointBeforeRefresh() throws {
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: repository.appendingPathComponent(
+                "Sources/ForgeConductorApp/AppModel.swift"
+            ),
+            encoding: .utf8
+        )
+
+        let response = try XCTUnwrap(
+            source.range(of: "let settings = try await client.updateSettings(patch, apply: true)")
+        )
+        let modelApply = try XCTUnwrap(
+            source.range(of: "self.apply(settings: settings)", range: response.upperBound..<source.endIndex)
+        )
+        let managerReplacement = try XCTUnwrap(
+            source.range(
+                of: "self.remoteManager = ManagerDashboardClient(",
+                range: modelApply.upperBound..<source.endIndex
+            )
+        )
+        let operatorReplacement = try XCTUnwrap(
+            source.range(
+                of: "self.operatorManagerClient.replace(",
+                range: managerReplacement.upperBound..<source.endIndex
+            )
+        )
+        let refresh = try XCTUnwrap(
+            source.range(
+                of: "self.refreshRemoteManagerStatus()",
+                range: operatorReplacement.upperBound..<source.endIndex
+            )
+        )
+
+        XCTAssertLessThan(response.lowerBound, modelApply.lowerBound)
+        XCTAssertLessThan(modelApply.lowerBound, managerReplacement.lowerBound)
+        XCTAssertLessThan(managerReplacement.lowerBound, operatorReplacement.lowerBound)
+        XCTAssertLessThan(operatorReplacement.lowerBound, refresh.lowerBound)
+        let transition = source[response.lowerBound..<refresh.upperBound]
+        XCTAssertTrue(transition.contains("host: settings.dashboardHost"))
+        XCTAssertTrue(transition.contains("port: settings.dashboardPort"))
+        XCTAssertFalse(
+            transition.contains("catch") || transition.contains("transport"),
+            "The app must switch only after decoding committed settings, never infer success from disconnect"
+        )
+    }
+
+    func testProtectedServiceSettingsUseOperationalHealthWithoutChangingRawStatus() throws {
         let repository = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
@@ -26,8 +76,14 @@ final class ProductPathReliabilityTests: XCTestCase {
             encoding: .utf8
         )
 
-        XCTAssertTrue(appModel.contains("await service.presentedStatus()"))
-        XCTAssertTrue(appModel.contains("guard secureFilesystemStatusTask == nil"))
+        XCTAssertTrue(appModel.contains("await service.operationalHealth("))
+        XCTAssertTrue(appModel.contains("paths: paths"))
+        XCTAssertTrue(appModel.contains("reconcile: reconcile"))
+        XCTAssertTrue(appModel.contains("beginSecureFilesystemServiceOperation(operation)"))
+        XCTAssertTrue(appModel.contains("private var secureFilesystemOperationTask"))
+        XCTAssertTrue(
+            appModel.contains("secureFilesystemServiceStatus = health.registrationStatus")
+        )
         XCTAssertTrue(appModel.contains(#"case .notRegistered: "Not enabled""#))
         XCTAssertTrue(appModel.contains(#"case .notFound: "Not packaged or invalid""#))
         XCTAssertFalse(appModel.contains("Not packaged in this build"))
@@ -35,6 +91,188 @@ final class ProductPathReliabilityTests: XCTestCase {
         XCTAssertTrue(service.contains("public func presentedStatus() async"))
         XCTAssertTrue(service.contains("packageObservation == .present"))
         XCTAssertTrue(service.contains("static func registrationStatus()"))
+        XCTAssertTrue(service.contains("reconcile: Bool = false"))
+        XCTAssertTrue(service.contains("public func unregister() async throws"))
+        XCTAssertFalse(service.contains("try registeredService.unregister()"))
+        XCTAssertTrue(service.contains("intent: .enable"))
+        XCTAssertTrue(service.contains("intent: .disable"))
+        XCTAssertTrue(service.contains("intent: .update"))
+        XCTAssertTrue(service.contains("phase: .registering"))
+        XCTAssertTrue(service.contains("phase: .unregistering"))
+        XCTAssertTrue(service.contains("prepareRecovery()"))
+        XCTAssertTrue(service.contains("attemptID: UUID().uuidString.lowercased()"))
+        XCTAssertTrue(service.contains("static let maximumAttempts = 8"))
+        XCTAssertTrue(service.contains(
+            "private var internallyReconciledAttemptID: String?"
+        ))
+        XCTAssertTrue(service.contains(
+            "public struct SecureFilesystemServiceLifecycleObservationContext"
+        ))
+        XCTAssertTrue(service.contains(
+            "public struct SecureFilesystemServiceLifecycleObservationGate"
+        ))
+        XCTAssertTrue(service.contains("let stateObserver = lifecycleStateObserver"))
+        XCTAssertTrue(service.contains("state: .settled"))
+    }
+
+    func testProtectedServiceSettingsUseOneOperationGateForEveryConflictingControl() throws {
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let appModel = try String(
+            contentsOf: repository.appendingPathComponent(
+                "Sources/ForgeConductorApp/AppModel.swift"
+            ),
+            encoding: .utf8
+        )
+        let view = try String(
+            contentsOf: repository.appendingPathComponent(
+                "Sources/ForgeConductorApp/Views/ManagerSettingsView.swift"
+            ),
+            encoding: .utf8
+        )
+        let appDelegate = try String(
+            contentsOf: repository.appendingPathComponent(
+                "Sources/ForgeConductorApp/ForgeConductorApp.swift"
+            ),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(appModel.contains(
+            "@Published public private(set) var secureFilesystemSettingsOperationState"
+        ))
+        XCTAssertTrue(appModel.contains(
+            "@Published public private(set) var secureFilesystemServiceLifecycleState"
+        ))
+        XCTAssertFalse(appModel.contains(
+            "@Published public private(set) var isUpdatingSecureFilesystemService"
+        ))
+        XCTAssertFalse(appModel.contains(
+            "@Published public private(set) var isReconcilingSecureFilesystemRecovery"
+        ))
+        XCTAssertTrue(appModel.contains(
+            "let operation: SecureFilesystemSettingsOperation = reconcile ? .reconcile : .refresh"
+        ))
+        for operation in [
+            "bootstrap", "enable", "update", "disable", "lifecycleRecovery", "approval",
+        ] {
+            XCTAssertTrue(
+                appModel.contains("beginSecureFilesystemServiceOperation(.\(operation))"),
+                "\(operation) must acquire the shared operation gate"
+            )
+        }
+        XCTAssertTrue(appModel.contains("cancelledTask?.cancel()"))
+        XCTAssertTrue(appModel.contains("nextState.cancel()"))
+        XCTAssertTrue(appModel.contains("cancelledOperation?.mayAwaitServiceUnregister"))
+        XCTAssertTrue(appModel.contains("secureFilesystemServiceLifecycleState = .cancelled"))
+        XCTAssertTrue(appModel.contains("configureLifecycleFence(paths: paths)"))
+        XCTAssertTrue(appModel.contains(
+            "recoverInterruptedLifecycle(\n                        lifecycleObservationContext: observationContext"
+        ))
+        XCTAssertTrue(appModel.contains(
+            "secureFilesystemService.setLifecycleStateObserver"
+        ))
+        XCTAssertTrue(appModel.contains(
+            "private var secureFilesystemLifecycleObservationGate"
+        ))
+        XCTAssertTrue(appModel.contains(
+            "beginSecureFilesystemLifecycleObservation()"
+        ))
+        XCTAssertTrue(appModel.contains(
+            "applySecureFilesystemLifecycleObservation(observation)"
+        ))
+        XCTAssertTrue(appModel.contains(
+            "lifecycleObservationContext: observationContext"
+        ))
+        XCTAssertTrue(appModel.contains(
+            "secureFilesystemServiceLifecycleState.recoveryActionLabel"
+        ))
+        XCTAssertTrue(view.contains(
+            "model.secureFilesystemServiceLifecycleRecoveryActionLabel"
+        ))
+        XCTAssertFalse(view.contains("Retry pending stop"))
+        XCTAssertFalse(view.contains("pending macOS stop"))
+        XCTAssertEqual(
+            appModel.components(separatedBy: "reconcile: true").count - 1,
+            1,
+            "only the explicit Reconcile action may request mutating debt reconciliation"
+        )
+        XCTAssertTrue(appModel.contains(
+            "bootstrapSecureFilesystemService(paths: forgeApp.paths)"
+        ))
+        XCTAssertFalse(appModel.contains(
+            "refreshSecureFilesystemServiceStatus(reconcile: true)\n            refreshLMStudioPluginStatus()"
+        ))
+        XCTAssertTrue(appModel.contains(
+            "ownsSecureFilesystemServiceOperation(operation, generation: generation)"
+        ))
+        XCTAssertTrue(appDelegate.contains(
+            "model.cancelSecureFilesystemServiceOperation()"
+        ))
+
+        let sectionStart = try XCTUnwrap(
+            view.range(of: #"Section("Protected filesystem service")"#)
+        )
+        let sectionEnd = try XCTUnwrap(
+            view.range(of: #"Section("Maintenance")"#, range: sectionStart.upperBound..<view.endIndex)
+        )
+        let section = view[sectionStart.lowerBound..<sectionEnd.lowerBound]
+        let firstControl = try XCTUnwrap(section.range(of: #"Button("Enable")"#))
+        for identifier in [
+            "settings-filesystem-service-status",
+            "settings-filesystem-service-operational-health",
+            "settings-filesystem-recovery-debt",
+            "settings-filesystem-operation-status",
+            "settings-filesystem-lifecycle-fence-status",
+        ] {
+            let status = try XCTUnwrap(section.range(of: identifier))
+            XCTAssertLessThan(
+                status.lowerBound,
+                firstControl.lowerBound,
+                "read-only status \(identifier) must remain visible above gated controls"
+            )
+        }
+        for control in ["enable", "update", "disable", "approval", "refresh", "reconcile"] {
+            XCTAssertTrue(
+                section.contains(
+                    ".disabled(!model.secureFilesystemSettingsControlAvailability.\(control))"
+                ),
+                "\(control) must derive availability from the shared operation gate"
+            )
+        }
+        XCTAssertTrue(section.contains("settings-filesystem-operation-progress"))
+        XCTAssertTrue(section.contains("settings-filesystem-lifecycle-fence-warning"))
+        XCTAssertTrue(section.contains("settings-filesystem-lifecycle-recovery"))
+        XCTAssertTrue(section.contains("recoverSecureFilesystemServiceLifecycle()"))
+        XCTAssertTrue(section.contains(
+            "!model.secureFilesystemSettingsControlAvailability.lifecycleRecovery"
+        ))
+        XCTAssertTrue(section.contains(
+            ".accessibilityLabel(model.secureFilesystemServiceOperationStatusLabel)"
+        ))
+    }
+
+    func testNestedLifecycleFixtureUsesContinuouslyDrainedCappedPipes() throws {
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let tests = try String(
+            contentsOf: repository.appendingPathComponent(
+                "Tests/ForgeConductorTests/SecureFilesystemMutationTests.swift"
+            ),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(tests.contains(
+            "SecureFilesystemLifecycleBoundedPipeCapture"
+        ))
+        XCTAssertTrue(tests.contains("maximumBytes: 64 * 1_024"))
+        XCTAssertTrue(tests.contains("read(upToCount: 8_192)"))
+        XCTAssertTrue(tests.contains("stdout_truncated="))
+        XCTAssertTrue(tests.contains("stderr_truncated="))
+        XCTAssertFalse(tests.contains("readDataToEndOfFile()"))
     }
 
     func testPrivilegedDaemonUsesDistinctCaptureIdentityAndPhaseReceipts() throws {
@@ -118,6 +356,198 @@ final class ProductPathReliabilityTests: XCTestCase {
                 "runtime helper must retain its exact product identity"
             )
         }
+    }
+
+    func testXcodeUnitTargetIncludesCurrentRuntimeQualificationSources() throws {
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let project = try String(
+            contentsOf: repository.appendingPathComponent(
+                "ForgeConductor.xcodeproj/project.pbxproj"
+            ),
+            encoding: .utf8
+        )
+
+        for source in [
+            "CLIContractTests.swift",
+            "LiveLMStudioManagedAutonomyTests.swift",
+            "RuntimeCancelQualificationTests.swift",
+            "LMStudioContractFixtureServer.swift",
+            "LMStudioContractFixtureTests.swift",
+        ] {
+            XCTAssertEqual(
+                project.components(separatedBy: "\(source) in Sources").count - 1,
+                2,
+                "\(source) must have one build-file declaration and one unit-test sources-phase entry"
+            )
+        }
+    }
+
+    func testXcodeAppContractTestsRemainHostedAndSeparatedFromCoreLogicTests() throws {
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let project = try String(
+            contentsOf: repository.appendingPathComponent(
+                "ForgeConductor.xcodeproj/project.pbxproj"
+            ),
+            encoding: .utf8
+        )
+        let mainScheme = try String(
+            contentsOf: repository.appendingPathComponent(
+                "ForgeConductor.xcodeproj/xcshareddata/xcschemes/ForgeConductor.xcscheme"
+            ),
+            encoding: .utf8
+        )
+        let appTestScheme = try String(
+            contentsOf: repository.appendingPathComponent(
+                "ForgeConductor.xcodeproj/xcshareddata/xcschemes/ForgeConductorAppTests.xcscheme"
+            ),
+            encoding: .utf8
+        )
+
+        func object(_ identifier: String) throws -> Substring {
+            let start = try XCTUnwrap(project.range(of: "\n\t\t\(identifier) /*"))
+            let end = try XCTUnwrap(
+                project.range(of: "\n\t\t};", range: start.lowerBound..<project.endIndex)
+            )
+            return project[start.lowerBound..<end.upperBound]
+        }
+
+        XCTAssertEqual(
+            project.components(
+                separatedBy: "OperatorProjectContractTests.swift in Sources"
+            ).count - 1,
+            2,
+            "the app contract must have one build-file declaration and one app-test phase entry"
+        )
+
+        let appTestSources = try object("1420E9C7330D4AB38BB472BD")
+        XCTAssertTrue(appTestSources.contains("OperatorProjectContractTests.swift in Sources"))
+        let coreTestSources = try object("00012A1DBBFF4A2B84B0D26C")
+        XCTAssertFalse(
+            coreTestSources.contains("OperatorProjectContractTests.swift"),
+            "app-module tests must not convert the unhosted core test bundle into an app host"
+        )
+
+        let appTestTarget = try object("DBD99DD4E877449D8703E483")
+        XCTAssertTrue(appTestTarget.contains("name = ForgeConductorAppTests;"))
+        XCTAssertTrue(appTestTarget.contains(
+            #"productType = "com.apple.product-type.bundle.unit-test";"#
+        ))
+        XCTAssertTrue(appTestTarget.contains(
+            "buildConfigurationList = D43C581B12424333B25FAB62"
+        ))
+        XCTAssertTrue(appTestTarget.contains("1420E9C7330D4AB38BB472BD /* Sources */"))
+        XCTAssertTrue(appTestTarget.contains("A91A75214D50435DB3067471 /* Frameworks */"))
+        XCTAssertTrue(appTestTarget.contains("72E2A331BE024299AC34EC3B"))
+        XCTAssertTrue(appTestTarget.contains("9189A1D436164BEF83F8B15B"))
+        XCTAssertTrue(
+            try object("A91A75214D50435DB3067471")
+                .contains("6F2D0652CF4E442B9F0CE2EB /* ForgeConductorCore.framework in Frameworks */")
+        )
+        XCTAssertTrue(
+            try object("72E2A331BE024299AC34EC3B")
+                .contains("target = D574F9BCA1204936B158984B")
+        )
+        XCTAssertTrue(
+            try object("9189A1D436164BEF83F8B15B")
+                .contains("target = C596F91D22BA465F8D8290A1")
+        )
+        XCTAssertTrue(project.contains(
+            """
+					DBD99DD4E877449D8703E483 = {
+						ProvisioningStyle = Automatic;
+						TestTargetID = D574F9BCA1204936B158984B;
+					};
+"""
+        ))
+
+        for configurationID in [
+            "42A19CA963294173ADE17124",
+            "0F1392D0CC8F4D3DB7B395A6",
+        ] {
+            let configuration = try object(configurationID)
+            XCTAssertTrue(configuration.contains(#"BUNDLE_LOADER = "$(TEST_HOST)";"#))
+            XCTAssertTrue(configuration.contains(
+                #"TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Forge Conductor.app/Contents/MacOS/Forge Conductor";"#
+            ))
+            XCTAssertTrue(configuration.contains(#"CODE_SIGN_IDENTITY = "Apple Development";"#))
+            XCTAssertTrue(configuration.contains("CODE_SIGN_STYLE = Automatic;"))
+            XCTAssertTrue(configuration.contains("DEVELOPMENT_TEAM = 9AQ2C2838M;"))
+            XCTAssertTrue(configuration.contains("TEST_TARGET_NAME = ForgeConductor;"))
+            XCTAssertTrue(configuration.contains(
+                #"SWIFT_INCLUDE_PATHS = "$(CONFIGURATION_TEMP_DIR)/ForgeConductor.build/Objects-normal/$(CURRENT_ARCH)";"#
+            ))
+        }
+
+        for configurationID in [
+            "89F432F3B43F4B81ADBFD41A",
+            "949B044302214128BBAA3EE8",
+        ] {
+            let configuration = try object(configurationID)
+            XCTAssertTrue(
+                configuration.contains("DEFINES_MODULE = YES;"),
+                "the hosted tests require the app target to publish its Swift module"
+            )
+        }
+
+        for configurationID in [
+            "B8CD77AA9F924CC09529D817",
+            "000293C386CD4B1A99C9F861",
+        ] {
+            let configuration = try object(configurationID)
+            XCTAssertTrue(configuration.contains("BUNDLE_LOADER = \"\";"))
+            XCTAssertTrue(configuration.contains("TEST_HOST = \"\";"))
+        }
+
+        XCTAssertFalse(
+            mainScheme.contains("DBD99DD4E877449D8703E483"),
+            "hosted-test isolation must not alter the existing main scheme's coverage"
+        )
+        XCTAssertFalse(mainScheme.contains("FORGE_CONDUCTOR_HOME"))
+        XCTAssertFalse(mainScheme.contains("FORGE_SKIP_PS"))
+        XCTAssertTrue(mainScheme.contains("8897BF3640FD4CBEA73213FC"))
+        XCTAssertTrue(mainScheme.contains("7AEAA3E3769249359E346C15"))
+
+        XCTAssertEqual(
+            appTestScheme.components(separatedBy: "DBD99DD4E877449D8703E483").count - 1,
+            1,
+            "the hosted app-test target must appear exactly once in its dedicated scheme"
+        )
+        XCTAssertEqual(
+            appTestScheme.components(separatedBy: "<TestableReference").count - 1,
+            1,
+            "the dedicated scheme must run only the hosted app-test target"
+        )
+        let blueprint = try XCTUnwrap(
+            appTestScheme.range(of: #"BlueprintIdentifier = "DBD99DD4E877449D8703E483""#)
+        )
+        let testableStart = try XCTUnwrap(
+            appTestScheme.range(
+                of: "<TestableReference",
+                options: .backwards,
+                range: appTestScheme.startIndex..<blueprint.lowerBound
+            )
+        )
+        let testableEnd = try XCTUnwrap(
+            appTestScheme.range(
+                of: "</TestableReference>",
+                range: blueprint.upperBound..<appTestScheme.endIndex
+            )
+        )
+        let testable = appTestScheme[testableStart.lowerBound..<testableEnd.upperBound]
+        XCTAssertTrue(testable.contains(#"parallelizable = "NO""#))
+        XCTAssertTrue(appTestScheme.contains(#"shouldUseLaunchSchemeArgsEnv = "NO""#))
+        XCTAssertTrue(appTestScheme.contains(#"argument = "--uitesting""#))
+        XCTAssertTrue(appTestScheme.contains(#"key = "FORGE_CONDUCTOR_HOME""#))
+        XCTAssertTrue(appTestScheme.contains(
+            #"value = "$(TARGET_TEMP_DIR)/ForgeConductorAppTests-home""#
+        ))
+        XCTAssertFalse(appTestScheme.contains("FORGE_SKIP_PS"))
     }
 
     func testXcodeFilesystemIdentityBuildGraphRetainsSigningBeforeSealingControls() throws {
@@ -390,10 +820,16 @@ final class ProductPathReliabilityTests: XCTestCase {
         )
 
         for requiredFragment in [
+            #"[Debug|DevelopmentRelease|Release]"#,
+            #"Debug|DevelopmentRelease)"#,
             #"CLI_EXECUTABLE="${3:-}""#,
             #"APP_EXECUTABLE="$APP_BUNDLE/Contents/MacOS/Forge Conductor""#,
             #"EMBEDDED_CLI="$APP_BUNDLE/Contents/Helpers/forge-conductor""#,
+            #"RUNTIME_LAUNCHER="$APP_BUNDLE/Contents/Helpers/forge-runtime-launcher""#,
+            #"CORE_FRAMEWORK="$APP_BUNDLE/Contents/Frameworks/ForgeConductorCore.framework""#,
             #"identifier \"com.forge-conductor.cli\""#,
+            #"identifier \"com.forge-conductor.runtime-launcher\""#,
+            #"identifier \"com.forge-conductor.core\""#,
             #"certificate leaf[subject.OU] = \"$TEAM_IDENTIFIER\""#,
             #"--strict --all-architectures"#,
             #"[[ -f "$executable" ]]"#,
@@ -405,8 +841,11 @@ final class ProductPathReliabilityTests: XCTestCase {
             #"supported_architectures "app main executable" "$APP_EXECUTABLE""#,
             #"--deep --strict --all-architectures"#,
             #""-R=$APP_REQUIREMENT" "$APP_BUNDLE""#,
+            #""-R=$RUNTIME_LAUNCHER_REQUIREMENT" "$RUNTIME_LAUNCHER""#,
+            #""-R=$CORE_FRAMEWORK_REQUIREMENT" "$CORE_FRAMEWORK""#,
             #"supported_architectures "$role" "$executable""#,
             #"supported_architectures "embedded filesystem daemon" "$DAEMON""#,
+            #"supported_architectures "runtime launcher" "$RUNTIME_LAUNCHER""#,
             #"require_cli_runpaths "$role" "$executable""#,
             #"/usr/bin/otool -l "$executable""#,
             #""@executable_path/../Frameworks""#,
@@ -438,6 +877,20 @@ final class ProductPathReliabilityTests: XCTestCase {
                     + "  \"-R=$APP_REQUIREMENT\" \"$APP_BUNDLE\""
             ),
             "app explicit-requirement verification must cover every architecture"
+        )
+        XCTAssertTrue(
+            checker.contains(
+                "/usr/bin/codesign --verify --strict --all-architectures --verbose=4 \\\n"
+                    + "  \"-R=$RUNTIME_LAUNCHER_REQUIREMENT\" \"$RUNTIME_LAUNCHER\""
+            ),
+            "runtime launcher explicit-requirement verification must cover every architecture"
+        )
+        XCTAssertTrue(
+            checker.contains(
+                "/usr/bin/codesign --verify --strict --all-architectures --verbose=4 \\\n"
+                    + "  \"-R=$CORE_FRAMEWORK_REQUIREMENT\" \"$CORE_FRAMEWORK\""
+            ),
+            "core framework explicit-requirement verification must cover every architecture"
         )
 
         let cliSignatureCheck = try XCTUnwrap(
@@ -476,18 +929,34 @@ final class ProductPathReliabilityTests: XCTestCase {
         )
 
         let requiredFragments = [
+            #"CLI_PRODUCT="forge-conductor""#,
             #"RUNTIME_HELPER_PRODUCT="forge-runtime-launcher""#,
+            #"DEVELOPMENT_SIGNING="${FORGE_DEVELOPMENT_SIGNING:-0}""#,
             #"APP_HELPERS="$APP_CONTENTS/Helpers""#,
+            #"CLI_EXECUTABLE="$APP_HELPERS/$CLI_PRODUCT""#,
             #"RUNTIME_HELPER="$APP_HELPERS/$RUNTIME_HELPER_PRODUCT""#,
-            #"swift build --configuration "$BINARY_CONFIGURATION" --product "$RUNTIME_HELPER_PRODUCT""#,
+            #"SWIFT_BUILD_ARGUMENTS=(--configuration "$BINARY_CONFIGURATION")"#,
+            #"SWIFT_BUILD_ARGUMENTS+=(-Xswiftc -DFORGE_DEVELOPMENT_SIGNING)"#,
+            #"swift build "${SWIFT_BUILD_ARGUMENTS[@]}" --product "$CLI_PRODUCT""#,
+            #"swift build "${SWIFT_BUILD_ARGUMENTS[@]}" --product "$RUNTIME_HELPER_PRODUCT""#,
+            #"cp "$BUILD_CLI_EXECUTABLE" "$CLI_EXECUTABLE""#,
             #"cp "$BUILD_RUNTIME_HELPER" "$RUNTIME_HELPER""#,
-            #"chmod 0755 "$APP_BINARY" "$RUNTIME_HELPER""#,
-            #"/usr/bin/codesign --verify --deep --strict "$APP_BUNDLE""#,
+            #"chmod 0755 "$APP_BINARY" "$CLI_EXECUTABLE" "$RUNTIME_HELPER""#,
+            #"/usr/bin/codesign --verify --strict --all-architectures --verbose=4 "$CLI_EXECUTABLE""#,
+            #"/usr/bin/codesign --verify --strict --all-architectures --verbose=4 "$RUNTIME_HELPER""#,
+            #"/usr/bin/codesign --verify --deep --strict --all-architectures --verbose=4 "$APP_BUNDLE""#,
+            #"EXPECTED_TEAM_IDENTIFIER="9AQ2C2838M""#,
+            #"EXPECTED_TEAM_IDENTIFIER="2Y25RTLZET""#,
+            #"certificate leaf[field.1.2.840.113635.100.6.1.12] exists"#,
+            #"certificate leaf[field.1.2.840.113635.100.6.1.13] exists"#,
         ]
         for fragment in requiredFragments {
             XCTAssertTrue(entrypoint.contains(fragment), "missing build-entrypoint contract: \(fragment)")
         }
 
+        let cliSigning = try XCTUnwrap(
+            entrypoint.range(of: #"--identifier "$CLI_IDENTIFIER""#)
+        )
         let helperSigning = try XCTUnwrap(
             entrypoint.range(of: #"--identifier "$RUNTIME_HELPER_IDENTIFIER""#)
         )
@@ -495,8 +964,11 @@ final class ProductPathReliabilityTests: XCTestCase {
             entrypoint.range(of: #"--identifier "$BUNDLE_ID""#)
         )
         let strictVerification = try XCTUnwrap(
-            entrypoint.range(of: #"/usr/bin/codesign --verify --deep --strict"#)
+            entrypoint.range(
+                of: #"/usr/bin/codesign --verify --deep --strict --all-architectures"#
+            )
         )
+        XCTAssertLessThan(cliSigning.lowerBound, helperSigning.lowerBound)
         XCTAssertLessThan(helperSigning.lowerBound, bundleSigning.lowerBound)
         XCTAssertLessThan(bundleSigning.lowerBound, strictVerification.lowerBound)
     }

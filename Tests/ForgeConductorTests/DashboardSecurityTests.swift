@@ -46,10 +46,13 @@ final class DashboardSecurityTests: XCTestCase {
             "/api/manager/shutdown",
             "/api/manager/settings",
             "/api/manager/projects/register",
+            "/api/manager/projects/relink",
             "/api/manager/projects/bind",
             "/api/manager/projects/reset-generation",
             "/api/manager/runs/start",
             "/api/manager/runs/control",
+            "/api/manager/runtime-jobs/cancel",
+            "/api/manager/provider/probe",
             "/api/manager/future-mutation",
         ] {
             XCTAssertTrue(

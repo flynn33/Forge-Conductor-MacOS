@@ -650,12 +650,12 @@ final class ManagedContinuityWorkerTests: XCTestCase {
         let paths = AppPaths(home: home)
         try paths.ensureLayout()
         let memory = ProjectMemoryService(paths: paths)
-        let initialized = try memory.initialize(path: projectRoot.path)
+        let initialized = try memory.initializeUnchecked(path: projectRoot.path)
         let projectString = try XCTUnwrap(initialized["project_id"] as? String)
         let projectID = ProjectID(try XCTUnwrap(UUID(uuidString: projectString)))
         let databaseURL = root.appendingPathComponent("control-plane.sqlite3")
         let repository = try ProjectControlPlaneRepository(databaseURL: databaseURL)
-        _ = try await repository.registerProject(
+        _ = try await repository.registerProjectUnchecked(
             projectID: projectID,
             displayName: "Managed Continuity Fixture",
             canonicalRoot: projectRoot

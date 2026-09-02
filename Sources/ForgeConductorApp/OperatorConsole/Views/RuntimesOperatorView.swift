@@ -123,6 +123,7 @@ struct RuntimesOperatorView: View {
         GroupBox("Selected job") {
             VStack(alignment: .leading, spacing: 9) {
                 LabeledContent("State") { OperatorStateBadge(state: job.state) }
+                    .accessibilityIdentifier("runtime-job-state")
                 LabeledContent("Job ID") { OperatorIdentifier(job.jobID) }
                 LabeledContent("Runtime", value: job.runtimeKind)
                 LabeledContent("Project") { OperatorIdentifier(job.projectID) }
@@ -137,9 +138,15 @@ struct RuntimesOperatorView: View {
                 if let error = job.errorSummary {
                     Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled)
                 }
-                Button("Cancel Job", role: .destructive) {}
-                    .disabled(true)
-                    .help("The manager does not advertise a runtime-job cancel command in this build.")
+                Button("Cancel Job", role: .destructive) {
+                    viewModel.cancelSelectedJob()
+                }
+                    .disabled(!viewModel.canCancelSelectedJob)
+                    .help(
+                        viewModel.canCancelSelectedJob
+                            ? "Persist cancellation for this queued or running job."
+                            : "Only queued or running jobs can be cancelled."
+                    )
                     .accessibilityIdentifier("runtime-job-cancel")
             }
         }

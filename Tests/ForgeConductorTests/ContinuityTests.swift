@@ -25,10 +25,10 @@ final class ContinuityTests: XCTestCase {
         root: URL? = nil
     ) throws {
         let canonicalRoot = try XCTUnwrap(root ?? tempHome)
-        let initialized = try app.projectMemory.initialize(path: canonicalRoot.path)
+        let initialized = try app.projectMemory.initializeUnchecked(path: canonicalRoot.path)
         let projectID = try XCTUnwrap(initialized["project_id"] as? String)
         let descriptor = try app.projectMemory.identities.descriptor(projectID: projectID)
-        _ = try app.projectContexts.registerAndBindMCPClient(
+        _ = try app.projectContexts.registerAndBindMCPClientUnchecked(
             descriptor: descriptor,
             canonicalRoot: canonicalRoot,
             clientID: clientID
@@ -3409,6 +3409,7 @@ final class ContinuityTests: XCTestCase {
     func testBudgetLoopSignalsExactlyAtSoftAndHardThresholds() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
+        try configureAllowedProjectRoot(app)
         let client = ClientID("exact-loop-thresholds")
         try bindProjectContext(app, clientID: client)
         let path = tempHome.appendingPathComponent("exact-loop.txt").path
@@ -3616,6 +3617,7 @@ final class ContinuityTests: XCTestCase {
     func testHardBudgetBlocksWhenContinuityPersistenceFails() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
+        try configureAllowedProjectRoot(app)
         let client = ClientID("failed-loop-persistence")
         try bindProjectContext(app, clientID: client)
         let path = tempHome.appendingPathComponent("failed-loop.txt").path
@@ -3662,6 +3664,7 @@ final class ContinuityTests: XCTestCase {
     func testBudgetFingerprintDistinguishesFractionalArguments() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
+        try configureAllowedProjectRoot(app)
         let client = ClientID("fractional-loop")
         try bindProjectContext(app, clientID: client)
         let path = tempHome.appendingPathComponent("fractional.txt").path
@@ -3692,6 +3695,7 @@ final class ContinuityTests: XCTestCase {
     func testAutoCheckpointDoesNotStealModelPacketIdentity() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
+        try configureAllowedProjectRoot(app)
         let modelClient = ClientID("model-author")
         let created = try app.tools.call(
             name: "session_checkpoint",
@@ -3732,6 +3736,7 @@ final class ContinuityTests: XCTestCase {
     func testRuntimeAutoCheckpointPersistsWithoutModelCall() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
+        try configureAllowedProjectRoot(app)
         let client = ClientID("auto-checkpoint")
         try bindProjectContext(app, clientID: client)
         for index in 0..<ContinuityAutomation.checkpointEveryTools {
@@ -3756,6 +3761,7 @@ final class ContinuityTests: XCTestCase {
         try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
+        try configureAllowedProjectRoot(app, root: projectRoot)
         _ = try app.config.update(["shell": ["enabled": true]], save: false)
         let original = ClientID("adopt-original")
         try bindProjectContext(app, clientID: original, root: projectRoot)
@@ -3795,6 +3801,7 @@ final class ContinuityTests: XCTestCase {
     func testRuntimeHandoffBlocksProjectToolsUntilContextGet() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
+        try configureAllowedProjectRoot(app)
         let client = ClientID("auto-handoff-block")
         try bindProjectContext(app, clientID: client)
         var last: ToolResult?

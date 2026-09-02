@@ -1,0 +1,723 @@
+{
+  "blocking_reasons": [
+    "Settings UI mutation was not attempted because System Events access was not explicitly authorized; use the Xcode XCUI production-app test lane"
+  ],
+  "claims": {
+    "autonomous_continuity_complete": false,
+    "filesystem_e2_complete": false,
+    "g10_complete": false,
+    "native_ui_signing_complete": false,
+    "p10_complete": false
+  },
+  "cleanup": {
+    "command_link": {
+      "action": "recreated_original",
+      "status": "restored",
+      "target": "/Users/jimdaley/.forge-conductor/bin/forge-conductor"
+    },
+    "final_canonical_job": "absent",
+    "final_canonical_plist": "absent",
+    "launchd_disabled": {
+      "after": false,
+      "before": false,
+      "exact_relevant_entry_restored": true
+    },
+    "notes": [
+      "macOS Background Task Management may retain display history until logout even after scoped bootout and plist removal"
+    ],
+    "qualification_home_retained": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198",
+    "residuals": [],
+    "status": "restored",
+    "steps": [
+      "booted_out_qualification_manager",
+      "removed_qualification_launchagent_plist"
+    ]
+  },
+  "generated_at": "2026-09-01T11:13:18.450420Z",
+  "kind": "signed-shell-installed-manager-qualification",
+  "mode": "execute",
+  "open_release_gates": [
+    "P10/G10 product qualification",
+    "filesystem E2 residual race",
+    "native UI and signing qualification",
+    "real-provider autonomous continuity",
+    "whole-product rollback freshness"
+  ],
+  "overall_status": "partial",
+  "repository": {
+    "branch": "release/0.9.0-product-readiness",
+    "head": "2cc41ee2d95255761582792ed6c70c00702ff2f6",
+    "path": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next"
+  },
+  "scenario": {
+    "app_process_restart": {
+      "after_manager_restart": {
+        "close_signal": "SIGTERM",
+        "executable": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/Forge Conductor.app/Contents/MacOS/Forge Conductor",
+        "pid": 39662,
+        "return_code": -15,
+        "status": "passed",
+        "stderr_log": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/qualification-logs/gui-after-manager-restart.stderr.log",
+        "stderr_tail": "",
+        "stdout_log": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/qualification-logs/gui-after-manager-restart.stdout.log"
+      },
+      "first": {
+        "close_signal": "SIGTERM",
+        "executable": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/Forge Conductor.app/Contents/MacOS/Forge Conductor",
+        "pid": 39647,
+        "return_code": -15,
+        "status": "passed",
+        "stderr_log": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/qualification-logs/gui-first.stderr.log",
+        "stderr_tail": "",
+        "stdout_log": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/qualification-logs/gui-first.stdout.log"
+      },
+      "reopened": {
+        "close_signal": "SIGTERM",
+        "executable": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/Forge Conductor.app/Contents/MacOS/Forge Conductor",
+        "pid": 39649,
+        "return_code": -15,
+        "status": "passed",
+        "stderr_log": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/qualification-logs/gui-reopened.stderr.log",
+        "stderr_tail": "",
+        "stdout_log": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/qualification-logs/gui-reopened.stdout.log"
+      },
+      "status": "passed"
+    },
+    "clean_install_default": {
+      "enabled": true,
+      "path": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/config.json",
+      "policy_origin": "default_enabled",
+      "policy_version": 2,
+      "sha256": "8538db1bb71eba1e06a1220d861657eaf39d302b4c9e7f1ac4856abd67aafbcd",
+      "user_disabled": false
+    },
+    "home_isolation": {
+      "default_forge_home": "/Users/jimdaley/.forge-conductor",
+      "default_forge_home_excluded": true,
+      "qualification_home": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198"
+    },
+    "install": {
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-p",
+        "(version 1) (allow default) (allow job-creation) (deny process-exec (literal \"/usr/libexec/ApplicationFirewall/socketfilterfw\"))",
+        "/private/tmp/forge-checkpoint-xcode-dev-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-conductor",
+        "manager",
+        "install-login",
+        "--keep-stale",
+        "--home",
+        "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198"
+      ],
+      "exit_code": 0,
+      "firewall_exec_denied_by_profile": true,
+      "stale_launchagent_cleanup_skipped": true,
+      "status": "passed",
+      "stderr_tail": "",
+      "stdout_tail": "\nForge Conductor login item installed\n  display name: Forge Conductor\n  app bundle:   /var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/Forge Conductor.app\n  label:        com.forge-conductor.manager\n  plist:        /Users/jimdaley/Library/LaunchAgents/com.forge-conductor.manager.plist\n  binary:       /var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/bin/forge-conductor\n  dashboard:    http://127.0.0.1:7788/\n\nWhere to look in System Settings:\n  General \u2192 Login Items & Extensions \u2192 Allow in the Background\n  \u2192 \"Forge Conductor\"  (NOT bash / python3)\n\nIf it still does not appear:\n  1. Log out and back in (BTM refresh)\n  2. Or reboot once\n  3. Check: launchctl print gui/$(id -u)/com.forge-conductor.manager\n{\"dashboard\":{\"host\":\"127.0.0.1\",\"port\":7788},\"home\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-signed-shell-manager-39533-1788261198\",\"live\":{\"auto_restart\":true,\"dashboard\":{\"host\":\"127.0.0.1\",\"port\":7788,\"refresh_interval_sec\":8,\"url\":\"http:\\/\\/127.0.0.1:7788\\/\"},\"desired_running\":true,\"home\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-signed-shell-manager-39533-1788261198\",\"http_listening\":true,\"last_error\":null,\"manager\":true,\"ok\":true,\"open_browser_on_start\":false,\"pid\":39576,\"restart_count\":0,\"service_active\":true,\"started_at\":\"2026-09-01T11:13:29Z\",\"state\":\"running\",\"uptime_sec\":0,\"version\":\"0.9.0\",\"watchdog_interval_sec\":3},\"manager_running\":true,\"ok\":true,\"pid\":39576,\"state\":{\"auto_restart\":true,\"dashboard\":{\"host\":\"127.0.0.1\",\"port\":7788,\"refresh_interval_sec\":8,\"url\":\"http:\\/\\/127.0.0.1:7788\\/\"},\"desired_running\":true,\"home\":\"\\/var\\/folders\\/tz\\/42vs04ls56q51168sddqb5940000gn\\/T\\/forge-signed-shell-manager-39533-1788261198\",\"http_listening\":true,\"last_error\":null,\"manager\":true,\"ok\":true,\"open_browser_on_start\":false,\"pid\":39576,\"restart_count\":0,\"service_active\":true,\"started_at\":\"2026-09-01T11:13:29Z\",\"state\":\"running\",\"uptime_sec\":0,\"version\":\"0.9.0\",\"watchdog_interval_sec\":3}}\n"
+    },
+    "installed_raw_cli_commands": {
+      "doctor_binary_installed": true,
+      "doctor_ok": true,
+      "executable": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/bin/forge-conductor",
+      "shell_enabled": true,
+      "status": "passed",
+      "status_ok": true,
+      "version": "0.9.0"
+    },
+    "launchagent_plist": {
+      "label": "com.forge-conductor.manager",
+      "path": "/Users/jimdaley/Library/LaunchAgents/com.forge-conductor.manager.plist",
+      "program_arguments": [
+        "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/Forge Conductor.app/Contents/MacOS/Forge Conductor",
+        "manager",
+        "run",
+        "--home",
+        "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198"
+      ],
+      "sha256": "3a82e13a29a39010fac0e055a3ca36a14a2a8d8bba552869bd4bc541248f4d4f",
+      "working_directory": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198"
+    },
+    "legacy_disabled_migration": {
+      "config": {
+        "default_timeout_sec": 41,
+        "enabled": true,
+        "path": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/legacy-disabled-migration/config.json",
+        "policy_origin": "legacy_disabled_default_migrated",
+        "sha256": "51f0928b5170fc9528f5929f541b8ecfe1cb5d3cc81b4a6618e1260e8907df4d",
+        "user_disabled": false
+      },
+      "fixture": {
+        "enabled": false,
+        "path": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/legacy-disabled-migration/config.json",
+        "schema_version": "absent",
+        "sha256": "859db24c1b97d05013543895057081dd4f2db6b0dd0e9f849fa021e9a34c16ac"
+      },
+      "home": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/legacy-disabled-migration",
+      "receipt": {
+        "backup_path": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/legacy-disabled-migration/config-migrations/config.pre-v2.2026-09-01T11-13-32Z.859db24c1b97.json",
+        "backup_sha256": "859db24c1b97d05013543895057081dd4f2db6b0dd0e9f849fa021e9a34c16ac",
+        "path": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/legacy-disabled-migration/config-migrations/shell-policy-v2.json",
+        "sha256": "52e0d68f41f478b1316ccf9b3b60f4b69dbac9e29df034c6c7a2a50d128ad5bc",
+        "status": "completed",
+        "target_path": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/legacy-disabled-migration/config-migrations/config.schema-v2.098eb29c-a396-4f6e-895e-622fb61ff730.json",
+        "target_sha256": "51f0928b5170fc9528f5929f541b8ecfe1cb5d3cc81b4a6618e1260e8907df4d"
+      },
+      "status": "passed"
+    },
+    "manager_control_credential": {
+      "created_by_manager": true,
+      "path": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/manager-control.secret",
+      "status": "passed",
+      "unauthorized_probe_code": "manager_mutation_unauthorized",
+      "unauthorized_probe_status": 401
+    },
+    "manager_process_restart": {
+      "opt_out_survived": true,
+      "predecessor": {
+        "arguments": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/Forge Conductor.app/Contents/MacOS/Forge Conductor manager run --home /var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198",
+        "executable": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/Forge Conductor.app/Contents/MacOS/Forge Conductor",
+        "launchctl_output_sha256": "b321675619ede571f2abdbac70eb32c9ba83fa82df6eb2b200b12ebda837f914",
+        "launchctl_program": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/Forge Conductor.app/Contents/MacOS/Forge Conductor",
+        "launchctl_state": "active",
+        "pid": 39576
+      },
+      "predecessor_gone": true,
+      "status": "passed",
+      "successor": {
+        "arguments": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/Forge Conductor.app/Contents/MacOS/Forge Conductor manager run --home /var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198",
+        "executable": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/Forge Conductor.app/Contents/MacOS/Forge Conductor",
+        "launchctl_output_sha256": "0be92ec527a56a78932eac7d5d475d486cdf2e59fa3f1da4925179b50fab5dcb",
+        "launchctl_program": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/Forge Conductor.app/Contents/MacOS/Forge Conductor",
+        "launchctl_state": "active",
+        "pid": 39653
+      },
+      "successor_pid_changed": true
+    },
+    "manager_status": {
+      "auto_restart": true,
+      "dashboard": {
+        "host": "127.0.0.1",
+        "port": 7788,
+        "refresh_interval_sec": 8,
+        "url": "http://127.0.0.1:7788/"
+      },
+      "desired_running": true,
+      "home": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198",
+      "http_listening": true,
+      "last_error": null,
+      "manager": true,
+      "ok": true,
+      "open_browser_on_start": false,
+      "pid": 39576,
+      "restart_count": 0,
+      "service_active": true,
+      "started_at": "2026-09-01T11:13:29Z",
+      "state": "running",
+      "uptime_sec": 1,
+      "version": "0.9.0",
+      "watchdog_interval_sec": 3
+    },
+    "post_settings_shell_probe": {
+      "reason": "Settings UI did not persist the required shell re-enable",
+      "status": "not_run"
+    },
+    "qualification_home": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198",
+    "reason": "Settings UI mutation was not attempted because System Events access was not explicitly authorized; use the Xcode XCUI production-app test lane",
+    "settings_control_plane": {
+      "allowed_project_root": {
+        "persisted_readback": {
+          "configured": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/project",
+          "normalized": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/project",
+          "resolved": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/project"
+        },
+        "update_response": {
+          "configured": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/project",
+          "normalized": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/project",
+          "resolved": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/project"
+        }
+      },
+      "clean_default_enabled": true,
+      "explicit_opt_out": true,
+      "opt_out_survived_app_restart": true,
+      "opt_out_survived_manager_restart": true,
+      "reenabled": false,
+      "status": "in_progress"
+    },
+    "settings_ui": {
+      "automation_route": "xcode_xcui_required",
+      "reason": "Settings UI mutation was not attempted because System Events access was not explicitly authorized; use the Xcode XCUI production-app test lane",
+      "status": "blocked",
+      "used_system_events": false,
+      "used_test_fixture": false,
+      "used_uitesting_argument": false
+    },
+    "shell_probes": {
+      "clean_default_success": {
+        "executable": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/Forge Conductor.app/Contents/MacOS/Forge Conductor",
+        "pid": 39628,
+        "request_methods": [
+          "initialize",
+          "notifications/initialized",
+          "tools/list",
+          "tools/call",
+          "tools/call",
+          "tools/call"
+        ],
+        "response_ids": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "shell": {
+          "command": "shopt -q login_shell || exit 97; [ \"$0\" = /bin/bash ] || exit 98; printf '%s' 'native-restart-ok'",
+          "contract_keys": [
+            "command",
+            "cwd",
+            "exit_code",
+            "ok",
+            "stderr",
+            "stderr_truncated",
+            "stdout",
+            "stdout_truncated",
+            "timed_out"
+          ],
+          "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/project",
+          "exit_code": 0,
+          "login_bash_proof": "shopt login_shell and $0=/bin/bash checks exited zero",
+          "requested_timeout_sec": 999,
+          "stdout": "native-restart-ok",
+          "timed_out": false
+        },
+        "status": "passed",
+        "stderr": "",
+        "tools_list": {
+          "shell_exec_count": 1,
+          "tool_count": 64
+        }
+      },
+      "explicit_opt_out_denial": {
+        "executable": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/Forge Conductor.app/Contents/MacOS/Forge Conductor",
+        "pid": 39645,
+        "request_methods": [
+          "initialize",
+          "notifications/initialized",
+          "tools/list",
+          "tools/call",
+          "tools/call",
+          "tools/call"
+        ],
+        "response_ids": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "shell": {
+          "code": "shell_disabled_by_user",
+          "ok": false,
+          "retryable": false
+        },
+        "status": "passed",
+        "stderr": "",
+        "tools_list": {
+          "shell_exec_count": 1,
+          "tool_count": 64
+        }
+      },
+      "installed_raw_cli_success": {
+        "executable": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/bin/forge-conductor",
+        "pid": 39635,
+        "request_methods": [
+          "initialize",
+          "notifications/initialized",
+          "tools/list",
+          "tools/call",
+          "tools/call",
+          "tools/call"
+        ],
+        "response_ids": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "shell": {
+          "command": "shopt -q login_shell || exit 97; [ \"$0\" = /bin/bash ] || exit 98; printf '%s' 'native-restart-ok'",
+          "contract_keys": [
+            "command",
+            "cwd",
+            "exit_code",
+            "ok",
+            "stderr",
+            "stderr_truncated",
+            "stdout",
+            "stdout_truncated",
+            "timed_out"
+          ],
+          "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/project",
+          "exit_code": 0,
+          "login_bash_proof": "shopt login_shell and $0=/bin/bash checks exited zero",
+          "requested_timeout_sec": 999,
+          "stdout": "native-restart-ok",
+          "timed_out": false
+        },
+        "status": "passed",
+        "stderr": "",
+        "tools_list": {
+          "shell_exec_count": 1,
+          "tool_count": 64
+        }
+      },
+      "legacy_disabled_migrated_success": {
+        "executable": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/Forge Conductor.app/Contents/MacOS/Forge Conductor",
+        "pid": 39640,
+        "request_methods": [
+          "initialize",
+          "notifications/initialized",
+          "tools/list",
+          "tools/call",
+          "tools/call",
+          "tools/call"
+        ],
+        "response_ids": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "shell": {
+          "command": "shopt -q login_shell || exit 97; [ \"$0\" = /bin/bash ] || exit 98; printf '%s' 'native-restart-ok'",
+          "contract_keys": [
+            "command",
+            "cwd",
+            "exit_code",
+            "ok",
+            "stderr",
+            "stderr_truncated",
+            "stdout",
+            "stdout_truncated",
+            "timed_out"
+          ],
+          "cwd": "/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/project",
+          "exit_code": 0,
+          "login_bash_proof": "shopt login_shell and $0=/bin/bash checks exited zero",
+          "requested_timeout_sec": 999,
+          "stdout": "native-restart-ok",
+          "timed_out": false
+        },
+        "status": "passed",
+        "stderr": "",
+        "tools_list": {
+          "shell_exec_count": 1,
+          "tool_count": 64
+        }
+      },
+      "post_manager_restart_opt_out_denial": {
+        "executable": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/Forge Conductor.app/Contents/MacOS/Forge Conductor",
+        "pid": 39660,
+        "request_methods": [
+          "initialize",
+          "notifications/initialized",
+          "tools/list",
+          "tools/call",
+          "tools/call",
+          "tools/call"
+        ],
+        "response_ids": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "shell": {
+          "code": "shell_disabled_by_user",
+          "ok": false,
+          "retryable": false
+        },
+        "status": "passed",
+        "stderr": "",
+        "tools_list": {
+          "shell_exec_count": 1,
+          "tool_count": 64
+        }
+      }
+    },
+    "staged_artifacts": {
+      "application": {
+        "build": "1",
+        "embedded_cli_rpaths": [
+          "@executable_path/../Frameworks",
+          "@executable_path",
+          "@loader_path"
+        ],
+        "path": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/Forge Conductor.app",
+        "paths": {
+          "embedded_cli": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/Forge Conductor.app/Contents/Helpers/forge-conductor",
+          "filesystem_daemon": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon",
+          "framework": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework",
+          "launchdaemon_plist": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/Forge Conductor.app/Contents/Library/LaunchDaemons/com.forge-conductor.filesystem-daemon.plist",
+          "main": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/Forge Conductor.app/Contents/MacOS/Forge Conductor",
+          "runtime_launcher": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher"
+        },
+        "sealed_daemon_hashes": {
+          "ForgeFilesystemDaemonCDHashArm64": "4800344e77fb532674b9308fba8fbd4ebda9f8e4"
+        },
+        "signatures": {
+          "application": {
+            "authorities": [
+              "Apple Development: James Daley (FW94K6ZY57)",
+              "Apple Worldwide Developer Relations Certification Authority",
+              "Apple Root CA"
+            ],
+            "cdhash": "6dca6047fd84104d14ec3dc326b15f10f0db8387",
+            "identifier": "com.forge-conductor.app",
+            "path": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/Forge Conductor.app",
+            "runtime_version": "26.5.0",
+            "sha256": null,
+            "signing_requirement": "anchor apple generic and identifier \"com.forge-conductor.app\" and certificate leaf[subject.OU] = \"9AQ2C2838M\" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists",
+            "team_identifier": "9AQ2C2838M"
+          },
+          "embedded_cli": {
+            "authorities": [
+              "Apple Development: James Daley (FW94K6ZY57)",
+              "Apple Worldwide Developer Relations Certification Authority",
+              "Apple Root CA"
+            ],
+            "cdhash": "d57f22af667d72145d52b83095c6f0de0a16efb7",
+            "identifier": "com.forge-conductor.cli",
+            "path": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/Forge Conductor.app/Contents/Helpers/forge-conductor",
+            "runtime_version": "26.5.0",
+            "sha256": "aacc32ae18cca292f7f694f0d6e300690d765cd8f2a208d64a7f8e7e3ee75abb",
+            "signing_requirement": "anchor apple generic and identifier \"com.forge-conductor.cli\" and certificate leaf[subject.OU] = \"9AQ2C2838M\" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists",
+            "team_identifier": "9AQ2C2838M"
+          },
+          "filesystem_daemon": {
+            "authorities": [
+              "Apple Development: James Daley (FW94K6ZY57)",
+              "Apple Worldwide Developer Relations Certification Authority",
+              "Apple Root CA"
+            ],
+            "cdhash": "4800344e77fb532674b9308fba8fbd4ebda9f8e4",
+            "identifier": "com.forge-conductor.filesystem-daemon",
+            "path": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon",
+            "runtime_version": "26.5.0",
+            "sha256": "0b433ee7a0859cf5a746934d9a3a16c73694ee2b0a774b185f43f2d5c75047d6",
+            "signing_requirement": "anchor apple generic and identifier \"com.forge-conductor.filesystem-daemon\" and certificate leaf[subject.OU] = \"9AQ2C2838M\" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists",
+            "team_identifier": "9AQ2C2838M"
+          },
+          "framework": {
+            "authorities": [
+              "Apple Development: James Daley (FW94K6ZY57)",
+              "Apple Worldwide Developer Relations Certification Authority",
+              "Apple Root CA"
+            ],
+            "cdhash": "a4d1acabd5e5780f9f61e8af8bac7f54a28fd9ff",
+            "identifier": "com.forge-conductor.core",
+            "path": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework",
+            "runtime_version": "26.5.0",
+            "sha256": null,
+            "signing_requirement": "anchor apple generic and identifier \"com.forge-conductor.core\" and certificate leaf[subject.OU] = \"9AQ2C2838M\" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists",
+            "team_identifier": "9AQ2C2838M"
+          },
+          "runtime_launcher": {
+            "authorities": [
+              "Apple Development: James Daley (FW94K6ZY57)",
+              "Apple Worldwide Developer Relations Certification Authority",
+              "Apple Root CA"
+            ],
+            "cdhash": "deb618e30973dbdee4fcc510917be5633fdbf4f9",
+            "identifier": "com.forge-conductor.runtime-launcher",
+            "path": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher",
+            "runtime_version": "26.5.0",
+            "sha256": "572d11e2b818018e3d91e5c06e15415cacb3916bb3bdf0c226c648875c8dfb27",
+            "signing_requirement": "anchor apple generic and identifier \"com.forge-conductor.runtime-launcher\" and certificate leaf[subject.OU] = \"9AQ2C2838M\" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists",
+            "team_identifier": "9AQ2C2838M"
+          }
+        },
+        "signing_authority": "Apple Development: James Daley (FW94K6ZY57)",
+        "team_identifier": "9AQ2C2838M",
+        "version": "0.9.0"
+      },
+      "raw_cli": {
+        "authorities": [
+          "Apple Development: James Daley (FW94K6ZY57)",
+          "Apple Worldwide Developer Relations Certification Authority",
+          "Apple Root CA"
+        ],
+        "cdhash": "d57f22af667d72145d52b83095c6f0de0a16efb7",
+        "identifier": "com.forge-conductor.cli",
+        "path": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/bin/forge-conductor",
+        "runtime_version": "26.5.0",
+        "sha256": "aacc32ae18cca292f7f694f0d6e300690d765cd8f2a208d64a7f8e7e3ee75abb",
+        "signing_requirement": "anchor apple generic and identifier \"com.forge-conductor.cli\" and certificate leaf[subject.OU] = \"9AQ2C2838M\" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists",
+        "team_identifier": "9AQ2C2838M"
+      },
+      "raw_cli_sibling_framework": {
+        "authorities": [
+          "Apple Development: James Daley (FW94K6ZY57)",
+          "Apple Worldwide Developer Relations Certification Authority",
+          "Apple Root CA"
+        ],
+        "cdhash": "a4d1acabd5e5780f9f61e8af8bac7f54a28fd9ff",
+        "identifier": "com.forge-conductor.core",
+        "path": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/bin/ForgeConductorCore.framework",
+        "runtime_version": "26.5.0",
+        "sha256": null,
+        "signing_requirement": "anchor apple generic and identifier \"com.forge-conductor.core\" and certificate leaf[subject.OU] = \"9AQ2C2838M\" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists",
+        "team_identifier": "9AQ2C2838M"
+      },
+      "standalone_raw_cli_runtime": {
+        "path": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/bin/forge-runtime-launcher",
+        "reason": "runtime launcher identity is verified here; raw-CLI commands and shell execution are exercised by the enclosing scenario",
+        "signature": {
+          "authorities": [
+            "Apple Development: James Daley (FW94K6ZY57)",
+            "Apple Worldwide Developer Relations Certification Authority",
+            "Apple Root CA"
+          ],
+          "cdhash": "deb618e30973dbdee4fcc510917be5633fdbf4f9",
+          "identifier": "com.forge-conductor.runtime-launcher",
+          "path": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-signed-shell-manager-39533-1788261198/bin/forge-runtime-launcher",
+          "runtime_version": "26.5.0",
+          "sha256": "572d11e2b818018e3d91e5c06e15415cacb3916bb3bdf0c226c648875c8dfb27",
+          "signing_requirement": "anchor apple generic and identifier \"com.forge-conductor.runtime-launcher\" and certificate leaf[subject.OU] = \"9AQ2C2838M\" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists",
+          "team_identifier": "9AQ2C2838M"
+        },
+        "status": "signature_verified"
+      }
+    },
+    "status": "blocked"
+  },
+  "schema_version": 1,
+  "shared_state_preflight": {
+    "canonical_job": {
+      "state": "absent",
+      "target": "gui/501/com.forge-conductor.manager"
+    },
+    "canonical_plist": {
+      "path": "/Users/jimdaley/Library/LaunchAgents/com.forge-conductor.manager.plist",
+      "state": "absent"
+    },
+    "command_link": {
+      "path": "/Users/jimdaley/.local/bin/forge-conductor-swift",
+      "state": "symlink",
+      "target": "/Users/jimdaley/.forge-conductor/bin/forge-conductor"
+    },
+    "dashboard_port_7788": "free",
+    "launchd_disabled": {
+      "output_sha256": "6d94ca012776b5cce977d88b05a14f99266a5f68291730a7fbe9b46614fab255",
+      "value": false
+    },
+    "product_processes": []
+  },
+  "signing_identity_constraint": {
+    "expected_signing_authority": "Apple Development: James Daley (FW94K6ZY57)",
+    "expected_team_identifier": "9AQ2C2838M",
+    "matched": true,
+    "mode": "explicit",
+    "observed_signing_authority": "Apple Development: James Daley (FW94K6ZY57)",
+    "observed_team_identifier": "9AQ2C2838M"
+  },
+  "source_application": {
+    "build": "1",
+    "embedded_cli_rpaths": [
+      "@executable_path/../Frameworks",
+      "@executable_path",
+      "@loader_path"
+    ],
+    "path": "/private/tmp/forge-checkpoint-xcode-dev-2cc41ee2d952/Build/Products/Release/Forge Conductor.app",
+    "paths": {
+      "embedded_cli": "/private/tmp/forge-checkpoint-xcode-dev-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-conductor",
+      "filesystem_daemon": "/private/tmp/forge-checkpoint-xcode-dev-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon",
+      "framework": "/private/tmp/forge-checkpoint-xcode-dev-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework",
+      "launchdaemon_plist": "/private/tmp/forge-checkpoint-xcode-dev-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/Library/LaunchDaemons/com.forge-conductor.filesystem-daemon.plist",
+      "main": "/private/tmp/forge-checkpoint-xcode-dev-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/MacOS/Forge Conductor",
+      "runtime_launcher": "/private/tmp/forge-checkpoint-xcode-dev-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher"
+    },
+    "sealed_daemon_hashes": {
+      "ForgeFilesystemDaemonCDHashArm64": "4800344e77fb532674b9308fba8fbd4ebda9f8e4"
+    },
+    "signatures": {
+      "application": {
+        "authorities": [
+          "Apple Development: James Daley (FW94K6ZY57)",
+          "Apple Worldwide Developer Relations Certification Authority",
+          "Apple Root CA"
+        ],
+        "cdhash": "6dca6047fd84104d14ec3dc326b15f10f0db8387",
+        "identifier": "com.forge-conductor.app",
+        "path": "/private/tmp/forge-checkpoint-xcode-dev-2cc41ee2d952/Build/Products/Release/Forge Conductor.app",
+        "runtime_version": "26.5.0",
+        "sha256": null,
+        "signing_requirement": "anchor apple generic and identifier \"com.forge-conductor.app\" and certificate leaf[subject.OU] = \"9AQ2C2838M\" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists",
+        "team_identifier": "9AQ2C2838M"
+      },
+      "embedded_cli": {
+        "authorities": [
+          "Apple Development: James Daley (FW94K6ZY57)",
+          "Apple Worldwide Developer Relations Certification Authority",
+          "Apple Root CA"
+        ],
+        "cdhash": "d57f22af667d72145d52b83095c6f0de0a16efb7",
+        "identifier": "com.forge-conductor.cli",
+        "path": "/private/tmp/forge-checkpoint-xcode-dev-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-conductor",
+        "runtime_version": "26.5.0",
+        "sha256": "aacc32ae18cca292f7f694f0d6e300690d765cd8f2a208d64a7f8e7e3ee75abb",
+        "signing_requirement": "anchor apple generic and identifier \"com.forge-conductor.cli\" and certificate leaf[subject.OU] = \"9AQ2C2838M\" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists",
+        "team_identifier": "9AQ2C2838M"
+      },
+      "filesystem_daemon": {
+        "authorities": [
+          "Apple Development: James Daley (FW94K6ZY57)",
+          "Apple Worldwide Developer Relations Certification Authority",
+          "Apple Root CA"
+        ],
+        "cdhash": "4800344e77fb532674b9308fba8fbd4ebda9f8e4",
+        "identifier": "com.forge-conductor.filesystem-daemon",
+        "path": "/private/tmp/forge-checkpoint-xcode-dev-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon",
+        "runtime_version": "26.5.0",
+        "sha256": "0b433ee7a0859cf5a746934d9a3a16c73694ee2b0a774b185f43f2d5c75047d6",
+        "signing_requirement": "anchor apple generic and identifier \"com.forge-conductor.filesystem-daemon\" and certificate leaf[subject.OU] = \"9AQ2C2838M\" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists",
+        "team_identifier": "9AQ2C2838M"
+      },
+      "framework": {
+        "authorities": [
+          "Apple Development: James Daley (FW94K6ZY57)",
+          "Apple Worldwide Developer Relations Certification Authority",
+          "Apple Root CA"
+        ],
+        "cdhash": "a4d1acabd5e5780f9f61e8af8bac7f54a28fd9ff",
+        "identifier": "com.forge-conductor.core",
+        "path": "/private/tmp/forge-checkpoint-xcode-dev-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework",
+        "runtime_version": "26.5.0",
+        "sha256": null,
+        "signing_requirement": "anchor apple generic and identifier \"com.forge-conductor.core\" and certificate leaf[subject.OU] = \"9AQ2C2838M\" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists",
+        "team_identifier": "9AQ2C2838M"
+      },
+      "runtime_launcher": {
+        "authorities": [
+          "Apple Development: James Daley (FW94K6ZY57)",
+          "Apple Worldwide Developer Relations Certification Authority",
+          "Apple Root CA"
+        ],
+        "cdhash": "deb618e30973dbdee4fcc510917be5633fdbf4f9",
+        "identifier": "com.forge-conductor.runtime-launcher",
+        "path": "/private/tmp/forge-checkpoint-xcode-dev-2cc41ee2d952/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher",
+        "runtime_version": "26.5.0",
+        "sha256": "572d11e2b818018e3d91e5c06e15415cacb3916bb3bdf0c226c648875c8dfb27",
+        "signing_requirement": "anchor apple generic and identifier \"com.forge-conductor.runtime-launcher\" and certificate leaf[subject.OU] = \"9AQ2C2838M\" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists",
+        "team_identifier": "9AQ2C2838M"
+      }
+    },
+    "signing_authority": "Apple Development: James Daley (FW94K6ZY57)",
+    "team_identifier": "9AQ2C2838M",
+    "version": "0.9.0"
+  },
+  "source_application_argument": "/tmp/forge-checkpoint-xcode-dev-2cc41ee2d952/Build/Products/Release/Forge Conductor.app"
+}

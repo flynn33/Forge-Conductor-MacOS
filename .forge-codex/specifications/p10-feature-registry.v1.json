@@ -1,0 +1,1668 @@
+{
+  "category_set": [
+    "build",
+    "cli",
+    "command",
+    "http",
+    "integration",
+    "lifecycle",
+    "mcp",
+    "mcp_tool",
+    "mcp_tool_pack",
+    "persistence",
+    "settings",
+    "telemetry",
+    "ui"
+  ],
+  "feature_count": 104,
+  "runtime_surface_inventory": {
+    "mcp_tools": [
+      "agent_context", "agent_get", "agent_list", "agent_recommend",
+      "agent_run_complete", "agent_run_start", "agent_run_status", "bash.run",
+      "context_get", "context_list", "continuity.acknowledge_handoff",
+      "continuity.checkpoint", "continuity.get_pending_handoff",
+      "continuity.prepare_handoff", "continuity.request_rollover",
+      "continuity.resume", "continuity.status", "forge_status", "fs_delete",
+      "fs_delete_recovery", "fs_edit", "fs_glob", "fs_list", "fs_mkdir",
+      "fs_move", "fs_read", "fs_write", "git_add", "git_commit", "git_diff",
+      "git_log", "git_status", "job.cancel", "job.list", "job.read_output",
+      "job.status", "memory_delete", "memory_get", "memory_list", "memory_search",
+      "memory_set", "pdf_from_file", "pdf_write", "powershell.run", "process.run",
+      "project_memory.export", "project_memory.forget", "project_memory.get",
+      "project_memory.import", "project_memory.initialize", "project_memory.link",
+      "project_memory.list_recent", "project_memory.remember",
+      "project_memory.remember_batch", "project_memory.search",
+      "project_memory.status", "project_memory.update", "python.run",
+      "runtime.capabilities", "search_text", "session_checkpoint", "session_handoff",
+      "shell.run", "shell_exec"
+    ],
+    "cli_feature_ids": [
+      "CLI-AGENTS", "CLI-DASHBOARD", "CLI-DOCTOR",
+      "CLI-EXTENDED-INSTALL-DASHBOARD-OPTIONS", "CLI-INSTALL",
+      "CLI-INSTALL-LMSTUDIO", "CLI-MANAGER",
+      "CLI-QUALIFICATION-FILESYSTEM-HEALTH", "CLI-SERVE", "CLI-STATUS",
+      "CLI-VERSION-HELP"
+    ],
+    "http_feature_ids": [
+      "HTTP-AUTONOMY-CONTROL", "HTTP-OPERATOR-SNAPSHOT", "HTTP-PROJECT-CONTROL",
+      "HTTP-PROVIDER-PROBE", "HTTP-RUNTIME-CANCEL"
+    ],
+    "native_ui_feature_ids": [
+      "CMD-AUTO-REFRESH", "CMD-OPERATOR-NAVIGATION", "CMD-REFRESH-NOW",
+      "CMD-TOGGLE-NAVIGATION", "UI-MAIN-WINDOW", "UI-NAVIGATION-SIDEBAR",
+      "UI-SETTINGS-AUTHORIZED-ROOTS", "UI-SETTINGS-PROTECTED-FILESYSTEM",
+      "UI-SETTINGS-SHELL-POLICY", "UI-SETTINGS-WINDOW", "UI-TAB-AGENTS",
+      "UI-TAB-AUTONOMY", "UI-TAB-CONTINUITY", "UI-TAB-DIAGNOSTICS",
+      "UI-TAB-EVIDENCE", "UI-TAB-LIVE-FEED", "UI-TAB-MANAGER", "UI-TAB-MCP",
+      "UI-TAB-PROJECTS", "UI-TAB-PROVIDER", "UI-TAB-RIG", "UI-TAB-RUNTIMES",
+      "UI-TAB-TOOLS"
+    ]
+  },
+  "historical_feature_mapping": {
+    "CMD-9F0D5D5B98": "CMD-OPERATOR-NAVIGATION",
+    "CMD-B9197A2822": "CMD-OPERATOR-NAVIGATION",
+    "CMD-FF4A30A48F": "CMD-OPERATOR-NAVIGATION",
+    "CMD-BB0F238D6A": "CMD-REFRESH-NOW",
+    "CMD-B24E64ABC6": "CMD-TOGGLE-NAVIGATION",
+    "MCP-51FC97C8EC": "MCP-TOOL-MEMORY",
+    "MCP-602ABCC874": "MCP-SERVER-STDIO",
+    "MCP-AE1A4C36F0": "MCP-SERVER-STDIO",
+    "MCP-694E9D8C93": "TEL-COMPOSED-SNAPSHOT",
+    "MCP-6D78F1A462": "TEL-NATIVE-COLLECTORS",
+    "MCP-3D723955FA": "TEL-NATIVE-COLLECTORS",
+    "MCP-E00A5B1500": "TEL-NATIVE-COLLECTORS",
+    "MCP-ADE744EB1E": "TEL-NATIVE-COLLECTORS",
+    "MCP-191F38FDEF": "MCP-SERVER-STDIO",
+    "MCP-C4A796E6A6": "MCP-CANONICAL-TOOL-CATALOG",
+    "MCP-9ABBA11F85": "MCP-SERVER-STDIO",
+    "MCP-0DDF758AF2": "MCP-SERVER-STDIO",
+    "MCP-6D04766CD7": "UI-TAB-MCP",
+    "MCP-1694B034B4": "TEL-NATIVE-COLLECTORS",
+    "MCP-85F09ACD1B": "UI-TAB-MCP",
+    "MCP-D2D64F9F7F": "MCP-SERVER-STDIO",
+    "MCP-A7D5F8D237": "MCP-SERVER-STDIO",
+    "MCP-4CAF1519E1": "MCP-SERVER-STDIO",
+    "MCP-01E4F6D53F": "MCP-TOOL-AGENT-LIST",
+    "MCP-097F790F93": "MCP-TOOL-AGENT-RECOMMEND",
+    "MCP-1BFBB11011": "MCP-TOOL-AGENT-RUN-COMPLETE",
+    "MCP-42051C5647": "MCP-TOOL-AGENT-RUN-START",
+    "MCP-4D13E0047A": "MCP-TOOL-AGENT-RUN-STATUS",
+    "MCP-2DD2F3EF76": "MCP-TOOL-CONTEXT-GET",
+    "MCP-9242AE501C": "MCP-TOOL-CONTEXT-LIST",
+    "MCP-B51DBFE706": "MCP-TOOL-FORGE-STATUS",
+    "MCP-669C9348BC": "MCP-TOOL-FILESYSTEM",
+    "MCP-AED65F001B": "MCP-TOOL-FILESYSTEM",
+    "MCP-0258DDF216": "MCP-TOOL-FILESYSTEM",
+    "MCP-882CF56740": "MCP-TOOL-FILESYSTEM",
+    "MCP-9DD6EC7913": "MCP-TOOL-FILESYSTEM",
+    "MCP-55FA335C9D": "MCP-TOOL-FILESYSTEM",
+    "MCP-3A722BFF26": "MCP-TOOL-FILESYSTEM",
+    "MCP-9C133026E4": "MCP-TOOL-FILESYSTEM",
+    "MCP-A5A3AD85C6": null,
+    "MCP-D13412AEA8": null,
+    "MCP-054C5F322D": "MCP-TOOL-GIT",
+    "MCP-FC15CB5F44": "MCP-TOOL-GIT",
+    "MCP-501EC33A2A": "MCP-TOOL-GIT",
+    "MCP-D4B42720D7": "MCP-TOOL-GIT",
+    "MCP-75F0524454": "MCP-TOOL-GIT",
+    "MCP-ADA29A6E28": "MCP-TOOL-MEMORY",
+    "MCP-EFFD08E4F7": "MCP-TOOL-MEMORY",
+    "MCP-51D6824AA8": "MCP-TOOL-MEMORY",
+    "MCP-C50439EC88": "MCP-TOOL-MEMORY",
+    "MCP-CC8B36BEA1": "MCP-TOOL-MEMORY",
+    "MCP-10220416F0": null,
+    "MCP-6C3ECC4797": "MCP-TOOL-PDF",
+    "MCP-C1A60429DB": "MCP-TOOL-PDF",
+    "MCP-DB5D66AF48": "MCP-TOOL-SEARCH",
+    "MCP-E60F36EBE1": "MCP-TOOL-SESSION-CHECKPOINT",
+    "MCP-8D916718E2": "MCP-TOOL-SESSION-HANDOFF",
+    "MCP-01883FAD6D": "MCP-TOOL-SHELL",
+    "MCP-D3D3CDE3DB": null,
+    "MEM-2DA38BB17C": "DATA-CONTEXT-HANDOFFS",
+    "MEM-257A559982": "RUNTIME-CONTEXT-BUDGET",
+    "MEM-A146AF97E6": "DATA-CONTEXT-HANDOFFS",
+    "MEM-D36A139313": "DATA-CONTEXT-HANDOFFS",
+    "MEM-73E2BE0FCE": "MCP-TOOL-CONTINUITY-LIFECYCLE",
+    "MEM-F1D610375F": "DATA-CONTEXT-HANDOFFS",
+    "MEM-CA2F27CD88": "DATA-CONTEXT-HANDOFFS",
+    "MEM-6EA92F9FF4": "DATA-CONTEXT-HANDOFFS",
+    "MEM-ABE8AFA09F": "DATA-MEMORY-NOTES",
+    "MEM-091BDBEC8D": null,
+    "MEM-742DE3CEE9": "DATA-MEMORY-NOTES",
+    "MEM-1561AE424F": "MCP-TOOL-MEMORY",
+    "MEM-CAAB367620": "MCP-TOOL-MEMORY",
+    "PROC-504B25D95A": "RUNTIME-PROCESS-RUNNER",
+    "PROC-59C757E0BA": "RUNTIME-PROCESS-RUNNER",
+    "PROC-8355C3465C": "RUNTIME-PROCESS-RUNNER",
+    "BUILD-CD74D060A3": "BUILD-CORE-LIBRARY",
+    "BUILD-6AA6E5982C": "BUILD-CLI-EXECUTABLE",
+    "BUILD-F76A5BC463": "BUILD-GUI-EXECUTABLE",
+    "UI-DB349A6329": "UI-SETTINGS-WINDOW",
+    "BUILD-74D314EFE3": "BUILD-GUI-EXECUTABLE",
+    "BUILD-42A5B89FCE": "BUILD-CLI-EXECUTABLE",
+    "BUILD-28A7A4E462": "BUILD-CORE-LIBRARY",
+    "BUILD-50A5474278": "BUILD-XCODE-WORKSPACE",
+    "TEL-4333B67EC0": "TEL-METAL-GAUGES",
+    "TEL-78F8F4DA48": "TEL-SSE-DASHBOARD",
+    "TEL-F4BAA0406A": "TEL-COMPOSED-SNAPSHOT",
+    "TEL-ED0CC21A55": "TEL-COMPOSED-SNAPSHOT",
+    "TEL-3BA7671EE1": "TEL-SSE-DASHBOARD",
+    "TEL-4E58190805": "TEL-REALTIME-ENGINE",
+    "TEL-BED348846A": "TEL-UI-BINDING",
+    "TEL-093C8348F8": "TEL-REALTIME-ENGINE",
+    "TEL-0B1911920D": "TEL-COMPOSED-SNAPSHOT",
+    "TEL-CCCFF4FC61": "TEL-REALTIME-ENGINE",
+    "TEL-9CCF7D69F7": "TEL-SSE-DASHBOARD",
+    "TEL-81D9E38B60": "TEL-REALTIME-ENGINE",
+    "TEL-2AE8C6D641": "TEL-UI-BINDING",
+    "TEL-BD08491B8C": "DATA-TELEMETRY-STATIC",
+    "TEL-B203FD5450": "TEL-UI-BINDING"
+  },
+  "features": [
+    {
+      "category": "build",
+      "id": "BUILD-CORE-LIBRARY",
+      "name": "ForgeConductorCore library",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "BUILD-CORE-LIBRARY.production-path"
+      ],
+      "signing_required": false,
+      "signing_artifact": null
+    },
+    {
+      "category": "build",
+      "id": "BUILD-CLI-EXECUTABLE",
+      "name": "forge-conductor executable",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "BUILD-CLI-EXECUTABLE.production-path",
+        "BUILD-CLI-EXECUTABLE.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "build",
+      "id": "BUILD-GUI-EXECUTABLE",
+      "name": "Forge Conductor native application",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "BUILD-GUI-EXECUTABLE.production-path",
+        "BUILD-GUI-EXECUTABLE.signed-product.forge-conductor-app"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-app"
+    },
+    {
+      "category": "build",
+      "id": "BUILD-XCODE-WORKSPACE",
+      "name": "ForgeConductor Xcode workspace and schemes",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "BUILD-XCODE-WORKSPACE.production-path"
+      ],
+      "signing_required": false,
+      "signing_artifact": null
+    },
+    {
+      "category": "build",
+      "id": "BUILD-RUN-ENTRYPOINT",
+      "name": "Project-local build and run entrypoint",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "BUILD-RUN-ENTRYPOINT.production-path"
+      ],
+      "signing_required": false,
+      "signing_artifact": null
+    },
+    {
+      "category": "ui",
+      "id": "UI-MAIN-WINDOW",
+      "name": "Single restorable Forge Conductor main window",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "UI-MAIN-WINDOW.production-path",
+        "UI-MAIN-WINDOW.signed-product.forge-conductor-app"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-app"
+    },
+    {
+      "category": "ui",
+      "id": "UI-SETTINGS-WINDOW",
+      "name": "Manager settings scene",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "UI-SETTINGS-WINDOW.production-path",
+        "UI-SETTINGS-WINDOW.signed-product.forge-conductor-app"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-app"
+    },
+    {
+      "category": "ui",
+      "id": "UI-NAVIGATION-SIDEBAR",
+      "name": "Persistent collapsible sidebar navigation",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "UI-NAVIGATION-SIDEBAR.production-path",
+        "UI-NAVIGATION-SIDEBAR.signed-product.forge-conductor-app"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-app"
+    },
+    {
+      "category": "ui",
+      "id": "UI-TAB-RIG",
+      "name": "FORGE RIG dashboard tab",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "UI-TAB-RIG.production-path",
+        "UI-TAB-RIG.signed-product.forge-conductor-app"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-app"
+    },
+    {
+      "category": "ui",
+      "id": "UI-TAB-MCP",
+      "name": "LM Studio MCP tab",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "UI-TAB-MCP.production-path",
+        "UI-TAB-MCP.signed-product.forge-conductor-app"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-app"
+    },
+    {
+      "category": "ui",
+      "id": "UI-TAB-AGENTS",
+      "name": "Agents tab",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "UI-TAB-AGENTS.production-path",
+        "UI-TAB-AGENTS.signed-product.forge-conductor-app"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-app"
+    },
+    {
+      "category": "ui",
+      "id": "UI-TAB-TOOLS",
+      "name": "Tools tab",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "UI-TAB-TOOLS.production-path",
+        "UI-TAB-TOOLS.signed-product.forge-conductor-app"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-app"
+    },
+    {
+      "category": "ui",
+      "id": "UI-TAB-LIVE-FEED",
+      "name": "Live Feed tab",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "UI-TAB-LIVE-FEED.production-path",
+        "UI-TAB-LIVE-FEED.signed-product.forge-conductor-app"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-app"
+    },
+    {
+      "category": "ui",
+      "id": "UI-TAB-DIAGNOSTICS",
+      "name": "Diagnostics tab",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "UI-TAB-DIAGNOSTICS.production-path",
+        "UI-TAB-DIAGNOSTICS.signed-product.forge-conductor-app"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-app"
+    },
+    {
+      "category": "ui",
+      "id": "UI-TAB-MANAGER",
+      "name": "Manager tab",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "UI-TAB-MANAGER.production-path",
+        "UI-TAB-MANAGER.signed-product.forge-conductor-app"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-app"
+    },
+    {
+      "category": "command",
+      "id": "CMD-TOGGLE-NAVIGATION",
+      "name": "Show or hide navigation command and toolbar action",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "CMD-TOGGLE-NAVIGATION.production-path",
+        "CMD-TOGGLE-NAVIGATION.signed-product.forge-conductor-app"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-app"
+    },
+    {
+      "category": "command",
+      "id": "CMD-REFRESH-NOW",
+      "name": "Manual telemetry refresh command and toolbar action",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "CMD-REFRESH-NOW.production-path",
+        "CMD-REFRESH-NOW.signed-product.forge-conductor-app"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-app"
+    },
+    {
+      "category": "command",
+      "id": "CMD-AUTO-REFRESH",
+      "name": "Automatic telemetry refresh toggle",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "CMD-AUTO-REFRESH.production-path",
+        "CMD-AUTO-REFRESH.signed-product.forge-conductor-app"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-app"
+    },
+    {
+      "category": "cli",
+      "id": "CLI-INSTALL",
+      "name": "Install CLI and app layout",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "CLI-INSTALL.production-path",
+        "CLI-INSTALL.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "cli",
+      "id": "CLI-INSTALL-LMSTUDIO",
+      "name": "Deploy primary and fallback LM Studio MCP plugins",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "CLI-INSTALL-LMSTUDIO.production-path",
+        "CLI-INSTALL-LMSTUDIO.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "cli",
+      "id": "CLI-DOCTOR",
+      "name": "Installation and endpoint diagnostics",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "CLI-DOCTOR.production-path",
+        "CLI-DOCTOR.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "cli",
+      "id": "CLI-STATUS",
+      "name": "Runtime status JSON",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "CLI-STATUS.production-path",
+        "CLI-STATUS.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "cli",
+      "id": "CLI-SERVE",
+      "name": "MCP stdio server mode",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "CLI-SERVE.production-path",
+        "CLI-SERVE.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "cli",
+      "id": "CLI-DASHBOARD",
+      "name": "Standalone dashboard server",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "CLI-DASHBOARD.production-path",
+        "CLI-DASHBOARD.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "cli",
+      "id": "CLI-MANAGER",
+      "name": "Supervised dashboard manager lifecycle",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "CLI-MANAGER.production-path",
+        "CLI-MANAGER.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "cli",
+      "id": "CLI-AGENTS",
+      "name": "Specialist agent listing",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "CLI-AGENTS.production-path",
+        "CLI-AGENTS.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "cli",
+      "id": "CLI-VERSION-HELP",
+      "name": "Version and help surfaces",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "CLI-VERSION-HELP.production-path",
+        "CLI-VERSION-HELP.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "mcp",
+      "id": "MCP-SERVER-STDIO",
+      "name": "NDJSON and Content-Length stdio transport",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "MCP-SERVER-STDIO.production-path",
+        "MCP-SERVER-STDIO.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "mcp_tool",
+      "id": "MCP-TOOL-AGENT-CONTEXT",
+      "name": "agent_context",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "MCP-TOOL-AGENT-CONTEXT.production-path",
+        "MCP-TOOL-AGENT-CONTEXT.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "mcp_tool",
+      "id": "MCP-TOOL-AGENT-GET",
+      "name": "agent_get",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "MCP-TOOL-AGENT-GET.production-path",
+        "MCP-TOOL-AGENT-GET.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "mcp_tool",
+      "id": "MCP-TOOL-AGENT-LIST",
+      "name": "agent_list",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "MCP-TOOL-AGENT-LIST.production-path",
+        "MCP-TOOL-AGENT-LIST.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "mcp_tool",
+      "id": "MCP-TOOL-AGENT-RECOMMEND",
+      "name": "agent_recommend",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "MCP-TOOL-AGENT-RECOMMEND.production-path",
+        "MCP-TOOL-AGENT-RECOMMEND.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "mcp_tool",
+      "id": "MCP-TOOL-AGENT-RUN-COMPLETE",
+      "name": "agent_run_complete",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "MCP-TOOL-AGENT-RUN-COMPLETE.production-path",
+        "MCP-TOOL-AGENT-RUN-COMPLETE.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "mcp_tool",
+      "id": "MCP-TOOL-AGENT-RUN-START",
+      "name": "agent_run_start",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "MCP-TOOL-AGENT-RUN-START.production-path",
+        "MCP-TOOL-AGENT-RUN-START.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "mcp_tool",
+      "id": "MCP-TOOL-AGENT-RUN-STATUS",
+      "name": "agent_run_status",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "MCP-TOOL-AGENT-RUN-STATUS.production-path",
+        "MCP-TOOL-AGENT-RUN-STATUS.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "mcp_tool",
+      "id": "MCP-TOOL-CONTEXT-GET",
+      "name": "context_get",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "MCP-TOOL-CONTEXT-GET.production-path",
+        "MCP-TOOL-CONTEXT-GET.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "mcp_tool",
+      "id": "MCP-TOOL-CONTEXT-LIST",
+      "name": "context_list",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "MCP-TOOL-CONTEXT-LIST.production-path",
+        "MCP-TOOL-CONTEXT-LIST.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "mcp_tool",
+      "id": "MCP-TOOL-FORGE-STATUS",
+      "name": "forge_status",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "MCP-TOOL-FORGE-STATUS.production-path",
+        "MCP-TOOL-FORGE-STATUS.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "mcp_tool_pack",
+      "id": "MCP-TOOL-FILESYSTEM",
+      "name": "fs_read, fs_write, fs_edit, fs_list, fs_glob, fs_mkdir, fs_delete, fs_move",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "MCP-TOOL-FILESYSTEM.member.fs_read.production-path",
+        "MCP-TOOL-FILESYSTEM.member.fs_write.production-path",
+        "MCP-TOOL-FILESYSTEM.member.fs_edit.production-path",
+        "MCP-TOOL-FILESYSTEM.member.fs_list.production-path",
+        "MCP-TOOL-FILESYSTEM.member.fs_glob.production-path",
+        "MCP-TOOL-FILESYSTEM.member.fs_mkdir.production-path",
+        "MCP-TOOL-FILESYSTEM.member.fs_delete.production-path",
+        "MCP-TOOL-FILESYSTEM.member.fs_move.production-path",
+        "MCP-TOOL-FILESYSTEM.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "mcp_tool_pack",
+      "id": "MCP-TOOL-GIT",
+      "name": "git_status, git_diff, git_log, git_add, git_commit",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "MCP-TOOL-GIT.member.git_status.production-path",
+        "MCP-TOOL-GIT.member.git_diff.production-path",
+        "MCP-TOOL-GIT.member.git_log.production-path",
+        "MCP-TOOL-GIT.member.git_add.production-path",
+        "MCP-TOOL-GIT.member.git_commit.production-path",
+        "MCP-TOOL-GIT.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "mcp_tool_pack",
+      "id": "MCP-TOOL-MEMORY",
+      "name": "memory_set, memory_get, memory_list, memory_search, memory_delete",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "MCP-TOOL-MEMORY.member.memory_set.production-path",
+        "MCP-TOOL-MEMORY.member.memory_get.production-path",
+        "MCP-TOOL-MEMORY.member.memory_list.production-path",
+        "MCP-TOOL-MEMORY.member.memory_search.production-path",
+        "MCP-TOOL-MEMORY.member.memory_delete.production-path",
+        "MCP-TOOL-MEMORY.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "mcp_tool_pack",
+      "id": "MCP-TOOL-PDF",
+      "name": "pdf_write, pdf_from_file",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "MCP-TOOL-PDF.member.pdf_write.production-path",
+        "MCP-TOOL-PDF.member.pdf_from_file.production-path",
+        "MCP-TOOL-PDF.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "mcp_tool",
+      "id": "MCP-TOOL-SEARCH",
+      "name": "search_text",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "MCP-TOOL-SEARCH.production-path",
+        "MCP-TOOL-SEARCH.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "mcp_tool",
+      "id": "MCP-TOOL-SESSION-CHECKPOINT",
+      "name": "session_checkpoint",
+      "parity_status": "preserved",
+      "provider_required": true,
+      "required_assertions": [
+        "MCP-TOOL-SESSION-CHECKPOINT.production-path",
+        "MCP-TOOL-SESSION-CHECKPOINT.signed-product.forge-conductor-cli",
+        "MCP-TOOL-SESSION-CHECKPOINT.real-provider"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "mcp_tool",
+      "id": "MCP-TOOL-SESSION-HANDOFF",
+      "name": "session_handoff",
+      "parity_status": "preserved",
+      "provider_required": true,
+      "required_assertions": [
+        "MCP-TOOL-SESSION-HANDOFF.production-path",
+        "MCP-TOOL-SESSION-HANDOFF.signed-product.forge-conductor-cli",
+        "MCP-TOOL-SESSION-HANDOFF.real-provider"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "mcp_tool",
+      "id": "MCP-TOOL-SHELL",
+      "name": "shell_exec",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "MCP-TOOL-SHELL.production-path",
+        "MCP-TOOL-SHELL.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "mcp",
+      "id": "MCP-EMPTY-RESOURCES-PROMPTS",
+      "name": "Empty resources and prompts lists",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "MCP-EMPTY-RESOURCES-PROMPTS.production-path",
+        "MCP-EMPTY-RESOURCES-PROMPTS.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "persistence",
+      "id": "DATA-CONFIG-JSON",
+      "name": "Atomic typed config.json with legacy dictionary merge",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "DATA-CONFIG-JSON.production-path",
+        "DATA-CONFIG-JSON.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "persistence",
+      "id": "DATA-SQLITE-V5",
+      "name": "SQLite schema version 5",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "DATA-SQLITE-V5.production-path",
+        "DATA-SQLITE-V5.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "persistence",
+      "id": "DATA-MEMORY-NOTES",
+      "name": "Durable memory notes",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "DATA-MEMORY-NOTES.production-path",
+        "DATA-MEMORY-NOTES.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "persistence",
+      "id": "DATA-AGENT-SESSIONS",
+      "name": "Durable agent session records",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "DATA-AGENT-SESSIONS.production-path",
+        "DATA-AGENT-SESSIONS.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "persistence",
+      "id": "DATA-CONTEXT-HANDOFFS",
+      "name": "SQLite and file-backed context handoffs",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "DATA-CONTEXT-HANDOFFS.production-path",
+        "DATA-CONTEXT-HANDOFFS.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "persistence",
+      "id": "DATA-AUDIT-DIAGNOSTICS",
+      "name": "Audit and diagnostic JSONL streams",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "DATA-AUDIT-DIAGNOSTICS.production-path",
+        "DATA-AUDIT-DIAGNOSTICS.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "persistence",
+      "id": "DATA-MANAGER-RUNTIME",
+      "name": "Manager PID, state, and launch-agent files",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "DATA-MANAGER-RUNTIME.production-path",
+        "DATA-MANAGER-RUNTIME.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "persistence",
+      "id": "DATA-LMSTUDIO-CONFIG",
+      "name": "LM Studio mcp.json and role-specific plugin state",
+      "parity_status": "preserved",
+      "provider_required": true,
+      "required_assertions": [
+        "DATA-LMSTUDIO-CONFIG.production-path",
+        "DATA-LMSTUDIO-CONFIG.signed-product.forge-conductor-cli",
+        "DATA-LMSTUDIO-CONFIG.real-provider"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "persistence",
+      "id": "DATA-TELEMETRY-STATIC",
+      "name": "Static telemetry cache under application home",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "DATA-TELEMETRY-STATIC.production-path",
+        "DATA-TELEMETRY-STATIC.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "persistence",
+      "id": "DATA-NO-USERDEFAULTS-KEYCHAIN",
+      "name": "No UserDefaults persistence; managed-provider credentials use an additive Keychain reference",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "DATA-NO-USERDEFAULTS-KEYCHAIN.production-path",
+        "DATA-NO-USERDEFAULTS-KEYCHAIN.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "telemetry",
+      "id": "TEL-REALTIME-ENGINE",
+      "name": "Continuous native realtime metrics engine",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "TEL-REALTIME-ENGINE.production-path",
+        "TEL-REALTIME-ENGINE.signed-product.forge-conductor-app"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-app"
+    },
+    {
+      "category": "telemetry",
+      "id": "TEL-COMPOSED-SNAPSHOT",
+      "name": "Typed composed telemetry snapshot and history",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "TEL-COMPOSED-SNAPSHOT.production-path",
+        "TEL-COMPOSED-SNAPSHOT.signed-product.forge-conductor-app"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-app"
+    },
+    {
+      "category": "telemetry",
+      "id": "TEL-UI-BINDING",
+      "name": "Realtime telemetry-to-SwiftUI binding",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "TEL-UI-BINDING.production-path",
+        "TEL-UI-BINDING.signed-product.forge-conductor-app"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-app"
+    },
+    {
+      "category": "telemetry",
+      "id": "TEL-METAL-GAUGES",
+      "name": "Metal bars, rings, core bars, status tiles, and multi-series load chart",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "TEL-METAL-GAUGES.production-path",
+        "TEL-METAL-GAUGES.signed-product.forge-conductor-app"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-app"
+    },
+    {
+      "category": "telemetry",
+      "id": "TEL-NATIVE-COLLECTORS",
+      "name": "CPU, RAM, GPU, disk, power, and process collectors",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "TEL-NATIVE-COLLECTORS.production-path",
+        "TEL-NATIVE-COLLECTORS.signed-product.forge-conductor-app"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-app"
+    },
+    {
+      "category": "telemetry",
+      "id": "TEL-SSE-DASHBOARD",
+      "name": "Dashboard HTTP and realtime telemetry routes",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "TEL-SSE-DASHBOARD.production-path",
+        "TEL-SSE-DASHBOARD.signed-product.forge-conductor-app"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-app"
+    },
+    {
+      "category": "lifecycle",
+      "id": "RUNTIME-PROCESS-RUNNER",
+      "name": "Bounded subprocess execution and pipe draining",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "RUNTIME-PROCESS-RUNNER.production-path",
+        "RUNTIME-PROCESS-RUNNER.signed-product.forge-runtime-launcher"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-runtime-launcher"
+    },
+    {
+      "category": "lifecycle",
+      "id": "RUNTIME-MANAGER-SUPERVISION",
+      "name": "Dashboard node supervision and restart",
+      "parity_status": "preserved",
+      "provider_required": false,
+      "required_assertions": [
+        "RUNTIME-MANAGER-SUPERVISION.production-path",
+        "RUNTIME-MANAGER-SUPERVISION.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "integration",
+      "id": "RUNTIME-LMSTUDIO-PRIMARY-FALLBACK",
+      "name": "Primary and fail-forward LM Studio connector roles",
+      "parity_status": "preserved",
+      "provider_required": true,
+      "required_assertions": [
+        "RUNTIME-LMSTUDIO-PRIMARY-FALLBACK.production-path",
+        "RUNTIME-LMSTUDIO-PRIMARY-FALLBACK.signed-product.forge-conductor-cli",
+        "RUNTIME-LMSTUDIO-PRIMARY-FALLBACK.real-provider"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "build",
+      "id": "BUILD-FILESYSTEM-PROTOCOL",
+      "name": "ForgeFilesystemProtocol library",
+      "parity_status": "additive",
+      "provider_required": false,
+      "required_assertions": [
+        "BUILD-FILESYSTEM-PROTOCOL.production-path"
+      ],
+      "signing_required": false,
+      "signing_artifact": null
+    },
+    {
+      "category": "build",
+      "id": "BUILD-NATIVE-HOST-PLUGIN",
+      "name": "ForgeNativeSessionHostPlugin library",
+      "parity_status": "additive",
+      "provider_required": false,
+      "required_assertions": [
+        "BUILD-NATIVE-HOST-PLUGIN.production-path",
+        "BUILD-NATIVE-HOST-PLUGIN.signed-product.forge-conductor-app"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-app"
+    },
+    {
+      "category": "build",
+      "id": "BUILD-RUNTIME-LAUNCHER",
+      "name": "ForgeRuntimeLauncher executable",
+      "parity_status": "additive",
+      "provider_required": false,
+      "required_assertions": [
+        "BUILD-RUNTIME-LAUNCHER.production-path",
+        "BUILD-RUNTIME-LAUNCHER.signed-product.forge-runtime-launcher"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-runtime-launcher"
+    },
+    {
+      "category": "build",
+      "id": "BUILD-FILESYSTEM-DAEMON",
+      "name": "ForgeFilesystemDaemon privileged helper executable",
+      "parity_status": "additive",
+      "provider_required": false,
+      "required_assertions": [
+        "BUILD-FILESYSTEM-DAEMON.production-path",
+        "BUILD-FILESYSTEM-DAEMON.signed-product.forge-filesystem-daemon"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-filesystem-daemon"
+    },
+    {
+      "category": "build",
+      "id": "BUILD-FILESYSTEM-QUALIFICATION",
+      "name": "Nonshipping protected-filesystem qualification harness and adversary",
+      "parity_status": "additive",
+      "provider_required": false,
+      "required_assertions": [
+        "BUILD-FILESYSTEM-QUALIFICATION.production-path"
+      ],
+      "signing_required": false,
+      "signing_artifact": null
+    },
+    {
+      "category": "ui",
+      "id": "UI-TAB-PROJECTS",
+      "name": "Projects operator tab",
+      "parity_status": "additive",
+      "provider_required": false,
+      "required_assertions": [
+        "UI-TAB-PROJECTS.production-path",
+        "UI-TAB-PROJECTS.signed-product.forge-conductor-app"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-app"
+    },
+    {
+      "category": "ui",
+      "id": "UI-TAB-AUTONOMY",
+      "name": "Autonomy operator tab",
+      "parity_status": "additive",
+      "provider_required": true,
+      "required_assertions": [
+        "UI-TAB-AUTONOMY.production-path",
+        "UI-TAB-AUTONOMY.signed-product.forge-conductor-app",
+        "UI-TAB-AUTONOMY.real-provider"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-app"
+    },
+    {
+      "category": "ui",
+      "id": "UI-TAB-CONTINUITY",
+      "name": "Continuity operator tab",
+      "parity_status": "additive",
+      "provider_required": true,
+      "required_assertions": [
+        "UI-TAB-CONTINUITY.production-path",
+        "UI-TAB-CONTINUITY.signed-product.forge-conductor-app",
+        "UI-TAB-CONTINUITY.real-provider"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-app"
+    },
+    {
+      "category": "ui",
+      "id": "UI-TAB-RUNTIMES",
+      "name": "Runtimes operator tab",
+      "parity_status": "additive",
+      "provider_required": false,
+      "required_assertions": [
+        "UI-TAB-RUNTIMES.production-path",
+        "UI-TAB-RUNTIMES.signed-product.forge-conductor-app"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-app"
+    },
+    {
+      "category": "ui",
+      "id": "UI-TAB-PROVIDER",
+      "name": "Provider operator tab",
+      "parity_status": "additive",
+      "provider_required": true,
+      "required_assertions": [
+        "UI-TAB-PROVIDER.production-path",
+        "UI-TAB-PROVIDER.signed-product.forge-conductor-app",
+        "UI-TAB-PROVIDER.real-provider"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-app"
+    },
+    {
+      "category": "ui",
+      "id": "UI-TAB-EVIDENCE",
+      "name": "Events and Evidence operator tab",
+      "parity_status": "additive",
+      "provider_required": false,
+      "required_assertions": [
+        "UI-TAB-EVIDENCE.production-path",
+        "UI-TAB-EVIDENCE.signed-product.forge-conductor-app"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-app"
+    },
+    {
+      "category": "command",
+      "id": "CMD-OPERATOR-NAVIGATION",
+      "name": "Operator tab keyboard navigation commands",
+      "parity_status": "additive",
+      "provider_required": false,
+      "required_assertions": [
+        "CMD-OPERATOR-NAVIGATION.production-path",
+        "CMD-OPERATOR-NAVIGATION.signed-product.forge-conductor-app"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-app"
+    },
+    {
+      "category": "settings",
+      "id": "UI-SETTINGS-AUTHORIZED-ROOTS",
+      "name": "Authorized project-root selection and removal controls",
+      "parity_status": "additive",
+      "provider_required": false,
+      "required_assertions": [
+        "UI-SETTINGS-AUTHORIZED-ROOTS.production-path",
+        "UI-SETTINGS-AUTHORIZED-ROOTS.signed-product.forge-conductor-app"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-app"
+    },
+    {
+      "category": "settings",
+      "id": "UI-SETTINGS-SHELL-POLICY",
+      "name": "Per-project shell policy and runtime capability controls",
+      "parity_status": "additive",
+      "provider_required": false,
+      "required_assertions": [
+        "UI-SETTINGS-SHELL-POLICY.production-path",
+        "UI-SETTINGS-SHELL-POLICY.signed-product.forge-conductor-app"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-app"
+    },
+    {
+      "category": "settings",
+      "id": "UI-SETTINGS-PROTECTED-FILESYSTEM",
+      "name": "Protected filesystem service status and lifecycle controls",
+      "parity_status": "additive",
+      "provider_required": false,
+      "required_assertions": [
+        "UI-SETTINGS-PROTECTED-FILESYSTEM.production-path",
+        "UI-SETTINGS-PROTECTED-FILESYSTEM.signed-product.forge-conductor-app"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-app"
+    },
+    {
+      "category": "cli",
+      "id": "CLI-QUALIFICATION-FILESYSTEM-HEALTH",
+      "name": "Protected-filesystem qualification health session command",
+      "parity_status": "additive",
+      "provider_required": false,
+      "required_assertions": [
+        "CLI-QUALIFICATION-FILESYSTEM-HEALTH.production-path",
+        "CLI-QUALIFICATION-FILESYSTEM-HEALTH.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "cli",
+      "id": "CLI-EXTENDED-INSTALL-DASHBOARD-OPTIONS",
+      "name": "Extended install, dashboard, and manager option contracts",
+      "parity_status": "additive",
+      "provider_required": false,
+      "required_assertions": [
+        "CLI-EXTENDED-INSTALL-DASHBOARD-OPTIONS.production-path",
+        "CLI-EXTENDED-INSTALL-DASHBOARD-OPTIONS.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "mcp_tool_pack",
+      "id": "MCP-TOOL-PROJECT-MEMORY",
+      "name": "project_memory.initialize, project_memory.remember, project_memory.remember_batch, project_memory.search, project_memory.get, project_memory.update, project_memory.forget, project_memory.list_recent, project_memory.link, project_memory.export, project_memory.import, project_memory.status",
+      "parity_status": "additive",
+      "provider_required": false,
+      "required_assertions": [
+        "MCP-TOOL-PROJECT-MEMORY.member.project_memory.initialize.production-path",
+        "MCP-TOOL-PROJECT-MEMORY.member.project_memory.remember.production-path",
+        "MCP-TOOL-PROJECT-MEMORY.member.project_memory.remember_batch.production-path",
+        "MCP-TOOL-PROJECT-MEMORY.member.project_memory.search.production-path",
+        "MCP-TOOL-PROJECT-MEMORY.member.project_memory.get.production-path",
+        "MCP-TOOL-PROJECT-MEMORY.member.project_memory.update.production-path",
+        "MCP-TOOL-PROJECT-MEMORY.member.project_memory.forget.production-path",
+        "MCP-TOOL-PROJECT-MEMORY.member.project_memory.list_recent.production-path",
+        "MCP-TOOL-PROJECT-MEMORY.member.project_memory.link.production-path",
+        "MCP-TOOL-PROJECT-MEMORY.member.project_memory.export.production-path",
+        "MCP-TOOL-PROJECT-MEMORY.member.project_memory.import.production-path",
+        "MCP-TOOL-PROJECT-MEMORY.member.project_memory.status.production-path",
+        "MCP-TOOL-PROJECT-MEMORY.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "mcp_tool_pack",
+      "id": "MCP-TOOL-CONTINUITY-LIFECYCLE",
+      "name": "continuity.checkpoint, continuity.prepare_handoff, continuity.get_pending_handoff, continuity.acknowledge_handoff, continuity.resume, continuity.status, continuity.request_rollover",
+      "parity_status": "additive",
+      "provider_required": true,
+      "required_assertions": [
+        "MCP-TOOL-CONTINUITY-LIFECYCLE.member.continuity.checkpoint.production-path",
+        "MCP-TOOL-CONTINUITY-LIFECYCLE.member.continuity.prepare_handoff.production-path",
+        "MCP-TOOL-CONTINUITY-LIFECYCLE.member.continuity.get_pending_handoff.production-path",
+        "MCP-TOOL-CONTINUITY-LIFECYCLE.member.continuity.acknowledge_handoff.production-path",
+        "MCP-TOOL-CONTINUITY-LIFECYCLE.member.continuity.resume.production-path",
+        "MCP-TOOL-CONTINUITY-LIFECYCLE.member.continuity.status.production-path",
+        "MCP-TOOL-CONTINUITY-LIFECYCLE.member.continuity.request_rollover.production-path",
+        "MCP-TOOL-CONTINUITY-LIFECYCLE.signed-product.forge-conductor-cli",
+        "MCP-TOOL-CONTINUITY-LIFECYCLE.real-provider"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "mcp_tool_pack",
+      "id": "MCP-TOOL-RUNTIME-JOBS",
+      "name": "runtime.capabilities, process.run, shell.run, bash.run, python.run, powershell.run, job.status, job.read_output, job.cancel, job.list",
+      "parity_status": "additive",
+      "provider_required": false,
+      "required_assertions": [
+        "MCP-TOOL-RUNTIME-JOBS.member.runtime.capabilities.production-path",
+        "MCP-TOOL-RUNTIME-JOBS.member.process.run.production-path",
+        "MCP-TOOL-RUNTIME-JOBS.member.shell.run.production-path",
+        "MCP-TOOL-RUNTIME-JOBS.member.bash.run.production-path",
+        "MCP-TOOL-RUNTIME-JOBS.member.python.run.production-path",
+        "MCP-TOOL-RUNTIME-JOBS.member.powershell.run.production-path",
+        "MCP-TOOL-RUNTIME-JOBS.member.job.status.production-path",
+        "MCP-TOOL-RUNTIME-JOBS.member.job.read_output.production-path",
+        "MCP-TOOL-RUNTIME-JOBS.member.job.cancel.production-path",
+        "MCP-TOOL-RUNTIME-JOBS.member.job.list.production-path",
+        "MCP-TOOL-RUNTIME-JOBS.signed-product.forge-runtime-launcher"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-runtime-launcher"
+    },
+    {
+      "category": "mcp_tool",
+      "id": "MCP-TOOL-FS-DELETE-RECOVERY",
+      "name": "fs_delete_recovery",
+      "parity_status": "additive",
+      "provider_required": false,
+      "required_assertions": [
+        "MCP-TOOL-FS-DELETE-RECOVERY.production-path",
+        "MCP-TOOL-FS-DELETE-RECOVERY.signed-product.forge-filesystem-daemon"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-filesystem-daemon"
+    },
+    {
+      "category": "mcp",
+      "id": "MCP-CANONICAL-TOOL-CATALOG",
+      "name": "Canonical MCP and managed-provider tool definition catalog",
+      "parity_status": "additive",
+      "provider_required": false,
+      "required_assertions": [
+        "MCP-CANONICAL-TOOL-CATALOG.production-path",
+        "MCP-CANONICAL-TOOL-CATALOG.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "http",
+      "id": "HTTP-OPERATOR-SNAPSHOT",
+      "name": "GET /api/manager/operator/snapshot",
+      "parity_status": "additive",
+      "provider_required": false,
+      "required_assertions": [
+        "HTTP-OPERATOR-SNAPSHOT.production-path",
+        "HTTP-OPERATOR-SNAPSHOT.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "http",
+      "id": "HTTP-PROJECT-CONTROL",
+      "name": "Project register, status, relink, bind, and generation-reset manager routes",
+      "parity_status": "additive",
+      "provider_required": false,
+      "required_assertions": [
+        "HTTP-PROJECT-CONTROL.production-path",
+        "HTTP-PROJECT-CONTROL.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "http",
+      "id": "HTTP-RUNTIME-CANCEL",
+      "name": "POST /api/manager/runtime-jobs/cancel",
+      "parity_status": "additive",
+      "provider_required": false,
+      "required_assertions": [
+        "HTTP-RUNTIME-CANCEL.production-path",
+        "HTTP-RUNTIME-CANCEL.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "http",
+      "id": "HTTP-PROVIDER-PROBE",
+      "name": "POST /api/manager/provider/probe",
+      "parity_status": "additive",
+      "provider_required": true,
+      "required_assertions": [
+        "HTTP-PROVIDER-PROBE.production-path",
+        "HTTP-PROVIDER-PROBE.signed-product.forge-conductor-cli",
+        "HTTP-PROVIDER-PROBE.real-provider"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "http",
+      "id": "HTTP-AUTONOMY-CONTROL",
+      "name": "Autonomy status and managed-run start, status, and control routes",
+      "parity_status": "additive",
+      "provider_required": true,
+      "required_assertions": [
+        "HTTP-AUTONOMY-CONTROL.production-path",
+        "HTTP-AUTONOMY-CONTROL.signed-product.forge-conductor-cli",
+        "HTTP-AUTONOMY-CONTROL.real-provider"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "persistence",
+      "id": "DATA-CONFIG-SCHEMA-V2-SHELL",
+      "name": "Configuration schema v2 shell policy, migration backup, and receipt",
+      "parity_status": "additive",
+      "provider_required": false,
+      "required_assertions": [
+        "DATA-CONFIG-SCHEMA-V2-SHELL.production-path",
+        "DATA-CONFIG-SCHEMA-V2-SHELL.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "persistence",
+      "id": "DATA-PROJECT-CONTROL-PLANE",
+      "name": "Project identity, generation, bindings, runs, commands, and event control plane",
+      "parity_status": "additive",
+      "provider_required": false,
+      "required_assertions": [
+        "DATA-PROJECT-CONTROL-PLANE.production-path",
+        "DATA-PROJECT-CONTROL-PLANE.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "persistence",
+      "id": "DATA-PROJECT-MEMORY-STORES",
+      "name": "Project-scoped memory stores, migrations, exports, and imports",
+      "parity_status": "additive",
+      "provider_required": false,
+      "required_assertions": [
+        "DATA-PROJECT-MEMORY-STORES.production-path",
+        "DATA-PROJECT-MEMORY-STORES.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "persistence",
+      "id": "DATA-RUNTIME-JOBS",
+      "name": "Durable runtime jobs, output artifacts, identity receipts, and recovery",
+      "parity_status": "additive",
+      "provider_required": false,
+      "required_assertions": [
+        "DATA-RUNTIME-JOBS.production-path",
+        "DATA-RUNTIME-JOBS.signed-product.forge-runtime-launcher"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-runtime-launcher"
+    },
+    {
+      "category": "persistence",
+      "id": "DATA-CONTINUITY-V2",
+      "name": "Project-bound continuity v2 checkpoints, handoffs, operations, acknowledgements, and migrations",
+      "parity_status": "additive",
+      "provider_required": false,
+      "required_assertions": [
+        "DATA-CONTINUITY-V2.production-path",
+        "DATA-CONTINUITY-V2.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "persistence",
+      "id": "DATA-PROVIDER-RECEIPTS",
+      "name": "Managed-provider configuration loading, request identity, and durable response receipts",
+      "parity_status": "additive",
+      "provider_required": true,
+      "required_assertions": [
+        "DATA-PROVIDER-RECEIPTS.production-path",
+        "DATA-PROVIDER-RECEIPTS.signed-product.forge-conductor-cli",
+        "DATA-PROVIDER-RECEIPTS.real-provider"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "persistence",
+      "id": "DATA-FILESYSTEM-RECOVERY",
+      "name": "Bounded protected-filesystem quarantine and recovery ledgers",
+      "parity_status": "additive",
+      "provider_required": false,
+      "required_assertions": [
+        "DATA-FILESYSTEM-RECOVERY.production-path",
+        "DATA-FILESYSTEM-RECOVERY.signed-product.forge-filesystem-daemon"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-filesystem-daemon"
+    },
+    {
+      "category": "lifecycle",
+      "id": "RUNTIME-MANAGED-AUTONOMY",
+      "name": "Manager-owned autonomous run scheduling, controls, restart recovery, and GUI-closed execution",
+      "parity_status": "additive",
+      "provider_required": true,
+      "required_assertions": [
+        "RUNTIME-MANAGED-AUTONOMY.production-path",
+        "RUNTIME-MANAGED-AUTONOMY.signed-product.forge-conductor-cli",
+        "RUNTIME-MANAGED-AUTONOMY.real-provider"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "lifecycle",
+      "id": "RUNTIME-CONTEXT-BUDGET",
+      "name": "Manager-owned context budget observation and rollover eligibility",
+      "parity_status": "additive",
+      "provider_required": true,
+      "required_assertions": [
+        "RUNTIME-CONTEXT-BUDGET.production-path",
+        "RUNTIME-CONTEXT-BUDGET.signed-product.forge-conductor-cli",
+        "RUNTIME-CONTEXT-BUDGET.real-provider"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "integration",
+      "id": "RUNTIME-LMSTUDIO-MANAGED-PROVIDER",
+      "name": "LM Studio Responses API managed-provider adapter",
+      "parity_status": "additive",
+      "provider_required": true,
+      "required_assertions": [
+        "RUNTIME-LMSTUDIO-MANAGED-PROVIDER.production-path",
+        "RUNTIME-LMSTUDIO-MANAGED-PROVIDER.signed-product.forge-conductor-cli",
+        "RUNTIME-LMSTUDIO-MANAGED-PROVIDER.real-provider"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    },
+    {
+      "category": "integration",
+      "id": "RUNTIME-EXACT-TOOL-RECONCILIATION",
+      "name": "Canonical managed-provider tool invocation, result reconciliation, and replay fencing",
+      "parity_status": "additive",
+      "provider_required": false,
+      "required_assertions": [
+        "RUNTIME-EXACT-TOOL-RECONCILIATION.production-path",
+        "RUNTIME-EXACT-TOOL-RECONCILIATION.signed-product.forge-conductor-cli"
+      ],
+      "signing_required": true,
+      "signing_artifact": "forge-conductor-cli"
+    }
+  ],
+  "parity_summary": {
+    "additive": 38,
+    "migrated": 0,
+    "preserved": 66
+  },
+  "qualifier": {
+    "name": "forge-p10-production-matrix",
+    "version": 2
+  },
+  "registry_id": "forge-conductor-p10-feature-registry",
+  "schema_version": 1,
+  "signing_artifacts": {
+    "forge-conductor-app": {
+      "installation_kind": "app-executable",
+      "kind": "app_bundle",
+      "product_name": "Forge Conductor",
+      "relative_path": "Contents/MacOS/Forge Conductor"
+    },
+    "forge-conductor-cli": {
+      "installation_kind": "helper",
+      "kind": "executable",
+      "product_name": "forge-conductor",
+      "relative_path": "Contents/Helpers/forge-conductor"
+    },
+    "forge-filesystem-daemon": {
+      "installation_kind": "helper",
+      "kind": "executable",
+      "product_name": "forge-filesystem-daemon",
+      "relative_path": "Contents/MacOS/forge-filesystem-daemon"
+    },
+    "forge-runtime-launcher": {
+      "installation_kind": "helper",
+      "kind": "executable",
+      "product_name": "forge-runtime-launcher",
+      "relative_path": "Contents/Helpers/forge-runtime-launcher"
+    }
+  },
+  "tool_pack_members": {
+    "MCP-TOOL-CONTINUITY-LIFECYCLE": [
+      "continuity.checkpoint",
+      "continuity.prepare_handoff",
+      "continuity.get_pending_handoff",
+      "continuity.acknowledge_handoff",
+      "continuity.resume",
+      "continuity.status",
+      "continuity.request_rollover"
+    ],
+    "MCP-TOOL-FILESYSTEM": [
+      "fs_read",
+      "fs_write",
+      "fs_edit",
+      "fs_list",
+      "fs_glob",
+      "fs_mkdir",
+      "fs_delete",
+      "fs_move"
+    ],
+    "MCP-TOOL-GIT": [
+      "git_status",
+      "git_diff",
+      "git_log",
+      "git_add",
+      "git_commit"
+    ],
+    "MCP-TOOL-MEMORY": [
+      "memory_set",
+      "memory_get",
+      "memory_list",
+      "memory_search",
+      "memory_delete"
+    ],
+    "MCP-TOOL-PDF": [
+      "pdf_write",
+      "pdf_from_file"
+    ],
+    "MCP-TOOL-PROJECT-MEMORY": [
+      "project_memory.initialize",
+      "project_memory.remember",
+      "project_memory.remember_batch",
+      "project_memory.search",
+      "project_memory.get",
+      "project_memory.update",
+      "project_memory.forget",
+      "project_memory.list_recent",
+      "project_memory.link",
+      "project_memory.export",
+      "project_memory.import",
+      "project_memory.status"
+    ],
+    "MCP-TOOL-RUNTIME-JOBS": [
+      "runtime.capabilities",
+      "process.run",
+      "shell.run",
+      "bash.run",
+      "python.run",
+      "powershell.run",
+      "job.status",
+      "job.read_output",
+      "job.cancel",
+      "job.list"
+    ]
+  }
+}

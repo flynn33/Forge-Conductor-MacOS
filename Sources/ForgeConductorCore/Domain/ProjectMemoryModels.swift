@@ -106,6 +106,76 @@ public struct ProjectMemoryDescriptor: Sendable, Equatable {
     }
 }
 
+/// Result of proving that a user-selected directory is another checkout or
+/// location of an already registered Git repository. The identity is inferred
+/// from the selected directory itself; callers cannot supply it.
+struct ProjectDirectoryIdentity: Sendable, Equatable {
+    let device: UInt64
+    let inode: UInt64
+}
+
+/// One independently discovered filesystem target. The raw namespace path is
+/// resolved exactly once; subsequent registration and relink transitions carry
+/// this value rather than resolving caller-controlled path text again.
+struct ProjectIdentityTarget: Sendable, Equatable {
+    let canonicalRoot: URL
+    let repositoryIdentity: String?
+    let directoryIdentity: ProjectDirectoryIdentity
+}
+
+struct ProjectRegistrationIdentityPreparation: Sendable, Equatable {
+    let operationID: String
+    let descriptor: ProjectMemoryDescriptor
+    let target: ProjectIdentityTarget
+    /// Nil proves that no control-plane row existed when the candidate was
+    /// captured. A value binds replay to that exact live generation.
+    let expectedControlGeneration: ProjectGeneration?
+    /// Nil accompanies an absent control row. A value prevents an unrelated
+    /// maintenance transition from being mistaken for registration recovery.
+    let expectedControlLifecycleState: ProjectLifecycleState?
+    /// The fingerprint captured from the same control-plane generation. This
+    /// distinguishes an exact no-op registration from a fenced legacy-null
+    /// repository-identity adoption.
+    let expectedControlRepositoryIdentity: String?
+}
+
+struct PendingProjectRegistrationIdentity: Sendable, Equatable {
+    let preparation: ProjectRegistrationIdentityPreparation
+    let requestedPath: String
+    let requestedDisplayName: String?
+    let repositoryIdentityAssertion: String?
+    let createdAt: String
+}
+
+struct StagedProjectRegistrationIdentity: Sendable, Equatable {
+    let pending: PendingProjectRegistrationIdentity
+    let created: Bool
+}
+
+struct ProjectRelinkIdentityPreparation: Sendable, Equatable {
+    let operationID: String
+    let expectedGeneration: ProjectGeneration
+    let descriptor: ProjectMemoryDescriptor
+    let target: ProjectIdentityTarget
+
+    var canonicalRoot: URL { target.canonicalRoot }
+    var repositoryIdentity: String {
+        // Relink discovery requires an existing repository identity.
+        target.repositoryIdentity ?? ""
+    }
+}
+
+struct PendingProjectRelinkIdentity: Sendable, Equatable {
+    let preparation: ProjectRelinkIdentityPreparation
+    let createdAt: String
+}
+
+enum ProjectRelinkIdentityRecovery: Sendable, Equatable {
+    case none
+    case abortedUncommitted(operationID: String)
+    case publishedCommittedAlias(operationID: String)
+}
+
 public struct ProjectMemoryRecord: Sendable, Equatable {
     public var id: String
     public var projectID: String

@@ -1202,6 +1202,7 @@ def evaluate_locked_gate(
             {"path": str(stdout_path), "sha256": stdout_hash, "kind": "stdout"},
             {"path": str(stderr_path), "sha256": stderr_hash, "kind": "stderr"},
         ]
+        criteria_document: dict[str, object] = {}
         if stat_path_at(result_directory_descriptor, criteria_name) is not None:
             criteria_captured = False
             try:
@@ -1237,7 +1238,45 @@ def evaluate_locked_gate(
                         raise ValueError(
                             f"criteria_results[{index}].passed is not boolean"
                         )
-            except (EvidenceSupportError, KeyError, ValueError) as error:
+                if gate_identifier == "G10":
+                    if set(criteria_document) != {
+                        "criteria_results",
+                        "valid",
+                        "errors",
+                        "p10_feature_binding",
+                    }:
+                        raise ValueError("G10 criteria has no exact P10 feature binding")
+                    if criteria_document.get("valid") is not True or criteria_document.get("errors") != []:
+                        raise ValueError("G10 criteria is not semantically valid")
+                    from p10_feature_evidence import validate_p10_feature_binding
+
+                    run_state = load_bounded_repository_json_object(
+                        repository,
+                        ".forge-codex/state/run-state.json",
+                        label="G10 P10 binding run state",
+                        maximum_bytes=MAXIMUM_QUALIFICATION_ARTIFACT_BYTES,
+                        budget=BoundedReadBudget(
+                            MAXIMUM_QUALIFICATION_ARTIFACT_BYTES,
+                            "G10 P10 binding run state",
+                        ),
+                    )
+                    binding_failures = validate_p10_feature_binding(
+                        repository,
+                        criteria_document.get("p10_feature_binding"),
+                        current_manifest=source_identity["source_manifest"],
+                        current_git_head=source_identity["source_head"],
+                        ledger_evidence_ids={
+                            item
+                            for item in run_state.get("evidence", [])
+                            if isinstance(item, str)
+                        },
+                    )
+                    if binding_failures:
+                        raise ValueError(
+                            "G10 P10 feature binding is stale or invalid: "
+                            + "; ".join(binding_failures[:8])
+                        )
+            except (EvidenceSupportError, ImportError, KeyError, ValueError) as error:
                 criteria = [
                     {
                         "criterion": "criteria sidecar parses",

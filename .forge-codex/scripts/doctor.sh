@@ -63,6 +63,8 @@ mandatory_release_issue_ids = {
     "FC-PROJECT-ROOT-SETTINGS-001",
     "FC-PRIVILEGED-SERVICE-LIFECYCLE-001",
     "FC-PRIVILEGED-CALLER-IDENTITY-001",
+    "FC-FEATURE-OPERABILITY-001",
+    "FC-PROVIDER-CONFIG-OPERABILITY-001",
 }
 gate_deferrals = {
     "G09": "real_provider_manager_owned_rollover_evidence_required",

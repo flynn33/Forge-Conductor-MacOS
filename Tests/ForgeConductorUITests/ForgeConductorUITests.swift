@@ -108,13 +108,13 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
 
     func testRefreshToolbarExists() throws {
         let refresh = app.buttons["toolbar-refresh"]
-        if refresh.waitForExistence(timeout: 5) {
-            refresh.click()
-            XCTAssertTrue(app.windows.firstMatch.exists)
-        } else {
-            // Toolbar buttons may be icons without identifiers on some OS builds — soft pass if app is up.
-            XCTAssertTrue(app.windows.firstMatch.exists)
-        }
+        XCTAssertTrue(
+            refresh.waitForExistence(timeout: 5),
+            "The production Refresh now control must remain accessibility-visible"
+        )
+        XCTAssertTrue(refresh.isEnabled)
+        refresh.click()
+        XCTAssertTrue(app.windows.firstMatch.exists)
     }
 
     func testManagerShowsProjectShellPolicyControls() throws {
@@ -182,16 +182,97 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         }
         XCTAssertTrue(app.buttons["settings-filesystem-service-approval"].exists)
         XCTAssertTrue(app.buttons["settings-filesystem-service-refresh"].exists)
+        XCTAssertTrue(
+            app.descendants(matching: .any)[
+                "settings-filesystem-service-operational-health"
+            ].exists
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)[
+                "settings-filesystem-lifecycle-fence-status"
+            ].exists
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["settings-filesystem-recovery-debt"].exists
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["settings-filesystem-recovery-policy"].exists
+        )
+        XCTAssertTrue(app.buttons["settings-filesystem-recovery-reconcile"].exists)
         XCTAssertTrue(app.buttons["settings-allowed-root-add"].exists)
         XCTAssertTrue(
             app.descendants(matching: .any)["settings-allowed-roots-empty"].exists
         )
     }
 
+    func testProtectedFilesystemRefreshMutuallyExcludesEveryConflictingControl() throws {
+        app.terminate()
+        app.launchEnvironment["FORGE_FILESYSTEM_SETTINGS_UI_TEST_DELAY_MS"] = "1200"
+        app.launch()
+        app.typeKey(",", modifierFlags: .command)
+
+        let operationStatus = app.descendants(matching: .any)[
+            "settings-filesystem-operation-status"
+        ]
+        XCTAssertTrue(operationStatus.waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { self.element(operationStatus, contains: "Idle") },
+            "bootstrap observation must finish before the explicit control exercise"
+        )
+
+        let controls = [
+            app.buttons["settings-filesystem-service-enable"],
+            app.buttons["settings-filesystem-service-reinstall"],
+            app.buttons["settings-filesystem-service-disable"],
+            app.buttons["settings-filesystem-service-approval"],
+            app.buttons["settings-filesystem-service-refresh"],
+            app.buttons["settings-filesystem-recovery-reconcile"],
+        ]
+        for control in controls {
+            XCTAssertTrue(control.exists)
+        }
+
+        let refresh = controls[4]
+        XCTAssertTrue(refresh.isEnabled)
+        makeHittable(refresh)
+        refresh.click()
+
+        XCTAssertTrue(
+            waitUntil(timeout: 3) {
+                self.element(operationStatus, contains: "Refreshing")
+                    && controls.allSatisfy { !$0.isEnabled }
+            },
+            "all protected-filesystem controls must disable during Refresh"
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["settings-filesystem-service-status"].exists
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)[
+                "settings-filesystem-service-operational-health"
+            ].exists
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["settings-filesystem-recovery-debt"].exists
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["settings-filesystem-operation-progress"].exists
+        )
+
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                self.element(operationStatus, contains: "Idle") && refresh.isEnabled
+            },
+            "Refresh must return the shared operation gate to idle"
+        )
+    }
+
     private func element(_ element: XCUIElement, contains text: String) -> Bool {
-        if element.staticTexts[text].exists { return true }
         if element.label.localizedCaseInsensitiveContains(text) { return true }
-        return (element.value as? String)?.localizedCaseInsensitiveContains(text) == true
+        if (element.value as? String)?.localizedCaseInsensitiveContains(text) == true { return true }
+        return element.descendants(matching: .staticText)
+            .matching(NSPredicate(format: "label CONTAINS[c] %@", text))
+            .firstMatch.exists
     }
 
     func testManagerSettingsControlsAndPersistsProjectShellPolicy() throws {
@@ -354,6 +435,359 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         )
     }
 
+    func testContinuityControlsSendTypedActionsAndSurfaceManagerRejection() throws {
+        let fixture = try OperatorManagerUITestFixture()
+        relaunch(with: fixture)
+
+        let continuity = app.buttons["tab-continuity"]
+        XCTAssertTrue(continuity.waitForExistence(timeout: 8))
+        continuity.click()
+
+        let checkpoint = app.buttons["checkpoint-command"]
+        let rollover = app.buttons["rollover-command"]
+        XCTAssertTrue(waitForEnabled(checkpoint, timeout: 5))
+        XCTAssertTrue(waitForEnabled(rollover, timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["continuity-controls-authority"].exists)
+        XCTAssertTrue(
+            element(
+                app.descendants(matching: .any)["continuity-control-eligibility"],
+                contains: "manager will still verify"
+            )
+        )
+
+        makeHittable(checkpoint)
+        checkpoint.click()
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            fixture.controlActions == ["checkpoint"]
+        })
+        XCTAssertEqual(fixture.mutationAuthorizationCount, 1)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["operator-notice"].waitForExistence(timeout: 5)
+        )
+
+        fixture.completeContinuityCycle()
+        let refresh = app.buttons["operator-refresh"]
+        XCTAssertTrue(waitForEnabled(refresh, timeout: 5))
+        refresh.click()
+        XCTAssertTrue(waitForEnabled(rollover, timeout: 5))
+        makeHittable(rollover)
+        rollover.click()
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            fixture.controlActions == ["checkpoint", "rollover"]
+        })
+        XCTAssertEqual(fixture.mutationAuthorizationCount, 2)
+
+        fixture.completeContinuityCycle()
+        fixture.rejectNextContinuityCommand()
+        XCTAssertTrue(waitForEnabled(refresh, timeout: 5))
+        refresh.click()
+        XCTAssertTrue(waitForEnabled(checkpoint, timeout: 5))
+        makeHittable(checkpoint)
+        checkpoint.click()
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            fixture.controlActions == ["checkpoint", "rollover", "checkpoint"]
+        })
+        let commandError = app.descendants(matching: .any)["continuity-command-error"]
+        XCTAssertTrue(commandError.waitForExistence(timeout: 5))
+        XCTAssertTrue(element(commandError, contains: "current usage observation"))
+        XCTAssertEqual(fixture.mutationAuthorizationCount, 3)
+    }
+
+    func testProviderControlsSendExactProtectedRequestsAndSurfaceSuccessAndFailure() throws {
+        let fixture = try OperatorManagerUITestFixture(failContractProbe: true)
+        relaunch(with: fixture)
+
+        let provider = app.buttons["tab-provider"]
+        XCTAssertTrue(provider.waitForExistence(timeout: 8))
+        provider.click()
+
+        let testConnection = app.buttons["provider-test-connection"]
+        XCTAssertTrue(waitForEnabled(testConnection, timeout: 5))
+        makeHittable(testConnection)
+        testConnection.click()
+
+        let expectedConnection = OperatorManagerUITestFixture.ProviderProbeRecord(
+            adapterID: "forge.native-session-host",
+            mode: "connection"
+        )
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            fixture.providerProbeRecords == [expectedConnection]
+        })
+        XCTAssertEqual(fixture.providerProbeAuthorizationCount, 1)
+        XCTAssertEqual(
+            fixture.providerProbeBodies.map { String(decoding: $0, as: UTF8.self) },
+            ["{\"adapter_id\":\"forge.native-session-host\",\"mode\":\"connection\"}"]
+        )
+        let notice = app.descendants(matching: .any)["provider-probe-notice"]
+        XCTAssertTrue(notice.waitForExistence(timeout: 5))
+        XCTAssertTrue(element(notice, contains: "configured provider and model are reachable"))
+
+        let runContractProbe = app.buttons["provider-run-contract-probe"]
+        XCTAssertTrue(waitForEnabled(runContractProbe, timeout: 5))
+        makeHittable(runContractProbe)
+        runContractProbe.click()
+
+        let expectedContract = OperatorManagerUITestFixture.ProviderProbeRecord(
+            adapterID: "forge.native-session-host",
+            mode: "contract"
+        )
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            fixture.providerProbeRecords == [expectedConnection, expectedContract]
+        })
+        XCTAssertEqual(fixture.providerProbeAuthorizationCount, 2)
+        XCTAssertEqual(
+            fixture.providerProbeBodies.map { String(decoding: $0, as: UTF8.self) },
+            [
+                "{\"adapter_id\":\"forge.native-session-host\",\"mode\":\"connection\"}",
+                "{\"adapter_id\":\"forge.native-session-host\",\"mode\":\"contract\"}",
+            ]
+        )
+
+        let structuredFailure = app.descendants(matching: .any)["operator-unavailable"]
+        XCTAssertTrue(structuredFailure.waitForExistence(timeout: 5))
+        XCTAssertTrue(element(structuredFailure, contains: "HTTP 422"))
+        XCTAssertTrue(element(structuredFailure, contains: "Provider contract probe failed"))
+        XCTAssertTrue(element(structuredFailure, contains: "custom tools"))
+        let lastProbeError = app.descendants(matching: .any)["provider-last-probe-error"]
+        XCTAssertTrue(lastProbeError.waitForExistence(timeout: 5))
+        XCTAssertTrue(element(lastProbeError, contains: "custom tools"))
+    }
+
+    func testRuntimeCancelUsesProtectedTypedRequestAndReconcilesSuccessAndRejection() throws {
+        let fixture = try OperatorManagerUITestFixture()
+        relaunch(with: fixture)
+
+        let runtimes = app.buttons["tab-runtimes"]
+        XCTAssertTrue(runtimes.waitForExistence(timeout: 8))
+        runtimes.click()
+
+        let state = app.descendants(matching: .any)["runtime-job-state"]
+        let cancel = app.buttons["runtime-job-cancel"]
+        XCTAssertTrue(state.waitForExistence(timeout: 5))
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5), "The actual Cancel Job control must be visible")
+        XCTAssertTrue(element(state, contains: "queued"))
+        XCTAssertTrue(cancel.isEnabled, "A queued runtime job must be cancellable")
+
+        fixture.setRuntimeJobState("running")
+        refreshOperator()
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            self.element(state, contains: "running") && cancel.isEnabled
+        })
+
+        for noncancellableState in [
+            "cancelling", "completed", "failed", "timed_out", "cancelled", "quarantined_stale",
+        ] {
+            fixture.setRuntimeJobState(noncancellableState)
+            refreshOperator()
+            XCTAssertTrue(waitUntil(timeout: 5) {
+                self.element(state, contains: noncancellableState)
+            })
+            XCTAssertFalse(
+                cancel.isEnabled,
+                "Cancel Job must be disabled for \(noncancellableState) jobs"
+            )
+        }
+
+        fixture.setRuntimeJobState("running")
+        refreshOperator()
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            self.element(state, contains: "running") && cancel.isEnabled
+        })
+        makeHittable(cancel)
+        cancel.click()
+
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            fixture.runtimeCancellationJobIDs == [fixture.runtimeJobID]
+        })
+        XCTAssertEqual(fixture.runtimeCancellationAuthorizationCount, 1)
+        XCTAssertEqual(fixture.mutationAuthorizationCount, 1)
+        XCTAssertEqual(
+            fixture.runtimeCancellationBodies.map { String(decoding: $0, as: UTF8.self) },
+            ["{\"job_id\":\"\(fixture.runtimeJobID)\"}"]
+        )
+        let notice = app.descendants(matching: .any)["operator-notice"]
+        XCTAssertTrue(notice.waitForExistence(timeout: 5))
+        XCTAssertTrue(element(notice, contains: fixture.runtimeJobID))
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            self.element(state, contains: "cancelled") && !cancel.isEnabled
+        })
+
+        fixture.setRuntimeJobState("queued")
+        fixture.rejectNextRuntimeCancellation()
+        refreshOperator()
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            self.element(state, contains: "queued") && cancel.isEnabled
+        })
+        makeHittable(cancel)
+        cancel.click()
+
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            fixture.runtimeCancellationJobIDs == [fixture.runtimeJobID, fixture.runtimeJobID]
+        })
+        XCTAssertEqual(fixture.runtimeCancellationAuthorizationCount, 2)
+        XCTAssertEqual(fixture.mutationAuthorizationCount, 2)
+        let rejection = app.descendants(matching: .any)["operator-unavailable"]
+        XCTAssertTrue(rejection.waitForExistence(timeout: 5))
+        XCTAssertTrue(element(rejection, contains: "fixture rejected runtime cancellation"))
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            self.element(state, contains: "queued") && cancel.isEnabled
+        })
+    }
+
+    func testProjectsRelinkControlUsesExactSelectionAndReconcilesViewModel() throws {
+        let selectedRoot = testHome.appendingPathComponent(
+            "fixture-project-relinked",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: selectedRoot,
+            withIntermediateDirectories: true
+        )
+        let fixture = try OperatorManagerUITestFixture()
+        app.launchEnvironment["FORGE_PROJECT_RELINK_UI_TEST_SELECTION"] = selectedRoot.path
+        relaunch(with: fixture)
+
+        let projects = app.buttons["tab-projects"]
+        XCTAssertTrue(projects.waitForExistence(timeout: 8))
+        projects.click()
+
+        let relink = app.buttons["project-relink"]
+        XCTAssertTrue(relink.waitForExistence(timeout: 5))
+        XCTAssertTrue(relink.isEnabled)
+        makeHittable(relink)
+        relink.click()
+
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            fixture.relinkRequestCount == 1
+                && fixture.projectGeneration == 5
+                && fixture.projectRoot == selectedRoot.standardizedFileURL.path
+        })
+        XCTAssertEqual(fixture.mutationAuthorizationCount, 1)
+        let notice = app.descendants(matching: .any)["operator-notice"]
+        XCTAssertTrue(notice.waitForExistence(timeout: 5))
+        XCTAssertTrue(element(notice, contains: "generation 5"))
+        let canonicalRoot = app.descendants(matching: .any)["project-canonical-root"]
+        XCTAssertTrue(canonicalRoot.waitForExistence(timeout: 5))
+        XCTAssertTrue(element(canonicalRoot, contains: selectedRoot.standardizedFileURL.path))
+        XCTAssertTrue(element(app.descendants(matching: .any)["project-generation"], contains: "5"))
+    }
+
+    func testProjectsRelinkLostResponseReplaysExactRequestAndShowsReconciledReceipt() throws {
+        let selectedRoot = testHome.appendingPathComponent(
+            "fixture-project-relinked-lost-response",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: selectedRoot,
+            withIntermediateDirectories: true
+        )
+        let fixture = try OperatorManagerUITestFixture(dropFirstRelinkResponse: true)
+        app.launchEnvironment["FORGE_PROJECT_RELINK_UI_TEST_SELECTION"] = selectedRoot.path
+        relaunch(with: fixture)
+
+        let projects = app.buttons["tab-projects"]
+        XCTAssertTrue(projects.waitForExistence(timeout: 8))
+        projects.click()
+        let relink = app.buttons["project-relink"]
+        XCTAssertTrue(relink.waitForExistence(timeout: 5))
+        makeHittable(relink)
+        relink.click()
+
+        XCTAssertTrue(waitUntil(timeout: 8) {
+            fixture.relinkRequestCount == 2
+                && fixture.projectGeneration == 5
+                && fixture.projectRoot == selectedRoot.standardizedFileURL.path
+        })
+        XCTAssertEqual(fixture.mutationAuthorizationCount, 2)
+        let notice = app.descendants(matching: .any)["operator-notice"]
+        XCTAssertTrue(notice.waitForExistence(timeout: 5))
+        XCTAssertTrue(element(notice, contains: "Reconciled"))
+        XCTAssertFalse(app.buttons["project-relink-reconcile"].exists)
+    }
+
+    func testProjectsRelinkBothAutomaticResponsesLostOffersManualExactReconciliation() throws {
+        let selectedRoot = testHome.appendingPathComponent(
+            "fixture-project-relinked-two-lost-responses",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: selectedRoot,
+            withIntermediateDirectories: true
+        )
+        let fixture = try OperatorManagerUITestFixture(dropRelinkResponseCount: 2)
+        app.launchEnvironment["FORGE_PROJECT_RELINK_UI_TEST_SELECTION"] = selectedRoot.path
+        relaunch(with: fixture)
+
+        let projects = app.buttons["tab-projects"]
+        XCTAssertTrue(projects.waitForExistence(timeout: 8))
+        projects.click()
+        let relink = app.buttons["project-relink"]
+        XCTAssertTrue(relink.waitForExistence(timeout: 5))
+        makeHittable(relink)
+        relink.click()
+
+        let reconcile = app.buttons["project-relink-reconcile"]
+        XCTAssertTrue(reconcile.waitForExistence(timeout: 8))
+        XCTAssertEqual(fixture.relinkRequestCount, 2)
+        XCTAssertEqual(fixture.projectGeneration, 5)
+        XCTAssertEqual(
+            fixture.projectRoot,
+            selectedRoot.standardizedFileURL.path
+        )
+        makeHittable(reconcile)
+        reconcile.click()
+
+        XCTAssertTrue(waitUntil(timeout: 8) {
+            fixture.relinkRequestCount == 3
+        })
+        XCTAssertEqual(fixture.projectGeneration, 5)
+        XCTAssertEqual(fixture.mutationAuthorizationCount, 3)
+        let notice = app.descendants(matching: .any)["operator-notice"]
+        XCTAssertTrue(notice.waitForExistence(timeout: 5))
+        XCTAssertTrue(element(notice, contains: "Reconciled"))
+        XCTAssertFalse(reconcile.exists)
+    }
+
+    func testProjectsRelinkRejectionOffersExactManualReconciliation() throws {
+        let selectedRoot = testHome.appendingPathComponent(
+            "fixture-project-relinked-manual-reconcile",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: selectedRoot,
+            withIntermediateDirectories: true
+        )
+        let fixture = try OperatorManagerUITestFixture(rejectFirstRelinkResponse: true)
+        app.launchEnvironment["FORGE_PROJECT_RELINK_UI_TEST_SELECTION"] = selectedRoot.path
+        relaunch(with: fixture)
+
+        let projects = app.buttons["tab-projects"]
+        XCTAssertTrue(projects.waitForExistence(timeout: 8))
+        projects.click()
+        let relink = app.buttons["project-relink"]
+        XCTAssertTrue(relink.waitForExistence(timeout: 5))
+        makeHittable(relink)
+        relink.click()
+
+        let reconcile = app.buttons["project-relink-reconcile"]
+        XCTAssertTrue(reconcile.waitForExistence(timeout: 5))
+        XCTAssertEqual(fixture.relinkRequestCount, 1)
+        XCTAssertEqual(fixture.projectGeneration, 4)
+        makeHittable(reconcile)
+        reconcile.click()
+
+        XCTAssertTrue(waitUntil(timeout: 8) {
+            fixture.relinkRequestCount == 2
+                && fixture.projectGeneration == 5
+                && fixture.projectRoot == selectedRoot.standardizedFileURL.path
+        })
+        XCTAssertEqual(fixture.mutationAuthorizationCount, 2)
+        let notice = app.descendants(matching: .any)["operator-notice"]
+        XCTAssertTrue(notice.waitForExistence(timeout: 5))
+        XCTAssertTrue(element(notice, contains: "generation 5"))
+        XCTAssertFalse(reconcile.exists)
+    }
+
     func testUncertainStartReusesExactClientRunIdentityDuringReconciliation() throws {
         let fixture = try OperatorManagerUITestFixture(failStartResponse: true)
         relaunch(with: fixture)
@@ -373,7 +807,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         mission.click()
         mission.typeText("Continue the fixture mission")
         tools.click()
-        tools.typeText("project.memory.search")
+        tools.typeText("project_memory.search")
         gates.click()
         gates.typeText("tests")
 
@@ -404,6 +838,43 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             "Reconciliation must replay the exact retained request body"
         )
         XCTAssertEqual(fixture.mutationAuthorizationCount, 2)
+    }
+
+    func testInvalidAllowedToolIsRejectedWithoutReconciliation() throws {
+        let fixture = try OperatorManagerUITestFixture()
+        relaunch(with: fixture)
+
+        let autonomy = app.buttons["tab-autonomy"]
+        XCTAssertTrue(autonomy.waitForExistence(timeout: 8))
+        autonomy.click()
+
+        let start = app.buttons["autonomy-start"]
+        XCTAssertTrue(waitForEnabled(start, timeout: 5))
+        start.click()
+
+        let mission = app.descendants(matching: .any)["run-start-mission"]
+        let tools = app.descendants(matching: .any)["run-start-tool-policy"]
+        let gates = app.descendants(matching: .any)["run-start-completion-gates"]
+        XCTAssertTrue(mission.waitForExistence(timeout: 5))
+        mission.click()
+        mission.typeText("Reject an invalid tool policy")
+        tools.click()
+        tools.typeText("project.memory.search")
+        gates.click()
+        gates.typeText("tests")
+
+        let confirm = app.buttons["run-start-confirm"]
+        XCTAssertTrue(waitForEnabled(confirm, timeout: 3))
+        confirm.click()
+
+        let error = app.descendants(matching: .any)["run-start-error"]
+        XCTAssertTrue(error.waitForExistence(timeout: 5))
+        XCTAssertTrue(element(error, contains: "autonomy_tool_configuration_invalid"))
+        XCTAssertFalse(app.buttons["run-start-reconcile"].exists)
+        XCTAssertTrue(waitForEnabled(confirm, timeout: 3))
+        XCTAssertEqual(fixture.startRequestCount, 1)
+        XCTAssertEqual(fixture.mutationAuthorizationCount, 1)
+        XCTAssertTrue(fixture.acceptedStartRunID.isEmpty)
     }
 
     func testCollapsedNavigationCanBeRestored() throws {
@@ -446,6 +917,13 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         operatorFixture = fixture
         app.launchEnvironment["FORGE_OPERATOR_UI_TEST_PORT"] = String(fixture.port)
         app.launch()
+    }
+
+    private func refreshOperator() {
+        let refresh = app.buttons["operator-refresh"]
+        XCTAssertTrue(waitForEnabled(refresh, timeout: 5))
+        makeHittable(refresh)
+        refresh.click()
     }
 
     private func waitForValue(_ value: String, on element: XCUIElement, timeout: TimeInterval = 5) -> Bool {
@@ -516,24 +994,50 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
 private final class OperatorManagerUITestFixture: @unchecked Sendable {
     private static let maximumRequestBytes = 64 * 1_024
 
+    struct ProviderProbeRecord: Equatable {
+        let adapterID: String
+        let mode: String
+    }
+
     let projectID = "11111111-1111-4111-8111-111111111111"
     let runID = "22222222-2222-4222-8222-222222222222"
+    let runtimeJobID = "33333333-3333-4333-8333-333333333333"
 
     private let listener: NWListener
     private let queue = DispatchQueue(label: "forge.operator-ui-fixture")
     private let lock = NSLock()
     private let failStartResponse: Bool
+    private let failContractProbe: Bool
+    private let dropRelinkResponseCount: Int
+    private let rejectFirstRelinkResponse: Bool
     private var mutableRunState = "running"
     private var mutableStartRequestCount = 0
     private var mutableControlRequestCount = 0
     private var mutableMutationAuthorizationCount = 0
     private var mutableStartRequestRunIDs: [String] = []
     private var mutableStartRequestBodies: [Data] = []
+    private var mutableControlActions: [String] = []
+    private var mutableRejectNextContinuityCommand = false
     private var mutableAcceptedStart = false
     private var mutableAcceptedStartRunID: String?
     private var mutableShellEnabled = true
     private var mutableAllowedRoots: [String] = []
     private var mutableSettingsUpdateCount = 0
+    private var mutableProjectRoot = "/tmp/forge-operator-fixture"
+    private var mutableProjectGeneration: UInt64 = 4
+    private var mutableRelinkRequestCount = 0
+    private var mutableProviderProbeRecords: [ProviderProbeRecord] = []
+    private var mutableProviderProbeBodies: [Data] = []
+    private var mutableProviderProbeAuthorizationCount = 0
+    private var mutableProviderHealth = "healthy"
+    private var mutableProviderLastProbeMode: String?
+    private var mutableProviderLastProbeError: String?
+    private var mutableProviderLastProbeAt: String?
+    private var mutableRuntimeJobState = "queued"
+    private var mutableRuntimeCancellationJobIDs: [String] = []
+    private var mutableRuntimeCancellationBodies: [Data] = []
+    private var mutableRuntimeCancellationAuthorizationCount = 0
+    private var mutableRejectNextRuntimeCancellation = false
     private(set) var port: UInt16 = 0
 
     var startRequestCount: Int { locked { mutableStartRequestCount } }
@@ -541,13 +1045,39 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     var mutationAuthorizationCount: Int { locked { mutableMutationAuthorizationCount } }
     var startRequestRunIDs: [String] { locked { mutableStartRequestRunIDs } }
     var startRequestBodies: [Data] { locked { mutableStartRequestBodies } }
+    var controlActions: [String] { locked { mutableControlActions } }
     var acceptedStartRunID: String { locked { mutableAcceptedStartRunID ?? "" } }
     var shellEnabled: Bool { locked { mutableShellEnabled } }
     var allowedRoots: [String] { locked { mutableAllowedRoots } }
     var settingsUpdateCount: Int { locked { mutableSettingsUpdateCount } }
+    var projectRoot: String { locked { mutableProjectRoot } }
+    var projectGeneration: UInt64 { locked { mutableProjectGeneration } }
+    var relinkRequestCount: Int { locked { mutableRelinkRequestCount } }
+    var providerProbeRecords: [ProviderProbeRecord] { locked { mutableProviderProbeRecords } }
+    var providerProbeBodies: [Data] { locked { mutableProviderProbeBodies } }
+    var providerProbeAuthorizationCount: Int {
+        locked { mutableProviderProbeAuthorizationCount }
+    }
+    var runtimeCancellationJobIDs: [String] { locked { mutableRuntimeCancellationJobIDs } }
+    var runtimeCancellationBodies: [Data] { locked { mutableRuntimeCancellationBodies } }
+    var runtimeCancellationAuthorizationCount: Int {
+        locked { mutableRuntimeCancellationAuthorizationCount }
+    }
 
-    init(failStartResponse: Bool = false) throws {
+    init(
+        failStartResponse: Bool = false,
+        failContractProbe: Bool = false,
+        dropFirstRelinkResponse: Bool = false,
+        dropRelinkResponseCount: Int = 0,
+        rejectFirstRelinkResponse: Bool = false
+    ) throws {
         self.failStartResponse = failStartResponse
+        self.failContractProbe = failContractProbe
+        self.dropRelinkResponseCount = max(
+            dropRelinkResponseCount,
+            dropFirstRelinkResponse ? 1 : 0
+        )
+        self.rejectFirstRelinkResponse = rejectFirstRelinkResponse
         listener = try NWListener(using: .tcp, on: .any)
 
         let ready = DispatchSemaphore(value: 0)
@@ -585,6 +1115,30 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
 
     func stop() {
         listener.cancel()
+    }
+
+    func completeContinuityCycle() {
+        locked {
+            mutableRunState = "running"
+        }
+    }
+
+    func rejectNextContinuityCommand() {
+        locked {
+            mutableRejectNextContinuityCommand = true
+        }
+    }
+
+    func setRuntimeJobState(_ state: String) {
+        locked {
+            mutableRuntimeJobState = state
+        }
+    }
+
+    func rejectNextRuntimeCancellation() {
+        locked {
+            mutableRejectNextRuntimeCancellation = true
+        }
     }
 
     private func accept(_ connection: NWConnection) {
@@ -684,28 +1238,213 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
                 ],
                 to: connection
             )
+        case "/api/manager/projects/status":
+            respond(status: 200, object: project(), to: connection)
+        case "/api/manager/projects/relink":
+            guard request.headers["authorization"]?.hasPrefix("Bearer ") == true,
+                  let object = try? JSONSerialization.jsonObject(with: request.body) as? [String: Any],
+                  Set(object.keys) == ["project_id", "project_generation", "path"],
+                  object["project_id"] as? String == projectID,
+                  let generation = (object["project_generation"] as? NSNumber)?.uint64Value,
+                  let path = object["path"] as? String,
+                  !path.isEmpty else {
+                respond(status: 401, object: ["message": "missing relink authority or identity"], to: connection)
+                return
+            }
+            let canonicalPath = URL(fileURLWithPath: path, isDirectory: true)
+                .standardizedFileURL.path
+            let outcome = locked { () -> (status: Int, receipt: [String: Any], drop: Bool) in
+                mutableRelinkRequestCount += 1
+                mutableMutationAuthorizationCount += 1
+                if rejectFirstRelinkResponse, mutableRelinkRequestCount == 1 {
+                    return (
+                        409,
+                        ["message": "fixture rejected the first relink request"],
+                        false
+                    )
+                }
+                if generation == mutableProjectGeneration {
+                    let prior = mutableProjectGeneration
+                    mutableProjectGeneration += 1
+                    mutableProjectRoot = canonicalPath
+                    return (
+                        200,
+                        [
+                            "project_id": projectID,
+                            "canonical_root": mutableProjectRoot,
+                            "prior_generation": prior,
+                            "new_generation": mutableProjectGeneration,
+                            "invalidated_binding_count": 0,
+                            "completed_at": "2026-08-31T12:00:00Z",
+                            "reconciled": false,
+                        ],
+                        mutableRelinkRequestCount <= dropRelinkResponseCount
+                    )
+                }
+                let prior = generation
+                let next = generation.addingReportingOverflow(1)
+                if !next.overflow,
+                   next.partialValue == mutableProjectGeneration,
+                   canonicalPath == mutableProjectRoot {
+                    return (
+                        200,
+                        [
+                            "project_id": projectID,
+                            "canonical_root": mutableProjectRoot,
+                            "prior_generation": prior,
+                            "new_generation": mutableProjectGeneration,
+                            "invalidated_binding_count": 0,
+                            "completed_at": "2026-08-31T12:00:00Z",
+                            "reconciled": true,
+                        ],
+                        mutableRelinkRequestCount <= dropRelinkResponseCount
+                    )
+                }
+                return (409, ["message": "stale project generation"], false)
+            }
+            if outcome.drop {
+                dropResponseAfterPartialBody(to: connection)
+            } else {
+                respond(status: outcome.status, object: outcome.receipt, to: connection)
+            }
+        case "/api/manager/provider/probe":
+            guard request.headers["authorization"]?.hasPrefix("Bearer ") == true,
+                  let object = try? JSONSerialization.jsonObject(with: request.body) as? [String: Any],
+                  Set(object.keys) == ["adapter_id", "mode"],
+                  let adapterID = object["adapter_id"] as? String,
+                  adapterID == "forge.native-session-host",
+                  let mode = object["mode"] as? String,
+                  mode == "connection" || mode == "contract" else {
+                respond(
+                    status: 401,
+                    object: [
+                        "code": "invalid_provider_probe",
+                        "message": "missing provider probe authority or exact typed payload",
+                    ],
+                    to: connection
+                )
+                return
+            }
+            let rejected = locked { () -> Bool in
+                mutableProviderProbeRecords.append(
+                    ProviderProbeRecord(adapterID: adapterID, mode: mode)
+                )
+                mutableProviderProbeBodies.append(request.body)
+                mutableProviderProbeAuthorizationCount += 1
+                mutableMutationAuthorizationCount += 1
+                mutableProviderLastProbeMode = mode
+                mutableProviderLastProbeAt = "2026-08-31T12:00:00Z"
+                if failContractProbe, mode == "contract" {
+                    mutableProviderHealth = "contract_invalid"
+                    mutableProviderLastProbeError = "Provider contract probe failed: required capabilities are absent: custom tools"
+                    return true
+                }
+                mutableProviderHealth = mode == "contract" ? "contract_valid" : "reachable"
+                mutableProviderLastProbeError = nil
+                return false
+            }
+            if rejected {
+                respond(
+                    status: 422,
+                    object: [
+                        "ok": false,
+                        "code": "provider_contract_unavailable",
+                        "message": "Provider contract probe failed: required capabilities are absent: custom tools",
+                    ],
+                    to: connection
+                )
+            } else {
+                respond(status: 200, object: provider(), to: connection)
+            }
+        case "/api/manager/runtime-jobs/cancel":
+            guard request.headers["authorization"]?.hasPrefix("Bearer ") == true,
+                  let object = try? JSONSerialization.jsonObject(with: request.body) as? [String: Any],
+                  Set(object.keys) == ["job_id"],
+                  let jobID = object["job_id"] as? String,
+                  jobID == runtimeJobID else {
+                respond(
+                    status: 401,
+                    object: [
+                        "code": "invalid_runtime_job_cancel",
+                        "message": "missing runtime cancellation authority or exact typed job identity",
+                    ],
+                    to: connection
+                )
+                return
+            }
+            let rejected = locked { () -> Bool in
+                mutableRuntimeCancellationJobIDs.append(jobID)
+                mutableRuntimeCancellationBodies.append(request.body)
+                mutableRuntimeCancellationAuthorizationCount += 1
+                mutableMutationAuthorizationCount += 1
+                if mutableRejectNextRuntimeCancellation {
+                    mutableRejectNextRuntimeCancellation = false
+                    return true
+                }
+                mutableRuntimeJobState = "cancelled"
+                return false
+            }
+            if rejected {
+                respond(
+                    status: 409,
+                    object: [
+                        "ok": false,
+                        "code": "runtime_job_invalid_transition",
+                        "message": "fixture rejected runtime cancellation",
+                    ],
+                    to: connection
+                )
+            } else {
+                respond(status: 200, object: runtimeJob(), to: connection)
+            }
         case "/api/manager/runs/control":
-            guard request.headers["authorization"]?.hasPrefix("Bearer ") == true else {
+            guard request.headers["authorization"]?.hasPrefix("Bearer ") == true,
+                  let object = try? JSONSerialization.jsonObject(with: request.body) as? [String: Any],
+                  Set(object.keys) == ["run_id", "action"],
+                  object["run_id"] as? String == runID,
+                  let action = object["action"] as? String,
+                  ["pause", "resume", "cancel", "retry", "checkpoint", "rollover"].contains(action) else {
                 respond(status: 401, object: ["message": "missing manager authorization"], to: connection)
                 return
             }
-            let body = String(data: request.body, encoding: .utf8) ?? ""
             let nextState: String
-            if body.contains("\"action\":\"pause\"") {
+            if action == "pause" {
                 nextState = "paused"
-            } else if body.contains("\"action\":\"resume\"") {
+            } else if action == "resume" {
                 nextState = "running"
-            } else if body.contains("\"action\":\"cancel\"") {
+            } else if action == "cancel" {
                 nextState = "cancel_requested"
+            } else if action == "checkpoint" {
+                nextState = "checkpointing"
+            } else if action == "rollover" {
+                nextState = "rolling_over"
             } else {
                 nextState = "recovering"
             }
-            locked {
-                mutableRunState = nextState
+            let rejected = locked { () -> Bool in
+                mutableControlActions.append(action)
                 mutableControlRequestCount += 1
                 mutableMutationAuthorizationCount += 1
+                if mutableRejectNextContinuityCommand,
+                   action == "checkpoint" || action == "rollover" {
+                    mutableRejectNextContinuityCommand = false
+                    return true
+                }
+                mutableRunState = nextState
+                return false
             }
-            respond(status: 200, object: run(state: nextState), to: connection)
+            if rejected {
+                respond(
+                    status: 409,
+                    object: [
+                        "code": "context_observation_required",
+                        "message": "A current usage observation is required",
+                    ],
+                    to: connection
+                )
+            } else {
+                respond(status: 200, object: run(state: nextState), to: connection)
+            }
         case "/api/manager/runs/start":
             guard request.headers["authorization"]?.hasPrefix("Bearer ") == true,
                   let object = try? JSONSerialization.jsonObject(with: request.body) as? [String: Any],
@@ -714,9 +1453,30 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
                 respond(status: 401, object: ["message": "missing manager authorization or run identity"], to: connection)
                 return
             }
+            locked { mutableMutationAuthorizationCount += 1 }
+            let allowedTools = Set(object["allowed_tools"] as? [String] ?? [])
+            let knownTools: Set<String> = ["project_memory.search"]
+            let invalidTools = allowedTools.subtracting(knownTools).sorted()
+            guard !allowedTools.isEmpty, invalidTools.isEmpty else {
+                locked {
+                    mutableStartRequestCount += 1
+                    mutableStartRequestRunIDs.append(requestedRunID)
+                    mutableStartRequestBodies.append(request.body)
+                }
+                respond(
+                    status: 422,
+                    object: [
+                        "ok": false,
+                        "code": "autonomy_tool_configuration_invalid",
+                        "message": "Allowed tools are not registered in this build: \(invalidTools.joined(separator: ", "))",
+                        "retryable": false,
+                    ],
+                    to: connection
+                )
+                return
+            }
             let disposition = locked { () -> (conflict: Bool, dropResponse: Bool) in
                 mutableStartRequestCount += 1
-                mutableMutationAuthorizationCount += 1
                 mutableStartRequestRunIDs.append(requestedRunID)
                 mutableStartRequestBodies.append(request.body)
                 if let accepted = mutableAcceptedStartRunID, accepted != requestedRunID {
@@ -766,28 +1526,74 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             )
         }
         return [
-            "projects": [[
-                "project_id": projectID,
-                "display_name": "Fixture Project",
-                "canonical_root": "/tmp/forge-operator-fixture",
-                "project_generation": 4,
-                "lifecycle_state": "active",
-                "bindings": [],
-                "memory": ["state": "healthy", "database_bytes": 4_096, "record_count": 2],
-                "continuity": ["state": "ready", "migration_state": "not_required"],
-                "migration_warnings": [],
-            ]],
+            "projects": [project()],
             "runs": runs,
             "continuity_operations": [],
-            "runtime_jobs": [],
-            "provider": [
-                "provider_id": "fixture-provider",
-                "health": "healthy",
-                "model_key": "fixture-model",
-                "tool_use_capable": true,
-            ],
+            "runtime_jobs": [runtimeJob()],
+            "provider": provider(),
             "runtime": runtimePolicy(),
             "events": [],
+        ]
+    }
+
+    private func runtimeJob() -> [String: Any] {
+        let state = locked { mutableRuntimeJobState }
+        return [
+            "job_id": runtimeJobID,
+            "run_id": runID,
+            "project_id": projectID,
+            "project_generation": 4,
+            "runtime_kind": "bash",
+            "state": state,
+            "canonical_working_directory": "/tmp/forge-operator-fixture",
+            "command_summary": "fixture runtime command",
+            "timeout_seconds": 30,
+            "output_bytes": 0,
+            "created_at": "2026-08-31T12:00:00Z",
+        ]
+    }
+
+    private func provider() -> [String: Any] {
+        let state = locked {
+            (
+                mutableProviderHealth,
+                mutableProviderLastProbeMode,
+                mutableProviderLastProbeError,
+                mutableProviderLastProbeAt
+            )
+        }
+        var value: [String: Any] = [
+            "adapter_id": "forge.native-session-host",
+            "provider_id": "fixture-provider",
+            "health": state.0,
+            "model_key": "fixture-model",
+            "tool_use_capable": true,
+        ]
+        if let mode = state.1 {
+            value["last_probe_mode"] = mode
+            value["probe_result_storage"] = "memory_only"
+        }
+        if let error = state.2 {
+            value["last_probe_error"] = error
+        }
+        if let completedAt = state.3 {
+            value["last_probe_at"] = completedAt
+        }
+        return value
+    }
+
+    private func project() -> [String: Any] {
+        let state = locked { (mutableProjectRoot, mutableProjectGeneration) }
+        return [
+            "project_id": projectID,
+            "display_name": "Fixture Project",
+            "canonical_root": state.0,
+            "project_generation": state.1,
+            "lifecycle_state": "active",
+            "bindings": [],
+            "memory": ["state": "healthy", "database_bytes": 4_096, "record_count": 2],
+            "continuity": ["state": "ready", "migration_state": "not_required"],
+            "migration_warnings": [],
         ]
     }
 
@@ -866,6 +1672,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             "provider_id": "fixture-provider",
             "adapter_id": "forge.native-session-host",
             "model_key": "fixture-model",
+            "active_session_id": "fixture-active-session",
             "continuation_pending": false,
             "completion_gates": ["tests"],
             "passed_gates": [],
@@ -889,11 +1696,21 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
         ]
     }
 
+    private func dropResponseAfterPartialBody(to connection: NWConnection) {
+        let prefix = Data(
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 1024\r\nConnection: close\r\n\r\n{".utf8
+        )
+        connection.send(content: prefix, completion: .contentProcessed { _ in
+            connection.cancel()
+        })
+    }
+
     private func respond(status: Int, object: [String: Any], to connection: NWConnection) {
         let body = (try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])) ?? Data("{}".utf8)
         let reason = status == 200 ? "OK"
             : status == 401 ? "Unauthorized"
             : status == 404 ? "Not Found"
+            : status == 422 ? "Unprocessable Content"
             : "Service Unavailable"
         let headers = "HTTP/1.1 \(status) \(reason)\r\nContent-Type: application/json\r\nContent-Length: \(body.count)\r\nConnection: close\r\n\r\n"
         var response = Data(headers.utf8)

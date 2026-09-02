@@ -42,6 +42,7 @@ from check_p10_protocol_compatibility import (
     CompatibilityError,
     MAXIMUM_MCP_MESSAGE_BYTES,
     MCPProcess,
+    configure_allowed_roots,
 )
 from record_command import execution_provenance
 
@@ -105,6 +106,27 @@ class EvidenceControlTests(unittest.TestCase):
                 0,
                 completed.stdout + completed.stderr,
             )
+
+    def test_protocol_fixture_persists_production_trusted_roots(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            home = pathlib.Path(temporary).resolve()
+            project = home / "project"
+            project.mkdir()
+
+            configure_allowed_roots(home, [project])
+
+            config = json.loads((home / "config.json").read_text(encoding="utf-8"))
+            self.assertEqual(config["config_schema_version"], 2)
+            self.assertEqual(config["allowed_roots"], [str(project.resolve())])
+            self.assertEqual(stat.S_IMODE((home / "config.json").stat().st_mode), 0o600)
+
+            with self.assertRaisesRegex(CompatibilityError, "duplicates"):
+                configure_allowed_roots(home, [project, project])
+
+            regular_file = home / "not-a-directory"
+            regular_file.write_text("fixture\n", encoding="utf-8")
+            with self.assertRaisesRegex(CompatibilityError, "directories"):
+                configure_allowed_roots(home, [regular_file])
 
     def test_bounded_repository_json_accepts_exact_file_and_aggregate_bounds(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -3676,7 +3698,7 @@ class EvidenceControlTests(unittest.TestCase):
                 (results / "G10.stdout.txt").read_text(encoding="utf-8"),
             )
 
-    def test_g10_run_gate_requires_exact_success_criteria(self) -> None:
+    def test_g10_run_gate_rejects_success_criteria_without_exact_feature_binding(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = pathlib.Path(temporary)
             self.install_g10_handler_fixture(
@@ -3716,19 +3738,14 @@ class EvidenceControlTests(unittest.TestCase):
                 text=True,
                 check=False,
             )
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             gate_result = json.loads(result.stdout)
-            self.assertEqual(gate_result["status"], "passed")
+            self.assertEqual(gate_result["status"], "failed")
             self.assertEqual(gate_result["commands"][0]["exit_code"], 0)
-            self.assertEqual(
-                gate_result["evaluator"]["criteria_results"],
-                [
-                    {
-                        "criterion": "semantic P10 completion",
-                        "passed": True,
-                        "evidence": "acceptance fixture",
-                    }
-                ],
+            self.assertFalse(gate_result["evaluator"]["criteria_results"][0]["passed"])
+            self.assertIn(
+                "no exact P10 feature binding",
+                gate_result["evaluator"]["criteria_results"][0]["evidence"],
             )
             criteria = root / ".forge-codex/state/gate-results/G10.criteria.json"
             self.assertTrue(criteria.is_file())
@@ -4141,9 +4158,10 @@ path.write_text(json.dumps(value) + "\\n", encoding="utf-8")
             def mutate_between_passes(
                 repository: pathlib.Path,
                 budget: BoundedReadBudget,
+                exclusions: frozenset[str],
             ) -> tuple[list[dict[str, object]], int]:
                 nonlocal calls
-                snapshot = real_snapshot(repository, budget)
+                snapshot = real_snapshot(repository, budget, exclusions)
                 calls += 1
                 if calls == 1:
                     path.write_text("struct Changed {}\n", encoding="utf-8")

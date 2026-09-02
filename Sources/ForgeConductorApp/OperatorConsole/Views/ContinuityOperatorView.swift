@@ -43,6 +43,24 @@ struct ContinuityOperatorView: View {
                     if let error = viewModel.errorMessage {
                         OperatorErrorBanner(message: error, retry: viewModel.load)
                     }
+                    if let error = viewModel.commandErrorMessage {
+                        Label {
+                            Text(error)
+                                .font(.caption)
+                                .textSelection(.enabled)
+                        } icon: {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                        }
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+                        .accessibilityIdentifier("continuity-command-error")
+                    }
+                    if let notice = viewModel.notice {
+                        OperatorNoticeBanner(message: notice)
+                    }
+                    administrativeControls
                     if let operation = viewModel.selectedOperation {
                         operationDetail(operation)
                     } else if viewModel.errorMessage == nil, !viewModel.isLoading {
@@ -58,8 +76,64 @@ struct ContinuityOperatorView: View {
             }
         }
         .navigationSplitViewStyle(.balanced)
+        .onChange(of: viewModel.selectedOperationID) { _, operationID in
+            viewModel.selectRun(forOperationID: operationID)
+        }
         .task { viewModel.load() }
         .accessibilityIdentifier("continuity-operator-view")
+    }
+
+    private var administrativeControls: some View {
+        GroupBox("Administrative continuity") {
+            VStack(alignment: .leading, spacing: 10) {
+                if viewModel.runs.isEmpty {
+                    Text("No managed run is available for an administrative continuity request.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    Picker("Managed run", selection: $viewModel.selectedRunID) {
+                        Text("Select a managed run").tag(String?.none)
+                        ForEach(viewModel.runs) { run in
+                            Text("\(run.mission) · \(run.state)")
+                                .tag(String?.some(run.runID))
+                        }
+                    }
+                    .accessibilityIdentifier("continuity-run-selection")
+
+                    if let run = viewModel.selectedRun {
+                        LabeledContent("Run state") {
+                            OperatorStateBadge(state: run.state)
+                                .accessibilityIdentifier("continuity-selected-run-state")
+                        }
+                        LabeledContent("Active session") {
+                            OperatorIdentifier(run.activeSessionID)
+                        }
+                    }
+                }
+
+                HStack(spacing: 10) {
+                    Button("Checkpoint Now", action: viewModel.requestCheckpoint)
+                        .disabled(!viewModel.canRequestCheckpoint)
+                        .accessibilityIdentifier("checkpoint-command")
+                    Button("Request Early Rollover", action: viewModel.requestRollover)
+                        .disabled(!viewModel.canRequestRollover)
+                        .accessibilityIdentifier("rollover-command")
+                    if let action = viewModel.controlInFlight {
+                        ProgressView()
+                            .controlSize(.small)
+                            .accessibilityLabel("Persisting \(action.rawValue) command")
+                    }
+                    Spacer()
+                }
+                Text(viewModel.eligibilityMessage)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("continuity-control-eligibility")
+                Text("The GUI sends a typed request only. Eligibility, quiescing, exact observation binding, and durable state transitions remain manager-owned.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("continuity-controls-authority")
+            }
+        }
     }
 
     private func operationDetail(_ operation: OperatorContinuity) -> some View {
@@ -158,16 +232,6 @@ struct ContinuityOperatorView: View {
                 }
             }
 
-            HStack {
-                Button("Checkpoint Now") {}
-                Button("Request Early Rollover") {}
-                    .accessibilityIdentifier("rollover-command")
-                Spacer()
-            }
-            .disabled(true)
-            Text("Administrative checkpoint and rollover commands are unavailable until the manager publishes authoritative mutation routes. Display state remains read-only.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
     }
 

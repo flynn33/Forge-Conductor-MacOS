@@ -1,9 +1,11 @@
 # Historical G1–G10 status (0.9.0)
 
 This table preserves the product-status snapshot recorded for the historical
-0.9.0 build 1 baseline. Its G1–G10 labels predate the current repair gate ledger and do
-not qualify the active P10 source tree. Current status is recorded in
-[`../.forge-codex/state/release-handoff.md`](../.forge-codex/state/release-handoff.md).
+0.9.0 build 1 baseline. Its G1–G10 labels predate the package qualification
+ledger and do not qualify the active source tree. That ledger retains its own
+still-open evidence in
+[`../.forge-codex/state/release-handoff.md`](../.forge-codex/state/release-handoff.md),
+but current source, the user guide, and the changelog define product behavior.
 
 Legend: **CODE** = implemented in the historical Xcode project · **TEST** =
 exact historical automated proof · **OPS** = operator-owned follow-up
@@ -25,9 +27,12 @@ The active line does not currently claim P10, filesystem E2, live shell
 compatibility, signed native UI and release validation, manager-owned
 real-provider autonomous continuity, owner-deferred representative physical-
 hardware qualification, current G09-G12, or release qualification complete.
-Native UI execution remains deferred and release-blocking. Historical unit, UI,
-simulator, synthetic-host, or direct-adapter results do not replace current-
-source authority. Filesystem capture and quarantine are mitigation, not
+An earlier exact-revision Apple Development-signed 100-cycle Rig/MCP navigation
+test passes as supporting evidence; the final current-source rerun, Developer ID
+Release, and the full native UI/settings/service lifecycle remain deferred and
+release-blocking. Historical or focused unit, UI, simulator,
+synthetic-host, or direct-adapter results do not replace complete current-source
+authority. Filesystem capture and quarantine are mitigation, not
 elimination, until the signed E2 matrix and formal closure pass.
 
 ## Port ownership behavior

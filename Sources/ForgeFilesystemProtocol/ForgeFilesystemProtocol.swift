@@ -14,6 +14,8 @@ public enum ForgeFilesystemProtocolConstants {
     public static let appIdentifier = "com.forge-conductor.app"
     public static let managerIdentifier = "com.forge-conductor.cli"
     public static let daemonIdentifier = "com.forge-conductor.filesystem-daemon"
+    public static let runtimeLauncherIdentifier = "com.forge-conductor.runtime-launcher"
+    public static let coreFrameworkIdentifier = "com.forge-conductor.core"
     public static let developmentTeamIdentifier = "9AQ2C2838M"
     public static let productionTeamIdentifier = "2Y25RTLZET"
     public static let maximumRelativeComponents = 128
@@ -23,7 +25,7 @@ public enum ForgeFilesystemProtocolConstants {
         requirement(
             identifier: appIdentifier,
             teamIdentifier: activeTeamIdentifier,
-            allowDevelopmentCertificate: isDevelopmentBuild
+            certificateRequirement: activeCertificateRequirement
         )
     }
 
@@ -34,7 +36,7 @@ public enum ForgeFilesystemProtocolConstants {
         let managerRequirement = requirement(
             identifier: managerIdentifier,
             teamIdentifier: activeTeamIdentifier,
-            allowDevelopmentCertificate: isDevelopmentBuild
+            certificateRequirement: activeCertificateRequirement
         )
         return "(\(requiredAppCodeSigningRequirement)) or (\(managerRequirement))"
     }
@@ -52,40 +54,67 @@ public enum ForgeFilesystemProtocolConstants {
         let designatedRequirement = requirement(
             identifier: daemonIdentifier,
             teamIdentifier: activeTeamIdentifier,
-            allowDevelopmentCertificate: isDevelopmentBuild
+            certificateRequirement: activeCertificateRequirement
         )
         return "(\(designatedRequirement)) and (\(exactIdentityRequirement))"
     }
 
+    /// Returns the stable Apple signing policy for one exact Forge product role.
+    /// Team and certificate class are intentionally inseparable: development
+    /// artifacts use Apple Development while distribution artifacts use
+    /// Developer ID Application.
+    public static func requiredProductCodeSigningRequirement(
+        identifier: String,
+        teamIdentifier: String
+    ) -> String? {
+        let knownIdentifiers: Set<String> = [
+            appIdentifier,
+            managerIdentifier,
+            daemonIdentifier,
+            runtimeLauncherIdentifier,
+            coreFrameworkIdentifier,
+        ]
+        guard knownIdentifiers.contains(identifier) else { return nil }
+
+        let certificateRequirement: String
+        switch teamIdentifier {
+        case developmentTeamIdentifier:
+            certificateRequirement =
+                "certificate leaf[field.1.2.840.113635.100.6.1.12] exists"
+        case productionTeamIdentifier:
+            certificateRequirement =
+                "certificate leaf[field.1.2.840.113635.100.6.1.13] exists"
+        default:
+            return nil
+        }
+        return requirement(
+            identifier: identifier,
+            teamIdentifier: teamIdentifier,
+            certificateRequirement: certificateRequirement
+        )
+    }
+
     public static var activeTeamIdentifier: String {
-        #if DEBUG
+        #if DEBUG || FORGE_DEVELOPMENT_SIGNING
         developmentTeamIdentifier
         #else
         productionTeamIdentifier
         #endif
     }
 
-    private static var isDevelopmentBuild: Bool {
-        #if DEBUG
-        true
+    private static var activeCertificateRequirement: String {
+        #if DEBUG || FORGE_DEVELOPMENT_SIGNING
+        "certificate leaf[field.1.2.840.113635.100.6.1.12] exists"
         #else
-        false
+        "certificate leaf[field.1.2.840.113635.100.6.1.13] exists"
         #endif
     }
 
     private static func requirement(
         identifier: String,
         teamIdentifier: String,
-        allowDevelopmentCertificate: Bool
+        certificateRequirement: String
     ) -> String {
-        let certificateRequirement: String
-        if allowDevelopmentCertificate {
-            certificateRequirement =
-                "certificate leaf[field.1.2.840.113635.100.6.1.12] exists"
-        } else {
-            certificateRequirement =
-                "certificate leaf[field.1.2.840.113635.100.6.1.13] exists"
-        }
         return "anchor apple generic and identifier \"\(identifier)\" "
             + "and certificate leaf[subject.OU] = \"\(teamIdentifier)\" "
             + "and \(certificateRequirement)"

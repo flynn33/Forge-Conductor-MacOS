@@ -8,8 +8,17 @@ import Foundation
 public protocol RuntimeJobContextValidating: Sendable {
     func validateCaller(_ context: ToolInvocationContext) async throws
     func prepareJob(jobID: UUID, context: ToolInvocationContext) async throws -> ToolInvocationContext
+    func contextForStoredJob(jobID: UUID) async throws -> ToolInvocationContext
     func validateJob(jobID: UUID, context: ToolInvocationContext) async throws
     func commitJobResult(jobID: UUID, context: ToolInvocationContext, resultSHA256: String) async throws
+}
+
+public extension RuntimeJobContextValidating {
+    func contextForStoredJob(jobID: UUID) async throws -> ToolInvocationContext {
+        throw RuntimeJobError.storageFailure(
+            "the configured runtime context validator cannot resolve stored job authority"
+        )
+    }
 }
 
 public protocol RuntimeJobLaunchObserving: Sendable {
@@ -64,6 +73,16 @@ public struct ProjectControlPlaneRuntimeJobContextValidator: RuntimeJobContextVa
             providerSessionID: context.providerSessionID,
             runtimeJobID: jobID,
             authorizationScope: context.authorizationScope
+        )
+    }
+
+    public func contextForStoredJob(jobID: UUID) async throws -> ToolInvocationContext {
+        try await repository.invocationContext(
+            for: ProjectBindingOwner(
+                kind: .runtimeJob,
+                id: jobID.uuidString.lowercased()
+            ),
+            clientID: ClientID("manager-runtime-job")
         )
     }
 
@@ -1033,6 +1052,20 @@ public actor ExecutionJobService: ExecutionJobServicing {
             context: context,
             commitObserver: commitObserver
         ).record
+    }
+
+    /// Trusted manager seam that resolves the exact durable runtime-job binding.
+    /// Callers provide no project, run, generation, or authorization scope to forge.
+    func cancelStoredJob(jobID: UUID) async throws -> RuntimeJobRecord {
+        try Task.checkCancellation()
+        try await ensureStarted()
+        guard try await repository.job(jobID) != nil else {
+            throw RuntimeJobError.jobNotFound(jobID)
+        }
+        let context = try await contextValidator.contextForStoredJob(jobID: jobID)
+        try await contextValidator.validateJob(jobID: jobID, context: context)
+        try Task.checkCancellation()
+        return try await cancelOwnedJob(jobID: jobID, context: context).record
     }
 
     /// Trusted manager seam for releasing the bounded set of queued and active jobs owned by a run.

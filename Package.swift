@@ -86,6 +86,7 @@ let package = Package(
                 "ForgeFilesystemProtocol",
                 "ForgeConductorCore",
                 "ForgeConductorCLI",
+                "ForgeConductorApp",
                 "ForgeNativeSessionHostPlugin",
                 "ForgeRuntimeLauncher",
             ],

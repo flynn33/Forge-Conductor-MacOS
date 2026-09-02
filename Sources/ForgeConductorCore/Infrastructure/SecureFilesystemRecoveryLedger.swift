@@ -251,6 +251,73 @@ final class SecureFilesystemRecoveryLedger: @unchecked Sendable {
         }
     }
 
+    /// Returns the complete fixed-slot inventory under the ledger lock. The
+    /// records remain internal and are never included in UI or status output.
+    func records() throws -> [SecureFilesystemRecoveryRecord] {
+        try withLedgerLock {
+            var records: [SecureFilesystemRecoveryRecord] = []
+            records.reserveCapacity(Self.maximumRecords)
+            for slot in 0..<Self.maximumRecords {
+                guard let record = try readSlot(slot) else { continue }
+                guard record.isStructurallyValid else {
+                    throw SecureFilesystemRecoveryLedgerError.unavailable
+                }
+                records.append(record)
+            }
+            return records
+        }
+    }
+
+    /// Returns the fixed-slot inventory without creating, rewriting, or
+    /// removing ledger state. A missing ledger is an empty ledger; a present
+    /// ledger must already have the private lock created by a writer.
+    func snapshotRecords() throws -> [SecureFilesystemRecoveryRecord] {
+        try withExistingLedgerReadLock(
+            missingValue: [SecureFilesystemRecoveryRecord]()
+        ) {
+            var records: [SecureFilesystemRecoveryRecord] = []
+            records.reserveCapacity(Self.maximumRecords)
+            for slot in 0..<Self.maximumRecords {
+                guard let record = try readSlot(slot) else { continue }
+                guard record.isStructurallyValid else {
+                    throw SecureFilesystemRecoveryLedgerError.unavailable
+                }
+                records.append(record)
+            }
+            return records
+        }
+    }
+
+    /// Removes authority only when the fixed-slot record still matches the
+    /// exact identity that was reconciled with the daemon.
+    @discardableResult
+    func remove(
+        transactionID: String,
+        ifMatching expected: SecureFilesystemRecoveryRecord
+    ) throws -> Bool {
+        guard UUID(uuidString: transactionID) != nil,
+              expected.isStructurallyValid,
+              expected.transactionID.caseInsensitiveCompare(transactionID) == .orderedSame else {
+            throw SecureFilesystemRecoveryLedgerError.invalidRecord
+        }
+        return try withLedgerLock {
+            for slot in 0..<Self.maximumRecords {
+                guard let record = try readSlot(slot) else { continue }
+                guard record.isStructurallyValid else {
+                    throw SecureFilesystemRecoveryLedgerError.unavailable
+                }
+                if record.transactionID.caseInsensitiveCompare(transactionID) == .orderedSame {
+                    guard record == expected else {
+                        throw SecureFilesystemRecoveryLedgerError.conflictingTransaction
+                    }
+                    try OwnerOnlyAtomicFile.removeIfExists(at: slotURL(slot))
+                    return try readSlot(slot) == nil
+                }
+            }
+            return false
+        }
+    }
+
     func hasRetainedAuthority(
         projectID: ProjectID,
         generation: ProjectGeneration
@@ -359,6 +426,57 @@ final class SecureFilesystemRecoveryLedger: @unchecked Sendable {
         }
 
         while flock(descriptor, LOCK_EX | LOCK_NB) != 0 {
+            let code = errno
+            guard code == EWOULDBLOCK || code == EAGAIN || code == EINTR,
+                  Date() < deadline else {
+                throw SecureFilesystemRecoveryLedgerError.unavailable
+            }
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        defer { _ = flock(descriptor, LOCK_UN) }
+        return try body()
+    }
+
+    private func withExistingLedgerReadLock<Value>(
+        missingValue: Value,
+        _ body: () throws -> Value
+    ) throws -> Value {
+        let deadline = Date().addingTimeInterval(Self.lockTimeoutSeconds)
+        guard Self.processLock.lock(before: deadline) else {
+            throw SecureFilesystemRecoveryLedgerError.unavailable
+        }
+        defer { Self.processLock.unlock() }
+
+        var rootInformation = stat()
+        guard root.path.withCString({ Darwin.lstat($0, &rootInformation) }) == 0 else {
+            let code = errno
+            if code == ENOENT { return missingValue }
+            throw SecureFilesystemRecoveryLedgerError.unavailable
+        }
+        guard rootInformation.st_mode & S_IFMT == S_IFDIR,
+              rootInformation.st_uid == geteuid(),
+              rootInformation.st_mode & mode_t(S_IRWXG | S_IRWXO) == 0 else {
+            throw SecureFilesystemRecoveryLedgerError.unavailable
+        }
+
+        let descriptor = lockURL.path.withCString {
+            Darwin.open($0, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK)
+        }
+        guard descriptor >= 0 else {
+            throw SecureFilesystemRecoveryLedgerError.unavailable
+        }
+        defer { _ = Darwin.close(descriptor) }
+
+        var lockInformation = stat()
+        guard Darwin.fstat(descriptor, &lockInformation) == 0,
+              lockInformation.st_mode & S_IFMT == S_IFREG,
+              lockInformation.st_uid == geteuid(),
+              lockInformation.st_mode & mode_t(S_IRWXG | S_IRWXO) == 0,
+              lockInformation.st_nlink == 1 else {
+            throw SecureFilesystemRecoveryLedgerError.unavailable
+        }
+
+        while flock(descriptor, LOCK_SH | LOCK_NB) != 0 {
             let code = errno
             guard code == EWOULDBLOCK || code == EAGAIN || code == EINTR,
                   Date() < deadline else {

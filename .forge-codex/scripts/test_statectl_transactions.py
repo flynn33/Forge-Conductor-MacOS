@@ -18,6 +18,14 @@ from unittest import mock
 
 import statectl
 from evidence_support import EvidenceSupportError, current_git_head, source_manifest
+from p10_fixture_support import (
+    FIXTURE_BASELINE,
+    FIXTURE_EVIDENCE_ID,
+    fixture_p10_binding,
+    fixture_p10_module,
+    fixture_python_command,
+    install_fixture_p10_evaluator,
+)
 
 
 SCRIPT_ROOT = pathlib.Path(__file__).resolve().parent
@@ -41,8 +49,29 @@ class StateTransactionTests(unittest.TestCase):
         *arguments: str,
         timeout: float = 8,
     ) -> subprocess.CompletedProcess[str]:
+        fixture_evaluator = (
+            root / ".forge-codex/scripts/p10_feature_evidence.py"
+        )
+        command = (
+            fixture_python_command(
+                root,
+                SCRIPT_ROOT,
+                STATECTL,
+                "--repo",
+                str(root),
+                *arguments,
+            )
+            if fixture_evaluator.is_file()
+            else [
+                sys.executable,
+                str(STATECTL),
+                "--repo",
+                str(root),
+                *arguments,
+            ]
+        )
         return subprocess.run(
-            [sys.executable, str(STATECTL), "--repo", str(root), *arguments],
+            command,
             capture_output=True,
             text=True,
             timeout=timeout,
@@ -61,6 +90,7 @@ class StateTransactionTests(unittest.TestCase):
 
     def make_g12_repository(self, root: pathlib.Path) -> None:
         self.write_json(root / ".forge-codex/plans/phases.json", {"phases": []})
+        install_fixture_p10_evaluator(root)
         gates = [
             {
                 "id": f"G{index:02d}",
@@ -86,11 +116,7 @@ class StateTransactionTests(unittest.TestCase):
             handler.chmod(0o755)
         self.write_json(
             root / ".forge-codex/state/feature-baseline.json",
-            {
-                "runtime_completion_required": False,
-                "parity_summary": {"unknown": 0, "untested": 0, "removed": 0},
-                "features": [{"parity_status": "preserved"}],
-            },
+            FIXTURE_BASELINE,
         )
         for command in (
             ["git", "init", "-q"],
@@ -117,6 +143,17 @@ class StateTransactionTests(unittest.TestCase):
             initialized.returncode,
             0,
             initialized.stdout + initialized.stderr,
+        )
+        referenced = self.run_statectl(
+            root,
+            "reference",
+            "evidence",
+            FIXTURE_EVIDENCE_ID,
+        )
+        self.assertEqual(
+            referenced.returncode,
+            0,
+            referenced.stdout + referenced.stderr,
         )
 
     def install_g12_pass(
@@ -164,6 +201,23 @@ class StateTransactionTests(unittest.TestCase):
             criteria_document: dict[str, object] = {
                 "criteria_results": [criteria_result],
             }
+            if gate_identifier == "G10":
+                criteria_document.update(
+                    {
+                        "valid": True,
+                        "errors": [],
+                        "p10_feature_binding": fixture_p10_binding(
+                            root,
+                            current_manifest=manifest,
+                            current_git_head=head,
+                            ledger_evidence_ids={
+                                item
+                                for item in state_before.get("evidence", [])
+                                if isinstance(item, str)
+                            },
+                        ),
+                    }
+                )
             if criteria_extra:
                 criteria_document.update(
                     {
@@ -302,9 +356,8 @@ class StateTransactionTests(unittest.TestCase):
             "current-source-identity-stable",
             "source-identity-unchanged-through-evaluation",
             "completion-gate-plan-valid",
-            "feature-runtime-inventory-complete",
-            "feature-parity-counters-zero",
-            "all-feature-statuses-valid",
+            "feature-baseline-valid",
+            "g10-p10-feature-evidence-binding",
             "findings-resolution-structure",
             "run-state-issues-structure",
             "critical-high-findings-resolved",
@@ -1276,7 +1329,7 @@ class StateTransactionTests(unittest.TestCase):
                         os.replace(replacement, result_path)
                     return value
 
-                with mock.patch.object(
+                with fixture_p10_module(root), mock.patch.object(
                     statectl,
                     "decode_strict_json_object",
                     side_effect=replace_during_decode,

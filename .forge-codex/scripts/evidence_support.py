@@ -84,6 +84,10 @@ MANIFEST_TARGETS = (
     ".forge-codex/schemas/p10-privileged-filesystem-h0-readiness.schema.json",
     ".forge-codex/schemas/p10-privileged-filesystem-admission-observation.schema.json",
     ".forge-codex/schemas/p10-privileged-filesystem-qualification-report.schema.json",
+    ".forge-codex/schemas/p10-feature-production-qualification.schema.json",
+    ".forge-codex/specifications/p10-feature-registry.v1.json",
+    ".forge-codex/specifications/p10-production-probes.v1.json",
+    ".forge-codex/scripts/qualify_p10_features.py",
     ".forge-codex/templates/p10-privileged-filesystem-qualification-report.json",
     ".forge-codex/docs/PRIVILEGED_FILESYSTEM_QUALIFICATION.md",
     ".forge-codex/architecture/SECURITY_AND_PRIVACY.md",
@@ -1354,7 +1358,10 @@ def sha256_bounded_regular_file(
     return digest.hexdigest(), total
 
 
-def _manifest_paths(root: pathlib.Path) -> Iterable[pathlib.Path]:
+def _manifest_paths(
+    root: pathlib.Path,
+    excluded_paths: frozenset[str] = frozenset(),
+) -> Iterable[pathlib.Path]:
     selected: set[pathlib.Path] = set()
     entries_seen = 0
     directory_flags = (
@@ -1365,6 +1372,9 @@ def _manifest_paths(root: pathlib.Path) -> Iterable[pathlib.Path]:
     )
 
     def include(path: pathlib.Path) -> None:
+        relative = path.relative_to(root).as_posix()
+        if relative in excluded_paths:
+            return
         if path in selected:
             return
         if len(selected) >= MAXIMUM_MANIFEST_FILES:
@@ -1599,6 +1609,7 @@ def _manifest_paths(root: pathlib.Path) -> Iterable[pathlib.Path]:
 def _source_manifest_snapshot(
     root: pathlib.Path,
     budget: BoundedReadBudget,
+    excluded_paths: frozenset[str] = frozenset(),
 ) -> tuple[list[dict[str, Any]], int]:
     files: list[dict[str, Any]] = []
     total = 0
@@ -1606,7 +1617,7 @@ def _source_manifest_snapshot(
         MAXIMUM_MANIFEST_TOTAL_BYTES,
         "source manifest snapshot",
     )
-    for path in _manifest_paths(root):
+    for path in _manifest_paths(root, excluded_paths):
         relative = path.relative_to(root).as_posix()
         digest, byte_count = sha256_bounded_repository_file(
             root,
@@ -1629,18 +1640,34 @@ def _source_manifest_snapshot(
     return files, total
 
 
-def source_manifest(root: pathlib.Path) -> dict[str, Any]:
+def source_manifest(
+    root: pathlib.Path,
+    *,
+    excluded_paths: Iterable[str] = (),
+) -> dict[str, Any]:
     root = root.resolve(strict=True)
+    canonical_exclusions: set[str] = set()
+    for raw_path in excluded_paths:
+        pure_path = _strict_repository_relative_path(
+            raw_path,
+            label="source manifest exclusion",
+        )
+        canonical_exclusions.add(pure_path.as_posix())
+    exclusions = frozenset(canonical_exclusions)
     budget = BoundedReadBudget(
         MAXIMUM_MANIFEST_TOTAL_BYTES * 2,
         "two-pass source manifest",
     )
-    files, total = _source_manifest_snapshot(root, budget)
+    files, total = _source_manifest_snapshot(root, budget, exclusions)
     if not files:
         raise EvidenceSupportError(f"source manifest is empty: {root}")
     if total < 1:
         raise EvidenceSupportError(f"source manifest has no source bytes: {root}")
-    verification_files, verification_total = _source_manifest_snapshot(root, budget)
+    verification_files, verification_total = _source_manifest_snapshot(
+        root,
+        budget,
+        exclusions,
+    )
     if files != verification_files or total != verification_total:
         raise EvidenceSupportError("source manifest changed during its two-pass read")
     payload = {"schema_version": MANIFEST_SCHEMA_VERSION, "files": files}

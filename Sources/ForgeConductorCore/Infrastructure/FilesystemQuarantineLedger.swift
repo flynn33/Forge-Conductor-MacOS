@@ -90,6 +90,14 @@ enum FilesystemQuarantineLedgerError: Error, LocalizedError, Sendable {
     }
 }
 
+struct FilesystemQuarantineLedgerStatus: Sendable, Equatable {
+    let occupiedCount: Int
+    let capacity: Int
+    let releasedCount: Int
+
+    var isExhausted: Bool { occupiedCount >= capacity }
+}
+
 final class FilesystemQuarantineLedger: @unchecked Sendable {
     static let maximumReservations = 32
     private static let maximumReceiptBytes = 8 * 1_024
@@ -211,6 +219,7 @@ final class FilesystemQuarantineLedger: @unchecked Sendable {
         expectedLeafIdentity: FilesystemQuarantineIdentity? = nil,
         parentIdentityVerifier: (() -> Bool)? = nil,
         leafIdentityVerifier: (() -> Bool)? = nil,
+        afterFinalIdentityVerification: (() -> Void)? = nil,
         transition: () throws -> (value: Value, durabilityConfirmed: Bool)
     ) throws -> (value: Value, durabilityConfirmed: Bool) {
         try withLedgerLock {
@@ -229,6 +238,9 @@ final class FilesystemQuarantineLedger: @unchecked Sendable {
             guard parentMatches, leafMatches else {
                 throw FilesystemQuarantineLedgerError.invalidPath
             }
+            // Internal deterministic test seam for the otherwise unobservable
+            // verifier-to-terminal-syscall window. Production callers omit it.
+            afterFinalIdentityVerification?()
             let outcome = try transition()
             if outcome.durabilityConfirmed {
                 switch removeReceipt(reservation.receiptURL) {
@@ -276,6 +288,48 @@ final class FilesystemQuarantineLedger: @unchecked Sendable {
     func reconcile() throws -> [String] {
         try withLedgerLock {
             try reconcileLocked().compactMap { $0?.recoveryPath }
+        }
+    }
+
+    /// Reconciles the fixed ledger and reports only bounded aggregate state.
+    /// Paths and receipt contents deliberately remain private to the ledger.
+    func status() throws -> FilesystemQuarantineLedgerStatus {
+        try withLedgerLock {
+            let occupiedBefore = (0..<Self.maximumReservations).reduce(into: 0) {
+                count, slot in
+                if Self.pathExistsWithoutFollowing(slotURL(slot)) { count += 1 }
+            }
+            let occupied = try reconcileLocked().reduce(into: 0) { count, slot in
+                if slot != nil { count += 1 }
+            }
+            return FilesystemQuarantineLedgerStatus(
+                occupiedCount: occupied,
+                capacity: Self.maximumReservations,
+                releasedCount: max(0, occupiedBefore - occupied)
+            )
+        }
+    }
+
+    /// Reports bounded aggregate state without reconciling or modifying any
+    /// receipt. A missing ledger is an empty ledger; a present ledger must have
+    /// its existing private lock so an observation cannot race a writer.
+    func snapshotStatus() throws -> FilesystemQuarantineLedgerStatus {
+        try withExistingLedgerReadLock(
+            missingValue: FilesystemQuarantineLedgerStatus(
+                occupiedCount: 0,
+                capacity: Self.maximumReservations,
+                releasedCount: 0
+            )
+        ) {
+            let occupied = (0..<Self.maximumReservations).reduce(into: 0) {
+                count, slot in
+                if Self.pathExistsWithoutFollowing(slotURL(slot)) { count += 1 }
+            }
+            return FilesystemQuarantineLedgerStatus(
+                occupiedCount: occupied,
+                capacity: Self.maximumReservations,
+                releasedCount: 0
+            )
         }
     }
 
@@ -541,6 +595,59 @@ final class FilesystemQuarantineLedger: @unchecked Sendable {
         defer { _ = Darwin.close(descriptor) }
 
         while flock(descriptor, LOCK_EX | LOCK_NB) != 0 {
+            let code = errno
+            guard code == EWOULDBLOCK || code == EAGAIN || code == EINTR else {
+                throw FilesystemQuarantineLedgerError.lockFailure(code)
+            }
+            guard Date() < deadline else {
+                throw FilesystemQuarantineLedgerError.lockTimeout
+            }
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        defer { _ = flock(descriptor, LOCK_UN) }
+        return try body()
+    }
+
+    private func withExistingLedgerReadLock<Value>(
+        missingValue: Value,
+        _ body: () throws -> Value
+    ) throws -> Value {
+        let deadline = Date().addingTimeInterval(Self.lockTimeoutSeconds)
+        guard Self.processLock.lock(before: deadline) else {
+            throw FilesystemQuarantineLedgerError.lockTimeout
+        }
+        defer { Self.processLock.unlock() }
+
+        var rootInformation = stat()
+        guard root.path.withCString({ Darwin.lstat($0, &rootInformation) }) == 0 else {
+            let code = errno
+            if code == ENOENT { return missingValue }
+            throw FilesystemQuarantineLedgerError.invalidLedgerDirectory
+        }
+        guard rootInformation.st_mode & S_IFMT == S_IFDIR,
+              rootInformation.st_uid == geteuid(),
+              rootInformation.st_mode & mode_t(S_IRWXG | S_IRWXO) == 0 else {
+            throw FilesystemQuarantineLedgerError.invalidLedgerDirectory
+        }
+
+        let descriptor = lockURL.path.withCString {
+            Darwin.open($0, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK)
+        }
+        guard descriptor >= 0 else {
+            throw FilesystemQuarantineLedgerError.lockFailure(errno)
+        }
+        defer { _ = Darwin.close(descriptor) }
+
+        var lockInformation = stat()
+        guard Darwin.fstat(descriptor, &lockInformation) == 0,
+              lockInformation.st_mode & S_IFMT == S_IFREG,
+              lockInformation.st_uid == geteuid(),
+              lockInformation.st_mode & mode_t(S_IRWXG | S_IRWXO) == 0,
+              lockInformation.st_nlink == 1 else {
+            throw FilesystemQuarantineLedgerError.lockFailure(errno)
+        }
+
+        while flock(descriptor, LOCK_SH | LOCK_NB) != 0 {
             let code = errno
             guard code == EWOULDBLOCK || code == EAGAIN || code == EINTR else {
                 throw FilesystemQuarantineLedgerError.lockFailure(code)

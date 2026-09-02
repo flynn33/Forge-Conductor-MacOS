@@ -110,6 +110,10 @@ public extension ToolAuthorizing {
 /// Agent tool grants and workspace roots are enforced here so a new tool pack
 /// cannot accidentally bypass policy by forgetting a local check.
 public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendable {
+    private enum AuthorizationPolicyError: Error {
+        case contextRootOutsideConfiguredAuthority
+    }
+
     private let paths: AppPaths
     private let config: ConfigStore
     private let fileManager: FileManager
@@ -230,13 +234,21 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
             )
         }
 
-        let readRoots = try authorizedRoots(
-            binding: binding,
-            context: context,
-            clientID: clientID,
-            excludeFilesystemRoot: tool == "project_memory.initialize",
-            cancellation: cancellation
-        )
+        let readRoots: [URL]
+        do {
+            readRoots = try authorizedRoots(
+                binding: binding,
+                context: context,
+                clientID: clientID,
+                excludeFilesystemRoot: tool == "project_memory.initialize",
+                cancellation: cancellation
+            )
+        } catch AuthorizationPolicyError.contextRootOutsideConfiguredAuthority {
+            return .denied(
+                code: "path_outside_allowed_roots",
+                message: "The durable project root is not authorized in Settings"
+            )
+        }
         let writeRoots = try authorizedWriteRoots(
             readRoots: readRoots,
             context: context,
@@ -255,7 +267,11 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
                     message: "Path exceeds the supported filesystem limit"
                 )
             }
-            let candidate = try canonicalURL(access.url, cancellation: cancellation)
+            let candidate = try canonicalURL(
+                access.url,
+                preservingFinalComponent: access.preservesFinalComponent,
+                cancellation: cancellation
+            )
             if tool == "project_memory.initialize", candidate.path == "/" {
                 return .denied(
                     code: "project_bootstrap_root_forbidden",
@@ -306,6 +322,7 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
         var url: URL
         var protectRoot: Bool
         var requiresWrite: Bool
+        var preservesFinalComponent: Bool
     }
 
     private func pathAccesses(
@@ -316,14 +333,16 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
         func access(
             _ key: String,
             protectRoot: Bool = false,
-            requiresWrite: Bool = false
+            requiresWrite: Bool = false,
+            preservesFinalComponent: Bool = false
         ) -> PathAccess? {
             guard let raw = ToolArgHelpers.string(arguments, key), !raw.isEmpty else { return nil }
             return PathAccess(
                 key: key,
                 url: resolve(raw, relativeTo: base),
                 protectRoot: protectRoot,
-                requiresWrite: requiresWrite
+                requiresWrite: requiresWrite,
+                preservesFinalComponent: preservesFinalComponent
             )
         }
 
@@ -347,11 +366,17 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
                     key: "path",
                     url: base,
                     protectRoot: false,
-                    requiresWrite: false
+                    requiresWrite: false,
+                    preservesFinalComponent: false
                 ),
             ]
         case "fs_delete":
-            return [access("path", protectRoot: true, requiresWrite: true)].compactMap { $0 }
+            return [access(
+                "path",
+                protectRoot: true,
+                requiresWrite: true,
+                preservesFinalComponent: true
+            )].compactMap { $0 }
         case "fs_move":
             let sourceKey = ["path", "src", "source"].first {
                 ToolArgHelpers.string(arguments, $0) != nil
@@ -360,8 +385,17 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
                 ToolArgHelpers.string(arguments, $0) != nil
             }
             return [
-                sourceKey.flatMap { access($0, protectRoot: true, requiresWrite: true) },
-                destinationKey.flatMap { access($0, requiresWrite: true) },
+                sourceKey.flatMap {
+                    access(
+                        $0,
+                        protectRoot: true,
+                        requiresWrite: true,
+                        preservesFinalComponent: true
+                    )
+                },
+                destinationKey.flatMap {
+                    access($0, requiresWrite: true, preservesFinalComponent: true)
+                },
             ].compactMap { $0 }
         case "pdf_write":
             return [access("path", requiresWrite: true)].compactMap { $0 }
@@ -374,7 +408,8 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
                     key: "dest_path",
                     url: source.url.deletingPathExtension().appendingPathExtension("pdf"),
                     protectRoot: false,
-                    requiresWrite: true
+                    requiresWrite: true,
+                    preservesFinalComponent: false
                 ))
             }
             return accesses
@@ -384,7 +419,8 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
                     key: "cwd",
                     url: base,
                     protectRoot: false,
-                    requiresWrite: false
+                    requiresWrite: false,
+                    preservesFinalComponent: false
                 ),
             ]
         case "git_add", "git_commit", "shell_exec", "process.run", "shell.run", "bash.run",
@@ -394,7 +430,8 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
                     key: "cwd",
                     url: base,
                     protectRoot: false,
-                    requiresWrite: true
+                    requiresWrite: true,
+                    preservesFinalComponent: false
                 ),
             ]
         default:
@@ -415,6 +452,18 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
                 context.authorizationScope.canonicalRoots,
                 cancellation: cancellation
             )
+            let configuredRoots = try canonicalizedUnique(
+                ManagerSettingsNormalizer.canonicalAllowedRoots(
+                    config.model.allowedRoots
+                ).map(ToolArgHelpers.resolvePath),
+                cancellation: cancellation
+            )
+            guard !contextualRoots.isEmpty,
+                  contextualRoots.allSatisfy({ candidate in
+                      configuredRoots.contains { contains(candidate, root: $0) }
+                  }) else {
+                throw AuthorizationPolicyError.contextRootOutsideConfiguredAuthority
+            }
             return excludeFilesystemRoot
                 ? contextualRoots.filter { $0.path != "/" }
                 : contextualRoots
@@ -484,9 +533,21 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
 
     private func canonicalURL(
         _ url: URL,
+        preservingFinalComponent: Bool = false,
         cancellation: ToolCallCancellation?
     ) throws -> URL {
-        var existing = url.standardizedFileURL
+        let standardizedURL = url.standardizedFileURL
+        if preservingFinalComponent, standardizedURL.path != "/" {
+            let parent = try canonicalURL(
+                standardizedURL.deletingLastPathComponent(),
+                cancellation: cancellation
+            )
+            try cancellation?.checkCancellation()
+            return parent
+                .appendingPathComponent(standardizedURL.lastPathComponent)
+                .standardizedFileURL
+        }
+        var existing = standardizedURL
         var suffix: [String] = []
         while !fileManager.fileExists(atPath: existing.path), existing.path != "/" {
             try cancellation?.checkCancellation()

@@ -554,7 +554,7 @@ public enum ForgeFilesystemQualificationContract {
         guard signingFacts.hardenedRuntime else {
             throw ForgeFilesystemQualificationContractError.invalidValue("hardened_runtime")
         }
-        #if DEBUG
+        #if DEBUG || FORGE_DEVELOPMENT_SIGNING
         let certificateRequirement =
             "certificate leaf[field.1.2.840.113635.100.6.1.12] exists"
         #else

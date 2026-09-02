@@ -168,7 +168,7 @@ final class CommittedResultRecoveryTests: XCTestCase {
         )
         defer { memory.closeAll() }
 
-        let response = try memory.initialize(
+        let response = try memory.initializeUnchecked(
             path: fixture.project.path,
             displayName: "Committed identity",
             cancellation: cancellation
@@ -221,6 +221,129 @@ final class CommittedResultRecoveryTests: XCTestCase {
         XCTAssertEqual(recovered, descriptor)
         XCTAssertTrue(FileManager.default.fileExists(atPath: metadata.path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: intent.path))
+    }
+
+    func testRelinkAliasRecoversInterruptedMetadataAndRetriesIdempotently() throws {
+        let fixture = try makeProjectFixture(label: "identity-relink-recovery")
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let replacement = fixture.root.appendingPathComponent("replacement", isDirectory: true)
+        try FileManager.default.createDirectory(at: replacement, withIntermediateDirectories: true)
+        try writeGitRemote("ssh://git@example.test/team/recovery.git", to: fixture.project)
+        try writeGitRemote("ssh://git@example.test/team/recovery.git", to: replacement)
+
+        let originalResolver = ProjectIdentityResolver(paths: fixture.paths)
+        let original = try originalResolver.initialize(
+            path: fixture.project.path,
+            projectID: nil,
+            displayName: "Recoverable Relink",
+            repositoryIdentity: nil
+        )
+        let interrupted = ProjectIdentityResolver(
+            paths: fixture.paths,
+            clock: FixedClock(Date(timeIntervalSince1970: 200)),
+            afterMetadataWriteObserver: {
+                throw ProjectIdentityPersistenceInterruption.afterMetadataWrite
+            },
+            didRegistryCommitObserver: nil
+        )
+
+        let preparation = try originalResolver.prepareRelink(
+            path: replacement.path,
+            projectID: original.id,
+            expectedGeneration: .initial,
+            expectedRepositoryIdentity: original.repositoryIdentity
+        )
+        XCTAssertThrowsError(try interrupted.commitRelink(preparation)) { error in
+            XCTAssertTrue(error is ProjectIdentityPersistenceInterruption)
+        }
+        let intent = fixture.paths.projectsDir.appendingPathComponent(".identity-update.json")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: intent.path))
+
+        let recoveredResolver = ProjectIdentityResolver(paths: fixture.paths)
+        let recovered = try recoveredResolver.prepareRelink(
+            path: replacement.path,
+            projectID: original.id,
+            expectedGeneration: .initial,
+            expectedRepositoryIdentity: original.repositoryIdentity
+        )
+        let committed = try recoveredResolver.commitRelink(recovered)
+        let retry = try recoveredResolver.commitRelink(recovered)
+
+        XCTAssertEqual(committed, retry)
+        XCTAssertEqual(
+            committed.aliases.filter {
+                $0 == replacement.standardizedFileURL.path
+            }.count,
+            1
+        )
+        XCTAssertFalse(FileManager.default.fileExists(atPath: intent.path))
+    }
+
+    func testRelinkAliasCleanupFailureIsReportedAndReconciledWithoutDuplication() throws {
+        let fixture = try makeProjectFixture(label: "identity-relink-cleanup-recovery")
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let replacement = fixture.root.appendingPathComponent("replacement", isDirectory: true)
+        try FileManager.default.createDirectory(at: replacement, withIntermediateDirectories: true)
+        try writeGitRemote("ssh://git@example.test/team/cleanup.git", to: fixture.project)
+        try writeGitRemote("ssh://git@example.test/team/cleanup.git", to: replacement)
+
+        let originalResolver = ProjectIdentityResolver(paths: fixture.paths)
+        let original = try originalResolver.initialize(
+            path: fixture.project.path,
+            projectID: nil,
+            displayName: "Cleanup Failure Relink",
+            repositoryIdentity: nil
+        )
+        let preparation = try originalResolver.prepareRelink(
+            path: replacement.path,
+            projectID: original.id,
+            expectedGeneration: .initial,
+            expectedRepositoryIdentity: original.repositoryIdentity
+        )
+        let interrupted = ProjectIdentityResolver(
+            paths: fixture.paths,
+            clock: FixedClock(Date(timeIntervalSince1970: 200)),
+            afterMetadataWriteObserver: nil,
+            didRegistryCommitObserver: nil,
+            beforeRelinkIntentRemovalObserver: {
+                throw ProjectMemoryError.storageFull
+            }
+        )
+
+        let committed = try interrupted.commitRelink(preparation)
+        XCTAssertEqual(
+            committed.aliases.filter { $0 == replacement.standardizedFileURL.path }.count,
+            1
+        )
+        XCTAssertThrowsError(try interrupted.completeRelinkIntent(preparation)) { error in
+            XCTAssertEqual(error as? ProjectMemoryError, .storageFull)
+        }
+        let published = try originalResolver.descriptor(projectID: original.id)
+        XCTAssertEqual(
+            published.aliases.filter { $0 == replacement.standardizedFileURL.path }.count,
+            1
+        )
+        XCTAssertTrue(try originalResolver.hasPendingRelink(projectID: original.id))
+
+        let recovered = try originalResolver.reconcilePendingRelink(
+            projectID: original.id,
+            controlPlaneGeneration: ProjectGeneration(2),
+            controlPlaneCanonicalRoot: replacement,
+            controlPlaneRepositoryIdentity: original.repositoryIdentity,
+            committedTransitionValidated: true
+        )
+        XCTAssertEqual(
+            recovered,
+            .publishedCommittedAlias(operationID: preparation.operationID)
+        )
+        let final = try originalResolver.descriptor(projectID: original.id)
+        XCTAssertEqual(
+            final.aliases.filter { $0 == replacement.standardizedFileURL.path }.count,
+            1
+        )
+        XCTAssertTrue(try originalResolver.hasPendingRelink(projectID: original.id))
+        try originalResolver.completeRelinkIntent(preparation)
+        XCTAssertFalse(try originalResolver.hasPendingRelink(projectID: original.id))
     }
 
     func testV1PrepareReturnsCapturedResultWhenStorageFailsAfterCommit() throws {
@@ -430,7 +553,7 @@ final class CommittedResultRecoveryTests: XCTestCase {
             databaseURL: fixture.root.appendingPathComponent("control-plane.sqlite3")
         )
         let projectIdentity = ProjectID(try XCTUnwrap(UUID(uuidString: fixture.projectID)))
-        _ = try await controlPlane.registerProject(
+        _ = try await controlPlane.registerProjectUnchecked(
             projectID: projectIdentity,
             displayName: "Committed result fixture",
             canonicalRoot: fixture.project
@@ -791,6 +914,14 @@ final class CommittedResultRecoveryTests: XCTestCase {
         _ = try runGit(["config", "commit.gpgsign", "false"], cwd: repository)
     }
 
+    private func writeGitRemote(_ remote: String, to root: URL) throws {
+        let git = root.appendingPathComponent(".git", isDirectory: true)
+        try FileManager.default.createDirectory(at: git, withIntermediateDirectories: true)
+        try Data(
+            "[remote \"origin\"]\n\turl = \(remote)\n".utf8
+        ).write(to: git.appendingPathComponent("config"), options: .atomic)
+    }
+
     @discardableResult
     private func runGit(_ arguments: [String], cwd: URL) throws -> ProcessResult {
         let result = try ProcessRunner().run(
@@ -826,7 +957,7 @@ final class CommittedResultRecoveryTests: XCTestCase {
     ) {
         let base = try makeProjectFixture(label: label)
         let memory = ProjectMemoryService(paths: base.paths)
-        let initialized = try memory.initialize(path: base.project.path)
+        let initialized = try memory.initializeUnchecked(path: base.project.path)
         return (
             base.root,
             base.project,

@@ -102,6 +102,10 @@ final class ForgeApplicationDelegate: NSObject, NSApplicationDelegate, Observabl
         return false
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        model.cancelSecureFilesystemServiceOperation()
+    }
+
     private func presentMainWindow() {
         if let controller = mainWindowController {
             controller.showWindow(nil)

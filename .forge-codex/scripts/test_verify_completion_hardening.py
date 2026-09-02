@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import os
@@ -13,6 +14,17 @@ import uuid
 from unittest import mock
 
 import verify_completion
+from evidence_support import source_manifest
+from p10_fixture_support import (
+    FIXTURE_BASELINE,
+    FIXTURE_BASELINE_PATH,
+    FIXTURE_EVIDENCE_ID,
+    FIXTURE_SENTINEL,
+    fixture_p10_binding,
+    fixture_p10_module,
+    fixture_python_command,
+    install_fixture_p10_evaluator,
+)
 
 
 SCRIPT_ROOT = pathlib.Path(__file__).resolve().parent
@@ -108,6 +120,7 @@ class CompletionVerifierHardeningTests(unittest.TestCase):
         package = root / ".forge-codex"
         scripts = package / "scripts"
         scripts.mkdir(parents=True)
+        install_fixture_p10_evaluator(root)
         for name in (
             "statectl.py",
             "validate_package.py",
@@ -180,6 +193,7 @@ class CompletionVerifierHardeningTests(unittest.TestCase):
                 }
             },
             "issues": [],
+            "evidence": [FIXTURE_EVIDENCE_ID],
             "last_event_sequence": 0,
         }
         self.write_json(package / "state/run-state.json", state)
@@ -242,11 +256,7 @@ class CompletionVerifierHardeningTests(unittest.TestCase):
             )
         self.write_json(
             package / "state/feature-baseline.json",
-            {
-                "runtime_completion_required": False,
-                "parity_summary": {"unknown": 0, "untested": 0, "removed": 0},
-                "features": [{"parity_status": "preserved"}],
-            },
+            FIXTURE_BASELINE,
         )
         self.write_json(package / "state/findings-resolution.json", {"findings": []})
         self.write_json(
@@ -269,6 +279,40 @@ class CompletionVerifierHardeningTests(unittest.TestCase):
         self.run_git(root, "init", "-q")
         self.commit_repository(root, "initial fixture")
         self.bind_current_source(root, fixture)
+        current_head = self.run_git(root, "rev-parse", "HEAD")
+        current_manifest = verify_completion.source_manifest(root)
+        binding = fixture_p10_binding(
+            root,
+            current_manifest=current_manifest,
+            current_git_head=current_head,
+            ledger_evidence_ids={FIXTURE_EVIDENCE_ID},
+        )
+        g10_criteria_path = package / "state/gate-results/G10.criteria.json"
+        self.write_json(
+            g10_criteria_path,
+            {
+                "criteria_results": [
+                    {
+                        "criterion": criterion,
+                        "passed": True,
+                        "evidence": "strict fixture P10 sentinel",
+                    }
+                    for criterion in criteria_by_gate["G10"]
+                ],
+                "valid": True,
+                "errors": [],
+                "p10_feature_binding": binding,
+            },
+        )
+        g10_result = fixture["results"]["G10"]
+        g10_result["artifacts"].append(
+            {
+                "path": str(g10_criteria_path.relative_to(root)),
+                "sha256": hashlib.sha256(g10_criteria_path.read_bytes()).hexdigest(),
+                "kind": "criteria",
+            }
+        )
+        self.write_json(result_paths["G10"], g10_result)
         return fixture
 
     def run_verifier(
@@ -277,14 +321,15 @@ class CompletionVerifierHardeningTests(unittest.TestCase):
         *arguments: str,
     ) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
-            [
-                sys.executable,
-                str(VERIFIER),
+            fixture_python_command(
+                root,
+                SCRIPT_ROOT,
+                VERIFIER,
                 "--repo",
                 str(root),
                 "--no-finalize",
                 *arguments,
-            ],
+            ),
             capture_output=True,
             text=True,
             timeout=20,
@@ -319,6 +364,20 @@ class CompletionVerifierHardeningTests(unittest.TestCase):
             self.assertTrue(
                 all(item["passed"] is True for item in criteria_payload["criteria_results"])
             )
+            g10_criteria = json.loads(
+                (
+                    fixture["package"]
+                    / "state/gate-results/G10.criteria.json"
+                ).read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                set(g10_criteria),
+                {"criteria_results", "valid", "errors", "p10_feature_binding"},
+            )
+            self.assertEqual(
+                g10_criteria["p10_feature_binding"]["sentinel"]["value"],
+                FIXTURE_SENTINEL,
+            )
 
     def test_unfinalized_and_mismatched_operations_fail_closed(self) -> None:
         mutations = ("unfinalized", "mismatched")
@@ -345,6 +404,99 @@ class CompletionVerifierHardeningTests(unittest.TestCase):
                     if mutation == "unfinalized"
                     else "gate-operation-pair:G00",
                     completed.stdout,
+                )
+
+    def test_fixture_p10_binding_rejects_stale_mutated_symlinked_and_traversal_values(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary).resolve()
+            fixture = self.install_repository(root)
+            criteria_path = (
+                fixture["package"] / "state/gate-results/G10.criteria.json"
+            )
+            criteria = json.loads(criteria_path.read_text(encoding="utf-8"))
+            binding = criteria["p10_feature_binding"]
+            head = self.run_git(root, "rev-parse", "HEAD")
+            manifest = source_manifest(root)
+
+            with fixture_p10_module(root) as module:
+                self.assertEqual(
+                    module.validate_p10_feature_binding(
+                        root,
+                        binding,
+                        current_manifest=manifest,
+                        current_git_head=head,
+                        ledger_evidence_ids={FIXTURE_EVIDENCE_ID},
+                    ),
+                    [],
+                )
+
+                for mutation in ("stale", "traversal"):
+                    with self.subTest(mutation=mutation):
+                        changed = copy.deepcopy(binding)
+                        if mutation == "stale":
+                            changed["source_identity"]["git_head"] = "f" * 40
+                        else:
+                            changed["sentinel"]["path"] = "../outside.json"
+                        failures = module.validate_p10_feature_binding(
+                            root,
+                            changed,
+                            current_manifest=manifest,
+                            current_git_head=head,
+                            ledger_evidence_ids={FIXTURE_EVIDENCE_ID},
+                        )
+                        self.assertIn(
+                            "fixture P10 sentinel binding changed after gate evaluation",
+                            failures,
+                        )
+
+                missing_ledger = module.validate_p10_feature_binding(
+                    root,
+                    binding,
+                    current_manifest=manifest,
+                    current_git_head=head,
+                    ledger_evidence_ids=set(),
+                )
+                self.assertIn(
+                    "fixture P10 evidence sentinel is absent from the ledger",
+                    missing_ledger,
+                )
+
+                baseline_path = root / FIXTURE_BASELINE_PATH
+                self.write_json(
+                    baseline_path,
+                    {**FIXTURE_BASELINE, "sentinel": "mutated"},
+                )
+                mutated = module.validate_p10_feature_binding(
+                    root,
+                    binding,
+                    current_manifest=manifest,
+                    current_git_head=head,
+                    ledger_evidence_ids={FIXTURE_EVIDENCE_ID},
+                )
+                self.assertIn(
+                    "fixture P10 baseline sentinel is not exact",
+                    mutated,
+                )
+
+                outside = root / "outside-feature-baseline.json"
+                self.write_json(outside, FIXTURE_BASELINE)
+                baseline_path.unlink()
+                baseline_path.symlink_to(outside)
+                symlinked = module.validate_p10_feature_binding(
+                    root,
+                    binding,
+                    current_manifest=manifest,
+                    current_git_head=head,
+                    ledger_evidence_ids={FIXTURE_EVIDENCE_ID},
+                )
+                self.assertTrue(
+                    any(
+                        "symlink" in failure or "unavailable" in failure
+                        for failure in symlinked
+                    ),
+                    symlinked,
                 )
 
     def test_gate_result_exact_bound_passes_and_plus_one_fails(self) -> None:
@@ -599,13 +751,14 @@ class CompletionVerifierHardeningTests(unittest.TestCase):
             result = json.loads(result_path.read_text(encoding="utf-8"))
             operation_id = result["operation_id"]
 
-            loaded_state, loaded_result = verify_completion.load_final_g12_pair(root)
+            with fixture_p10_module(root):
+                loaded_state, loaded_result = verify_completion.load_final_g12_pair(root)
 
             self.assertEqual(loaded_state["gates"]["G12"]["operation_id"], operation_id)
             self.assertEqual(loaded_result["source_head"], result["source_head"])
             result["source_head"] = "0" * 40
             self.write_json(result_path, result)
-            with self.assertRaisesRegex(
+            with fixture_p10_module(root), self.assertRaisesRegex(
                 verify_completion.EvidenceSupportError,
                 "finalized matching operation",
             ):
@@ -616,7 +769,7 @@ class CompletionVerifierHardeningTests(unittest.TestCase):
             source = root / "Sources/Dirty.swift"
             source.parent.mkdir(parents=True, exist_ok=True)
             source.write_text("let dirty = true\n", encoding="utf-8")
-            with self.assertRaisesRegex(
+            with fixture_p10_module(root), self.assertRaisesRegex(
                 verify_completion.EvidenceSupportError,
                 "dirty, or unstable",
             ):
@@ -700,18 +853,36 @@ class CompletionVerifierHardeningTests(unittest.TestCase):
             for index in range(12):
                 identifier = f"G{index:02d}"
                 handler = handlers / f"{identifier}.sh"
-                handler.write_text(
+                source = (
                     "#!/usr/bin/env python3\n"
-                    "import json, os, pathlib\n"
+                    "import json, os, pathlib, sys\n"
                     "root = pathlib.Path(os.environ['FORGE_GATE_REPOSITORY_ROOT'])\n"
+                    "sys.path.insert(0, str(root / '.forge-codex/scripts'))\n"
                     f"criteria = {criteria_by_gate[identifier]!r}\n"
                     f"path = root / '.forge-codex/state/gate-results/{identifier}.criteria.json'\n"
                     "payload = {'criteria_results': ["
                     "{'criterion': item, 'passed': True, 'evidence': 'fixture'} "
                     "for item in criteria]}\n"
-                    "path.write_text(json.dumps(payload, indent=2, sort_keys=True) + '\\n')\n",
-                    encoding="utf-8",
                 )
+                if identifier == "G10":
+                    source += (
+                        "from evidence_support import current_git_head, source_manifest\n"
+                        "from p10_feature_evidence import evaluate_p10_feature_evidence\n"
+                        "state = json.loads((root / '.forge-codex/state/run-state.json').read_text())\n"
+                        "evaluation = evaluate_p10_feature_evidence(\n"
+                        "    root,\n"
+                        "    current_manifest=source_manifest(root),\n"
+                        "    current_git_head=current_git_head(root) or '',\n"
+                        "    ledger_evidence_ids={item for item in state.get('evidence', []) if isinstance(item, str)},\n"
+                        ")\n"
+                        "if evaluation.failures:\n"
+                        "    raise SystemExit('; '.join(evaluation.failures))\n"
+                        "payload.update({'valid': True, 'errors': [], 'p10_feature_binding': evaluation.binding})\n"
+                    )
+                source += (
+                    "path.write_text(json.dumps(payload, indent=2, sort_keys=True) + '\\n')\n"
+                )
+                handler.write_text(source, encoding="utf-8")
                 handler.chmod(0o755)
             g12_handler = handlers / "G12.sh"
             g12_handler.write_bytes(
@@ -742,6 +913,26 @@ class CompletionVerifierHardeningTests(unittest.TestCase):
                 0,
                 initialized.stdout + initialized.stderr,
             )
+            referenced = subprocess.run(
+                [
+                    sys.executable,
+                    str(scripts / "statectl.py"),
+                    "--repo",
+                    str(root),
+                    "reference",
+                    "evidence",
+                    FIXTURE_EVIDENCE_ID,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            )
+            self.assertEqual(
+                referenced.returncode,
+                0,
+                referenced.stdout + referenced.stderr,
+            )
             for index in range(12):
                 identifier = f"G{index:02d}"
                 admitted = subprocess.run(
@@ -758,10 +949,16 @@ class CompletionVerifierHardeningTests(unittest.TestCase):
                     timeout=20,
                     check=False,
                 )
+                gate_stderr = package / f"state/gate-results/{identifier}.stderr.txt"
+                gate_diagnostic = (
+                    gate_stderr.read_text(encoding="utf-8", errors="replace")
+                    if gate_stderr.is_file()
+                    else ""
+                )
                 self.assertEqual(
                     admitted.returncode,
                     0,
-                    admitted.stdout + admitted.stderr,
+                    admitted.stdout + admitted.stderr + gate_diagnostic,
                 )
 
             completed = subprocess.run(

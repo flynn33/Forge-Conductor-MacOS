@@ -892,7 +892,7 @@ final class ForgeFilesystemProtocolTests: XCTestCase {
         XCTAssertTrue(daemon.contains("anchor apple generic"))
         XCTAssertTrue(app.contains("1.2.840.113635.100.6.1"))
         XCTAssertTrue(daemon.contains("1.2.840.113635.100.6.1"))
-        #if DEBUG
+        #if DEBUG || FORGE_DEVELOPMENT_SIGNING
         XCTAssertTrue(app.contains("1.2.840.113635.100.6.1.12"))
         XCTAssertFalse(app.contains("1.2.840.113635.100.6.1.13"))
         XCTAssertTrue(daemon.contains("1.2.840.113635.100.6.1.12"))
@@ -922,6 +922,64 @@ final class ForgeFilesystemProtocolTests: XCTestCase {
         XCTAssertNil(ForgeFilesystemProtocolConstants.requiredDaemonCodeSigningRequirement(
             codeDirectoryHashes: [firstHash, "not-a-cdhash"]
         ))
+    }
+
+    func testProductRequirementsBindEachApprovedTeamToOnlyItsCertificateClass() throws {
+        let identifiers = [
+            ForgeFilesystemProtocolConstants.appIdentifier,
+            ForgeFilesystemProtocolConstants.managerIdentifier,
+            ForgeFilesystemProtocolConstants.daemonIdentifier,
+            ForgeFilesystemProtocolConstants.runtimeLauncherIdentifier,
+            ForgeFilesystemProtocolConstants.coreFrameworkIdentifier,
+        ]
+        for identifier in identifiers {
+            let development = try XCTUnwrap(
+                ForgeFilesystemProtocolConstants.requiredProductCodeSigningRequirement(
+                    identifier: identifier,
+                    teamIdentifier: ForgeFilesystemProtocolConstants.developmentTeamIdentifier
+                )
+            )
+            XCTAssertTrue(development.contains("identifier \"\(identifier)\""))
+            XCTAssertTrue(development.contains("9AQ2C2838M"))
+            XCTAssertTrue(development.contains("1.2.840.113635.100.6.1.12"))
+            XCTAssertFalse(development.contains("1.2.840.113635.100.6.1.13"))
+
+            let distribution = try XCTUnwrap(
+                ForgeFilesystemProtocolConstants.requiredProductCodeSigningRequirement(
+                    identifier: identifier,
+                    teamIdentifier: ForgeFilesystemProtocolConstants.productionTeamIdentifier
+                )
+            )
+            XCTAssertTrue(distribution.contains("identifier \"\(identifier)\""))
+            XCTAssertTrue(distribution.contains("2Y25RTLZET"))
+            XCTAssertTrue(distribution.contains("1.2.840.113635.100.6.1.13"))
+            XCTAssertFalse(distribution.contains("1.2.840.113635.100.6.1.12"))
+
+            for requirement in [development, distribution] {
+                var compiled: SecRequirement?
+                XCTAssertEqual(
+                    SecRequirementCreateWithString(
+                        requirement as CFString,
+                        SecCSFlags(rawValue: 0),
+                        &compiled
+                    ),
+                    errSecSuccess
+                )
+                XCTAssertNotNil(compiled)
+            }
+        }
+        XCTAssertNil(
+            ForgeFilesystemProtocolConstants.requiredProductCodeSigningRequirement(
+                identifier: ForgeFilesystemProtocolConstants.appIdentifier,
+                teamIdentifier: "UNAPPROVED1"
+            )
+        )
+        XCTAssertNil(
+            ForgeFilesystemProtocolConstants.requiredProductCodeSigningRequirement(
+                identifier: "com.forge-conductor.unrecognized",
+                teamIdentifier: ForgeFilesystemProtocolConstants.developmentTeamIdentifier
+            )
+        )
     }
 
     func testRequesterPolicyRejectsRootAndInvalidUIDs() {

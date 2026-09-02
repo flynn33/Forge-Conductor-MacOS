@@ -1,0 +1,10 @@
+Test Suite 'Selected tests' started at 2026-09-01 06:04:48.329.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-09-01 06:04:48.330.
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-09-01 06:04:48.330.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-09-01 06:04:48.330.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

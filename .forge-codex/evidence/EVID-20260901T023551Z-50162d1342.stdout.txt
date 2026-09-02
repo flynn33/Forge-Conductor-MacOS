@@ -1,0 +1,15 @@
+Test Suite 'Selected tests' started at 2026-08-31 21:35:52.301.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-31 21:35:52.301.
+Test Suite 'ProductPathReliabilityTests' started at 2026-08-31 21:35:52.301.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testRemoteSettingsCommitReplacesEveryAppModelManagerEndpointBeforeRefresh]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testRemoteSettingsCommitReplacesEveryAppModelManagerEndpointBeforeRefresh]' passed (0.001 seconds).
+Test Suite 'ProductPathReliabilityTests' passed at 2026-08-31 21:35:52.303.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.001 (0.001) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-08-31 21:35:52.303.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.001 (0.001) seconds
+Test Suite 'Selected tests' passed at 2026-08-31 21:35:52.303.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.001 (0.002) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

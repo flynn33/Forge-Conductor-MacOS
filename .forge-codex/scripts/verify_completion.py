@@ -540,6 +540,45 @@ class CompletionEvaluation:
             "schema, timing, environment, and evaluator metadata",
         )
         self.validate_gate_artifacts(gate_identifier, result)
+        if gate_identifier == "G10":
+            try:
+                criteria_document = self.load_control(
+                    ".forge-codex/state/gate-results/G10.criteria.json",
+                    label="G10 P10 feature-bound criteria",
+                )
+                if set(criteria_document) != {
+                    "criteria_results",
+                    "valid",
+                    "errors",
+                    "p10_feature_binding",
+                }:
+                    raise EvidenceSupportError(
+                        "G10 criteria has no exact P10 feature binding"
+                    )
+                from p10_feature_evidence import validate_p10_feature_binding
+
+                binding_failures = validate_p10_feature_binding(
+                    self.repository,
+                    criteria_document.get("p10_feature_binding"),
+                    current_manifest=self.current_source_manifest or {},
+                    current_git_head=self.current_source_head or "",
+                    ledger_evidence_ids={
+                        item
+                        for item in self.state.get("evidence", [])
+                        if isinstance(item, str)
+                    },
+                )
+                self.check(
+                    "g10-p10-feature-evidence-binding",
+                    not binding_failures,
+                    (
+                        "exact feature, evidence-record, semantic-row, artifact, and ledger binding"
+                        if not binding_failures
+                        else "; ".join(binding_failures[:8])
+                    ),
+                )
+            except (EvidenceSupportError, ImportError) as error:
+                self.check("g10-p10-feature-evidence-binding", False, error)
 
         if gate_identifier not in ACCEPTANCE_REQUIRED_GATES:
             return
@@ -622,36 +661,29 @@ class CompletionEvaluation:
 
     def validate_feature_baseline(self) -> None:
         try:
-            baseline = self.load_control(
-                ".forge-codex/state/feature-baseline.json",
-                label="completion feature baseline",
+            from p10_feature_evidence import evaluate_p10_feature_evidence
+
+            evaluation = evaluate_p10_feature_evidence(
+                self.repository,
+                current_manifest=self.current_source_manifest or {},
+                current_git_head=self.current_source_head or "",
+                ledger_evidence_ids={
+                    item
+                    for item in self.state.get("evidence", [])
+                    if isinstance(item, str)
+                },
             )
-        except EvidenceSupportError as error:
+            self.check(
+                "feature-baseline-valid",
+                not evaluation.failures,
+                (
+                    "104 exact registry-bound production-qualified feature records"
+                    if not evaluation.failures
+                    else "; ".join(evaluation.failures[:8])
+                ),
+            )
+        except (EvidenceSupportError, ImportError) as error:
             self.check("feature-baseline-valid", False, error)
-            return
-        summary = baseline.get("parity_summary")
-        summary = summary if isinstance(summary, dict) else {}
-        features = baseline.get("features")
-        features = features if isinstance(features, list) else []
-        try:
-            counters_valid = all(
-                int(summary.get(name, 1)) == 0
-                for name in ("unknown", "untested", "removed")
-            )
-        except (TypeError, ValueError):
-            counters_valid = False
-        statuses_valid = bool(features) and all(
-            isinstance(feature, dict)
-            and feature.get("parity_status") in {"preserved", "additive", "migrated"}
-            for feature in features
-        )
-        self.check(
-            "feature-runtime-inventory-complete",
-            baseline.get("runtime_completion_required") is False,
-            baseline.get("runtime_completion_required"),
-        )
-        self.check("feature-parity-counters-zero", counters_valid, summary)
-        self.check("all-feature-statuses-valid", statuses_valid, f"{len(features)} feature records")
 
     def validate_findings(self) -> None:
         findings_document: dict[str, Any] | None = None

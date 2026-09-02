@@ -394,6 +394,142 @@ public struct TelemetryHealthReport: Sendable, Equatable {
 
 // MARK: - Native operator snapshot
 
+public enum ManagerProjectRegistrationState: String, Codable, Sendable {
+    case committed
+    case reconciliationRequired = "reconciliation_required"
+}
+
+/// Typed result for a manager-owned project registration. A transport client
+/// may return `reconciliationRequired` after its one exact automatic replay is
+/// also lost; that state never asserts whether the manager committed.
+public struct ManagerProjectRegistrationResult: Codable, Sendable, Equatable {
+    public let registrationState: ManagerProjectRegistrationState
+    public let projectID: String?
+    public let displayName: String?
+    public let canonicalRoot: String?
+    public let projectGeneration: UInt64?
+    public let lifecycleState: String?
+    public let requestPath: String
+    public let requestedDisplayName: String?
+    public let repositoryIdentityAssertion: String?
+    public let reconciled: Bool
+    public let code: String?
+    public let message: String?
+
+    enum CodingKeys: String, CodingKey {
+        case registrationState = "registration_status"
+        case projectID = "project_id"
+        case displayName = "display_name"
+        case canonicalRoot = "canonical_root"
+        case projectGeneration = "project_generation"
+        case lifecycleState = "lifecycle_state"
+        case requestPath = "request_path"
+        case requestedDisplayName = "requested_display_name"
+        case repositoryIdentityAssertion = "repository_identity_assertion"
+        case reconciled, code, message
+    }
+
+    public init(
+        registrationState: ManagerProjectRegistrationState,
+        projectID: String?,
+        displayName: String?,
+        canonicalRoot: String?,
+        projectGeneration: UInt64?,
+        lifecycleState: String?,
+        requestPath: String,
+        requestedDisplayName: String?,
+        repositoryIdentityAssertion: String?,
+        reconciled: Bool,
+        code: String? = nil,
+        message: String? = nil
+    ) {
+        self.registrationState = registrationState
+        self.projectID = projectID
+        self.displayName = displayName
+        self.canonicalRoot = canonicalRoot
+        self.projectGeneration = projectGeneration
+        self.lifecycleState = lifecycleState
+        self.requestPath = requestPath
+        self.requestedDisplayName = requestedDisplayName
+        self.repositoryIdentityAssertion = repositoryIdentityAssertion
+        self.reconciled = reconciled
+        self.code = code
+        self.message = message
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        projectID = try container.decodeIfPresent(String.self, forKey: .projectID)
+        registrationState = try container.decodeIfPresent(
+            ManagerProjectRegistrationState.self,
+            forKey: .registrationState
+        ) ?? (projectID == nil ? .reconciliationRequired : .committed)
+        displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+        canonicalRoot = try container.decodeIfPresent(String.self, forKey: .canonicalRoot)
+        projectGeneration = try container.decodeIfPresent(UInt64.self, forKey: .projectGeneration)
+        lifecycleState = try container.decodeIfPresent(String.self, forKey: .lifecycleState)
+        requestPath = try container.decodeIfPresent(String.self, forKey: .requestPath)
+            ?? canonicalRoot
+            ?? ""
+        requestedDisplayName = try container.decodeIfPresent(
+            String.self,
+            forKey: .requestedDisplayName
+        )
+        repositoryIdentityAssertion = try container.decodeIfPresent(
+            String.self,
+            forKey: .repositoryIdentityAssertion
+        )
+        reconciled = try container.decodeIfPresent(Bool.self, forKey: .reconciled) ?? false
+        code = try container.decodeIfPresent(String.self, forKey: .code)
+        message = try container.decodeIfPresent(String.self, forKey: .message)
+    }
+
+    public func asDictionary() throws -> [String: Any] {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        let data = try encoder.encode(self)
+        guard var object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw ManagerModelError.invalidOperatorSnapshot
+        }
+        object["ok"] = registrationState == .committed
+        object["reconciliation_required"] = registrationState == .reconciliationRequired
+        return object
+    }
+}
+
+/// Typed manager receipt for an identity-verified project relink. `reconciled`
+/// is true only when the manager observes the exact already-committed
+/// generation/root tuple after a lost response and returns it idempotently.
+public struct ManagerProjectRelinkResult: Codable, Sendable, Equatable {
+    public let projectID: String
+    public let canonicalRoot: String
+    public let priorGeneration: UInt64
+    public let newGeneration: UInt64
+    public let invalidatedBindingCount: Int
+    public let completedAt: String
+    public let reconciled: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case projectID = "project_id"
+        case canonicalRoot = "canonical_root"
+        case priorGeneration = "prior_generation"
+        case newGeneration = "new_generation"
+        case invalidatedBindingCount = "invalidated_binding_count"
+        case completedAt = "completed_at"
+        case reconciled
+    }
+
+    public func asDictionary() throws -> [String: Any] {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        let data = try encoder.encode(self)
+        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw ManagerModelError.invalidOperatorSnapshot
+        }
+        return object
+    }
+}
+
 /// Bounded, read-only projection consumed by the native operator views.
 /// Every nested value is intentionally smaller than its underlying durable record:
 /// request bodies, tool arguments, provider output, and runtime output are not part of
@@ -402,6 +538,7 @@ public struct ManagerOperatorSnapshot: Encodable, Sendable, Equatable {
     public let generatedAt: String
     public let limit: Int
     public let projects: [ManagerOperatorProject]
+    public let pendingProjectRegistrations: [ManagerOperatorPendingProjectRegistration]
     public let runs: [ManagerOperatorRun]
     public let continuityOperations: [ManagerOperatorContinuity]
     public let runtimeJobs: [ManagerOperatorRuntimeJob]
@@ -413,6 +550,7 @@ public struct ManagerOperatorSnapshot: Encodable, Sendable, Equatable {
     enum CodingKeys: String, CodingKey {
         case generatedAt = "generated_at"
         case limit, projects, runs
+        case pendingProjectRegistrations = "pending_project_registrations"
         case continuityOperations = "continuity_operations"
         case runtimeJobs = "runtime_jobs"
         case provider, runtime, events
@@ -430,6 +568,29 @@ public struct ManagerOperatorSnapshot: Encodable, Sendable, Equatable {
     }
 }
 
+/// One validated, non-authoritative registration intent that is durable before
+/// its first control-plane row exists. The top-level shape keeps that exact
+/// request discoverable after restart without pretending it is a project.
+public struct ManagerOperatorPendingProjectRegistration: Encodable, Sendable, Equatable {
+    public let projectID: String
+    public let state: String
+    public let requestPath: String
+    public let requestedDisplayName: String?
+    public let repositoryIdentityAssertion: String?
+    public let operationID: String
+    public let createdAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case projectID = "project_id"
+        case state
+        case requestPath = "request_path"
+        case requestedDisplayName = "requested_display_name"
+        case repositoryIdentityAssertion = "repository_identity_assertion"
+        case operationID = "operation_id"
+        case createdAt = "created_at"
+    }
+}
+
 public struct ManagerOperatorProject: Encodable, Sendable, Equatable {
     public let projectID: String
     public let displayName: String
@@ -441,6 +602,7 @@ public struct ManagerOperatorProject: Encodable, Sendable, Equatable {
     public let continuity: ManagerOperatorProjectContinuity
     public let migrationWarnings: [String]
     public let resetReceipt: ManagerOperatorResetReceipt?
+    public let pendingTransition: ManagerOperatorProjectTransition?
     public let createdAt: String
     public let updatedAt: String
 
@@ -453,8 +615,43 @@ public struct ManagerOperatorProject: Encodable, Sendable, Equatable {
         case bindings, memory, continuity
         case migrationWarnings = "migration_warnings"
         case resetReceipt = "reset_receipt"
+        case pendingTransition = "pending_transition"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+    }
+
+    public func asDictionary() throws -> [String: Any] {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        let data = try encoder.encode(self)
+        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw ManagerModelError.invalidOperatorSnapshot
+        }
+        return object
+    }
+}
+
+/// One manager-owned, durable project transition that can be replayed exactly
+/// after the app or manager process restarts. At most one transition is
+/// projected for any project generation.
+public struct ManagerOperatorProjectTransition: Encodable, Sendable, Equatable {
+    public let kind: String
+    public let state: String
+    public let requestPath: String
+    public let requestedDisplayName: String?
+    public let repositoryIdentityAssertion: String?
+    public let expectedGeneration: UInt64?
+    public let operationID: String
+    public let createdAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case kind, state
+        case requestPath = "request_path"
+        case requestedDisplayName = "requested_display_name"
+        case repositoryIdentityAssertion = "repository_identity_assertion"
+        case expectedGeneration = "expected_generation"
+        case operationID = "operation_id"
+        case createdAt = "created_at"
     }
 }
 
@@ -611,6 +808,15 @@ public struct ManagerOperatorContextBudget: Encodable, Sendable, Equatable {
     }
 }
 
+struct ManagerOperatorContinuityEvidence: Sendable, Equatable {
+    let operationID: UUID
+    let projectID: ProjectID
+    let projectGeneration: ProjectGeneration
+    let runID: RunID
+    let checkpointID: String
+    let acknowledgementSHA256: String?
+}
+
 public struct ManagerOperatorContinuityReadModel: Sendable, Equatable {
     public let command: ContinuityCommand
     public let run: AutonomousRunRecord?
@@ -618,6 +824,8 @@ public struct ManagerOperatorContinuityReadModel: Sendable, Equatable {
     public let successor: ProviderSessionRecord?
     public let automaticContinuation: ProviderTurnRecord?
     public let budgetObservation: ContextBudgetObservation?
+    public let checkpointID: String?
+    public let acknowledgementSHA256: String?
 }
 
 public struct ManagerOperatorContinuity: Encodable, Sendable, Equatable {
@@ -628,6 +836,7 @@ public struct ManagerOperatorContinuity: Encodable, Sendable, Equatable {
     public let mode: String
     public let state: String
     public let controlState: String
+    public let checkpointID: String?
     public let handoffID: String?
     public let handoffSHA256: String?
     public let predecessorSessionID: String?
@@ -648,6 +857,7 @@ public struct ManagerOperatorContinuity: Encodable, Sendable, Equatable {
         case runID = "run_id"
         case mode, state
         case controlState = "control_state"
+        case checkpointID = "checkpoint_id"
         case handoffID = "handoff_id"
         case handoffSHA256 = "handoff_sha256"
         case predecessorSessionID = "predecessor_session_id"
@@ -663,7 +873,7 @@ public struct ManagerOperatorContinuity: Encodable, Sendable, Equatable {
     }
 }
 
-public struct ManagerOperatorRuntimeJob: Encodable, Sendable, Equatable {
+public struct ManagerOperatorRuntimeJob: Codable, Sendable, Equatable {
     public let jobID: String
     public let runID: String?
     public let projectID: String
@@ -697,9 +907,66 @@ public struct ManagerOperatorRuntimeJob: Encodable, Sendable, Equatable {
         case createdAt = "created_at"
         case completedAt = "completed_at"
     }
+
+    public func asDictionary() throws -> [String: Any] {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        let data = try encoder.encode(self)
+        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw ManagerModelError.invalidOperatorSnapshot
+        }
+        return object
+    }
 }
 
-public struct ManagerOperatorProvider: Encodable, Sendable, Equatable {
+public enum ManagerProviderProbeMode: String, Codable, Sendable, CaseIterable {
+    case connection
+    case contract
+}
+
+public enum ManagerProviderProbeError: Error, LocalizedError, Sendable, Equatable {
+    case invalidAdapterIdentifier
+    case adapterNotRegistered
+    case managedProviderUnavailable
+    case probeInProgress
+    case storageUnavailable
+    case connectionFailed(String)
+    case contractUnavailable(String)
+
+    public var code: String {
+        switch self {
+        case .invalidAdapterIdentifier: "invalid_provider_adapter"
+        case .adapterNotRegistered: "provider_adapter_not_registered"
+        case .managedProviderUnavailable: "managed_provider_unavailable"
+        case .probeInProgress: "provider_probe_in_progress"
+        case .storageUnavailable: "provider_storage_unavailable"
+        case .connectionFailed: "provider_connection_failed"
+        case .contractUnavailable: "provider_contract_unavailable"
+        }
+    }
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidAdapterIdentifier:
+            "The provider adapter identifier is invalid."
+        case .adapterNotRegistered:
+            "The requested native session-host adapter is not registered."
+        case .managedProviderUnavailable:
+            "The registered adapter does not expose a managed model provider."
+        case .probeInProgress:
+            "A provider probe is already in progress."
+        case .storageUnavailable:
+            "The manager could not prepare protected provider storage."
+        case .connectionFailed(let detail):
+            "Provider connection failed: \(detail)"
+        case .contractUnavailable(let detail):
+            "Provider contract probe failed: \(detail)"
+        }
+    }
+}
+
+public struct ManagerOperatorProvider: Codable, Sendable, Equatable {
+    public let adapterID: String?
     public let providerID: String?
     public let health: String
     public let endpoint: String?
@@ -716,10 +983,13 @@ public struct ManagerOperatorProvider: Encodable, Sendable, Equatable {
     public let lifecycleManagementEnabled: Bool?
     public let idleTTLSeconds: Int?
     public let contractFingerprint: String?
+    public let lastProbeMode: String?
+    public let probeResultStorage: String?
     public let lastProbeAt: String?
     public let lastProbeError: String?
 
     enum CodingKeys: String, CodingKey {
+        case adapterID = "adapter_id"
         case providerID = "provider_id"
         case health, endpoint, loopback, tls
         case authenticationEnabled = "authentication_enabled"
@@ -733,8 +1003,20 @@ public struct ManagerOperatorProvider: Encodable, Sendable, Equatable {
         case lifecycleManagementEnabled = "lifecycle_management_enabled"
         case idleTTLSeconds = "idle_ttl_seconds"
         case contractFingerprint = "contract_fingerprint"
+        case lastProbeMode = "last_probe_mode"
+        case probeResultStorage = "probe_result_storage"
         case lastProbeAt = "last_probe_at"
         case lastProbeError = "last_probe_error"
+    }
+
+    public func asDictionary() throws -> [String: Any] {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        let data = try encoder.encode(self)
+        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw ManagerModelError.invalidOperatorSnapshot
+        }
+        return object
     }
 }
 

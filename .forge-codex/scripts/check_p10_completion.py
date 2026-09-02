@@ -25,7 +25,9 @@ from evidence_support import (
     MAXIMUM_MANIFEST_FILE_BYTES,
     MAXIMUM_QUALIFICATION_ARTIFACT_BYTES,
     QUALIFICATION_ARTIFACT_BINDING_SCHEMA_VERSION,
+    atomic_write,
     canonical_json_sha256,
+    current_git_head,
     decode_strict_json_object,
     load_qualification_artifact,
     parse_xctest_summaries,
@@ -39,6 +41,7 @@ from record_command import (
     MAXIMUM_PRESERVED_ARTIFACT_BYTES,
     execution_provenance,
 )
+from p10_feature_evidence import evaluate_p10_feature_evidence
 
 
 ROOT = pathlib.Path(os.environ.get("FORGE_P10_REPOSITORY", pathlib.Path(__file__).resolve().parents[2])).resolve()
@@ -1128,12 +1131,18 @@ def manifest_report(report: dict[str, Any], label: str) -> None:
     check(report.get("source_manifest") == CURRENT_MANIFEST, f"{label} report is stale for the current source manifest")
 
 
-baseline = load(".forge-codex/state/feature-baseline.json")
-features = baseline.get("features")
-check(isinstance(features, list) and len(features) == 66, "baseline feature inventory is not exactly 66 entries")
-if isinstance(features, list):
-    check(all(isinstance(item, dict) and item.get("parity_status") == "preserved" for item in features), "baseline feature inventory contains a non-preserved entry")
-    check(all(isinstance(item, dict) and item.get("evidence") and item.get("tests") for item in features), "baseline feature inventory contains an entry without evidence or tests")
+CURRENT_GIT_HEAD = current_git_head(ROOT)
+if CURRENT_GIT_HEAD is None:
+    failures.append("P10 current Git HEAD is unavailable")
+P10_FEATURE_EVALUATION = evaluate_p10_feature_evidence(
+    ROOT,
+    current_manifest=CURRENT_MANIFEST,
+    current_git_head=CURRENT_GIT_HEAD or "",
+    ledger_evidence_ids=LEDGER_EVIDENCE_IDS,
+)
+baseline = P10_FEATURE_EVALUATION.baseline
+features = baseline.get("features") if isinstance(baseline, dict) else None
+failures.extend(P10_FEATURE_EVALUATION.failures)
 
 try:
     project = read_bounded_repository_bytes(
@@ -2203,8 +2212,27 @@ result = {
     "phase": "P10",
     "source_manifest": CURRENT_MANIFEST,
     "baseline_features": len(features) if isinstance(features, list) else 0,
+    "feature_evidence_binding": P10_FEATURE_EVALUATION.binding,
     "migration_fixtures": len(fixtures) if isinstance(fixtures, list) else 0,
     "failures": failures,
 }
+binding_output = os.environ.get("FORGE_P10_BINDING_OUTPUT")
+if binding_output is not None:
+    expected_binding_output = (
+        ROOT / ".forge-codex/state/gate-results/G10.p10-feature-binding.json"
+    )
+    if binding_output != str(expected_binding_output):
+        result["failures"].append("P10 binding output path is not canonical")
+        result["ok"] = False
+    elif result["ok"]:
+        encoded_binding = (
+            json.dumps(
+                P10_FEATURE_EVALUATION.binding,
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n"
+        ).encode("utf-8")
+        atomic_write(expected_binding_output, encoded_binding, final_mode=0o600)
 print(json.dumps(result, indent=2, sort_keys=True))
 raise SystemExit(0 if not failures else 1)

@@ -935,6 +935,26 @@ def prepare_tool_fixture(
     return workspace, playbook, initial_head
 
 
+def configure_allowed_roots(home: pathlib.Path, roots: list[pathlib.Path]) -> None:
+    """Persist the trusted-root policy required by production authorization."""
+    require(roots, "compatibility fixture requires at least one trusted root")
+    resolved = [root.resolve(strict=True) for root in roots]
+    require(
+        all(root.is_dir() for root in resolved),
+        "compatibility fixture roots must be existing directories",
+    )
+    normalized = [str(root) for root in resolved]
+    require(len(normalized) == len(set(normalized)), "compatibility fixture roots contain duplicates")
+    payload = {
+        "config_schema_version": 2,
+        "allowed_roots": normalized,
+    }
+    atomic_write(
+        home / "config.json",
+        (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode("utf-8"),
+    )
+
+
 def exercise_legacy_tool_success_matrix(
     binary: pathlib.Path,
     root: pathlib.Path,
@@ -950,6 +970,7 @@ def exercise_legacy_tool_success_matrix(
     home = root / name
     home.mkdir(parents=True, exist_ok=False)
     workspace, playbook, initial_head = prepare_tool_fixture(home, legacy_tools)
+    configure_allowed_roots(home, [workspace])
     tracked = workspace / "tracked.txt"
     source = workspace / "source.md"
     moved = workspace / "moved.md"
@@ -1314,6 +1335,7 @@ def exercise_concurrent_mixed_correlation_probe(
     home = root / name
     home.mkdir(parents=True, exist_ok=False)
     workspace, _, _ = prepare_tool_fixture(home, ["shell_exec"])
+    configure_allowed_roots(home, [workspace])
     process, requests, responses = initialize_process(binary, home, name, response_timeout)
     try:
         start_fixture_session(process, requests, responses, workspace, response_timeout)
@@ -1474,6 +1496,7 @@ def exercise_active_cancellation_probe(
     home = root / name
     home.mkdir(parents=True, exist_ok=False)
     workspace, _, _ = prepare_tool_fixture(home, ["shell_exec"])
+    configure_allowed_roots(home, [workspace])
     ready = workspace / "cancel-ready"
     child_path = workspace / "cancel-child.pid"
     process, requests, responses = initialize_process(binary, home, name, response_timeout)
@@ -1568,6 +1591,7 @@ def exercise_non_shell_search_control_probe(
     home = root / name
     home.mkdir(parents=True, exist_ok=False)
     workspace, _, _ = prepare_tool_fixture(home, ["search_text"])
+    configure_allowed_roots(home, [workspace])
     cancellation_root = workspace / "blocking-cancel-search"
     deadline_root = workspace / "blocking-deadline-search"
     cancellation_root.mkdir()
@@ -1769,6 +1793,7 @@ def exercise_git_post_commit_reconciliation_probe(
     home = root / name
     home.mkdir(parents=True, exist_ok=False)
     workspace, _, initial_head = prepare_tool_fixture(home, ["git_commit"])
+    configure_allowed_roots(home, [workspace])
     tracked = workspace / "tracked.txt"
     tracked.write_text("tracked after\n", encoding="utf-8")
     for command in (
@@ -1923,6 +1948,7 @@ def exercise_active_eof_shutdown_probe(
     home = root / name
     home.mkdir(parents=True, exist_ok=False)
     workspace, _, _ = prepare_tool_fixture(home, ["shell_exec"])
+    configure_allowed_roots(home, [workspace])
     ready = workspace / "eof-ready"
     child_path = workspace / "eof-child.pid"
     process, requests, responses = initialize_process(binary, home, name, response_timeout)
@@ -2161,6 +2187,7 @@ def exercise_pagination_probe(
     home.mkdir(parents=True, exist_ok=False)
     project_path = home / "fixture-project"
     project_path.mkdir()
+    configure_allowed_roots(home, [project_path])
     process, requests, responses = initialize_process(binary, home, name, response_timeout)
 
     def call_tool(request_id: int, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:

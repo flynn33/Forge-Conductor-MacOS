@@ -266,7 +266,7 @@ final class ContinuityCoordinatorTests: XCTestCase {
         let paths = AppPaths(home: home)
         try paths.ensureLayout()
         let memory = ProjectMemoryService(paths: paths)
-        let initialized = try memory.initialize(path: project.path)
+        let initialized = try memory.initializeUnchecked(path: project.path)
         let projectID = try XCTUnwrap(initialized["project_id"] as? String)
         return (root, home, projectID, memory)
     }

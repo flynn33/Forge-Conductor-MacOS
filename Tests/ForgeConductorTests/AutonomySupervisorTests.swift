@@ -601,11 +601,11 @@ final class AutonomySupervisorTests: XCTestCase {
             try paths.ensureLayout()
             let memory = ProjectMemoryService(paths: paths)
             defer { memory.closeAll() }
-            let initialized = try memory.initialize(path: projectRoot.path)
+            let initialized = try memory.initializeUnchecked(path: projectRoot.path)
             let projectID = ProjectID(try XCTUnwrap(UUID(
                 uuidString: try XCTUnwrap(initialized["project_id"] as? String)
             )))
-            _ = try await repository.registerProject(
+            _ = try await repository.registerProjectUnchecked(
                 projectID: projectID,
                 displayName: "Memory Reconciliation Fixture",
                 canonicalRoot: projectRoot
@@ -1191,7 +1191,7 @@ final class AutonomySupervisorTests: XCTestCase {
     ) async throws -> RunFixture {
         let projectID = ProjectID()
         let projectRoot = root.appendingPathComponent("project", isDirectory: true)
-        _ = try await repository.registerProject(
+        _ = try await repository.registerProjectUnchecked(
             projectID: projectID,
             displayName: "Autonomy Fixture",
             canonicalRoot: projectRoot
