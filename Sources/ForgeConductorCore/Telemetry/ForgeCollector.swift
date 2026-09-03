@@ -493,7 +493,7 @@ public final class ForgeCollector: ForgeMetricsCollecting, @unchecked Sendable {
             "forge_status", "agent_list", "agent_get", "agent_context", "agent_recommend",
             "agent_run_start", "agent_run_status", "agent_run_complete",
             "session_checkpoint", "session_handoff", "context_get", "context_list",
-            "fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "fs_delete", "fs_move",
+            "fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "fs_delete", "fs_delete_recovery", "fs_move",
             "shell_exec", "git_status", "git_diff", "git_log", "git_add", "git_commit",
             "pdf_write", "pdf_from_file", "search_text",
             "memory_set", "memory_get", "memory_list", "memory_delete", "memory_search",

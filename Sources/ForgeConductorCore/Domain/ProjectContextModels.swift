@@ -203,6 +203,19 @@ public struct ProjectGenerationResetReceipt: Codable, Sendable, Equatable {
     public let completedAt: String
 }
 
+/// Durable result of moving an existing project identity to a new canonical
+/// repository root. Relinking always advances the generation so no authority
+/// issued for the prior root can be reused at the new location.
+public struct ProjectRelinkReceipt: Codable, Sendable, Equatable {
+    public let projectID: ProjectID
+    public let priorCanonicalRoot: URL
+    public let newCanonicalRoot: URL
+    public let priorGeneration: ProjectGeneration
+    public let newGeneration: ProjectGeneration
+    public let invalidatedBindingCount: Int
+    public let completedAt: String
+}
+
 public struct ControlPlaneDatabaseHealth: Codable, Sendable, Equatable {
     public let schemaVersion: Int
     public let journalMode: String
@@ -215,15 +228,24 @@ public enum ProjectContextError: Error, LocalizedError, Equatable, Sendable {
     case invalidIdentifier(String)
     case invalidGeneration(UInt64)
     case invalidAuthorizationScope(String)
+    case projectRootNotAuthorized(URL)
     case projectNotFound(ProjectID)
     case projectRootAlreadyRegistered(String)
     case projectRelinkRequired(ProjectID)
+    case projectRelinkBusy(ProjectID)
+    case projectRegistrationTargetChanged(ProjectID)
+    case projectRepositoryIdentityMismatch(ProjectID)
+    case projectRelinkTargetChanged(ProjectID)
+    case projectTransitionConflict(ProjectID)
+    case projectTransitionCoordinatorRequired
     case projectNotActive(ProjectLifecycleState)
     case projectContextRequired(ProjectBindingOwner)
     case projectScopeMismatch
     case staleProjectGeneration(expected: ProjectGeneration, actual: ProjectGeneration)
     case ownerAlreadyBound(ProjectBindingOwner)
     case resetNotPrepared(ProjectID)
+    case retainedFilesystemRecovery(ProjectID)
+    case resetCancellationFailed(ProjectID)
     case unsupportedSchemaVersion(Int)
     case databaseBusy
     case storageFull
@@ -236,15 +258,24 @@ public enum ProjectContextError: Error, LocalizedError, Equatable, Sendable {
         case .invalidIdentifier: "invalid_identifier"
         case .invalidGeneration: "invalid_project_generation"
         case .invalidAuthorizationScope: "invalid_authorization_scope"
+        case .projectRootNotAuthorized: "project_root_not_authorized"
         case .projectNotFound: "project_not_found"
         case .projectRootAlreadyRegistered: "project_root_already_registered"
         case .projectRelinkRequired: "project_relink_required"
+        case .projectRelinkBusy: "project_relink_busy"
+        case .projectRegistrationTargetChanged: "project_registration_target_changed"
+        case .projectRepositoryIdentityMismatch: "project_repository_identity_mismatch"
+        case .projectRelinkTargetChanged: "project_relink_target_changed"
+        case .projectTransitionConflict: "project_transition_conflict"
+        case .projectTransitionCoordinatorRequired: "project_transition_coordinator_required"
         case .projectNotActive: "project_not_active"
         case .projectContextRequired: "project_context_required"
         case .projectScopeMismatch: "project_scope_mismatch"
         case .staleProjectGeneration: "stale_project_generation"
         case .ownerAlreadyBound: "binding_owner_conflict"
         case .resetNotPrepared: "project_reset_not_prepared"
+        case .retainedFilesystemRecovery: "project_reset_filesystem_recovery_required"
+        case .resetCancellationFailed: "project_reset_cancellation_failed"
         case .unsupportedSchemaVersion: "unsupported_schema_version"
         case .databaseBusy: "database_busy"
         case .storageFull: "storage_full"
@@ -262,12 +293,26 @@ public enum ProjectContextError: Error, LocalizedError, Equatable, Sendable {
             "Invalid project generation: \(value)"
         case .invalidAuthorizationScope(let reason):
             "Invalid authorization scope: \(reason)"
+        case .projectRootNotAuthorized(let root):
+            "Project root is not authorized in Settings: \(root.path)"
         case .projectNotFound(let projectID):
             "Project not found: \(projectID)"
         case .projectRootAlreadyRegistered(let root):
             "Project root is already registered: \(root)"
         case .projectRelinkRequired(let projectID):
             "Project root changed and requires an explicit relink: \(projectID)"
+        case .projectRelinkBusy(let projectID):
+            "Project relink requires all project bindings and autonomous runs to be inactive: \(projectID)"
+        case .projectRegistrationTargetChanged(let projectID):
+            "Project registration target changed after it was selected: \(projectID)"
+        case .projectRepositoryIdentityMismatch(let projectID):
+            "Project relink target does not match the registered repository identity: \(projectID)"
+        case .projectRelinkTargetChanged(let projectID):
+            "Project relink target changed after it was selected: \(projectID)"
+        case .projectTransitionConflict(let projectID):
+            "Another project transition owns the pending maintenance state: \(projectID)"
+        case .projectTransitionCoordinatorRequired:
+            "Project registration and relink require the manager-owned transition coordinator"
         case .projectNotActive(let state):
             "Project is not active: \(state.rawValue)"
         case .projectContextRequired(let owner):
@@ -280,6 +325,10 @@ public enum ProjectContextError: Error, LocalizedError, Equatable, Sendable {
             "Binding owner is already active: \(owner.kind.rawValue):\(owner.id)"
         case .resetNotPrepared(let projectID):
             "Project reset is not prepared: \(projectID)"
+        case .retainedFilesystemRecovery(let projectID):
+            "Project generation reset requires protected filesystem recovery first: \(projectID)"
+        case .resetCancellationFailed(let projectID):
+            "Project generation reset cleanup failed and requires operator recovery: \(projectID)"
         case .unsupportedSchemaVersion(let version):
             "Unsupported control-plane schema version: \(version)"
         case .databaseBusy:

@@ -1,0 +1,53 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260830T185419Z-1a7e9d87f7.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 112,
+      "path": ".forge-codex/evidence/EVID-20260830T185419Z-1a7e9d87f7.stderr.txt",
+      "sha256": "799a1eccbe8913a4214c637ac83fc778cd5caadb315f5f664c645ee44d2a6bc9",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "command": "python3 .forge-codex/scripts/test_qualify_signed_shell_manager.py",
+  "ended_at": "2026-08-30T18:54:19.557300+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260830T185419Z-1a7e9d87f7",
+  "kind": "p10-signed-shell-manager-harness-tests",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 16777216,
+  "related_findings": [],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 9555398,
+    "file_count": 252,
+    "schema_version": 1,
+    "sha256": "62361115e3af17e340f56c656b2731bd720e98b3cddceb7d848a040cb6e0a21c"
+  },
+  "source_manifest_after": {
+    "bytes": 9555398,
+    "file_count": 252,
+    "schema_version": 1,
+    "sha256": "62361115e3af17e340f56c656b2731bd720e98b3cddceb7d848a040cb6e0a21c"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-30T18:54:19.475326+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

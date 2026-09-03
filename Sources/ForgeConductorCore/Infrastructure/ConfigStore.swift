@@ -9,7 +9,7 @@ import Darwin
 
 /// Persistence for `AppConfig`. Domain consumers use `model`; dict update remains for HTTP edge patches.
 public final class ConfigStore: ConfigurationProviding, @unchecked Sendable {
-    private static let migrationLockTimeout: TimeInterval = 5
+    static let configurationLockTimeoutSeconds: TimeInterval = 5
     private static let processMigrationLock = NSLock()
 
     private var _model: AppConfig
@@ -517,7 +517,7 @@ public final class ConfigStore: ConfigurationProviding, @unchecked Sendable {
             withIntermediateDirectories: true,
             attributes: [.posixPermissions: 0o700]
         )
-        let processDeadline = Date().addingTimeInterval(migrationLockTimeout)
+        let processDeadline = Date().addingTimeInterval(configurationLockTimeoutSeconds)
         guard processMigrationLock.lock(before: processDeadline) else {
             throw ConfigMigrationError.lockTimeout
         }
@@ -531,7 +531,7 @@ public final class ConfigStore: ConfigurationProviding, @unchecked Sendable {
         }
         defer { _ = Darwin.close(descriptor) }
 
-        let deadline = Date().addingTimeInterval(migrationLockTimeout)
+        let deadline = Date().addingTimeInterval(configurationLockTimeoutSeconds)
         while Darwin.lockf(descriptor, F_TLOCK, 0) != 0 {
             let code = errno
             guard code == EACCES || code == EAGAIN else {

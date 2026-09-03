@@ -1,0 +1,388 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://forge-conductor.local/schemas/p10-privileged-filesystem-h0-readiness.schema.json",
+  "title": "P10 Privileged Filesystem H0 Readiness",
+  "description": "Strict nonpassing H0 control report. Conformance records harness readiness only and cannot satisfy a qualification row, formal predicate, gate, or release claim.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "kind",
+    "generated_at",
+    "run_id",
+    "mode",
+    "overall_status",
+    "production_mutation_exercised",
+    "qualification_status",
+    "rows_updated",
+    "formal_predicates_updated",
+    "matrix",
+    "formal_closure",
+    "context_bound",
+    "recorder_context_bound",
+    "recorder_evidence_context",
+    "smappservice_invoked",
+    "smappservice_registered",
+    "completion_claims",
+    "commands",
+    "blocking_reasons",
+    "release_blockers"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "p10-privileged-filesystem-h0-readiness" },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "run_id": { "type": "string", "format": "uuid" },
+    "mode": { "enum": ["preflight_only", "execute"] },
+    "overall_status": { "enum": ["ready", "blocked"] },
+    "production_mutation_exercised": { "const": false },
+    "qualification_status": { "const": "not_run" },
+    "rows_updated": { "const": 0 },
+    "formal_predicates_updated": { "const": 0 },
+    "matrix": { "$ref": "#/$defs/matrixNonclaim" },
+    "formal_closure": { "$ref": "#/$defs/formalNonclaim" },
+    "context_bound": { "const": false },
+    "recorder_context_bound": { "type": "boolean" },
+    "recorder_evidence_context": {
+      "anyOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/recorderContext" }
+      ]
+    },
+    "smappservice_invoked": { "const": false },
+    "smappservice_registered": { "const": false },
+    "completion_claims": { "$ref": "#/$defs/completionClaims" },
+    "commands": {
+      "type": "array",
+      "maxItems": 4,
+      "items": { "$ref": "#/$defs/commandResult" }
+    },
+    "blocking_reasons": {
+      "type": "array",
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/boundedText" }
+    },
+    "release_blockers": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/boundedText" },
+      "allOf": [
+        { "contains": { "type": "string", "pattern": "E2 remains open" } },
+        { "contains": { "type": "string", "pattern": "P10, G10, and G12 remain open" } },
+        { "contains": { "type": "string", "pattern": "Native Developer Mode UI.*release-blocking" } },
+        { "contains": { "type": "string", "pattern": "Real-provider autonomous continuity" } },
+        { "contains": { "type": "string", "pattern": "Real-hardware qualification.*release-blocking" } },
+        { "contains": { "type": "string", "pattern": "local APFS.*does not eliminate same-UID interference" } }
+      ]
+    },
+    "repository": { "$ref": "#/$defs/repositoryExecution" },
+    "operator": { "$ref": "#/$defs/operator" },
+    "canonical_qualification_template": { "$ref": "#/$defs/canonicalTemplate" },
+    "daemon_client_admission": { "$ref": "#/$defs/daemonAdmission" },
+    "signatures": { "$ref": "#/$defs/signatures" }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": { "properties": { "recorder_context_bound": { "const": true } } },
+      "then": { "properties": { "recorder_evidence_context": { "$ref": "#/$defs/recorderContext" } } },
+      "else": { "properties": { "recorder_evidence_context": { "type": "null" } } }
+    },
+    {
+      "if": { "properties": { "overall_status": { "const": "ready" } }, "required": ["overall_status"] },
+      "then": {
+        "required": [
+          "repository",
+          "operator",
+          "canonical_qualification_template",
+          "daemon_client_admission",
+          "signatures"
+        ]
+      }
+    },
+    {
+      "if": { "properties": { "mode": { "const": "execute" }, "overall_status": { "const": "ready" } }, "required": ["mode", "overall_status"] },
+      "then": {
+        "properties": {
+          "recorder_context_bound": { "const": true },
+          "commands": {
+            "minItems": 4,
+            "maxItems": 4,
+            "prefixItems": [
+              { "required": ["role", "command"], "properties": { "role": { "const": "harness" }, "command": { "const": "describe" } } },
+              { "required": ["role", "command"], "properties": { "role": { "const": "harness" }, "command": { "const": "self-check" } } },
+              { "required": ["role", "command"], "properties": { "role": { "const": "adversary" }, "command": { "const": "describe" } } },
+              { "required": ["role", "command"], "properties": { "role": { "const": "adversary" }, "command": { "const": "self-check" } } }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "boundedText": { "type": "string", "minLength": 1, "maxLength": 16384 },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "cdhash": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "gitSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "completionClaims": {
+      "const": { "e2": false, "g10": false, "g12": false, "p10": false, "release": false }
+    },
+    "matrixNonclaim": {
+      "type": "object",
+      "required": ["required_rows", "executed_rows"],
+      "properties": {
+        "required_rows": { "type": ["integer", "null"], "minimum": 57, "maximum": 57 },
+        "executed_rows": { "const": 0 }
+      },
+      "additionalProperties": false
+    },
+    "formalNonclaim": {
+      "type": "object",
+      "required": ["required_predicates", "proven_predicates"],
+      "properties": {
+        "required_predicates": { "type": ["integer", "null"], "minimum": 12, "maximum": 12 },
+        "proven_predicates": { "const": 0 }
+      },
+      "additionalProperties": false
+    },
+    "sourceManifest": {
+      "type": "object",
+      "required": ["schema_version", "sha256", "file_count", "bytes"],
+      "properties": {
+        "schema_version": { "const": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "file_count": { "type": "integer", "minimum": 1, "maximum": 32768 },
+        "bytes": { "type": "integer", "minimum": 1, "maximum": 536870912 }
+      },
+      "additionalProperties": false
+    },
+    "repositoryBinding": {
+      "type": "object",
+      "required": ["branch", "head_sha", "base_branch", "base_sha", "repository_path"],
+      "properties": {
+        "branch": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "head_sha": { "$ref": "#/$defs/gitSha" },
+        "base_branch": { "const": "main" },
+        "base_sha": { "$ref": "#/$defs/gitSha" },
+        "repository_path": { "type": "string", "pattern": "^/", "maxLength": 4096 }
+      },
+      "additionalProperties": false
+    },
+    "repositoryExecution": {
+      "type": "object",
+      "required": ["path", "branch", "head", "base_branch", "base_sha"],
+      "properties": {
+        "path": { "type": "string", "pattern": "^/", "maxLength": 4096 },
+        "branch": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "head": { "$ref": "#/$defs/gitSha" },
+        "base_branch": { "const": "main" },
+        "base_sha": { "$ref": "#/$defs/gitSha" }
+      },
+      "additionalProperties": false
+    },
+    "testEnvironment": {
+      "type": "object",
+      "required": ["macos_build", "machine_identifier", "platform", "architecture"],
+      "properties": {
+        "macos_build": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "machine_identifier": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "platform": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "architecture": { "type": "string", "minLength": 1, "maxLength": 256 }
+      },
+      "additionalProperties": false
+    },
+    "recorderContext": {
+      "type": "object",
+      "required": ["schema_version", "binding_schema_version", "evidence_id", "source_manifest", "repository", "test_environment", "qualification_context_present"],
+      "properties": {
+        "schema_version": { "const": 1 },
+        "binding_schema_version": { "const": 1 },
+        "evidence_id": { "type": "string", "pattern": "^EVID-[A-Za-z0-9][A-Za-z0-9._-]{0,250}$" },
+        "source_manifest": { "$ref": "#/$defs/sourceManifest" },
+        "repository": { "$ref": "#/$defs/repositoryBinding" },
+        "test_environment": { "$ref": "#/$defs/testEnvironment" },
+        "qualification_context_present": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "operator": {
+      "type": "object",
+      "required": ["uid", "name", "console_user"],
+      "properties": {
+        "uid": { "type": "integer", "minimum": 1 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "console_user": { "type": "string", "minLength": 1, "maxLength": 256 }
+      },
+      "additionalProperties": false
+    },
+    "fileSnapshot": {
+      "type": "object",
+      "required": ["path", "device", "inode", "mode", "owner_uid", "link_count", "size", "modification_time_ns", "change_time_ns", "sha256"],
+      "properties": {
+        "path": { "type": "string", "pattern": "^/", "maxLength": 4096 },
+        "device": { "type": "integer", "minimum": 0 },
+        "inode": { "type": "integer", "minimum": 1 },
+        "mode": { "type": "integer", "minimum": 0 },
+        "owner_uid": { "type": "integer", "minimum": 0 },
+        "link_count": { "type": "integer", "minimum": 1 },
+        "size": { "type": "integer", "minimum": 0 },
+        "modification_time_ns": { "type": "integer", "minimum": 0 },
+        "change_time_ns": { "type": "integer", "minimum": 0 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    },
+    "nonpassingContract": {
+      "type": "object",
+      "required": ["matrix_rows_required", "matrix_rows_executed", "formal_predicates_required", "formal_predicates_proven", "status", "ok", "residual_disposition"],
+      "properties": {
+        "matrix_rows_required": { "const": 57 },
+        "matrix_rows_executed": { "const": 0 },
+        "formal_predicates_required": { "const": 12 },
+        "formal_predicates_proven": { "const": 0 },
+        "status": { "const": "partial" },
+        "ok": { "const": false },
+        "residual_disposition": { "const": "open_release_blocker" }
+      },
+      "additionalProperties": false
+    },
+    "canonicalTemplate": {
+      "type": "object",
+      "required": ["path", "before_sha256", "after_sha256", "byte_stable", "nonpassing_contract"],
+      "properties": {
+        "path": { "type": "string", "pattern": "^/", "maxLength": 4096 },
+        "before_sha256": { "$ref": "#/$defs/sha256" },
+        "after_sha256": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/sha256" }] },
+        "byte_stable": { "type": "boolean" },
+        "nonpassing_contract": { "$ref": "#/$defs/nonpassingContract" }
+      },
+      "additionalProperties": false
+    },
+    "daemonAdmission": {
+      "type": "object",
+      "required": ["source", "app_identifier", "manager_identifier", "development_team_identifier", "production_team_identifier", "certificate_class", "authority_prefix", "certificate_requirement", "requirement", "requirement_sha256"],
+      "properties": {
+        "source": { "$ref": "#/$defs/fileSnapshot" },
+        "app_identifier": { "const": "com.forge-conductor.app" },
+        "manager_identifier": { "const": "com.forge-conductor.cli" },
+        "development_team_identifier": { "type": "string", "pattern": "^[A-Z0-9]{10}$" },
+        "production_team_identifier": { "type": "string", "pattern": "^[A-Z0-9]{10}$" },
+        "certificate_class": { "enum": ["development", "distribution"] },
+        "authority_prefix": { "enum": ["Apple Development:", "Developer ID Application:"] },
+        "certificate_requirement": { "$ref": "#/$defs/boundedText" },
+        "requirement": { "$ref": "#/$defs/boundedText" },
+        "requirement_sha256": { "$ref": "#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    },
+    "entitlements": {
+      "type": "object",
+      "required": ["com.apple.application-identifier"],
+      "properties": {
+        "com.apple.application-identifier": { "type": "string", "minLength": 1, "maxLength": 512 }
+      },
+      "additionalProperties": false
+    },
+    "qualifiedFilesystem": {
+      "type": "object",
+      "required": ["type", "local", "mount_point", "mount_source", "mount_flags", "identity_replacement_detection"],
+      "properties": {
+        "type": { "const": "apfs" },
+        "local": { "const": true },
+        "mount_point": { "type": "string", "pattern": "^/", "maxLength": 4096 },
+        "mount_source": { "$ref": "#/$defs/boundedText" },
+        "mount_flags": { "type": "integer", "minimum": 0 },
+        "identity_replacement_detection": { "const": "inode_and_ctime_on_local_apfs" }
+      },
+      "additionalProperties": false
+    },
+    "signature": {
+      "type": "object",
+      "required": ["path", "sha256", "filesystem", "identifier", "team_identifier", "code_directory_hash", "hardened_runtime", "authorities", "designated_requirement", "entitlements", "exact_identity_requirement_satisfied", "daemon_client_requirement_rejected"],
+      "properties": {
+        "path": { "type": "string", "pattern": "^/", "maxLength": 4096 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "filesystem": { "$ref": "#/$defs/qualifiedFilesystem" },
+        "identifier": { "enum": ["com.forge-conductor.qualification-harness", "com.forge-conductor.qualification-adversary"] },
+        "team_identifier": { "type": "string", "pattern": "^[A-Z0-9]{10}$" },
+        "code_directory_hash": { "$ref": "#/$defs/cdhash" },
+        "hardened_runtime": { "const": true },
+        "authorities": { "type": "array", "minItems": 1, "maxItems": 8, "items": { "$ref": "#/$defs/boundedText" } },
+        "designated_requirement": { "$ref": "#/$defs/boundedText" },
+        "entitlements": { "$ref": "#/$defs/entitlements" },
+        "exact_identity_requirement_satisfied": { "const": true },
+        "daemon_client_requirement_rejected": { "const": true }
+      },
+      "additionalProperties": false
+    },
+    "signatures": {
+      "type": "object",
+      "required": ["harness", "adversary"],
+      "properties": {
+        "harness": { "$ref": "#/$defs/signature" },
+        "adversary": { "$ref": "#/$defs/signature" }
+      },
+      "additionalProperties": false
+    },
+    "liveIdentity": {
+      "type": "object",
+      "required": ["process_id", "stop_signal", "code_directory_hash", "matches_inspected_executable"],
+      "properties": {
+        "process_id": { "type": "integer", "minimum": 1 },
+        "stop_signal": { "type": "integer", "minimum": 1 },
+        "code_directory_hash": { "$ref": "#/$defs/cdhash" },
+        "matches_inspected_executable": { "const": true }
+      },
+      "additionalProperties": false
+    },
+    "toolResult": {
+      "type": "object",
+      "required": ["schema_version", "command", "role", "process_id", "parent_process_id", "effective_user_id", "executable_path", "bundle_identifier", "signing_team_identifier", "signing_entitlements", "code_directory_hash", "hardened_runtime", "self_identity_requirement_satisfied", "daemon_client_requirement_sha256", "daemon_client_requirement_satisfied", "team_only_admission_probe_satisfied", "recorder_context_present", "supported_commands", "production_mutation_exercised", "qualification_status", "rows_updated", "formal_predicates_updated", "completion_claims"],
+      "properties": {
+        "schema_version": { "const": 1 },
+        "command": { "enum": ["describe", "self-check"] },
+        "role": { "enum": ["harness", "adversary"] },
+        "process_id": { "type": "integer", "minimum": 1 },
+        "parent_process_id": { "type": "integer", "minimum": 1 },
+        "effective_user_id": { "type": "integer", "minimum": 1 },
+        "executable_path": { "type": "string", "pattern": "^/", "maxLength": 4096 },
+        "bundle_identifier": { "enum": ["com.forge-conductor.qualification-harness", "com.forge-conductor.qualification-adversary"] },
+        "signing_team_identifier": { "type": "string", "pattern": "^[A-Z0-9]{10}$" },
+        "signing_entitlements": { "$ref": "#/$defs/entitlements" },
+        "code_directory_hash": { "$ref": "#/$defs/cdhash" },
+        "hardened_runtime": { "const": true },
+        "self_identity_requirement_satisfied": { "const": true },
+        "daemon_client_requirement_sha256": { "$ref": "#/$defs/sha256" },
+        "daemon_client_requirement_satisfied": { "const": false },
+        "team_only_admission_probe_satisfied": { "const": true },
+        "recorder_context_present": { "type": "boolean" },
+        "supported_commands": { "const": ["describe", "self-check"] },
+        "production_mutation_exercised": { "const": false },
+        "qualification_status": { "const": "not_run" },
+        "rows_updated": { "const": 0 },
+        "formal_predicates_updated": { "const": 0 },
+        "completion_claims": { "$ref": "#/$defs/completionClaims" }
+      },
+      "additionalProperties": false
+    },
+    "commandResult": {
+      "type": "object",
+      "required": ["command", "role", "return_code", "timed_out", "stdout_sha256", "stderr_bytes", "process_group_cleanup", "live_process_identity", "executable_snapshot_sha256", "result"],
+      "properties": {
+        "command": { "enum": ["describe", "self-check"] },
+        "role": { "enum": ["harness", "adversary"] },
+        "return_code": { "const": 0 },
+        "timed_out": { "const": false },
+        "stdout_sha256": { "$ref": "#/$defs/sha256" },
+        "stderr_bytes": { "const": 0 },
+        "process_group_cleanup": { "enum": ["already_empty", "killed"] },
+        "live_process_identity": { "$ref": "#/$defs/liveIdentity" },
+        "executable_snapshot_sha256": { "$ref": "#/$defs/sha256" },
+        "result": { "$ref": "#/$defs/toolResult" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

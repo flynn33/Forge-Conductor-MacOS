@@ -245,6 +245,22 @@ private enum ManagerOperatorSnapshotQueryError: Error, LocalizedError {
 
 /// Manager control plane routes: start/stop/restart/settings/shutdown.
 public final class ManagerRoutes: @unchecked Sendable {
+    public static let maximumProjectRegistrationPathBytes = 4_096
+    static let maximumProjectRegistrationBodyBytes = 16_384
+    public static let maximumProjectRelinkPathBytes = 4_096
+    static let maximumProjectRelinkBodyBytes = 16_384
+    static let maximumRuntimeJobCancelBodyBytes = 256
+    static let maximumProviderProbeBodyBytes = 512
+    static let maximumRunControlBodyBytes = 256
+    /// Provider I/O is intentionally isolated from `DashboardServer`'s serial
+    /// listener queue. The active-connection cap bounds submitted work, while
+    /// `ManagerNode` rejects overlapping probes and owns the operation deadline.
+    private static let providerProbeQueue = DispatchQueue(
+        label: "forge.dashboard.provider-probe",
+        qos: .userInitiated,
+        attributes: .concurrent
+    )
+
     private let manager: ManagerNode
     private let http: HTTPResponder
     private let authorizer: ManagerMutationAuthorizer
@@ -334,20 +350,174 @@ public final class ManagerRoutes: @unchecked Sendable {
             let result = try manager.updateSettings(patch, apply: apply)
             http.respondJSON(connection, status: 200, object: result)
         case ("POST", "/api/manager/projects/register"):
-            let object = try JSONSupport.object(from: body)
-            guard let path = object["path"] as? String, !path.isEmpty else {
-                throw ProjectContextError.invalidIdentifier("project path")
+            guard body.count <= Self.maximumProjectRegistrationBodyBytes else {
+                http.respondJSON(connection, status: 413, object: [
+                    "ok": false,
+                    "code": "project_registration_body_too_large",
+                    "message": "Project registration accepts one bounded path and optional identity fields",
+                ])
+                return
             }
-            let result = try manager.registerProject(
-                path: path,
-                displayName: object["display_name"] as? String,
-                repositoryIdentity: object["repository_identity"] as? String
-            )
-            http.respondJSON(connection, status: 200, object: result)
+            let object = try JSONSupport.object(from: body)
+            let allowedKeys = Set(["path", "display_name", "repository_identity"])
+            guard Set(object.keys).isSubset(of: allowedKeys),
+                  let path = object["path"] as? String,
+                  !path.isEmpty,
+                  path.utf8.count <= Self.maximumProjectRegistrationPathBytes,
+                  (path as NSString).isAbsolutePath,
+                  object["display_name"].map({ $0 is String }) ?? true,
+                  (object["display_name"] as? String).map({ $0.utf8.count <= 512 }) ?? true,
+                  object["repository_identity"].map({ $0 is String }) ?? true,
+                  (object["repository_identity"] as? String).map({
+                      $0.utf8.count <= 2_048
+                  }) ?? true else {
+                http.respondJSON(connection, status: 400, object: [
+                    "ok": false,
+                    "code": "invalid_project_registration",
+                    "message": "Project registration requires one bounded absolute path and bounded optional identity fields",
+                ])
+                return
+            }
+            do {
+                let result = try manager.registerProjectResult(
+                    path: path,
+                    displayName: object["display_name"] as? String,
+                    repositoryIdentity: object["repository_identity"] as? String
+                )
+                var response = try result.asDictionary()
+                if result.registrationState == .committed,
+                   let rawProjectID = result.projectID,
+                   let projectUUID = UUID(uuidString: rawProjectID) {
+                    response.merge(
+                        try manager.projectStatus(projectID: ProjectID(projectUUID)),
+                        uniquingKeysWith: { typed, _ in typed }
+                    )
+                }
+                http.respondJSON(
+                    connection,
+                    status: result.registrationState == .committed ? 200 : 202,
+                    object: response
+                )
+            } catch let error as ProjectContextError {
+                let busy = error == .databaseBusy
+                http.respondJSON(connection, status: busy ? 503 : 409, object: [
+                    "ok": false,
+                    "code": error.code,
+                    "message": error.localizedDescription,
+                    "retryable": busy,
+                    "reconciliation_required": false,
+                ])
+            } catch let error as ProjectMemoryError {
+                let invalid: Bool
+                switch error {
+                case .invalidRequest, .payloadTooLarge:
+                    invalid = true
+                default:
+                    invalid = false
+                }
+                let busy = error == .databaseBusy
+                http.respondJSON(
+                    connection,
+                    status: invalid ? 400 : (busy ? 503 : 409),
+                    object: [
+                        "ok": false,
+                        "code": error.code,
+                        "message": error.localizedDescription,
+                        "retryable": busy,
+                        "reconciliation_required": false,
+                    ]
+                )
+            }
         case ("POST", "/api/manager/projects/status"):
             let object = try JSONSupport.object(from: body)
             let result = try manager.projectStatus(projectID: try projectID(object))
             http.respondJSON(connection, status: 200, object: result)
+        case ("POST", "/api/manager/projects/relink"):
+            guard body.count <= Self.maximumProjectRelinkBodyBytes else {
+                http.respondJSON(connection, status: 413, object: [
+                    "ok": false,
+                    "code": "project_relink_body_too_large",
+                    "message": "Project relink accepts one bounded project, generation, and path",
+                ])
+                return
+            }
+            let object: [String: Any]
+            do {
+                object = try JSONSupport.object(from: body)
+            } catch {
+                http.respondJSON(connection, status: 400, object: [
+                    "ok": false,
+                    "code": "invalid_project_relink",
+                    "message": "Project relink requires a JSON object",
+                ])
+                return
+            }
+            guard object.count == 3,
+                  Set(object.keys) == ["project_id", "project_generation", "path"],
+                  let path = object["path"] as? String,
+                  !path.isEmpty,
+                  path.utf8.count <= Self.maximumProjectRelinkPathBytes,
+                  (path as NSString).isAbsolutePath else {
+                http.respondJSON(connection, status: 400, object: [
+                    "ok": false,
+                    "code": "invalid_project_relink",
+                    "message": "Project relink requires exactly one project UUID, generation, and absolute path",
+                ])
+                return
+            }
+            do {
+                let result = try manager.relinkProject(
+                    projectID: try projectID(object),
+                    expectedGeneration: try projectGeneration(object),
+                    path: path
+                )
+                var response = try result.asDictionary()
+                response.merge(
+                    try manager.projectStatus(projectID: try projectID(object)),
+                    uniquingKeysWith: { receipt, _ in receipt }
+                )
+                http.respondJSON(connection, status: 200, object: response)
+            } catch let error as ProjectContextError {
+                let status: Int
+                switch error {
+                case .invalidIdentifier, .invalidGeneration:
+                    status = 400
+                case .projectNotFound:
+                    status = 404
+                case .databaseBusy:
+                    status = 503
+                default:
+                    status = 409
+                }
+                http.respondJSON(connection, status: status, object: [
+                    "ok": false,
+                    "code": error.code,
+                    "message": error.localizedDescription,
+                    "retryable": error == .databaseBusy,
+                    "reconciliation_required": error == .databaseBusy,
+                ])
+            } catch let error as ProjectMemoryError {
+                let status: Int
+                switch error {
+                case .invalidRequest, .payloadTooLarge:
+                    status = 400
+                case .projectNotFound:
+                    status = 404
+                case .projectScopeMismatch, .conflict:
+                    status = 409
+                case .databaseBusy:
+                    status = 503
+                default:
+                    status = 500
+                }
+                http.respondJSON(connection, status: status, object: [
+                    "ok": false,
+                    "code": error.code,
+                    "message": error.localizedDescription,
+                    "retryable": error == .databaseBusy,
+                    "reconciliation_required": error == .databaseBusy,
+                ])
+            }
         case ("POST", "/api/manager/projects/bind"):
             let object = try JSONSupport.object(from: body)
             guard let kindName = object["owner_kind"] as? String,
@@ -365,24 +535,138 @@ public final class ManagerRoutes: @unchecked Sendable {
                 runID = nil
             }
             let allowedTools = Set((object["allowed_tools"] as? [String]) ?? ["*"])
-            let result = try manager.bindProject(
-                projectID: try projectID(object),
-                expectedGeneration: try projectGeneration(object),
-                owner: ProjectBindingOwner(kind: ownerKind, id: ownerID),
-                runID: runID,
-                allowedTools: allowedTools,
-                networkAllowed: (object["network_allowed"] as? Bool) ?? false,
-                maximumInlineOutputBytes: integer(object["maximum_inline_output_bytes"])
-                    ?? ProjectContextService.defaultInlineOutputLimit
-            )
-            http.respondJSON(connection, status: 200, object: result)
+            do {
+                let result = try manager.bindProject(
+                    projectID: try projectID(object),
+                    expectedGeneration: try projectGeneration(object),
+                    owner: ProjectBindingOwner(kind: ownerKind, id: ownerID),
+                    runID: runID,
+                    allowedTools: allowedTools,
+                    networkAllowed: (object["network_allowed"] as? Bool) ?? false,
+                    maximumInlineOutputBytes: integer(object["maximum_inline_output_bytes"])
+                        ?? ProjectContextService.defaultInlineOutputLimit
+                )
+                http.respondJSON(connection, status: 200, object: result)
+            } catch let error as ProjectContextError {
+                guard case .projectRootNotAuthorized = error else { throw error }
+                http.respondJSON(connection, status: 403, object: [
+                    "ok": false,
+                    "code": error.code,
+                    "message": error.localizedDescription,
+                    "retryable": false,
+                ])
+            }
         case ("POST", "/api/manager/projects/reset-generation"):
             let object = try JSONSupport.object(from: body)
-            let result = try manager.resetProjectGeneration(
-                projectID: try projectID(object),
+            let requestedProjectID = try projectID(object)
+            var result = try manager.resetProjectGeneration(
+                projectID: requestedProjectID,
                 expectedGeneration: try projectGeneration(object)
             )
+            result.merge(
+                try manager.projectStatus(projectID: requestedProjectID),
+                uniquingKeysWith: { receipt, _ in receipt }
+            )
             http.respondJSON(connection, status: 200, object: result)
+        case ("POST", "/api/manager/runtime-jobs/cancel"):
+            guard body.count <= Self.maximumRuntimeJobCancelBodyBytes else {
+                http.respondJSON(connection, status: 413, object: [
+                    "ok": false,
+                    "code": "runtime_job_cancel_body_too_large",
+                    "message": "Runtime job cancellation accepts one bounded job identifier",
+                ])
+                return
+            }
+            let object: [String: Any]
+            do {
+                object = try JSONSupport.object(from: body)
+            } catch {
+                http.respondJSON(connection, status: 400, object: [
+                    "ok": false,
+                    "code": "invalid_runtime_job_cancel",
+                    "message": "Runtime job cancellation requires a JSON object containing only job_id",
+                ])
+                return
+            }
+            guard object.count == 1,
+                  Set(object.keys) == ["job_id"],
+                  let jobIDValue = object["job_id"] as? String,
+                  jobIDValue.utf8.count <= 36,
+                  let jobID = UUID(uuidString: jobIDValue) else {
+                http.respondJSON(connection, status: 400, object: [
+                    "ok": false,
+                    "code": "invalid_runtime_job_cancel",
+                    "message": "Runtime job cancellation requires exactly one UUID job_id",
+                ])
+                return
+            }
+            do {
+                http.respondJSON(
+                    connection,
+                    status: 200,
+                    object: try manager.cancelRuntimeJob(jobID: jobID).asDictionary()
+                )
+            } catch let error as RuntimeJobError {
+                let status: Int
+                switch error {
+                case .jobNotFound:
+                    status = 404
+                case .invalidRequest, .jobScopeMismatch, .invalidTransition:
+                    status = 409
+                default:
+                    status = 500
+                }
+                http.respondJSON(connection, status: status, object: [
+                    "ok": false,
+                    "code": error.code,
+                    "message": error.localizedDescription,
+                ])
+            } catch let error as ProjectContextError {
+                http.respondJSON(connection, status: 409, object: [
+                    "ok": false,
+                    "code": error.code,
+                    "message": error.localizedDescription,
+                ])
+            }
+        case ("POST", "/api/manager/provider/probe"):
+            guard body.count <= Self.maximumProviderProbeBodyBytes else {
+                http.respondJSON(connection, status: 413, object: [
+                    "ok": false,
+                    "code": "provider_probe_body_too_large",
+                    "message": "Provider probing accepts one bounded adapter identifier and mode",
+                ])
+                return
+            }
+            let object: [String: Any]
+            do {
+                object = try JSONSupport.object(from: body)
+            } catch {
+                http.respondJSON(connection, status: 400, object: [
+                    "ok": false,
+                    "code": "invalid_provider_probe",
+                    "message": "Provider probing requires a JSON object containing only adapter_id and mode",
+                ])
+                return
+            }
+            guard object.count == 2,
+                  Set(object.keys) == ["adapter_id", "mode"],
+                  let adapterID = object["adapter_id"] as? String,
+                  adapterID.utf8.count <= ManagerNode.maximumProviderAdapterIDBytes,
+                  let modeValue = object["mode"] as? String,
+                  modeValue.utf8.count <= 16,
+                  let mode = ManagerProviderProbeMode(rawValue: modeValue) else {
+                http.respondJSON(connection, status: 400, object: [
+                    "ok": false,
+                    "code": "invalid_provider_probe",
+                    "message": "Provider probing requires one bounded adapter_id and an exact connection or contract mode",
+                ])
+                return
+            }
+            dispatchProviderProbe(
+                adapterID: adapterID,
+                mode: mode,
+                connection: connection
+            )
         case ("GET", "/api/manager/autonomy/status"):
             http.respondJSON(
                 connection,
@@ -403,22 +687,40 @@ public final class ManagerRoutes: @unchecked Sendable {
                     "run_id, mission, model_key, allowed_tools, and completion_gates are required"
                 )
             }
-            let result = try manager.startAutonomousRun(
-                runID: RunID(runUUID),
-                projectID: try projectID(object),
-                expectedGeneration: try projectGeneration(object),
-                assignmentID: object["assignment_id"] as? String,
-                mission: mission,
-                providerID: object["provider_id"] as? String ?? "lmstudio",
-                adapterID: object["adapter_id"] as? String ?? "forge.native-session-host",
-                modelKey: modelKey,
-                allowedTools: Set(allowedToolValues),
-                completionGates: completionGates,
-                networkAllowed: (object["network_allowed"] as? Bool) ?? false,
-                maximumInlineOutputBytes: integer(object["maximum_inline_output_bytes"])
-                    ?? ProjectContextService.defaultInlineOutputLimit
-            )
-            http.respondJSON(connection, status: 202, object: result)
+            do {
+                let result = try manager.startAutonomousRun(
+                    runID: RunID(runUUID),
+                    projectID: try projectID(object),
+                    expectedGeneration: try projectGeneration(object),
+                    assignmentID: object["assignment_id"] as? String,
+                    mission: mission,
+                    providerID: object["provider_id"] as? String ?? "lmstudio",
+                    adapterID: object["adapter_id"] as? String ?? "forge.native-session-host",
+                    modelKey: modelKey,
+                    allowedTools: Set(allowedToolValues),
+                    completionGates: completionGates,
+                    networkAllowed: (object["network_allowed"] as? Bool) ?? false,
+                    maximumInlineOutputBytes: integer(object["maximum_inline_output_bytes"])
+                        ?? ProjectContextService.defaultInlineOutputLimit
+                )
+                http.respondJSON(connection, status: 202, object: result)
+            } catch let error as AutonomyError {
+                guard case .invalidToolConfiguration = error else { throw error }
+                http.respondJSON(connection, status: 422, object: [
+                    "ok": false,
+                    "code": error.code,
+                    "message": error.localizedDescription,
+                    "retryable": false,
+                ])
+            } catch let error as ProjectContextError {
+                guard case .projectRootNotAuthorized = error else { throw error }
+                http.respondJSON(connection, status: 403, object: [
+                    "ok": false,
+                    "code": error.code,
+                    "message": error.localizedDescription,
+                    "retryable": false,
+                ])
+            }
         case ("POST", "/api/manager/runs/status"):
             let object = try JSONSupport.object(from: body)
             http.respondJSON(
@@ -427,28 +729,118 @@ public final class ManagerRoutes: @unchecked Sendable {
                 object: try manager.autonomousRunStatus(runID: try runID(object))
             )
         case ("POST", "/api/manager/runs/control"):
-            let object = try JSONSupport.object(from: body)
-            guard let runIDValue = object["run_id"] as? String,
+            guard body.count <= Self.maximumRunControlBodyBytes else {
+                http.respondJSON(connection, status: 413, object: [
+                    "ok": false,
+                    "code": "run_control_body_too_large",
+                    "message": "Run control accepts one bounded run identifier and action",
+                ])
+                return
+            }
+            let object: [String: Any]
+            do {
+                object = try JSONSupport.object(from: body)
+            } catch {
+                http.respondJSON(connection, status: 400, object: [
+                    "ok": false,
+                    "code": "invalid_run_control",
+                    "message": "Run control requires a JSON object containing only run_id and action",
+                ])
+                return
+            }
+            guard object.count == 2,
+                  Set(object.keys) == ["run_id", "action"],
+                  let runIDValue = object["run_id"] as? String,
+                  runIDValue.utf8.count <= 36,
                   let runUUID = UUID(uuidString: runIDValue),
                   let actionValue = object["action"] as? String,
+                  actionValue.utf8.count <= 16,
                   let action = ManagedAutonomyControlAction(rawValue: actionValue) else {
                 http.respondJSON(connection, status: 400, object: [
                     "ok": false,
                     "code": "invalid_run_control",
-                    "message": "run_id and an exact pause, resume, cancel, or retry action are required",
+                    "message": "Run control requires exactly one UUID run_id and an exact pause, resume, cancel, retry, checkpoint, or rollover action",
                 ])
                 return
             }
-            http.respondJSON(
-                connection,
-                status: 200,
-                object: try manager.controlAutonomousRun(
-                    runID: RunID(runUUID),
-                    action: action
+            do {
+                http.respondJSON(
+                    connection,
+                    status: 200,
+                    object: try manager.controlAutonomousRun(
+                        runID: RunID(runUUID),
+                        action: action
+                    )
                 )
-            )
+            } catch let error as AutonomyError {
+                let status: Int
+                switch error {
+                case .runNotFound:
+                    status = 404
+                case .shutdown:
+                    status = 503
+                default:
+                    status = 409
+                }
+                http.respondJSON(connection, status: status, object: [
+                    "ok": false,
+                    "code": error.code,
+                    "message": error.localizedDescription,
+                ])
+            } catch let error as ContextBudgetError {
+                http.respondJSON(connection, status: 409, object: [
+                    "ok": false,
+                    "code": error.code,
+                    "message": error.localizedDescription,
+                ])
+            }
         default:
             http.respond(connection, status: 404, body: "Not Found", contentType: "text/plain")
+        }
+    }
+
+    private func dispatchProviderProbe(
+        adapterID: String,
+        mode: ManagerProviderProbeMode,
+        connection: NWConnection
+    ) {
+        let manager = self.manager
+        let http = self.http
+        Self.providerProbeQueue.async {
+            do {
+                http.respondJSON(
+                    connection,
+                    status: 200,
+                    object: try manager.probeProvider(
+                        adapterID: adapterID,
+                        mode: mode
+                    ).asDictionary()
+                )
+            } catch let error as ManagerProviderProbeError {
+                let status: Int
+                switch error {
+                case .invalidAdapterIdentifier:
+                    status = 400
+                case .adapterNotRegistered:
+                    status = 404
+                case .managedProviderUnavailable, .probeInProgress, .storageUnavailable:
+                    status = 409
+                case .connectionFailed:
+                    status = 502
+                case .contractUnavailable:
+                    status = 422
+                }
+                http.respondJSON(connection, status: status, object: [
+                    "ok": false,
+                    "code": error.code,
+                    "message": error.localizedDescription,
+                ])
+            } catch {
+                http.respondJSON(connection, status: 500, object: [
+                    "ok": false,
+                    "message": "\(error)",
+                ])
+            }
         }
     }
 

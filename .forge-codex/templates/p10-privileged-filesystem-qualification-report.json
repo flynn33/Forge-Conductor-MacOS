@@ -1,0 +1,2516 @@
+{
+  "schema_version": 2,
+  "artifact_binding_schema_version": 1,
+  "status": "partial",
+  "ok": false,
+  "source_manifest": null,
+  "captured_at": null,
+  "repository": {
+    "branch": null,
+    "head_sha": null,
+    "base_branch": null,
+    "base_sha": null,
+    "repository_path": null
+  },
+  "test_environment": {
+    "macos_build": null,
+    "machine_identifier": null,
+    "platform": null,
+    "architecture": null
+  },
+  "test_processes": {
+    "separately_signed": false,
+    "helper_effective_uid": null
+  },
+  "qualification_context_artifact_reference": null,
+  "matrix": {
+    "signed_debug_bundle": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "signed_release_bundle": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "unauthorized_same_uid_client": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "unauthorized_same_uid_namespace_access": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "unauthorized_same_uid_ledger_mutation": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "differently_signed_client": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "authorized_app_and_manager_cli_identities": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "unknown_protocol_and_malformed_messages": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "outside_root_sentinel_preservation": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "wrong_project_id": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "stale_project_generation": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "negative_project_generation_wire_rejected": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "project_binding_hash_collision_resolution": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "project_binding_lifecycle_exhaustion_and_revoke": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "case_normalized_transaction_replay": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "root_descriptor_identity_mismatch": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "atomic_swap_source_leaf_before_capture": {
+      "contracts_exercised": [
+        "currentEntry",
+        "namespaceVersionExact"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "atomic_swap_source_leaf_during_capture": {
+      "contracts_exercised": [
+        "currentEntry",
+        "namespaceVersionExact"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "atomic_swap_source_leaf_after_capture": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "atomic_swap_parent_before_capture": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "atomic_swap_parent_after_capture": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "parent_relocation_during_rollback": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "atomic_swap_rollback_destination_occupied": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "atomic_swap_special_leaf_before_descriptor_open": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "authorization_metadata_change_after_final_check": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "crash_at_every_durable_phase": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "daemon_restart_and_idempotent_recovery": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "manager_restart_and_idempotent_recovery": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "query_is_strictly_nonmutating": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "resume_after_reply_and_pathname_loss": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "terminal_outcome_retained_until_acknowledged": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "acknowledgement_authority_and_idempotency": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "acknowledgement_crash_cleanup_matrix": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "caller_ledger_precedes_xpc_submission": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "caller_ledger_restart_and_scope_fencing": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "broker_interruption_requires_transaction_recovery": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "caller_ledger_same_uid_tamper": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "caller_ledger_lock_replacement_during_retention": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "project_generation_reset_with_retained_transaction": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "local_ownership_enforced_apfs": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "external_volume_rejected": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "removable_volume_rejected": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "network_volume_rejected": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "ignore_ownership_volume_rejected": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "cross_volume_destination_durable_before_source_destruction": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "approval_and_denial": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "upgrade_unregister_reregister": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "same_connection_service_version_handshake": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "caller_sealed_helper_code_identity": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "app_manager_cli_helper_packaging": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "settings_status_and_control": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "tampered_or_wrong_signature": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "source_leaf_substitution": {
+      "contracts_exercised": [
+        "currentEntry",
+        "namespaceVersionExact"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "hard_link_behavior": {
+      "contracts_exercised": [
+        "namespaceVersionExact",
+        "contentVersionExact"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "writable_file_descriptor_behavior": {
+      "contracts_exercised": [
+        "currentEntry",
+        "contentVersionExact"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "no_same_uid_fallback": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    },
+    "shell_nonregression": {
+      "contracts_exercised": [
+        "currentEntry"
+      ],
+      "status": "not_run",
+      "raw_artifact_references": [],
+      "iterations": {
+        "planned": 1,
+        "executed": 0,
+        "conclusive": 0,
+        "barrier_hits": 0,
+        "barrier_misses": 0
+      },
+      "barrier_evidence": [],
+      "process_identities": [],
+      "signing_identities": [],
+      "fixture_digests": {
+        "before": [],
+        "after": []
+      },
+      "mount_facts": {
+        "applicable": false,
+        "filesystem_type": null,
+        "mount_path": null,
+        "device_identifier": null,
+        "volume_uuid": null,
+        "mount_flags": [],
+        "local": null,
+        "removable": null,
+        "network": null,
+        "ownership_enabled": null,
+        "raw_artifact_reference": null
+      },
+      "crash_point": {
+        "applicable": false,
+        "phase": null,
+        "timing": null,
+        "signal": null,
+        "restart_observed": null,
+        "raw_artifact_reference": null
+      },
+      "observed_result": "Not executed; this template records no qualification result."
+    }
+  },
+  "same_uid_fallback": "unverified",
+  "same_uid_threat_model": "in_scope",
+  "formal_closure": {
+    "capture_linearization": false,
+    "source_parent_containment_and_authority": false,
+    "protected_namespace_denial": false,
+    "current_entry_contract": false,
+    "namespace_exact_no_mismatch_disposal": false,
+    "content_exact_fail_closed": false,
+    "final_authorization_metadata_race_closure": false,
+    "quarantine_disposition_qualification": false,
+    "startup_recovery_fence": false,
+    "caller_generation_fence": false,
+    "volume_behavior_qualification": false,
+    "equivalent_identity_conditional_boundary_proof": false,
+    "formal_argument_artifact_references": []
+  },
+  "residual_risk": {
+    "disposition": "open_release_blocker",
+    "remaining_race": "Known current residuals, not qualification results: a same-UID attacker can relocate the validated source parent outside the authorized root before capture, substitute the final source entry before exclusive capture, or change ACL or BSD metadata after the last check and before unlinkat.",
+    "maximum_race_impact": "Known current upper bound, not a measured pass: one winning source-parent race can delete one eligible outside-root regular file or symbolic link containing unbounded bytes, or quarantine one ineligible directory containing an unbounded subtree. The final metadata race can delete the one already captured expected regular file or symbolic link, with unbounded file bytes. Retained quarantine can consume one slot per conflict and all 32 slots per protected volume. Caller-ledger tamper or generation fencing loss can strand or allow stale-authority completion of up to 32 captured or terminally deleted expected leaves per protected volume; each regular file can contain unbounded bytes. Writable descriptors and hard links prevent an exact-content guarantee. E2 remains open."
+  },
+  "remaining_requirements": [
+    "Execute every case through the signed-host qualification harness and preserve bounded recorder-captured read-only raw snapshots.",
+    "Execute the harness with schema-v1 case-scoped, role-scoped, iteration-scoped, fact-digest-bound, and predicate-scoped artifacts for every row, barrier, mount observation, crash point, process identity, signing identity, fixture digest, and formal argument.",
+    "Implement and qualify an authorized quarantine disposition so repeated conflicts cannot permanently exhaust all 32 slots.",
+    "Fence startup on complete recovery of every nonterminal transaction.",
+    "Define and qualify repair transitions for terminal receipts whose protected-leaf physical state contradicts the recorded disposition.",
+    "Make source-parent containment and requester authority atomic with capture, then prove outside-root sentinels remain unchanged.",
+    "Close caller-generation fencing, binding lifecycle, and behavior-qualified volume policy.",
+    "Prove the equivalent identity-conditional boundary formally without describing mitigation as elimination."
+  ]
+}

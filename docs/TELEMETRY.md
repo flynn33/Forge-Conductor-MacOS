@@ -41,6 +41,21 @@ Frame shape still validated by `TelemetryContract` and
 Continuous behavior is proven by `RealtimeStreamTests` (engine samples,
 service listener frames, multi-event SSE).
 
+## Qualification boundary
+
+Telemetry contract and stream tests qualify only this subsystem. They do not
+close P10, filesystem E2, current G09-G12, Developer ID Release signing and
+the full native UI/settings/service matrix, the live shell app/installed-
+manager restart scenario,
+manager-owned real-provider autonomous continuity, or owner-deferred
+representative physical-hardware qualification.
+
+The earlier exact-revision Apple Development-signed 100-cycle Rig/MCP navigation
+test is supporting evidence; the final current-source rerun and broader release
+runs remain required.
+
 ## Version
 
 `0.9.0`
+
+Build: `1`

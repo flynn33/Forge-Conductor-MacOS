@@ -101,6 +101,6 @@ Report medians and upper percentiles where multiple samples exist. Do not infer 
 
 ## Evidence storage
 
-Store the index under `.forge-codex/evidence/index.json`. Large traces may live under an external run directory referenced by absolute path and SHA-256. Never commit secrets or raw private project content.
+Store the index under `.forge-codex/state/evidence-index.json`, as generated atomically by `.forge-codex/scripts/build_evidence_index.py`. Large traces may live under an external run directory referenced by absolute path and SHA-256. Never commit secrets or raw private project content.
 
 Each evidence record must include the generating command, exit code, start/end time, environment summary, artifact hash, and related gate IDs.

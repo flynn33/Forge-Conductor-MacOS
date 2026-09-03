@@ -1,0 +1,96 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260831T033848Z-142f880271.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 117,
+      "path": ".forge-codex/evidence/EVID-20260831T033848Z-142f880271.stderr.txt",
+      "sha256": "1be6f9ecae9d5c4d615cda795e3740f13a0b3daf02c42f0a103348b5c4a42759",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "child_evidence_context": {
+    "binding_schema_version": 1,
+    "evidence_id": "EVID-20260831T033848Z-142f880271",
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "cd7e84fed8ed0fe0a8ec90793e83388c8a451f09",
+      "branch": "fix/launchagent-readiness",
+      "head_sha": "d0276b0799de2be2dd897b8ecadac22747775fc3",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor-LaunchAgent-Readiness"
+    },
+    "schema_version": 1,
+    "source_manifest": {
+      "bytes": 10009211,
+      "file_count": 259,
+      "schema_version": 1,
+      "sha256": "92fdee8b39d3defc81b5102c0c13777225d218267b00d1d9874b9cb80aa2728e"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "command": "python3 .forge-codex/scripts/test_qualify_signed_shell_manager.py",
+  "ended_at": "2026-08-31T03:38:48.557695+00:00",
+  "environment": {
+    "architecture": "arm64",
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-LaunchAgent-Readiness",
+    "machine_identifier": "Mac16,7",
+    "macos_build": "25G83",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "execution_provenance": {
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "cd7e84fed8ed0fe0a8ec90793e83388c8a451f09",
+      "branch": "fix/launchagent-readiness",
+      "head_sha": "d0276b0799de2be2dd897b8ecadac22747775fc3",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor-LaunchAgent-Readiness"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "exit_code": 0,
+  "id": "EVID-20260831T033848Z-142f880271",
+  "kind": "launchagent-shell-harness-tests",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [
+    "FC-SHELL-COMPAT-QUALIFICATION-001"
+  ],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 10009211,
+    "file_count": 259,
+    "schema_version": 1,
+    "sha256": "92fdee8b39d3defc81b5102c0c13777225d218267b00d1d9874b9cb80aa2728e"
+  },
+  "source_manifest_after": {
+    "bytes": 10009211,
+    "file_count": 259,
+    "schema_version": 1,
+    "sha256": "92fdee8b39d3defc81b5102c0c13777225d218267b00d1d9874b9cb80aa2728e"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-31T03:38:48.458452+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

@@ -4,6 +4,7 @@
 import CryptoKit
 import Darwin
 import Foundation
+import ForgeFilesystemProtocol
 import MachO
 import Security
 
@@ -298,11 +299,56 @@ enum RuntimeProcessSandbox {
 /// paths before it runs outside the sandbox.
 enum RuntimeLaunchGate {
     static let executableName = "forge-runtime-launcher"
-    static let productIdentifier = "com.forge-conductor.runtime-launcher"
-    static let productTeamIdentifier = "2Y25RTLZET"
+    static let productIdentifier = ForgeFilesystemProtocolConstants.runtimeLauncherIdentifier
+    static let developmentTestBundleIdentifier = "com.forge-conductor.tests"
+    static let developmentTeamIdentifier =
+        ForgeFilesystemProtocolConstants.developmentTeamIdentifier
+    static let distributionTeamIdentifier =
+        ForgeFilesystemProtocolConstants.productionTeamIdentifier
+    static let approvedProductTeamIdentifiers: Set<String> = [
+        developmentTeamIdentifier,
+        distributionTeamIdentifier,
+    ]
     static let inheritedDescriptor: Int32 = 3
     static let releaseByte: UInt8 = 0xA5
     static let maximumExecutableBytes = 8 * 1_024 * 1_024
+
+    static func requiredProductCodeSigningRequirement(
+        identifier: String,
+        teamIdentifier: String
+    ) -> String? {
+        ForgeFilesystemProtocolConstants.requiredProductCodeSigningRequirement(
+            identifier: identifier,
+            teamIdentifier: teamIdentifier
+        )
+    }
+
+    /// The Xcode unit-test bundle is not a shipping product role. It receives
+    /// one narrow local-development exception so a development-signed test host
+    /// can exercise the adjacent, production-identified runtime launcher.
+    static func requiredDevelopmentTestCodeSigningRequirement(
+        identifier: String,
+        teamIdentifier: String
+    ) -> String? {
+        guard identifier == developmentTestBundleIdentifier,
+              teamIdentifier == developmentTeamIdentifier else { return nil }
+        return "anchor apple generic and identifier \"\(identifier)\" "
+            + "and certificate leaf[subject.OU] = \"\(teamIdentifier)\" "
+            + "and certificate leaf[field.1.2.840.113635.100.6.1.12] exists"
+    }
+
+    private static func requiredCodeSigningRequirement(
+        identifier: String,
+        teamIdentifier: String
+    ) -> String? {
+        requiredProductCodeSigningRequirement(
+            identifier: identifier,
+            teamIdentifier: teamIdentifier
+        ) ?? requiredDevelopmentTestCodeSigningRequirement(
+            identifier: identifier,
+            teamIdentifier: teamIdentifier
+        )
+    }
 
     static var isAvailable: Bool {
         (try? sourceExecutableURL()) != nil
@@ -497,29 +543,12 @@ enum RuntimeLaunchGate {
         }
 
         if sourceIdentity.identifier == productIdentifier {
-            let allowedParent = ["com.forge-conductor.cli", "com.forge-conductor.tests"]
-                .contains(currentIdentity.identifier)
-            if allowedParent,
-               sourceIdentity.teamIdentifier == productTeamIdentifier,
-               currentIdentity.teamIdentifier == productTeamIdentifier {
-                return sourceIdentity
-            }
-            let sourceIsExpectedDevelopmentSignature =
-                sourceIdentity.teamIdentifier == productTeamIdentifier
-                || (sourceIdentity.teamIdentifier == nil
-                    && sourceIdentity.flags.contains(.adhoc))
-            guard allowedParent,
-                  sourceIsExpectedDevelopmentSignature,
-                  currentIdentity.teamIdentifier == nil,
-                  currentIdentity.flags.contains(.adhoc),
-                  isExpectedDevelopmentPair(
-                    source: source,
-                    currentExecutable: currentExecutable
-                  ) else {
-                throw RuntimeJobError.storageFailure(
-                    "runtime launch gate does not match the command-line product"
-                )
-            }
+            try validateCommandLineProductIdentity(
+                source: source,
+                sourceIdentity: sourceIdentity,
+                currentExecutable: currentExecutable,
+                currentIdentity: currentIdentity
+            )
             return sourceIdentity
         }
 
@@ -546,6 +575,55 @@ enum RuntimeLaunchGate {
             )
         }
         return sourceIdentity
+    }
+
+    /// Binds the runtime launcher to the exact adjacent CLI product. Development
+    /// and distribution signing are both valid product modes, but the launcher
+    /// and CLI must carry the same approved team identifier. This cannot depend
+    /// on `DEBUG`: a Release binary may be development-signed for local testing.
+    static func validateCommandLineProductIdentity(
+        source: URL,
+        sourceIdentity: CodeIdentity,
+        currentExecutable: URL,
+        currentIdentity: CodeIdentity
+    ) throws {
+        let currentIsCommandLineProduct = currentIdentity.identifier
+            == "com.forge-conductor.cli"
+        let currentIsDevelopmentTest = currentIdentity.identifier
+            == developmentTestBundleIdentifier
+        guard sourceIdentity.identifier == productIdentifier,
+              currentIsCommandLineProduct || currentIsDevelopmentTest,
+              isExpectedDevelopmentPair(
+                source: source,
+                currentExecutable: currentExecutable
+              ) else {
+            throw RuntimeJobError.storageFailure(
+                "runtime launch gate does not match the command-line product"
+            )
+        }
+        if currentIsDevelopmentTest {
+            guard sourceIdentity.teamIdentifier == developmentTeamIdentifier,
+                  currentIdentity.teamIdentifier == developmentTeamIdentifier else {
+                throw RuntimeJobError.storageFailure(
+                    "runtime launch gate does not match the development test product"
+                )
+            }
+            return
+        }
+        if let sourceTeam = sourceIdentity.teamIdentifier,
+           approvedProductTeamIdentifiers.contains(sourceTeam),
+           currentIdentity.teamIdentifier == sourceTeam {
+            return
+        }
+        let sourceIsExpectedDevelopmentSignature = sourceIdentity.teamIdentifier
+            .map(approvedProductTeamIdentifiers.contains) ?? sourceIdentity.flags.contains(.adhoc)
+        guard sourceIsExpectedDevelopmentSignature,
+              currentIdentity.teamIdentifier == nil,
+              currentIdentity.flags.contains(.adhoc) else {
+            throw RuntimeJobError.storageFailure(
+                "runtime launch gate does not match the command-line product"
+            )
+        }
     }
 
     /// Binds an application helper to the exact enclosing product. Team-signed
@@ -578,7 +656,7 @@ enum RuntimeLaunchGate {
         }
 
         if let appTeam = appIdentity.teamIdentifier,
-           appTeam == productTeamIdentifier,
+           approvedProductTeamIdentifiers.contains(appTeam),
            sourceIdentity.teamIdentifier == appTeam,
            currentIdentity.teamIdentifier == appTeam {
             return
@@ -706,9 +784,43 @@ enum RuntimeLaunchGate {
                 "runtime launch gate signature metadata failed with status \(informationStatus)"
             )
         }
+        let teamIdentifier = information[kSecCodeInfoTeamIdentifier] as? String
+        if let teamIdentifier {
+            guard let requirementText = requiredCodeSigningRequirement(
+                identifier: identifier,
+                teamIdentifier: teamIdentifier
+            ) else {
+                throw RuntimeJobError.storageFailure(
+                    "runtime launch gate has an unsupported product signing identity"
+                )
+            }
+            var requirement: SecRequirement?
+            let requirementStatus = SecRequirementCreateWithString(
+                requirementText as CFString,
+                SecCSFlags(rawValue: 0),
+                &requirement
+            )
+            guard requirementStatus == errSecSuccess, let requirement else {
+                throw RuntimeJobError.storageFailure(
+                    "runtime launch gate signing requirement failed to compile with status "
+                        + "\(requirementStatus)"
+                )
+            }
+            let validationStatus = SecStaticCodeCheckValidity(
+                staticCode,
+                flags,
+                requirement
+            )
+            guard validationStatus == errSecSuccess else {
+                throw RuntimeJobError.storageFailure(
+                    "runtime launch gate product signing requirement failed with status "
+                        + "\(validationStatus)"
+                )
+            }
+        }
         return CodeIdentity(
             identifier: identifier,
-            teamIdentifier: information[kSecCodeInfoTeamIdentifier] as? String,
+            teamIdentifier: teamIdentifier,
             flags: SecCodeSignatureFlags(rawValue: flagsNumber.uint32Value),
             uniqueHash: uniqueHash
         )

@@ -5,11 +5,13 @@
 // Why: Central composition makes modules replaceable without service-locator globals.
 
 import Foundation
+import ForgeFilesystemProtocol
 
 /// Composition root for the Forge-Conductor application.
 /// All layers hang off this object; suitable for CLI, MCP stdio, and future Xcode shell.
 public final class ForgeApp: @unchecked Sendable {
-    public static let version = "0.9.0"
+    public static let version = ForgeFilesystemProtocolConstants.productVersion
+    public static let buildVersion = ForgeFilesystemProtocolConstants.productBuildVersion
     public static let productName = "Forge-Conductor"
 
     public let paths: AppPaths

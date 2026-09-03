@@ -9,11 +9,17 @@ import SwiftUI
 /// Persistent application navigation. This intentionally uses explicit
 /// buttons instead of `List(selection:)`: tab choice is application state,
 /// not a second navigation-stack state machine.
-struct AppSidebarView: View {
-    let selectedTab: AppModel.AppTab
-    let version: String
-    let lastError: String?
+struct AppSidebarView: View, Equatable {
+    nonisolated let selectedTab: AppModel.AppTab
+    nonisolated let version: String
+    nonisolated let lastError: String?
     let onSelect: (AppModel.AppTab) -> Void
+
+    nonisolated static func == (lhs: AppSidebarView, rhs: AppSidebarView) -> Bool {
+        lhs.selectedTab == rhs.selectedTab
+            && lhs.version == rhs.version
+            && lhs.lastError == rhs.lastError
+    }
 
     var body: some View {
         VStack(spacing: 0) {

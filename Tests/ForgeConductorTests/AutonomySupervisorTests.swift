@@ -154,6 +154,213 @@ final class AutonomySupervisorTests: XCTestCase {
         ))
     }
 
+    func testDeleteGrantAdmitsAdditiveRecoveryThroughBroker() async throws {
+        try await withRepository { repository, root in
+            let fixture = try await makeRun(
+                repository: repository,
+                root: root,
+                allowedTools: ["fs_delete"]
+            )
+            let lease = try await repository.acquireRunLease(
+                runID: fixture.run.runID,
+                ownerID: "manager-delete-recovery-admission",
+                policy: fixture.leasePolicy
+            )
+            let toolFixture = try await makeProviderToolContext(
+                repository: repository,
+                run: fixture.run,
+                lease: lease,
+                sessionID: "session-delete-recovery-admission"
+            )
+            let executor = RecoveryToolExecutor(interruptAfterDispatch: false)
+            let broker = ToolInvocationBroker(
+                repository: repository,
+                executor: executor,
+                classifier: StaticToolReplayClassifier(classifications: [
+                    "fs_delete_recovery": .reconciled,
+                ])
+            )
+
+            let result = try await broker.invoke(
+                BrokeredToolCall(
+                    providerCallID: "call-delete-recovery-admission",
+                    toolName: "fs_delete_recovery",
+                    arguments: [
+                        "transaction_id": UUID().uuidString.lowercased(),
+                        "action": "query",
+                    ]
+                ),
+                turnID: toolFixture.turn.turnID,
+                context: toolFixture.context,
+                lease: lease
+            )
+
+            XCTAssertTrue(result.ok)
+            XCTAssertEqual(result.payload["action"] as? String, "query")
+            XCTAssertEqual(executor.callCount, 1)
+        }
+    }
+
+    func testInterruptedRecoveryActionsRemainAmbiguousAndNeverReplayUnresolved() async throws {
+        try await withRepository { repository, root in
+            let fixture = try await makeRun(
+                repository: repository,
+                root: root,
+                allowedTools: ["fs_delete"]
+            )
+            let lease = try await repository.acquireRunLease(
+                runID: fixture.run.runID,
+                ownerID: "manager-delete-recovery-replay",
+                policy: fixture.leasePolicy
+            )
+            let toolFixture = try await makeProviderToolContext(
+                repository: repository,
+                run: fixture.run,
+                lease: lease,
+                sessionID: "session-delete-recovery-replay"
+            )
+            let executor = RecoveryToolExecutor(interruptAfterDispatch: true)
+            let broker = ToolInvocationBroker(
+                repository: repository,
+                executor: executor,
+                classifier: StaticToolReplayClassifier(classifications: [
+                    "fs_delete_recovery": .reconciled,
+                ])
+            )
+
+            for action in ["query", "resume", "acknowledge"] {
+                let call = BrokeredToolCall(
+                    providerCallID: "call-delete-recovery-\(action)",
+                    toolName: "fs_delete_recovery",
+                    arguments: [
+                        "transaction_id": UUID().uuidString.lowercased(),
+                        "action": action,
+                    ]
+                )
+                do {
+                    _ = try await broker.invoke(
+                        call,
+                        turnID: toolFixture.turn.turnID,
+                        context: toolFixture.context,
+                        lease: lease
+                    )
+                    XCTFail("Expected the injected recovery interruption for \(action)")
+                } catch RecoveryToolExecutor.Interruption.afterDispatch {
+                    // The durable invocation is now ambiguous and cannot be replayed.
+                }
+
+                let afterFirstDispatch = executor.callCount
+                await assertAutonomyError(code: "tool_replay_blocked") {
+                    _ = try await broker.invoke(
+                        call,
+                        turnID: toolFixture.turn.turnID,
+                        context: toolFixture.context,
+                        lease: lease
+                    )
+                }
+                XCTAssertEqual(executor.callCount, afterFirstDispatch, action)
+
+                let storedValue = try await repository.toolInvocation(
+                    sessionID: toolFixture.context.providerSessionID ?? "",
+                    providerCallID: call.providerCallID
+                )
+                XCTAssertEqual(try XCTUnwrap(storedValue).state, .ambiguous, action)
+            }
+            XCTAssertEqual(executor.callCount, 3)
+        }
+    }
+
+    func testInterruptedProtectedDeleteNeverReconcilesFromPathnameAbsence() async throws {
+        try await withRepository { repository, root in
+            let fixture = try await makeRun(
+                repository: repository,
+                root: root,
+                allowedTools: ["fs_delete"]
+            )
+            let projectRoot = root.appendingPathComponent("project", isDirectory: true)
+            try FileManager.default.createDirectory(
+                at: projectRoot,
+                withIntermediateDirectories: true
+            )
+            let target = projectRoot.appendingPathComponent("protected-delete.txt")
+            try Data("protected\n".utf8).write(to: target)
+            let lease = try await repository.acquireRunLease(
+                runID: fixture.run.runID,
+                ownerID: "manager-protected-delete-reconcile",
+                policy: fixture.leasePolicy
+            )
+            let toolFixture = try await makeProviderToolContext(
+                repository: repository,
+                run: fixture.run,
+                lease: lease,
+                sessionID: "session-protected-delete-reconcile"
+            )
+            let paths = AppPaths(home: root.appendingPathComponent("memory-home"))
+            try paths.ensureLayout()
+            let memory = ProjectMemoryService(paths: paths)
+            defer { memory.closeAll() }
+            let runtimeJobs = try RuntimeJobRepository(
+                databaseURL: root.appendingPathComponent("runtime-jobs.sqlite3")
+            )
+            let executor = InterruptingFilesystemDeleteExecutor()
+            let reconciler = ProductionToolInvocationReconciler(
+                controlPlane: repository,
+                runtimeJobs: runtimeJobs,
+                memory: memory
+            )
+            let classifier = StaticToolReplayClassifier(classifications: [
+                "fs_delete": .reconciled,
+            ])
+            let call = BrokeredToolCall(
+                providerCallID: "call-protected-delete-reconcile",
+                toolName: "fs_delete",
+                arguments: ["path": target.path]
+            )
+            let broker = ToolInvocationBroker(
+                repository: repository,
+                executor: executor,
+                classifier: classifier,
+                reconciler: reconciler
+            )
+
+            do {
+                _ = try await broker.invoke(
+                    call,
+                    turnID: toolFixture.turn.turnID,
+                    context: toolFixture.context,
+                    lease: lease
+                )
+                XCTFail("Expected the injected delete interruption")
+            } catch InterruptingFilesystemDeleteExecutor.Interruption.afterEffect {
+                // The protected path disappeared, but no durable broker result exists.
+            }
+            XCTAssertFalse(FileManager.default.fileExists(atPath: target.path))
+            XCTAssertEqual(executor.callCount, 1)
+
+            let replayBroker = ToolInvocationBroker(
+                repository: repository,
+                executor: executor,
+                classifier: classifier,
+                reconciler: reconciler
+            )
+            await assertAutonomyError(code: "tool_replay_blocked") {
+                _ = try await replayBroker.invoke(
+                    call,
+                    turnID: toolFixture.turn.turnID,
+                    context: toolFixture.context,
+                    lease: lease
+                )
+            }
+            XCTAssertEqual(executor.callCount, 1)
+            let stored = try await repository.toolInvocation(
+                sessionID: toolFixture.context.providerSessionID ?? "",
+                providerCallID: call.providerCallID
+            )
+            XCTAssertEqual(try XCTUnwrap(stored).state, .ambiguous)
+            await runtimeJobs.close()
+        }
+    }
+
     func testProductionReconcilerCompletesInterruptedFilesystemEditWithoutRepeatingIt() async throws {
         try await withRepository { repository, root in
             let fixture = try await makeRun(
@@ -394,11 +601,11 @@ final class AutonomySupervisorTests: XCTestCase {
             try paths.ensureLayout()
             let memory = ProjectMemoryService(paths: paths)
             defer { memory.closeAll() }
-            let initialized = try memory.initialize(path: projectRoot.path)
+            let initialized = try memory.initializeUnchecked(path: projectRoot.path)
             let projectID = ProjectID(try XCTUnwrap(UUID(
                 uuidString: try XCTUnwrap(initialized["project_id"] as? String)
             )))
-            _ = try await repository.registerProject(
+            _ = try await repository.registerProjectUnchecked(
                 projectID: projectID,
                 displayName: "Memory Reconciliation Fixture",
                 canonicalRoot: projectRoot
@@ -984,7 +1191,7 @@ final class AutonomySupervisorTests: XCTestCase {
     ) async throws -> RunFixture {
         let projectID = ProjectID()
         let projectRoot = root.appendingPathComponent("project", isDirectory: true)
-        _ = try await repository.registerProject(
+        _ = try await repository.registerProjectUnchecked(
             projectID: projectID,
             displayName: "Autonomy Fixture",
             canonicalRoot: projectRoot
@@ -1117,6 +1324,61 @@ private final class CountingToolExecutor: ToolExecuting, @unchecked Sendable {
     }
 }
 
+private final class RecoveryToolExecutor: ToolExecuting, @unchecked Sendable {
+    enum Interruption: Error {
+        case afterDispatch
+    }
+
+    private let lock = NSLock()
+    private let interruptAfterDispatch: Bool
+    private var count = 0
+
+    init(interruptAfterDispatch: Bool) {
+        self.interruptAfterDispatch = interruptAfterDispatch
+    }
+
+    var toolNames: [String] { ["fs_delete_recovery"] }
+
+    var callCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return count
+    }
+
+    func call(
+        name: String,
+        arguments: [String: Any],
+        clientID: ClientID
+    ) throws -> ToolResult {
+        try execute(name: name, arguments: arguments)
+    }
+
+    func call(
+        name: String,
+        arguments: [String: Any],
+        context: ToolInvocationContext
+    ) throws -> ToolResult {
+        try execute(name: name, arguments: arguments)
+    }
+
+    private func execute(
+        name: String,
+        arguments: [String: Any]
+    ) throws -> ToolResult {
+        guard name == "fs_delete_recovery",
+              let action = arguments["action"] as? String else {
+            throw AutonomyError.invalidRequest("invalid recovery fixture call")
+        }
+        lock.lock()
+        count += 1
+        lock.unlock()
+        if interruptAfterDispatch {
+            throw Interruption.afterDispatch
+        }
+        return .success(["action": action])
+    }
+}
+
 private final class InterruptingFilesystemEditExecutor: ToolExecuting, @unchecked Sendable {
     enum Interruption: Error {
         case afterEffect
@@ -1169,6 +1431,54 @@ private final class InterruptingFilesystemEditExecutor: ToolExecuting, @unchecke
         }
         try source.replacingOccurrences(of: old, with: new)
             .write(to: url, atomically: true, encoding: .utf8)
+        throw Interruption.afterEffect
+    }
+}
+
+private final class InterruptingFilesystemDeleteExecutor: ToolExecuting, @unchecked Sendable {
+    enum Interruption: Error {
+        case afterEffect
+    }
+
+    private let lock = NSLock()
+    private var count = 0
+
+    var toolNames: [String] { ["fs_delete"] }
+
+    var callCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return count
+    }
+
+    func call(
+        name: String,
+        arguments: [String: Any],
+        clientID: ClientID
+    ) throws -> ToolResult {
+        try execute(name: name, arguments: arguments)
+    }
+
+    func call(
+        name: String,
+        arguments: [String: Any],
+        context: ToolInvocationContext
+    ) throws -> ToolResult {
+        try execute(name: name, arguments: arguments)
+    }
+
+    private func execute(
+        name: String,
+        arguments: [String: Any]
+    ) throws -> ToolResult {
+        guard name == "fs_delete",
+              let path = arguments["path"] as? String else {
+            throw AutonomyError.invalidRequest("invalid protected delete fixture call")
+        }
+        lock.lock()
+        count += 1
+        lock.unlock()
+        try FileManager.default.removeItem(atPath: path)
         throw Interruption.afterEffect
     }
 }

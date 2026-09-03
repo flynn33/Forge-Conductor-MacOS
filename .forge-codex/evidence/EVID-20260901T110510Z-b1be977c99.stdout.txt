@@ -1,0 +1,32 @@
+Test Suite 'Selected tests' started at 2026-09-01 06:05:11.412.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-09-01 06:05:11.413.
+Test Suite 'FilesystemCancellationTests' started at 2026-09-01 06:05:11.413.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testQuarantineStatusKeepsUnresolvedDebtAndReleasesOnlyExactRestoredIdentity]' started.
+Test Case '-[ForgeConductorTests.FilesystemCancellationTests testQuarantineStatusKeepsUnresolvedDebtAndReleasesOnlyExactRestoredIdentity]' passed (0.159 seconds).
+Test Suite 'FilesystemCancellationTests' passed at 2026-09-01 06:05:11.573.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.159 (0.160) seconds
+Test Suite 'SecureFilesystemMutationTests' started at 2026-09-01 06:05:11.573.
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testCallerRecoveryLedgerTreatsMalformedOccupiedSlotAsUnavailable]' started.
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testCallerRecoveryLedgerTreatsMalformedOccupiedSlotAsUnavailable]' passed (0.002 seconds).
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testOperationalHealthRefreshDoesNotReleaseRestoredLocalQuarantineReceipt]' started.
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testOperationalHealthRefreshDoesNotReleaseRestoredLocalQuarantineReceipt]' passed (0.005 seconds).
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testOperationalHealthRefreshDoesNotReleaseTerminalPrivilegedRecoveryReceipt]' started.
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testOperationalHealthRefreshDoesNotReleaseTerminalPrivilegedRecoveryReceipt]' passed (0.004 seconds).
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testOperationalHealthRefreshRejectsFIFOQuarantineLockWithoutBlockingOrMutation]' started.
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testOperationalHealthRefreshRejectsFIFOQuarantineLockWithoutBlockingOrMutation]' passed (0.004 seconds).
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testOperationalHealthRefreshRejectsFIFORecoveryLockWithoutBlockingOrMutation]' started.
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testOperationalHealthRefreshRejectsFIFORecoveryLockWithoutBlockingOrMutation]' passed (0.002 seconds).
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testRestartReconciliationKeepsQuarantinedTransactionUnresolved]' started.
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testRestartReconciliationKeepsQuarantinedTransactionUnresolved]' passed (0.003 seconds).
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testRestartReconciliationPurgesVerifiedTerminalTransaction]' started.
+Test Case '-[ForgeConductorTests.SecureFilesystemMutationTests testRestartReconciliationPurgesVerifiedTerminalTransaction]' passed (0.002 seconds).
+Test Suite 'SecureFilesystemMutationTests' passed at 2026-09-01 06:05:11.596.
+	 Executed 7 tests, with 0 failures (0 unexpected) in 0.023 (0.024) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-09-01 06:05:11.596.
+	 Executed 8 tests, with 0 failures (0 unexpected) in 0.182 (0.183) seconds
+Test Suite 'Selected tests' passed at 2026-09-01 06:05:11.596.
+	 Executed 8 tests, with 0 failures (0 unexpected) in 0.182 (0.184) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

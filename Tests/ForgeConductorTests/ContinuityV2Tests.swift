@@ -195,7 +195,7 @@ final class ContinuityV2Tests: XCTestCase {
         let runtimeJobs = try RuntimeJobRepository(databaseURL: databaseURL)
         let projectID = ProjectID(try XCTUnwrap(UUID(uuidString: fixture.projectID)))
         let projectRoot = fixture.root.appendingPathComponent("project", isDirectory: true)
-        _ = try await controlPlane.registerProject(
+        _ = try await controlPlane.registerProjectUnchecked(
             projectID: projectID,
             displayName: "Continuity Reconciler Fixture",
             canonicalRoot: projectRoot
@@ -288,7 +288,7 @@ final class ContinuityV2Tests: XCTestCase {
         let repository = try ProjectControlPlaneRepository(
             databaseURL: databaseURL
         )
-        _ = try await repository.registerProject(
+        _ = try await repository.registerProjectUnchecked(
             projectID: projectID,
             displayName: "Command Fixture",
             canonicalRoot: projectRoot
@@ -352,6 +352,81 @@ final class ContinuityV2Tests: XCTestCase {
         await restarted.close()
     }
 
+    func testOperatorContinuityReadModelBindsBoundedCheckpointAndAcknowledgementEvidence() async throws {
+        let root = temporaryRoot("operator-continuity-evidence")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let repository = try ProjectControlPlaneRepository(
+            databaseURL: root.appendingPathComponent("control-plane.sqlite3")
+        )
+        defer { Task { await repository.close() } }
+        let projectID = ProjectID()
+        let runID = RunID()
+        let operationID = UUID()
+        let projectRoot = root.appendingPathComponent("project", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+        _ = try await repository.registerProjectUnchecked(
+            projectID: projectID,
+            displayName: "Operator Evidence",
+            canonicalRoot: projectRoot
+        )
+        try await repository.reserveContinuityRun(
+            runID: runID,
+            projectID: projectID,
+            projectGeneration: .initial,
+            mission: "Project bounded continuity evidence",
+            mode: .managedAutonomous
+        )
+        let command = try await repository.enqueueContinuityCommand(
+            ContinuityCommandRequest(
+                operationID: operationID,
+                runID: runID,
+                projectID: projectID,
+                projectGeneration: .initial,
+                type: .rollover,
+                requestedBy: "operator-test",
+                reason: "project exact durable evidence",
+                idempotencyKey: "operator-continuity-evidence",
+                payloadSHA256: String(repeating: "a", count: 64)
+            )
+        )
+        let checkpointID = UUID().uuidString.lowercased()
+        let acknowledgementSHA256 = String(repeating: "b", count: 64)
+        let evidence = ManagerOperatorContinuityEvidence(
+            operationID: operationID,
+            projectID: projectID,
+            projectGeneration: .initial,
+            runID: runID,
+            checkpointID: checkpointID,
+            acknowledgementSHA256: acknowledgementSHA256
+        )
+
+        let rows = try await repository.operatorContinuityReadModels(
+            commands: [command],
+            evidenceByOperation: [operationID: evidence]
+        )
+        let row = try XCTUnwrap(rows.first)
+        XCTAssertEqual(row.checkpointID, checkpointID)
+        XCTAssertEqual(row.acknowledgementSHA256, acknowledgementSHA256)
+
+        let compatibilityRows = try await repository.operatorContinuityReadModels(
+            commands: [command]
+        )
+        XCTAssertNil(compatibilityRows.first?.checkpointID)
+        XCTAssertNil(compatibilityRows.first?.acknowledgementSHA256)
+
+        let unrelatedOperationID = UUID()
+        do {
+            _ = try await repository.operatorContinuityReadModels(
+                commands: [command],
+                evidenceByOperation: [unrelatedOperationID: evidence]
+            )
+            XCTFail("Unrequested continuity evidence must be rejected")
+        } catch let error as AutonomyError {
+            XCTAssertEqual(error.code, "autonomy_invalid_request")
+        }
+    }
+
     func testManagedRequestPersistsHandoffBeforeEnqueueAndReconcilesReplay() async throws {
         let fixture = try makeMemoryFixture(label: "managed-route")
         defer {
@@ -363,7 +438,7 @@ final class ContinuityV2Tests: XCTestCase {
         defer { Task { await controlPlane.close() } }
         let projectUUID = try XCTUnwrap(UUID(uuidString: fixture.projectID))
         let canonicalRoot = fixture.root.appendingPathComponent("project", isDirectory: true)
-        _ = try await controlPlane.registerProject(
+        _ = try await controlPlane.registerProjectUnchecked(
             projectID: ProjectID(projectUUID),
             displayName: "Managed Fixture",
             canonicalRoot: canonicalRoot
@@ -818,7 +893,7 @@ final class ContinuityV2Tests: XCTestCase {
         defer { Task { await controlPlane.close() } }
         let projectID = ProjectID(try XCTUnwrap(UUID(uuidString: fixture.projectID)))
         let projectRoot = fixture.root.appendingPathComponent("project", isDirectory: true)
-        _ = try await controlPlane.registerProject(
+        _ = try await controlPlane.registerProjectUnchecked(
             projectID: projectID,
             displayName: "Managed Bridge Fixture",
             canonicalRoot: projectRoot
@@ -908,7 +983,7 @@ final class ContinuityV2Tests: XCTestCase {
         )
         defer { Task { await controlPlane.close() } }
         let projectID = ProjectID(try XCTUnwrap(UUID(uuidString: fixture.projectID)))
-        _ = try await controlPlane.registerProject(
+        _ = try await controlPlane.registerProjectUnchecked(
             projectID: projectID,
             displayName: "Managed Projection Receipt Fixture",
             canonicalRoot: fixture.root.appendingPathComponent("project", isDirectory: true)
@@ -989,7 +1064,7 @@ final class ContinuityV2Tests: XCTestCase {
         )
         defer { Task { await controlPlane.close() } }
         let projectID = ProjectID(try XCTUnwrap(UUID(uuidString: fixture.projectID)))
-        _ = try await controlPlane.registerProject(
+        _ = try await controlPlane.registerProjectUnchecked(
             projectID: projectID,
             displayName: "Managed Post-Commit Receipt Fixture",
             canonicalRoot: fixture.root.appendingPathComponent("project", isDirectory: true)
@@ -1055,7 +1130,7 @@ final class ContinuityV2Tests: XCTestCase {
         )
         defer { Task { await controlPlane.close() } }
         let projectID = ProjectID(try XCTUnwrap(UUID(uuidString: fixture.projectID)))
-        _ = try await controlPlane.registerProject(
+        _ = try await controlPlane.registerProjectUnchecked(
             projectID: projectID,
             displayName: "Managed Preflight Fixture",
             canonicalRoot: fixture.root.appendingPathComponent("project", isDirectory: true)
@@ -1101,6 +1176,7 @@ final class ContinuityV2Tests: XCTestCase {
 
         let app = try ForgeApp.bootstrap(home: home)
         defer { app.shutdown() }
+        _ = try app.config.update(["allowed_roots": [root.path]], save: false)
         let managedClient = ClientID("managed-continuity-client")
         let initialized = try app.tools.call(
             name: "project_memory.initialize",
@@ -2196,7 +2272,7 @@ final class ContinuityV2Tests: XCTestCase {
             beforeContinuityProjectionWriteObserver: beforeContinuityProjectionWriteObserver,
             didMutationCommitObserver: didMutationCommitObserver
         )
-        let initialized = try memory.initialize(path: project.path)
+        let initialized = try memory.initializeUnchecked(path: project.path)
         return (
             root,
             home,

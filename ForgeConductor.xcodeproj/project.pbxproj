@@ -140,6 +140,13 @@
 		M1C2P3S4E5R6V7E80002 /* MCP/MCPServeVerifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = M1C2P3S4E5R6V7E80001 /* MCP/MCPServeVerifier.swift */; };
 		P0W3R50U5C3C0L001002 /* Telemetry/Collectors/PowerSourcesCollector.swift in Sources */ = {isa = PBXBuildFile; fileRef = P0W3R50U5C3C0L001001 /* Telemetry/Collectors/PowerSourcesCollector.swift */; };
 		P1R2O3D4U5C6T7E80002 /* Tests/ForgeConductorTests/ProductPathReliabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = P1R2O3D4U5C6T7E80001 /* Tests/ForgeConductorTests/ProductPathReliabilityTests.swift */; };
+		14782D2FE9544A59A1AED446 /* Tests/ForgeConductorTests/OperatorProjectContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE153ABEB86940BF8945EE52 /* Tests/ForgeConductorTests/OperatorProjectContractTests.swift */; };
+		6F2D0652CF4E442B9F0CE2EB /* ForgeConductorCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E1FEBD9C424A4245A89601F6 /* ForgeConductorCore.framework */; };
+		F09B00000000000000000001 /* CLIContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F09F00000000000000000001 /* CLIContractTests.swift */; };
+		F09B00000000000000000002 /* LiveLMStudioManagedAutonomyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F09F00000000000000000002 /* LiveLMStudioManagedAutonomyTests.swift */; };
+		F09B00000000000000000003 /* RuntimeCancelQualificationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F09F00000000000000000003 /* RuntimeCancelQualificationTests.swift */; };
+		F09B00000000000000000004 /* LMStudioContractFixtureServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F09F00000000000000000004 /* LMStudioContractFixtureServer.swift */; };
+		F09B00000000000000000005 /* LMStudioContractFixtureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F09F00000000000000000005 /* LMStudioContractFixtureTests.swift */; };
 		R1E2A3L4T5I6M7E8000002 /* Telemetry/RealtimeMetricsEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = R1E2A3L4T5I6M7E8000001 /* Telemetry/RealtimeMetricsEngine.swift */; };
 		R1E2A3L4T5S6T7R80002 /* Tests/ForgeConductorTests/RealtimeStreamTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = R1E2A3L4T5S6T7R80001 /* Tests/ForgeConductorTests/RealtimeStreamTests.swift */; };
 		A26B00000000000000000001 /* Application/AutonomySupervisor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000001 /* Application/AutonomySupervisor.swift */; };
@@ -224,6 +231,29 @@
 		B27B00000000000000000007 /* ToolRouterDeadlineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27F00000000000000000007 /* ToolRouterDeadlineTests.swift */; };
 		F0A700000000000000000001 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0A70000000000000000000A /* main.swift */; };
 		F0A700000000000000000002 /* forge-runtime-launcher in Embed Runtime Helper */ = {isa = PBXBuildFile; fileRef = F0A70000000000000000000B /* forge-runtime-launcher */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		E2F500000000000000000001 /* ForgeFilesystemProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000010 /* ForgeFilesystemProtocol.swift */; };
+		E2F500000000000000000002 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000011 /* main.swift */; };
+		E2F500000000000000000003 /* Infrastructure/SecureFilesystemService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000012 /* Infrastructure/SecureFilesystemService.swift */; };
+		E2F500000000000000000050 /* Infrastructure/SecureFilesystemRecoveryLedger.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000051 /* Infrastructure/SecureFilesystemRecoveryLedger.swift */; };
+		E2F500000000000000000052 /* Infrastructure/SecureFilesystemQualificationHealthSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000053 /* Infrastructure/SecureFilesystemQualificationHealthSession.swift */; };
+		E2F500000000000000000004 /* ForgeFilesystemProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000013 /* ForgeFilesystemProtocolTests.swift */; };
+		E2F500000000000000000005 /* libForgeFilesystemProtocol.a in Frameworks */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000014 /* libForgeFilesystemProtocol.a */; };
+		E2F500000000000000000006 /* libForgeFilesystemProtocol.a in Frameworks */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000014 /* libForgeFilesystemProtocol.a */; };
+		E2F500000000000000000008 /* forge-filesystem-daemon in Embed Filesystem Daemon */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000015 /* forge-filesystem-daemon */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		E2F500000000000000000009 /* com.forge-conductor.filesystem-daemon.plist in Embed Filesystem LaunchDaemon Plist */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000016 /* com.forge-conductor.filesystem-daemon.plist */; };
+		E2F500000000000000000049 /* forge-conductor in Embed Manager CLI */ = {isa = PBXBuildFile; fileRef = FAD7DC3FA3A1480E9B4955B1 /* forge-conductor */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		E2F500000000000000000041 /* PrivilegedLeafDeleteEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000043 /* PrivilegedLeafDeleteEngine.swift */; };
+		E2F500000000000000000042 /* SecureFilesystemMutationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000044 /* SecureFilesystemMutationTests.swift */; };
+		E2F500000000000000000054 /* SecureFilesystemQualificationHealthSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000055 /* SecureFilesystemQualificationHealthSessionTests.swift */; };
+		E2A000000000000000000001 /* QualificationReadiness.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2A000000000000000000010 /* QualificationReadiness.swift */; };
+		E2A000000000000000000009 /* UnauthorizedAdmissionProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2A000000000000000000016 /* UnauthorizedAdmissionProbe.swift */; };
+		E2A000000000000000000002 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2A000000000000000000011 /* main.swift */; };
+		E2A000000000000000000003 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2A000000000000000000012 /* main.swift */; };
+		E2A000000000000000000004 /* libForgeFilesystemProtocol.a in Frameworks */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000014 /* libForgeFilesystemProtocol.a */; };
+		E2A000000000000000000005 /* libForgeFilesystemQualificationSupport.a in Frameworks */ = {isa = PBXBuildFile; fileRef = E2A000000000000000000013 /* libForgeFilesystemQualificationSupport.a */; };
+		E2A000000000000000000006 /* libForgeFilesystemProtocol.a in Frameworks */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000014 /* libForgeFilesystemProtocol.a */; };
+		E2A000000000000000000007 /* libForgeFilesystemQualificationSupport.a in Frameworks */ = {isa = PBXBuildFile; fileRef = E2A000000000000000000013 /* libForgeFilesystemQualificationSupport.a */; };
+		E2A000000000000000000008 /* libForgeFilesystemProtocol.a in Frameworks */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000014 /* libForgeFilesystemProtocol.a */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -240,6 +270,20 @@
 			proxyType = 1;
 			remoteGlobalIDString = D574F9BCA1204936B158984B;
 			remoteInfo = ForgeConductor;
+		};
+		5146CF2B65E241CDB36B8FF0 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FF3F53A3F88F4DF8B3C98871 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D574F9BCA1204936B158984B;
+			remoteInfo = ForgeConductor;
+		};
+		8A3C7885291B471FBB141CE2 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FF3F53A3F88F4DF8B3C98871 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C596F91D22BA465F8D8290A1;
+			remoteInfo = ForgeConductorCore;
 		};
 		530F32EDF9B44C03BBF84D9F /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -283,6 +327,76 @@
 			remoteGlobalIDString = F0A70000000000000000000E;
 			remoteInfo = ForgeRuntimeLauncher;
 		};
+		E2F500000000000000000027 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FF3F53A3F88F4DF8B3C98871 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E2F500000000000000000025;
+			remoteInfo = ForgeFilesystemProtocol;
+		};
+		E2F500000000000000000028 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FF3F53A3F88F4DF8B3C98871 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E2F500000000000000000025;
+			remoteInfo = ForgeFilesystemProtocol;
+		};
+		E2F500000000000000000030 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FF3F53A3F88F4DF8B3C98871 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E2F500000000000000000026;
+			remoteInfo = ForgeFilesystemDaemon;
+		};
+		E2F500000000000000000047 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FF3F53A3F88F4DF8B3C98871 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E2F500000000000000000026;
+			remoteInfo = ForgeFilesystemDaemon;
+		};
+		E2F50000000000000000004A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FF3F53A3F88F4DF8B3C98871 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 05C234606560407787702A3C;
+			remoteInfo = "forge-conductor";
+		};
+		E2A000000000000000000060 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FF3F53A3F88F4DF8B3C98871 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E2F500000000000000000025;
+			remoteInfo = ForgeFilesystemProtocol;
+		};
+		E2A000000000000000000061 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FF3F53A3F88F4DF8B3C98871 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E2A000000000000000000040;
+			remoteInfo = ForgeFilesystemQualificationSupport;
+		};
+		E2A000000000000000000062 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FF3F53A3F88F4DF8B3C98871 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E2F500000000000000000025;
+			remoteInfo = ForgeFilesystemProtocol;
+		};
+		E2A000000000000000000063 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FF3F53A3F88F4DF8B3C98871 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E2A000000000000000000040;
+			remoteInfo = ForgeFilesystemQualificationSupport;
+		};
+		E2A000000000000000000064 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FF3F53A3F88F4DF8B3C98871 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E2F500000000000000000025;
+			remoteInfo = ForgeFilesystemProtocol;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -317,6 +431,39 @@
 				F0A700000000000000000002 /* forge-runtime-launcher in Embed Runtime Helper */,
 			);
 			name = "Embed Runtime Helper";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E2F500000000000000000023 /* Embed Filesystem Daemon */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/MacOS;
+			dstSubfolderSpec = 1;
+			files = (
+				E2F500000000000000000008 /* forge-filesystem-daemon in Embed Filesystem Daemon */,
+			);
+			name = "Embed Filesystem Daemon";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E2F500000000000000000024 /* Embed Filesystem LaunchDaemon Plist */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Library/LaunchDaemons;
+			dstSubfolderSpec = 1;
+			files = (
+				E2F500000000000000000009 /* com.forge-conductor.filesystem-daemon.plist in Embed Filesystem LaunchDaemon Plist */,
+			);
+			name = "Embed Filesystem LaunchDaemon Plist";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E2F50000000000000000004B /* Embed Manager CLI */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Helpers;
+			dstSubfolderSpec = 1;
+			files = (
+				E2F500000000000000000049 /* forge-conductor in Embed Manager CLI */,
+			);
+			name = "Embed Manager CLI";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -457,6 +604,13 @@
 		M1C2P3S4E5R6V7E80001 /* MCP/MCPServeVerifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCP/MCPServeVerifier.swift; sourceTree = "<group>"; };
 		P0W3R50U5C3C0L001001 /* Telemetry/Collectors/PowerSourcesCollector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Telemetry/Collectors/PowerSourcesCollector.swift; sourceTree = "<group>"; };
 		P1R2O3D4U5C6T7E80001 /* Tests/ForgeConductorTests/ProductPathReliabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/ForgeConductorTests/ProductPathReliabilityTests.swift; sourceTree = SOURCE_ROOT; };
+		BE153ABEB86940BF8945EE52 /* Tests/ForgeConductorTests/OperatorProjectContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/ForgeConductorTests/OperatorProjectContractTests.swift; sourceTree = SOURCE_ROOT; };
+		3AF976AA2BDA4AE6A631CED4 /* ForgeConductorAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ForgeConductorAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F09F00000000000000000001 /* CLIContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIContractTests.swift; sourceTree = "<group>"; };
+		F09F00000000000000000002 /* LiveLMStudioManagedAutonomyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveLMStudioManagedAutonomyTests.swift; sourceTree = "<group>"; };
+		F09F00000000000000000003 /* RuntimeCancelQualificationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeCancelQualificationTests.swift; sourceTree = "<group>"; };
+		F09F00000000000000000004 /* LMStudioContractFixtureServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LMStudioContractFixtureServer.swift; sourceTree = "<group>"; };
+		F09F00000000000000000005 /* LMStudioContractFixtureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LMStudioContractFixtureTests.swift; sourceTree = "<group>"; };
 		R1E2A3L4T5I6M7E8000001 /* Telemetry/RealtimeMetricsEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Telemetry/RealtimeMetricsEngine.swift; sourceTree = "<group>"; };
 		R1E2A3L4T5S6T7R80001 /* Tests/ForgeConductorTests/RealtimeStreamTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/ForgeConductorTests/RealtimeStreamTests.swift; sourceTree = SOURCE_ROOT; };
 		A26F00000000000000000001 /* Application/AutonomySupervisor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/AutonomySupervisor.swift; sourceTree = "<group>"; };
@@ -541,9 +695,36 @@
 		B27F00000000000000000007 /* ToolRouterDeadlineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolRouterDeadlineTests.swift; sourceTree = "<group>"; };
 		F0A70000000000000000000A /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		F0A70000000000000000000B /* forge-runtime-launcher */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "forge-runtime-launcher"; sourceTree = BUILT_PRODUCTS_DIR; };
+		E2F500000000000000000010 /* ForgeFilesystemProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForgeFilesystemProtocol.swift; sourceTree = "<group>"; };
+		E2F500000000000000000011 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		E2F500000000000000000012 /* Infrastructure/SecureFilesystemService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Infrastructure/SecureFilesystemService.swift; sourceTree = "<group>"; };
+		E2F500000000000000000051 /* Infrastructure/SecureFilesystemRecoveryLedger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Infrastructure/SecureFilesystemRecoveryLedger.swift; sourceTree = "<group>"; };
+		E2F500000000000000000053 /* Infrastructure/SecureFilesystemQualificationHealthSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Infrastructure/SecureFilesystemQualificationHealthSession.swift; sourceTree = "<group>"; };
+		E2F500000000000000000013 /* ForgeFilesystemProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForgeFilesystemProtocolTests.swift; sourceTree = "<group>"; };
+		E2F500000000000000000014 /* libForgeFilesystemProtocol.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libForgeFilesystemProtocol.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		E2F500000000000000000015 /* forge-filesystem-daemon */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "forge-filesystem-daemon"; sourceTree = BUILT_PRODUCTS_DIR; };
+		E2F500000000000000000016 /* com.forge-conductor.filesystem-daemon.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Resources/com.forge-conductor.filesystem-daemon.plist"; sourceTree = "<group>"; };
+		E2F500000000000000000043 /* PrivilegedLeafDeleteEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivilegedLeafDeleteEngine.swift; sourceTree = "<group>"; };
+		E2F500000000000000000044 /* SecureFilesystemMutationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureFilesystemMutationTests.swift; sourceTree = "<group>"; };
+		E2F500000000000000000055 /* SecureFilesystemQualificationHealthSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureFilesystemQualificationHealthSessionTests.swift; sourceTree = "<group>"; };
+		E2A000000000000000000010 /* QualificationReadiness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QualificationReadiness.swift; sourceTree = "<group>"; };
+		E2A000000000000000000016 /* UnauthorizedAdmissionProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnauthorizedAdmissionProbe.swift; sourceTree = "<group>"; };
+		E2A000000000000000000011 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		E2A000000000000000000012 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		E2A000000000000000000013 /* libForgeFilesystemQualificationSupport.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libForgeFilesystemQualificationSupport.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		E2A000000000000000000014 /* forge-filesystem-qualification-harness */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "forge-filesystem-qualification-harness"; sourceTree = BUILT_PRODUCTS_DIR; };
+		E2A000000000000000000015 /* forge-filesystem-qualification-adversary */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "forge-filesystem-qualification-adversary"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		A91A75214D50435DB3067471 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6F2D0652CF4E442B9F0CE2EB /* ForgeConductorCore.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		2388A51F6AB442BEBA190CF4 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -555,6 +736,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E2F500000000000000000005 /* libForgeFilesystemProtocol.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -591,12 +773,58 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E2F500000000000000000019 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E2F500000000000000000020 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E2F500000000000000000006 /* libForgeFilesystemProtocol.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E2A000000000000000000020 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E2A000000000000000000004 /* libForgeFilesystemProtocol.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E2A000000000000000000021 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E2A000000000000000000005 /* libForgeFilesystemQualificationSupport.a in Frameworks */,
+				E2A000000000000000000006 /* libForgeFilesystemProtocol.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E2A000000000000000000022 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E2A000000000000000000007 /* libForgeFilesystemQualificationSupport.a in Frameworks */,
+				E2A000000000000000000008 /* libForgeFilesystemProtocol.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		542C2FF4110F47EF87C47888 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
+				E2F500000000000000000017 /* ForgeFilesystemProtocol */,
+				E2F500000000000000000018 /* ForgeFilesystemDaemon */,
+				E2A000000000000000000030 /* ForgeFilesystemQualificationSupport */,
+				E2A000000000000000000031 /* ForgeFilesystemQualificationHarness */,
+				E2A000000000000000000032 /* ForgeFilesystemAdversary */,
 				EF8AADDA82404E2F8ED4A976 /* ForgeConductorCore */,
 				C446733565AC47CF93D47FF3 /* ForgeConductorCLI */,
 				F0A70000000000000000000D /* ForgeRuntimeLauncher */,
@@ -608,10 +836,18 @@
 		64BB9664134D41DE87CE4C03 /* Tests/ForgeConductorTests */ = {
 			isa = PBXGroup;
 			children = (
+				BE153ABEB86940BF8945EE52 /* Tests/ForgeConductorTests/OperatorProjectContractTests.swift */,
+				E2F500000000000000000013 /* ForgeFilesystemProtocolTests.swift */,
+				E2F500000000000000000044 /* SecureFilesystemMutationTests.swift */,
+				E2F500000000000000000055 /* SecureFilesystemQualificationHealthSessionTests.swift */,
 				A26F00000000000000000035 /* AutonomousContinuityAcceptanceTests.swift */,
 				A26F00000000000000000023 /* AutonomySupervisorTests.swift */,
 				A26F00000000000000000024 /* ContextBudgetSupervisorTests.swift */,
 				A26F00000000000000000025 /* ContinuityV2Tests.swift */,
+				F09F00000000000000000001 /* CLIContractTests.swift */,
+				F09F00000000000000000002 /* LiveLMStudioManagedAutonomyTests.swift */,
+				F09F00000000000000000004 /* LMStudioContractFixtureServer.swift */,
+				F09F00000000000000000005 /* LMStudioContractFixtureTests.swift */,
 				A26F00000000000000000033 /* ManagedAutonomyRuntimeTests.swift */,
 				A26F00000000000000000034 /* ManagedContinuityWorkerTests.swift */,
 				A26F00000000000000000026 /* ManagedModelProviderBridgeTests.swift */,
@@ -619,6 +855,7 @@
 				A26F00000000000000000028 /* ProjectContextIntegrationTests.swift */,
 				A26F00000000000000000029 /* ProjectControlPlaneRepositoryTests.swift */,
 				A26F00000000000000000030 /* RuntimeExecutionJobTests.swift */,
+				F09F00000000000000000003 /* RuntimeCancelQualificationTests.swift */,
 				A26F00000000000000000031 /* ToolDefinitionCatalogTests.swift */,
 				P11F00000000000000000001 /* ReleaseStressTests.swift */,
 				P10F00000000000000000014 /* ContinuityCoordinatorTests.swift */,
@@ -672,11 +909,17 @@
 		9B211F949DD04484A3010082 /* Products */ = {
 			isa = PBXGroup;
 			children = (
+				E2F500000000000000000014 /* libForgeFilesystemProtocol.a */,
+				E2F500000000000000000015 /* forge-filesystem-daemon */,
+				E2A000000000000000000013 /* libForgeFilesystemQualificationSupport.a */,
+				E2A000000000000000000014 /* forge-filesystem-qualification-harness */,
+				E2A000000000000000000015 /* forge-filesystem-qualification-adversary */,
 				E1FEBD9C424A4245A89601F6 /* ForgeConductorCore.framework */,
 				FAD7DC3FA3A1480E9B4955B1 /* forge-conductor */,
 				F0A70000000000000000000B /* forge-runtime-launcher */,
 				29BC85D97DC146E3AA9DF401 /* Forge Conductor.app */,
 				1EBA34625EF54B7B870DFDC9 /* ForgeConductorTests.xctest */,
+				3AF976AA2BDA4AE6A631CED4 /* ForgeConductorAppTests.xctest */,
 				222C8F97CB2D45D39C28D4B7 /* ForgeConductorUITests.xctest */,
 			);
 			name = Products;
@@ -704,6 +947,48 @@
 				F0A70000000000000000000A /* main.swift */,
 			);
 			path = ForgeRuntimeLauncher;
+			sourceTree = "<group>";
+		};
+		E2F500000000000000000017 /* ForgeFilesystemProtocol */ = {
+			isa = PBXGroup;
+			children = (
+				E2F500000000000000000010 /* ForgeFilesystemProtocol.swift */,
+			);
+			path = ForgeFilesystemProtocol;
+			sourceTree = "<group>";
+		};
+		E2F500000000000000000018 /* ForgeFilesystemDaemon */ = {
+			isa = PBXGroup;
+			children = (
+				E2F500000000000000000011 /* main.swift */,
+				E2F500000000000000000043 /* PrivilegedLeafDeleteEngine.swift */,
+			);
+			path = ForgeFilesystemDaemon;
+			sourceTree = "<group>";
+		};
+		E2A000000000000000000030 /* ForgeFilesystemQualificationSupport */ = {
+			isa = PBXGroup;
+			children = (
+				E2A000000000000000000010 /* QualificationReadiness.swift */,
+				E2A000000000000000000016 /* UnauthorizedAdmissionProbe.swift */,
+			);
+			path = ForgeFilesystemQualificationSupport;
+			sourceTree = "<group>";
+		};
+		E2A000000000000000000031 /* ForgeFilesystemQualificationHarness */ = {
+			isa = PBXGroup;
+			children = (
+				E2A000000000000000000011 /* main.swift */,
+			);
+			path = ForgeFilesystemQualificationHarness;
+			sourceTree = "<group>";
+		};
+		E2A000000000000000000032 /* ForgeFilesystemAdversary */ = {
+			isa = PBXGroup;
+			children = (
+				E2A000000000000000000012 /* main.swift */,
+			);
+			path = ForgeFilesystemAdversary;
 			sourceTree = "<group>";
 		};
 		CA4B3C65563941F98ACE0362 = {
@@ -753,6 +1038,7 @@
 				805ED2598B25452A80C201C6 /* Views/ToolsView.swift */,
 				0C14023BCB93449CB7FC65C5 /* Resources/Info.plist */,
 				0C14023BCB93449CB7FC65C6 /* Resources/ForgeConductor.entitlements */,
+				E2F500000000000000000016 /* com.forge-conductor.filesystem-daemon.plist */,
 				1BA0DE917137446192590EDC /* Metal/MetalMeterView.swift */,
 				5DFD78206D604D69B0466E28 /* Metal/MultiSeriesLoadRenderer.swift */,
 				A3A912701042491E96B07D2B /* Views/Rig/RigDashboardView.swift */,
@@ -800,6 +1086,9 @@
 				71D3A9C84F6E42B1A5D809CE /* Infrastructure/VerifiedMigrationBackup.swift */,
 				B27F00000000000000000001 /* Infrastructure/OwnerOnlyAtomicFile.swift */,
 				B28F00000000000000000001 /* Infrastructure/FilesystemQuarantineLedger.swift */,
+				E2F500000000000000000051 /* Infrastructure/SecureFilesystemRecoveryLedger.swift */,
+				E2F500000000000000000012 /* Infrastructure/SecureFilesystemService.swift */,
+				E2F500000000000000000053 /* Infrastructure/SecureFilesystemQualificationHealthSession.swift */,
 				P10F00000000000000000010 /* Application/ProjectMemoryService.swift */,
 				P10F00000000000000000011 /* Application/Tools/ProjectMemoryToolPack.swift */,
 				P10F00000000000000000012 /* Infrastructure/ResourcePolicy.swift */,
@@ -898,6 +1187,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 364DA9615EEF4503B64E048F /* Build configuration list for PBXNativeTarget "forge-conductor" */;
 			buildPhases = (
+				E2F500000000000000000046 /* Seal Filesystem Daemon Identity */,
 				EDC2E30003514F1F9A39A3FF /* Sources */,
 				FD857FD53ADB4EB29A390115 /* Frameworks */,
 			);
@@ -906,6 +1196,7 @@
 			dependencies = (
 				C7B38FE38DB84BD889BDDFC8 /* PBXTargetDependency */,
 				F0A700000000000000000007 /* PBXTargetDependency */,
+				E2F500000000000000000048 /* PBXTargetDependency */,
 			);
 			name = "forge-conductor";
 			productName = "forge-conductor";
@@ -930,6 +1221,24 @@
 			productReference = 222C8F97CB2D45D39C28D4B7 /* ForgeConductorUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		DBD99DD4E877449D8703E483 /* ForgeConductorAppTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D43C581B12424333B25FAB62 /* Build configuration list for PBXNativeTarget "ForgeConductorAppTests" */;
+			buildPhases = (
+				1420E9C7330D4AB38BB472BD /* Sources */,
+				A91A75214D50435DB3067471 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				72E2A331BE024299AC34EC3B /* PBXTargetDependency */,
+				9189A1D436164BEF83F8B15B /* PBXTargetDependency */,
+			);
+			name = ForgeConductorAppTests;
+			productName = ForgeConductorAppTests;
+			productReference = 3AF976AA2BDA4AE6A631CED4 /* ForgeConductorAppTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		8897BF3640FD4CBEA73213FC /* ForgeConductorTests */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = DBACB75102DA422EB1237476 /* Build configuration list for PBXNativeTarget "ForgeConductorTests" */;
@@ -951,6 +1260,92 @@
 			productReference = 1EBA34625EF54B7B870DFDC9 /* ForgeConductorTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		E2F500000000000000000025 /* ForgeFilesystemProtocol */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E2F500000000000000000039 /* Build configuration list for PBXNativeTarget "ForgeFilesystemProtocol" */;
+			buildPhases = (
+				E2F500000000000000000021 /* Sources */,
+				E2F500000000000000000019 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ForgeFilesystemProtocol;
+			productName = ForgeFilesystemProtocol;
+			productReference = E2F500000000000000000014 /* libForgeFilesystemProtocol.a */;
+			productType = "com.apple.product-type.library.static";
+		};
+		E2F500000000000000000026 /* ForgeFilesystemDaemon */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E2F500000000000000000040 /* Build configuration list for PBXNativeTarget "ForgeFilesystemDaemon" */;
+			buildPhases = (
+				E2F500000000000000000022 /* Sources */,
+				E2F500000000000000000020 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				E2F500000000000000000032 /* PBXTargetDependency */,
+			);
+			name = ForgeFilesystemDaemon;
+			productName = "forge-filesystem-daemon";
+			productReference = E2F500000000000000000015 /* forge-filesystem-daemon */;
+			productType = "com.apple.product-type.tool";
+		};
+		E2A000000000000000000040 /* ForgeFilesystemQualificationSupport */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E2A000000000000000000090 /* Build configuration list for PBXNativeTarget "ForgeFilesystemQualificationSupport" */;
+			buildPhases = (
+				E2A000000000000000000050 /* Sources */,
+				E2A000000000000000000020 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				E2A000000000000000000070 /* PBXTargetDependency */,
+			);
+			name = ForgeFilesystemQualificationSupport;
+			productName = ForgeFilesystemQualificationSupport;
+			productReference = E2A000000000000000000013 /* libForgeFilesystemQualificationSupport.a */;
+			productType = "com.apple.product-type.library.static";
+		};
+		E2A000000000000000000041 /* ForgeFilesystemQualificationHarness */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E2A000000000000000000091 /* Build configuration list for PBXNativeTarget "ForgeFilesystemQualificationHarness" */;
+			buildPhases = (
+				E2A000000000000000000051 /* Sources */,
+				E2A000000000000000000021 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				E2A000000000000000000071 /* PBXTargetDependency */,
+				E2A000000000000000000072 /* PBXTargetDependency */,
+			);
+			name = ForgeFilesystemQualificationHarness;
+			productName = "forge-filesystem-qualification-harness";
+			productReference = E2A000000000000000000014 /* forge-filesystem-qualification-harness */;
+			productType = "com.apple.product-type.tool";
+		};
+		E2A000000000000000000042 /* ForgeFilesystemAdversary */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E2A000000000000000000092 /* Build configuration list for PBXNativeTarget "ForgeFilesystemAdversary" */;
+			buildPhases = (
+				E2A000000000000000000052 /* Sources */,
+				E2A000000000000000000022 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				E2A000000000000000000073 /* PBXTargetDependency */,
+				E2A000000000000000000074 /* PBXTargetDependency */,
+			);
+			name = ForgeFilesystemAdversary;
+			productName = "forge-filesystem-qualification-adversary";
+			productReference = E2A000000000000000000015 /* forge-filesystem-qualification-adversary */;
+			productType = "com.apple.product-type.tool";
+		};
 		C596F91D22BA465F8D8290A1 /* ForgeConductorCore */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 94531B2FA005414CB4A349CA /* Build configuration list for PBXNativeTarget "ForgeConductorCore" */;
@@ -962,6 +1357,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				E2F500000000000000000031 /* PBXTargetDependency */,
 			);
 			name = ForgeConductorCore;
 			productName = ForgeConductorCore;
@@ -988,17 +1384,23 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 80CDA28A6A1140C4960F2655 /* Build configuration list for PBXNativeTarget "ForgeConductor" */;
 			buildPhases = (
+				E2F500000000000000000045 /* Seal Filesystem Daemon Identity */,
 				3ABF1A6B59F3473DA6AD1A26 /* Sources */,
 				BD46199A67854F19A9586E75 /* Resources */,
 				D2CE50ED41104B5E981F8DD0 /* Frameworks */,
 				98CBE8A3FF644D858AC1F1DA /* Embed Frameworks */,
 				F0A700000000000000000009 /* Embed Runtime Helper */,
+				E2F50000000000000000004B /* Embed Manager CLI */,
+				E2F500000000000000000023 /* Embed Filesystem Daemon */,
+				E2F500000000000000000024 /* Embed Filesystem LaunchDaemon Plist */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				7F8369FCE0FB4AF984DF68CB /* PBXTargetDependency */,
 				F0A700000000000000000006 /* PBXTargetDependency */,
+				E2F500000000000000000034 /* PBXTargetDependency */,
+				E2F50000000000000000004C /* PBXTargetDependency */,
 			);
 			name = ForgeConductor;
 			productName = ForgeConductor;
@@ -1014,6 +1416,12 @@
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1600;
 				LastUpgradeCheck = 2660;
+				TargetAttributes = {
+					DBD99DD4E877449D8703E483 = {
+						ProvisioningStyle = Automatic;
+						TestTargetID = D574F9BCA1204936B158984B;
+					};
+				};
 			};
 			buildConfigurationList = 1495A2723FBC442B8EAE3139 /* Build configuration list for PBXProject "ForgeConductor" */;
 			compatibilityVersion = "Xcode 14.0";
@@ -1028,11 +1436,17 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
+				E2F500000000000000000025 /* ForgeFilesystemProtocol */,
+				E2F500000000000000000026 /* ForgeFilesystemDaemon */,
+				E2A000000000000000000040 /* ForgeFilesystemQualificationSupport */,
+				E2A000000000000000000041 /* ForgeFilesystemQualificationHarness */,
+				E2A000000000000000000042 /* ForgeFilesystemAdversary */,
 				C596F91D22BA465F8D8290A1 /* ForgeConductorCore */,
 				05C234606560407787702A3C /* forge-conductor */,
 				F0A70000000000000000000E /* ForgeRuntimeLauncher */,
 				D574F9BCA1204936B158984B /* ForgeConductor */,
 				8897BF3640FD4CBEA73213FC /* ForgeConductorTests */,
+				DBD99DD4E877449D8703E483 /* ForgeConductorAppTests */,
 				7AEAA3E3769249359E346C15 /* ForgeConductorUITests */,
 			);
 		};
@@ -1086,15 +1500,79 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		E2F500000000000000000045 /* Seal Filesystem Daemon Identity */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/script/seal_filesystem_daemon_identity.sh",
+				"$(BUILT_PRODUCTS_DIR)/forge-filesystem-daemon",
+				"$(SRCROOT)/Sources/ForgeConductorApp/Resources/Info.plist",
+			);
+			name = "Seal Filesystem Daemon Identity";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/ForgeConductorApp-Info.plist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${SRCROOT}/script/seal_filesystem_daemon_identity.sh\" \"${BUILT_PRODUCTS_DIR}/forge-filesystem-daemon\" \"${SRCROOT}/Sources/ForgeConductorApp/Resources/Info.plist\" \"${DERIVED_FILE_DIR}/ForgeConductorApp-Info.plist\"\n";
+			showEnvVarsInLog = 0;
+		};
+		E2F500000000000000000046 /* Seal Filesystem Daemon Identity */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/script/seal_filesystem_daemon_identity.sh",
+				"$(BUILT_PRODUCTS_DIR)/forge-filesystem-daemon",
+				"$(SRCROOT)/Sources/ForgeConductorCLI/Info.plist",
+			);
+			name = "Seal Filesystem Daemon Identity";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/ForgeConductorCLI-Info.plist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${SRCROOT}/script/seal_filesystem_daemon_identity.sh\" \"${BUILT_PRODUCTS_DIR}/forge-filesystem-daemon\" \"${SRCROOT}/Sources/ForgeConductorCLI/Info.plist\" \"${DERIVED_FILE_DIR}/ForgeConductorCLI-Info.plist\"\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
+		1420E9C7330D4AB38BB472BD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				14782D2FE9544A59A1AED446 /* Tests/ForgeConductorTests/OperatorProjectContractTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		00012A1DBBFF4A2B84B0D26C /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E2F500000000000000000004 /* ForgeFilesystemProtocolTests.swift in Sources */,
+				E2F500000000000000000042 /* SecureFilesystemMutationTests.swift in Sources */,
+				E2F500000000000000000054 /* SecureFilesystemQualificationHealthSessionTests.swift in Sources */,
 				A26B00000000000000000035 /* AutonomousContinuityAcceptanceTests.swift in Sources */,
 				A26B00000000000000000023 /* AutonomySupervisorTests.swift in Sources */,
 				A26B00000000000000000024 /* ContextBudgetSupervisorTests.swift in Sources */,
 				A26B00000000000000000025 /* ContinuityV2Tests.swift in Sources */,
+				F09B00000000000000000001 /* CLIContractTests.swift in Sources */,
+				F09B00000000000000000002 /* LiveLMStudioManagedAutonomyTests.swift in Sources */,
+				F09B00000000000000000004 /* LMStudioContractFixtureServer.swift in Sources */,
+				F09B00000000000000000005 /* LMStudioContractFixtureTests.swift in Sources */,
 				A26B00000000000000000033 /* ManagedAutonomyRuntimeTests.swift in Sources */,
 				A26B00000000000000000034 /* ManagedContinuityWorkerTests.swift in Sources */,
 				A26B00000000000000000026 /* ManagedModelProviderBridgeTests.swift in Sources */,
@@ -1102,6 +1580,7 @@
 				A26B00000000000000000028 /* ProjectContextIntegrationTests.swift in Sources */,
 				A26B00000000000000000029 /* ProjectControlPlaneRepositoryTests.swift in Sources */,
 				A26B00000000000000000030 /* RuntimeExecutionJobTests.swift in Sources */,
+				F09B00000000000000000003 /* RuntimeCancelQualificationTests.swift in Sources */,
 				A26B00000000000000000031 /* ToolDefinitionCatalogTests.swift in Sources */,
 				P11B00000000000000000001 /* ReleaseStressTests.swift in Sources */,
 				P10B00000000000000000014 /* ContinuityCoordinatorTests.swift in Sources */,
@@ -1203,6 +1682,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E2F500000000000000000050 /* Infrastructure/SecureFilesystemRecoveryLedger.swift in Sources */,
+				E2F500000000000000000003 /* Infrastructure/SecureFilesystemService.swift in Sources */,
+				E2F500000000000000000052 /* Infrastructure/SecureFilesystemQualificationHealthSession.swift in Sources */,
 				A26B00000000000000000001 /* Application/AutonomySupervisor.swift in Sources */,
 				A26B00000000000000000002 /* Application/ContextBudgetSupervisor.swift in Sources */,
 				A26B00000000000000000003 /* Application/ExecutionJobService.swift in Sources */,
@@ -1321,9 +1803,61 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E2F500000000000000000021 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E2F500000000000000000001 /* ForgeFilesystemProtocol.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E2F500000000000000000022 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E2F500000000000000000002 /* main.swift in Sources */,
+				E2F500000000000000000041 /* PrivilegedLeafDeleteEngine.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E2A000000000000000000050 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E2A000000000000000000001 /* QualificationReadiness.swift in Sources */,
+				E2A000000000000000000009 /* UnauthorizedAdmissionProbe.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E2A000000000000000000051 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E2A000000000000000000002 /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E2A000000000000000000052 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E2A000000000000000000003 /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		72E2A331BE024299AC34EC3B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D574F9BCA1204936B158984B /* ForgeConductor */;
+			targetProxy = 5146CF2B65E241CDB36B8FF0 /* PBXContainerItemProxy */;
+		};
+		9189A1D436164BEF83F8B15B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C596F91D22BA465F8D8290A1 /* ForgeConductorCore */;
+			targetProxy = 8A3C7885291B471FBB141CE2 /* PBXContainerItemProxy */;
+		};
 		1B20C9C218D54E71A69A1A02 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 05C234606560407787702A3C /* forge-conductor */;
@@ -1364,9 +1898,113 @@
 			target = F0A70000000000000000000E /* ForgeRuntimeLauncher */;
 			targetProxy = F0A700000000000000000005 /* PBXContainerItemProxy */;
 		};
+		E2F500000000000000000031 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E2F500000000000000000025 /* ForgeFilesystemProtocol */;
+			targetProxy = E2F500000000000000000027 /* PBXContainerItemProxy */;
+		};
+		E2F500000000000000000032 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E2F500000000000000000025 /* ForgeFilesystemProtocol */;
+			targetProxy = E2F500000000000000000028 /* PBXContainerItemProxy */;
+		};
+		E2F500000000000000000034 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E2F500000000000000000026 /* ForgeFilesystemDaemon */;
+			targetProxy = E2F500000000000000000030 /* PBXContainerItemProxy */;
+		};
+		E2F500000000000000000048 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E2F500000000000000000026 /* ForgeFilesystemDaemon */;
+			targetProxy = E2F500000000000000000047 /* PBXContainerItemProxy */;
+		};
+		E2F50000000000000000004C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 05C234606560407787702A3C /* forge-conductor */;
+			targetProxy = E2F50000000000000000004A /* PBXContainerItemProxy */;
+		};
+		E2A000000000000000000070 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E2F500000000000000000025 /* ForgeFilesystemProtocol */;
+			targetProxy = E2A000000000000000000060 /* PBXContainerItemProxy */;
+		};
+		E2A000000000000000000071 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E2A000000000000000000040 /* ForgeFilesystemQualificationSupport */;
+			targetProxy = E2A000000000000000000061 /* PBXContainerItemProxy */;
+		};
+		E2A000000000000000000072 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E2F500000000000000000025 /* ForgeFilesystemProtocol */;
+			targetProxy = E2A000000000000000000062 /* PBXContainerItemProxy */;
+		};
+		E2A000000000000000000073 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E2A000000000000000000040 /* ForgeFilesystemQualificationSupport */;
+			targetProxy = E2A000000000000000000063 /* PBXContainerItemProxy */;
+		};
+		E2A000000000000000000074 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E2F500000000000000000025 /* ForgeFilesystemProtocol */;
+			targetProxy = E2A000000000000000000064 /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		42A19CA963294173ADE17124 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 9AQ2C2838M;
+				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.app-tests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_INCLUDE_PATHS = "$(CONFIGURATION_TEMP_DIR)/ForgeConductor.build/Objects-normal/$(CURRENT_ARCH)";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Forge Conductor.app/Contents/MacOS/Forge Conductor";
+				TEST_TARGET_NAME = ForgeConductor;
+			};
+			name = Debug;
+		};
+		0F1392D0CC8F4D3DB7B395A6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 9AQ2C2838M;
+				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.app-tests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_INCLUDE_PATHS = "$(CONFIGURATION_TEMP_DIR)/ForgeConductor.build/Objects-normal/$(CURRENT_ARCH)";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Forge Conductor.app/Contents/MacOS/Forge Conductor";
+				TEST_TARGET_NAME = ForgeConductor;
+			};
+			name = Release;
+		};
 		000293C386CD4B1A99C9F861 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -1393,17 +2031,27 @@
 		462BB7BBB61F4979BE23EEDD /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_IDENTITY = "Developer ID Application";
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
+				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 2Y25RTLZET;
+				EAGER_COMPILATION_ALLOW_SCRIPTS = NO;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
-				GENERATE_INFOPLIST_FILE = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "$(DERIVED_FILE_DIR)/ForgeConductorCLI-Info.plist";
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
+					"@executable_path/../Frameworks",
 					"@executable_path",
 					"@loader_path",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.9.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.cli";
 				PRODUCT_NAME = "forge-conductor";
 				SWIFT_STRICT_CONCURRENCY = complete;
@@ -1465,8 +2113,10 @@
 		6F360A34EC18439189CBEF0F /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Tests/ForgeConductorUITests/ForgeConductorUITests.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2Y25RTLZET;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
@@ -1493,12 +2143,14 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = 2Y25RTLZET;
+				DEFINES_MODULE = YES;
+				DEVELOPMENT_TEAM = 9AQ2C2838M;
+				EAGER_COMPILATION_ALLOW_SCRIPTS = NO;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				EXTRACT_APP_INTENTS_METADATA = NO;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = Sources/ForgeConductorApp/Resources/Info.plist;
+				INFOPLIST_FILE = "$(DERIVED_FILE_DIR)/ForgeConductorApp-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Forge Conductor";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
@@ -1524,16 +2176,18 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Sources/ForgeConductorApp/Resources/ForgeConductor.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_IDENTITY = "Developer ID Application";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
+				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 2Y25RTLZET;
+				EAGER_COMPILATION_ALLOW_SCRIPTS = NO;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = Sources/ForgeConductorApp/Resources/Info.plist;
+				INFOPLIST_FILE = "$(DERIVED_FILE_DIR)/ForgeConductorApp-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Forge Conductor";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
@@ -1555,7 +2209,7 @@
 		A3DBA24BE10849FEB69442E8 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_IDENTITY = "Developer ID Application";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -1656,17 +2310,27 @@
 		D82F296A8E4141ECB3B96E83 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
+				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 9AQ2C2838M;
+				EAGER_COMPILATION_ALLOW_SCRIPTS = NO;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
-				GENERATE_INFOPLIST_FILE = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "$(DERIVED_FILE_DIR)/ForgeConductorCLI-Info.plist";
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
+					"@executable_path/../Frameworks",
 					"@executable_path",
 					"@loader_path",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.9.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.cli";
 				PRODUCT_NAME = "forge-conductor";
 				SWIFT_STRICT_CONCURRENCY = complete;
@@ -1683,7 +2347,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEFINES_MODULE = NO;
-				DEVELOPMENT_TEAM = 2Y25RTLZET;
+				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -1707,10 +2371,11 @@
 		FDE6781008BC4141BDA1233A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_IDENTITY = "-";
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_ENTITLEMENTS = Tests/ForgeConductorUITests/ForgeConductorUITests.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
@@ -1733,7 +2398,7 @@
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = 2Y25RTLZET;
+				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -1751,7 +2416,7 @@
 		F0A700000000000000000011 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_IDENTITY = "Developer ID Application";
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -1765,6 +2430,216 @@
 				MARKETING_VERSION = 0.9.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.runtime-launcher";
 				PRODUCT_NAME = "forge-runtime-launcher";
+				SKIP_INSTALL = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		E2F500000000000000000035 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				DEAD_CODE_STRIPPING = YES;
+				DEFINES_MODULE = YES;
+				ENABLE_CODE_COVERAGE = NO;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MACH_O_TYPE = staticlib;
+				PRODUCT_NAME = ForgeFilesystemProtocol;
+				SKIP_INSTALL = YES;
+				SWIFT_INSTALL_OBJC_HEADER = NO;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		E2F500000000000000000036 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				DEAD_CODE_STRIPPING = YES;
+				DEFINES_MODULE = YES;
+				ENABLE_CODE_COVERAGE = NO;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MACH_O_TYPE = staticlib;
+				PRODUCT_NAME = ForgeFilesystemProtocol;
+				SKIP_INSTALL = YES;
+				SWIFT_INSTALL_OBJC_HEADER = NO;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		E2F500000000000000000037 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 9AQ2C2838M;
+				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
+				ENABLE_CODE_COVERAGE = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.9.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.filesystem-daemon";
+				PRODUCT_NAME = "forge-filesystem-daemon";
+				SKIP_INSTALL = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		E2F500000000000000000038 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "Developer ID Application";
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 2Y25RTLZET;
+				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
+				ENABLE_CODE_COVERAGE = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.9.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.filesystem-daemon";
+				PRODUCT_NAME = "forge-filesystem-daemon";
+				SKIP_INSTALL = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		E2A000000000000000000080 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				DEAD_CODE_STRIPPING = YES;
+				DEFINES_MODULE = YES;
+				ENABLE_CODE_COVERAGE = NO;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MACH_O_TYPE = staticlib;
+				PRODUCT_NAME = ForgeFilesystemQualificationSupport;
+				SKIP_INSTALL = YES;
+				SWIFT_INSTALL_OBJC_HEADER = NO;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		E2A000000000000000000081 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				DEAD_CODE_STRIPPING = YES;
+				DEFINES_MODULE = YES;
+				ENABLE_CODE_COVERAGE = NO;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MACH_O_TYPE = staticlib;
+				PRODUCT_NAME = ForgeFilesystemQualificationSupport;
+				SKIP_INSTALL = YES;
+				SWIFT_INSTALL_OBJC_HEADER = NO;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		E2A000000000000000000082 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 9AQ2C2838M;
+				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
+				ENABLE_CODE_COVERAGE = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.qualification-harness";
+				PRODUCT_NAME = "forge-filesystem-qualification-harness";
+				SKIP_INSTALL = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		E2A000000000000000000083 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "Developer ID Application";
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 2Y25RTLZET;
+				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
+				ENABLE_CODE_COVERAGE = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.qualification-harness";
+				PRODUCT_NAME = "forge-filesystem-qualification-harness";
+				SKIP_INSTALL = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		E2A000000000000000000084 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 9AQ2C2838M;
+				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
+				ENABLE_CODE_COVERAGE = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.qualification-adversary";
+				PRODUCT_NAME = "forge-filesystem-qualification-adversary";
+				SKIP_INSTALL = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		E2A000000000000000000085 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "Developer ID Application";
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 2Y25RTLZET;
+				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
+				ENABLE_CODE_COVERAGE = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.qualification-adversary";
+				PRODUCT_NAME = "forge-filesystem-qualification-adversary";
 				SKIP_INSTALL = YES;
 				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_VERSION = 5.0;
@@ -1819,6 +2694,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
+		D43C581B12424333B25FAB62 /* Build configuration list for PBXNativeTarget "ForgeConductorAppTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				42A19CA963294173ADE17124 /* Debug */,
+				0F1392D0CC8F4D3DB7B395A6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		DBACB75102DA422EB1237476 /* Build configuration list for PBXNativeTarget "ForgeConductorTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -1833,6 +2717,51 @@
 			buildConfigurations = (
 				F0A700000000000000000010 /* Debug */,
 				F0A700000000000000000011 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E2F500000000000000000039 /* Build configuration list for PBXNativeTarget "ForgeFilesystemProtocol" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E2F500000000000000000035 /* Debug */,
+				E2F500000000000000000036 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E2F500000000000000000040 /* Build configuration list for PBXNativeTarget "ForgeFilesystemDaemon" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E2F500000000000000000037 /* Debug */,
+				E2F500000000000000000038 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E2A000000000000000000090 /* Build configuration list for PBXNativeTarget "ForgeFilesystemQualificationSupport" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E2A000000000000000000080 /* Debug */,
+				E2A000000000000000000081 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E2A000000000000000000091 /* Build configuration list for PBXNativeTarget "ForgeFilesystemQualificationHarness" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E2A000000000000000000082 /* Debug */,
+				E2A000000000000000000083 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E2A000000000000000000092 /* Build configuration list for PBXNativeTarget "ForgeFilesystemAdversary" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E2A000000000000000000084 /* Debug */,
+				E2A000000000000000000085 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

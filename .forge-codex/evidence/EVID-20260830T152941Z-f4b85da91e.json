@@ -1,0 +1,53 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 24158,
+      "path": ".forge-codex/evidence/EVID-20260830T152941Z-f4b85da91e.stdout.txt",
+      "sha256": "4d80984b44d8d00002d4044f25a34a41f688d6f453987b0fbe87d1b8224848f2",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260830T152941Z-f4b85da91e.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "command": ".forge-codex/scripts/doctor.sh",
+  "ended_at": "2026-08-30T15:29:42.426570+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260830T152941Z-f4b85da91e",
+  "kind": "environment-doctor",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 9395649,
+    "file_count": 251,
+    "schema_version": 1,
+    "sha256": "28707961c294df84dcb27f8074a98924e9f2d4fcc2ade0cb95ca42ba0d46e995"
+  },
+  "source_manifest_after": {
+    "bytes": 9395649,
+    "file_count": 251,
+    "schema_version": 1,
+    "sha256": "28707961c294df84dcb27f8074a98924e9f2d4fcc2ade0cb95ca42ba0d46e995"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-30T15:29:41.661741+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

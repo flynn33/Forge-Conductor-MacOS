@@ -39,6 +39,14 @@ final class ToolDefinitionCatalogTests: XCTestCase {
             )
             XCTAssertEqual(allowed.map(\.name), ["fs_read", "memory_get"])
             XCTAssertEqual(
+                try catalog.definitions(allowedToolNames: ["fs_delete"]).map(\.name),
+                ["fs_delete", "fs_delete_recovery"]
+            )
+            XCTAssertEqual(
+                try catalog.definitions(allowedToolNames: ["fs_delete_recovery"]).map(\.name),
+                ["fs_delete_recovery"]
+            )
+            XCTAssertEqual(
                 try catalog.definitions(allowedToolNames: ["*"]),
                 catalog.definitions
             )
@@ -151,6 +159,29 @@ final class ToolDefinitionCatalogTests: XCTestCase {
         }
     }
 
+    func testProtectedDeleteRecoverySchemaIsPathlessAndBounded() throws {
+        try withProductionApp("delete-recovery-schema") { app in
+            let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
+            let definition = try XCTUnwrap(
+                catalog.definitions.first(where: { $0.name == "fs_delete_recovery" })
+            )
+            let schema = try definition.inputSchemaObject()
+            let properties = try XCTUnwrap(schema["properties"] as? [String: Any])
+            let action = try XCTUnwrap(properties["action"] as? [String: Any])
+
+            XCTAssertEqual(
+                Set((action["enum"] as? [String]) ?? []),
+                ["query", "resume", "acknowledge"]
+            )
+            XCTAssertNotNil(properties["transaction_id"])
+            XCTAssertNil(properties["path"])
+            XCTAssertEqual(
+                Set((schema["required"] as? [String]) ?? []),
+                ["transaction_id", "action"]
+            )
+        }
+    }
+
     func testProductionReplayCatalogExactlyCoversRouterAndRejectsDrift() throws {
         try withProductionApp("replay") { app in
             let names = app.tools.toolNames
@@ -168,6 +199,10 @@ final class ToolDefinitionCatalogTests: XCTestCase {
             }
             XCTAssertEqual(try classifier.replayClass(for: "fs_read"), .readOnly)
             XCTAssertEqual(try classifier.replayClass(for: "fs_write"), .idempotent)
+            XCTAssertEqual(
+                try classifier.replayClass(for: "fs_delete_recovery"),
+                .reconciled
+            )
             XCTAssertEqual(try classifier.replayClass(for: "git_commit"), .reconciled)
             XCTAssertEqual(try classifier.replayClass(for: "process.run"), .reconciled)
             XCTAssertEqual(try classifier.replayClass(for: "shell_exec"), .nonReplayable)

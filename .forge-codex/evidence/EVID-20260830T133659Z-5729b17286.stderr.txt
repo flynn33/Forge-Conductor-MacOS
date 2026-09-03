@@ -1,0 +1,29 @@
+--- xcodebuild: WARNING: Using the first of multiple matching destinations:
+{ platform:macOS, arch:arm64, id:00006040-0016283C11F8801C, name:My Mac }
+{ platform:macOS, arch:x86_64, id:00006040-0016283C11F8801C, name:My Mac }
+2026-08-30 08:37:15.314 xcodebuild[85401:20285777] [MT] IDELaunchParametersSnapshot: The operation couldn’t be completed. (DebuggerLLDB.DebuggerVersionStore.StoreError error 0.)
+2026-08-30 08:37:15.314 xcodebuild[85401:20285777] [MT] IDELaunchParametersSnapshot: no debugger version
+2026-08-30 08:37:18.049 xcodebuild[85401:20285777] [MT] IDELaunchParametersSnapshot: The operation couldn’t be completed. (DebuggerLLDB.DebuggerVersionStore.StoreError error 0.)
+2026-08-30 08:37:18.049 xcodebuild[85401:20285777] [MT] IDELaunchParametersSnapshot: no debugger version
+2026-08-30 08:37:19.889 xcodebuild[85401:20285777] [MT] IDELaunchParametersSnapshot: The operation couldn’t be completed. (DebuggerLLDB.DebuggerVersionStore.StoreError error 0.)
+2026-08-30 08:37:19.889 xcodebuild[85401:20285777] [MT] IDELaunchParametersSnapshot: no debugger version
+2026-08-30 08:37:28.704 xcodebuild[85401:20285777] [MT] IDELaunchParametersSnapshot: The operation couldn’t be completed. (DebuggerLLDB.DebuggerVersionStore.StoreError error 0.)
+2026-08-30 08:37:28.704 xcodebuild[85401:20285777] [MT] IDELaunchParametersSnapshot: no debugger version
+2026-08-30 08:37:30.536 xcodebuild[85401:20285777] [MT] IDELaunchParametersSnapshot: The operation couldn’t be completed. (DebuggerLLDB.DebuggerVersionStore.StoreError error 0.)
+2026-08-30 08:37:30.536 xcodebuild[85401:20285777] [MT] IDELaunchParametersSnapshot: no debugger version
+2026-08-30 08:37:41.481 xcodebuild[85401:20285777] [MT] IDELaunchParametersSnapshot: The operation couldn’t be completed. (DebuggerLLDB.DebuggerVersionStore.StoreError error 0.)
+2026-08-30 08:37:41.481 xcodebuild[85401:20285777] [MT] IDELaunchParametersSnapshot: no debugger version
+2026-08-30 08:37:50.422 xcodebuild[85401:20285777] [MT] IDELaunchParametersSnapshot: The operation couldn’t be completed. (DebuggerLLDB.DebuggerVersionStore.StoreError error 0.)
+2026-08-30 08:37:50.422 xcodebuild[85401:20285777] [MT] IDELaunchParametersSnapshot: no debugger version
+2026-08-30 08:37:55.055 xcodebuild[85401:20285777] [MT] IDELaunchParametersSnapshot: The operation couldn’t be completed. (DebuggerLLDB.DebuggerVersionStore.StoreError error 0.)
+2026-08-30 08:37:55.055 xcodebuild[85401:20285777] [MT] IDELaunchParametersSnapshot: no debugger version
+2026-08-30 08:38:01.556 xcodebuild[85401:20285777] [MT] IDETestOperationsObserverDebug: 47.458 elapsed -- Testing started completed.
+2026-08-30 08:38:01.556 xcodebuild[85401:20285777] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-08-30 08:38:01.556 xcodebuild[85401:20285777] [MT] IDETestOperationsObserverDebug: 47.458 sec, +47.458 sec -- end
+Failing tests:
+	ForgeConductorUITests.testManagerSettingsControlsAndPersistsProjectShellPolicy()
+	ForgeConductorUITests.testManagerShowsProjectShellPolicyControls()
+	ForgeConductorUITests.testOperatorStateReconnectsAfterGUIRelaunch()
+
+** TEST FAILED **
+

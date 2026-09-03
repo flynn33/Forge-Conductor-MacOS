@@ -1,0 +1,51 @@
+Building for production...
+[0/47] /tmp/forge-checkpoint-release-2cc41ee2d952/arm64-apple-macosx/release/ForgeConductorPackageTests.derived/runner.swift
+[1/47] Write sources
+[9/47] Copying responses-root.sse
+[9/47] Copying telemetry_contract_keys.json
+[10/47] Copying responses-continuation.sse
+[12/47] Copying models-loaded.json
+[12/47] Copying tools-catalog.js
+[13/47] Copying test.md
+[15/47] Copying style.css
+[16/47] Copying security.md
+[16/47] Copying review.md
+[18/47] Copying research.md
+[19/47] Copying precommit-audit.md
+[19/47] Copying plan.md
+[21/47] Copying index.html
+[22/47] Copying implement.md
+[22/47] Copying explore.md
+[24/47] Copying docs.md
+[24/47] Copying debug.md
+[26/47] Write sources
+[27/47] Copying app.js
+[28/47] Write sources
+[32/47] Write swift-version--58304C5D6DBC2206.txt
+[34/49] Compiling ForgeRuntimeLauncher main.swift
+[34/49] Write Objects.LinkFileList
+[35/49] Linking forge-runtime-launcher
+[37/49] Compiling ForgeFilesystemProtocol ForgeFilesystemProtocol.swift
+[38/52] Compiling ForgeFilesystemQualificationSupport QualificationReadiness.swift
+[39/54] Compiling ForgeFilesystemQualificationHarness main.swift
+[40/55] Compiling ForgeFilesystemAdversary main.swift
+[40/55] Write Objects.LinkFileList
+[42/55] Linking ForgeFilesystemQualificationHarness
+[43/55] Linking ForgeFilesystemAdversary
+[45/55] Compiling ForgeFilesystemDaemon PrivilegedLeafDeleteEngine.swift
+[45/55] Write Objects.LinkFileList
+[46/55] Linking forge-filesystem-daemon
+[48/55] Compiling ForgeFilesystemQualificationSupportTests AdmissionProbeTests.swift
+[49/55] Compiling ForgeConductorCore AgentCatalog.swift
+[50/56] Compiling ForgeNativeSessionHostPlugin ForgeNativeSessionHostPlugin.swift
+[51/58] Compiling ForgeConductorCLI ForgeConductorMain.swift
+[51/58] Write Objects.LinkFileList
+[52/58] Linking forge-conductor
+[54/58] Compiling ForgeConductorApp AppDeployController.swift
+[54/58] Write Objects.LinkFileList
+[55/58] Linking forge-conductor-app
+[57/59] Compiling ForgeConductorTests AppConfigAndDoctorTests.swift
+[58/60] Compiling ForgeConductorPackageTests runner.swift
+[58/60] Write Objects.LinkFileList
+[59/60] Linking ForgeConductorPackageTests
+Build complete! (169.99s)

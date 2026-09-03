@@ -1,0 +1,29 @@
+Test Suite 'Selected tests' started at 2026-08-31 21:35:26.137.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-08-31 21:35:26.138.
+Test Suite 'ManagerTests' started at 2026-08-31 21:35:26.138.
+Test Case '-[ForgeConductorTests.ManagerTests testDashboardClientAttachesToExistingManager]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testDashboardClientAttachesToExistingManager]' passed (0.399 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testDashboardClientBindChangeMovesControlPlaneWhileServiceRemainsStopped]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testDashboardClientBindChangeMovesControlPlaneWhileServiceRemainsStopped]' passed (0.442 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testDashboardClientBindChangeReturnsCompleteResponseAndCommittedEndpointTakesOwnership]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testDashboardClientBindChangeReturnsCompleteResponseAndCommittedEndpointTakesOwnership]' passed (0.445 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testDashboardClientCancelsOneRuntimeJobThroughProtectedBoundedRoute]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testDashboardClientCancelsOneRuntimeJobThroughProtectedBoundedRoute]' passed (0.402 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testDashboardClientFailedBindReturnsServerErrorAndRestoresOldEndpoint]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testDashboardClientFailedBindReturnsServerErrorAndRestoresOldEndpoint]' passed (0.501 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testDashboardClientRemoteRestartReturnsCompleteDecodedStatus]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testDashboardClientRemoteRestartReturnsCompleteDecodedStatus]' passed (0.432 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testDashboardHTMLHasManagerControls]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testDashboardHTMLHasManagerControls]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.ManagerTests testDashboardSettingsPUTBindChangeReturnsCompleteResponseOnNewEndpoint]' started.
+Test Case '-[ForgeConductorTests.ManagerTests testDashboardSettingsPUTBindChangeReturnsCompleteResponseOnNewEndpoint]' passed (0.438 seconds).
+Test Suite 'ManagerTests' passed at 2026-08-31 21:35:29.200.
+	 Executed 8 tests, with 0 failures (0 unexpected) in 3.061 (3.062) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-08-31 21:35:29.200.
+	 Executed 8 tests, with 0 failures (0 unexpected) in 3.061 (3.062) seconds
+Test Suite 'Selected tests' passed at 2026-08-31 21:35:29.200.
+	 Executed 8 tests, with 0 failures (0 unexpected) in 3.061 (3.063) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

@@ -1,0 +1,104 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 74354,
+      "path": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/com.openai.sky.CUAService/Forge Conductor Screenshot 2026-08-31 at 9.10.39 AM.jpeg",
+      "portability": "origin-host-required",
+      "sha256": "1bfd272cc1bebb8e36e2b2b006b5473d29f4a69f65b4d0a9498ab4a2d7e2aaac",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260831T141114Z-f11c3d17c1.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 140,
+      "path": ".forge-codex/evidence/EVID-20260831T141114Z-f11c3d17c1.stderr.txt",
+      "sha256": "be8dc73aa70717641c0be0fb2a536e9942a331f82975d5affb90bb9de78eae6b",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "child_evidence_context": {
+    "binding_schema_version": 1,
+    "evidence_id": "EVID-20260831T141114Z-f11c3d17c1",
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "3e4fe44b3d96938c30d6b83f7d92d417489a97be",
+      "branch": "repair/e2-qualification-next",
+      "head_sha": "e0a84daae9e73ba9652702f78ae73e2535e0989b",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next"
+    },
+    "schema_version": 1,
+    "source_manifest": {
+      "bytes": 10402023,
+      "file_count": 275,
+      "schema_version": 1,
+      "sha256": "0e2ab963a4325f69c716412185d9c297c0515b6ac641b7cbcc298294934810e5"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "command": "spctl --assess --type execute --verbose=4 '/Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-E2-LaneA-e0a84daae9e7/Build/Products/Debug/Forge Conductor.app'",
+  "ended_at": "2026-08-31T14:11:14.397146+00:00",
+  "environment": {
+    "architecture": "arm64",
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next",
+    "machine_identifier": "Mac16,7",
+    "macos_build": "25G83",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "execution_provenance": {
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "3e4fe44b3d96938c30d6b83f7d92d417489a97be",
+      "branch": "repair/e2-qualification-next",
+      "head_sha": "e0a84daae9e73ba9652702f78ae73e2535e0989b",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "exit_code": 3,
+  "id": "EVID-20260831T141114Z-f11c3d17c1",
+  "kind": "native-settings-development-smappservice-blocker",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [
+    "FC-UI-QUALIFICATION-001",
+    "FC-PRIVILEGED-SERVICE-LIFECYCLE-001"
+  ],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 10402023,
+    "file_count": 275,
+    "schema_version": 1,
+    "sha256": "0e2ab963a4325f69c716412185d9c297c0515b6ac641b7cbcc298294934810e5"
+  },
+  "source_manifest_after": {
+    "bytes": 10402023,
+    "file_count": 275,
+    "schema_version": 1,
+    "sha256": "0e2ab963a4325f69c716412185d9c297c0515b6ac641b7cbcc298294934810e5"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-31T14:11:14.089433+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

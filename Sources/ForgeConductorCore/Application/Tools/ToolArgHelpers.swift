@@ -25,8 +25,10 @@ public final class ToolCallCancellation: @unchecked Sendable {
     private var deadlineUptimeNanoseconds: UInt64?
     private var commitDepth = 0
     private var committedReceipt: Any?
+    public let requestID: UUID
 
-    public init(timeoutSeconds: TimeInterval? = nil) {
+    public init(timeoutSeconds: TimeInterval? = nil, requestID: UUID = UUID()) {
+        self.requestID = requestID
         if let timeoutSeconds {
             deadlineUptimeNanoseconds = Self.deadline(after: timeoutSeconds)
         }

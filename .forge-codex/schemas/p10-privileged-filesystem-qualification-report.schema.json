@@ -1,0 +1,1352 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://forge-conductor.local/schemas/p10-privileged-filesystem-qualification-report.schema.json",
+  "title": "P10 Privileged Filesystem Qualification Report",
+  "description": "Structure for the signed-host P10 filesystem qualification matrix. Conformance is not evidence that any case passed.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "artifact_binding_schema_version",
+    "status",
+    "ok",
+    "source_manifest",
+    "captured_at",
+    "repository",
+    "test_environment",
+    "test_processes",
+    "qualification_context_artifact_reference",
+    "matrix",
+    "same_uid_fallback",
+    "same_uid_threat_model",
+    "formal_closure",
+    "residual_risk",
+    "remaining_requirements"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 2
+    },
+    "artifact_binding_schema_version": {
+      "const": 1
+    },
+    "status": {
+      "enum": [
+        "partial",
+        "passed",
+        "failed",
+        "inconclusive"
+      ]
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "source_manifest": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/sourceManifest"
+        }
+      ]
+    },
+    "captured_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "repository": {
+      "type": "object",
+      "required": [
+        "branch",
+        "head_sha",
+        "base_branch",
+        "base_sha",
+        "repository_path"
+      ],
+      "properties": {
+        "branch": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "head_sha": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "base_branch": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "base_sha": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "repository_path": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^/",
+          "minLength": 1,
+          "maxLength": 4096
+        }
+      },
+      "additionalProperties": false
+    },
+    "test_environment": {
+      "type": "object",
+      "required": [
+        "macos_build",
+        "machine_identifier",
+        "platform",
+        "architecture"
+      ],
+      "properties": {
+        "macos_build": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "machine_identifier": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "platform": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "architecture": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "additionalProperties": false
+    },
+    "test_processes": {
+      "type": "object",
+      "required": [
+        "separately_signed",
+        "helper_effective_uid"
+      ],
+      "properties": {
+        "separately_signed": {
+          "type": "boolean"
+        },
+        "helper_effective_uid": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "qualification_context_artifact_reference": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/artifactReference"
+        }
+      ]
+    },
+    "matrix": {
+      "type": "object",
+      "required": [
+        "signed_debug_bundle",
+        "signed_release_bundle",
+        "unauthorized_same_uid_client",
+        "unauthorized_same_uid_namespace_access",
+        "unauthorized_same_uid_ledger_mutation",
+        "differently_signed_client",
+        "authorized_app_and_manager_cli_identities",
+        "unknown_protocol_and_malformed_messages",
+        "outside_root_sentinel_preservation",
+        "wrong_project_id",
+        "stale_project_generation",
+        "negative_project_generation_wire_rejected",
+        "project_binding_hash_collision_resolution",
+        "project_binding_lifecycle_exhaustion_and_revoke",
+        "case_normalized_transaction_replay",
+        "root_descriptor_identity_mismatch",
+        "atomic_swap_source_leaf_before_capture",
+        "atomic_swap_source_leaf_during_capture",
+        "atomic_swap_source_leaf_after_capture",
+        "atomic_swap_parent_before_capture",
+        "atomic_swap_parent_after_capture",
+        "parent_relocation_during_rollback",
+        "atomic_swap_rollback_destination_occupied",
+        "atomic_swap_special_leaf_before_descriptor_open",
+        "authorization_metadata_change_after_final_check",
+        "crash_at_every_durable_phase",
+        "daemon_restart_and_idempotent_recovery",
+        "manager_restart_and_idempotent_recovery",
+        "query_is_strictly_nonmutating",
+        "resume_after_reply_and_pathname_loss",
+        "terminal_outcome_retained_until_acknowledged",
+        "acknowledgement_authority_and_idempotency",
+        "acknowledgement_crash_cleanup_matrix",
+        "caller_ledger_precedes_xpc_submission",
+        "caller_ledger_restart_and_scope_fencing",
+        "broker_interruption_requires_transaction_recovery",
+        "caller_ledger_same_uid_tamper",
+        "caller_ledger_lock_replacement_during_retention",
+        "project_generation_reset_with_retained_transaction",
+        "local_ownership_enforced_apfs",
+        "external_volume_rejected",
+        "removable_volume_rejected",
+        "network_volume_rejected",
+        "ignore_ownership_volume_rejected",
+        "cross_volume_destination_durable_before_source_destruction",
+        "approval_and_denial",
+        "upgrade_unregister_reregister",
+        "same_connection_service_version_handshake",
+        "caller_sealed_helper_code_identity",
+        "app_manager_cli_helper_packaging",
+        "settings_status_and_control",
+        "tampered_or_wrong_signature",
+        "source_leaf_substitution",
+        "hard_link_behavior",
+        "writable_file_descriptor_behavior",
+        "no_same_uid_fallback",
+        "shell_nonregression"
+      ],
+      "properties": {
+        "signed_debug_bundle": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "signed_release_bundle": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "unauthorized_same_uid_client": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "unauthorized_same_uid_namespace_access": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "unauthorized_same_uid_ledger_mutation": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "differently_signed_client": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "authorized_app_and_manager_cli_identities": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "unknown_protocol_and_malformed_messages": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "outside_root_sentinel_preservation": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "wrong_project_id": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "stale_project_generation": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "negative_project_generation_wire_rejected": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "project_binding_hash_collision_resolution": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "project_binding_lifecycle_exhaustion_and_revoke": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "case_normalized_transaction_replay": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "root_descriptor_identity_mismatch": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "atomic_swap_source_leaf_before_capture": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/qualificationCase"
+            },
+            {
+              "$ref": "#/$defs/currentEntryAndNamespaceVersionExact"
+            }
+          ]
+        },
+        "atomic_swap_source_leaf_during_capture": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/qualificationCase"
+            },
+            {
+              "$ref": "#/$defs/currentEntryAndNamespaceVersionExact"
+            }
+          ]
+        },
+        "atomic_swap_source_leaf_after_capture": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "atomic_swap_parent_before_capture": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "atomic_swap_parent_after_capture": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "parent_relocation_during_rollback": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "atomic_swap_rollback_destination_occupied": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "atomic_swap_special_leaf_before_descriptor_open": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "authorization_metadata_change_after_final_check": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "crash_at_every_durable_phase": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "daemon_restart_and_idempotent_recovery": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "manager_restart_and_idempotent_recovery": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "query_is_strictly_nonmutating": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "resume_after_reply_and_pathname_loss": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "terminal_outcome_retained_until_acknowledged": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "acknowledgement_authority_and_idempotency": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "acknowledgement_crash_cleanup_matrix": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "caller_ledger_precedes_xpc_submission": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "caller_ledger_restart_and_scope_fencing": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "broker_interruption_requires_transaction_recovery": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "caller_ledger_same_uid_tamper": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "caller_ledger_lock_replacement_during_retention": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "project_generation_reset_with_retained_transaction": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "local_ownership_enforced_apfs": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "external_volume_rejected": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "removable_volume_rejected": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "network_volume_rejected": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "ignore_ownership_volume_rejected": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "cross_volume_destination_durable_before_source_destruction": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "approval_and_denial": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "upgrade_unregister_reregister": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "same_connection_service_version_handshake": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "caller_sealed_helper_code_identity": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "app_manager_cli_helper_packaging": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "settings_status_and_control": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "tampered_or_wrong_signature": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "source_leaf_substitution": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/qualificationCase"
+            },
+            {
+              "$ref": "#/$defs/currentEntryAndNamespaceVersionExact"
+            }
+          ]
+        },
+        "hard_link_behavior": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/qualificationCase"
+            },
+            {
+              "$ref": "#/$defs/namespaceVersionExactAndContentVersionExact"
+            }
+          ]
+        },
+        "writable_file_descriptor_behavior": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/qualificationCase"
+            },
+            {
+              "$ref": "#/$defs/currentEntryAndContentVersionExact"
+            }
+          ]
+        },
+        "no_same_uid_fallback": {
+          "$ref": "#/$defs/qualificationCase"
+        },
+        "shell_nonregression": {
+          "$ref": "#/$defs/qualificationCase"
+        }
+      },
+      "additionalProperties": false
+    },
+    "same_uid_fallback": {
+      "enum": [
+        "absent",
+        "present",
+        "unverified"
+      ]
+    },
+    "same_uid_threat_model": {
+      "const": "in_scope"
+    },
+    "formal_closure": {
+      "$ref": "#/$defs/formalClosure"
+    },
+    "residual_risk": {
+      "type": "object",
+      "required": [
+        "disposition",
+        "remaining_race",
+        "maximum_race_impact"
+      ],
+      "properties": {
+        "disposition": {
+          "enum": [
+            "open_release_blocker",
+            "mitigated_open",
+            "qualified_boundary_with_explicit_nonclaims"
+          ]
+        },
+        "remaining_race": {
+          "type": "string",
+          "minLength": 1
+        },
+        "maximum_race_impact": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "remaining_requirements": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "passed"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "ok": {
+            "const": true
+          },
+          "source_manifest": {
+            "$ref": "#/$defs/sourceManifest"
+          },
+          "captured_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "repository": {
+            "type": "object",
+            "required": [
+              "branch",
+              "head_sha",
+              "base_branch",
+              "base_sha",
+              "repository_path"
+            ],
+            "properties": {
+              "branch": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "head_sha": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{40}$"
+              },
+              "base_branch": {
+                "const": "main"
+              },
+              "base_sha": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{40}$"
+              },
+              "repository_path": {
+                "type": "string",
+                "pattern": "^/",
+                "minLength": 1,
+                "maxLength": 4096
+              }
+            },
+            "additionalProperties": false
+          },
+          "test_environment": {
+            "type": "object",
+            "required": [
+              "macos_build",
+              "machine_identifier",
+              "platform",
+              "architecture"
+            ],
+            "properties": {
+              "macos_build": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "machine_identifier": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "platform": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              "architecture": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              }
+            },
+            "additionalProperties": false
+          },
+          "qualification_context_artifact_reference": {
+            "$ref": "#/$defs/artifactReference"
+          },
+          "same_uid_fallback": {
+            "const": "absent"
+          },
+          "formal_closure": {
+            "properties": {
+              "capture_linearization": {
+                "const": true
+              },
+              "source_parent_containment_and_authority": {
+                "const": true
+              },
+              "protected_namespace_denial": {
+                "const": true
+              },
+              "current_entry_contract": {
+                "const": true
+              },
+              "namespace_exact_no_mismatch_disposal": {
+                "const": true
+              },
+              "content_exact_fail_closed": {
+                "const": true
+              },
+              "final_authorization_metadata_race_closure": {
+                "const": true
+              },
+              "quarantine_disposition_qualification": {
+                "const": true
+              },
+              "startup_recovery_fence": {
+                "const": true
+              },
+              "caller_generation_fence": {
+                "const": true
+              },
+              "volume_behavior_qualification": {
+                "const": true
+              },
+              "equivalent_identity_conditional_boundary_proof": {
+                "const": true
+              },
+              "formal_argument_artifact_references": {
+                "minItems": 12,
+                "maxItems": 12
+              }
+            }
+          },
+          "residual_risk": {
+            "properties": {
+              "disposition": {
+                "const": "qualified_boundary_with_explicit_nonclaims"
+              }
+            }
+          },
+          "remaining_requirements": {
+            "maxItems": 0
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sourceManifest": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "sha256",
+        "file_count",
+        "bytes"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "file_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32768
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 536870912
+        }
+      },
+      "additionalProperties": false
+    },
+    "formalClosure": {
+      "type": "object",
+      "required": [
+        "capture_linearization",
+        "source_parent_containment_and_authority",
+        "protected_namespace_denial",
+        "current_entry_contract",
+        "namespace_exact_no_mismatch_disposal",
+        "content_exact_fail_closed",
+        "final_authorization_metadata_race_closure",
+        "quarantine_disposition_qualification",
+        "startup_recovery_fence",
+        "caller_generation_fence",
+        "volume_behavior_qualification",
+        "equivalent_identity_conditional_boundary_proof",
+        "formal_argument_artifact_references"
+      ],
+      "properties": {
+        "capture_linearization": {
+          "type": "boolean"
+        },
+        "source_parent_containment_and_authority": {
+          "type": "boolean"
+        },
+        "protected_namespace_denial": {
+          "type": "boolean"
+        },
+        "current_entry_contract": {
+          "type": "boolean"
+        },
+        "namespace_exact_no_mismatch_disposal": {
+          "type": "boolean"
+        },
+        "content_exact_fail_closed": {
+          "type": "boolean"
+        },
+        "final_authorization_metadata_race_closure": {
+          "type": "boolean"
+        },
+        "quarantine_disposition_qualification": {
+          "type": "boolean"
+        },
+        "startup_recovery_fence": {
+          "type": "boolean"
+        },
+        "caller_generation_fence": {
+          "type": "boolean"
+        },
+        "volume_behavior_qualification": {
+          "type": "boolean"
+        },
+        "equivalent_identity_conditional_boundary_proof": {
+          "type": "boolean"
+        },
+        "formal_argument_artifact_references": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/artifactReference"
+          },
+          "uniqueItems": true,
+          "maxItems": 12
+        }
+      },
+      "additionalProperties": false
+    },
+    "currentEntryAndNamespaceVersionExact": {
+      "type": "object",
+      "properties": {
+        "contracts_exercised": {
+          "allOf": [
+            {
+              "contains": {
+                "const": "currentEntry"
+              }
+            },
+            {
+              "contains": {
+                "const": "namespaceVersionExact"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "namespaceVersionExactAndContentVersionExact": {
+      "type": "object",
+      "properties": {
+        "contracts_exercised": {
+          "allOf": [
+            {
+              "contains": {
+                "const": "namespaceVersionExact"
+              }
+            },
+            {
+              "contains": {
+                "const": "contentVersionExact"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "currentEntryAndContentVersionExact": {
+      "type": "object",
+      "properties": {
+        "contracts_exercised": {
+          "allOf": [
+            {
+              "contains": {
+                "const": "currentEntry"
+              }
+            },
+            {
+              "contains": {
+                "const": "contentVersionExact"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "artifactReference": {
+      "type": "object",
+      "required": [
+        "evidence_id",
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "barrierObservation": {
+      "type": "object",
+      "required": [
+        "name",
+        "status",
+        "iteration",
+        "monotonic_timestamp_ns",
+        "raw_artifact_reference"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "not_reached",
+            "reached",
+            "missed"
+          ]
+        },
+        "iteration": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "monotonic_timestamp_ns": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "raw_artifact_reference": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/artifactReference"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "processIdentity": {
+      "type": "object",
+      "required": [
+        "role",
+        "pid",
+        "effective_uid",
+        "executable_path",
+        "raw_artifact_reference"
+      ],
+      "properties": {
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pid": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "effective_uid": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "executable_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_artifact_reference": {
+          "$ref": "#/$defs/artifactReference"
+        }
+      },
+      "additionalProperties": false
+    },
+    "signingIdentity": {
+      "type": "object",
+      "required": [
+        "role",
+        "certificate_common_name",
+        "team_identifier",
+        "signing_identifier",
+        "code_directory_hash",
+        "designated_requirement",
+        "raw_artifact_reference"
+      ],
+      "properties": {
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "certificate_common_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "team_identifier": {
+          "type": "string",
+          "minLength": 1
+        },
+        "signing_identifier": {
+          "type": "string",
+          "minLength": 1
+        },
+        "code_directory_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{40,64}$"
+        },
+        "designated_requirement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_artifact_reference": {
+          "$ref": "#/$defs/artifactReference"
+        }
+      },
+      "additionalProperties": false
+    },
+    "fixtureDigest": {
+      "type": "object",
+      "required": [
+        "label",
+        "present",
+        "device",
+        "inode",
+        "entry_type",
+        "sha256",
+        "acl_sha256",
+        "bsd_flags",
+        "raw_artifact_reference"
+      ],
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "present": {
+          "type": "boolean"
+        },
+        "device": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "inode": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "entry_type": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "acl_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "bsd_flags": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "raw_artifact_reference": {
+          "$ref": "#/$defs/artifactReference"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mountFacts": {
+      "type": "object",
+      "required": [
+        "applicable",
+        "filesystem_type",
+        "mount_path",
+        "device_identifier",
+        "volume_uuid",
+        "mount_flags",
+        "local",
+        "removable",
+        "network",
+        "ownership_enabled",
+        "raw_artifact_reference"
+      ],
+      "properties": {
+        "applicable": {
+          "type": "boolean"
+        },
+        "filesystem_type": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "mount_path": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "device_identifier": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "volume_uuid": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "mount_flags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "local": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "removable": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "network": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "ownership_enabled": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "raw_artifact_reference": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/artifactReference"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "crashPoint": {
+      "type": "object",
+      "required": [
+        "applicable",
+        "phase",
+        "timing",
+        "signal",
+        "restart_observed",
+        "raw_artifact_reference"
+      ],
+      "properties": {
+        "applicable": {
+          "type": "boolean"
+        },
+        "phase": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "timing": {
+          "enum": [
+            "before",
+            "during",
+            "after",
+            null
+          ]
+        },
+        "signal": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "restart_observed": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "raw_artifact_reference": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/artifactReference"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "qualificationCase": {
+      "type": "object",
+      "required": [
+        "contracts_exercised",
+        "status",
+        "raw_artifact_references",
+        "iterations",
+        "barrier_evidence",
+        "process_identities",
+        "signing_identities",
+        "fixture_digests",
+        "mount_facts",
+        "crash_point",
+        "observed_result"
+      ],
+      "properties": {
+        "contracts_exercised": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "currentEntry",
+              "namespaceVersionExact",
+              "contentVersionExact"
+            ]
+          }
+        },
+        "status": {
+          "enum": [
+            "not_run",
+            "passed",
+            "failed",
+            "inconclusive"
+          ]
+        },
+        "raw_artifact_references": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/artifactReference"
+          },
+          "uniqueItems": true
+        },
+        "iterations": {
+          "type": "object",
+          "required": [
+            "planned",
+            "executed",
+            "conclusive",
+            "barrier_hits",
+            "barrier_misses"
+          ],
+          "properties": {
+            "planned": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "executed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "conclusive": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "barrier_hits": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "barrier_misses": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "barrier_evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/barrierObservation"
+          }
+        },
+        "process_identities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/processIdentity"
+          }
+        },
+        "signing_identities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/signingIdentity"
+          }
+        },
+        "fixture_digests": {
+          "type": "object",
+          "required": [
+            "before",
+            "after"
+          ],
+          "properties": {
+            "before": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/fixtureDigest"
+              }
+            },
+            "after": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/fixtureDigest"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "mount_facts": {
+          "$ref": "#/$defs/mountFacts"
+        },
+        "crash_point": {
+          "$ref": "#/$defs/crashPoint"
+        },
+        "observed_result": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "not": {
+              "properties": {
+                "status": {
+                  "const": "not_run"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            }
+          },
+          "then": {
+            "properties": {
+              "raw_artifact_references": {
+                "minItems": 1
+              },
+              "iterations": {
+                "properties": {
+                  "executed": {
+                    "minimum": 1
+                  }
+                }
+              },
+              "barrier_evidence": {
+                "minItems": 1
+              },
+              "process_identities": {
+                "minItems": 1
+              },
+              "signing_identities": {
+                "minItems": 1
+              },
+              "fixture_digests": {
+                "properties": {
+                  "before": {
+                    "minItems": 1
+                  },
+                  "after": {
+                    "minItems": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

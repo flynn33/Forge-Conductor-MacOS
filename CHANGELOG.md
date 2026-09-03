@@ -6,14 +6,74 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 for marketing versions (`MAJOR.MINOR.PATCH`).
 
+Current product identity is marketing version **0.9.0**, build **1**. The work
+under **Unreleased** is not a new qualified release.
+
 ## [Unreleased]
 
-This is an in-progress P10 checkpoint, not a qualified release. P10,
-filesystem E2, shell compatibility, native UI validation, autonomous continuity,
-and the final release gates remain open.
+This is a 0.9.0 development snapshot, not a qualified release. Product version
+surfaces remain 0.9.0 build 1. P10/G10, filesystem E2, production Settings shell
+qualification, Developer ID Release/native lifecycle
+validation, manager-owned
+real-provider autonomous continuity, owner-deferred representative physical-
+hardware qualification, and current G09-G12 remain open and release-blocking.
+Clean-install managed-provider configuration is also open: the adapter reads a
+validated LM Studio configuration when present, but the product does not yet
+provide a supported control that creates it.
+
+### Verified current-source evidence
+
+- The CLI `version` output reports marketing version **0.9.0**. The Swift
+  runtime constants, the versioned Xcode configurations, and the built app
+  bundle report marketing version **0.9.0**, build **1**.
+- The Xcode unit-test target now consumes `ForgeFilesystemProtocol` through
+  `ForgeConductorCore` instead of loading a second static copy. All seven
+  focused protocol tests pass without duplicate-class or decode warnings.
+- Persistent sidebar controls no longer rebuild for unrelated telemetry field
+  publications. An earlier exact-revision Apple Development-signed native UI
+  test completed 100 Rig-to-MCP and 100 MCP-to-Rig transitions with zero
+  failures. That record is supporting evidence only because this Unreleased
+  tree has since changed operator navigation and must be rerun from the final
+  source checkpoint.
+- Focused current-source protected-filesystem and managed-provider receipt/
+  recovery regressions pass. These are supporting source tests, not the signed
+  E2 matrix or real-provider rollover authority run; the final source matrix
+  must be rerun after all Unreleased changes settle.
+- The current-source SwiftPM Release configuration builds with
+  warnings treated as errors and executes 1,001 tests with 5 declared
+  environment skips and 0 failures. The dedicated Apple Development-signed
+  Xcode app-hosted project-contract suite executes 2 tests with 0 failures from
+  fresh DerivedData. Neither result replaces feature-specific production-path
+  evidence.
 
 ### Changed
 
+- Manager project and run responses now use complete shared read-model
+  projections. Project bind and run start authority is limited to roots
+  configured by the operator. Provider probes execute outside dashboard
+  serialization with bounded admission; after a timeout, admission remains
+  fail-closed until the exact provider task exits so a cancellation-ignoring
+  provider cannot accumulate work. Feature operability and native
+  qualification remain open.
+- Added a dedicated app-hosted Xcode contract-test target and isolated shared
+  scheme. It exercises the production operator client and view-model module
+  boundary without changing the existing main Xcode test scheme.
+
+- Product staging and runtime launch now enforce an explicit Security.framework
+  requirement for every signed app, manager CLI, filesystem daemon, runtime
+  launcher, and core framework. Team `9AQ2C2838M` is accepted only with the
+  Apple Development certificate class; team `2Y25RTLZET` is accepted only with
+  the Developer ID Application certificate class. The outer bundle checker
+  applies the same identifier, team, Apple anchor, and certificate-class policy
+  across every architecture. This closes the signer-class admission gap but
+  does not establish whole-product rollback freshness or pass Developer ID,
+  native lifecycle, notarization, P10, or E2 qualification.
+- Added nonshipping, non-archived signed qualification-harness and adversary
+  targets plus a fail-closed H0 readiness runner. H0 binds repository, recorder,
+  signing, live-process, command-result, and local-APFS inode/change-time facts,
+  but exercises no production mutation: all 57 E2 rows and all 12 formal
+  predicates remain unexecuted and unproven. The path-replacement check is a
+  local-APFS mitigation, not elimination of same-UID interference.
 - Fresh configurations enable project shell tools by default. Migration enables
   schema-v1 configurations whose disabled value had no provenance; schema-v1
   could not distinguish the shipped default from a user-chosen false value.
@@ -33,29 +93,180 @@ and the final release gates remain open.
   whose requested namespace becomes unstable while durability is unconfirmed
   returns its live receipt as required ledger recovery, merging any additional
   retained staging-cleanup receipt into the same result.
+  The move and recursive-directory paths are hardened internal implementations
+  exercised by adversarial tests only in this snapshot. Production `fs_move`
+  and recursive directory `fs_delete` remain unavailable until an additive
+  signed-helper protocol and its recovery matrix are implemented and qualified.
+- The partial privileged leaf-delete boundary now uses protocol v5 and binds
+  the daemon requirement to exact per-architecture CodeDirectory hashes sealed
+  into each signed caller. The app-scheme build produces one matching
+  app/embedded-CLI/standalone-CLI/daemon artifact set, and app-origin manager
+  installation stages only the embedded CLI plus its signed framework. Missing,
+  symlinked, mismatched, or independently cross-paired artifacts fail closed.
+- Protocol v5 makes successful `renameatx_np(..., RENAME_EXCL)` capture the
+  mutation linearization point and records a canonical request digest plus an
+  explicit `currentEntry`, `namespaceVersionExact`, or `contentVersionExact`
+  contract. Production `fs_delete` uses `currentEntry`; namespace-exact recovery
+  disposes only a matching captured identity; and content-exact requests fail
+  closed because an existing writable descriptor, mapping, or hard link prevents
+  an exclusive-writer proof. Capture mismatch and post-capture metadata changes
+  enter durable protected quarantine instead of being described as eliminated.
+- Protocol v5 retains terminal committed, restored, rejected, and conflicted transactions in
+  32 fixed root-owned slots until durable exact acknowledgement. The additive,
+  pathless `fs_delete_recovery` tool queries, resumes, or acknowledges the
+  original transaction under its requester/project/generation/root authority;
+  a bounded owner-only caller ledger is durable before XPC submission. Existing
+  `fs_delete` and `shell_exec` contracts are unchanged.
+- Privileged rollback no longer restores a captured leaf through a source-parent
+  descriptor because a same-UID process can relocate that directory after it is
+  validated. The daemon durably enters rollback and retains the leaf in its
+  protected slot for explicit recovery. Project-generation reset now holds the
+  caller-ledger lock across checks before and after entering the resetting state
+  and through generation advance, failing closed when old-generation authority
+  is visible. Delete retention revalidates the current project generation while
+  holding that same lock, so a request delayed behind reset fails before caller
+  record publication or XPC dispatch. A failed reset cancellation is surfaced
+  as a distinct operator recovery error instead of being suppressed.
+- Crash recovery no longer depends on reopening a user-controlled source parent
+  after a protected capture exists. Persisted v5 records must recompute to their
+  canonical request digest from an explicit schema-3 protocol and digest-
+  canonicalization version; mixed legacy/v5 record shapes fail closed. A valid
+  transaction-bound pending capture-identity receipt is published on recovery
+  instead of discarded. Documented atomic-capture errors that leave both names
+  unchanged, including immutable/no-unlink denial and an unrenameable mount,
+  become durable rejected outcomes instead of indefinitely occupying a slot.
+  A legacy
+  rollback reports restored only when the source still has the exact recorded
+  identity, while an absent v5 protected capture or unprovable legacy restore
+  becomes a durable conflict.
+- Accepted managed-provider receipts survive manager restart. An unresolved
+  provider-response crash is fenced for 660 seconds before retry. LM Studio
+  exposes no request-ID receipt lookup, so one retry can create at most one
+  duplicate model inference per attempt and repeated operator or recovery
+  retries can repeat inference. Manager reconciliation prevents duplicate tool
+  execution. This mitigates the race; it does not eliminate it.
+- Project registration and relink now stage bounded, owner-only recovery intents
+  before control-plane mutation. A dedicated bounded
+  `project_transition_authority` row, not diagnostic audit events, binds the
+  exact operation, generation, root, repository identity, and directory
+  device/inode in the same transaction as control state. Registration and
+  relink publish aliases only after that authority is accepted, activate only
+  the exact staged operation, and remove the intent only after active,
+  published authority is reverified. Lost native-client responses receive one
+  bounded retry using the same encoded body and captured authorization header;
+  exact concurrent registration requests converge on one durable project
+  identity. Restart and crash-boundary regressions cover control commit, alias
+  publication, activation, response loss, intent cleanup, and two concurrent
+  callers. A bounded top-level operator projection now reconstructs an exact
+  registration request after a crash between intent persistence and the first
+  control-plane row; it returns at most 100 intents and fails closed after a
+  4,096-entry project-directory scan. Same-UID mutation of the owner-only
+  recovery files or SQLite store remains outside this integrity boundary. A
+  same-UID writer can also remove or coherently replace an intent, or inflate
+  the directory to deny the operator snapshot. Signed native UI execution is
+  still required before shipment.
+- The project build entrypoint now builds and stages the manager CLI at
+  `Contents/Helpers/forge-conductor`, signs it before the enclosing app, and
+  performs strict signature verification of the CLI, runtime launcher,
+  filesystem daemon, and app bundle. Source and focused product-path tests are
+  green; an exact current-source installed, signed bundle execution remains an
+  open qualification step.
 
 ### Open qualification and security boundaries
 
-- A same-user writer can still swap a quarantine name between final verification
-  and the terminal mutation. One successful race can affect one entry under the
-  pinned authorized parent; final-link deletion can lose an unbounded number of
-  bytes and a directory rename can relocate an unbounded subtree. A recursive
-  request can reuse the 32 slots across up to 100,000 entries, so the slot bound
-  limits simultaneous cooperative recovery state rather than cumulative
-  adversarial wrong-object mutations. Initial path
-  anchoring, destination hierarchy creation, and hard-link ctime ambiguity also
-  remain E2.
+- A same-user writer can still substitute the source before exclusive capture
+  or relocate the validated source parent outside the authorized root before
+  capture. The latter race can make one eligible regular file or symbolic link
+  outside the configured root be deleted; that file can contain unbounded
+  bytes. An ineligible captured directory can quarantine an unbounded subtree.
+  A same-user writer can also alter ACL/BSD authorization metadata between
+  final verification and root `unlinkat`. A winning terminal race can delete
+  the one captured expected regular file or symbolic link after its metadata
+  changed; a regular file can
+  contain an unbounded number of bytes. A pre-capture substitution can make one
+  entry temporarily unavailable or recovery-required; an unsupported directory
+  can represent an unbounded subtree but is not eligible for terminal deletion.
+  Writable descriptors and hard links retain content residuals. The full signed
+  distinct-process atomic-swap, every-durable-phase crash, recovery, volume,
+  lifecycle, hard-link, and writable-descriptor matrix remains unexecuted, so
+  E2 remains mandatory and release-blocking. This is mitigation, not elimination.
+- Terminal-outcome receipts are not yet reconciled against every possible
+  crash/corruption mismatch in the physical protected leaf. A committed,
+  restored, rejected, or conflicted receipt paired with a retained leaf, or a
+  quarantined receipt whose leaf is absent or has the wrong identity, must not
+  be treated as truthful closure. Defining and qualifying those repair
+  transitions remains release-blocking.
+- Disabling automatic privileged restore prevents the known out-of-root write
+  path, but it increases bounded slot availability impact: one captured entry per
+  affected transaction can remain unavailable, up to the 32 protected slots per
+  volume. A captured entry can be a directory substituted immediately before
+  capture, so one occupied slot can isolate an unbounded subtree; the 32-slot
+  limit is not a byte or descendant bound. There is not yet an independently
+  authorized restore/release/purge disposition, so repeated conflicts can
+  exhaust the slots and disable later protected deletes. The reset fence and
+  in-lock generation check reject normal delayed
+  retainers, but the caller ledger remains same-UID-owned. Hostile removal or
+  relocation of an already-retained caller record can hide the sole handle from
+  reset while its daemon transaction remains, allowing generation advance while
+  old authority can still complete. A same-UID process can also replace the
+  locked inode after a retainer validates but before slot publication, splitting
+  retention from reset and permitting stale dispatch. Maximum post-reset impact
+  is up to 32
+  captured or terminally deleted expected leaves per protected volume; each
+  regular file can contain unbounded bytes. Both rows require signed adversarial
+  execution and remain part of open E2.
 - The shell policy, migration, MCP registration, execution, compatibility
-  contract, and restart paths have non-native regressions. The native Settings
-  test has build-only evidence. Developer Mode is disabled and the available
-  signing identity does not match the configured team, so native UI and shell
-  compatibility qualification remain deferred and release-blocking.
+  contract, and restart paths pass current-source Debug and Release regressions.
+  Developer Mode is enabled and Apple Development signing uses James Daley on
+  team `9AQ2C2838M`. A bounded current-source signed Release installed-app run
+  corrected the false-success LaunchAgent fallback and passed clean-install
+  enablement, accidental legacy-disabled migration, explicit opt-out and denial,
+  `tools/list`, established login-Bash/result compatibility through both the app
+  and installed raw CLI, app relaunch, and installed-manager PID replacement
+  with predecessor exit. The guarded run deliberately did not invoke System
+  Events and restored the prior manager job, plist, command link, and launchd
+  enablement state exactly. Its result remains partial: native Settings control
+  and post-Settings re-enable are blocked for the Xcode XCUI lane. The installer
+  now stages, signs, verifies, and commits
+  the runtime launcher transactionally beside the raw CLI, embeds it in synthesized
+  app layouts, and fails closed on missing or symlinked launcher payloads. A
+  current-source Apple Development-signed Release smoke run also passed
+  installed raw-CLI `version`, `status`, and `doctor`. Production Settings UI,
+  exact current-source P10
+  qualification, production folder-panel observation, privileged-service lifecycle,
+  release signing, and notarization also remain deferred and release-blocking.
+- Exact caller-sealed helper identity prevents helper-only substitution against
+  a current caller, but it does not establish whole-product rollback freshness.
+  A monotonic root-owned receipt is not implemented; a rolled-back allowlisted
+  daemon retains its full bounded root mutation authority and its vulnerabilities.
+  Distinct installed signed app/manager/CLI XPC, stale-helper, wrong-signer,
+  approval/update/restart, and crash-recovery matrices remain unexecuted.
+- An interrupted managed query/resume/acknowledge call is left ambiguous and
+  blocked from replay if its exact result cannot be reconciled. Explicit
+  transaction recovery remains available. An interrupted `fs_delete` whose
+  previously existing path is now absent also remains ambiguous; pathname
+  absence is not converted into synthetic success and the mutation is not
+  redispatched. Automatic post-broker durable acknowledgement and discovery are
+  not implemented. The caller recovery ledger remains under same-UID-owned
+  application storage, so another same-UID process can rename or remove the
+  only caller handle without gaining daemon authority. Up to 32 lost handles per
+  protected volume can strand normal recovery and then make later mutations
+  fail closed on capacity. This availability risk remains part of open E2.
 - Historical G09 evidence covers an exact-revision, directly invoked live
   provider adapter. Current autonomous-continuity authority still requires one
   manager-owned, threshold-forced real-provider rollover proving exact successor
   acknowledgment, predecessor fencing and idempotent sealing, automatic
   continuation, GUI-closed operation, and recovery from every durable crash
   state. Unit and synthetic-host tests do not satisfy this gate.
+- The managed-provider receipt fence does not prove exactly-once inference.
+  Accepted receipts are restart-durable and reconciled tool effects are not
+  executed twice, but an unresolved response has no LM Studio request-ID lookup.
+  Retrying after 660 seconds can repeat one inference per attempt; repeated
+  recovery attempts can therefore repeat inference.
+- Current G09-G12 remain nonpassing. Historical compatibility, direct-adapter,
+  build, unit, synthetic-host, or simulator evidence does not replace the
+  current-source parity, signed native, real-provider continuity, and
+  owner-deferred physical-hardware evidence required by those gates.
 
 ## [0.9.0] — 2026-08-23
 

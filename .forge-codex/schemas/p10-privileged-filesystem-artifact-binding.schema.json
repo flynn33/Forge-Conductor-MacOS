@@ -1,0 +1,326 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://forge-conductor.local/schemas/p10-privileged-filesystem-artifact-binding.schema.json",
+  "title": "P10 Privileged Filesystem Artifact Binding",
+  "description": "Versioned binding envelope for one bounded recorder-preserved read-only context-scoped, case-scoped, or predicate-scoped qualification snapshot. Schema conformance is not evidence that the bound fact is true.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "qualification",
+    "evidence_id",
+    "source_manifest",
+    "scope",
+    "fact_sha256",
+    "claim"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "qualification": {
+      "const": "p10-privileged-filesystem"
+    },
+    "evidence_id": {
+      "type": "string",
+      "pattern": "^EVID-[A-Za-z0-9][A-Za-z0-9._-]*$",
+      "maxLength": 256
+    },
+    "source_manifest": {
+      "$ref": "#/$defs/sourceManifest"
+    },
+    "scope": {
+      "$ref": "#/$defs/scope"
+    },
+    "fact_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "claim": {
+      "$ref": "#/$defs/nonPlaceholderText",
+      "maxLength": 16384
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "nonPlaceholderText": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "enum": [
+          "fixture",
+          "n/a",
+          "not run",
+          "not-run",
+          "not_run",
+          "placeholder",
+          "tbd",
+          "todo",
+          "unknown",
+          "unset"
+        ]
+      }
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "sourceManifest": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "sha256",
+        "file_count",
+        "bytes"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "file_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32768
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 536870912
+        }
+      },
+      "additionalProperties": false
+    },
+    "scope": {
+      "type": "object",
+      "required": [
+        "case_id",
+        "role",
+        "iteration",
+        "subject",
+        "predicate"
+      ],
+      "properties": {
+        "case_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/nonPlaceholderText"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "maxLength": 256
+        },
+        "role": {
+          "enum": [
+            "qualification_context",
+            "case_result",
+            "barrier",
+            "process_identity",
+            "signing_identity",
+            "fixture_before",
+            "fixture_after",
+            "mount",
+            "crash",
+            "formal_argument"
+          ]
+        },
+        "iteration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "subject": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/nonPlaceholderText"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "maxLength": 4096
+        },
+        "predicate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/nonPlaceholderText"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "maxLength": 256
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "const": "qualification_context"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          },
+          "then": {
+            "properties": {
+              "case_id": {
+                "type": "null"
+              },
+              "iteration": {
+                "type": "null"
+              },
+              "subject": {
+                "type": "null"
+              },
+              "predicate": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "const": "formal_argument"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          },
+          "then": {
+            "properties": {
+              "case_id": {
+                "type": "null"
+              },
+              "iteration": {
+                "type": "null"
+              },
+              "subject": {
+                "type": "null"
+              },
+              "predicate": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              }
+            }
+          },
+          "else": {
+            "if": {
+              "properties": {
+                "role": {
+                  "const": "qualification_context"
+                }
+              },
+              "required": [
+                "role"
+              ]
+            },
+            "then": {
+              "properties": {
+                "case_id": {
+                  "type": "null"
+                },
+                "iteration": {
+                  "type": "null"
+                },
+                "subject": {
+                  "type": "null"
+                },
+                "predicate": {
+                  "type": "null"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "case_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "predicate": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "enum": [
+                  "case_result",
+                  "barrier"
+                ]
+              }
+            },
+            "required": [
+              "role"
+            ]
+          },
+          "then": {
+            "properties": {
+              "iteration": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "iteration": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "enum": [
+                  "barrier",
+                  "process_identity",
+                  "signing_identity",
+                  "fixture_before",
+                  "fixture_after"
+                ]
+              }
+            },
+            "required": [
+              "role"
+            ]
+          },
+          "then": {
+            "properties": {
+              "subject": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "subject": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

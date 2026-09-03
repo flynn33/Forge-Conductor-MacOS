@@ -27,7 +27,30 @@ public final class ProjectContextService: @unchecked Sendable {
         )
     }
 
+    /// Source-compatible facade for the pre-coordinator API. The former
+    /// implementation trusted a caller-supplied descriptor and could mutate the
+    /// control plane without publishing the corresponding project identity. It
+    /// now fails closed; callers must use ManagerNode or the manager-owned MCP
+    /// bootstrap coordinator.
+    @available(*, deprecated, message: "Use ManagerNode or ToolRouter project registration")
     public func registerAndBindMCPClient(
+        descriptor: ProjectMemoryDescriptor,
+        canonicalRoot: URL,
+        clientID: ClientID,
+        allowedTools: Set<String> = ["*"],
+        maximumInlineOutputBytes: Int = ProjectContextService.defaultInlineOutputLimit,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ToolInvocationContext {
+        _ = descriptor
+        _ = canonicalRoot
+        _ = clientID
+        _ = allowedTools
+        _ = maximumInlineOutputBytes
+        try cancellation?.checkCancellation()
+        throw ProjectContextError.projectTransitionCoordinatorRequired
+    }
+
+    func registerAndBindMCPClientUnchecked(
         descriptor: ProjectMemoryDescriptor,
         canonicalRoot: URL,
         clientID: ClientID,
@@ -42,7 +65,7 @@ public final class ProjectContextService: @unchecked Sendable {
         let projectID = ProjectID(rawProjectID)
         let root = canonicalRoot.resolvingSymlinksInPath().standardizedFileURL
         let project = try wait(cancellation: cancellation, committedResultWins: true) { control in
-            try await self.repository.registerProject(
+            try await self.repository.registerProjectUnchecked(
                 projectID: projectID,
                 displayName: descriptor.displayName,
                 canonicalRoot: root,
@@ -71,7 +94,48 @@ public final class ProjectContextService: @unchecked Sendable {
         return binding.invocationContext(clientID: clientID)
     }
 
+    func bindMCPClient(
+        project: ProjectControlRecord,
+        clientID: ClientID,
+        allowedTools: Set<String> = ["*"],
+        maximumInlineOutputBytes: Int = ProjectContextService.defaultInlineOutputLimit,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ToolInvocationContext {
+        let owner = ProjectBindingOwner(kind: .mcpClient, id: clientID.rawValue)
+        let scope = ToolAuthorizationScope(
+            canonicalRoots: [project.canonicalRoot],
+            allowedTools: allowedTools,
+            networkAllowed: false,
+            maximumInlineOutputBytes: maximumInlineOutputBytes
+        )
+        let binding = try wait(cancellation: nil, committedResultWins: true) { control in
+            try await self.repository.bind(
+                owner: owner,
+                projectID: project.projectID,
+                generation: project.generation,
+                authorizationScope: scope,
+                cancellation: control
+            )
+        }
+        return binding.invocationContext(clientID: clientID)
+    }
+
+    /// Source-compatible facade for the pre-coordinator registration API.
+    /// It intentionally performs no mutation because the caller-provided
+    /// descriptor cannot prove project-memory publication authority.
+    @available(*, deprecated, message: "Use ManagerNode or ToolRouter project registration")
     public func registerProject(
+        descriptor: ProjectMemoryDescriptor,
+        canonicalRoot: URL,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ProjectControlRecord {
+        _ = descriptor
+        _ = canonicalRoot
+        try cancellation?.checkCancellation()
+        throw ProjectContextError.projectTransitionCoordinatorRequired
+    }
+
+    func registerProjectUnchecked(
         descriptor: ProjectMemoryDescriptor,
         canonicalRoot: URL,
         cancellation: ToolCallCancellation? = nil
@@ -82,11 +146,183 @@ public final class ProjectContextService: @unchecked Sendable {
         }
         let root = canonicalRoot.resolvingSymlinksInPath().standardizedFileURL
         return try wait(cancellation: cancellation, committedResultWins: true) { control in
-            try await self.repository.registerProject(
+            try await self.repository.registerProjectUnchecked(
                 projectID: ProjectID(rawProjectID),
                 displayName: descriptor.displayName,
                 canonicalRoot: root,
                 repositoryFingerprint: descriptor.repositoryIdentity,
+                cancellation: control
+            )
+        }
+    }
+
+    func prepareControlledRegistration(
+        identities: ProjectIdentityResolver,
+        target: ProjectIdentityTarget,
+        requestedProjectID: String?,
+        displayName: String?,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ProjectRegistrationIdentityPreparation {
+        try cancellation?.checkCancellation()
+        let rootOwner = try project(
+            atCanonicalRoot: target.canonicalRoot,
+            cancellation: cancellation
+        )
+        let identityOwner = try target.repositoryIdentity.flatMap { identity in
+            try project(repositoryFingerprint: identity, cancellation: cancellation)
+        }
+        if let rootOwner, let identityOwner,
+           rootOwner.projectID != identityOwner.projectID {
+            throw ProjectContextError.integrityFailure(
+                "canonical root and repository identity belong to different projects"
+            )
+        }
+        let controlled = identityOwner ?? rootOwner
+        if let controlled {
+            guard controlled.lifecycleState == .active
+                    || controlled.lifecycleState == .maintenance else {
+                throw ProjectContextError.projectNotActive(controlled.lifecycleState)
+            }
+            guard controlled.canonicalRoot == target.canonicalRoot else {
+                throw ProjectContextError.projectRelinkRequired(controlled.projectID)
+            }
+            if controlled.repositoryFingerprint != target.repositoryIdentity {
+                guard controlled.repositoryFingerprint == nil,
+                      target.repositoryIdentity != nil,
+                      controlled.canonicalRoot == target.canonicalRoot else {
+                    throw ProjectContextError.projectRepositoryIdentityMismatch(
+                        controlled.projectID
+                    )
+                }
+            }
+            if let requestedProjectID,
+               requestedProjectID.caseInsensitiveCompare(
+                   controlled.projectID.description
+               ) != .orderedSame {
+                throw ProjectContextError.projectScopeMismatch
+            }
+        }
+        let preparation = try identities.prepareRegistration(
+            target: target,
+            requestedProjectID: controlled?.projectID.description ?? requestedProjectID,
+            displayName: displayName,
+            allowUnregisteredRequestedID: controlled != nil,
+            expectedControlGeneration: controlled?.generation,
+            expectedControlLifecycleState: controlled?.lifecycleState,
+            expectedControlRepositoryIdentity: controlled?.repositoryFingerprint,
+            cancellation: cancellation
+        )
+        if let controlled,
+           preparation.descriptor.id.caseInsensitiveCompare(
+               controlled.projectID.description
+           ) != .orderedSame {
+            throw ProjectContextError.projectScopeMismatch
+        }
+        return preparation
+    }
+
+    func validateControlledRegistration(
+        _ captured: ProjectRegistrationIdentityPreparation,
+        identities: ProjectIdentityResolver,
+        requestedProjectID: String?,
+        displayName: String?,
+        cancellation: ToolCallCancellation? = nil
+    ) throws {
+        let current = try prepareControlledRegistration(
+            identities: identities,
+            target: captured.target,
+            requestedProjectID: requestedProjectID,
+            displayName: displayName,
+            cancellation: cancellation
+        )
+        guard current == captured else {
+            throw ProjectMemoryError.conflict(
+                "project registration authority changed before control-plane acceptance"
+            )
+        }
+    }
+
+    func registerProject(
+        preparation: ProjectRegistrationIdentityPreparation,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ProjectControlRecord {
+        try cancellation?.checkCancellation()
+        guard let rawProjectID = UUID(uuidString: preparation.descriptor.id) else {
+            throw ProjectContextError.invalidIdentifier("project identifier")
+        }
+        return try wait(cancellation: cancellation, committedResultWins: true) { control in
+            try await self.repository.registerProjectUnchecked(
+                projectID: ProjectID(rawProjectID),
+                displayName: preparation.descriptor.displayName,
+                canonicalRoot: preparation.target.canonicalRoot,
+                repositoryFingerprint: preparation.target.repositoryIdentity,
+                controlExpectation: preparation.expectedControlGeneration.map {
+                    .existing($0)
+                } ?? .absent,
+                targetDirectoryIdentity: preparation.target.directoryIdentity,
+                disposition: preparation.expectedControlLifecycleState == .active
+                        && preparation.expectedControlRepositoryIdentity
+                            == preparation.target.repositoryIdentity
+                        && preparation.descriptor.aliases.contains(
+                            preparation.target.canonicalRoot.path
+                        )
+                    ? .active
+                    : .awaitingIdentityPublication,
+                transitionOperationID: preparation.operationID,
+                cancellation: control
+            )
+        }
+    }
+
+    func finalizeRegistration(
+        preparation: ProjectRegistrationIdentityPreparation,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ProjectControlRecord {
+        guard let rawProjectID = UUID(uuidString: preparation.descriptor.id) else {
+            throw ProjectContextError.invalidIdentifier("project identifier")
+        }
+        let projectID = ProjectID(rawProjectID)
+        if preparation.expectedControlLifecycleState == .active,
+           preparation.expectedControlRepositoryIdentity
+                == preparation.target.repositoryIdentity,
+           preparation.descriptor.aliases.contains(
+                preparation.target.canonicalRoot.path
+           ) {
+            guard let current = try project(projectID, cancellation: cancellation) else {
+                throw ProjectContextError.projectNotFound(projectID)
+            }
+            guard current.lifecycleState == .active,
+                  current.generation == preparation.expectedControlGeneration,
+                  current.canonicalRoot == preparation.target.canonicalRoot,
+                  current.repositoryFingerprint == preparation.target.repositoryIdentity else {
+                throw ProjectContextError.projectTransitionConflict(projectID)
+            }
+            return current
+        }
+        return try wait(cancellation: cancellation, committedResultWins: true) { control in
+            try await self.repository.finalizeRegistration(
+                projectID: projectID,
+                generation: preparation.expectedControlGeneration ?? .initial,
+                target: preparation.target,
+                transitionOperationID: preparation.operationID,
+                cancellation: control
+            )
+        }
+    }
+
+    func validateRegistrationPublicationAuthority(
+        preparation: ProjectRegistrationIdentityPreparation,
+        cancellation: ToolCallCancellation? = nil
+    ) throws {
+        guard let rawProjectID = UUID(uuidString: preparation.descriptor.id) else {
+            throw ProjectContextError.invalidIdentifier("project identifier")
+        }
+        try wait(cancellation: cancellation, committedResultWins: false) { control in
+            try await self.repository.validateRegistrationPublicationAuthority(
+                projectID: ProjectID(rawProjectID),
+                generation: preparation.expectedControlGeneration ?? .initial,
+                target: preparation.target,
+                transitionOperationID: preparation.operationID,
                 cancellation: control
             )
         }
@@ -98,6 +334,125 @@ public final class ProjectContextService: @unchecked Sendable {
     ) throws -> ProjectControlRecord? {
         try wait(cancellation: cancellation, committedResultWins: false) { control in
             try await self.repository.project(projectID, cancellation: control)
+        }
+    }
+
+    func project(
+        atCanonicalRoot canonicalRoot: URL,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ProjectControlRecord? {
+        try wait(cancellation: cancellation, committedResultWins: false) { control in
+            try await self.repository.project(
+                atCanonicalRoot: canonicalRoot,
+                cancellation: control
+            )
+        }
+    }
+
+    func project(
+        repositoryFingerprint: String,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ProjectControlRecord? {
+        try wait(cancellation: cancellation, committedResultWins: false) { control in
+            try await self.repository.project(
+                repositoryFingerprint: repositoryFingerprint,
+                cancellation: control
+            )
+        }
+    }
+
+    /// Source-compatible facade for the pre-coordinator relink API. Relink now
+    /// requires a durable identity stage, retained-authority fence, control-plane
+    /// compare-and-set, and alias publication owned by ManagerNode.
+    @available(*, deprecated, message: "Use ManagerNode.relinkProject(projectID:expectedGeneration:path:)")
+    public func relinkProject(
+        projectID: ProjectID,
+        expectedGeneration: ProjectGeneration,
+        newCanonicalRoot: URL,
+        repositoryFingerprint: String?,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ProjectRelinkReceipt {
+        _ = projectID
+        _ = expectedGeneration
+        _ = newCanonicalRoot
+        _ = repositoryFingerprint
+        try cancellation?.checkCancellation()
+        throw ProjectContextError.projectTransitionCoordinatorRequired
+    }
+
+    func relinkProjectUnchecked(
+        projectID: ProjectID,
+        expectedGeneration: ProjectGeneration,
+        newCanonicalRoot: URL,
+        repositoryFingerprint: String?,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ProjectRelinkReceipt {
+        let root = newCanonicalRoot.resolvingSymlinksInPath().standardizedFileURL
+        return try wait(cancellation: cancellation, committedResultWins: true) { control in
+            try await self.repository.relinkProjectUnchecked(
+                projectID: projectID,
+                expectedGeneration: expectedGeneration,
+                newCanonicalRoot: root,
+                repositoryFingerprint: repositoryFingerprint,
+                cancellation: control
+            )
+        }
+    }
+
+    func relinkProject(
+        projectID: ProjectID,
+        expectedGeneration: ProjectGeneration,
+        target: ProjectIdentityTarget,
+        transitionOperationID: String,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ProjectRelinkReceipt {
+        try wait(cancellation: cancellation, committedResultWins: true) { control in
+            try await self.repository.relinkProjectUnchecked(
+                projectID: projectID,
+                expectedGeneration: expectedGeneration,
+                newCanonicalRoot: target.canonicalRoot,
+                repositoryFingerprint: target.repositoryIdentity,
+                targetDirectoryIdentity: target.directoryIdentity,
+                disposition: .awaitingIdentityPublication,
+                transitionOperationID: transitionOperationID,
+                cancellation: control
+            )
+        }
+    }
+
+    func finalizeRelink(
+        projectID: ProjectID,
+        priorGeneration: ProjectGeneration,
+        target: ProjectIdentityTarget,
+        transitionOperationID: String,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ProjectControlRecord {
+        try wait(cancellation: cancellation, committedResultWins: true) { control in
+            try await self.repository.finalizeRelink(
+                projectID: projectID,
+                priorGeneration: priorGeneration,
+                target: target,
+                transitionOperationID: transitionOperationID,
+                cancellation: control
+            )
+        }
+    }
+
+    func validateRelinkPublicationAuthority(
+        projectID: ProjectID,
+        priorGeneration: ProjectGeneration,
+        target: ProjectIdentityTarget,
+        transitionOperationID: String,
+        cancellation: ToolCallCancellation? = nil
+    ) throws {
+        try wait(cancellation: cancellation, committedResultWins: false) { control in
+            try await self.repository.validateRelinkPublicationAuthority(
+                projectID: projectID,
+                priorGeneration: priorGeneration,
+                target: target,
+                transitionOperationID: transitionOperationID,
+                cancellation: control
+            )
         }
     }
 

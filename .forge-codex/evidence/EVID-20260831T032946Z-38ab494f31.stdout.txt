@@ -1,0 +1,168 @@
+{
+  "blocking_reasons": [
+    "manager credential is unavailable",
+    "macOS Background Task Management may retain display history until logout even after scoped bootout and plist removal"
+  ],
+  "claims": {
+    "autonomous_continuity_complete": false,
+    "filesystem_e2_complete": false,
+    "g10_complete": false,
+    "native_ui_signing_complete": false,
+    "p10_complete": false
+  },
+  "cleanup": {
+    "command_link": {
+      "action": "recreated_original",
+      "status": "restored",
+      "target": "/Users/jimdaley/.forge-conductor/bin/forge-conductor"
+    },
+    "final_canonical_job": "absent",
+    "final_canonical_plist": "absent",
+    "launchd_disabled": {
+      "after": null,
+      "before": null,
+      "exact_relevant_entry_restored": true
+    },
+    "qualification_home_retained": "/private/tmp/forge-shell-qualification2.qeu3HZ/run-home",
+    "residuals": [
+      "macOS Background Task Management may retain display history until logout even after scoped bootout and plist removal"
+    ],
+    "status": "partial",
+    "steps": [
+      "booted_out_qualification_manager",
+      "removed_qualification_launchagent_plist"
+    ]
+  },
+  "generated_at": "2026-08-31T03:29:46.567835Z",
+  "kind": "signed-shell-installed-manager-qualification",
+  "mode": "execute",
+  "open_release_gates": [
+    "P10/G10 product qualification",
+    "filesystem E2 residual race",
+    "native UI and signing qualification",
+    "real-provider autonomous continuity",
+    "whole-product rollback freshness"
+  ],
+  "overall_status": "blocked",
+  "repository": {
+    "branch": "fix/launchagent-readiness",
+    "head": "47d6f314d9a94bbfc658df08ed32fdde1f29d776",
+    "path": "/Users/jimdaley/GitHub/Forge-Conductor-LaunchAgent-Readiness"
+  },
+  "scenario": {
+    "reason": "manager credential is unavailable",
+    "status": "blocked"
+  },
+  "schema_version": 1,
+  "shared_state_preflight": {
+    "canonical_job": {
+      "state": "absent",
+      "target": "gui/501/com.forge-conductor.manager"
+    },
+    "canonical_plist": {
+      "path": "/Users/jimdaley/Library/LaunchAgents/com.forge-conductor.manager.plist",
+      "state": "absent"
+    },
+    "command_link": {
+      "path": "/Users/jimdaley/.local/bin/forge-conductor-swift",
+      "state": "symlink",
+      "target": "/Users/jimdaley/.forge-conductor/bin/forge-conductor"
+    },
+    "dashboard_port_7788": "free",
+    "launchd_disabled": {
+      "output_sha256": "956f713fb1900d048533506cb526feea0fe74a3da429ea52052d8e8f0641c81d",
+      "value": null
+    },
+    "product_processes": []
+  },
+  "source_application": {
+    "build": "1",
+    "embedded_cli_rpaths": [
+      "@executable_path/../Frameworks",
+      "@executable_path",
+      "@loader_path"
+    ],
+    "path": "/private/tmp/forge-launchagent-cleanbuild2.fLQyj0/Build/Products/Debug/Forge Conductor.app",
+    "paths": {
+      "embedded_cli": "/private/tmp/forge-launchagent-cleanbuild2.fLQyj0/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-conductor",
+      "filesystem_daemon": "/private/tmp/forge-launchagent-cleanbuild2.fLQyj0/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon",
+      "framework": "/private/tmp/forge-launchagent-cleanbuild2.fLQyj0/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework",
+      "launchdaemon_plist": "/private/tmp/forge-launchagent-cleanbuild2.fLQyj0/Build/Products/Debug/Forge Conductor.app/Contents/Library/LaunchDaemons/com.forge-conductor.filesystem-daemon.plist",
+      "main": "/private/tmp/forge-launchagent-cleanbuild2.fLQyj0/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/Forge Conductor",
+      "runtime_launcher": "/private/tmp/forge-launchagent-cleanbuild2.fLQyj0/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher"
+    },
+    "sealed_daemon_hashes": {
+      "ForgeFilesystemDaemonCDHashArm64": "ef9a4c0ba0f19c17110ce6acc2d0c74ee466aa8e"
+    },
+    "signatures": {
+      "application": {
+        "authorities": [
+          "Apple Development: James Daley (FW94K6ZY57)",
+          "Apple Worldwide Developer Relations Certification Authority",
+          "Apple Root CA"
+        ],
+        "cdhash": "df971b8a8599552dc6ef23c715b8cffb149218e3",
+        "identifier": "com.forge-conductor.app",
+        "path": "/private/tmp/forge-launchagent-cleanbuild2.fLQyj0/Build/Products/Debug/Forge Conductor.app",
+        "runtime_version": "26.5.0",
+        "sha256": null,
+        "team_identifier": "9AQ2C2838M"
+      },
+      "embedded_cli": {
+        "authorities": [
+          "Apple Development: James Daley (FW94K6ZY57)",
+          "Apple Worldwide Developer Relations Certification Authority",
+          "Apple Root CA"
+        ],
+        "cdhash": "bcbf9752d4584643c348ee8d5023f07c73b05906",
+        "identifier": "com.forge-conductor.cli",
+        "path": "/private/tmp/forge-launchagent-cleanbuild2.fLQyj0/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-conductor",
+        "runtime_version": "26.5.0",
+        "sha256": "f9b280bb5c6a86c9beb84bafc25f37f529b0de69f8c048ff08a7e96d5c76bf9b",
+        "team_identifier": "9AQ2C2838M"
+      },
+      "filesystem_daemon": {
+        "authorities": [
+          "Apple Development: James Daley (FW94K6ZY57)",
+          "Apple Worldwide Developer Relations Certification Authority",
+          "Apple Root CA"
+        ],
+        "cdhash": "ef9a4c0ba0f19c17110ce6acc2d0c74ee466aa8e",
+        "identifier": "com.forge-conductor.filesystem-daemon",
+        "path": "/private/tmp/forge-launchagent-cleanbuild2.fLQyj0/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon",
+        "runtime_version": "26.5.0",
+        "sha256": "781dc393410d70ebfdaa16eac7f3629363bd2a8e165c0660f1fd10523b7d52f5",
+        "team_identifier": "9AQ2C2838M"
+      },
+      "framework": {
+        "authorities": [
+          "Apple Development: James Daley (FW94K6ZY57)",
+          "Apple Worldwide Developer Relations Certification Authority",
+          "Apple Root CA"
+        ],
+        "cdhash": "19584aa47bc159ebe1f6b7716c4a22c7ae4d927f",
+        "identifier": "com.forge-conductor.core",
+        "path": "/private/tmp/forge-launchagent-cleanbuild2.fLQyj0/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework",
+        "runtime_version": "26.5.0",
+        "sha256": null,
+        "team_identifier": "9AQ2C2838M"
+      },
+      "runtime_launcher": {
+        "authorities": [
+          "Apple Development: James Daley (FW94K6ZY57)",
+          "Apple Worldwide Developer Relations Certification Authority",
+          "Apple Root CA"
+        ],
+        "cdhash": "48fa84640a1a9297fb270920c9b932ce15bd134c",
+        "identifier": "com.forge-conductor.runtime-launcher",
+        "path": "/private/tmp/forge-launchagent-cleanbuild2.fLQyj0/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher",
+        "runtime_version": "26.5.0",
+        "sha256": "cd8a555d93d6fab409cc7fcc89d0a3f244ab3b604403a62a6c2b95938d1b0010",
+        "team_identifier": "9AQ2C2838M"
+      }
+    },
+    "team_identifier": "9AQ2C2838M",
+    "version": "0.9.0"
+  },
+  "source_application_argument": "/tmp/forge-launchagent-cleanbuild2.fLQyj0/Build/Products/Debug/Forge Conductor.app"
+}

@@ -1,13 +1,23 @@
 # Forge Conductor user guide
 
-Version **0.9.0**, with the current unreleased P10 behavior called out explicitly.
-This guide is for operators who run Forge Conductor with
+Version **0.9.0**, build **1**. This guide is for operators who run Forge Conductor with
 [LM Studio](https://lmstudio.ai) on macOS.
 
-The current tree is not release-qualified. P10, filesystem E2, shell
-compatibility, native UI validation, and autonomous continuity remain open.
-Where implementation has only non-native or build-only evidence, that boundary
-is stated plainly.
+## Current status
+
+| Implemented and test-backed in this source | Still open or deferred before shipment |
+|---------------------------------|----------------------------------------|
+| The CLI reports 0.9.0; runtime constants, Xcode settings, and the built app bundle report 0.9.0 build 1. | Signed distinct-process filesystem E2 and recovery qualification. |
+| Native app surfaces build; an earlier exact-revision Apple Development-signed 100-cycle Rig/MCP navigation result remains supporting evidence. | Final current-source navigation/action rerun, Developer ID Release, full native/settings/service lifecycle, archive, notarization, staple, and Gatekeeper validation. |
+| Project memory, durable jobs, and telemetry have current-source regression coverage. The SwiftPM Release suite executes 1,001 tests with 5 declared environment skips and 0 failures; a dedicated signed Xcode app-hosted contract suite executes 2 tests with 0 failures. A bounded signed installed-app scenario passed shell policy, migration, `tools/list`, established `shell_exec` through app and raw CLI, app relaunch, and installed-manager PID-replacement checks. | Production Settings control and post-Settings re-enable through XCUI, Developer ID Release, and exact P10 production qualification. |
+| Durable continuity state, provider receipt storage, successor/fencing models, and tool-effect reconciliation are implemented. | Manager-owned threshold-forced real-provider rollover, exact successor acknowledgment, automatic continuation, GUI-closed operation, and durable crash recovery. |
+| Protected regular-file/symlink deletion has protocol-v5 capture and recovery machinery. | Production `fs_move`, recursive directory `fs_delete`, signed distinct-process filesystem E2, and recovery qualification. |
+| The managed adapter can load and validate an existing LM Studio configuration. | A supported clean-install app/CLI/manager control for creating and updating that configuration. |
+| Package P10/G10 evidence remains available for qualification review. | Package P10/G10 and current G09-G12 remain open; representative physical-hardware qualification is owner-deferred. |
+
+Where implementation has only unit, synthetic-host, simulator, focused Debug,
+or build-only evidence, that boundary is stated plainly. This guide does not
+mark a package or release gate complete.
 
 Related detail (developer-oriented):
 
@@ -55,7 +65,8 @@ Default home (override with `FORGE_CONDUCTOR_HOME`):
 
 | Path | Role |
 |------|------|
-| `~/.forge-conductor/store.sqlite` | Authoritative store (audit, presence, sessions, memory, handoffs) |
+| `~/.forge-conductor/store.sqlite` | Sessions, memory, handoffs, presence, and audit index |
+| `~/.forge-conductor/control-plane.sqlite3` | Project/generation/binding/run control state and dedicated bounded transition-authority rows; diagnostic audit retention cannot grant or revoke transition authority |
 | `~/.forge-conductor/config.json` | Config (dashboard port, allowed roots, timeouts) |
 | `~/.forge-conductor/bin/forge-conductor` | Installed CLI (typical MCP target after `install`) |
 | `~/.forge-conductor/memory/current-task.md` | Readable projection of the latest packet |
@@ -102,6 +113,9 @@ forge-conductor version    # should print 0.9.0
 plutil -p ~/.lmstudio/mcp.json
 ```
 
+For an app bundle, `CFBundleShortVersionString` must be `0.9.0` and
+`CFBundleVersion` must be `1`.
+
 On a clean install, project shell tools are enabled by default. Schema-v1
 configurations persisted no provenance capable of distinguishing the shipped
 disabled default from a user-chosen false value, so they migrate to enabled. An
@@ -118,13 +132,19 @@ maximum, and retains its established result fields (`ok`, `exit_code`, `stdout`,
 additive durable-job tool that starts Bash with profile and rc files disabled;
 it does not replace or redefine `shell_exec`.
 
-The non-native policy, migration, registration, execution, and result-contract
-regressions exist in the current tree. Restart coverage at that boundary uses a
-manager-service restart plus `ForgeApp` teardown/rebootstrap inside the test
-process. The Settings XCUITest includes an actual app terminate/relaunch flow,
-but it has build-only evidence: Developer Mode and a matching signing
-configuration are still required for native execution. Neither native relaunch
-nor shell compatibility is release-qualified.
+The current tree has policy, migration, registration, execution, result-contract,
+and restart regressions. A bounded Apple Development-signed Release installed-
+app run executed `shell_exec` through login Bash from both the app executable and
+installed raw CLI. It verified clean-install enablement, accidental legacy-
+disabled migration, explicit opt-out and denial, one `shell_exec` entry in
+`tools/list`, app close/reopen, and installed LaunchAgent manager replacement by
+a new PID with predecessor exit. The raw installed CLI also passed `version`,
+`status`, and `doctor`, and the launcher beside it was signed and verified. The
+run deliberately did not invoke System Events; native Settings control and post-
+Settings re-enable remain blocked for Xcode XCUI. Developer ID Release signing,
+exact current-source P10 production qualification, the full native UI matrix,
+archive, notarization, and staple/Gatekeeper evidence remain open. The bounded
+compatibility scenarios pass; shipment does not.
 
 ---
 
@@ -147,15 +167,31 @@ LM Studio only starts the `serve` processes when a chat has those MCP servers se
 
 ## 6. Continuity (packet automation and current boundary)
 
-The checkpoint and handoff behavior below is implemented. The current release
-candidate has not yet proven autonomous session succession through a
+The checkpoint and handoff behavior below is implemented. The current
+development snapshot has not yet proven autonomous session succession through a
 manager-owned, threshold-forced real-provider rollover. Until that test also
 proves exact successor acknowledgment, predecessor fencing, idempotent sealing,
 automatic continuation, GUI-closed operation, and crash-state recovery, use the
 new-chat recipe as the operational path rather than treating autonomous
 continuity as qualified.
 
-### 6.1 What the model can still call
+Unit and synthetic-host tests do not close this gate. The authority run must use
+the real provider with the GUI closed and recover from every durable crash state.
+
+### 6.1 Provider-response recovery boundary
+
+Accepted provider receipts are durable across manager restart. If Forge crashes
+after the provider may have accepted a request but before its response is
+resolved, the manager fences that request for **660 seconds**. LM Studio does not
+expose a request-ID receipt lookup, so a retry after the fence can create at
+most one duplicate model inference for that attempt. Repeated operator or
+recovery retries can therefore repeat inference.
+
+Forge reconciles manager-owned tool effects so a replayed response does not run
+the same tool effect twice. This limits side effects, but it does not make model
+inference exactly once and does not eliminate the response race.
+
+### 6.2 What the model can still call
 
 | Tool | Effect |
 |------|--------|
@@ -164,7 +200,7 @@ continuity as qualified.
 | `context_get` | Load latest (or a given id) packet; adopt workspace; **clear a context-budget block** on this client |
 | `context_list` | List recent packets |
 
-### 6.2 What Forge does without being asked
+### 6.3 What Forge does without being asked
 
 Progress tools are: `fs_*`, `shell_exec`, `git_*`, `memory_set`, `search_text`, `pdf_*`, `agent_run_start`, `agent_run_complete`.
 
@@ -181,13 +217,13 @@ Identical-call budget (separate from the 20-tool rule):
 - 4th identical call: soft handoff signal (`handoff_required`), work can still continue
 - 9th identical call: hard `identical_call_loop` and the same client is blocked
 
-### 6.3 What a handoff is not
+### 6.4 What a handoff is not
 
 A handoff is a **file + SQLite packet**. It does not shrink the current LM Studio transcript. The current chat still contains every prior tool dump. That is why the block exists: to make you start a **new** chat instead of prefilling 150k tokens again.
 
 Forge cannot click “New chat” in the LM Studio GUI.
 
-### 6.4 New-chat recipe
+### 6.5 New-chat recipe
 
 1. Leave the old chat (it may now refuse project tools).
 2. New chat, same preset, MCP enabled.
@@ -296,6 +332,17 @@ LM Studio may send all `tools/call` traffic to one of them (often fallback). Tha
 - The current checkpoint does not yet qualify manager-owned autonomous
   succession. A directly invoked provider-adapter test is not a substitute for
   the required forced-rollover scenario.
+- Protected filesystem capture and quarantine mitigate known destructive-path
+  races but do not eliminate them. E2 remains mandatory until the signed
+  distinct-process 57-case matrix and formal predicates pass. Production
+  `fs_move` and recursive directory `fs_delete` are unavailable until their
+  additive signed-helper protocols are implemented and qualified.
+- Managed Autonomy is not operable on a clean install until the product can
+  create and validate its LM Studio provider configuration; test-written files
+  are not a supported operator workflow.
+- Current G09-G12, native Settings/release/signing, exact shell UI
+  qualification, real-provider continuity, and owner-deferred representative
+  physical-hardware gates remain open; this guide is not a ship authorization.
 - `/Applications/Forge Conductor.app` is not updated by `install` if the OS refuses the overwrite. Check **version** on the binary LM Studio actually spawns.
 - `forge-conductor install` from the CLI may stage a **CLI** binary inside `~/.forge-conductor/Forge Conductor.app`. That bundle is not a substitute for the SwiftUI GUI in `dist/` or a proper app-bundle install.
 - Read-only tools can list most of your home directory. Treat that as a real permission, not a sandbox.

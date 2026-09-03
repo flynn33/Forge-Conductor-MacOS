@@ -20,7 +20,7 @@ final class ManagedProjectRunStepExecutorTests: XCTestCase {
             at: projectRoot,
             withIntermediateDirectories: true
         )
-        _ = try await repository.registerProject(
+        _ = try await repository.registerProjectUnchecked(
             projectID: projectID,
             displayName: "Managed Step Fixture",
             canonicalRoot: projectRoot
@@ -169,7 +169,7 @@ final class ManagedProjectRunStepExecutorTests: XCTestCase {
         let projectRoot = root.appendingPathComponent("project", isDirectory: true)
         try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
         let projectID = ProjectID()
-        _ = try await repository.registerProject(
+        _ = try await repository.registerProjectUnchecked(
             projectID: projectID,
             displayName: "Managed Cancellation Fixture",
             canonicalRoot: projectRoot
@@ -249,7 +249,7 @@ final class ManagedProjectRunStepExecutorTests: XCTestCase {
         let projectRoot = root.appendingPathComponent("project", isDirectory: true)
         try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
         let projectID = ProjectID()
-        _ = try await repository.registerProject(
+        _ = try await repository.registerProjectUnchecked(
             projectID: projectID,
             displayName: "Managed Failure Fixture",
             canonicalRoot: projectRoot

@@ -50,7 +50,7 @@ final class ProjectMemoryTests: XCTestCase {
     }
 
     func testToolConformanceIsAdditiveAndInitializeAdvertisesCapabilities() throws {
-        let app = try ForgeApp.bootstrap(home: home)
+        let app = try bootstrapApplication()
         defer { app.shutdown() }
         let names = Set(app.tools.toolNames)
         XCTAssertTrue(Set(ProjectMemoryToolPack.names).isSubset(of: names))
@@ -83,8 +83,265 @@ final class ProjectMemoryTests: XCTestCase {
         XCTAssertNotNil(structured["project_id"] as? String)
     }
 
+    func testRelinkStageIsNonAuthoritativeAndCommitPublishesAliasIdempotently() throws {
+        let app = try bootstrapApplication()
+        defer { app.shutdown() }
+        let replacement = home.deletingLastPathComponent()
+            .appendingPathComponent("project-a-moved", isDirectory: true)
+        try FileManager.default.createDirectory(at: replacement, withIntermediateDirectories: true)
+        try writeGitRemote("ssh://git@example.test/team/project.git", to: projectA)
+        try writeGitRemote("ssh://git@example.test/team/project.git", to: replacement)
+
+        let initialized = try app.projectMemory.initializeUnchecked(path: projectA.path)
+        let projectID = try XCTUnwrap(initialized["project_id"] as? String)
+        let descriptor = try app.projectMemory.identities.descriptor(projectID: projectID)
+        let expectedIdentity = try XCTUnwrap(descriptor.repositoryIdentity)
+
+        let first = try app.projectMemory.identities.prepareRelink(
+            path: replacement.path,
+            projectID: projectID,
+            expectedGeneration: .initial,
+            expectedRepositoryIdentity: expectedIdentity
+        )
+        let second = try app.projectMemory.identities.prepareRelink(
+            path: replacement.path,
+            projectID: projectID,
+            expectedGeneration: .initial,
+            expectedRepositoryIdentity: expectedIdentity
+        )
+
+        XCTAssertEqual(first, second)
+        XCTAssertEqual(first.canonicalRoot, replacement.standardizedFileURL)
+        XCTAssertEqual(first.repositoryIdentity, expectedIdentity)
+        XCTAssertFalse(first.descriptor.aliases.contains(replacement.standardizedFileURL.path))
+        XCTAssertTrue(try app.projectMemory.identities.hasPendingRelink(projectID: projectID))
+
+        let committed = try app.projectMemory.identities.commitRelink(first)
+        let replayed = try app.projectMemory.identities.commitRelink(second)
+        XCTAssertEqual(committed, replayed)
+        XCTAssertEqual(
+            committed.aliases.filter { $0 == replacement.standardizedFileURL.path }.count,
+            1
+        )
+        XCTAssertTrue(try app.projectMemory.identities.hasPendingRelink(projectID: projectID))
+        try app.projectMemory.identities.completeRelinkIntent(first)
+        XCTAssertFalse(try app.projectMemory.identities.hasPendingRelink(projectID: projectID))
+
+        let restarted = try ProjectIdentityResolver(paths: app.paths).descriptor(projectID: projectID)
+        XCTAssertTrue(restarted.aliases.contains(replacement.standardizedFileURL.path))
+        XCTAssertEqual(restarted.repositoryIdentity, expectedIdentity)
+    }
+
+    func testRealGitLinkedWorktreeUsesCommonRepositoryIdentityAndRelinks() throws {
+        try runGit(["init", projectA.path])
+        try runGit(["-C", projectA.path, "config", "user.name", "Forge Test"])
+        try runGit(["-C", projectA.path, "config", "user.email", "forge-test@example.invalid"])
+        try runGit(["-C", projectA.path, "config", "commit.gpgsign", "false"])
+        try runGit([
+            "-C", projectA.path, "remote", "add", "origin",
+            "ssh://git@example.test/team/real-worktree.git",
+        ])
+        try Data("worktree identity\n".utf8).write(
+            to: projectA.appendingPathComponent("README.md"),
+            options: .atomic
+        )
+        try runGit(["-C", projectA.path, "add", "README.md"])
+        try runGit(["-C", projectA.path, "commit", "-m", "initial"])
+        try FileManager.default.removeItem(at: projectB)
+        try runGit([
+            "-C", projectA.path, "worktree", "add", "-b",
+            "forge-worktree-test", projectB.path,
+        ])
+
+        let app = try bootstrapApplication()
+        defer { app.shutdown() }
+        let originalTarget = try app.projectMemory.identities.discoverTarget(path: projectA.path)
+        let worktreeTarget = try app.projectMemory.identities.discoverTarget(path: projectB.path)
+        let identity = try XCTUnwrap(originalTarget.repositoryIdentity)
+        XCTAssertEqual(worktreeTarget.repositoryIdentity, identity)
+
+        let manager = ManagerNode(app: app)
+        let registered = try manager.registerProject(path: projectA.path)
+        let projectUUID = try XCTUnwrap(
+            (registered["project_id"] as? String).flatMap(UUID.init(uuidString:))
+        )
+        let relinked = try manager.relinkProject(
+            projectID: ProjectID(projectUUID),
+            expectedGeneration: .initial,
+            path: projectB.path
+        )
+        XCTAssertEqual(relinked.newGeneration, 2)
+        XCTAssertEqual(relinked.canonicalRoot, projectB.standardizedFileURL.path)
+        let descriptor = try app.projectMemory.identities.descriptor(
+            projectID: projectUUID.uuidString.lowercased()
+        )
+        XCTAssertEqual(descriptor.repositoryIdentity, identity)
+        XCTAssertTrue(descriptor.aliases.contains(projectB.standardizedFileURL.path))
+    }
+
+    func testLegacyNullWorktreeIdentityAdoptionRecoversAtAdvancedGeneration() throws {
+        var app: ForgeApp? = try bootstrapApplication()
+        var manager: ManagerNode? = ManagerNode(app: try XCTUnwrap(app))
+        let legacy = try XCTUnwrap(manager).registerProject(path: projectA.path)
+        let projectUUID = try XCTUnwrap(
+            (legacy["project_id"] as? String).flatMap(UUID.init(uuidString:))
+        )
+        let projectID = ProjectID(projectUUID)
+        XCTAssertNil(
+            try XCTUnwrap(app).projectMemory.identities.descriptor(
+                projectID: projectID.description
+            ).repositoryIdentity
+        )
+        let reset = try XCTUnwrap(manager).resetProjectGeneration(
+            projectID: projectID,
+            expectedGeneration: .initial
+        )
+        XCTAssertEqual(reset["new_generation"] as? UInt64, 2)
+
+        try runGit(["init", projectA.path])
+        try runGit([
+            "-C", projectA.path, "remote", "add", "origin",
+            "ssh://git@example.test/team/legacy-worktree.git",
+        ])
+        let inferred = try XCTUnwrap(
+            try XCTUnwrap(app).projectMemory.identities.discoverTarget(
+                path: projectA.path
+            ).repositoryIdentity
+        )
+        manager = ManagerNode(
+            app: try XCTUnwrap(app),
+            projectRegistrationCheckpoint: { checkpoint in
+                if case .controlPlaneAccepted = checkpoint {
+                    throw ManagerProjectRegistrationInterruption.simulatedProcessExit(
+                        checkpoint
+                    )
+                }
+            }
+        )
+        XCTAssertThrowsError(try XCTUnwrap(manager).registerProject(path: projectA.path))
+        let staged = try XCTUnwrap(
+            try XCTUnwrap(app).projectContexts.project(projectID)
+        )
+        XCTAssertEqual(staged.generation.rawValue, 2)
+        XCTAssertEqual(staged.lifecycleState, .maintenance)
+        XCTAssertEqual(staged.repositoryFingerprint, inferred)
+        manager = nil
+        try XCTUnwrap(app).shutdown()
+        app = nil
+
+        let restarted = try bootstrapApplication()
+        defer { restarted.shutdown() }
+        let recovered = try ManagerNode(app: restarted).registerProject(path: projectA.path)
+        XCTAssertEqual(recovered["project_id"] as? String, projectID.description)
+        XCTAssertEqual(recovered["project_generation"] as? UInt64, 2)
+        let active = try XCTUnwrap(try restarted.projectContexts.project(projectID))
+        XCTAssertEqual(active.lifecycleState, .active)
+        XCTAssertEqual(active.repositoryFingerprint, inferred)
+        let descriptor = try restarted.projectMemory.identities.descriptor(
+            projectID: projectID.description
+        )
+        XCTAssertEqual(descriptor.repositoryIdentity, inferred)
+        XCTAssertEqual(descriptor.aliases.filter { $0 == projectA.path }.count, 1)
+    }
+
+    func testRelinkStageRejectsDifferentPendingTargetWithoutPublishingEitherAlias() throws {
+        let app = try bootstrapApplication()
+        defer { app.shutdown() }
+        let firstTarget = home.deletingLastPathComponent()
+            .appendingPathComponent("project-a-first-relink", isDirectory: true)
+        let secondTarget = home.deletingLastPathComponent()
+            .appendingPathComponent("project-a-second-relink", isDirectory: true)
+        for target in [firstTarget, secondTarget] {
+            try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
+            try writeGitRemote("ssh://git@example.test/team/project.git", to: target)
+        }
+        try writeGitRemote("ssh://git@example.test/team/project.git", to: projectA)
+        let initialized = try app.projectMemory.initializeUnchecked(path: projectA.path)
+        let projectID = try XCTUnwrap(initialized["project_id"] as? String)
+        let expectedIdentity = try XCTUnwrap(
+            try app.projectMemory.identities.descriptor(projectID: projectID).repositoryIdentity
+        )
+        let first = try app.projectMemory.identities.prepareRelink(
+            path: firstTarget.path,
+            projectID: projectID,
+            expectedGeneration: .initial,
+            expectedRepositoryIdentity: expectedIdentity
+        )
+
+        XCTAssertThrowsError(try app.projectMemory.identities.prepareRelink(
+            path: secondTarget.path,
+            projectID: projectID,
+            expectedGeneration: .initial,
+            expectedRepositoryIdentity: expectedIdentity
+        )) { error in
+            guard case ProjectMemoryError.conflict = error else {
+                return XCTFail("Expected one bounded pending relink, received \(error)")
+            }
+        }
+        let descriptor = try app.projectMemory.identities.descriptor(projectID: projectID)
+        XCTAssertFalse(descriptor.aliases.contains(firstTarget.standardizedFileURL.path))
+        XCTAssertFalse(descriptor.aliases.contains(secondTarget.standardizedFileURL.path))
+        XCTAssertTrue(try app.projectMemory.identities.hasPendingRelink(projectID: projectID))
+
+        try app.projectMemory.identities.abortRelink(first)
+        XCTAssertFalse(try app.projectMemory.identities.hasPendingRelink(projectID: projectID))
+        let afterAbort = try app.projectMemory.identities.descriptor(projectID: projectID)
+        XCTAssertFalse(afterAbort.aliases.contains(firstTarget.standardizedFileURL.path))
+        XCTAssertFalse(afterAbort.aliases.contains(secondTarget.standardizedFileURL.path))
+    }
+
+    func testRelinkPreparationRejectsAbsentMismatchedAndCallerAssertedIdentity() throws {
+        let app = try bootstrapApplication()
+        defer { app.shutdown() }
+        let replacement = home.deletingLastPathComponent()
+            .appendingPathComponent("project-a-invalid-move", isDirectory: true)
+        try FileManager.default.createDirectory(at: replacement, withIntermediateDirectories: true)
+        try writeGitRemote("ssh://git@example.test/team/project.git", to: projectA)
+
+        let initialized = try app.projectMemory.initializeUnchecked(path: projectA.path)
+        let projectID = try XCTUnwrap(initialized["project_id"] as? String)
+        let descriptor = try app.projectMemory.identities.descriptor(projectID: projectID)
+        let expectedIdentity = try XCTUnwrap(descriptor.repositoryIdentity)
+
+        XCTAssertThrowsError(try app.projectMemory.identities.prepareRelink(
+            path: replacement.path,
+            projectID: projectID,
+            expectedGeneration: .initial,
+            expectedRepositoryIdentity: expectedIdentity
+        )) { error in
+            XCTAssertEqual(error as? ProjectMemoryError, .projectScopeMismatch)
+        }
+
+        try writeGitRemote("ssh://git@example.test/other/project.git", to: replacement)
+        XCTAssertThrowsError(try app.projectMemory.identities.prepareRelink(
+            path: replacement.path,
+            projectID: projectID,
+            expectedGeneration: .initial,
+            expectedRepositoryIdentity: expectedIdentity
+        )) { error in
+            XCTAssertEqual(error as? ProjectMemoryError, .projectScopeMismatch)
+        }
+
+        XCTAssertThrowsError(try app.projectMemory.identities.initialize(
+            path: replacement.path,
+            projectID: nil,
+            displayName: nil,
+            repositoryIdentity: expectedIdentity
+        )) { error in
+            XCTAssertEqual(error as? ProjectMemoryError, .projectScopeMismatch)
+        }
+        XCTAssertThrowsError(try app.projectMemory.identities.prepareRelink(
+            path: replacement.path,
+            projectID: projectID,
+            expectedGeneration: .initial,
+            expectedRepositoryIdentity: expectedIdentity
+        )) { error in
+            XCTAssertEqual(error as? ProjectMemoryError, .projectScopeMismatch)
+        }
+    }
+
     func testProjectIsolationRedactionDeduplicationAndRestartDurability() throws {
-        var app: ForgeApp? = try ForgeApp.bootstrap(home: home)
+        var app: ForgeApp? = try bootstrapApplication()
         let idA = try initialize(app!, project: projectA)
         let clientB = ClientID("project-memory-test-b")
         let idB = try initialize(app!, project: projectB, clientID: clientB)
@@ -118,7 +375,7 @@ final class ProjectMemoryTests: XCTestCase {
 
         app?.shutdown()
         app = nil
-        app = try ForgeApp.bootstrap(home: home)
+        app = try bootstrapApplication()
         defer { app?.shutdown() }
         let reopenedA = try initialize(app!, project: projectA)
         XCTAssertEqual(reopenedA, idA)
@@ -127,7 +384,7 @@ final class ProjectMemoryTests: XCTestCase {
     }
 
     func testBatchPaginationUpdateConflictLinkAndTombstone() throws {
-        let app = try ForgeApp.bootstrap(home: home)
+        let app = try bootstrapApplication()
         defer { app.shutdown() }
         let projectID = try initialize(app, project: projectA)
         let items: [[String: Any]] = (0..<6).map { index in
@@ -189,7 +446,7 @@ final class ProjectMemoryTests: XCTestCase {
     }
 
     func testPrivateKeyRejectedPayloadBoundsAndCacheBound() throws {
-        let app = try ForgeApp.bootstrap(home: home)
+        let app = try bootstrapApplication()
         defer { app.shutdown() }
         let projectID = try initialize(app, project: projectA)
         let rejected = try app.tools.call(
@@ -225,7 +482,7 @@ final class ProjectMemoryTests: XCTestCase {
     }
 
     func testIntegrityVersionFailurePreservesDatabaseAndExportChecksumIsVerified() throws {
-        var app: ForgeApp? = try ForgeApp.bootstrap(home: home)
+        var app: ForgeApp? = try bootstrapApplication()
         let projectID = try initialize(app!, project: projectA)
         _ = try call(app!, "project_memory.remember", [
             "project_id": projectID, "kind": "constraint", "title": "Preserve", "summary": "Never delete on migration failure",
@@ -251,21 +508,38 @@ final class ProjectMemoryTests: XCTestCase {
         let before = try Data(contentsOf: database)
         try setUserVersion(database, version: 99)
         let modified = try Data(contentsOf: database)
-        app = try ForgeApp.bootstrap(home: home)
+        app = try bootstrapApplication()
         let failed = try app!.tools.call(
             name: "project_memory.initialize",
             arguments: ["project_path": projectA.path],
             clientID: ClientID("project-memory-version")
         )
-        XCTAssertFalse(failed.ok)
-        XCTAssertEqual(failed.payload["code"] as? String, "unsupported_version")
+        XCTAssertTrue(failed.ok, "\(failed.payload)")
+        XCTAssertEqual(failed.payload["ok"] as? Bool, true)
+        XCTAssertEqual(failed.payload["project_id"] as? String, projectID)
+        XCTAssertEqual(failed.payload["primary_committed"] as? Bool, true)
+        XCTAssertEqual(failed.payload["primary_commit_phase"] as? String, "identity_published")
+        XCTAssertEqual(failed.payload["migration_status"] as? String, "pending")
+        XCTAssertEqual(failed.payload["project_memory_initialization"] as? String, "pending")
+        XCTAssertEqual(failed.payload["project_context_attached"] as? Bool, false)
+        XCTAssertEqual(failed.payload["project_context_attachment"] as? String, "pending")
+        XCTAssertEqual(
+            failed.payload["project_context_error"] as? String,
+            "project_memory_initialization_failed"
+        )
+        XCTAssertEqual(failed.payload["reconciled"] as? Bool, false)
+        XCTAssertEqual(failed.payload["reconciliation_required"] as? Bool, true)
+        XCTAssertEqual(
+            failed.payload["project_memory_initialization_error"] as? String,
+            "unsupported_version"
+        )
         XCTAssertEqual(try Data(contentsOf: database), modified)
         XCTAssertNotEqual(before, modified)
         app?.shutdown()
     }
 
     func testImportRejectsSpecialFileWithoutBlockingPastDeadline() throws {
-        let app = try ForgeApp.bootstrap(home: home)
+        let app = try bootstrapApplication()
         defer { app.shutdown() }
         let projectID = try initialize(app, project: projectA)
         let exports = home.appendingPathComponent(
@@ -885,7 +1159,7 @@ final class ProjectMemoryTests: XCTestCase {
             query: "matching", kinds: [], tags: [], sessionID: nil, limit: 10, offset: 0
         ).count, 1)
 
-        var app: ForgeApp? = try ForgeApp.bootstrap(home: home)
+        var app: ForgeApp? = try bootstrapApplication()
         let projectID = try initialize(app!, project: projectA)
         _ = try call(app!, "project_memory.remember", [
             "project_id": projectID, "kind": "fact", "title": "Before corruption", "summary": "preserve the artifact",
@@ -900,13 +1174,30 @@ final class ProjectMemoryTests: XCTestCase {
             ? try Data(contentsOf: sourceWriteAheadLog)
             : nil
 
-        app = try ForgeApp.bootstrap(home: home)
+        app = try bootstrapApplication()
         let failed = try app!.tools.call(
             name: "project_memory.initialize", arguments: ["project_path": projectA.path],
             clientID: ClientID("project-memory-corruption")
         )
-        XCTAssertFalse(failed.ok)
-        XCTAssertEqual(failed.payload["code"] as? String, "integrity_failure")
+        XCTAssertTrue(failed.ok, "\(failed.payload)")
+        XCTAssertEqual(failed.payload["ok"] as? Bool, true)
+        XCTAssertEqual(failed.payload["project_id"] as? String, projectID)
+        XCTAssertEqual(failed.payload["primary_committed"] as? Bool, true)
+        XCTAssertEqual(failed.payload["primary_commit_phase"] as? String, "identity_published")
+        XCTAssertEqual(failed.payload["migration_status"] as? String, "pending")
+        XCTAssertEqual(failed.payload["project_memory_initialization"] as? String, "pending")
+        XCTAssertEqual(failed.payload["project_context_attached"] as? Bool, false)
+        XCTAssertEqual(failed.payload["project_context_attachment"] as? String, "pending")
+        XCTAssertEqual(
+            failed.payload["project_context_error"] as? String,
+            "project_memory_initialization_failed"
+        )
+        XCTAssertEqual(failed.payload["reconciled"] as? Bool, false)
+        XCTAssertEqual(failed.payload["reconciliation_required"] as? Bool, true)
+        XCTAssertEqual(
+            failed.payload["project_memory_initialization_error"] as? String,
+            "integrity_failure"
+        )
         XCTAssertEqual(try Data(contentsOf: database), corrupt)
         if let writeAheadLogBytes {
             XCTAssertEqual(try Data(contentsOf: sourceWriteAheadLog), writeAheadLogBytes)
@@ -931,13 +1222,30 @@ final class ProjectMemoryTests: XCTestCase {
         }
         app?.shutdown(); app = nil
 
-        app = try ForgeApp.bootstrap(home: home)
+        app = try bootstrapApplication()
         let repeated = try app!.tools.call(
             name: "project_memory.initialize", arguments: ["project_path": projectA.path],
             clientID: ClientID("project-memory-corruption-repeat")
         )
-        XCTAssertFalse(repeated.ok)
-        XCTAssertEqual(repeated.payload["code"] as? String, "integrity_failure")
+        XCTAssertTrue(repeated.ok, "\(repeated.payload)")
+        XCTAssertEqual(repeated.payload["ok"] as? Bool, true)
+        XCTAssertEqual(repeated.payload["project_id"] as? String, projectID)
+        XCTAssertEqual(repeated.payload["primary_committed"] as? Bool, true)
+        XCTAssertEqual(repeated.payload["primary_commit_phase"] as? String, "identity_published")
+        XCTAssertEqual(repeated.payload["migration_status"] as? String, "pending")
+        XCTAssertEqual(repeated.payload["project_memory_initialization"] as? String, "pending")
+        XCTAssertEqual(repeated.payload["project_context_attached"] as? Bool, false)
+        XCTAssertEqual(repeated.payload["project_context_attachment"] as? String, "pending")
+        XCTAssertEqual(
+            repeated.payload["project_context_error"] as? String,
+            "project_memory_initialization_failed"
+        )
+        XCTAssertEqual(repeated.payload["reconciled"] as? Bool, false)
+        XCTAssertEqual(repeated.payload["reconciliation_required"] as? Bool, true)
+        XCTAssertEqual(
+            repeated.payload["project_memory_initialization_error"] as? String,
+            "integrity_failure"
+        )
         let repeatedRecoveryFamily = try FileManager.default.contentsOfDirectory(
             at: projectDirectory,
             includingPropertiesForKeys: nil
@@ -954,7 +1262,7 @@ final class ProjectMemoryTests: XCTestCase {
     }
 
     func testDatabaseLockReturnsTypedBusyWithoutPartialWrite() throws {
-        let app = try ForgeApp.bootstrap(home: home)
+        let app = try bootstrapApplication()
         defer { app.shutdown() }
         let projectID = try initialize(app, project: projectA)
         let databaseURL = home.appendingPathComponent("Projects/\(projectID)/memory.sqlite3")
@@ -978,7 +1286,7 @@ final class ProjectMemoryTests: XCTestCase {
     }
 
     func testDeadlinePreemptsDatabaseLockWithoutPartialWrite() throws {
-        let app = try ForgeApp.bootstrap(home: home)
+        let app = try bootstrapApplication()
         defer { app.shutdown() }
         let projectID = try initialize(app, project: projectA)
         let databaseURL = home.appendingPathComponent("Projects/\(projectID)/memory.sqlite3")
@@ -1106,7 +1414,7 @@ final class ProjectMemoryTests: XCTestCase {
             }
         )
         defer { memory.closeAll() }
-        let descriptor = try memory.initialize(path: projectA.path)
+        let descriptor = try memory.initializeUnchecked(path: projectA.path)
         let projectID = try XCTUnwrap(descriptor["project_id"] as? String)
         _ = try memory.remember(
             projectID: projectID,
@@ -1219,6 +1527,41 @@ final class ProjectMemoryTests: XCTestCase {
             clientID: clientID
         )
         return try XCTUnwrap(payload["project_id"] as? String)
+    }
+
+    private func bootstrapApplication() throws -> ForgeApp {
+        let app = try ForgeApp.bootstrap(home: home)
+        _ = try app.config.update(
+            ["allowed_roots": [home.deletingLastPathComponent().path]],
+            save: false
+        )
+        return app
+    }
+
+    private func writeGitRemote(_ remote: String, to root: URL) throws {
+        let git = root.appendingPathComponent(".git", isDirectory: true)
+        try FileManager.default.createDirectory(at: git, withIntermediateDirectories: true)
+        try Data(
+            "[remote \"origin\"]\n\turl = \(remote)\n".utf8
+        ).write(to: git.appendingPathComponent("config"), options: .atomic)
+    }
+
+    private func runGit(_ arguments: [String]) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        process.arguments = arguments
+        process.standardInput = FileHandle.nullDevice
+        let output = Pipe()
+        process.standardOutput = output
+        process.standardError = output
+        try process.run()
+        process.waitUntilExit()
+        let transcript = output.fileHandleForReading.readDataToEndOfFile()
+        guard process.terminationStatus == 0 else {
+            throw ProjectMemoryError.invalidRequest(
+                "git fixture failed: \(String(data: transcript, encoding: .utf8) ?? "non-UTF8 output")"
+            )
+        }
     }
 
     private func call(

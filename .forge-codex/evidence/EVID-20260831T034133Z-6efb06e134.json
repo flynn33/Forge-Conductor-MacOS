@@ -1,0 +1,103 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 7265,
+      "path": "/private/tmp/forge-shell-qualification4.YfPDDG/execute.json",
+      "portability": "origin-host-required",
+      "sha256": "79cc4742f38a25933905027961b5d762ee24bc337af0992b86fbe295eb59a8f7",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 7265,
+      "path": ".forge-codex/evidence/EVID-20260831T034133Z-6efb06e134.stdout.txt",
+      "sha256": "79cc4742f38a25933905027961b5d762ee24bc337af0992b86fbe295eb59a8f7",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260831T034133Z-6efb06e134.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "child_evidence_context": {
+    "binding_schema_version": 1,
+    "evidence_id": "EVID-20260831T034133Z-6efb06e134",
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "cd7e84fed8ed0fe0a8ec90793e83388c8a451f09",
+      "branch": "fix/launchagent-readiness",
+      "head_sha": "500adf9272cb8afc29cf5d5ad7fd03a01ec8205e",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor-LaunchAgent-Readiness"
+    },
+    "schema_version": 1,
+    "source_manifest": {
+      "bytes": 10009211,
+      "file_count": 259,
+      "schema_version": 1,
+      "sha256": "92fdee8b39d3defc81b5102c0c13777225d218267b00d1d9874b9cb80aa2728e"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "command": "python3 ./.forge-codex/scripts/qualify_signed_shell_manager.py --app '/tmp/forge-launchagent-cleanbuild4.htM6vR/Build/Products/Debug/Forge Conductor.app' --execute --qualification-home /tmp/forge-shell-qualification4.YfPDDG/run-home --output /tmp/forge-shell-qualification4.YfPDDG/execute.json",
+  "ended_at": "2026-08-31T03:41:46.062943+00:00",
+  "environment": {
+    "architecture": "arm64",
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-LaunchAgent-Readiness",
+    "machine_identifier": "Mac16,7",
+    "macos_build": "25G83",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "execution_provenance": {
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "cd7e84fed8ed0fe0a8ec90793e83388c8a451f09",
+      "branch": "fix/launchagent-readiness",
+      "head_sha": "500adf9272cb8afc29cf5d5ad7fd03a01ec8205e",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor-LaunchAgent-Readiness"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "exit_code": 2,
+  "id": "EVID-20260831T034133Z-6efb06e134",
+  "kind": "launchagent-signed-shell-live",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [
+    "FC-SHELL-COMPAT-QUALIFICATION-001"
+  ],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 10009211,
+    "file_count": 259,
+    "schema_version": 1,
+    "sha256": "92fdee8b39d3defc81b5102c0c13777225d218267b00d1d9874b9cb80aa2728e"
+  },
+  "source_manifest_after": {
+    "bytes": 10009211,
+    "file_count": 259,
+    "schema_version": 1,
+    "sha256": "92fdee8b39d3defc81b5102c0c13777225d218267b00d1d9874b9cb80aa2728e"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-31T03:41:33.091585+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

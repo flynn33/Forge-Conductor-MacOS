@@ -1,15 +1,21 @@
 {
   "schema_version": 1,
   "work_package": "FC-UI-001",
-  "status": "blocked_environment",
-  "recorded_at": "2026-08-26T23:45:46Z",
-  "summary": "The native UI builds, but the accessibility test runner cannot establish an automation session on this Mac.",
-  "conditions": [
-    "DevToolsSecurity reports that Developer mode is disabled.",
-    "The configured development team has no matching Mac Development signing identity on this host.",
-    "The ad-hoc-signed runner starts but times out while enabling automation mode."
+  "status": "deferred_release_blocking",
+  "recorded_at": "2026-08-31T02:02:48Z",
+  "summary": "Native signing, UI, protected-service lifecycle, Release signing, and notarization remain deferred and release-blocking. No current native UI pass exists.",
+  "available_prerequisites": [
+    "Developer Mode is enabled.",
+    "A valid Apple Development identity for James Daley on team 9AQ2C2838M is available.",
+    "Earlier exact-revision signed Debug XCUI evidence EVID-20260830T153118Z-752f058222 passed six bounded Settings and relaunch cases as supporting evidence only."
   ],
-  "command_references": [
+  "current_blocking_conditions": [
+    "Two product-source-equivalent prior-revision signed native attempts exited 65 before test execution because the test runner timed out while enabling automation authorization. Their bundles contain no commit SHA, so neither attempt is current-source evidence or a pass.",
+    "The writer daemon requires authorization, and real SMAppService approval, denial, update, disable, unregister, re-register, restart, and transaction-recovery behavior has not passed.",
+    "No usable Developer ID identity is installed. Release signing, archive, notarization, staple, and Gatekeeper evidence are absent.",
+    "The production NSOpenPanel path, installed-manager identity, exact running-helper identity, and signed shell execution across real app and manager restarts remain unqualified."
+  ],
+  "historical_command_references": [
     "CMD-20260826T225735Z-0c70ad3cf6",
     "CMD-20260826T225905Z-1b04745fd0",
     "CMD-20260826T225928Z-a91e5b14f6",
@@ -17,5 +23,6 @@
     "CMD-20260826T232713Z-f98d33c523"
   ],
   "evidence": ".forge-autonomy-state/evidence/FC-UI-001",
-  "resume_condition": "Enable DevToolsSecurity with administrator authorization, install a valid Mac Development identity for the configured team, and rerun the recorded XCUITest command."
+  "nonclaim": "Build-only, unit, simulator, synthetic-host, static bundle, unsigned UI-target, and partial XCUI results cannot pass native qualification.",
+  "resume_condition": "Obtain foreground automation authorization and run the current-source signed Debug UI and protected-service lifecycle matrix, then run Developer ID Release signing, archive, notarization, staple, and Gatekeeper qualification. Preserve this blocker until every required runtime result passes."
 }

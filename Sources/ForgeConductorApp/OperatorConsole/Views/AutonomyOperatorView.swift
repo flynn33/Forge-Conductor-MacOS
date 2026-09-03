@@ -222,7 +222,10 @@ struct AutonomyOperatorView: View {
             Toggle("Allow network tools for this run", isOn: $viewModel.networkAllowed)
 
             if let error = viewModel.errorMessage {
-                Text(error).font(.caption).foregroundStyle(.red)
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .accessibilityIdentifier("run-start-error")
             }
             if viewModel.startRequiresReconciliation, !viewModel.isStarting {
                 Button("Reconcile with Manager", action: viewModel.reconcileStart)

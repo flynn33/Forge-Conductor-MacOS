@@ -1,0 +1,45 @@
+--prepared:/private/tmp/forge-p10-signed-settings-derived-final-20260830/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/__preview.dylib
+--validated:/private/tmp/forge-p10-signed-settings-derived-final-20260830/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/__preview.dylib
+--prepared:/private/tmp/forge-p10-signed-settings-derived-final-20260830/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon
+--validated:/private/tmp/forge-p10-signed-settings-derived-final-20260830/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon
+--prepared:/private/tmp/forge-p10-signed-settings-derived-final-20260830/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher
+--validated:/private/tmp/forge-p10-signed-settings-derived-final-20260830/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher
+--prepared:/private/tmp/forge-p10-signed-settings-derived-final-20260830/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/Forge Conductor.debug.dylib
+--validated:/private/tmp/forge-p10-signed-settings-derived-final-20260830/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/Forge Conductor.debug.dylib
+--prepared:/private/tmp/forge-p10-signed-settings-derived-final-20260830/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework/Versions/Current/.
+--validated:/private/tmp/forge-p10-signed-settings-derived-final-20260830/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework/Versions/Current/.
+/tmp/forge-p10-signed-settings-derived-final-20260830/Build/Products/Debug/Forge Conductor.app: valid on disk
+/tmp/forge-p10-signed-settings-derived-final-20260830/Build/Products/Debug/Forge Conductor.app: satisfies its Designated Requirement
+--prepared:/private/tmp/forge-p10-signed-settings-derived-final-20260830/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/__preview.dylib
+--validated:/private/tmp/forge-p10-signed-settings-derived-final-20260830/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/__preview.dylib
+--prepared:/private/tmp/forge-p10-signed-settings-derived-final-20260830/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon
+--validated:/private/tmp/forge-p10-signed-settings-derived-final-20260830/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon
+--prepared:/private/tmp/forge-p10-signed-settings-derived-final-20260830/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/Forge Conductor.debug.dylib
+--validated:/private/tmp/forge-p10-signed-settings-derived-final-20260830/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/Forge Conductor.debug.dylib
+--prepared:/private/tmp/forge-p10-signed-settings-derived-final-20260830/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher
+--validated:/private/tmp/forge-p10-signed-settings-derived-final-20260830/Build/Products/Debug/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher
+--prepared:/private/tmp/forge-p10-signed-settings-derived-final-20260830/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework/Versions/Current/.
+--validated:/private/tmp/forge-p10-signed-settings-derived-final-20260830/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework/Versions/Current/.
+/tmp/forge-p10-signed-settings-derived-final-20260830/Build/Products/Debug/Forge Conductor.app: valid on disk
+/tmp/forge-p10-signed-settings-derived-final-20260830/Build/Products/Debug/Forge Conductor.app: satisfies its Designated Requirement
+/tmp/forge-p10-signed-settings-derived-final-20260830/Build/Products/Debug/Forge Conductor.app: explicit requirement satisfied
+/tmp/forge-p10-signed-settings-derived-final-20260830/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon: valid on disk
+/tmp/forge-p10-signed-settings-derived-final-20260830/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon: satisfies its Designated Requirement
+/tmp/forge-p10-signed-settings-derived-final-20260830/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon: explicit requirement satisfied
+filesystem daemon has unexpected entitlements
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.temporary-exception.files.absolute-path.read-only</key>
+	<array>
+		<string>/</string>
+	</array>
+	<key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
+	<array>
+		<string>com.apple.testmanagerd</string>
+		<string>com.apple.dt.testmanagerd.runner</string>
+		<string>com.apple.coresymbolicationd</string>
+	</array>
+</dict>
+</plist>

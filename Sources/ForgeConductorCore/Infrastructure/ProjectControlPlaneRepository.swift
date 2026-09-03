@@ -2,13 +2,64 @@
 // Owns durable project bindings and generation fences on one serialized SQLite connection.
 
 import Foundation
+import Darwin
 import SQLite3
+
+enum ProjectRegistrationControlExpectation: Sendable, Equatable {
+    case unchecked
+    case absent
+    case existing(ProjectGeneration)
+}
+
+enum ProjectControlPublicationDisposition: Sendable, Equatable {
+    case active
+    case awaitingIdentityPublication
+
+    var lifecycleState: ProjectLifecycleState {
+        switch self {
+        case .active: .active
+        case .awaitingIdentityPublication: .maintenance
+        }
+    }
+}
+
+private enum ProjectTransitionAuthorityKind: String {
+    case registration
+    case relink
+}
+
+private enum ProjectTransitionAuthorityState: String {
+    case staged
+    case published
+}
+
+private struct ProjectTransitionAuthorityIdentity: Equatable {
+    let projectID: String
+    let kind: ProjectTransitionAuthorityKind
+    let operationID: String
+    let priorGeneration: UInt64
+    let newGeneration: UInt64
+    let targetRootSHA256: String
+    let repositoryIdentitySHA256: String
+    let directoryDevice: String
+    let directoryInode: String
+    let authoritySHA256: String
+}
+
+private struct ProjectTransitionAuthorityRecord {
+    let sequence: Int64
+    let identity: ProjectTransitionAuthorityIdentity
+    let state: ProjectTransitionAuthorityState
+    let createdAt: String
+    let publishedAt: String?
+}
 
 public actor ProjectControlPlaneRepository {
     public static let schemaVersion = 2
     public static let maximumQuarantineEventsPerProject = 128
     public static let maximumContextBudgetObservationsPerSession = 2_048
     public static let maximumContextBudgetActionRequestsPerRead = 256
+    public static let maximumPublishedProjectTransitionAuthoritiesPerProject = 16
 
     public let databaseURL: URL
 
@@ -110,12 +161,35 @@ public actor ProjectControlPlaneRepository {
     }
 
     @discardableResult
+    @available(*, deprecated, message: "Use ManagerNode or ToolRouter project registration")
     public func registerProject(
         projectID: ProjectID,
         displayName: String,
         canonicalRoot: URL,
         repositoryFingerprint: String? = nil,
         bookmarkReference: String? = nil,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ProjectControlRecord {
+        _ = projectID
+        _ = displayName
+        _ = canonicalRoot
+        _ = repositoryFingerprint
+        _ = bookmarkReference
+        try cancellation?.checkCancellation()
+        throw ProjectContextError.projectTransitionCoordinatorRequired
+    }
+
+    @discardableResult
+    func registerProjectUnchecked(
+        projectID: ProjectID,
+        displayName: String,
+        canonicalRoot: URL,
+        repositoryFingerprint: String? = nil,
+        bookmarkReference: String? = nil,
+        controlExpectation: ProjectRegistrationControlExpectation = .unchecked,
+        targetDirectoryIdentity: ProjectDirectoryIdentity? = nil,
+        disposition: ProjectControlPublicationDisposition = .active,
+        transitionOperationID: String? = nil,
         cancellation: ToolCallCancellation? = nil
     ) throws -> ProjectControlRecord {
         try cancellation?.checkCancellation()
@@ -126,11 +200,82 @@ public actor ProjectControlPlaneRepository {
         let root = try Self.canonicalRoot(canonicalRoot)
         let fingerprint = try Self.boundedOptional(repositoryFingerprint, maximumBytes: 2_048, field: "repository fingerprint")
         let bookmark = try Self.boundedOptional(bookmarkReference, maximumBytes: 16 * 1_024, field: "bookmark reference")
+        let operationID = try Self.validatedTransitionOperationID(
+            transitionOperationID,
+            required: disposition == .awaitingIdentityPublication
+        )
+        let transitionGeneration: ProjectGeneration
+        if case .existing(let expectedGeneration) = controlExpectation {
+            transitionGeneration = expectedGeneration
+        } else {
+            transitionGeneration = .initial
+        }
+        let transitionMetadata: [String: String]?
+        let transitionAuthority: ProjectTransitionAuthorityIdentity?
+        if disposition == .awaitingIdentityPublication {
+            guard let operationID, let targetDirectoryIdentity else {
+                throw ProjectContextError.invalidIdentifier(
+                    "registration transition authority"
+                )
+            }
+            transitionMetadata = Self.projectTransitionMetadata(
+                operationID: operationID,
+                priorGeneration: transitionGeneration,
+                newGeneration: transitionGeneration,
+                root: root,
+                repositoryFingerprint: fingerprint,
+                directoryIdentity: targetDirectoryIdentity
+            )
+            transitionAuthority = Self.projectTransitionAuthorityIdentity(
+                kind: .registration,
+                projectID: projectID,
+                operationID: operationID,
+                priorGeneration: transitionGeneration,
+                newGeneration: transitionGeneration,
+                root: root,
+                repositoryFingerprint: fingerprint,
+                directoryIdentity: targetDirectoryIdentity
+            )
+        } else {
+            transitionMetadata = nil
+            transitionAuthority = nil
+        }
         let timestamp = ISO8601.string(from: clock.now())
         try cancellation?.checkCancellation()
 
-        return try controlledTransaction(cancellation: cancellation) { connection in
+        return try controlledTransaction(
+            cancellation: cancellation,
+            beforeCommitValidation: {
+                if let targetDirectoryIdentity {
+                    try Self.validateDirectoryIdentity(
+                        root,
+                        expected: targetDirectoryIdentity,
+                        failure: .projectRegistrationTargetChanged(projectID)
+                    )
+                }
+            }
+        ) { connection in
+            if let targetDirectoryIdentity {
+                try Self.validateDirectoryIdentity(
+                    root,
+                    expected: targetDirectoryIdentity,
+                    failure: .projectRegistrationTargetChanged(projectID)
+                )
+            }
             if let current = try projectUnlocked(projectID, connection: connection) {
+                switch controlExpectation {
+                case .unchecked:
+                    break
+                case .absent:
+                    throw ProjectContextError.projectScopeMismatch
+                case .existing(let expected):
+                    guard current.generation == expected else {
+                        throw ProjectContextError.staleProjectGeneration(
+                            expected: expected,
+                            actual: current.generation
+                        )
+                    }
+                }
                 guard current.canonicalRoot.path == root.path else {
                     throw ProjectContextError.projectRelinkRequired(projectID)
                 }
@@ -138,21 +283,76 @@ public actor ProjectControlPlaneRepository {
                    rootOwner.projectID != projectID {
                     throw ProjectContextError.projectRootAlreadyRegistered(root.path)
                 }
-                try connection.execute(
+                let priorLifecycle = current.lifecycleState
+                switch (priorLifecycle, disposition) {
+                case (.active, .active):
+                    break
+                case (.active, .awaitingIdentityPublication):
+                    guard case .existing(let expectedGeneration) = controlExpectation,
+                          expectedGeneration == current.generation,
+                          current.repositoryFingerprint == nil,
+                          fingerprint != nil,
+                          transitionMetadata != nil,
+                          transitionAuthority != nil else {
+                        throw ProjectContextError.projectTransitionConflict(projectID)
+                    }
+                case (.maintenance, .awaitingIdentityPublication):
+                    guard let transitionAuthority else {
+                        throw ProjectContextError.projectTransitionConflict(projectID)
+                    }
+                    try requireTransitionAuthorityUnlocked(
+                        projectID: projectID,
+                        identity: transitionAuthority,
+                        state: .staged,
+                        connection: connection
+                    )
+                case (.maintenance, .active):
+                    throw ProjectContextError.projectTransitionConflict(projectID)
+                default:
+                    throw ProjectContextError.projectNotActive(priorLifecycle)
+                }
+                let changed = try connection.execute(
                     """
                     UPDATE control_projects SET
-                        display_name=?,repository_fingerprint=?,bookmark_reference=?,updated_at=?
-                    WHERE project_id=? AND canonical_root=?
+                        display_name=?,lifecycle_state=?,repository_fingerprint=?,bookmark_reference=?,updated_at=?
+                    WHERE project_id=? AND canonical_root=? AND generation=? AND lifecycle_state=?
                     """,
                     bindings: [
-                        .text(name), .optionalText(fingerprint), .optionalText(bookmark),
+                        .text(name), .text(disposition.lifecycleState.rawValue),
+                        .optionalText(fingerprint), .optionalText(bookmark),
                         .text(timestamp), .text(projectID.description), .text(root.path),
+                        .int64(try Self.sqliteGeneration(current.generation)),
+                        .text(priorLifecycle.rawValue),
                     ]
                 )
+                guard changed == 1 else {
+                    throw ProjectContextError.projectTransitionConflict(projectID)
+                }
+                if priorLifecycle == .active,
+                   disposition == .awaitingIdentityPublication,
+                   let transitionMetadata,
+                   let transitionAuthority {
+                    try stageTransitionAuthorityUnlocked(
+                        transitionAuthority,
+                        timestamp: timestamp,
+                        connection: connection
+                    )
+                    try appendEventUnlocked(
+                        projectID: projectID,
+                        eventType: "project_registration_staged",
+                        severity: "info",
+                        summary: "Project registration is fenced pending identity publication",
+                        metadata: transitionMetadata,
+                        connection: connection
+                    )
+                }
                 guard let refreshed = try projectUnlocked(projectID, connection: connection) else {
                     throw ProjectContextError.integrityFailure("updated project could not be read back")
                 }
                 return refreshed
+            }
+            if case .existing = controlExpectation {
+                throw ProjectContextError.projectNotFound(projectID)
             }
             if try projectAtRootUnlocked(root, connection: connection) != nil {
                 throw ProjectContextError.projectRootAlreadyRegistered(root.path)
@@ -162,10 +362,11 @@ public actor ProjectControlPlaneRepository {
                 INSERT INTO control_projects(
                     project_id,display_name,canonical_root,generation,lifecycle_state,
                     repository_fingerprint,bookmark_reference,created_at,updated_at
-                ) VALUES(?,?,?,1,'active',?,?,?,?)
+                ) VALUES(?,?,?,1,?,?,?,?,?)
                 """,
                 bindings: [
                     .text(projectID.description), .text(name), .text(root.path),
+                    .text(disposition.lifecycleState.rawValue),
                     .optionalText(fingerprint), .optionalText(bookmark),
                     .text(timestamp), .text(timestamp),
                 ]
@@ -173,7 +374,210 @@ public actor ProjectControlPlaneRepository {
             guard let inserted = try projectUnlocked(projectID, connection: connection) else {
                 throw ProjectContextError.integrityFailure("registered project could not be read back")
             }
+            if disposition == .awaitingIdentityPublication,
+               let transitionMetadata,
+               let transitionAuthority {
+                try stageTransitionAuthorityUnlocked(
+                    transitionAuthority,
+                    timestamp: timestamp,
+                    connection: connection
+                )
+                try appendEventUnlocked(
+                    projectID: projectID,
+                    eventType: "project_registration_staged",
+                    severity: "info",
+                    summary: "Project registration is fenced pending identity publication",
+                    metadata: transitionMetadata,
+                    connection: connection
+                )
+            }
             return inserted
+        }
+    }
+
+    /// Makes one exact registration usable only after the caller has durably
+    /// published the independently discovered identity and canonical alias.
+    func finalizeRegistration(
+        projectID: ProjectID,
+        generation: ProjectGeneration,
+        target: ProjectIdentityTarget,
+        transitionOperationID: String,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ProjectControlRecord {
+        try cancellation?.checkCancellation()
+        try Self.validate(generation)
+        let root = try Self.canonicalRoot(target.canonicalRoot)
+        let fingerprint = try Self.boundedOptional(
+            target.repositoryIdentity,
+            maximumBytes: 2_048,
+            field: "repository fingerprint"
+        )
+        guard let operationID = try Self.validatedTransitionOperationID(
+            transitionOperationID,
+            required: true
+        ) else {
+            throw ProjectContextError.invalidIdentifier("registration transition authority")
+        }
+        let transitionMetadata = Self.projectTransitionMetadata(
+            operationID: operationID,
+            priorGeneration: generation,
+            newGeneration: generation,
+            root: root,
+            repositoryFingerprint: fingerprint,
+            directoryIdentity: target.directoryIdentity
+        )
+        let transitionAuthority = Self.projectTransitionAuthorityIdentity(
+            kind: .registration,
+            projectID: projectID,
+            operationID: operationID,
+            priorGeneration: generation,
+            newGeneration: generation,
+            root: root,
+            repositoryFingerprint: fingerprint,
+            directoryIdentity: target.directoryIdentity
+        )
+        let timestamp = ISO8601.string(from: clock.now())
+        return try controlledTransaction(
+            cancellation: cancellation,
+            beforeCommitValidation: {
+                try Self.validateDirectoryIdentity(
+                    root,
+                    expected: target.directoryIdentity,
+                    failure: .projectRegistrationTargetChanged(projectID)
+                )
+            }
+        ) { connection in
+            try Self.validateDirectoryIdentity(
+                root,
+                expected: target.directoryIdentity,
+                failure: .projectRegistrationTargetChanged(projectID)
+            )
+            guard let current = try projectUnlocked(projectID, connection: connection) else {
+                throw ProjectContextError.projectNotFound(projectID)
+            }
+            guard current.generation == generation else {
+                throw ProjectContextError.staleProjectGeneration(
+                    expected: generation,
+                    actual: current.generation
+                )
+            }
+            guard current.canonicalRoot == root,
+                  current.repositoryFingerprint == fingerprint else {
+                throw ProjectContextError.projectScopeMismatch
+            }
+            if current.lifecycleState == .active {
+                try requireTransitionAuthorityUnlocked(
+                    projectID: projectID,
+                    identity: transitionAuthority,
+                    state: .published,
+                    connection: connection
+                )
+                return current
+            }
+            guard current.lifecycleState == .maintenance,
+                  current.generation == generation else {
+                throw ProjectContextError.projectNotActive(current.lifecycleState)
+            }
+            try requireTransitionAuthorityUnlocked(
+                projectID: projectID,
+                identity: transitionAuthority,
+                state: .staged,
+                connection: connection
+            )
+            let changed = try connection.execute(
+                """
+                UPDATE control_projects SET lifecycle_state='active',updated_at=?
+                WHERE project_id=? AND canonical_root=? AND generation=?
+                  AND lifecycle_state='maintenance'
+                """,
+                bindings: [
+                    .text(timestamp), .text(projectID.description), .text(root.path),
+                    .int64(try Self.sqliteGeneration(generation)),
+                ]
+            )
+            guard changed == 1 else {
+                throw ProjectContextError.databaseFailure(
+                    "project registration activation compare-and-set failed"
+                )
+            }
+            try publishTransitionAuthorityUnlocked(
+                projectID: projectID,
+                identity: transitionAuthority,
+                timestamp: timestamp,
+                connection: connection
+            )
+            try appendEventUnlocked(
+                projectID: projectID,
+                eventType: "project_registration_published",
+                severity: "info",
+                summary: "Project registration identity publication completed",
+                metadata: transitionMetadata,
+                connection: connection
+            )
+            guard let activated = try projectUnlocked(projectID, connection: connection) else {
+                throw ProjectContextError.integrityFailure(
+                    "activated registered project could not be read back"
+                )
+            }
+            return activated
+        }
+    }
+
+    /// Proves the exact unsettled control-plane authority before the identity
+    /// registry publishes a registration alias. Finalization repeats this
+    /// proof; the separate check prevents reconciliation from publishing first.
+    func validateRegistrationPublicationAuthority(
+        projectID: ProjectID,
+        generation: ProjectGeneration,
+        target: ProjectIdentityTarget,
+        transitionOperationID: String,
+        cancellation: ToolCallCancellation? = nil
+    ) throws {
+        try cancellation?.checkCancellation()
+        try Self.validate(generation)
+        let root = try Self.canonicalRoot(target.canonicalRoot)
+        let fingerprint = try Self.boundedOptional(
+            target.repositoryIdentity,
+            maximumBytes: 2_048,
+            field: "repository fingerprint"
+        )
+        guard let operationID = try Self.validatedTransitionOperationID(
+            transitionOperationID,
+            required: true
+        ) else {
+            throw ProjectContextError.invalidIdentifier("registration transition authority")
+        }
+        let authority = Self.projectTransitionAuthorityIdentity(
+            kind: .registration,
+            projectID: projectID,
+            operationID: operationID,
+            priorGeneration: generation,
+            newGeneration: generation,
+            root: root,
+            repositoryFingerprint: fingerprint,
+            directoryIdentity: target.directoryIdentity
+        )
+        try controlledOperation(cancellation: cancellation) { connection in
+            try Self.validateDirectoryIdentity(
+                root,
+                expected: target.directoryIdentity,
+                failure: .projectRegistrationTargetChanged(projectID)
+            )
+            guard let current = try projectUnlocked(projectID, connection: connection) else {
+                throw ProjectContextError.projectNotFound(projectID)
+            }
+            guard current.generation == generation,
+                  current.lifecycleState == .maintenance,
+                  current.canonicalRoot == root,
+                  current.repositoryFingerprint == fingerprint else {
+                throw ProjectContextError.projectTransitionConflict(projectID)
+            }
+            try requireTransitionAuthorityUnlocked(
+                projectID: projectID,
+                identity: authority,
+                state: .staged,
+                connection: connection
+            )
         }
     }
 
@@ -183,6 +587,459 @@ public actor ProjectControlPlaneRepository {
     ) throws -> ProjectControlRecord? {
         try controlledOperation(cancellation: cancellation) { connection in
             try projectUnlocked(projectID, connection: connection)
+        }
+    }
+
+    func project(
+        atCanonicalRoot canonicalRoot: URL,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ProjectControlRecord? {
+        let root = try Self.canonicalRoot(canonicalRoot)
+        return try controlledOperation(cancellation: cancellation) { connection in
+            try projectAtRootUnlocked(root, connection: connection)
+        }
+    }
+
+    func project(
+        repositoryFingerprint: String,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ProjectControlRecord? {
+        guard let fingerprint = try Self.boundedOptional(
+            repositoryFingerprint,
+            maximumBytes: 2_048,
+            field: "repository fingerprint"
+        ) else {
+            return nil
+        }
+        return try controlledOperation(cancellation: cancellation) { connection in
+            let matches = try connection.all(
+                """
+                SELECT project_id,display_name,canonical_root,generation,lifecycle_state,
+                       repository_fingerprint,bookmark_reference,created_at,updated_at
+                FROM control_projects
+                WHERE repository_fingerprint=? AND lifecycle_state!='archived'
+                ORDER BY project_id LIMIT 2
+                """,
+                bindings: [.text(fingerprint)],
+                map: Self.decodeProject
+            )
+            guard matches.count <= 1 else {
+                throw ProjectContextError.integrityFailure(
+                    "repository identity is assigned to multiple active projects"
+                )
+            }
+            return matches.first
+        }
+    }
+
+    /// Atomically changes the canonical root only for a quiescent project. The
+    /// generation advance is the authority fence: all prior contexts remain
+    /// stale even though relinking is refused while any live binding or run is
+    /// present. Identity verification is supplied by the project identity
+    /// registry and rechecked here against the stored repository fingerprint.
+    @discardableResult
+    @available(*, deprecated, message: "Use ManagerNode.relinkProject(projectID:expectedGeneration:path:)")
+    public func relinkProject(
+        projectID: ProjectID,
+        expectedGeneration: ProjectGeneration,
+        newCanonicalRoot: URL,
+        repositoryFingerprint: String?,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ProjectRelinkReceipt {
+        _ = projectID
+        _ = expectedGeneration
+        _ = newCanonicalRoot
+        _ = repositoryFingerprint
+        try cancellation?.checkCancellation()
+        throw ProjectContextError.projectTransitionCoordinatorRequired
+    }
+
+    /// Internal control-plane primitive. Production call sites must provide a
+    /// manager-owned, independently discovered target before reaching this API.
+    @discardableResult
+    func relinkProjectUnchecked(
+        projectID: ProjectID,
+        expectedGeneration: ProjectGeneration,
+        newCanonicalRoot: URL,
+        repositoryFingerprint: String?,
+        targetDirectoryIdentity: ProjectDirectoryIdentity? = nil,
+        disposition: ProjectControlPublicationDisposition = .active,
+        transitionOperationID: String? = nil,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ProjectRelinkReceipt {
+        try cancellation?.checkCancellation()
+        try Self.validate(expectedGeneration)
+        guard expectedGeneration.rawValue < UInt64(Int64.max) else {
+            throw ProjectContextError.invalidGeneration(expectedGeneration.rawValue)
+        }
+        let root = try Self.canonicalRoot(newCanonicalRoot)
+        let fingerprint = try Self.boundedOptional(
+            repositoryFingerprint,
+            maximumBytes: 2_048,
+            field: "repository fingerprint"
+        )
+        let operationID = try Self.validatedTransitionOperationID(
+            transitionOperationID,
+            required: disposition == .awaitingIdentityPublication
+        )
+        if disposition == .awaitingIdentityPublication,
+           targetDirectoryIdentity == nil {
+            throw ProjectContextError.invalidIdentifier("relink transition authority")
+        }
+        let next = ProjectGeneration(expectedGeneration.rawValue + 1)
+        let transitionMetadata: [String: String]?
+        let transitionAuthority: ProjectTransitionAuthorityIdentity?
+        if disposition == .awaitingIdentityPublication {
+            guard let operationID, let targetDirectoryIdentity else {
+                throw ProjectContextError.invalidIdentifier("relink transition authority")
+            }
+            transitionMetadata = Self.projectTransitionMetadata(
+                operationID: operationID,
+                priorGeneration: expectedGeneration,
+                newGeneration: next,
+                root: root,
+                repositoryFingerprint: fingerprint,
+                directoryIdentity: targetDirectoryIdentity
+            )
+            transitionAuthority = Self.projectTransitionAuthorityIdentity(
+                kind: .relink,
+                projectID: projectID,
+                operationID: operationID,
+                priorGeneration: expectedGeneration,
+                newGeneration: next,
+                root: root,
+                repositoryFingerprint: fingerprint,
+                directoryIdentity: targetDirectoryIdentity
+            )
+        } else {
+            transitionMetadata = nil
+            transitionAuthority = nil
+        }
+        let timestamp = ISO8601.string(from: clock.now())
+        return try controlledTransaction(
+            cancellation: cancellation,
+            beforeCommitValidation: {
+                if let targetDirectoryIdentity {
+                    try Self.validateDirectoryIdentity(
+                        root,
+                        expected: targetDirectoryIdentity,
+                        failure: .projectRelinkTargetChanged(projectID)
+                    )
+                }
+            }
+        ) { connection in
+            if let targetDirectoryIdentity {
+                try Self.validateDirectoryIdentity(
+                    root,
+                    expected: targetDirectoryIdentity,
+                    failure: .projectRelinkTargetChanged(projectID)
+                )
+            }
+            guard let current = try projectUnlocked(projectID, connection: connection) else {
+                throw ProjectContextError.projectNotFound(projectID)
+            }
+            guard current.generation == expectedGeneration else {
+                throw ProjectContextError.staleProjectGeneration(
+                    expected: expectedGeneration,
+                    actual: current.generation
+                )
+            }
+            guard current.lifecycleState == .active else {
+                throw ProjectContextError.projectNotActive(current.lifecycleState)
+            }
+            guard current.canonicalRoot.path != root.path else {
+                throw ProjectContextError.invalidIdentifier(
+                    "relink target matches the current canonical root"
+                )
+            }
+            if let owner = try projectAtRootUnlocked(root, connection: connection),
+               owner.projectID != projectID {
+                throw ProjectContextError.projectRootAlreadyRegistered(root.path)
+            }
+            guard let existing = current.repositoryFingerprint,
+                  let fingerprint,
+                  existing == fingerprint else {
+                throw ProjectContextError.projectRepositoryIdentityMismatch(projectID)
+            }
+
+            let activeBindings = try connection.scalarInt(
+                "SELECT COUNT(*) FROM project_bindings WHERE project_id=? AND active=1",
+                bindings: [.text(projectID.description)]
+            )
+            let activeRuns = try connection.scalarInt(
+                """
+                SELECT COUNT(*) FROM autonomous_runs
+                WHERE project_id=? AND project_generation=?
+                  AND state NOT IN ('completed','cancelled','failed_terminal')
+                """,
+                bindings: [
+                    .text(projectID.description),
+                    .int64(try Self.sqliteGeneration(expectedGeneration)),
+                ]
+            )
+            guard activeBindings == 0, activeRuns == 0 else {
+                throw ProjectContextError.projectRelinkBusy(projectID)
+            }
+
+            let changed = try connection.execute(
+                """
+                UPDATE control_projects
+                SET canonical_root=?,generation=?,lifecycle_state=?,repository_fingerprint=?,updated_at=?
+                WHERE project_id=? AND canonical_root=? AND generation=?
+                  AND lifecycle_state='active'
+                """,
+                bindings: [
+                    .text(root.path),
+                    .int64(try Self.sqliteGeneration(next)),
+                    .text(disposition.lifecycleState.rawValue),
+                    .text(fingerprint),
+                    .text(timestamp),
+                    .text(projectID.description),
+                    .text(current.canonicalRoot.path),
+                    .int64(try Self.sqliteGeneration(expectedGeneration)),
+                ]
+            )
+            guard changed == 1 else {
+                throw ProjectContextError.databaseFailure(
+                    "project relink compare-and-set failed"
+                )
+            }
+            if let transitionAuthority {
+                try stageTransitionAuthorityUnlocked(
+                    transitionAuthority,
+                    timestamp: timestamp,
+                    connection: connection
+                )
+            }
+            try appendEventUnlocked(
+                projectID: projectID,
+                eventType: disposition == .active
+                    ? "project_relinked"
+                    : "project_relink_staged",
+                severity: "info",
+                summary: disposition == .active
+                    ? "Project canonical root changed with a generation fence"
+                    : "Project relink generation is fenced pending identity publication",
+                metadata: transitionMetadata ?? [
+                    "prior_generation": String(expectedGeneration.rawValue),
+                    "new_generation": String(next.rawValue),
+                    "prior_root_sha256": JSONSupport.sha256Hex(current.canonicalRoot.path),
+                    "new_root_sha256": JSONSupport.sha256Hex(root.path),
+                ],
+                connection: connection
+            )
+            return ProjectRelinkReceipt(
+                projectID: projectID,
+                priorCanonicalRoot: current.canonicalRoot,
+                newCanonicalRoot: root,
+                priorGeneration: expectedGeneration,
+                newGeneration: next,
+                invalidatedBindingCount: 0,
+                completedAt: timestamp
+            )
+        }
+    }
+
+    /// Activates only an exact relink tuple after the project-memory alias has
+    /// been durably published. While the row is in `maintenance`, every normal
+    /// binding and execution path remains fail-closed through
+    /// `requiredActiveProjectUnlocked`.
+    func finalizeRelink(
+        projectID: ProjectID,
+        priorGeneration: ProjectGeneration,
+        target: ProjectIdentityTarget,
+        transitionOperationID: String,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ProjectControlRecord {
+        try cancellation?.checkCancellation()
+        try Self.validate(priorGeneration)
+        guard priorGeneration.rawValue < UInt64(Int64.max) else {
+            throw ProjectContextError.invalidGeneration(priorGeneration.rawValue)
+        }
+        let next = ProjectGeneration(priorGeneration.rawValue + 1)
+        let root = try Self.canonicalRoot(target.canonicalRoot)
+        guard let fingerprint = try Self.boundedOptional(
+            target.repositoryIdentity,
+            maximumBytes: 2_048,
+            field: "repository fingerprint"
+        ) else {
+            throw ProjectContextError.projectRepositoryIdentityMismatch(projectID)
+        }
+        guard let operationID = try Self.validatedTransitionOperationID(
+            transitionOperationID,
+            required: true
+        ) else {
+            throw ProjectContextError.invalidIdentifier("relink transition authority")
+        }
+        let transitionMetadata = Self.projectTransitionMetadata(
+            operationID: operationID,
+            priorGeneration: priorGeneration,
+            newGeneration: next,
+            root: root,
+            repositoryFingerprint: fingerprint,
+            directoryIdentity: target.directoryIdentity
+        )
+        let transitionAuthority = Self.projectTransitionAuthorityIdentity(
+            kind: .relink,
+            projectID: projectID,
+            operationID: operationID,
+            priorGeneration: priorGeneration,
+            newGeneration: next,
+            root: root,
+            repositoryFingerprint: fingerprint,
+            directoryIdentity: target.directoryIdentity
+        )
+        let timestamp = ISO8601.string(from: clock.now())
+
+        return try controlledTransaction(
+            cancellation: cancellation,
+            beforeCommitValidation: {
+                try Self.validateDirectoryIdentity(
+                    root,
+                    expected: target.directoryIdentity,
+                    failure: .projectRelinkTargetChanged(projectID)
+                )
+            }
+        ) { connection in
+            try Self.validateDirectoryIdentity(
+                root,
+                expected: target.directoryIdentity,
+                failure: .projectRelinkTargetChanged(projectID)
+            )
+            guard let current = try projectUnlocked(projectID, connection: connection) else {
+                throw ProjectContextError.projectNotFound(projectID)
+            }
+            guard current.generation == next else {
+                throw ProjectContextError.staleProjectGeneration(
+                    expected: next,
+                    actual: current.generation
+                )
+            }
+            guard current.canonicalRoot == root,
+                  current.repositoryFingerprint == fingerprint else {
+                throw ProjectContextError.projectScopeMismatch
+            }
+            if current.lifecycleState == .active {
+                try requireTransitionAuthorityUnlocked(
+                    projectID: projectID,
+                    identity: transitionAuthority,
+                    state: .published,
+                    connection: connection
+                )
+                return current
+            }
+            guard current.lifecycleState == .maintenance else {
+                throw ProjectContextError.projectNotActive(current.lifecycleState)
+            }
+            try requireTransitionAuthorityUnlocked(
+                projectID: projectID,
+                identity: transitionAuthority,
+                state: .staged,
+                connection: connection
+            )
+            let changed = try connection.execute(
+                """
+                UPDATE control_projects
+                SET lifecycle_state='active',updated_at=?
+                WHERE project_id=? AND canonical_root=? AND generation=?
+                  AND lifecycle_state='maintenance' AND repository_fingerprint=?
+                """,
+                bindings: [
+                    .text(timestamp),
+                    .text(projectID.description),
+                    .text(root.path),
+                    .int64(try Self.sqliteGeneration(next)),
+                    .text(fingerprint),
+                ]
+            )
+            guard changed == 1 else {
+                throw ProjectContextError.databaseFailure(
+                    "project relink activation compare-and-set failed"
+                )
+            }
+            try publishTransitionAuthorityUnlocked(
+                projectID: projectID,
+                identity: transitionAuthority,
+                timestamp: timestamp,
+                connection: connection
+            )
+            try appendEventUnlocked(
+                projectID: projectID,
+                eventType: "project_relinked",
+                severity: "info",
+                summary: "Project relink identity publication completed",
+                metadata: transitionMetadata,
+                connection: connection
+            )
+            guard let activated = try projectUnlocked(projectID, connection: connection) else {
+                throw ProjectContextError.integrityFailure(
+                    "activated relink project could not be read back"
+                )
+            }
+            return activated
+        }
+    }
+
+    /// Proves the exact staged relink authority before the project-memory alias
+    /// is published. Finalization performs the same proof again.
+    func validateRelinkPublicationAuthority(
+        projectID: ProjectID,
+        priorGeneration: ProjectGeneration,
+        target: ProjectIdentityTarget,
+        transitionOperationID: String,
+        cancellation: ToolCallCancellation? = nil
+    ) throws {
+        try cancellation?.checkCancellation()
+        try Self.validate(priorGeneration)
+        guard priorGeneration.rawValue < UInt64(Int64.max) else {
+            throw ProjectContextError.invalidGeneration(priorGeneration.rawValue)
+        }
+        let next = ProjectGeneration(priorGeneration.rawValue + 1)
+        let root = try Self.canonicalRoot(target.canonicalRoot)
+        guard let fingerprint = try Self.boundedOptional(
+            target.repositoryIdentity,
+            maximumBytes: 2_048,
+            field: "repository fingerprint"
+        ) else {
+            throw ProjectContextError.projectRepositoryIdentityMismatch(projectID)
+        }
+        guard let operationID = try Self.validatedTransitionOperationID(
+            transitionOperationID,
+            required: true
+        ) else {
+            throw ProjectContextError.invalidIdentifier("relink transition authority")
+        }
+        let authority = Self.projectTransitionAuthorityIdentity(
+            kind: .relink,
+            projectID: projectID,
+            operationID: operationID,
+            priorGeneration: priorGeneration,
+            newGeneration: next,
+            root: root,
+            repositoryFingerprint: fingerprint,
+            directoryIdentity: target.directoryIdentity
+        )
+        try controlledOperation(cancellation: cancellation) { connection in
+            try Self.validateDirectoryIdentity(
+                root,
+                expected: target.directoryIdentity,
+                failure: .projectRelinkTargetChanged(projectID)
+            )
+            guard let current = try projectUnlocked(projectID, connection: connection) else {
+                throw ProjectContextError.projectNotFound(projectID)
+            }
+            guard current.generation == next,
+                  current.lifecycleState == .maintenance,
+                  current.canonicalRoot == root,
+                  current.repositoryFingerprint == fingerprint else {
+                throw ProjectContextError.projectTransitionConflict(projectID)
+            }
+            try requireTransitionAuthorityUnlocked(
+                projectID: projectID,
+                identity: authority,
+                state: .staged,
+                connection: connection
+            )
         }
     }
 
@@ -1162,16 +2019,61 @@ public actor ProjectControlPlaneRepository {
         )
     }
 
+    /// Resolves the newest continuity command for one exact project without
+    /// depending on the globally limited operator feed. The single-row bound
+    /// prevents a busy project or another project's newer commands from
+    /// truncating the project status projection.
+    public func operatorLatestContinuityCommand(
+        projectID: ProjectID
+    ) throws -> ContinuityCommand? {
+        try requiredConnection().first(
+            Self.continuityCommandSelect
+                + " WHERE project_id=? ORDER BY updated_at DESC,command_id DESC LIMIT 1",
+            bindings: [.text(projectID.description)],
+            map: Self.decodeContinuityCommand
+        )
+    }
+
     /// Resolves only bounded, durable detail rows needed by the operator projection.
     /// No provider calls, memory reads, or process work occurs here.
     public func operatorContinuityReadModels(
         commands: [ContinuityCommand]
     ) throws -> [ManagerOperatorContinuityReadModel] {
+        try operatorContinuityReadModels(commands: commands, evidenceByOperation: [:])
+    }
+
+    func operatorContinuityReadModels(
+        commands: [ContinuityCommand],
+        evidenceByOperation: [UUID: ManagerOperatorContinuityEvidence]
+    ) throws -> [ManagerOperatorContinuityReadModel] {
         guard commands.count <= 100 else {
             throw AutonomyError.invalidRequest("operator continuity detail query is outside bounds")
         }
+        let requestedOperationIDs = Set(commands.map(\.operationID))
+        guard evidenceByOperation.count <= commands.count,
+              Set(evidenceByOperation.keys).isSubset(of: requestedOperationIDs) else {
+            throw AutonomyError.invalidRequest("operator continuity evidence is outside bounds")
+        }
         let connection = try requiredConnection()
         return try commands.map { command in
+            let evidence = evidenceByOperation[command.operationID]
+            if let evidence {
+                guard evidence.operationID == command.operationID,
+                      evidence.projectID == command.projectID,
+                      evidence.projectGeneration == command.projectGeneration,
+                      evidence.runID == command.runID,
+                      UUID(uuidString: evidence.checkpointID) != nil else {
+                    throw ProjectContextError.integrityFailure(
+                        "operator continuity evidence does not match its command"
+                    )
+                }
+                if let acknowledgementSHA256 = evidence.acknowledgementSHA256 {
+                    try Self.validateSHA256(
+                        acknowledgementSHA256,
+                        field: "continuity acknowledgement SHA-256"
+                    )
+                }
+            }
             let run = try autonomousRunUnlocked(command.runID, connection: connection)
             let successor = try connection.first(
                 Self.providerSessionSelect
@@ -1215,7 +2117,9 @@ public actor ProjectControlPlaneRepository {
                     kind: .automaticContinuation,
                     connection: connection
                 ),
-                budgetObservation: observation
+                budgetObservation: observation,
+                checkpointID: evidence?.checkpointID,
+                acknowledgementSHA256: evidence?.acknowledgementSHA256
             )
         }
     }
@@ -2782,6 +3686,12 @@ public actor ProjectControlPlaneRepository {
         )
     }
 
+    /// Reads one exact durable invocation identity without exposing an unbounded
+    /// run-wide tool history query.
+    public func toolInvocation(_ invocationID: UUID) throws -> ToolInvocationRecord? {
+        try toolInvocationUnlocked(invocationID, connection: requiredConnection())
+    }
+
     public func unresolvedToolInvocations(
         runID: RunID,
         limit: Int = 256
@@ -2917,6 +3827,7 @@ public actor ProjectControlPlaneRepository {
     private func controlledTransaction<T>(
         cancellation: ToolCallCancellation?,
         checkCancellationBeforeCommit: Bool = true,
+        beforeCommitValidation: (() throws -> Void)? = nil,
         _ body: (ControlPlaneSQLiteConnection) throws -> T
     ) throws -> T {
         let connection = try requiredConnection()
@@ -2925,7 +3836,8 @@ public actor ProjectControlPlaneRepository {
             busyRetryObserver: busyRetryObserver,
             beforeCommitObserver: beforeCommitObserver,
             didCommitObserver: didCommitObserver,
-            checkCancellationBeforeCommit: checkCancellationBeforeCommit
+            checkCancellationBeforeCommit: checkCancellationBeforeCommit,
+            beforeCommitValidation: beforeCommitValidation
         ) {
             try body(connection)
         }
@@ -4616,14 +5528,7 @@ public actor ProjectControlPlaneRepository {
     ) throws -> String {
         let eventID = UUID().uuidString.lowercased()
         let timestamp = ISO8601.string(from: clock.now())
-        let metadataData = try JSONSerialization.data(
-            withJSONObject: metadata.sorted { $0.key < $1.key }.reduce(into: [String: String]()) { $0[$1.key] = $1.value },
-            options: [.sortedKeys]
-        )
-        guard metadataData.count <= 2_048,
-              let metadataJSON = String(data: metadataData, encoding: .utf8) else {
-            throw ProjectContextError.databaseFailure("event metadata exceeds the bounded payload")
-        }
+        let metadataJSON = try Self.canonicalEventMetadata(metadata)
         let previous = try connection.scalarText(
             "SELECT event_sha256 FROM autonomy_events ORDER BY sequence DESC LIMIT 1"
         )
@@ -4644,6 +5549,287 @@ public actor ProjectControlPlaneRepository {
             ]
         )
         return eventID
+    }
+
+    private func stageTransitionAuthorityUnlocked(
+        _ identity: ProjectTransitionAuthorityIdentity,
+        timestamp: String,
+        connection: ControlPlaneSQLiteConnection
+    ) throws {
+        guard let projectUUID = UUID(uuidString: identity.projectID) else {
+            throw ProjectContextError.integrityFailure(
+                "project transition authority has an invalid project identifier"
+            )
+        }
+        let projectID = ProjectID(projectUUID)
+        if let existing = try transitionAuthorityRecordUnlocked(
+            projectID: projectID,
+            kind: identity.kind,
+            operationID: identity.operationID,
+            connection: connection
+        ) {
+            guard existing.identity == identity, existing.state == .staged else {
+                throw ProjectContextError.projectTransitionConflict(projectID)
+            }
+            return
+        }
+        let stagedOperation = try connection.scalarText(
+            """
+            SELECT operation_id FROM project_transition_authority
+            WHERE project_id=? AND state='staged' LIMIT 1
+            """,
+            bindings: [.text(projectID.description)]
+        )
+        guard stagedOperation == nil else {
+            throw ProjectContextError.projectTransitionConflict(projectID)
+        }
+        try connection.execute(
+            """
+            INSERT INTO project_transition_authority(
+                project_id,transition_kind,operation_id,prior_generation,new_generation,
+                target_root_sha256,repository_identity_sha256,directory_device,directory_inode,
+                state,authority_sha256,created_at,published_at
+            ) VALUES(?,?,?,?,?,?,?,?,?,'staged',?,?,NULL)
+            """,
+            bindings: [
+                .text(identity.projectID), .text(identity.kind.rawValue),
+                .text(identity.operationID), .int64(Int64(identity.priorGeneration)),
+                .int64(Int64(identity.newGeneration)), .text(identity.targetRootSHA256),
+                .text(identity.repositoryIdentitySHA256), .text(identity.directoryDevice),
+                .text(identity.directoryInode), .text(identity.authoritySHA256), .text(timestamp),
+            ]
+        )
+    }
+
+    @discardableResult
+    private func requireTransitionAuthorityUnlocked(
+        projectID: ProjectID,
+        identity: ProjectTransitionAuthorityIdentity,
+        state: ProjectTransitionAuthorityState,
+        connection: ControlPlaneSQLiteConnection
+    ) throws -> ProjectTransitionAuthorityRecord {
+        guard identity.projectID == projectID.description,
+              let record = try transitionAuthorityRecordUnlocked(
+                projectID: projectID,
+                kind: identity.kind,
+                operationID: identity.operationID,
+                connection: connection
+              ),
+              record.identity == identity,
+              record.state == state else {
+            throw ProjectContextError.projectTransitionConflict(projectID)
+        }
+        return record
+    }
+
+    private func publishTransitionAuthorityUnlocked(
+        projectID: ProjectID,
+        identity: ProjectTransitionAuthorityIdentity,
+        timestamp: String,
+        connection: ControlPlaneSQLiteConnection
+    ) throws {
+        let staged = try requireTransitionAuthorityUnlocked(
+            projectID: projectID,
+            identity: identity,
+            state: .staged,
+            connection: connection
+        )
+        let changed = try connection.execute(
+            """
+            UPDATE project_transition_authority
+            SET state='published',published_at=?
+            WHERE sequence=? AND project_id=? AND transition_kind=? AND operation_id=?
+              AND state='staged' AND authority_sha256=?
+            """,
+            bindings: [
+                .text(timestamp), .int64(staged.sequence), .text(projectID.description),
+                .text(identity.kind.rawValue), .text(identity.operationID),
+                .text(identity.authoritySHA256),
+            ]
+        )
+        guard changed == 1 else {
+            throw ProjectContextError.projectTransitionConflict(projectID)
+        }
+        try connection.execute(
+            """
+            DELETE FROM project_transition_authority
+            WHERE project_id=? AND state='published' AND sequence NOT IN (
+                SELECT sequence FROM project_transition_authority
+                WHERE project_id=? AND state='published'
+                ORDER BY sequence DESC LIMIT ?
+            )
+            """,
+            bindings: [
+                .text(projectID.description), .text(projectID.description),
+                .int64(Int64(Self.maximumPublishedProjectTransitionAuthoritiesPerProject)),
+            ]
+        )
+    }
+
+    private func transitionAuthorityRecordUnlocked(
+        projectID: ProjectID,
+        kind: ProjectTransitionAuthorityKind,
+        operationID: String,
+        connection: ControlPlaneSQLiteConnection
+    ) throws -> ProjectTransitionAuthorityRecord? {
+        let records = try connection.all(
+            """
+            SELECT sequence,project_id,transition_kind,operation_id,prior_generation,
+                   new_generation,target_root_sha256,repository_identity_sha256,
+                   directory_device,directory_inode,state,authority_sha256,created_at,published_at
+            FROM project_transition_authority
+            WHERE project_id=? AND transition_kind=? AND operation_id=? LIMIT 2
+            """,
+            bindings: [
+                .text(projectID.description), .text(kind.rawValue), .text(operationID),
+            ],
+            map: { row in
+                try Self.decodeTransitionAuthority(row, expectedProjectID: projectID)
+            }
+        )
+        guard records.count <= 1 else {
+            throw ProjectContextError.projectTransitionConflict(projectID)
+        }
+        return records.first
+    }
+
+    private static func decodeTransitionAuthority(
+        _ row: ControlPlaneSQLiteRow,
+        expectedProjectID: ProjectID
+    ) throws -> ProjectTransitionAuthorityRecord {
+        let sequence = row.int64(0)
+        let priorGeneration = row.int64(4)
+        let newGeneration = row.int64(5)
+        guard sequence > 0,
+              let projectID = row.text(1), projectID == expectedProjectID.description,
+              let kindValue = row.text(2),
+              let kind = ProjectTransitionAuthorityKind(rawValue: kindValue),
+              let operationID = row.text(3), isLowercaseSHA256(operationID),
+              priorGeneration > 0, newGeneration >= priorGeneration,
+              let rootSHA256 = row.text(6), isLowercaseSHA256(rootSHA256),
+              let repositorySHA256 = row.text(7), isLowercaseSHA256(repositorySHA256),
+              let directoryDevice = row.text(8),
+              let device = UInt64(directoryDevice), device > 0,
+              directoryDevice == String(device),
+              let directoryInode = row.text(9),
+              let inode = UInt64(directoryInode), inode > 0,
+              directoryInode == String(inode),
+              let stateValue = row.text(10),
+              let state = ProjectTransitionAuthorityState(rawValue: stateValue),
+              let storedAuthoritySHA256 = row.text(11),
+              isLowercaseSHA256(storedAuthoritySHA256),
+              let createdAt = row.text(12), ISO8601.date(from: createdAt) != nil else {
+            throw ProjectContextError.projectTransitionConflict(expectedProjectID)
+        }
+        let publishedAt = row.text(13)
+        guard (state == .staged && publishedAt == nil)
+                || (state == .published
+                    && publishedAt.flatMap(ISO8601.date(from:)) != nil) else {
+            throw ProjectContextError.projectTransitionConflict(expectedProjectID)
+        }
+        let identity = projectTransitionAuthorityIdentity(
+            kind: kind,
+            projectID: expectedProjectID,
+            operationID: operationID,
+            priorGeneration: ProjectGeneration(UInt64(priorGeneration)),
+            newGeneration: ProjectGeneration(UInt64(newGeneration)),
+            targetRootSHA256: rootSHA256,
+            repositoryIdentitySHA256: repositorySHA256,
+            directoryIdentity: ProjectDirectoryIdentity(device: device, inode: inode)
+        )
+        guard identity.authoritySHA256 == storedAuthoritySHA256 else {
+            throw ProjectContextError.projectTransitionConflict(expectedProjectID)
+        }
+        return ProjectTransitionAuthorityRecord(
+            sequence: sequence,
+            identity: identity,
+            state: state,
+            createdAt: createdAt,
+            publishedAt: publishedAt
+        )
+    }
+
+    private static func projectTransitionAuthorityIdentity(
+        kind: ProjectTransitionAuthorityKind,
+        projectID: ProjectID,
+        operationID: String,
+        priorGeneration: ProjectGeneration,
+        newGeneration: ProjectGeneration,
+        root: URL,
+        repositoryFingerprint: String?,
+        directoryIdentity: ProjectDirectoryIdentity
+    ) -> ProjectTransitionAuthorityIdentity {
+        projectTransitionAuthorityIdentity(
+            kind: kind,
+            projectID: projectID,
+            operationID: operationID,
+            priorGeneration: priorGeneration,
+            newGeneration: newGeneration,
+            targetRootSHA256: JSONSupport.sha256Hex(root.path),
+            repositoryIdentitySHA256: JSONSupport.sha256Hex(repositoryFingerprint ?? ""),
+            directoryIdentity: directoryIdentity
+        )
+    }
+
+    private static func projectTransitionAuthorityIdentity(
+        kind: ProjectTransitionAuthorityKind,
+        projectID: ProjectID,
+        operationID: String,
+        priorGeneration: ProjectGeneration,
+        newGeneration: ProjectGeneration,
+        targetRootSHA256: String,
+        repositoryIdentitySHA256: String,
+        directoryIdentity: ProjectDirectoryIdentity
+    ) -> ProjectTransitionAuthorityIdentity {
+        let immutableFields = [
+            "project-transition-authority-v1",
+            projectID.description,
+            kind.rawValue,
+            operationID,
+            String(priorGeneration.rawValue),
+            String(newGeneration.rawValue),
+            targetRootSHA256,
+            repositoryIdentitySHA256,
+            String(directoryIdentity.device),
+            String(directoryIdentity.inode),
+        ]
+        return ProjectTransitionAuthorityIdentity(
+            projectID: projectID.description,
+            kind: kind,
+            operationID: operationID,
+            priorGeneration: priorGeneration.rawValue,
+            newGeneration: newGeneration.rawValue,
+            targetRootSHA256: targetRootSHA256,
+            repositoryIdentitySHA256: repositoryIdentitySHA256,
+            directoryDevice: String(directoryIdentity.device),
+            directoryInode: String(directoryIdentity.inode),
+            authoritySHA256: JSONSupport.sha256Hex(immutableFields.joined(separator: "\u{0}"))
+        )
+    }
+
+    private static func isLowercaseSHA256(_ value: String) -> Bool {
+        let range = value.startIndex..<value.endIndex
+        return value.range(of: "^[0-9a-f]{64}$", options: .regularExpression) == range
+    }
+
+    private static func canonicalEventMetadata(
+        _ metadata: [String: String]
+    ) throws -> String {
+        let metadataData = try JSONSerialization.data(
+            withJSONObject: metadata.sorted { $0.key < $1.key }.reduce(
+                into: [String: String]()
+            ) { result, element in
+                result[element.key] = element.value
+            },
+            options: [.sortedKeys]
+        )
+        guard metadataData.count <= 2_048,
+              let metadataJSON = String(data: metadataData, encoding: .utf8) else {
+            throw ProjectContextError.databaseFailure(
+                "event metadata exceeds the bounded payload"
+            )
+        }
+        return metadataJSON
     }
 
     private static func decodeProject(_ row: ControlPlaneSQLiteRow) throws -> ProjectControlRecord {
@@ -4722,6 +5908,66 @@ public actor ProjectControlPlaneRepository {
             throw ProjectContextError.invalidIdentifier("canonical project root")
         }
         return value
+    }
+
+    private static func validatedTransitionOperationID(
+        _ value: String?,
+        required: Bool
+    ) throws -> String? {
+        guard let value else {
+            if required {
+                throw ProjectContextError.invalidIdentifier(
+                    "project transition operation identifier"
+                )
+            }
+            return nil
+        }
+        let range = value.startIndex..<value.endIndex
+        guard value.range(of: "^[0-9a-f]{64}$", options: .regularExpression)
+                == range else {
+            throw ProjectContextError.invalidIdentifier(
+                "project transition operation identifier"
+            )
+        }
+        return value
+    }
+
+    private static func projectTransitionMetadata(
+        operationID: String,
+        priorGeneration: ProjectGeneration,
+        newGeneration: ProjectGeneration,
+        root: URL,
+        repositoryFingerprint: String?,
+        directoryIdentity: ProjectDirectoryIdentity
+    ) -> [String: String] {
+        [
+            "operation_id": operationID,
+            "prior_generation": String(priorGeneration.rawValue),
+            "new_generation": String(newGeneration.rawValue),
+            "target_root_sha256": JSONSupport.sha256Hex(root.path),
+            "repository_identity_sha256": JSONSupport.sha256Hex(
+                repositoryFingerprint ?? ""
+            ),
+            "directory_device": String(directoryIdentity.device),
+            "directory_inode": String(directoryIdentity.inode),
+        ]
+    }
+
+    private static func validateDirectoryIdentity(
+        _ root: URL,
+        expected: ProjectDirectoryIdentity,
+        failure: ProjectContextError
+    ) throws {
+        var information = stat()
+        let matches = root.path.withCString { path in
+            Darwin.lstat(path, &information) == 0
+                && information.st_mode & S_IFMT == S_IFDIR
+                && UInt64(information.st_dev) == expected.device
+                && UInt64(information.st_ino) == expected.inode
+        }
+        guard matches else {
+            throw failure
+        }
     }
 
     private static func validate(_ owner: ProjectBindingOwner) throws {
@@ -5117,6 +6363,7 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
         beforeCommitObserver: (@Sendable () throws -> Void)? = nil,
         didCommitObserver: (@Sendable () -> Void)? = nil,
         checkCancellationBeforeCommit: Bool = true,
+        beforeCommitValidation: (() throws -> Void)? = nil,
         _ body: () throws -> T
     ) throws -> T {
         try withRequestControl(
@@ -5133,12 +6380,15 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
                 if checkCancellationBeforeCommit {
                     if let activeControl {
                         try activeControl.performCommit(committedResult: value) {
+                            try beforeCommitValidation?()
                             try executeStatic("COMMIT;")
                         }
                     } else {
+                        try beforeCommitValidation?()
                         try executeStatic("COMMIT;")
                     }
                 } else {
+                    try beforeCommitValidation?()
                     try executeStatic("COMMIT;")
                     activeControl?.recordCommit()
                 }
@@ -5356,6 +6606,47 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_control_projects_root
         ON control_projects(canonical_root) WHERE lifecycle_state != 'archived';
+
+    CREATE TABLE IF NOT EXISTS project_transition_authority (
+        sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id TEXT NOT NULL REFERENCES control_projects(project_id) ON DELETE CASCADE,
+        transition_kind TEXT NOT NULL CHECK (transition_kind IN ('registration','relink')),
+        operation_id TEXT NOT NULL CHECK (
+            length(operation_id)=64 AND operation_id NOT GLOB '*[^0-9a-f]*'
+        ),
+        prior_generation INTEGER NOT NULL CHECK (prior_generation >= 1),
+        new_generation INTEGER NOT NULL CHECK (new_generation >= prior_generation),
+        target_root_sha256 TEXT NOT NULL CHECK (
+            length(target_root_sha256)=64 AND target_root_sha256 NOT GLOB '*[^0-9a-f]*'
+        ),
+        repository_identity_sha256 TEXT NOT NULL CHECK (
+            length(repository_identity_sha256)=64
+                AND repository_identity_sha256 NOT GLOB '*[^0-9a-f]*'
+        ),
+        directory_device TEXT NOT NULL CHECK (
+            length(directory_device) BETWEEN 1 AND 20
+                AND directory_device NOT GLOB '*[^0-9]*'
+        ),
+        directory_inode TEXT NOT NULL CHECK (
+            length(directory_inode) BETWEEN 1 AND 20
+                AND directory_inode NOT GLOB '*[^0-9]*'
+        ),
+        state TEXT NOT NULL CHECK (state IN ('staged','published')),
+        authority_sha256 TEXT NOT NULL CHECK (
+            length(authority_sha256)=64 AND authority_sha256 NOT GLOB '*[^0-9a-f]*'
+        ),
+        created_at TEXT NOT NULL,
+        published_at TEXT,
+        UNIQUE(project_id,transition_kind,operation_id),
+        CHECK (
+            (state='staged' AND published_at IS NULL)
+                OR (state='published' AND published_at IS NOT NULL)
+        )
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_project_transition_authority_staged
+        ON project_transition_authority(project_id) WHERE state='staged';
+    CREATE INDEX IF NOT EXISTS idx_project_transition_authority_retention
+        ON project_transition_authority(project_id,state,sequence DESC);
 
     CREATE TABLE IF NOT EXISTS project_bindings (
         binding_id TEXT PRIMARY KEY,

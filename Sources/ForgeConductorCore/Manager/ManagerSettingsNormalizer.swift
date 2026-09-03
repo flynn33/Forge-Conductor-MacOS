@@ -55,7 +55,67 @@ public enum ManagerSettingsNormalizer {
         if let level = patch["log_level"] as? String {
             normalized["log_level"] = level
         }
+        if let roots = patch["allowed_roots"] as? [String] {
+            normalized["allowed_roots"] = canonicalAllowedRoots(roots)
+        }
         return normalized
+    }
+
+    /// Returns an existing, absolute directory path suitable for project-root authority.
+    /// Filesystem root is never a valid configured project root.
+    public static func canonicalAllowedRoot(_ path: String) -> String? {
+        let expanded = (path as NSString).expandingTildeInPath
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard expanded.hasPrefix("/") else { return nil }
+
+        let canonical = URL(fileURLWithPath: expanded, isDirectory: true)
+            .resolvingSymlinksInPath()
+            .standardizedFileURL
+        guard canonical.path != "/" else { return nil }
+
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(
+            atPath: canonical.path,
+            isDirectory: &isDirectory
+        ), isDirectory.boolValue else { return nil }
+        return canonical.path
+    }
+
+    /// Canonicalizes, de-duplicates, and sorts configured roots for stable persistence and UI.
+    public static func canonicalAllowedRoots(_ roots: [String]) -> [String] {
+        Array(Set(roots.compactMap(canonicalAllowedRoot))).sorted()
+    }
+
+    /// Returns the exact canonical project root only when it is equal to or
+    /// contained by a root explicitly authorized in Settings. A project root
+    /// narrows configured authority; registration metadata never expands it.
+    static func authorizedProjectRoot(
+        _ projectRoot: URL,
+        allowedRoots: [String]
+    ) -> URL? {
+        guard let canonicalProjectPath = canonicalAllowedRoot(projectRoot.path) else {
+            return nil
+        }
+        let canonicalProjectRoot = URL(
+            fileURLWithPath: canonicalProjectPath,
+            isDirectory: true
+        ).standardizedFileURL
+        let configuredRoots = canonicalAllowedRoots(allowedRoots).map {
+            URL(fileURLWithPath: $0, isDirectory: true).standardizedFileURL
+        }
+        guard configuredRoots.contains(where: {
+            contains(canonicalProjectRoot, root: $0)
+        }) else {
+            return nil
+        }
+        return canonicalProjectRoot
+    }
+
+    private static func contains(_ candidate: URL, root: URL) -> Bool {
+        let candidateComponents = candidate.standardizedFileURL.pathComponents
+        let rootComponents = root.standardizedFileURL.pathComponents
+        guard candidateComponents.count >= rootComponents.count else { return false }
+        return Array(candidateComponents.prefix(rootComponents.count)) == rootComponents
     }
 
     public static func intValue(_ any: Any?) -> Int? {

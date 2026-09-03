@@ -26,6 +26,7 @@ public enum LMStudioProviderError: Error, LocalizedError, Sendable, Equatable {
     case cancelled
     case malformedResponse(String)
     case limitExceeded(String)
+    case receiptStorage(String)
     case syntheticProviderIdentifier
 
     public var errorDescription: String? {
@@ -44,6 +45,7 @@ public enum LMStudioProviderError: Error, LocalizedError, Sendable, Equatable {
         case .cancelled: "LM Studio request was cancelled"
         case .malformedResponse(let detail): "LM Studio returned an invalid response: \(detail)"
         case .limitExceeded(let detail): "LM Studio response exceeded the \(detail) limit"
+        case .receiptStorage(let detail): "LM Studio receipt storage failed: \(detail)"
         case .syntheticProviderIdentifier: "LM Studio returned a synthetic provider identifier"
         }
     }
@@ -58,7 +60,7 @@ extension LMStudioProviderError: ManagedProviderFailure {
             .waitingProvider
         case .contextOverflow:
             .contextOverflow
-        case .responseTruncated:
+        case .responseTruncated, .receiptStorage:
             .failedRecoverable
         case .cancelled:
             .cancelled
@@ -83,6 +85,7 @@ extension LMStudioProviderError: ManagedProviderFailure {
         case .cancelled: "lmstudio_cancelled"
         case .malformedResponse: "lmstudio_malformed_response"
         case .limitExceeded: "lmstudio_limit_exceeded"
+        case .receiptStorage: "lmstudio_receipt_storage"
         case .syntheticProviderIdentifier: "lmstudio_synthetic_provider_identifier"
         }
     }
@@ -1513,7 +1516,11 @@ public actor LMStudioRESTClient {
         )
         guard contractTurn.previousResponseID == nil,
               contractTurn.status == "completed",
-              contractTurn.model == selected.key,
+              Self.responseModelMatches(
+                contractTurn.model,
+                modelKey: selected.key,
+                loadedInstanceID: instance.id
+              ),
               contractTurn.functionCalls.count == 1,
               let call = contractTurn.functionCalls.first,
               call.name == Self.capabilityProbeToolName,
@@ -1565,6 +1572,18 @@ public actor LMStudioRESTClient {
             ContinuousClock.now.advanced(by: .seconds(Self.capabilityCacheSeconds))
         )
         return capabilities
+    }
+
+    /// LM Studio accepts a catalog model key when creating a response, while the
+    /// terminal response can identify the exact loaded instance selected for that
+    /// request. Both names are bound by the immediately preceding inventory probe;
+    /// no third or caller-supplied alias is accepted.
+    private static func responseModelMatches(
+        _ responseModel: String,
+        modelKey: String,
+        loadedInstanceID: String
+    ) -> Bool {
+        responseModel == modelKey || responseModel == loadedInstanceID
     }
 
     private func providerVersion(from response: HTTPURLResponse) -> String {
@@ -1845,17 +1864,380 @@ public actor LMStudioManagedSessionTransport: LMStudioManagedTransporting {
     }
 }
 
+private enum LMStudioManagedProviderReceiptStatus: String, Codable {
+    case intent
+    case accepted
+}
+
+private struct LMStudioManagedProviderReceiptRecord: Codable {
+    var idempotencyKeySHA256: String
+    var requestFingerprintSHA256: String
+    var requestID: String
+    var capabilities: ProviderCapabilities
+    var status: LMStudioManagedProviderReceiptStatus
+    var turn: ProviderTurn?
+    var updatedAt: String
+
+    private enum CodingKeys: String, CodingKey {
+        case idempotencyKeySHA256 = "idempotency_key_sha256"
+        case requestFingerprintSHA256 = "request_fingerprint_sha256"
+        case requestID = "request_id"
+        case capabilities, status, turn
+        case updatedAt = "updated_at"
+    }
+}
+
+private struct LMStudioManagedProviderReceiptLedger: Codable {
+    var schemaVersion = 1
+    var records: [LMStudioManagedProviderReceiptRecord] = []
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion = "schema_version"
+        case records
+    }
+}
+
+/// A bounded, owner-only receipt store shared by every production provider
+/// instance. Accepted turns survive manager replacement. An unfinished intent
+/// is leased before it may be retried. Because LM Studio does not expose a
+/// request-ID receipt lookup, an expired-intent retry can cause at most one
+/// duplicate model inference for that retry attempt; repeated later retries can
+/// repeat that cost. Tool execution is reconciled independently by the manager,
+/// so this mitigation does not authorize duplicate tool side effects and must
+/// not be described as eliminating the provider-response crash race.
+private struct LMStudioManagedProviderReceiptStore: Sendable {
+    static let fileName = "managed-provider-receipts.json"
+    static let maximumRecords = 32
+    static let maximumLedgerBytes = 32 * 1_024 * 1_024
+    static let intentLeaseSeconds: TimeInterval = 660
+
+    let ledgerURL: URL
+
+    init(storageDirectory: URL) throws {
+        ledgerURL = storageDirectory.appendingPathComponent(Self.fileName, isDirectory: false)
+        try withLedgerLock {
+            _ = try loadLedger()
+        }
+    }
+
+    func record(
+        forIdempotencyKey key: String,
+        requestFingerprint: String? = nil
+    ) throws -> LMStudioManagedProviderReceiptRecord? {
+        let digest = JSONSupport.sha256Hex(key)
+        return try withLedgerLock {
+            let ledger = try loadLedger()
+            guard let record = ledger.records.first(where: {
+                $0.idempotencyKeySHA256 == digest
+            }) else { return nil }
+            if let requestFingerprint,
+               record.requestFingerprintSHA256 != requestFingerprint {
+                throw LMStudioProviderError.invalidConfiguration(
+                    "an idempotency key was reused for a different provider request"
+                )
+            }
+            return record
+        }
+    }
+
+    /// Claims a new or expired intent. `false` means another instance still
+    /// owns a live intent or committed an accepted turn while this caller was
+    /// probing provider capabilities.
+    func claim(
+        idempotencyKey: String,
+        requestFingerprint: String,
+        requestID: String,
+        capabilities: ProviderCapabilities,
+        now: Date = Date()
+    ) throws -> Bool {
+        let digest = JSONSupport.sha256Hex(idempotencyKey)
+        return try withLedgerLock {
+            var ledger = try loadLedger()
+            if let index = ledger.records.firstIndex(where: {
+                $0.idempotencyKeySHA256 == digest
+            }) {
+                let existing = ledger.records[index]
+                guard existing.requestFingerprintSHA256 == requestFingerprint else {
+                    throw LMStudioProviderError.invalidConfiguration(
+                        "an idempotency key was reused for a different provider request"
+                    )
+                }
+                guard existing.status == .intent,
+                      Self.intentLeaseExpired(existing, now: now) else {
+                    return false
+                }
+                ledger.records[index].requestID = requestID
+                ledger.records[index].capabilities = capabilities
+                ledger.records[index].updatedAt = ISO8601.string(from: now)
+                try persist(ledger, protecting: digest)
+                return true
+            }
+
+            while ledger.records.count >= Self.maximumRecords {
+                guard let removable = ledger.records.enumerated()
+                    .filter({ $0.element.status == .accepted })
+                    .min(by: { $0.element.updatedAt < $1.element.updatedAt })?.offset else {
+                    throw LMStudioProviderError.limitExceeded(
+                        "durable provider receipt record"
+                    )
+                }
+                ledger.records.remove(at: removable)
+            }
+            ledger.records.append(LMStudioManagedProviderReceiptRecord(
+                idempotencyKeySHA256: digest,
+                requestFingerprintSHA256: requestFingerprint,
+                requestID: requestID,
+                capabilities: capabilities,
+                status: .intent,
+                turn: nil,
+                updatedAt: ISO8601.string(from: now)
+            ))
+            try persist(ledger, protecting: digest)
+            return true
+        }
+    }
+
+    func accept(
+        idempotencyKey: String,
+        requestFingerprint: String,
+        turn: ProviderTurn,
+        capabilities: ProviderCapabilities,
+        now: Date = Date()
+    ) throws {
+        let digest = JSONSupport.sha256Hex(idempotencyKey)
+        try withLedgerLock {
+            var ledger = try loadLedger()
+            guard let index = ledger.records.firstIndex(where: {
+                $0.idempotencyKeySHA256 == digest
+            }) else {
+                throw LMStudioProviderError.receiptStorage(
+                    "the provider intent disappeared before its terminal receipt was stored"
+                )
+            }
+            guard ledger.records[index].requestFingerprintSHA256 == requestFingerprint else {
+                throw LMStudioProviderError.invalidConfiguration(
+                    "an idempotency key was reused for a different provider request"
+                )
+            }
+            ledger.records[index].requestID = turn.requestID
+            ledger.records[index].capabilities = capabilities
+            ledger.records[index].status = .accepted
+            ledger.records[index].turn = turn
+            ledger.records[index].updatedAt = ISO8601.string(from: now)
+            try persist(ledger, protecting: digest)
+        }
+    }
+
+    func removeRejectedIntent(
+        idempotencyKey: String,
+        requestFingerprint: String
+    ) {
+        let digest = JSONSupport.sha256Hex(idempotencyKey)
+        try? withLedgerLock {
+            var ledger = try loadLedger()
+            ledger.records.removeAll {
+                $0.idempotencyKeySHA256 == digest
+                    && $0.requestFingerprintSHA256 == requestFingerprint
+                    && $0.status == .intent
+            }
+            try persist(ledger, protecting: nil)
+        }
+    }
+
+    func intentLeaseExpired(
+        _ record: LMStudioManagedProviderReceiptRecord,
+        now: Date = Date()
+    ) -> Bool {
+        Self.intentLeaseExpired(record, now: now)
+    }
+
+    private static func intentLeaseExpired(
+        _ record: LMStudioManagedProviderReceiptRecord,
+        now: Date
+    ) -> Bool {
+        guard record.status == .intent,
+              let updated = ISO8601.date(from: record.updatedAt) else { return false }
+        return now.timeIntervalSince(updated) >= intentLeaseSeconds
+    }
+
+    private func withLedgerLock<Value>(_ body: () throws -> Value) throws -> Value {
+        do {
+            return try VerifiedMigrationBackup.withMigrationLock(
+                databaseURL: ledgerURL,
+                timeoutSeconds: 10,
+                body
+            )
+        } catch let error as LMStudioProviderError {
+            throw error
+        } catch {
+            throw LMStudioProviderError.receiptStorage(
+                String(error.localizedDescription.prefix(2_048))
+            )
+        }
+    }
+
+    private func loadLedger() throws -> LMStudioManagedProviderReceiptLedger {
+        guard FileManager.default.fileExists(atPath: ledgerURL.path) else {
+            return LMStudioManagedProviderReceiptLedger()
+        }
+        let data = try OwnerOnlyAtomicFile.read(
+            from: ledgerURL,
+            maximumBytes: Self.maximumLedgerBytes
+        )
+        let ledger = try JSONDecoder().decode(
+            LMStudioManagedProviderReceiptLedger.self,
+            from: data
+        )
+        try Self.validate(ledger, encodedBytes: data.count)
+        return ledger
+    }
+
+    private func persist(
+        _ input: LMStudioManagedProviderReceiptLedger,
+        protecting protectedDigest: String?
+    ) throws {
+        var ledger = input
+        var data = try Self.encoded(ledger)
+        while data.count > Self.maximumLedgerBytes {
+            guard let removable = ledger.records.enumerated()
+                .filter({ record in
+                    record.element.status == .accepted
+                        && record.element.idempotencyKeySHA256 != protectedDigest
+                })
+                .min(by: { $0.element.updatedAt < $1.element.updatedAt })?.offset else {
+                throw LMStudioProviderError.limitExceeded(
+                    "durable provider receipt file"
+                )
+            }
+            ledger.records.remove(at: removable)
+            data = try Self.encoded(ledger)
+        }
+        try Self.validate(ledger, encodedBytes: data.count)
+        try OwnerOnlyAtomicFile.write(data, to: ledgerURL)
+    }
+
+    private static func encoded(_ ledger: LMStudioManagedProviderReceiptLedger) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        return try encoder.encode(ledger)
+    }
+
+    private static func validate(
+        _ ledger: LMStudioManagedProviderReceiptLedger,
+        encodedBytes: Int
+    ) throws {
+        guard ledger.schemaVersion == 1,
+              ledger.records.count <= maximumRecords,
+              encodedBytes <= maximumLedgerBytes else {
+            throw LMStudioProviderError.receiptStorage(
+                "the durable provider receipt ledger is unsupported or oversized"
+            )
+        }
+        var digests = Set<String>()
+        for record in ledger.records {
+            guard Self.isSHA256(record.idempotencyKeySHA256),
+                  Self.isSHA256(record.requestFingerprintSHA256),
+                  digests.insert(record.idempotencyKeySHA256).inserted,
+                  !record.requestID.isEmpty,
+                  record.requestID.utf8.count
+                    <= ManagedModelProviderContract.maximumIdentifierBytes,
+                  ISO8601.date(from: record.updatedAt) != nil else {
+                throw LMStudioProviderError.receiptStorage(
+                    "the durable provider receipt ledger has invalid record identity"
+                )
+            }
+            let capabilities = try Self.validated(record.capabilities)
+            guard capabilities.providerID == "lmstudio" else {
+                throw LMStudioProviderError.receiptStorage(
+                    "the durable provider receipt has an invalid provider identity"
+                )
+            }
+            switch (record.status, record.turn) {
+            case (.intent, nil):
+                break
+            case (.accepted, .some(let turn)):
+                let validatedTurn = try Self.validated(turn)
+                guard validatedTurn.requestID == record.requestID,
+                      validatedTurn.providerID == "lmstudio" else {
+                    throw LMStudioProviderError.receiptStorage(
+                        "the durable provider receipt does not match its request"
+                    )
+                }
+            default:
+                throw LMStudioProviderError.receiptStorage(
+                    "the durable provider receipt has an invalid state"
+                )
+            }
+        }
+    }
+
+    private static func validated(_ capabilities: ProviderCapabilities) throws
+        -> ProviderCapabilities {
+        try ProviderCapabilities(
+            providerID: capabilities.providerID,
+            providerVersion: capabilities.providerVersion,
+            modelKey: capabilities.modelKey,
+            providerInstanceID: capabilities.providerInstanceID,
+            contextLength: capabilities.contextLength,
+            maximumContextLength: capabilities.maximumContextLength,
+            statefulResponses: capabilities.statefulResponses,
+            streaming: capabilities.streaming,
+            customTools: capabilities.customTools,
+            mcp: capabilities.mcp,
+            structuredOutput: capabilities.structuredOutput,
+            usageReporting: capabilities.usageReporting,
+            idempotencyLookup: capabilities.idempotencyLookup,
+            capabilityFingerprintSHA256: capabilities.capabilityFingerprintSHA256
+        )
+    }
+
+    private static func validated(_ turn: ProviderTurn) throws -> ProviderTurn {
+        try ProviderTurn(
+            requestID: turn.requestID,
+            responseID: turn.responseID,
+            previousResponseID: turn.previousResponseID,
+            providerID: turn.providerID,
+            providerVersion: turn.providerVersion,
+            modelKey: turn.modelKey,
+            providerInstanceID: turn.providerInstanceID,
+            messages: turn.messages,
+            toolCalls: turn.toolCalls,
+            structuredOutputJSON: turn.structuredOutputJSON,
+            usage: turn.usage,
+            completed: turn.completed,
+            finishReason: turn.finishReason,
+            rawArtifactID: turn.rawArtifactID
+        )
+    }
+
+    private static func isSHA256(_ value: String) -> Bool {
+        value.count == 64 && value.allSatisfy(\.isHexDigit)
+    }
+}
+
 public actor LMStudioManagedModelProvider: ManagedModelProvider {
     public static let maximumRememberedRequestIDs = 32
     public nonisolated let providerID = "lmstudio"
 
     public nonisolated let transport: any LMStudioManagedTransporting
+    private let receiptStore: LMStudioManagedProviderReceiptStore?
     private var latestCapabilities: ProviderCapabilities?
     private var requestIDsByIdempotencyKey: [String: String] = [:]
     private var requestIDOrder: [String] = []
 
     public init(transport: any LMStudioManagedTransporting) {
         self.transport = transport
+        receiptStore = nil
+    }
+
+    public init(
+        storageDirectory: URL,
+        transport: any LMStudioManagedTransporting
+    ) throws {
+        self.transport = transport
+        receiptStore = try LMStudioManagedProviderReceiptStore(
+            storageDirectory: storageDirectory
+        )
     }
 
     public func probe() async throws -> ProviderCapabilities {
@@ -1888,61 +2270,187 @@ public actor LMStudioManagedModelProvider: ManagedModelProvider {
                 "LM Studio structured response format is not enabled by this adapter"
             )
         }
+        let requestID = request.operationID.uuidString.lowercased()
+        let fingerprint = try Self.requestFingerprint(
+            kind: "root",
+            operationID: request.operationID,
+            modelKey: request.modelKey,
+            previousResponseID: nil,
+            input: Data(request.input.utf8),
+            tools: request.tools
+        )
+        if let recovered = try await durableReceipt(
+            idempotencyKey: request.idempotencyKey,
+            requestFingerprint: fingerprint
+        ) {
+            return recovered
+        }
         let capabilities = try await probe()
         guard request.modelKey == capabilities.modelKey else {
             throw ManagedModelProviderContractError.invalidValue(
                 "request model does not match the probed model"
             )
         }
-        let requestID = request.operationID.uuidString.lowercased()
-        remember(requestID: requestID, forIdempotencyKey: request.idempotencyKey)
-        let turn = try await transport.createRoot(LMStudioRootRequest(
-            operationID: requestID,
-            providerRequestID: requestID,
-            modelKey: request.modelKey,
-            systemPrompt: "",
-            userInput: request.input,
-            tools: try request.tools.map(Self.functionTool),
-            idempotencyKey: request.idempotencyKey
-        ))
-        guard turn.previousResponseID == nil else {
-            throw ManagedModelProviderContractError.invalidValue(
-                "root response unexpectedly references a predecessor"
+        let tools = try request.tools.map(Self.functionTool)
+        if let receiptStore {
+            let claimed = try receiptStore.claim(
+                idempotencyKey: request.idempotencyKey,
+                requestFingerprint: fingerprint,
+                requestID: requestID,
+                capabilities: capabilities
             )
+            if !claimed {
+                if let recovered = try await durableReceipt(
+                    idempotencyKey: request.idempotencyKey,
+                    requestFingerprint: fingerprint
+                ) {
+                    return recovered
+                }
+                throw LMStudioProviderError.conflict
+            }
         }
-        return try normalize(turn, requestID: requestID, capabilities: capabilities)
+        remember(requestID: requestID, forIdempotencyKey: request.idempotencyKey)
+        do {
+            let turn = try await transport.createRoot(LMStudioRootRequest(
+                operationID: requestID,
+                providerRequestID: requestID,
+                modelKey: request.modelKey,
+                systemPrompt: "",
+                userInput: request.input,
+                tools: tools,
+                idempotencyKey: request.idempotencyKey
+            ))
+            guard turn.previousResponseID == nil else {
+                throw ManagedModelProviderContractError.invalidValue(
+                    "root response unexpectedly references a predecessor"
+                )
+            }
+            let normalized = try normalize(
+                turn,
+                requestID: requestID,
+                capabilities: capabilities
+            )
+            try receiptStore?.accept(
+                idempotencyKey: request.idempotencyKey,
+                requestFingerprint: fingerprint,
+                turn: normalized,
+                capabilities: capabilities
+            )
+            return normalized
+        } catch {
+            clearRejectedIntentIfDefinitive(
+                error,
+                idempotencyKey: request.idempotencyKey,
+                requestFingerprint: fingerprint
+            )
+            throw error
+        }
     }
 
     public func continueSession(
         _ request: ProviderContinuationRequest
     ) async throws -> ProviderTurn {
         let request = try request.validated()
+        let requestID = request.operationID.uuidString.lowercased()
+        let fingerprint = try Self.requestFingerprint(
+            kind: "continuation",
+            operationID: request.operationID,
+            modelKey: request.modelKey,
+            previousResponseID: request.previousResponseID,
+            input: request.input,
+            tools: request.tools
+        )
+        if let recovered = try await durableReceipt(
+            idempotencyKey: request.idempotencyKey,
+            requestFingerprint: fingerprint
+        ) {
+            return recovered
+        }
         let capabilities = try await probe()
         guard request.modelKey == capabilities.modelKey else {
             throw ManagedModelProviderContractError.invalidValue(
                 "request model does not match the probed model"
             )
         }
-        let requestID = request.operationID.uuidString.lowercased()
-        remember(requestID: requestID, forIdempotencyKey: request.idempotencyKey)
-        let turn = try await transport.continueSession(LMStudioContinuationRequest(
-            operationID: requestID,
-            modelKey: request.modelKey,
-            previousResponseID: request.previousResponseID,
-            input: try Self.continuationInput(request.input),
-            tools: try request.tools.map(Self.functionTool),
-            idempotencyKey: request.idempotencyKey
-        ))
-        guard turn.previousResponseID == request.previousResponseID else {
-            throw ManagedModelProviderContractError.invalidValue(
-                "continuation response does not reference the requested predecessor"
+        let input = try Self.continuationInput(request.input)
+        let tools = try request.tools.map(Self.functionTool)
+        if let receiptStore {
+            let claimed = try receiptStore.claim(
+                idempotencyKey: request.idempotencyKey,
+                requestFingerprint: fingerprint,
+                requestID: requestID,
+                capabilities: capabilities
             )
+            if !claimed {
+                if let recovered = try await durableReceipt(
+                    idempotencyKey: request.idempotencyKey,
+                    requestFingerprint: fingerprint
+                ) {
+                    return recovered
+                }
+                throw LMStudioProviderError.conflict
+            }
         }
-        return try normalize(turn, requestID: requestID, capabilities: capabilities)
+        remember(requestID: requestID, forIdempotencyKey: request.idempotencyKey)
+        do {
+            let turn = try await transport.continueSession(LMStudioContinuationRequest(
+                operationID: requestID,
+                modelKey: request.modelKey,
+                previousResponseID: request.previousResponseID,
+                input: input,
+                tools: tools,
+                idempotencyKey: request.idempotencyKey
+            ))
+            guard turn.previousResponseID == request.previousResponseID else {
+                throw ManagedModelProviderContractError.invalidValue(
+                    "continuation response does not reference the requested predecessor"
+                )
+            }
+            let normalized = try normalize(
+                turn,
+                requestID: requestID,
+                capabilities: capabilities
+            )
+            try receiptStore?.accept(
+                idempotencyKey: request.idempotencyKey,
+                requestFingerprint: fingerprint,
+                turn: normalized,
+                capabilities: capabilities
+            )
+            return normalized
+        } catch {
+            clearRejectedIntentIfDefinitive(
+                error,
+                idempotencyKey: request.idempotencyKey,
+                requestFingerprint: fingerprint
+            )
+            throw error
+        }
     }
 
     public func lookup(idempotencyKey: String) async throws -> ProviderTurn? {
         try ManagedModelProviderContract.validateIdempotencyKey(idempotencyKey)
+        if let record = try receiptStore?.record(forIdempotencyKey: idempotencyKey) {
+            latestCapabilities = record.capabilities
+            if let turn = record.turn { return turn }
+            if let transportTurn = await transport.receipt(
+                forIdempotencyKey: idempotencyKey
+            ) {
+                let normalized = try normalize(
+                    transportTurn,
+                    requestID: record.requestID,
+                    capabilities: record.capabilities
+                )
+                try receiptStore?.accept(
+                    idempotencyKey: idempotencyKey,
+                    requestFingerprint: record.requestFingerprintSHA256,
+                    turn: normalized,
+                    capabilities: record.capabilities
+                )
+                return normalized
+            }
+            return nil
+        }
         guard let turn = await transport.receipt(forIdempotencyKey: idempotencyKey) else {
             return nil
         }
@@ -1965,6 +2473,75 @@ public actor LMStudioManagedModelProvider: ManagedModelProvider {
         await transport.cancel(operationID: requestID)
     }
 
+    private func durableReceipt(
+        idempotencyKey: String,
+        requestFingerprint: String
+    ) async throws -> ProviderTurn? {
+        guard let receiptStore,
+              let record = try receiptStore.record(
+                forIdempotencyKey: idempotencyKey,
+                requestFingerprint: requestFingerprint
+              ) else { return nil }
+        latestCapabilities = record.capabilities
+        if let turn = record.turn { return turn }
+        if let transportTurn = await transport.receipt(
+            forIdempotencyKey: idempotencyKey
+        ) {
+            let normalized = try normalize(
+                transportTurn,
+                requestID: record.requestID,
+                capabilities: record.capabilities
+            )
+            try receiptStore.accept(
+                idempotencyKey: idempotencyKey,
+                requestFingerprint: requestFingerprint,
+                turn: normalized,
+                capabilities: record.capabilities
+            )
+            return normalized
+        }
+        guard receiptStore.intentLeaseExpired(record) else {
+            throw LMStudioProviderError.conflict
+        }
+        return nil
+    }
+
+    private func clearRejectedIntentIfDefinitive(
+        _ error: Error,
+        idempotencyKey: String,
+        requestFingerprint: String
+    ) {
+        guard let providerError = error as? LMStudioProviderError else { return }
+        switch providerError {
+        case .invalidConfiguration, .unauthorized, .forbidden, .endpointNotFound:
+            receiptStore?.removeRejectedIntent(
+                idempotencyKey: idempotencyKey,
+                requestFingerprint: requestFingerprint
+            )
+        default:
+            break
+        }
+    }
+
+    private static func requestFingerprint(
+        kind: String,
+        operationID: UUID,
+        modelKey: String,
+        previousResponseID: String?,
+        input: Data,
+        tools: [Data]
+    ) throws -> String {
+        let object: [String: Any] = [
+            "kind": kind,
+            "operation_id": operationID.uuidString.lowercased(),
+            "model_key": modelKey,
+            "previous_response_id": previousResponseID.map { $0 as Any } ?? NSNull(),
+            "input_sha256": JSONSupport.sha256Hex(input),
+            "tool_sha256": tools.map(JSONSupport.sha256Hex),
+        ].compactNSNull()
+        return JSONSupport.sha256Hex(try JSONSupport.data(from: object))
+    }
+
     private func remember(requestID: String, forIdempotencyKey key: String) {
         if requestIDsByIdempotencyKey[key] == nil { requestIDOrder.append(key) }
         requestIDsByIdempotencyKey[key] = requestID
@@ -1981,7 +2558,8 @@ public actor LMStudioManagedModelProvider: ManagedModelProvider {
         guard turn.status == "completed" else {
             throw ManagedModelProviderContractError.incompleteTerminalResponse
         }
-        guard turn.model == capabilities.modelKey else {
+        guard turn.model == capabilities.modelKey
+                || turn.model == capabilities.providerInstanceID else {
             throw ManagedModelProviderContractError.invalidValue(
                 "response model does not match the probed model"
             )
@@ -2023,7 +2601,7 @@ public actor LMStudioManagedModelProvider: ManagedModelProvider {
             previousResponseID: turn.previousResponseID,
             providerID: providerID,
             providerVersion: capabilities.providerVersion,
-            modelKey: turn.model,
+            modelKey: capabilities.modelKey,
             providerInstanceID: capabilities.providerInstanceID,
             messages: turn.assistantText.isEmpty ? [] : [turn.assistantText],
             toolCalls: calls,
@@ -2754,7 +3332,7 @@ public actor LMStudioManagedSessionHostAdapterV2: SessionHostAdapterV2 {
             return try receipt.materialized()
         }
         ledger.records[current].providerResponseID = turn.responseID
-        ledger.records[current].modelKey = turn.model
+        ledger.records[current].modelKey = request.modelKey
         ledger.records[current].status = .providerCreated
         ledger.records[current].updatedAt = ISO8601.string(from: Date())
         try persist()
@@ -2765,7 +3343,9 @@ public actor LMStudioManagedSessionHostAdapterV2: SessionHostAdapterV2 {
                     "provider response is not a fresh root"
                 )
             }
-            guard turn.status == "completed", turn.model == request.modelKey else {
+            guard turn.status == "completed",
+                  turn.model == request.modelKey
+                    || turn.model == provider.loadedInstanceID else {
                 throw SessionHostAdapterV2Error.acknowledgementMismatch(
                     "provider completion or model does not match"
                 )
@@ -2787,7 +3367,7 @@ public actor LMStudioManagedSessionHostAdapterV2: SessionHostAdapterV2 {
             let receipt = ManagedBootstrapReceiptV2(
                 acknowledgement: acknowledgement,
                 internalSessionID: ledger.records[current].internalSessionID,
-                providerResponseID: turn.responseID, modelKey: turn.model,
+                providerResponseID: turn.responseID, modelKey: request.modelKey,
                 adapterID: identifier,
                 providerUsage: turn.usageWasReported ? turn.usage : nil,
                 contextLength: turn.usageWasReported ? provider.contextLength : nil,
@@ -3291,6 +3871,7 @@ public actor LMStudioManagedSessionHostAdapterV2: SessionHostAdapterV2 {
             case .cancelled: "cancelled"
             case .malformedResponse: "malformed_response"
             case .limitExceeded: "limit_exceeded"
+            case .receiptStorage: "receipt_storage"
             case .syntheticProviderIdentifier: "synthetic_provider_identifier"
             }
         } else if let adapter = error as? SessionHostAdapterV2Error {
@@ -4084,7 +4665,8 @@ public enum ForgeNativeSessionHostPlugin {
         registry.register(
             manifest: manifest,
             managedProviderFactory: { storageDirectory in
-                LMStudioManagedModelProvider(
+                try LMStudioManagedModelProvider(
+                    storageDirectory: storageDirectory,
                     transport: try transportFactory(storageDirectory)
                 )
             }

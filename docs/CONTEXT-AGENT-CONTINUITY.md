@@ -4,7 +4,11 @@
 
 Operator walkthrough: [USER-GUIDE.md](../USER-GUIDE.md).
 
-Forge Conductor owns **context handoff** and **agent session continuity** for LM Studio chats. Both ship over the existing **stdio MCP** server (`serve`). Deploy remains **Deploy to LM Studio** (primary + fallback mcpBridge). No HTTP dependency for agent resume.
+Forge Conductor preserves **context handoff** and **agent session continuity**
+for externally owned LM Studio chats over the existing **stdio MCP** server
+(`serve`). Managed Autonomy is a separate manager-owned provider path: the
+persistent manager owns provider turns, context accounting, fresh-root
+rollover, and automatic continuation while the GUI is closed.
 
 ## Product constraints
 
@@ -49,11 +53,44 @@ them from SQLite after an interrupted or older-version write.
 
 1. **Model** — calls checkpoint/handoff tools
 2. **Budget** — ToolRouter tracks canonical consecutive tool fingerprints. The fourth identical call writes a soft handoff signal; the ninth is blocked with `identical_call_loop`. Continuity calls do not count toward the loop.
-3. **Runtime (0.9.0)** — `ContinuityAutomation` counts progress tools (`fs_*`, enabled `shell_exec`, git, memory_set, agent_run_*). Every 5 progress tools (or 3 minutes) Forge writes a checkpoint. Every 20 progress tools (or 12 minutes) it writes a resume-ready handoff, writes `memory/NEXT-CHAT.md`, and **blocks** further filesystem/shell/git tools on that MCP client until `context_get`. LM Studio has no API to open a GUI chat; the hard block is the enforcement. `lms chat` is a separate CLI session, not the GUI.
+3. **External MCP compatibility** — `ContinuityAutomation` retains the legacy
+   progress-tool/time fallback for a chat Forge does not own. It can persist a
+   resume-ready handoff and fence that external client, but cannot claim an
+   automatic successor.
+4. **Managed provider** — the persistent manager records provider-reported
+   capacity and usage, calculates explicit reserves, and triggers a fresh-root
+   rollover without waiting for a model continuity-tool call. After exact
+   acknowledgment it fences the predecessor and issues the successor's
+   continuation automatically.
 
-## Phase 2
+## Manager-owned provider path
 
-Runtime continuity is implemented in-process. Opening a new LM Studio chat is still a host action; Forge returns `resume_seed` when a handoff is required.
+The established external MCP handoff path remains available: Forge returns a
+`resume_seed`, and an operator can start a new LM Studio GUI chat and call
+`context_get`. The current source also implements manager-owned provider
+session creation through the native session-host adapter, persisted successor
+and fencing state, automatic-continuation records, and provider receipt
+recovery. Those implemented surfaces are not, by themselves, proof of a
+qualified autonomous rollover.
+
+Accepted provider receipts survive manager restart. When a provider response is
+unresolved after a crash, the request is fenced for **660 seconds** before a
+retry may proceed. LM Studio exposes no request-ID receipt lookup, so each retry
+attempt can create at most one duplicate model inference and repeated operator
+or recovery retries can repeat inference. Manager tool-effect reconciliation
+prevents the same reconciled tool effect from executing twice. This is
+mitigation, not elimination of the provider-response race.
+
+Release qualification still requires one threshold-forced manager-owned run
+against the real provider that proves exact successor acknowledgment,
+predecessor fencing and idempotent sealing, automatic continuation, GUI-closed
+operation, and recovery from every durable crash state. Unit and synthetic-host
+tests do not satisfy that boundary.
+
+The adapter currently requires a validated managed-provider configuration file.
+This snapshot does not yet provide a supported clean-install app, CLI, or
+manager control that creates it; test-only file provisioning is not a product
+configuration workflow.
 
 ## Bootstrap (new chat)
 

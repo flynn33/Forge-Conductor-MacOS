@@ -24,6 +24,7 @@ final class CoreTests: XCTestCase {
         clientID: ClientID,
         projectRoot: URL? = nil
     ) throws -> ToolResult {
+        try trustProjectRoot(projectRoot ?? tempHome, app: app)
         let result = try app.tools.call(
             name: "project_memory.initialize",
             arguments: ["project_path": (projectRoot ?? tempHome).path],
@@ -41,6 +42,7 @@ final class CoreTests: XCTestCase {
         goal: String,
         projectRoot: URL? = nil
     ) throws -> ToolResult {
+        try trustProjectRoot(projectRoot ?? tempHome, app: app)
         let result = try app.tools.call(
             name: "agent_run_start",
             arguments: [
@@ -52,6 +54,13 @@ final class CoreTests: XCTestCase {
         )
         XCTAssertTrue(result.ok, "\(result.payload)")
         return result
+    }
+
+    private func trustProjectRoot(_ projectRoot: URL, app: ForgeApp) throws {
+        var roots = app.config.model.allowedRoots
+        let path = projectRoot.resolvingSymlinksInPath().standardizedFileURL.path
+        if !roots.contains(path) { roots.append(path) }
+        _ = try app.config.update(["allowed_roots": roots], save: false)
     }
 
     // MARK: - Bootstrap / paths
@@ -395,6 +404,53 @@ final class CoreTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: outside.path))
     }
 
+    func testUnboundFilesystemAndSearchToolsCannotReadForgeControlState() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let providerState = app.paths.managedProvidersDir.appendingPathComponent("provider-state.json")
+        try Data("provider-secret-sentinel".utf8).write(to: providerState, options: .atomic)
+        try Data("manager-secret-sentinel".utf8).write(
+            to: app.paths.managerControlCredential,
+            options: .atomic
+        )
+        let sensitivePaths = [
+            app.paths.configJSON,
+            app.paths.managerControlCredential,
+            app.paths.controlPlaneSQLite,
+            providerState,
+        ]
+        let clientID = ClientID("unbound-control-state")
+
+        for sensitivePath in sensitivePaths {
+            for (tool, arguments) in [
+                ("fs_read", ["path": sensitivePath.path]),
+                ("fs_list", ["path": sensitivePath.path]),
+                ("fs_glob", ["path": sensitivePath.path, "pattern": "*"]),
+                ("search_text", ["path": sensitivePath.path, "pattern": "sentinel"]),
+            ] {
+                let result = try app.tools.call(
+                    name: tool,
+                    arguments: arguments,
+                    clientID: clientID
+                )
+                XCTAssertFalse(result.ok, "\(tool) unexpectedly accessed \(sensitivePath.path)")
+                XCTAssertEqual(result.payload["code"] as? String, "path_outside_allowed_roots")
+                XCTAssertFalse("\(result.payload)".contains("provider-secret-sentinel"))
+                XCTAssertFalse("\(result.payload)".contains("manager-secret-sentinel"))
+            }
+        }
+
+        for (tool, arguments) in [
+            ("fs_list", [String: Any]()),
+            ("fs_glob", ["pattern": "*"] as [String: Any]),
+            ("search_text", ["pattern": "sentinel"] as [String: Any]),
+        ] {
+            let result = try app.tools.call(name: tool, arguments: arguments, clientID: clientID)
+            XCTAssertFalse(result.ok, "\(tool) defaulted to the Forge control directory")
+            XCTAssertEqual(result.payload["code"] as? String, "path_outside_allowed_roots")
+        }
+    }
+
     func testConfiguredWorkspaceRootAllowsFilesystemTool() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
@@ -497,6 +553,111 @@ final class CoreTests: XCTestCase {
         XCTAssertFalse(result.ok)
         XCTAssertEqual(result.payload["code"] as? String, "path_outside_allowed_roots")
         XCTAssertNil(app.sessions.binding(for: ClientID("untrusted-session-root")))
+    }
+
+    func testProjectMemoryInitializeRejectsFilesystemRootEvenWhenConfigured() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        _ = try app.config.update(["allowed_roots": ["/"]], save: false)
+
+        let result = try app.tools.call(
+            name: "project_memory.initialize",
+            arguments: ["project_path": "/"],
+            clientID: ClientID("bootstrap-filesystem-root")
+        )
+
+        XCTAssertFalse(result.ok)
+        XCTAssertEqual(result.payload["code"] as? String, "project_bootstrap_root_forbidden")
+
+        let child = try app.tools.call(
+            name: "project_memory.initialize",
+            arguments: ["project_path": tempHome.deletingLastPathComponent().path],
+            clientID: ClientID("bootstrap-filesystem-root-child")
+        )
+        XCTAssertFalse(child.ok)
+        XCTAssertEqual(child.payload["code"] as? String, "path_outside_allowed_roots")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: app.paths.projectRegistry.path))
+    }
+
+    func testProjectMemoryInitializeRejectsImplicitApplicationHomeAndChildren() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let child = tempHome.appendingPathComponent("untrusted-bootstrap", isDirectory: true)
+        try FileManager.default.createDirectory(at: child, withIntermediateDirectories: true)
+
+        for (index, candidate) in [tempHome!, child].enumerated() {
+            let result = try app.tools.call(
+                name: "project_memory.initialize",
+                arguments: ["project_path": candidate.path],
+                clientID: ClientID("implicit-app-home-\(index)")
+            )
+            XCTAssertFalse(result.ok)
+            XCTAssertEqual(result.payload["code"] as? String, "path_outside_allowed_roots")
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: app.paths.projectRegistry.path))
+    }
+
+    func testProjectMemoryInitializeRejectsOutsideConfiguredBootstrapRootAndLegacyAlias() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let trusted = tempHome.deletingLastPathComponent()
+            .appendingPathComponent("forge-bootstrap-trusted-\(UUID().uuidString)", isDirectory: true)
+        let outside = tempHome.deletingLastPathComponent()
+            .appendingPathComponent("forge-bootstrap-outside-\(UUID().uuidString)", isDirectory: true)
+        defer {
+            try? FileManager.default.removeItem(at: trusted)
+            try? FileManager.default.removeItem(at: outside)
+        }
+        try FileManager.default.createDirectory(at: trusted, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        let escape = trusted.appendingPathComponent("escape", isDirectory: true)
+        try FileManager.default.createSymbolicLink(at: escape, withDestinationURL: outside)
+        _ = try app.config.update(["allowed_roots": [trusted.path]], save: false)
+
+        for (index, arguments) in [
+            ["project_path": outside.path],
+            ["path": outside.path],
+            ["project_path": escape.path],
+        ].enumerated() {
+            let result = try app.tools.call(
+                name: "project_memory.initialize",
+                arguments: arguments,
+                clientID: ClientID("bootstrap-outside-\(index)")
+            )
+            XCTAssertFalse(result.ok)
+            XCTAssertEqual(result.payload["code"] as? String, "path_outside_allowed_roots")
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: app.paths.projectRegistry.path))
+    }
+
+    func testProjectMemoryInitializeAllowsProjectInsideConfiguredBootstrapRoot() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let trusted = tempHome.deletingLastPathComponent()
+            .appendingPathComponent("forge-bootstrap-allowed-\(UUID().uuidString)", isDirectory: true)
+        let project = trusted.appendingPathComponent("project", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: trusted) }
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        _ = try app.config.update(["allowed_roots": [trusted.path]], save: false)
+        let clientID = ClientID("bootstrap-allowed")
+
+        let result = try app.tools.call(
+            name: "project_memory.initialize",
+            arguments: ["project_path": project.path],
+            clientID: clientID
+        )
+
+        XCTAssertTrue(result.ok, "\(result.payload)")
+        XCTAssertEqual(result.payload["project_context_attached"] as? Bool, true)
+        let context = try app.projectContexts.invocationContext(for: clientID)
+        XCTAssertEqual(
+            context.authorizationScope.canonicalRoots,
+            [project.resolvingSymlinksInPath().standardizedFileURL]
+        )
+        XCTAssertEqual(
+            context.authorizationScope.writableRoots,
+            [project.resolvingSymlinksInPath().standardizedFileURL]
+        )
     }
 
     func testShellExecutesByDefaultInsideAuthorizedProjectWorkspace() throws {

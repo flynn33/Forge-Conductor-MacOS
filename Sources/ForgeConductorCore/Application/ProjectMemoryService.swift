@@ -32,6 +32,46 @@ private struct ProjectIdentityUpdateIntent: Codable {
     var metadataDirectoryExisted: Bool
 }
 
+/// A registration intent retains the exact native manager request before the
+/// first control row exists and while that row is fenced in maintenance. It is
+/// non-authoritative and bounded to one file for the deterministic identifier.
+private struct ProjectRegistrationIdentityIntent: Codable, Equatable {
+    static let schemaVersion = 1
+
+    var schemaVersion: Int
+    var operationID: String
+    var projectID: String
+    var requestedPath: String
+    var requestedDisplayName: String?
+    var repositoryIdentityAssertion: String?
+    var resolvedDisplayName: String
+    var canonicalRoot: String
+    var repositoryIdentity: String?
+    var directoryDevice: UInt64
+    var directoryInode: UInt64
+    var expectedControlGeneration: UInt64?
+    var expectedControlLifecycleState: String?
+    var expectedControlRepositoryIdentity: String?
+    var createdAt: String
+}
+
+/// A relink intent is deliberately not part of the published project identity.
+/// It bridges the project-memory and control-plane commits without granting the
+/// candidate path alias authority before the generation compare-and-set wins.
+private struct ProjectRelinkIdentityIntent: Codable, Equatable {
+    static let schemaVersion = 2
+
+    var schemaVersion: Int
+    var operationID: String
+    var projectID: String
+    var expectedGeneration: UInt64
+    var canonicalRoot: String
+    var repositoryIdentity: String
+    var directoryDevice: UInt64
+    var directoryInode: UInt64
+    var createdAt: String
+}
+
 enum ProjectIdentityPersistenceInterruption: Error {
     case afterMetadataWrite
 }
@@ -89,9 +129,16 @@ private enum ProjectMemoryFileReader {
     }
 }
 
-public final class ProjectIdentityResolver: @unchecked Sendable {
+final class ProjectIdentityResolver: @unchecked Sendable {
     private static let maximumRegistryBytes = 4 * 1_024 * 1_024
     private static let maximumGitConfigBytes = 1 * 1_024 * 1_024
+    private static let maximumGitPointerBytes = 16 * 1_024
+    private static let maximumGitControlPathBytes = 4_096
+    private static let maximumRegistrationIntentBytes = 32 * 1_024
+    private static let maximumRegistrationIntentDirectoryScanCount = 4_096
+    private static let maximumRegistrationIntentProjectionCount = 100
+    private static let maximumRelinkIntentBytes = 32 * 1_024
+    private static let maximumRelinkPathBytes = 4_096
     private struct MetadataSnapshot {
         let directory: URL
         let metadataURL: URL
@@ -105,17 +152,19 @@ public final class ProjectIdentityResolver: @unchecked Sendable {
     private let clock: any Clock
     private let afterMetadataWriteObserver: (@Sendable () throws -> Void)?
     private let didRegistryCommitObserver: (@Sendable () -> Void)?
+    private let beforeRelinkIntentRemovalObserver: (@Sendable () throws -> Void)?
 
     private var updateIntentURL: URL {
         paths.projectsDir.appendingPathComponent(".identity-update.json")
     }
 
-    public convenience init(paths: AppPaths, clock: any Clock = SystemClock()) {
+    convenience init(paths: AppPaths, clock: any Clock = SystemClock()) {
         self.init(
             paths: paths,
             clock: clock,
             afterMetadataWriteObserver: nil,
-            didRegistryCommitObserver: nil
+            didRegistryCommitObserver: nil,
+            beforeRelinkIntentRemovalObserver: nil
         )
     }
 
@@ -123,88 +172,39 @@ public final class ProjectIdentityResolver: @unchecked Sendable {
         paths: AppPaths,
         clock: any Clock,
         afterMetadataWriteObserver: (@Sendable () throws -> Void)?,
-        didRegistryCommitObserver: (@Sendable () -> Void)?
+        didRegistryCommitObserver: (@Sendable () -> Void)?,
+        beforeRelinkIntentRemovalObserver: (@Sendable () throws -> Void)? = nil
     ) {
         self.paths = paths
         self.clock = clock
         self.afterMetadataWriteObserver = afterMetadataWriteObserver
         self.didRegistryCommitObserver = didRegistryCommitObserver
+        self.beforeRelinkIntentRemovalObserver = beforeRelinkIntentRemovalObserver
     }
 
-    public func initialize(
+    func initialize(
         path rawPath: String,
         projectID requestedID: String?,
         displayName: String?,
         repositoryIdentity suppliedRepositoryIdentity: String?,
         cancellation: ToolCallCancellation? = nil
     ) throws -> ProjectMemoryDescriptor {
-        try cancellation?.checkCancellation()
-        let canonical = try canonicalDirectory(rawPath, cancellation: cancellation)
-        let repositoryIdentity = try normalized(suppliedRepositoryIdentity)
-            ?? inferredRepositoryIdentity(canonical, cancellation: cancellation)
-        return try withRegistryLock(cancellation: cancellation) {
-            try recoverPendingIdentityUpdate(cancellation: cancellation)
-            var registry = try loadRegistry(cancellation: cancellation)
-            try cancellation?.checkCancellation()
-            let now = ISO8601.string(from: clock.now())
-            let requested = normalized(requestedID)
-            if let requested, UUID(uuidString: requested) == nil {
-                throw ProjectMemoryError.invalidRequest("project_id must be a UUID")
-            }
-
-            var index: Int?
-            if let requested {
-                index = registry.projects.firstIndex { $0.id.caseInsensitiveCompare(requested) == .orderedSame }
-                guard index != nil else { throw ProjectMemoryError.projectNotFound(requested) }
-            } else if let repositoryIdentity {
-                index = registry.projects.firstIndex { $0.repositoryIdentity == repositoryIdentity }
-            }
-            if index == nil {
-                index = registry.projects.firstIndex { $0.aliases.contains(canonical.path) }
-            }
-
-            if let index {
-                var entry = registry.projects[index]
-                if let repositoryIdentity, let existing = entry.repositoryIdentity,
-                   existing != repositoryIdentity {
-                    throw ProjectMemoryError.projectScopeMismatch
-                }
-                if !entry.aliases.contains(canonical.path) { entry.aliases.append(canonical.path) }
-                entry.aliases = Array(entry.aliases.suffix(32))
-                if entry.repositoryIdentity == nil { entry.repositoryIdentity = repositoryIdentity }
-                if let name = normalized(displayName) { entry.displayName = name }
-                entry.updatedAt = now
-                registry.projects[index] = entry
-                try cancellation?.checkCancellation()
-                try persistIdentityUpdate(
-                    entry: entry,
-                    registry: registry,
-                    cancellation: cancellation
-                )
-                return descriptor(entry)
-            }
-
-            let id = UUID().uuidString.lowercased()
-            let entry = ProjectRegistryEntry(
-                id: id,
-                displayName: normalized(displayName) ?? canonical.lastPathComponent,
-                repositoryIdentity: repositoryIdentity,
-                aliases: [canonical.path],
-                createdAt: now,
-                updatedAt: now
-            )
-            registry.projects.append(entry)
-            try cancellation?.checkCancellation()
-            try persistIdentityUpdate(
-                entry: entry,
-                registry: registry,
-                cancellation: cancellation
-            )
-            return descriptor(entry)
-        }
+        let target = try discoverTarget(
+            path: rawPath,
+            repositoryIdentityAssertion: suppliedRepositoryIdentity,
+            cancellation: cancellation
+        )
+        let preparation = try prepareRegistration(
+            target: target,
+            requestedProjectID: requestedID,
+            displayName: displayName,
+            allowUnregisteredRequestedID: false,
+            cancellation: cancellation
+        )
+        return try commitRegistration(preparation, cancellation: cancellation)
     }
 
-    public func descriptor(
+    func descriptor(
         projectID: String,
         cancellation: ToolCallCancellation? = nil
     ) throws -> ProjectMemoryDescriptor {
@@ -219,7 +219,1093 @@ public final class ProjectIdentityResolver: @unchecked Sendable {
         }
     }
 
-    public func projectDirectory(
+    /// Resolves caller-controlled path text once and independently derives its
+    /// repository identity. The compatibility field is an assertion only.
+    func discoverTarget(
+        path rawPath: String,
+        repositoryIdentityAssertion: String? = nil,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ProjectIdentityTarget {
+        try cancellation?.checkCancellation()
+        let canonical = try canonicalDirectory(rawPath, cancellation: cancellation)
+        let capturedIdentity = try directoryIdentity(canonical)
+        let inferred = try inferredRepositoryIdentity(
+            canonical,
+            cancellation: cancellation
+        )
+        if let asserted = normalized(repositoryIdentityAssertion), asserted != inferred {
+            throw ProjectMemoryError.projectScopeMismatch
+        }
+        try cancellation?.checkCancellation()
+        guard try directoryIdentity(canonical) == capturedIdentity else {
+            throw ProjectMemoryError.conflict(
+                "project directory identity changed during discovery"
+            )
+        }
+        return ProjectIdentityTarget(
+            canonicalRoot: canonical,
+            repositoryIdentity: inferred,
+            directoryIdentity: capturedIdentity
+        )
+    }
+
+    /// Builds a deterministic, read-only registration candidate. No registry
+    /// alias or per-project metadata is written until `commitRegistration`.
+    func prepareRegistration(
+        target: ProjectIdentityTarget,
+        requestedProjectID: String?,
+        displayName: String?,
+        allowUnregisteredRequestedID: Bool,
+        expectedControlGeneration: ProjectGeneration? = nil,
+        expectedControlLifecycleState: ProjectLifecycleState? = nil,
+        expectedControlRepositoryIdentity: String? = nil,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ProjectRegistrationIdentityPreparation {
+        try validateTarget(target)
+        return try withRegistryLock(cancellation: cancellation) {
+            try recoverPendingIdentityUpdate(cancellation: cancellation)
+            let registry = try loadRegistry(cancellation: cancellation)
+            try cancellation?.checkCancellation()
+            let requested = normalized(requestedProjectID)
+            if let requested, UUID(uuidString: requested) == nil {
+                throw ProjectMemoryError.invalidRequest("project_id must be a UUID")
+            }
+
+            let repositoryIndex = target.repositoryIdentity.flatMap { identity in
+                registry.projects.firstIndex { $0.repositoryIdentity == identity }
+            }
+            let aliasIndex = registry.projects.firstIndex {
+                $0.aliases.contains(target.canonicalRoot.path)
+            }
+            let requestedIndex = requested.flatMap { value in
+                registry.projects.firstIndex {
+                    $0.id.caseInsensitiveCompare(value) == .orderedSame
+                }
+            }
+            if let requested, requestedIndex == nil, !allowUnregisteredRequestedID {
+                throw ProjectMemoryError.projectNotFound(requested)
+            }
+            if let requestedIndex, let repositoryIndex, requestedIndex != repositoryIndex {
+                throw ProjectMemoryError.projectScopeMismatch
+            }
+            if let requestedIndex, let aliasIndex, requestedIndex != aliasIndex {
+                throw ProjectMemoryError.projectScopeMismatch
+            }
+            if let repositoryIndex, let aliasIndex, repositoryIndex != aliasIndex {
+                throw ProjectMemoryError.projectScopeMismatch
+            }
+
+            let selectedIndex = requestedIndex ?? repositoryIndex ?? aliasIndex
+            let selectedID = requested?.lowercased()
+                ?? selectedIndex.map { registry.projects[$0].id }
+                ?? Self.registrationProjectID(target: target)
+            let existing = selectedIndex.map { registry.projects[$0] }
+            if let existingIdentity = existing?.repositoryIdentity,
+               existingIdentity != target.repositoryIdentity {
+                throw ProjectMemoryError.projectScopeMismatch
+            }
+            if let selectedIndex,
+               registry.projects.enumerated().contains(where: { candidate in
+                   candidate.offset != selectedIndex
+                       && candidate.element.aliases.contains(target.canonicalRoot.path)
+               }) {
+                throw ProjectMemoryError.projectScopeMismatch
+            }
+            if selectedIndex == nil,
+               registry.projects.contains(where: {
+                   $0.id.caseInsensitiveCompare(selectedID) == .orderedSame
+                       || $0.aliases.contains(target.canonicalRoot.path)
+                       || (target.repositoryIdentity != nil
+                           && $0.repositoryIdentity == target.repositoryIdentity)
+               }) {
+                throw ProjectMemoryError.conflict(
+                    "project registration identity changed during discovery"
+                )
+            }
+
+            let descriptor = ProjectMemoryDescriptor(
+                id: selectedID,
+                displayName: normalized(displayName)
+                    ?? existing?.displayName
+                    ?? target.canonicalRoot.lastPathComponent,
+                repositoryIdentity: target.repositoryIdentity,
+                aliases: existing?.aliases ?? []
+            )
+            return ProjectRegistrationIdentityPreparation(
+                operationID: Self.registrationOperationID(
+                    descriptor: descriptor,
+                    target: target,
+                    expectedControlGeneration: expectedControlGeneration,
+                    expectedControlLifecycleState: expectedControlLifecycleState,
+                    expectedControlRepositoryIdentity: expectedControlRepositoryIdentity
+                ),
+                descriptor: descriptor,
+                target: target,
+                expectedControlGeneration: expectedControlGeneration,
+                expectedControlLifecycleState: expectedControlLifecycleState,
+                expectedControlRepositoryIdentity: expectedControlRepositoryIdentity
+            )
+        }
+    }
+
+    /// Retains one exact native-manager request before the control-plane stage.
+    /// Repeating the identical request is a no-op; any different request for
+    /// the same deterministic project identifier fails closed.
+    func stageRegistrationIntent(
+        _ preparation: ProjectRegistrationIdentityPreparation,
+        requestedPath: String,
+        requestedDisplayName: String?,
+        repositoryIdentityAssertion: String?,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> StagedProjectRegistrationIdentity {
+        try validateTarget(preparation.target)
+        guard !requestedPath.isEmpty,
+              requestedPath.utf8.count <= Self.maximumRelinkPathBytes,
+              (requestedPath as NSString).isAbsolutePath,
+              requestedDisplayName.map({ $0.utf8.count <= 512 }) ?? true,
+              repositoryIdentityAssertion.map({ $0.utf8.count <= 2_048 }) ?? true,
+              repositoryIdentityAssertion.map({
+                  normalized($0) == preparation.target.repositoryIdentity
+              }) ?? true else {
+            throw ProjectMemoryError.invalidRequest(
+                "project registration intent is outside its request bounds"
+            )
+        }
+        let intended = ProjectRegistrationIdentityIntent(
+            schemaVersion: ProjectRegistrationIdentityIntent.schemaVersion,
+            operationID: preparation.operationID,
+            projectID: preparation.descriptor.id.lowercased(),
+            requestedPath: requestedPath,
+            requestedDisplayName: requestedDisplayName,
+            repositoryIdentityAssertion: repositoryIdentityAssertion,
+            resolvedDisplayName: preparation.descriptor.displayName,
+            canonicalRoot: preparation.target.canonicalRoot.path,
+            repositoryIdentity: preparation.target.repositoryIdentity,
+            directoryDevice: preparation.target.directoryIdentity.device,
+            directoryInode: preparation.target.directoryIdentity.inode,
+            expectedControlGeneration: preparation.expectedControlGeneration?.rawValue,
+            expectedControlLifecycleState: preparation.expectedControlLifecycleState?.rawValue,
+            expectedControlRepositoryIdentity: preparation.expectedControlRepositoryIdentity,
+            createdAt: ISO8601.string(from: clock.now())
+        )
+        return try withRegistryLock(cancellation: cancellation) {
+            if let existing = try loadRegistrationIntentIfPresent(
+                projectID: preparation.descriptor.id,
+                cancellation: cancellation
+            ) {
+                guard Self.sameRegistration(existing, intended, ignoringCreatedAt: true) else {
+                    throw ProjectMemoryError.conflict(
+                        "another project registration request is pending"
+                    )
+                }
+                let pending = try pendingRegistration(
+                    intent: existing,
+                    projectID: preparation.descriptor.id
+                )
+                return StagedProjectRegistrationIdentity(
+                    pending: pending,
+                    created: false
+                )
+            }
+            try cancellation?.checkCancellation()
+            try OwnerOnlyAtomicFile.write(
+                try JSONEncoder.sorted.encode(intended),
+                to: registrationIntentURL(projectID: preparation.descriptor.id)
+            )
+            let pending = try pendingRegistration(
+                intent: intended,
+                projectID: preparation.descriptor.id
+            )
+            return StagedProjectRegistrationIdentity(
+                pending: pending,
+                created: true
+            )
+        }
+    }
+
+    func pendingRegistration(
+        projectID: String,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> PendingProjectRegistrationIdentity? {
+        try withRegistryLock(cancellation: cancellation) {
+            guard let intent = try loadRegistrationIntentIfPresent(
+                projectID: projectID,
+                cancellation: cancellation
+            ) else {
+                return nil
+            }
+            return try pendingRegistration(intent: intent, projectID: projectID)
+        }
+    }
+
+    /// Returns a bounded, non-authoritative recovery projection for registration
+    /// intents that may not yet have a control-plane row. Directory enumeration is
+    /// lazy and capped so a same-UID writer cannot turn an operator refresh into an
+    /// unbounded scan. Each returned intent still passes the exact per-file schema,
+    /// operation-authority, owner-only, size, and identity validation used by replay.
+    func pendingRegistrations(
+        limit: Int,
+        excludingProjectIDs: Set<String> = [],
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> [PendingProjectRegistrationIdentity] {
+        guard (1...Self.maximumRegistrationIntentProjectionCount).contains(limit) else {
+            throw ProjectMemoryError.invalidRequest(
+                "project registration projection limit must be between 1 and 100"
+            )
+        }
+        return try withRegistryLock(cancellation: cancellation) {
+            var enumerationError: Error?
+            guard let enumerator = FileManager.default.enumerator(
+                at: paths.projectsDir,
+                includingPropertiesForKeys: nil,
+                options: [.skipsSubdirectoryDescendants],
+                errorHandler: { _, error in
+                    enumerationError = error
+                    return false
+                }
+            ) else {
+                throw ProjectMemoryError.integrityFailure(
+                    "project registration intents cannot be enumerated"
+                )
+            }
+
+            var scanned = 0
+            var projectIDs = Set<String>()
+            while let value = enumerator.nextObject() {
+                try cancellation?.checkCancellation()
+                scanned += 1
+                guard scanned <= Self.maximumRegistrationIntentDirectoryScanCount else {
+                    throw ProjectMemoryError.payloadTooLarge(
+                        "project registration intent directory exceeds its scan bound"
+                    )
+                }
+                guard let candidate = value as? URL,
+                      candidate.deletingLastPathComponent().standardizedFileURL
+                        == paths.projectsDir.standardizedFileURL else {
+                    throw ProjectMemoryError.integrityFailure(
+                        "project registration intent enumeration escaped its project root"
+                    )
+                }
+                let projectID = candidate.lastPathComponent.lowercased()
+                if UUID(uuidString: projectID) != nil {
+                    projectIDs.insert(projectID)
+                }
+            }
+            if enumerationError != nil {
+                throw ProjectMemoryError.integrityFailure(
+                    "project registration intents cannot be enumerated"
+                )
+            }
+
+            var pending: [PendingProjectRegistrationIdentity] = []
+            pending.reserveCapacity(min(limit, projectIDs.count))
+            for projectID in projectIDs.sorted() {
+                try cancellation?.checkCancellation()
+                guard pending.count < limit else { break }
+                guard !excludingProjectIDs.contains(projectID) else { continue }
+                guard let intent = try loadRegistrationIntentIfPresent(
+                    projectID: projectID,
+                    cancellation: cancellation
+                ) else {
+                    continue
+                }
+                pending.append(try pendingRegistration(
+                    intent: intent,
+                    projectID: projectID
+                ))
+            }
+            return pending
+        }
+    }
+
+    private func pendingRegistration(
+        intent: ProjectRegistrationIdentityIntent,
+        projectID: String
+    ) throws -> PendingProjectRegistrationIdentity {
+        guard intent.projectID.caseInsensitiveCompare(projectID) == .orderedSame else {
+            throw ProjectMemoryError.integrityFailure(
+                "project registration intent changed project identity"
+            )
+        }
+        let lifecycle = intent.expectedControlLifecycleState.flatMap(
+            ProjectLifecycleState.init(rawValue:)
+        )
+        let target = ProjectIdentityTarget(
+            canonicalRoot: URL(
+                fileURLWithPath: intent.canonicalRoot,
+                isDirectory: true
+            ).standardizedFileURL,
+            repositoryIdentity: intent.repositoryIdentity,
+            directoryIdentity: ProjectDirectoryIdentity(
+                device: intent.directoryDevice,
+                inode: intent.directoryInode
+            )
+        )
+        let preparation = ProjectRegistrationIdentityPreparation(
+            operationID: intent.operationID,
+            descriptor: ProjectMemoryDescriptor(
+                id: intent.projectID,
+                displayName: intent.resolvedDisplayName,
+                repositoryIdentity: intent.repositoryIdentity,
+                aliases: lifecycle == .active ? [intent.canonicalRoot] : []
+            ),
+            target: target,
+            expectedControlGeneration: intent.expectedControlGeneration.map(
+                { ProjectGeneration($0) }
+            ),
+            expectedControlLifecycleState: lifecycle,
+            expectedControlRepositoryIdentity: intent.expectedControlRepositoryIdentity
+        )
+        return PendingProjectRegistrationIdentity(
+            preparation: preparation,
+            requestedPath: intent.requestedPath,
+            requestedDisplayName: intent.requestedDisplayName,
+            repositoryIdentityAssertion: intent.repositoryIdentityAssertion,
+            createdAt: intent.createdAt
+        )
+    }
+
+    func completeRegistrationIntent(
+        _ preparation: ProjectRegistrationIdentityPreparation,
+        cancellation: ToolCallCancellation? = nil
+    ) throws {
+        try removeRegistrationIntent(
+            preparation,
+            cancellation: cancellation
+        )
+    }
+
+    func abortRegistrationIntent(
+        _ preparation: ProjectRegistrationIdentityPreparation,
+        cancellation: ToolCallCancellation? = nil
+    ) throws {
+        try removeRegistrationIntent(
+            preparation,
+            cancellation: cancellation
+        )
+    }
+
+    /// Publishes the exact registration target after the control plane accepted
+    /// the same project identifier, root, and independently inferred identity.
+    func commitRegistration(
+        _ preparation: ProjectRegistrationIdentityPreparation,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ProjectMemoryDescriptor {
+        try validateTarget(preparation.target)
+        guard preparation.operationID == Self.registrationOperationID(
+            descriptor: preparation.descriptor,
+            target: preparation.target,
+            expectedControlGeneration: preparation.expectedControlGeneration,
+            expectedControlLifecycleState: preparation.expectedControlLifecycleState,
+            expectedControlRepositoryIdentity: preparation.expectedControlRepositoryIdentity
+        ) else {
+            throw ProjectMemoryError.integrityFailure(
+                "project registration preparation is invalid"
+            )
+        }
+        return try withRegistryLock(cancellation: cancellation) {
+            try recoverPendingIdentityUpdate(cancellation: cancellation)
+            var registry = try loadRegistry(cancellation: cancellation)
+            try cancellation?.checkCancellation()
+            let id = preparation.descriptor.id
+            let identity = preparation.target.repositoryIdentity
+            let root = preparation.target.canonicalRoot.path
+            let existingIndex = registry.projects.firstIndex {
+                $0.id.caseInsensitiveCompare(id) == .orderedSame
+            }
+            guard !registry.projects.enumerated().contains(where: { candidate in
+                candidate.offset != (existingIndex ?? -1)
+                    && candidate.element.aliases.contains(root)
+            }) else {
+                throw ProjectMemoryError.projectScopeMismatch
+            }
+            if let identity {
+                guard !registry.projects.enumerated().contains(where: { candidate in
+                    candidate.offset != (existingIndex ?? -1)
+                        && candidate.element.repositoryIdentity == identity
+                }) else {
+                    throw ProjectMemoryError.projectScopeMismatch
+                }
+            }
+
+            let now = ISO8601.string(from: clock.now())
+            let entry: ProjectRegistryEntry
+            if let existingIndex {
+                var updated = registry.projects[existingIndex]
+                if let existingIdentity = updated.repositoryIdentity,
+                   existingIdentity != identity {
+                    throw ProjectMemoryError.projectScopeMismatch
+                }
+                if !updated.aliases.contains(root) { updated.aliases.append(root) }
+                updated.aliases = Array(updated.aliases.suffix(32))
+                if updated.repositoryIdentity == nil { updated.repositoryIdentity = identity }
+                updated.displayName = preparation.descriptor.displayName
+                updated.updatedAt = now
+                registry.projects[existingIndex] = updated
+                entry = updated
+            } else {
+                let inserted = ProjectRegistryEntry(
+                    id: id,
+                    displayName: preparation.descriptor.displayName,
+                    repositoryIdentity: identity,
+                    aliases: [root],
+                    createdAt: now,
+                    updatedAt: now
+                )
+                registry.projects.append(inserted)
+                entry = inserted
+            }
+            try persistIdentityUpdate(
+                entry: entry,
+                registry: registry,
+                cancellation: cancellation
+            )
+            return descriptor(entry)
+        }
+    }
+
+    /// Proves a relink target from its own Git configuration and records a
+    /// bounded, non-authoritative intent. The candidate path is not published as
+    /// an alias until `commitRelink` is called after the control-plane
+    /// generation/root compare-and-set succeeds.
+    func prepareRelink(
+        path rawPath: String,
+        projectID: String,
+        expectedGeneration: ProjectGeneration,
+        expectedRepositoryIdentity: String?,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ProjectRelinkIdentityPreparation {
+        let target = try discoverTarget(
+            path: rawPath,
+            cancellation: cancellation
+        )
+        return try prepareRelink(
+            target: target,
+            projectID: projectID,
+            expectedGeneration: expectedGeneration,
+            expectedRepositoryIdentity: expectedRepositoryIdentity,
+            cancellation: cancellation
+        )
+    }
+
+    func prepareRelink(
+        target: ProjectIdentityTarget,
+        projectID: String,
+        expectedGeneration: ProjectGeneration,
+        expectedRepositoryIdentity: String?,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ProjectRelinkIdentityPreparation {
+        try cancellation?.checkCancellation()
+        guard projectID.utf8.count <= 36, UUID(uuidString: projectID) != nil else {
+            throw ProjectMemoryError.invalidRequest("project_id must be a UUID")
+        }
+        guard expectedGeneration.rawValue > 0,
+              expectedGeneration.rawValue < UInt64(Int64.max) else {
+            throw ProjectMemoryError.invalidRequest("project generation is outside bounds")
+        }
+        try validateTarget(target)
+        let canonical = target.canonicalRoot
+        guard let inferredIdentity = target.repositoryIdentity,
+              let expectedIdentity = normalized(expectedRepositoryIdentity),
+           inferredIdentity == expectedIdentity else {
+            throw ProjectMemoryError.projectScopeMismatch
+        }
+
+        return try withRegistryLock(cancellation: cancellation) {
+            try recoverPendingIdentityUpdate(cancellation: cancellation)
+            let registry = try loadRegistry(cancellation: cancellation)
+            try cancellation?.checkCancellation()
+            guard let index = registry.projects.firstIndex(where: {
+                $0.id.caseInsensitiveCompare(projectID) == .orderedSame
+            }) else {
+                throw ProjectMemoryError.projectNotFound(projectID)
+            }
+            guard registry.projects[index].repositoryIdentity == inferredIdentity else {
+                throw ProjectMemoryError.projectScopeMismatch
+            }
+            guard !registry.projects.enumerated().contains(where: { candidate in
+                candidate.offset != index && candidate.element.aliases.contains(canonical.path)
+            }) else {
+                throw ProjectMemoryError.projectScopeMismatch
+            }
+
+            let entry = registry.projects[index]
+            let operationID = Self.relinkOperationID(
+                projectID: projectID,
+                expectedGeneration: expectedGeneration,
+                canonicalRoot: canonical.path,
+                repositoryIdentity: inferredIdentity
+            )
+            let preparation = ProjectRelinkIdentityPreparation(
+                operationID: operationID,
+                expectedGeneration: expectedGeneration,
+                descriptor: descriptor(entry),
+                target: target
+            )
+
+            // A fully published exact retry needs no new staged record. The
+            // manager still rechecks the control-plane generation/root tuple.
+            if entry.aliases.contains(canonical.path) {
+                return preparation
+            }
+
+            let intended = ProjectRelinkIdentityIntent(
+                schemaVersion: ProjectRelinkIdentityIntent.schemaVersion,
+                operationID: operationID,
+                projectID: projectID.lowercased(),
+                expectedGeneration: expectedGeneration.rawValue,
+                canonicalRoot: canonical.path,
+                repositoryIdentity: inferredIdentity,
+                directoryDevice: target.directoryIdentity.device,
+                directoryInode: target.directoryIdentity.inode,
+                createdAt: ISO8601.string(from: clock.now())
+            )
+            let intentURL = relinkIntentURL(projectID: projectID)
+            if let existing = try loadRelinkIntentIfPresent(
+                projectID: projectID,
+                cancellation: cancellation
+            ) {
+                guard Self.sameRelink(existing, intended) else {
+                    throw ProjectMemoryError.conflict(
+                        "another project relink intent is pending"
+                    )
+                }
+                return preparation
+            }
+            try cancellation?.checkCancellation()
+            try OwnerOnlyAtomicFile.write(try JSONEncoder.sorted.encode(intended), to: intentURL)
+            return preparation
+        }
+    }
+
+    /// Publishes exactly the staged alias after the caller has committed the
+    /// matching control-plane root and generation. Replays are idempotent.
+    func commitRelink(
+        _ preparation: ProjectRelinkIdentityPreparation,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ProjectMemoryDescriptor {
+        try validateTarget(preparation.target)
+        return try withRegistryLock(cancellation: cancellation) {
+            try recoverPendingIdentityUpdate(cancellation: cancellation)
+            var registry = try loadRegistry(cancellation: cancellation)
+            try cancellation?.checkCancellation()
+            guard let index = registry.projects.firstIndex(where: {
+                $0.id.caseInsensitiveCompare(preparation.descriptor.id) == .orderedSame
+            }) else {
+                throw ProjectMemoryError.projectNotFound(preparation.descriptor.id)
+            }
+            guard registry.projects[index].repositoryIdentity == preparation.repositoryIdentity,
+                  preparation.operationID == Self.relinkOperationID(
+                    projectID: preparation.descriptor.id,
+                    expectedGeneration: preparation.expectedGeneration,
+                    canonicalRoot: preparation.canonicalRoot.path,
+                    repositoryIdentity: preparation.repositoryIdentity
+                  ),
+                  !registry.projects.enumerated().contains(where: { candidate in
+                    candidate.offset != index
+                        && candidate.element.aliases.contains(preparation.canonicalRoot.path)
+                  }) else {
+                throw ProjectMemoryError.projectScopeMismatch
+            }
+
+            if let intent = try loadRelinkIntentIfPresent(
+                projectID: preparation.descriptor.id,
+                cancellation: cancellation
+            ) {
+                guard Self.matches(preparation, intent: intent) else {
+                    throw ProjectMemoryError.conflict(
+                        "project relink intent does not match the committed control-plane tuple"
+                    )
+                }
+            } else if !registry.projects[index].aliases.contains(preparation.canonicalRoot.path) {
+                throw ProjectMemoryError.conflict("project relink intent is missing")
+            }
+
+            var entry = registry.projects[index]
+            if !entry.aliases.contains(preparation.canonicalRoot.path) {
+                entry.aliases.append(preparation.canonicalRoot.path)
+                entry.aliases = Array(entry.aliases.suffix(32))
+                entry.updatedAt = ISO8601.string(from: clock.now())
+                registry.projects[index] = entry
+                try persistIdentityUpdate(
+                    entry: entry,
+                    registry: registry,
+                    cancellation: cancellation
+                )
+            }
+            return descriptor(entry)
+        }
+    }
+
+    /// Removes an exact relink intent only after the manager has verified the
+    /// active control tuple and its published transition authority. Alias
+    /// publication alone is not sufficient to discard restart recovery state.
+    func completeRelinkIntent(
+        _ preparation: ProjectRelinkIdentityPreparation,
+        cancellation: ToolCallCancellation? = nil
+    ) throws {
+        try withRegistryLock(cancellation: cancellation) {
+            guard let intent = try loadRelinkIntentIfPresent(
+                projectID: preparation.descriptor.id,
+                cancellation: cancellation
+            ) else { return }
+            guard Self.matches(preparation, intent: intent) else {
+                throw ProjectMemoryError.conflict(
+                    "project relink intent changed before completion"
+                )
+            }
+            let registry = try loadRegistry(cancellation: cancellation)
+            guard let entry = registry.projects.first(where: {
+                $0.id.caseInsensitiveCompare(preparation.descriptor.id) == .orderedSame
+            }),
+                entry.repositoryIdentity == preparation.repositoryIdentity,
+                entry.aliases.contains(preparation.canonicalRoot.path) else {
+                throw ProjectMemoryError.conflict(
+                    "project relink alias was not published before completion"
+                )
+            }
+            try removeRelinkIntent(projectID: preparation.descriptor.id)
+        }
+    }
+
+    /// Cancels only an exact uncommitted stage. It never removes a published
+    /// alias and never guesses which of two conflicting intents is authoritative.
+    func abortRelink(
+        _ preparation: ProjectRelinkIdentityPreparation,
+        cancellation: ToolCallCancellation? = nil
+    ) throws {
+        try withRegistryLock(cancellation: cancellation) {
+            guard let intent = try loadRelinkIntentIfPresent(
+                projectID: preparation.descriptor.id,
+                cancellation: cancellation
+            ) else { return }
+            guard Self.matches(preparation, intent: intent) else {
+                throw ProjectMemoryError.conflict(
+                    "project relink intent changed before cancellation"
+                )
+            }
+            try removeRelinkIntent(projectID: preparation.descriptor.id)
+        }
+    }
+
+    func hasPendingRelink(
+        projectID: String,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> Bool {
+        try withRegistryLock(cancellation: cancellation) {
+            try loadRelinkIntentIfPresent(
+                projectID: projectID,
+                cancellation: cancellation
+            ) != nil
+        }
+    }
+
+    func pendingRelink(
+        projectID: String,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> PendingProjectRelinkIdentity? {
+        try withRegistryLock(cancellation: cancellation) {
+            try recoverPendingIdentityUpdate(cancellation: cancellation)
+            let registry = try loadRegistry(cancellation: cancellation)
+            guard let entry = registry.projects.first(where: {
+                $0.id.caseInsensitiveCompare(projectID) == .orderedSame
+            }) else {
+                throw ProjectMemoryError.projectNotFound(projectID)
+            }
+            guard let intent = try loadRelinkIntentIfPresent(
+                projectID: projectID,
+                cancellation: cancellation
+            ) else {
+                return nil
+            }
+            let preparation = ProjectRelinkIdentityPreparation(
+                operationID: intent.operationID,
+                expectedGeneration: ProjectGeneration(intent.expectedGeneration),
+                descriptor: descriptor(entry),
+                target: ProjectIdentityTarget(
+                    canonicalRoot: URL(
+                        fileURLWithPath: intent.canonicalRoot,
+                        isDirectory: true
+                    ).standardizedFileURL,
+                    repositoryIdentity: intent.repositoryIdentity,
+                    directoryIdentity: ProjectDirectoryIdentity(
+                        device: intent.directoryDevice,
+                        inode: intent.directoryInode
+                    )
+                )
+            )
+            guard Self.matches(preparation, intent: intent),
+                  entry.repositoryIdentity == intent.repositoryIdentity else {
+                throw ProjectMemoryError.integrityFailure(
+                    "project relink intent no longer matches project identity"
+                )
+            }
+            return PendingProjectRelinkIdentity(
+                preparation: preparation,
+                createdAt: intent.createdAt
+            )
+        }
+    }
+
+    /// Resolves a durable stage against the authoritative control-plane tuple.
+    /// An uncommitted stage is safe to remove; a committed tuple publishes its
+    /// alias but retains the intent until the manager verifies final activation.
+    /// Every other relationship is retained for explicit diagnosis.
+    func reconcilePendingRelink(
+        projectID: String,
+        controlPlaneGeneration: ProjectGeneration,
+        controlPlaneCanonicalRoot: URL,
+        controlPlaneRepositoryIdentity: String?,
+        committedTransitionValidated: Bool = false,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ProjectRelinkIdentityRecovery {
+        guard let pending = try pendingRelink(
+            projectID: projectID,
+            cancellation: cancellation
+        ) else {
+            return .none
+        }
+        let preparation = pending.preparation
+        guard preparation.repositoryIdentity == controlPlaneRepositoryIdentity else {
+            throw ProjectMemoryError.conflict(
+                "project relink intent does not match control-plane repository identity"
+            )
+        }
+        let controlRoot = controlPlaneCanonicalRoot.standardizedFileURL
+        if controlPlaneGeneration == preparation.expectedGeneration,
+           controlRoot != preparation.canonicalRoot {
+            try abortRelink(preparation, cancellation: cancellation)
+            return .abortedUncommitted(operationID: preparation.operationID)
+        }
+        let next = preparation.expectedGeneration.rawValue.addingReportingOverflow(1)
+        if !next.overflow,
+           controlPlaneGeneration.rawValue == next.partialValue,
+           controlRoot == preparation.canonicalRoot {
+            guard committedTransitionValidated else {
+                throw ProjectMemoryError.conflict(
+                    "project relink publication authority was not validated"
+                )
+            }
+            _ = try commitRelink(preparation, cancellation: cancellation)
+            return .publishedCommittedAlias(operationID: preparation.operationID)
+        }
+        throw ProjectMemoryError.conflict(
+            "project relink intent cannot be reconciled with the control-plane tuple"
+        )
+    }
+
+    private func removeRelinkIntent(projectID: String) throws {
+        try beforeRelinkIntentRemovalObserver?()
+        try OwnerOnlyAtomicFile.removeIfExists(
+            at: relinkIntentURL(projectID: projectID)
+        )
+    }
+
+    private func removeRegistrationIntent(
+        _ preparation: ProjectRegistrationIdentityPreparation,
+        cancellation: ToolCallCancellation?
+    ) throws {
+        try withRegistryLock(cancellation: cancellation) {
+            guard let intent = try loadRegistrationIntentIfPresent(
+                projectID: preparation.descriptor.id,
+                cancellation: cancellation
+            ) else {
+                return
+            }
+            guard intent.operationID == preparation.operationID else {
+                throw ProjectMemoryError.conflict(
+                    "project registration intent changed before cleanup"
+                )
+            }
+            let url = registrationIntentURL(projectID: preparation.descriptor.id)
+            try OwnerOnlyAtomicFile.removeIfExists(at: url)
+            let directory = url.deletingLastPathComponent()
+            if FileManager.default.fileExists(atPath: directory.path),
+               try FileManager.default.contentsOfDirectory(atPath: directory.path).isEmpty {
+                try FileManager.default.removeItem(at: directory)
+                try OwnerOnlyAtomicFile.synchronizeDirectory(paths.projectsDir)
+            }
+        }
+    }
+
+    private func registrationIntentURL(projectID: String) -> URL {
+        paths.projectsDir
+            .appendingPathComponent(projectID.lowercased(), isDirectory: true)
+            .appendingPathComponent(".registration-intent.json")
+    }
+
+    private func loadRegistrationIntentIfPresent(
+        projectID: String,
+        cancellation: ToolCallCancellation?
+    ) throws -> ProjectRegistrationIdentityIntent? {
+        guard projectID.utf8.count <= 36, UUID(uuidString: projectID) != nil else {
+            throw ProjectMemoryError.invalidRequest("project_id must be a UUID")
+        }
+        let url = registrationIntentURL(projectID: projectID)
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        try cancellation?.checkCancellation()
+        let data: Data
+        do {
+            data = try OwnerOnlyAtomicFile.read(
+                from: url,
+                maximumBytes: Self.maximumRegistrationIntentBytes
+            )
+        } catch {
+            throw ProjectMemoryError.integrityFailure(
+                "project registration intent cannot be read"
+            )
+        }
+        let intent: ProjectRegistrationIdentityIntent
+        do {
+            intent = try JSONDecoder().decode(ProjectRegistrationIdentityIntent.self, from: data)
+        } catch {
+            throw ProjectMemoryError.integrityFailure(
+                "project registration intent is invalid"
+            )
+        }
+        let canonical = URL(fileURLWithPath: intent.canonicalRoot, isDirectory: true)
+            .standardizedFileURL
+        let lifecycle = intent.expectedControlLifecycleState.flatMap(
+            ProjectLifecycleState.init(rawValue:)
+        )
+        guard intent.schemaVersion == ProjectRegistrationIdentityIntent.schemaVersion,
+              intent.projectID.caseInsensitiveCompare(projectID) == .orderedSame,
+              intent.operationID.utf8.count == 64,
+              intent.requestedPath.utf8.count <= Self.maximumRelinkPathBytes,
+              (intent.requestedPath as NSString).isAbsolutePath,
+              intent.requestedDisplayName.map({ $0.utf8.count <= 512 }) ?? true,
+              intent.repositoryIdentityAssertion.map({ $0.utf8.count <= 2_048 }) ?? true,
+              !intent.resolvedDisplayName.isEmpty,
+              intent.resolvedDisplayName.utf8.count <= 512,
+              intent.canonicalRoot.utf8.count <= Self.maximumRelinkPathBytes,
+              (intent.canonicalRoot as NSString).isAbsolutePath,
+              canonical.path == intent.canonicalRoot,
+              intent.repositoryIdentity.map({ $0.utf8.count <= 2_048 }) ?? true,
+              intent.repositoryIdentityAssertion.map({
+                  normalized($0) == intent.repositoryIdentity
+              }) ?? true,
+              intent.directoryDevice > 0,
+              intent.directoryInode > 0,
+              intent.expectedControlGeneration.map({
+                  $0 > 0 && $0 < UInt64(Int64.max)
+              }) ?? true,
+              intent.expectedControlLifecycleState == nil || lifecycle != nil,
+              ISO8601.date(from: intent.createdAt) != nil else {
+            throw ProjectMemoryError.integrityFailure(
+                "project registration intent is outside its identity or size bounds"
+            )
+        }
+        let descriptor = ProjectMemoryDescriptor(
+            id: intent.projectID,
+            displayName: intent.resolvedDisplayName,
+            repositoryIdentity: intent.repositoryIdentity,
+            aliases: lifecycle == .active ? [intent.canonicalRoot] : []
+        )
+        let target = ProjectIdentityTarget(
+            canonicalRoot: canonical,
+            repositoryIdentity: intent.repositoryIdentity,
+            directoryIdentity: ProjectDirectoryIdentity(
+                device: intent.directoryDevice,
+                inode: intent.directoryInode
+            )
+        )
+        guard intent.operationID == Self.registrationOperationID(
+            descriptor: descriptor,
+            target: target,
+            expectedControlGeneration: intent.expectedControlGeneration.map(
+                { ProjectGeneration($0) }
+            ),
+            expectedControlLifecycleState: lifecycle,
+            expectedControlRepositoryIdentity: intent.expectedControlRepositoryIdentity
+        ) else {
+            throw ProjectMemoryError.integrityFailure(
+                "project registration intent does not match its operation authority"
+            )
+        }
+        return intent
+    }
+
+    private func relinkIntentURL(projectID: String) -> URL {
+        paths.projectsDir
+            .appendingPathComponent(projectID.lowercased(), isDirectory: true)
+            .appendingPathComponent(".relink-intent.json")
+    }
+
+    private func loadRelinkIntentIfPresent(
+        projectID: String,
+        cancellation: ToolCallCancellation?
+    ) throws -> ProjectRelinkIdentityIntent? {
+        guard projectID.utf8.count <= 36, UUID(uuidString: projectID) != nil else {
+            throw ProjectMemoryError.invalidRequest("project_id must be a UUID")
+        }
+        let url = relinkIntentURL(projectID: projectID)
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        try cancellation?.checkCancellation()
+        let data: Data
+        do {
+            data = try OwnerOnlyAtomicFile.read(
+                from: url,
+                maximumBytes: Self.maximumRelinkIntentBytes
+            )
+        } catch {
+            throw ProjectMemoryError.integrityFailure(
+                "project relink intent cannot be read"
+            )
+        }
+        let intent: ProjectRelinkIdentityIntent
+        do {
+            intent = try JSONDecoder().decode(ProjectRelinkIdentityIntent.self, from: data)
+        } catch {
+            throw ProjectMemoryError.integrityFailure(
+                "project relink intent is invalid"
+            )
+        }
+        let canonical = URL(fileURLWithPath: intent.canonicalRoot, isDirectory: true)
+            .standardizedFileURL
+        guard intent.schemaVersion == ProjectRelinkIdentityIntent.schemaVersion,
+              intent.projectID.caseInsensitiveCompare(projectID) == .orderedSame,
+              intent.expectedGeneration > 0,
+              intent.expectedGeneration < UInt64(Int64.max),
+              intent.canonicalRoot.utf8.count <= Self.maximumRelinkPathBytes,
+              (intent.canonicalRoot as NSString).isAbsolutePath,
+              canonical.path == intent.canonicalRoot,
+              !intent.repositoryIdentity.isEmpty,
+              intent.repositoryIdentity.utf8.count <= 2_048,
+              intent.directoryDevice > 0,
+              intent.directoryInode > 0,
+              intent.operationID == Self.relinkOperationID(
+                projectID: intent.projectID,
+                expectedGeneration: ProjectGeneration(intent.expectedGeneration),
+                canonicalRoot: intent.canonicalRoot,
+                repositoryIdentity: intent.repositoryIdentity
+              ) else {
+            throw ProjectMemoryError.integrityFailure(
+                "project relink intent is outside its identity or size bounds"
+            )
+        }
+        return intent
+    }
+
+    private static func relinkOperationID(
+        projectID: String,
+        expectedGeneration: ProjectGeneration,
+        canonicalRoot: String,
+        repositoryIdentity: String
+    ) -> String {
+        return JSONSupport.sha256Hex(
+            [
+                "project-relink-v1",
+                projectID.lowercased(),
+                String(expectedGeneration.rawValue),
+                canonicalRoot,
+                repositoryIdentity,
+            ].joined(separator: "\u{0}")
+        )
+    }
+
+    private static func registrationProjectID(
+        target: ProjectIdentityTarget
+    ) -> String {
+        let authority = target.repositoryIdentity.map { "repository:\($0)" }
+            ?? "path:\(target.canonicalRoot.path)"
+        let hash = JSONSupport.sha256Hex(
+            ["project-registration-v1", authority].joined(separator: "\u{0}")
+        )
+        let start = hash.startIndex
+        func part(_ lower: Int, _ upper: Int) -> Substring {
+            hash[hash.index(start, offsetBy: lower)..<hash.index(start, offsetBy: upper)]
+        }
+        return "\(part(0, 8))-\(part(8, 12))-\(part(12, 16))-\(part(16, 20))-\(part(20, 32))"
+    }
+
+    private static func registrationOperationID(
+        descriptor: ProjectMemoryDescriptor,
+        target: ProjectIdentityTarget,
+        expectedControlGeneration: ProjectGeneration?,
+        expectedControlLifecycleState: ProjectLifecycleState?,
+        expectedControlRepositoryIdentity: String?
+    ) -> String {
+        let controlAuthority: String
+        if expectedControlGeneration == nil,
+           expectedControlLifecycleState == nil {
+            controlAuthority = "publication:1"
+        } else if let expectedControlGeneration,
+                  expectedControlLifecycleState == .maintenance
+                    || expectedControlLifecycleState == .active {
+            // The publication operation remains stable across both durable
+            // lifecycle boundaries: maintenance before identity publication and
+            // active after finalization. Display name, path, repository identity,
+            // and directory identity still distinguish a later registration.
+            controlAuthority = "publication:\(expectedControlGeneration.rawValue)"
+        } else {
+            controlAuthority = [
+                expectedControlGeneration.map { String($0.rawValue) } ?? "absent",
+                expectedControlLifecycleState?.rawValue ?? "absent",
+                expectedControlRepositoryIdentity ?? "none",
+            ].joined(separator: ":")
+        }
+        return JSONSupport.sha256Hex(
+            [
+                "project-registration-operation-v1",
+                descriptor.id.lowercased(),
+                descriptor.displayName,
+                target.canonicalRoot.path,
+                target.repositoryIdentity ?? "",
+                String(target.directoryIdentity.device),
+                String(target.directoryIdentity.inode),
+                controlAuthority,
+            ].joined(separator: "\u{0}")
+        )
+    }
+
+    private static func matches(
+        _ preparation: ProjectRelinkIdentityPreparation,
+        intent: ProjectRelinkIdentityIntent
+    ) -> Bool {
+        intent.schemaVersion == ProjectRelinkIdentityIntent.schemaVersion
+            && intent.operationID == preparation.operationID
+            && intent.projectID.caseInsensitiveCompare(preparation.descriptor.id) == .orderedSame
+            && intent.expectedGeneration == preparation.expectedGeneration.rawValue
+            && intent.canonicalRoot == preparation.canonicalRoot.path
+            && intent.repositoryIdentity == preparation.repositoryIdentity
+            && intent.directoryDevice == preparation.target.directoryIdentity.device
+            && intent.directoryInode == preparation.target.directoryIdentity.inode
+    }
+
+    private static func sameRelink(
+        _ lhs: ProjectRelinkIdentityIntent,
+        _ rhs: ProjectRelinkIdentityIntent
+    ) -> Bool {
+        lhs.schemaVersion == rhs.schemaVersion
+            && lhs.operationID == rhs.operationID
+            && lhs.projectID.caseInsensitiveCompare(rhs.projectID) == .orderedSame
+            && lhs.expectedGeneration == rhs.expectedGeneration
+            && lhs.canonicalRoot == rhs.canonicalRoot
+            && lhs.repositoryIdentity == rhs.repositoryIdentity
+            && lhs.directoryDevice == rhs.directoryDevice
+            && lhs.directoryInode == rhs.directoryInode
+    }
+
+    private static func sameRegistration(
+        _ lhs: ProjectRegistrationIdentityIntent,
+        _ rhs: ProjectRegistrationIdentityIntent,
+        ignoringCreatedAt: Bool
+    ) -> Bool {
+        lhs.schemaVersion == rhs.schemaVersion
+            && lhs.operationID == rhs.operationID
+            && lhs.projectID.caseInsensitiveCompare(rhs.projectID) == .orderedSame
+            && lhs.requestedPath == rhs.requestedPath
+            && lhs.requestedDisplayName == rhs.requestedDisplayName
+            && lhs.repositoryIdentityAssertion == rhs.repositoryIdentityAssertion
+            && lhs.resolvedDisplayName == rhs.resolvedDisplayName
+            && lhs.canonicalRoot == rhs.canonicalRoot
+            && lhs.repositoryIdentity == rhs.repositoryIdentity
+            && lhs.directoryDevice == rhs.directoryDevice
+            && lhs.directoryInode == rhs.directoryInode
+            && (ignoringCreatedAt || lhs.createdAt == rhs.createdAt)
+    }
+
+    func projectDirectory(
         projectID: String,
         cancellation: ToolCallCancellation? = nil
     ) throws -> URL {
@@ -250,23 +1336,45 @@ public final class ProjectIdentityResolver: @unchecked Sendable {
         return url
     }
 
+    private func directoryIdentity(_ url: URL) throws -> ProjectDirectoryIdentity {
+        var information = stat()
+        guard url.path.withCString({ Darwin.lstat($0, &information) }) == 0,
+              information.st_mode & S_IFMT == S_IFDIR else {
+            throw ProjectMemoryError.invalidRequest(
+                "project_path must remain the discovered directory"
+            )
+        }
+        return ProjectDirectoryIdentity(
+            device: UInt64(information.st_dev),
+            inode: UInt64(information.st_ino)
+        )
+    }
+
+    private func validateTarget(_ target: ProjectIdentityTarget) throws {
+        guard target.canonicalRoot.isFileURL,
+              target.canonicalRoot.path.hasPrefix("/"),
+              target.canonicalRoot.path.utf8.count <= Self.maximumRelinkPathBytes,
+              target.canonicalRoot.standardizedFileURL == target.canonicalRoot,
+              try directoryIdentity(target.canonicalRoot) == target.directoryIdentity else {
+            throw ProjectMemoryError.conflict(
+                "project directory identity changed after discovery"
+            )
+        }
+    }
+
     private func inferredRepositoryIdentity(
         _ project: URL,
         cancellation: ToolCallCancellation?
     ) throws -> String? {
-        let config = project.appendingPathComponent(".git/config")
-        let data: Data
-        do {
-            data = try ProjectMemoryFileReader.read(
-                config,
-                maximumBytes: Self.maximumGitConfigBytes,
-                cancellation: cancellation
-            )
-        } catch ProjectMemoryFileReadError.unreadable {
-            return nil
-        } catch ProjectMemoryFileReadError.tooLarge {
-            throw ProjectMemoryError.payloadTooLarge("Git configuration exceeds 1 MiB")
-        }
+        guard let config = try gitConfigurationURL(
+            project,
+            cancellation: cancellation
+        ), let data = try readOptionalGitControlFile(
+            config,
+            maximumBytes: Self.maximumGitConfigBytes,
+            label: "Git configuration",
+            cancellation: cancellation
+        ) else { return nil }
         guard let text = String(data: data, encoding: .utf8) else { return nil }
         var remotes: [String] = []
         for line in text.split(separator: "\n") {
@@ -277,6 +1385,151 @@ public final class ProjectIdentityResolver: @unchecked Sendable {
         remotes.sort()
         guard !remotes.isEmpty else { return nil }
         return "git:" + JSONSupport.sha256Hex(remotes.joined(separator: "\n"))
+    }
+
+    /// Resolves both ordinary repositories (`.git` directory) and Git's
+    /// descriptor-file form used by linked worktrees and submodules. Runtime
+    /// code reads the control files directly instead of spawning Git.
+    private func gitConfigurationURL(
+        _ project: URL,
+        cancellation: ToolCallCancellation?
+    ) throws -> URL? {
+        try cancellation?.checkCancellation()
+        let marker = project.appendingPathComponent(".git", isDirectory: false)
+        var markerInformation = stat()
+        let markerResult = marker.path.withCString {
+            Darwin.lstat($0, &markerInformation)
+        }
+        if markerResult != 0 {
+            if errno == ENOENT { return nil }
+            throw ProjectMemoryError.invalidRequest("Git control marker is unreadable")
+        }
+        switch markerInformation.st_mode & S_IFMT {
+        case S_IFDIR:
+            return marker.appendingPathComponent("config", isDirectory: false)
+        case S_IFREG:
+            guard let pointerData = try readOptionalGitControlFile(
+                marker,
+                maximumBytes: Self.maximumGitPointerBytes,
+                label: "Git worktree pointer",
+                cancellation: cancellation
+            ), let pointer = String(data: pointerData, encoding: .utf8) else {
+                throw ProjectMemoryError.invalidRequest("Git worktree pointer is malformed")
+            }
+            let gitDirectory = try resolveGitControlDirectory(
+                pointerValue(pointer, prefix: "gitdir:"),
+                relativeTo: project,
+                label: "Git worktree directory"
+            )
+            let commonDirectoryFile = gitDirectory.appendingPathComponent(
+                "commondir",
+                isDirectory: false
+            )
+            if let commonData = try readOptionalGitControlFile(
+                commonDirectoryFile,
+                maximumBytes: Self.maximumGitPointerBytes,
+                label: "Git common-directory pointer",
+                cancellation: cancellation
+            ) {
+                guard let commonPointer = String(data: commonData, encoding: .utf8) else {
+                    throw ProjectMemoryError.invalidRequest(
+                        "Git common-directory pointer is malformed"
+                    )
+                }
+                let commonDirectory = try resolveGitControlDirectory(
+                    singleControlPath(commonPointer, label: "Git common-directory pointer"),
+                    relativeTo: gitDirectory,
+                    label: "Git common directory"
+                )
+                return commonDirectory.appendingPathComponent("config", isDirectory: false)
+            }
+            return gitDirectory.appendingPathComponent("config", isDirectory: false)
+        default:
+            throw ProjectMemoryError.invalidRequest(
+                "Git control marker must be a directory or regular descriptor file"
+            )
+        }
+    }
+
+    private func pointerValue(_ value: String, prefix: String) throws -> String {
+        let line = try singleControlPath(value, label: "Git worktree pointer")
+        guard line.hasPrefix(prefix) else {
+            throw ProjectMemoryError.invalidRequest("Git worktree pointer is malformed")
+        }
+        let suffix = line.dropFirst(prefix.count)
+            .trimmingCharacters(in: .whitespaces)
+        guard !suffix.isEmpty else {
+            throw ProjectMemoryError.invalidRequest("Git worktree pointer is malformed")
+        }
+        return suffix
+    }
+
+    private func singleControlPath(_ value: String, label: String) throws -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              trimmed.utf8.count <= Self.maximumGitControlPathBytes,
+              !trimmed.contains("\n"),
+              !trimmed.contains("\r"),
+              !trimmed.contains("\0") else {
+            throw ProjectMemoryError.invalidRequest("\(label) is malformed")
+        }
+        return trimmed
+    }
+
+    private func resolveGitControlDirectory(
+        _ rawPath: String,
+        relativeTo base: URL,
+        label: String
+    ) throws -> URL {
+        let path = try singleControlPath(rawPath, label: label)
+        let candidate: URL
+        if (path as NSString).isAbsolutePath {
+            candidate = URL(fileURLWithPath: path, isDirectory: true)
+        } else {
+            candidate = base.appendingPathComponent(path, isDirectory: true)
+        }
+        let resolved = candidate.standardizedFileURL
+            .resolvingSymlinksInPath().standardizedFileURL
+        guard resolved.path.hasPrefix("/"),
+              resolved.path.utf8.count <= Self.maximumGitControlPathBytes else {
+            throw ProjectMemoryError.invalidRequest("\(label) is outside path bounds")
+        }
+        var information = stat()
+        guard resolved.path.withCString({ Darwin.lstat($0, &information) }) == 0,
+              information.st_mode & S_IFMT == S_IFDIR else {
+            throw ProjectMemoryError.invalidRequest("\(label) is not a directory")
+        }
+        return resolved
+    }
+
+    private func readOptionalGitControlFile(
+        _ url: URL,
+        maximumBytes: Int,
+        label: String,
+        cancellation: ToolCallCancellation?
+    ) throws -> Data? {
+        var information = stat()
+        let result = url.path.withCString { Darwin.lstat($0, &information) }
+        if result != 0 {
+            if errno == ENOENT { return nil }
+            throw ProjectMemoryError.invalidRequest("\(label) is unreadable")
+        }
+        guard information.st_mode & S_IFMT == S_IFREG else {
+            throw ProjectMemoryError.invalidRequest("\(label) is not a regular file")
+        }
+        do {
+            return try ProjectMemoryFileReader.read(
+                url,
+                maximumBytes: maximumBytes,
+                cancellation: cancellation
+            )
+        } catch ProjectMemoryFileReadError.unreadable {
+            throw ProjectMemoryError.invalidRequest("\(label) is unreadable")
+        } catch ProjectMemoryFileReadError.tooLarge {
+            throw ProjectMemoryError.payloadTooLarge(
+                "\(label) exceeds \(maximumBytes) bytes"
+            )
+        }
     }
 
     private func loadRegistry(
@@ -670,7 +1923,7 @@ public final class ProjectMemoryService: @unchecked Sendable {
     public static let capabilityVersion = 1
     private static let maximumImportArtifactBytes = 40 * 1_024 * 1_024
     public let limits: ProjectMemoryLimits
-    public let identities: ProjectIdentityResolver
+    let identities: ProjectIdentityResolver
     private let paths: AppPaths
     private let clock: any Clock
     private let beforeContinuityProjectionWriteObserver: (@Sendable (String, String, String) -> Void)?
@@ -741,6 +1994,11 @@ public final class ProjectMemoryService: @unchecked Sendable {
         repository?.close()
     }
 
+    /// Source-compatible facade for callers that previously initialized the
+    /// project-memory registry without control-plane acceptance. That ordering
+    /// can publish an alias for a rejected registration, so the public facade
+    /// now fails closed and performs no mutation.
+    @available(*, deprecated, message: "Use ManagerNode or ToolRouter project registration")
     public func initialize(
         path: String,
         projectID: String? = nil,
@@ -748,11 +2006,47 @@ public final class ProjectMemoryService: @unchecked Sendable {
         repositoryIdentity: String? = nil,
         cancellation: ToolCallCancellation? = nil
     ) throws -> [String: Any] {
+        _ = path
+        _ = projectID
+        _ = displayName
+        _ = repositoryIdentity
         try cancellation?.checkCancellation()
-        let descriptor = try identities.initialize(
-            path: path, projectID: projectID, displayName: displayName,
-            repositoryIdentity: repositoryIdentity, cancellation: cancellation
+        throw ProjectContextError.projectTransitionCoordinatorRequired
+    }
+
+    func initializeUnchecked(
+        path: String,
+        projectID: String? = nil,
+        displayName: String? = nil,
+        repositoryIdentity: String? = nil,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> [String: Any] {
+        try cancellation?.checkCancellation()
+        let target = try identities.discoverTarget(
+            path: path,
+            repositoryIdentityAssertion: repositoryIdentity,
+            cancellation: cancellation
         )
+        let preparation = try identities.prepareRegistration(
+            target: target,
+            requestedProjectID: projectID,
+            displayName: displayName,
+            allowUnregisteredRequestedID: false,
+            cancellation: cancellation
+        )
+        return try commitInitialization(preparation, cancellation: cancellation)
+    }
+
+    func commitInitialization(
+        _ preparation: ProjectRegistrationIdentityPreparation,
+        cancellation: ToolCallCancellation? = nil,
+        onIdentityCommitted: ((ProjectMemoryDescriptor) -> Void)? = nil
+    ) throws -> [String: Any] {
+        let descriptor = try identities.commitRegistration(
+            preparation,
+            cancellation: cancellation
+        )
+        onIdentityCommitted?(descriptor)
         // Identity metadata and the registry are now durable. Opening the
         // project database must not turn a late transport cancellation into a
         // false report that initialization had no effect.

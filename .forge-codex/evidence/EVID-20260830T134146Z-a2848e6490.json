@@ -1,0 +1,58 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 487514,
+      "path": ".forge-codex/evidence/EVID-20260830T134146Z-a2848e6490.stdout.txt",
+      "sha256": "4a37c9aab46b9fbfd2a6004fedb007ff181b9dc7983375e5ee57f3261a6db184",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 4016,
+      "path": ".forge-codex/evidence/EVID-20260830T134146Z-a2848e6490.stderr.txt",
+      "sha256": "02fb617c5dcd707037fe406f557d46a477de0f6c4a8d2269257532cfb0221492",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "command": "xcodebuild test -project ForgeConductor.xcodeproj -scheme ForgeConductor -configuration Debug -destination platform=macOS -derivedDataPath /tmp/forge-p10-signed-settings-derived-final-20260830 -resultBundlePath /tmp/forge-p10-signed-settings-final-20260830.xcresult -parallel-testing-enabled NO -only-testing:ForgeConductorUITests/ForgeConductorUITests/testManagerShowsProjectShellPolicyControls -only-testing:ForgeConductorUITests/ForgeConductorUITests/testManagerShowsProtectedFilesystemServiceControls -only-testing:ForgeConductorUITests/ForgeConductorUITests/testManagerSettingsControlsAndPersistsProjectShellPolicy -only-testing:ForgeConductorUITests/ForgeConductorUITests/testManagerSettingsStagesCanonicalAllowedRootAndRemoval -only-testing:ForgeConductorUITests/ForgeConductorUITests/testManagerSettingsRejectsFilesystemRootSelection -only-testing:ForgeConductorUITests/ForgeConductorUITests/testOperatorStateReconnectsAfterGUIRelaunch",
+  "ended_at": "2026-08-30T13:43:16.910709+00:00",
+  "environment": {
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-P10-Security",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "exit_code": 0,
+  "id": "EVID-20260830T134146Z-a2848e6490",
+  "kind": "p10-signed-settings-ui-final",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [
+    "FC-UI-QUALIFICATION-001",
+    "FC-PROJECT-ROOT-SETTINGS-001",
+    "FC-SHELL-COMPAT-QUALIFICATION-001",
+    "FC-PRIVILEGED-SERVICE-LIFECYCLE-001"
+  ],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 9289759,
+    "file_count": 250,
+    "schema_version": 1,
+    "sha256": "8935956c67e00f63c9ad5f4e35d5f481c27d3a2d4bee97640f16d2550fa2a100"
+  },
+  "source_manifest_after": {
+    "bytes": 9289759,
+    "file_count": 250,
+    "schema_version": 1,
+    "sha256": "8935956c67e00f63c9ad5f4e35d5f481c27d3a2d4bee97640f16d2550fa2a100"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-08-30T13:41:46.112395+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

@@ -2,16 +2,16 @@
   "schema_version": 2,
   "phase": "P10",
   "status": "incomplete",
-  "generated_at": "2026-08-28T12:50:48Z",
+  "generated_at": "2026-08-31T04:04:26Z",
   "tested_tree": {
-    "head": "6288210d82270b26add5f0e078d150bc4377bd62",
+    "head": "36d1f3e9af30beb756c5741c6a9d8f4779827a5b",
     "working_tree": true
   },
   "source_manifest": {
-    "bytes": 9082957,
-    "file_count": 242,
+    "bytes": 10009211,
+    "file_count": 259,
     "schema_version": 1,
-    "sha256": "bc7b2f66d381d8fa4cd51b9e4da78b8c8486572385e05425c07d94922e8c3106"
+    "sha256": "92fdee8b39d3defc81b5102c0c13777225d218267b00d1d9874b9cb80aa2728e"
   },
   "baseline": {
     "curated_feature_count": 66,
@@ -20,16 +20,26 @@
   },
   "current_automated_results": {
     "swiftpm_debug_strict": {
-      "evidence_id": "EVID-20260828T124332Z-1e2a050c0e",
-      "executed": 657,
-      "skipped": 4,
+      "evidence_id": "EVID-20260831T035742Z-50132edfb8",
+      "executed": 776,
+      "skipped": 2,
       "failures": 0
     },
     "swiftpm_release_strict": {
-      "evidence_id": "EVID-20260828T124624Z-00a3dd27c2",
-      "executed": 657,
-      "skipped": 4,
+      "evidence_id": "EVID-20260831T040038Z-09ae71112e",
+      "executed": 776,
+      "skipped": 2,
       "failures": 0
+    },
+    "signed_shell_manager": {
+      "status": "passed_bounded",
+      "evidence_id": "EVID-20260831T035638Z-5798086c52",
+      "source_head": "36d1f3e9af30beb756c5741c6a9d8f4779827a5b",
+      "overall_report_status": "partial",
+      "scenario_status": "passed",
+      "shell_probes_passed": 4,
+      "settings_ui_status": "blocked",
+      "cleanup_status": "partial"
     },
     "cli_compatibility": {
       "status": "passed",
@@ -75,6 +85,7 @@
     "legacy CLI command and option help contract",
     "all historical manager HTTP success semantics",
     "all historical MCP tool names, descriptions, and non-narrowed schemas",
+    "established synchronous /bin/bash -lc shell_exec semantics with additive clean-profile bash.run",
     "native operator console",
     "managed continuity implementation with supporting direct-adapter provider evidence",
     "runtime v3 execution and run-scoped cancellation",
@@ -83,33 +94,41 @@
   "removed": [],
   "unknown": [],
   "untested": [
-    "native signed UI command, settings, accessibility, reconnect, and redaction flow",
-    "FC-SHELL-COMPAT-QUALIFICATION-001 native Settings visibility, control, execution, and real app/manager relaunch",
-    "post-quarantine final-component substitution residual",
+    "current-source native signed UI command, settings, accessibility, reconnect, and redaction flow",
+    "signed 57-row distinct-process privileged-filesystem adversarial, atomic-swap, crash, volume, signature, and lifecycle matrix",
+    "same-UID source-parent relocation before capture and final authorization-metadata-to-unlinkat residual races",
+    "case-, role-, iteration-, barrier-, mount-, crash-phase-, fixture-, and formal-predicate semantic binding for qualification artifacts",
     "manager-owned real-provider forced rollover with fencing, GUI-closed continuation, and crash recovery"
   ],
   "ui": {
     "implementation_present": true,
-    "behavioral_status": "blocked",
-    "developer_mode": "disabled",
-    "configured_team_signing_identity_present": false,
-    "xctest_attempts": 3,
-    "passing_xctest_attempts": 0,
-    "build_only_evidence_id": "EVID-20260828T124634Z-c6c0c861da",
+    "behavioral_status": "partial",
+    "developer_mode": "enabled",
+    "configured_team_signing_identity_present": true,
+    "xctest_attempts": 1,
+    "passing_xctest_attempts": 1,
+    "signed_settings_evidence_id": "EVID-20260830T153118Z-752f058222",
+    "build_only_evidence_id": "EVID-20260830T211007Z-760c293557",
     "compiled": true,
-    "executed": false,
+    "executed": true,
+    "executed_cases": 6,
+    "current_source": false,
     "release_blocking": true,
     "issue_id": "FC-UI-QUALIFICATION-001",
-    "evidence": ".forge-autonomy-state/evidence/FC-UI-001/test-results.json"
+    "remaining": [
+      "current-source production NSOpenPanel observation",
+      "real SMAppService approval, update, disable, and installed-helper identity",
+      "Developer ID Release signing, archive, notarization, staple, and Gatekeeper"
+    ]
   },
   "migration_report": {
     "status": "passed",
     "path": ".forge-codex/evidence/P10-migration-report.json"
   },
   "remaining_requirements": [
-    "authorize and pass the native signed UI lane",
-    "keep FC-SHELL-COMPAT-QUALIFICATION-001 open and release-blocking until the signed native Settings lane proves visibility, control, execution, and app/manager restart behavior",
-    "retain FC-FILESYSTEM-PATH-TOCTOU-001 as open E2 until an identity-conditional mutation or independent privilege boundary is available",
+    "pass the current-source native signed UI and production signing lane",
+    "retain FC-FILESYSTEM-PATH-TOCTOU-001 as open E2 until the required identity-conditional boundary and signed 57-row qualification evidence exist",
+    "bind every privileged-filesystem artifact semantically to its exact case, role, iteration, barrier, mount, crash phase, fixture, and formal predicate",
     "run the complete manager-owned real-provider forced-rollover authority scenario"
   ]
 }

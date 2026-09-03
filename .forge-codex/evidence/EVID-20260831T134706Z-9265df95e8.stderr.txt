@@ -1,0 +1,7 @@
+** BUILD FAILED **
+
+
+The following build commands failed:
+	PhaseScriptExecution Seal\ Filesystem\ Daemon\ Identity /Users/jimdaley/Library/Developer/Xcode/DerivedData/ForgeConductor-E2-LaneA-41c592f7344a/Build/Intermediates.noindex/ForgeConductor.build/Debug/forge-conductor.build/Script-E2F500000000000000000046.sh (in target 'forge-conductor' from project 'ForgeConductor')
+	Building project ForgeConductor with scheme ForgeConductor and configuration Debug
+(2 failures)

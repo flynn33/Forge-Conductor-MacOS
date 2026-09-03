@@ -6,13 +6,17 @@ Performance and reliability work must not silently remove, rename, disable, or n
 
 ## Baseline construction
 
-Before behavior-changing edits, run:
+Before behavior-changing edits, validate the checked-in schema-v2 baseline and
+its authoritative registry:
 
 ```bash
-./.forge-codex/scripts/feature_inventory.py --repo .
+python3 .forge-codex/scripts/test_p10_feature_baseline.py
 ```
 
-Then inspect and complete `.forge-codex/state/feature-baseline.json`.
+Then inspect `.forge-codex/state/feature-baseline.json` and the canonical
+`.forge-codex/specifications/p10-feature-registry.v1.json`. The legacy
+`feature_inventory.py` emits an incompatible schema-v1 discovery artifact and
+must never overwrite the authoritative schema-v2 baseline.
 
 The inventory must cover:
 

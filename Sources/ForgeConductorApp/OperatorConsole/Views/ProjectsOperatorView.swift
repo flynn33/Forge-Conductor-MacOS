@@ -58,6 +58,51 @@ struct ProjectsOperatorView: View {
                     if let notice = viewModel.notice {
                         OperatorNoticeBanner(message: notice)
                     }
+                    if let pendingPath = viewModel.pendingRegistrationPath {
+                        GroupBox("Registration reconciliation") {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text(
+                                    viewModel.pendingRegistrationProjectID == nil
+                                        ? "Both bounded registration attempts lost their response. The outcome is unknown; replaying the exact request is idempotent."
+                                        : "The manager retained this exact registration after a partial transition. When its project is in maintenance, normal work remains fenced. The request is reconstructed after restart."
+                                )
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                LabeledContent("Pending path") {
+                                    OperatorIdentifier(pendingPath)
+                                }
+                                if let projectID = viewModel.pendingRegistrationProjectID {
+                                    LabeledContent("Project UUID") {
+                                        OperatorIdentifier(projectID)
+                                    }
+                                }
+                                if let message = viewModel.pendingRegistrationMessage {
+                                    Text(message)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                HStack {
+                                    Button("Reconcile Registration") {
+                                        viewModel.reconcilePendingRegistration()
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .disabled(viewModel.isLoading)
+                                    .accessibilityIdentifier("project-registration-reconcile")
+                                    if viewModel.canDiscardPendingRegistration {
+                                        Button("Dismiss") {
+                                            viewModel.discardPendingRegistration()
+                                        }
+                                        .disabled(viewModel.isLoading)
+                                        .accessibilityIdentifier(
+                                            "project-registration-reconcile-dismiss"
+                                        )
+                                    }
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .accessibilityIdentifier("project-registration-reconciliation")
+                    }
                     if let project = viewModel.selectedProject {
                         projectDetail(project)
                     } else if viewModel.errorMessage == nil, !viewModel.isLoading {
@@ -98,7 +143,10 @@ struct ProjectsOperatorView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     LabeledContent("Name", value: project.displayName)
                     LabeledContent("Project UUID") { OperatorIdentifier(project.projectID) }
-                    LabeledContent("Canonical root") { OperatorIdentifier(project.canonicalRoot) }
+                    LabeledContent("Canonical root") {
+                        OperatorIdentifier(project.canonicalRoot)
+                            .accessibilityIdentifier("project-canonical-root")
+                    }
                     LabeledContent("Generation", value: "\(project.projectGeneration)")
                         .accessibilityIdentifier("project-generation")
                     LabeledContent("Lifecycle") { OperatorStateBadge(state: project.lifecycleState) }
@@ -177,10 +225,47 @@ struct ProjectsOperatorView: View {
                 .accessibilityIdentifier("project-reset-receipt")
             }
 
+            if let pendingPath = viewModel.pendingRelinkPath {
+                GroupBox("Relink reconciliation") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(
+                            "The last relink did not return a confirmed receipt. "
+                                + "Replaying the exact project, generation, and path is idempotent "
+                                + "and lets the manager reconcile a commit whose response was lost."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        LabeledContent("Pending path") {
+                            OperatorIdentifier(pendingPath)
+                        }
+                        HStack {
+                            Button("Reconcile Relink") {
+                                viewModel.reconcilePendingRelink()
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(viewModel.isLoading)
+                            .accessibilityIdentifier("project-relink-reconcile")
+                            if viewModel.canDiscardPendingRelink {
+                                Button("Dismiss") {
+                                    viewModel.discardPendingRelink()
+                                }
+                                .disabled(viewModel.isLoading)
+                                .accessibilityIdentifier("project-relink-reconcile-dismiss")
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .accessibilityIdentifier("project-relink-reconciliation")
+            }
+
             HStack {
-                Button("Relink…") {}
-                    .disabled(true)
-                    .help("The manager does not advertise a relink command in this build.")
+                Button("Relink…") {
+                    chooseRelinkFolder(for: project)
+                }
+                .disabled(viewModel.isLoading || project.lifecycleState != "active")
+                .help("Choose another location for this same Git repository.")
+                .accessibilityIdentifier("project-relink")
                 Spacer()
                 Button("Reset Generation…", role: .destructive) {
                     showingResetConfirmation = true
@@ -226,5 +311,29 @@ struct ProjectsOperatorView: View {
         registrationPath = url.standardizedFileURL.path
         registrationName = url.lastPathComponent
         showingRegistration = true
+    }
+
+    /// Uses the native directory picker in production. UI qualification can
+    /// supply one explicit selection without trying to automate the system-owned
+    /// panel process.
+    private func chooseRelinkFolder(for project: OperatorProject) {
+        let environment = ProcessInfo.processInfo.environment
+        if CommandLine.arguments.contains("--uitesting"),
+           let path = environment["FORGE_PROJECT_RELINK_UI_TEST_SELECTION"] {
+            viewModel.relinkSelectedProject(to: path)
+            return
+        }
+
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.directoryURL = URL(fileURLWithPath: project.canonicalRoot, isDirectory: true)
+            .deletingLastPathComponent()
+        panel.prompt = "Relink Project"
+        panel.message = "Choose the new location of \(project.displayName). Forge Conductor will verify that it is the same Git repository."
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        viewModel.relinkSelectedProject(to: url.standardizedFileURL.path)
     }
 }

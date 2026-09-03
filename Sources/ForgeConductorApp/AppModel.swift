@@ -49,10 +49,20 @@ public final class AppModel: ObservableObject {
     @Published public var setShellEnabled: Bool = true
     @Published public var setShellTimeout: Int = 30
     @Published public var setAutoRestart: Bool = true
+    @Published public var setAllowedRoots: [String] = []
+    @Published public private(set) var allowedRootsMessage: String?
     @Published public private(set) var shellPolicyOrigin: String = "default_enabled"
     @Published public private(set) var shellMigrationState: String = "not_required"
     @Published public private(set) var shellMigrationReceiptValid: Bool = false
     @Published public private(set) var shellRuntimeCapabilities = ShellRuntimeCapabilities.detect()
+    @Published public private(set) var secureFilesystemServiceStatus: SecureFilesystemServiceStatus = .notFound
+    @Published public private(set) var secureFilesystemOperationalHealth =
+        SecureFilesystemOperationalHealth.initial
+    @Published public private(set) var secureFilesystemServiceMessage: String?
+    @Published public private(set) var secureFilesystemSettingsOperationState =
+        SecureFilesystemSettingsOperationState()
+    @Published public private(set) var secureFilesystemServiceLifecycleState =
+        SecureFilesystemServiceLifecycleState.checking
 
     public private(set) var app: ForgeApp?
     public private(set) var manager: ManagerNode?
@@ -67,8 +77,12 @@ public final class AppModel: ObservableObject {
     private var telemetryBag: AnyCancellable?
     private var managerPollInFlight = false
     private var remoteManagerLastError: String?
+    private let secureFilesystemService = SecureFilesystemServiceController()
+    private var secureFilesystemOperationTask: Task<Void, Never>?
+    private var secureFilesystemLifecycleObservationGate =
+        SecureFilesystemServiceLifecycleObservationGate()
 
-    public enum AppTab: String, CaseIterable, Identifiable {
+    public enum AppTab: String, CaseIterable, Identifiable, Sendable {
         case rig = "FORGE RIG"
         case mcp = "LM Studio MCP"
         case agents = "Agents"
@@ -105,6 +119,9 @@ public final class AppModel: ObservableObject {
     }
 
     public init() {
+        secureFilesystemService.setLifecycleStateObserver { [weak self] observation in
+            self?.applySecureFilesystemLifecycleObservation(observation)
+        }
         bootstrap()
         startManagerPoll()
         bindTelemetryMirror()
@@ -156,6 +173,7 @@ public final class AppModel: ObservableObject {
                 attachToOrStartManager(app: forgeApp)
             }
             loadSettingsFromConfig()
+            bootstrapSecureFilesystemService(paths: forgeApp.paths)
             refreshLMStudioPluginStatus()
             refreshDiagnosticsPreview()
             forgeApp.diagnostics.info("gui_bootstrap", [
@@ -571,6 +589,9 @@ public final class AppModel: ObservableObject {
         setShellEnabled = app.config.bool("shell", "enabled", default: true)
         setShellTimeout = app.config.int("shell", "default_timeout_sec", default: 30)
         setAutoRestart = app.config.bool("manager", "auto_restart", default: true)
+        setAllowedRoots = ManagerSettingsNormalizer.canonicalAllowedRoots(
+            app.config.model.allowedRoots
+        )
         let shell = app.config.shellPolicyStatus
         shellPolicyOrigin = shell.policyOrigin
         shellMigrationState = shell.migration.state
@@ -601,7 +622,8 @@ public final class AppModel: ObservableObject {
             watchdogIntervalSec: setWatchdog,
             sessionIdleTTLSec: setIdleTTL,
             shellEnabled: setShellEnabled,
-            shellTimeoutSec: setShellTimeout
+            shellTimeoutSec: setShellTimeout,
+            allowedRoots: setAllowedRoots
         )
         if let client = remoteManager {
             managerMessage = "Saving settings…"
@@ -651,6 +673,552 @@ public final class AppModel: ObservableObject {
         }
     }
 
+    public var secureFilesystemServiceStatusLabel: String {
+        switch secureFilesystemServiceStatus {
+        case .enabled: "Enabled"
+        case .requiresApproval: "Approval required"
+        case .notRegistered: "Not enabled"
+        case .notFound: "Not packaged or invalid"
+        }
+    }
+
+    public var secureFilesystemOperationalStatusLabel: String {
+        switch secureFilesystemOperationalHealth.operationalState {
+        case .operational: "Operational"
+        case .registeredUnavailable: "Registered, not responding"
+        case .requiresApproval: "Waiting for approval"
+        case .notRegistered: "Not registered"
+        case .notPackaged: "Not packaged or invalid"
+        }
+    }
+
+    public var secureFilesystemRecoveryDebtLabel: String {
+        let health = secureFilesystemOperationalHealth
+        guard health.debtStatusAvailable else { return "Unavailable" }
+        return "Local \(health.localQuarantineOccupied)/\(health.localQuarantineCapacity) · Protected \(health.privilegedRecoveryRetained)/\(health.privilegedRecoveryCapacity)"
+    }
+
+    public var secureFilesystemServiceLifecycleStatusLabel: String {
+        secureFilesystemServiceLifecycleState.operatorStatusLabel
+    }
+
+    public var secureFilesystemServiceLifecycleRecoveryActionLabel: String {
+        secureFilesystemServiceLifecycleState.recoveryActionLabel
+    }
+
+    public var secureFilesystemSettingsControlAvailability:
+        SecureFilesystemSettingsControlAvailability
+    {
+        SecureFilesystemSettingsControlAvailability(
+            registrationStatus: secureFilesystemServiceStatus,
+            operationState: secureFilesystemSettingsOperationState,
+            lifecycleState: secureFilesystemServiceLifecycleState
+        )
+    }
+
+    public var secureFilesystemServiceOperationStatusLabel: String {
+        if let operation = secureFilesystemSettingsOperationState.activeOperation {
+            return operation.accessibilityLabel
+        }
+        return secureFilesystemServiceLifecycleState.phase == .settled
+            ? "Idle"
+            : secureFilesystemServiceLifecycleStatusLabel
+    }
+
+    public var isSecureFilesystemServiceOperationActive: Bool {
+        secureFilesystemSettingsOperationState.isActive
+    }
+
+    public var isUpdatingSecureFilesystemService: Bool {
+        secureFilesystemSettingsOperationState.activeOperation == .update
+    }
+
+    public var isReconcilingSecureFilesystemRecovery: Bool {
+        secureFilesystemSettingsOperationState.activeOperation == .reconcile
+    }
+
+    private func bootstrapSecureFilesystemService(paths: AppPaths) {
+        guard let generation = beginSecureFilesystemServiceOperation(.bootstrap) else { return }
+        guard let observationContext = beginSecureFilesystemLifecycleObservation() else {
+            finishSecureFilesystemServiceOperation(.bootstrap, generation: generation)
+            return
+        }
+        let service = secureFilesystemService
+        secureFilesystemOperationTask = Task { @MainActor [weak self] in
+            let observedState = await service.configureLifecycleFence(paths: paths)
+            guard !Task.isCancelled else { return }
+            var lifecycleFailure: String?
+            if observedState.canRetryResolution {
+                do {
+                    _ = try await service.recoverInterruptedLifecycle(
+                        lifecycleObservationContext: observationContext
+                    )
+                } catch {
+                    lifecycleFailure = error.localizedDescription
+                }
+            }
+            guard !Task.isCancelled else { return }
+            let health = await service.operationalHealth(paths: paths, reconcile: false)
+            let lifecycleState = await service.lifecycleState()
+            guard !Task.isCancelled,
+                  let self,
+                  ownsSecureFilesystemServiceOperation(.bootstrap, generation: generation)
+            else { return }
+            applySecureFilesystemOperationalHealth(health)
+            applySecureFilesystemLifecycleState(
+                lifecycleState,
+                context: observationContext
+            )
+            if let lifecycleFailure,
+               lifecycleState.blocksLifecycleMutation {
+                secureFilesystemServiceMessage =
+                    "Interrupted service lifecycle change remains unresolved: \(lifecycleFailure)"
+            } else if let lifecycleFailure {
+                secureFilesystemServiceMessage =
+                    "Interrupted lifecycle request completed with an error; lifecycle fence cleared: \(lifecycleFailure)"
+            } else if observedState.canRetryResolution {
+                secureFilesystemServiceMessage =
+                    "Interrupted service lifecycle change resolved"
+            } else if observedState.phase == .stateInvalid {
+                secureFilesystemServiceMessage =
+                    "Protected filesystem lifecycle fence is invalid; lifecycle changes remain blocked"
+            }
+            finishSecureFilesystemServiceOperation(.bootstrap, generation: generation)
+        }
+    }
+
+    public func refreshSecureFilesystemServiceStatus(reconcile: Bool = false) {
+        guard let paths = app?.paths else { return }
+        let operation: SecureFilesystemSettingsOperation = reconcile ? .reconcile : .refresh
+        guard let generation = beginSecureFilesystemServiceOperation(operation) else { return }
+        let service = secureFilesystemService
+        secureFilesystemOperationTask = Task { @MainActor [weak self] in
+            await Self.waitForSecureFilesystemUITestObservationWindow()
+            guard !Task.isCancelled else { return }
+            let health = await service.operationalHealth(
+                paths: paths,
+                reconcile: reconcile
+            )
+            let lifecycleState = await service.lifecycleState()
+            guard !Task.isCancelled,
+                  let self,
+                  ownsSecureFilesystemServiceOperation(operation, generation: generation)
+            else { return }
+            applySecureFilesystemOperationalHealth(health)
+            secureFilesystemServiceLifecycleState = lifecycleState
+            finishSecureFilesystemServiceOperation(operation, generation: generation)
+        }
+    }
+
+    public func reconcileSecureFilesystemRecovery() {
+        refreshSecureFilesystemServiceStatus(reconcile: true)
+    }
+
+    public func recoverSecureFilesystemServiceLifecycle() {
+        guard let paths = app?.paths,
+              secureFilesystemServiceLifecycleState.canRetryResolution,
+              let generation = beginSecureFilesystemServiceOperation(.lifecycleRecovery)
+        else { return }
+        guard let observationContext = beginSecureFilesystemLifecycleObservation() else {
+            finishSecureFilesystemServiceOperation(
+                .lifecycleRecovery,
+                generation: generation
+            )
+            return
+        }
+        secureFilesystemServiceMessage =
+            "Resuming the interrupted protected filesystem service lifecycle…"
+        let service = secureFilesystemService
+        secureFilesystemOperationTask = Task { @MainActor [weak self] in
+            await Self.waitForSecureFilesystemUITestObservationWindow()
+            guard !Task.isCancelled else { return }
+            let failure: String?
+            do {
+                _ = try await service.recoverInterruptedLifecycle(
+                    lifecycleObservationContext: observationContext
+                )
+                failure = nil
+            } catch {
+                failure = error.localizedDescription
+            }
+            guard !Task.isCancelled else { return }
+            let health = await service.operationalHealth(paths: paths, reconcile: false)
+            let lifecycleState = await service.lifecycleState()
+            guard !Task.isCancelled,
+                  let self,
+                  ownsSecureFilesystemServiceOperation(
+                      .lifecycleRecovery,
+                      generation: generation
+                  )
+            else { return }
+            applySecureFilesystemOperationalHealth(health)
+            applySecureFilesystemLifecycleState(
+                lifecycleState,
+                context: observationContext
+            )
+            if let failure, lifecycleState.blocksLifecycleMutation {
+                secureFilesystemServiceMessage =
+                    "Interrupted service lifecycle change remains unresolved: \(failure)"
+            } else if let failure {
+                secureFilesystemServiceMessage =
+                    "Interrupted lifecycle request completed with an error; lifecycle fence cleared: \(failure)"
+            } else {
+                secureFilesystemServiceMessage = "Interrupted service lifecycle change resolved"
+            }
+            finishSecureFilesystemServiceOperation(
+                .lifecycleRecovery,
+                generation: generation
+            )
+        }
+    }
+
+    public func enableSecureFilesystemService() {
+        guard let paths = app?.paths,
+              let generation = beginSecureFilesystemServiceOperation(.enable)
+        else { return }
+        guard let observationContext = beginSecureFilesystemLifecycleObservation() else {
+            finishSecureFilesystemServiceOperation(.enable, generation: generation)
+            return
+        }
+        secureFilesystemServiceMessage = "Enabling the protected filesystem service…"
+        let service = secureFilesystemService
+        secureFilesystemOperationTask = Task { @MainActor [weak self] in
+            await Self.waitForSecureFilesystemUITestObservationWindow()
+            guard !Task.isCancelled else { return }
+            let registrationStatus: SecureFilesystemServiceStatus?
+            let failure: String?
+            do {
+                registrationStatus = try await service.register(
+                    lifecycleObservationContext: observationContext
+                )
+                failure = nil
+            } catch {
+                registrationStatus = nil
+                failure = error.localizedDescription
+            }
+            guard !Task.isCancelled else { return }
+            let health = await service.operationalHealth(paths: paths, reconcile: false)
+            let lifecycleState = await service.lifecycleState()
+            guard !Task.isCancelled,
+                  let self,
+                  ownsSecureFilesystemServiceOperation(.enable, generation: generation)
+            else { return }
+            applySecureFilesystemOperationalHealth(health)
+            applySecureFilesystemLifecycleState(
+                lifecycleState,
+                context: observationContext
+            )
+            if let failure {
+                secureFilesystemServiceMessage = "Enable failed: \(failure)"
+            } else if let registrationStatus {
+                switch registrationStatus {
+                case .enabled:
+                    secureFilesystemServiceMessage = "Protected filesystem service registered; checking runtime health"
+                case .requiresApproval:
+                    secureFilesystemServiceMessage = "Approve Forge Conductor in System Settings to enable protected filesystem mutations"
+                case .notRegistered:
+                    secureFilesystemServiceMessage = "Protected filesystem service was not enabled"
+                case .notFound:
+                    secureFilesystemServiceMessage = "Protected filesystem service registration status is unavailable"
+                }
+            } else {
+                secureFilesystemServiceMessage = "Protected filesystem service registration status is unavailable"
+            }
+            finishSecureFilesystemServiceOperation(.enable, generation: generation)
+        }
+    }
+
+    public func disableSecureFilesystemService() {
+        guard let paths = app?.paths,
+              let generation = beginSecureFilesystemServiceOperation(.disable)
+        else { return }
+        guard let observationContext = beginSecureFilesystemLifecycleObservation() else {
+            finishSecureFilesystemServiceOperation(.disable, generation: generation)
+            return
+        }
+        secureFilesystemServiceMessage = "Disabling the protected filesystem service…"
+        let service = secureFilesystemService
+        secureFilesystemOperationTask = Task { @MainActor [weak self] in
+            await Self.waitForSecureFilesystemUITestObservationWindow()
+            guard !Task.isCancelled else { return }
+            let failure: String?
+            do {
+                _ = try await service.unregister(
+                    lifecycleObservationContext: observationContext
+                )
+                failure = nil
+            } catch {
+                failure = error.localizedDescription
+            }
+            guard !Task.isCancelled else { return }
+            let health = await service.operationalHealth(paths: paths, reconcile: false)
+            let lifecycleState = await service.lifecycleState()
+            guard !Task.isCancelled,
+                  let self,
+                  ownsSecureFilesystemServiceOperation(.disable, generation: generation)
+            else { return }
+            applySecureFilesystemOperationalHealth(health)
+            applySecureFilesystemLifecycleState(
+                lifecycleState,
+                context: observationContext
+            )
+            secureFilesystemServiceMessage = failure.map { "Disable failed: \($0)" }
+                ?? "Protected filesystem service disabled"
+            finishSecureFilesystemServiceOperation(.disable, generation: generation)
+        }
+    }
+
+    public func reinstallSecureFilesystemService() {
+        guard let paths = app?.paths,
+              let generation = beginSecureFilesystemServiceOperation(.update)
+        else { return }
+        guard let observationContext = beginSecureFilesystemLifecycleObservation() else {
+            finishSecureFilesystemServiceOperation(.update, generation: generation)
+            return
+        }
+        secureFilesystemServiceMessage = "Replacing the protected filesystem service…"
+        let service = secureFilesystemService
+        secureFilesystemOperationTask = Task { @MainActor [weak self] in
+            await Self.waitForSecureFilesystemUITestObservationWindow()
+            guard !Task.isCancelled else { return }
+            let registrationStatus: SecureFilesystemServiceStatus?
+            let failure: String?
+            do {
+                registrationStatus = try await service.reinstall(
+                    lifecycleObservationContext: observationContext
+                )
+                failure = nil
+            } catch {
+                registrationStatus = nil
+                failure = error.localizedDescription
+            }
+            guard !Task.isCancelled else { return }
+            let health = await service.operationalHealth(paths: paths, reconcile: false)
+            let lifecycleState = await service.lifecycleState()
+            guard !Task.isCancelled,
+                  let self,
+                  ownsSecureFilesystemServiceOperation(.update, generation: generation)
+            else { return }
+            applySecureFilesystemOperationalHealth(health)
+            applySecureFilesystemLifecycleState(
+                lifecycleState,
+                context: observationContext
+            )
+            if let failure {
+                secureFilesystemServiceMessage = "Update failed: \(failure)"
+            } else if let registrationStatus {
+                switch registrationStatus {
+                case .enabled:
+                    secureFilesystemServiceMessage = "Protected filesystem service replacement registered; checking runtime health"
+                case .requiresApproval:
+                    secureFilesystemServiceMessage = "Replacement registered; approve Forge Conductor in System Settings"
+                case .notRegistered:
+                    secureFilesystemServiceMessage = "Protected filesystem service replacement was not registered"
+                case .notFound:
+                    secureFilesystemServiceMessage = "Protected filesystem service registration status is unavailable"
+                }
+            } else {
+                secureFilesystemServiceMessage = "Protected filesystem service registration status is unavailable"
+            }
+            finishSecureFilesystemServiceOperation(.update, generation: generation)
+        }
+    }
+
+    public func openSecureFilesystemApprovalSettings() {
+        guard let generation = beginSecureFilesystemServiceOperation(.approval) else { return }
+        let service = secureFilesystemService
+        secureFilesystemOperationTask = Task { @MainActor [weak self] in
+            await Self.waitForSecureFilesystemUITestObservationWindow()
+            guard !Task.isCancelled else { return }
+            service.openApprovalSettings()
+            await Task.yield()
+            guard !Task.isCancelled,
+                  let self,
+                  ownsSecureFilesystemServiceOperation(.approval, generation: generation)
+            else { return }
+            finishSecureFilesystemServiceOperation(.approval, generation: generation)
+        }
+    }
+
+    public func cancelSecureFilesystemServiceOperation() {
+        let cancelledTask = secureFilesystemOperationTask
+        let cancelledOperation = secureFilesystemSettingsOperationState.activeOperation
+        let cancelledObservationContext =
+            secureFilesystemLifecycleObservationGate.activeContext
+        cancelledTask?.cancel()
+        secureFilesystemOperationTask = nil
+        var nextState = secureFilesystemSettingsOperationState
+        nextState.cancel()
+        secureFilesystemSettingsOperationState = nextState
+        guard cancelledOperation?.mayAwaitServiceUnregister == true else { return }
+
+        let intent: SecureFilesystemServiceLifecycleIntent?
+        switch cancelledOperation {
+        case .enable:
+            intent = .enable
+        case .update:
+            intent = .update
+        case .disable:
+            intent = .disable
+        case .bootstrap, .lifecycleRecovery:
+            intent = secureFilesystemServiceLifecycleState.intent
+        case .approval, .refresh, .reconcile, nil:
+            intent = nil
+        }
+        secureFilesystemServiceLifecycleState = .cancelled(intent: intent)
+        let service = secureFilesystemService
+        Task { @MainActor [weak self] in
+            await cancelledTask?.value
+            let durableState = await service.lifecycleState()
+            guard let self,
+                  !secureFilesystemSettingsOperationState.isActive else { return }
+            if let cancelledObservationContext {
+                applySecureFilesystemLifecycleState(
+                    durableState,
+                    context: cancelledObservationContext
+                )
+            } else {
+                secureFilesystemServiceLifecycleState = durableState
+            }
+        }
+    }
+
+    private func beginSecureFilesystemServiceOperation(
+        _ operation: SecureFilesystemSettingsOperation
+    ) -> UInt64? {
+        guard secureFilesystemOperationTask == nil else { return nil }
+        var nextState = secureFilesystemSettingsOperationState
+        guard let generation = nextState.begin(operation) else { return nil }
+        secureFilesystemSettingsOperationState = nextState
+        return generation
+    }
+
+    private func beginSecureFilesystemLifecycleObservation()
+        -> SecureFilesystemServiceLifecycleObservationContext?
+    {
+        var gate = secureFilesystemLifecycleObservationGate
+        guard let context = gate.begin() else { return nil }
+        secureFilesystemLifecycleObservationGate = gate
+        return context
+    }
+
+    private func applySecureFilesystemLifecycleState(
+        _ state: SecureFilesystemServiceLifecycleState,
+        context: SecureFilesystemServiceLifecycleObservationContext
+    ) {
+        applySecureFilesystemLifecycleObservation(
+            SecureFilesystemServiceLifecycleObservation(
+                context: context,
+                state: state
+            )
+        )
+    }
+
+    private func applySecureFilesystemLifecycleObservation(
+        _ observation: SecureFilesystemServiceLifecycleObservation
+    ) {
+        var gate = secureFilesystemLifecycleObservationGate
+        guard let state = gate.accept(observation) else { return }
+        secureFilesystemLifecycleObservationGate = gate
+        secureFilesystemServiceLifecycleState = state
+    }
+
+    private func ownsSecureFilesystemServiceOperation(
+        _ operation: SecureFilesystemSettingsOperation,
+        generation: UInt64
+    ) -> Bool {
+        secureFilesystemSettingsOperationState.owns(operation, generation: generation)
+    }
+
+    private func finishSecureFilesystemServiceOperation(
+        _ operation: SecureFilesystemSettingsOperation,
+        generation: UInt64
+    ) {
+        var nextState = secureFilesystemSettingsOperationState
+        guard nextState.finish(operation, generation: generation) else { return }
+        secureFilesystemSettingsOperationState = nextState
+        secureFilesystemOperationTask = nil
+    }
+
+    /// Gives signed XCUI a bounded observation window without replacing the
+    /// production operation. The hook is ignored outside an explicit UI-test launch.
+    private static func waitForSecureFilesystemUITestObservationWindow() async {
+        let environment = ProcessInfo.processInfo.environment
+        guard CommandLine.arguments.contains("--uitesting"),
+              let rawDelay = environment["FORGE_FILESYSTEM_SETTINGS_UI_TEST_DELAY_MS"],
+              let delayMilliseconds = Int(rawDelay),
+              (1...2_000).contains(delayMilliseconds)
+        else { return }
+        try? await Task.sleep(for: .milliseconds(delayMilliseconds))
+    }
+
+    private func applySecureFilesystemOperationalHealth(
+        _ health: SecureFilesystemOperationalHealth
+    ) {
+        secureFilesystemOperationalHealth = health
+        secureFilesystemServiceStatus = health.registrationStatus
+        if health.releasedDuringReconciliation > 0 {
+            secureFilesystemServiceMessage =
+                "Released \(health.releasedDuringReconciliation) verified terminal recovery slot(s)"
+        }
+    }
+
+    /// Presents the native directory picker in production. UI tests may provide an
+    /// explicit path so the resulting controls can be exercised without automating a
+    /// process-owned system panel.
+    public func chooseAllowedRoot() {
+        let environment = ProcessInfo.processInfo.environment
+        if CommandLine.arguments.contains("--uitesting"),
+           let path = environment["FORGE_ALLOWED_ROOT_UI_TEST_SELECTION"] {
+            _ = addAllowedRoot(URL(fileURLWithPath: path, isDirectory: true))
+            return
+        }
+
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Authorize Folder"
+        panel.message = "Choose one project folder Forge Conductor may access."
+        guard panel.runModal() == .OK, let selected = panel.url else {
+            allowedRootsMessage = "No project folder was added"
+            return
+        }
+        _ = addAllowedRoot(selected)
+    }
+
+    /// Stages one canonical project root for the next settings save.
+    @discardableResult
+    public func addAllowedRoot(_ url: URL) -> Bool {
+        guard url.isFileURL,
+              let canonical = ManagerSettingsNormalizer.canonicalAllowedRoot(url.path) else {
+            allowedRootsMessage = url.standardizedFileURL.path == "/"
+                ? "The filesystem root cannot be authorized"
+                : "Choose an existing folder"
+            return false
+        }
+        guard !setAllowedRoots.contains(canonical) else {
+            allowedRootsMessage = "That project folder is already authorized"
+            return true
+        }
+        setAllowedRoots = ManagerSettingsNormalizer.canonicalAllowedRoots(
+            setAllowedRoots + [canonical]
+        )
+        allowedRootsMessage = "Project folder staged; choose Save settings to apply it"
+        return true
+    }
+
+    /// Stages removal of one project root for the next settings save.
+    public func removeAllowedRoot(_ path: String) {
+        let canonical = URL(fileURLWithPath: path, isDirectory: true)
+            .resolvingSymlinksInPath()
+            .standardizedFileURL
+            .path
+        setAllowedRoots.removeAll { $0 == canonical }
+        allowedRootsMessage = "Project folder removal staged; choose Save settings to apply it"
+    }
+
     private func apply(settings: ManagerSettings) {
         setHost = settings.dashboardHost
         setPort = settings.dashboardPort
@@ -664,6 +1232,7 @@ public final class AppModel: ObservableObject {
         shellMigrationState = settings.shellMigrationState
         shellMigrationReceiptValid = settings.shellMigrationReceiptValid
         shellRuntimeCapabilities = settings.shellRuntimeCapabilities
+        setAllowedRoots = ManagerSettingsNormalizer.canonicalAllowedRoots(settings.allowedRoots)
     }
 
     private func recordRemoteManagerFailure(action: String, error: Error) {

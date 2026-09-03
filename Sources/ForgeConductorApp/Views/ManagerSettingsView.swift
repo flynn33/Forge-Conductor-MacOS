@@ -15,6 +15,61 @@ struct ManagerSettingsView: View {
 
     var body: some View {
         Form {
+            Section("Authorized project folders") {
+                Text(
+                    "Forge Conductor denies project filesystem access until a folder is explicitly authorized. Choose folders here, then select Save settings."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+                if model.setAllowedRoots.isEmpty {
+                    Text("No project folders authorized")
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("settings-allowed-roots-empty")
+                } else {
+                    ForEach(Array(model.setAllowedRoots.enumerated()), id: \.element) { index, path in
+                        HStack(spacing: 8) {
+                            Image(systemName: "folder")
+                                .foregroundStyle(.secondary)
+                                .accessibilityHidden(true)
+                            Text(path)
+                                .font(.system(.body, design: .monospaced))
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                                .textSelection(.enabled)
+                                .help(path)
+                                .accessibilityLabel(path)
+                                .accessibilityIdentifier("settings-allowed-root-path-\(index)")
+                            Spacer(minLength: 8)
+                            Button {
+                                model.removeAllowedRoot(path)
+                            } label: {
+                                Label("Remove \(path)", systemImage: "minus.circle")
+                                    .labelStyle(.iconOnly)
+                            }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel("Remove authorized project folder \(path)")
+                            .accessibilityIdentifier("settings-allowed-root-remove-\(index)")
+                        }
+                    }
+                }
+
+                Button {
+                    model.chooseAllowedRoot()
+                } label: {
+                    Label("Add Folder…", systemImage: "plus")
+                }
+                .accessibilityLabel("Add authorized project folder")
+                .accessibilityIdentifier("settings-allowed-root-add")
+
+                if let message = model.allowedRootsMessage {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("settings-allowed-roots-message")
+                }
+            }
+
             Section {
                 LabeledContent("State", value: model.serviceState)
                 LabeledContent("Active", value: model.serviceActive ? "yes" : "no")
@@ -103,6 +158,124 @@ struct ManagerSettingsView: View {
                 .accessibilityIdentifier("shell-policy-migration-status")
             }
 
+            Section("Protected filesystem service") {
+                LabeledContent(
+                    "Registration",
+                    value: model.secureFilesystemServiceStatusLabel
+                )
+                .accessibilityIdentifier("settings-filesystem-service-status")
+
+                LabeledContent(
+                    "Operational health",
+                    value: model.secureFilesystemOperationalStatusLabel
+                )
+                .accessibilityIdentifier("settings-filesystem-service-operational-health")
+
+                LabeledContent(
+                    "Unresolved recovery debt",
+                    value: model.secureFilesystemRecoveryDebtLabel
+                )
+                .accessibilityIdentifier("settings-filesystem-recovery-debt")
+
+                LabeledContent(
+                    "Operation",
+                    value: model.secureFilesystemServiceOperationStatusLabel
+                )
+                .accessibilityIdentifier("settings-filesystem-operation-status")
+
+                LabeledContent(
+                    "Lifecycle fence",
+                    value: model.secureFilesystemServiceLifecycleStatusLabel
+                )
+                .accessibilityIdentifier("settings-filesystem-lifecycle-fence-status")
+
+                if model.secureFilesystemServiceLifecycleState.blocksLifecycleMutation {
+                    Label(
+                        "Service lifecycle changes are blocked until the pending macOS lifecycle action is resolved.",
+                        systemImage: "lock.trianglebadge.exclamationmark"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .accessibilityIdentifier("settings-filesystem-lifecycle-fence-warning")
+                }
+
+                Text(
+                    "Protected regular-file and symbolic-link deletes require the separately signed service. Production move and recursive directory delete remain unavailable until their signed-helper recovery protocols are implemented and qualified. Shell tools remain nonprivileged and are controlled independently above."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+                Text(
+                    "Reconcile verifies fixed-slot receipts and releases only terminal or exact-identity restored entries. Restoring retained quarantine entries to their original path is not supported."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("settings-filesystem-recovery-policy")
+
+                if model.secureFilesystemOperationalHealth.hasExhaustedLedger {
+                    Label(
+                        "A recovery ledger is full. New protected mutations remain blocked until verified debt is released.",
+                        systemImage: "exclamationmark.triangle.fill"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .accessibilityIdentifier("settings-filesystem-recovery-exhausted")
+                }
+
+                if let message = model.secureFilesystemServiceMessage {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("settings-filesystem-service-message")
+                }
+
+                HStack(spacing: 10) {
+                    Button("Enable") { model.enableSecureFilesystemService() }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(!model.secureFilesystemSettingsControlAvailability.enable)
+                        .accessibilityIdentifier("settings-filesystem-service-enable")
+                    Button("Update / Reinstall") {
+                        model.reinstallSecureFilesystemService()
+                    }
+                    .disabled(!model.secureFilesystemSettingsControlAvailability.update)
+                    .accessibilityIdentifier("settings-filesystem-service-reinstall")
+                    Button("Disable") { model.disableSecureFilesystemService() }
+                        .disabled(!model.secureFilesystemSettingsControlAvailability.disable)
+                        .accessibilityIdentifier("settings-filesystem-service-disable")
+                    Button("Open System Settings") {
+                        model.openSecureFilesystemApprovalSettings()
+                    }
+                    .disabled(!model.secureFilesystemSettingsControlAvailability.approval)
+                    .accessibilityIdentifier("settings-filesystem-service-approval")
+                    Button("Refresh") { model.refreshSecureFilesystemServiceStatus() }
+                        .disabled(!model.secureFilesystemSettingsControlAvailability.refresh)
+                        .accessibilityIdentifier("settings-filesystem-service-refresh")
+                    Button("Reconcile recovery") {
+                        model.reconcileSecureFilesystemRecovery()
+                    }
+                    .disabled(!model.secureFilesystemSettingsControlAvailability.reconcile)
+                    .accessibilityIdentifier("settings-filesystem-recovery-reconcile")
+                    if model.secureFilesystemServiceLifecycleState.canRetryResolution {
+                        Button(model.secureFilesystemServiceLifecycleRecoveryActionLabel) {
+                            model.recoverSecureFilesystemServiceLifecycle()
+                        }
+                        .disabled(
+                            !model.secureFilesystemSettingsControlAvailability.lifecycleRecovery
+                        )
+                        .accessibilityIdentifier(
+                            "settings-filesystem-lifecycle-recovery"
+                        )
+                    }
+                    if model.isSecureFilesystemServiceOperationActive {
+                        ProgressView()
+                            .controlSize(.small)
+                            .accessibilityLabel(model.secureFilesystemServiceOperationStatusLabel)
+                            .accessibilityIdentifier("settings-filesystem-operation-progress")
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+
             Section("Maintenance") {
                 Toggle("Auto-refresh telemetry", isOn: $model.autoRefresh)
                 Button("Refresh telemetry now") { model.refresh(force: true) }
@@ -148,7 +321,10 @@ struct ManagerSettingsView: View {
         }
         .formStyle(.grouped)
         .padding(16)
-        .onAppear { model.loadSettingsFromConfig() }
+        .onAppear {
+            model.loadSettingsFromConfig()
+            model.refreshSecureFilesystemServiceStatus()
+        }
     }
 
     @ViewBuilder

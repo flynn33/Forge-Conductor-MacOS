@@ -2,6 +2,7 @@
 // Focused lifecycle, output-bound, capability, and generation-fence proof for durable jobs.
 
 import Darwin
+import Security
 import SQLite3
 import XCTest
 @testable import ForgeConductorCore
@@ -215,6 +216,88 @@ final class RuntimeExecutionJobTests: XCTestCase {
         let descendantGone = await Self.waitUntilProcessIsGone(descendant)
         XCTAssertTrue(descendantGone)
         await fixture.close()
+    }
+
+    func testStoredContextCancellationTargetsExactlyOneQueuedOrActiveJob() async throws {
+        let fixture = try await Fixture.make()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let first = try await fixture.service.submit(
+            fixture.request(
+                kind: .bash,
+                profile: .bashNoProfile,
+                script: "while :; do sleep 1; done",
+                timeout: 30
+            )
+        )
+        let second = try await fixture.service.submit(
+            fixture.request(
+                kind: .bash,
+                profile: .bashNoProfile,
+                script: "while :; do sleep 1; done",
+                timeout: 30
+            )
+        )
+        let queued = try await fixture.service.submit(
+            fixture.request(
+                kind: .bash,
+                profile: .bashNoProfile,
+                script: "while :; do sleep 1; done",
+                timeout: 30
+            )
+        )
+        let firstRunning = await fixture.waitForState(first, expected: .running)
+        let secondRunning = await fixture.waitForState(second, expected: .running)
+        let thirdQueued = await fixture.waitForState(queued, expected: .queued)
+        XCTAssertTrue(firstRunning)
+        XCTAssertTrue(secondRunning)
+        XCTAssertTrue(thirdQueued)
+
+        let queuedReceipt = try await fixture.service.cancelStoredJob(jobID: queued)
+        XCTAssertEqual(queuedReceipt.jobID, queued)
+        XCTAssertEqual(queuedReceipt.state, .cancelled)
+        let firstBeforeActiveCancellation = try await fixture.service.status(
+            jobID: first,
+            context: fixture.context
+        )
+        let secondBeforeActiveCancellation = try await fixture.service.status(
+            jobID: second,
+            context: fixture.context
+        )
+        XCTAssertEqual(firstBeforeActiveCancellation.state, .running)
+        XCTAssertEqual(secondBeforeActiveCancellation.state, .running)
+
+        let storedContext = try await fixture.controlRepository.invocationContext(
+            for: ProjectBindingOwner(
+                kind: .runtimeJob,
+                id: first.uuidString.lowercased()
+            )
+        )
+        XCTAssertEqual(storedContext.runtimeJobID, first)
+        XCTAssertEqual(storedContext.projectID, fixture.projectID)
+        XCTAssertEqual(storedContext.authorizationScope, fixture.context.authorizationScope)
+
+        let receipt = try await fixture.service.cancelStoredJob(jobID: first)
+        XCTAssertEqual(receipt.jobID, first)
+        XCTAssertTrue(receipt.state == .cancelling || receipt.state == .cancelled)
+        let firstCancelled = await fixture.waitForState(first, expected: .cancelled)
+        XCTAssertTrue(firstCancelled)
+        let secondStatus = try await fixture.service.status(
+            jobID: second,
+            context: fixture.context
+        )
+        XCTAssertEqual(secondStatus.state, .running)
+
+        try await fixture.service.cancel(jobID: second, context: fixture.context)
+        let secondCancelled = await fixture.waitForState(second, expected: .cancelled)
+        XCTAssertTrue(secondCancelled)
+        await fixture.close()
+    }
+
+    func testOperatorCancellationStatePolicyAllowsOnlyQueuedAndRunningJobs() {
+        XCTAssertEqual(
+            Set(RuntimeJobState.allCases.filter(\.isOperatorCancellable)),
+            Set([.queued, .running])
+        )
     }
 
     func testLegacyShellAdapterTaskCancellationTerminatesDescendantProcessGroup() async throws {
@@ -1915,6 +1998,241 @@ final class RuntimeExecutionJobTests: XCTestCase {
                 return XCTFail("unexpected product-identity error: \(error)")
             }
         }
+    }
+
+    func testRuntimeLaunchGateApprovesOnlyProductSigningTeams() {
+        XCTAssertEqual(RuntimeLaunchGate.developmentTeamIdentifier, "9AQ2C2838M")
+        XCTAssertEqual(RuntimeLaunchGate.distributionTeamIdentifier, "2Y25RTLZET")
+        XCTAssertEqual(
+            RuntimeLaunchGate.approvedProductTeamIdentifiers,
+            ["9AQ2C2838M", "2Y25RTLZET"]
+        )
+    }
+
+    func testRuntimeLaunchGateMapsApprovedTeamsToExactCertificateClasses() throws {
+        let development = try XCTUnwrap(
+            RuntimeLaunchGate.requiredProductCodeSigningRequirement(
+                identifier: RuntimeLaunchGate.productIdentifier,
+                teamIdentifier: RuntimeLaunchGate.developmentTeamIdentifier
+            )
+        )
+        XCTAssertTrue(development.contains("anchor apple generic"))
+        XCTAssertTrue(development.contains("9AQ2C2838M"))
+        XCTAssertTrue(development.contains("1.2.840.113635.100.6.1.12"))
+        XCTAssertFalse(development.contains("1.2.840.113635.100.6.1.13"))
+
+        let distribution = try XCTUnwrap(
+            RuntimeLaunchGate.requiredProductCodeSigningRequirement(
+                identifier: RuntimeLaunchGate.productIdentifier,
+                teamIdentifier: RuntimeLaunchGate.distributionTeamIdentifier
+            )
+        )
+        XCTAssertTrue(distribution.contains("anchor apple generic"))
+        XCTAssertTrue(distribution.contains("2Y25RTLZET"))
+        XCTAssertTrue(distribution.contains("1.2.840.113635.100.6.1.13"))
+        XCTAssertFalse(distribution.contains("1.2.840.113635.100.6.1.12"))
+        XCTAssertNil(
+            RuntimeLaunchGate.requiredProductCodeSigningRequirement(
+                identifier: RuntimeLaunchGate.productIdentifier,
+                teamIdentifier: "UNAPPROVED1"
+            )
+        )
+    }
+
+    func testRuntimeLaunchGateDevelopmentTestRequirementIsNarrowAndCompiles() throws {
+        XCTAssertNil(
+            RuntimeLaunchGate.requiredProductCodeSigningRequirement(
+                identifier: RuntimeLaunchGate.developmentTestBundleIdentifier,
+                teamIdentifier: RuntimeLaunchGate.developmentTeamIdentifier
+            ),
+            "the test bundle must not become a production product role"
+        )
+        XCTAssertNil(
+            RuntimeLaunchGate.requiredProductCodeSigningRequirement(
+                identifier: RuntimeLaunchGate.developmentTestBundleIdentifier,
+                teamIdentifier: RuntimeLaunchGate.distributionTeamIdentifier
+            ),
+            "the test bundle must not become a distribution product role"
+        )
+
+        let requirement = try XCTUnwrap(
+            RuntimeLaunchGate.requiredDevelopmentTestCodeSigningRequirement(
+                identifier: RuntimeLaunchGate.developmentTestBundleIdentifier,
+                teamIdentifier: RuntimeLaunchGate.developmentTeamIdentifier
+            )
+        )
+        XCTAssertEqual(
+            requirement,
+            "anchor apple generic and identifier \"com.forge-conductor.tests\" "
+                + "and certificate leaf[subject.OU] = \"9AQ2C2838M\" "
+                + "and certificate leaf[field.1.2.840.113635.100.6.1.12] exists"
+        )
+        XCTAssertFalse(requirement.contains("1.2.840.113635.100.6.1.13"))
+
+        var compiledRequirement: SecRequirement?
+        XCTAssertEqual(
+            SecRequirementCreateWithString(
+                requirement as CFString,
+                SecCSFlags(rawValue: 0),
+                &compiledRequirement
+            ),
+            errSecSuccess
+        )
+        XCTAssertNotNil(compiledRequirement)
+        XCTAssertNil(
+            RuntimeLaunchGate.requiredDevelopmentTestCodeSigningRequirement(
+                identifier: RuntimeLaunchGate.developmentTestBundleIdentifier,
+                teamIdentifier: RuntimeLaunchGate.distributionTeamIdentifier
+            )
+        )
+        XCTAssertNil(
+            RuntimeLaunchGate.requiredDevelopmentTestCodeSigningRequirement(
+                identifier: "com.forge-conductor.uitests",
+                teamIdentifier: RuntimeLaunchGate.developmentTeamIdentifier
+            )
+        )
+    }
+
+    func testRuntimeLaunchGateAcceptsDevelopmentAndDistributionSignedCLIProducts() throws {
+        let executableDirectory = URL(
+            fileURLWithPath: "/tmp/forge-runtime-signed-cli",
+            isDirectory: true
+        )
+        let executable = executableDirectory.appendingPathComponent("forge-conductor")
+        let helper = executableDirectory.appendingPathComponent("forge-runtime-launcher")
+
+        for team in RuntimeLaunchGate.approvedProductTeamIdentifiers {
+            XCTAssertNoThrow(
+                try RuntimeLaunchGate.validateCommandLineProductIdentity(
+                    source: helper,
+                    sourceIdentity: RuntimeLaunchGate.CodeIdentity(
+                        identifier: RuntimeLaunchGate.productIdentifier,
+                        teamIdentifier: team,
+                        flags: [],
+                        uniqueHash: Data(repeating: 0x31, count: 20)
+                    ),
+                    currentExecutable: executable,
+                    currentIdentity: RuntimeLaunchGate.CodeIdentity(
+                        identifier: "com.forge-conductor.cli",
+                        teamIdentifier: team,
+                        flags: [],
+                        uniqueHash: Data(repeating: 0x32, count: 20)
+                    )
+                )
+            )
+        }
+    }
+
+    func testRuntimeLaunchGateAcceptsOnlyDevelopmentSignedXcodeTestParent() throws {
+        let executableDirectory = URL(
+            fileURLWithPath: "/tmp/forge-runtime-signed-xcode-test",
+            isDirectory: true
+        )
+        let executable = executableDirectory.appendingPathComponent("ForgeConductorTests")
+        let helper = executableDirectory.appendingPathComponent("forge-runtime-launcher")
+
+        XCTAssertNoThrow(
+            try RuntimeLaunchGate.validateCommandLineProductIdentity(
+                source: helper,
+                sourceIdentity: RuntimeLaunchGate.CodeIdentity(
+                    identifier: RuntimeLaunchGate.productIdentifier,
+                    teamIdentifier: RuntimeLaunchGate.developmentTeamIdentifier,
+                    flags: [],
+                    uniqueHash: Data(repeating: 0x36, count: 20)
+                ),
+                currentExecutable: executable,
+                currentIdentity: RuntimeLaunchGate.CodeIdentity(
+                    identifier: RuntimeLaunchGate.developmentTestBundleIdentifier,
+                    teamIdentifier: RuntimeLaunchGate.developmentTeamIdentifier,
+                    flags: [],
+                    uniqueHash: Data(repeating: 0x37, count: 20)
+                )
+            )
+        )
+
+        for rejectedTeam in [RuntimeLaunchGate.distributionTeamIdentifier, nil] {
+            XCTAssertThrowsError(
+                try RuntimeLaunchGate.validateCommandLineProductIdentity(
+                    source: helper,
+                    sourceIdentity: RuntimeLaunchGate.CodeIdentity(
+                        identifier: RuntimeLaunchGate.productIdentifier,
+                        teamIdentifier: rejectedTeam,
+                        flags: rejectedTeam == nil ? .adhoc : [],
+                        uniqueHash: Data(repeating: 0x38, count: 20)
+                    ),
+                    currentExecutable: executable,
+                    currentIdentity: RuntimeLaunchGate.CodeIdentity(
+                        identifier: RuntimeLaunchGate.developmentTestBundleIdentifier,
+                        teamIdentifier: rejectedTeam,
+                        flags: rejectedTeam == nil ? .adhoc : [],
+                        uniqueHash: Data(repeating: 0x39, count: 20)
+                    )
+                )
+            )
+        }
+    }
+
+    func testRuntimeLaunchGateInstallsProductLauncherFromTestHost() throws {
+        let serviceRoot = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "forge-runtime-signed-test-install-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: serviceRoot,
+            withIntermediateDirectories: true
+        )
+        defer { try? FileManager.default.removeItem(at: serviceRoot) }
+
+        let installed = try RuntimeLaunchGate.install(serviceRoot: serviceRoot)
+        XCTAssertTrue(installed.lastPathComponent.hasPrefix(
+            RuntimeLaunchGate.executableName + "-"
+        ))
+        XCTAssertNoThrow(try RuntimeLaunchGate.validate(installed, outside: []))
+    }
+
+    func testRuntimeLaunchGateRejectsMismatchedAndUnapprovedCLIProductTeams() {
+        let executableDirectory = URL(
+            fileURLWithPath: "/tmp/forge-runtime-signed-cli",
+            isDirectory: true
+        )
+        let executable = executableDirectory.appendingPathComponent("forge-conductor")
+        let helper = executableDirectory.appendingPathComponent("forge-runtime-launcher")
+        let helperIdentity = RuntimeLaunchGate.CodeIdentity(
+            identifier: RuntimeLaunchGate.productIdentifier,
+            teamIdentifier: RuntimeLaunchGate.developmentTeamIdentifier,
+            flags: [],
+            uniqueHash: Data(repeating: 0x33, count: 20)
+        )
+
+        for team in [RuntimeLaunchGate.distributionTeamIdentifier, "UNAPPROVED1"] {
+            XCTAssertThrowsError(
+                try RuntimeLaunchGate.validateCommandLineProductIdentity(
+                    source: helper,
+                    sourceIdentity: helperIdentity,
+                    currentExecutable: executable,
+                    currentIdentity: RuntimeLaunchGate.CodeIdentity(
+                        identifier: "com.forge-conductor.cli",
+                        teamIdentifier: team,
+                        flags: [],
+                        uniqueHash: Data(repeating: 0x34, count: 20)
+                    )
+                )
+            )
+        }
+
+        XCTAssertThrowsError(
+            try RuntimeLaunchGate.validateCommandLineProductIdentity(
+                source: URL(fileURLWithPath: "/tmp/other/forge-runtime-launcher"),
+                sourceIdentity: helperIdentity,
+                currentExecutable: executable,
+                currentIdentity: RuntimeLaunchGate.CodeIdentity(
+                    identifier: "com.forge-conductor.cli",
+                    teamIdentifier: RuntimeLaunchGate.developmentTeamIdentifier,
+                    flags: [],
+                    uniqueHash: Data(repeating: 0x35, count: 20)
+                )
+            )
+        )
     }
 
     func testRuntimeLaunchGateAcceptsExactAdHocApplicationPair() throws {
@@ -4601,7 +4919,7 @@ final class RuntimeExecutionJobTests: XCTestCase {
             let database = root.appendingPathComponent("control-plane.sqlite")
             let control = try ProjectControlPlaneRepository(databaseURL: database)
             let projectID = ProjectID()
-            _ = try await control.registerProject(
+            _ = try await control.registerProjectUnchecked(
                 projectID: projectID,
                 displayName: "Runtime Fixture",
                 canonicalRoot: projectRoot
@@ -4753,10 +5071,12 @@ final class RuntimeExecutionJobTests: XCTestCase {
             try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
             try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
             do {
-                return try ProductionFixture(
+                let app = try ForgeApp.bootstrap(home: home)
+                _ = try app.config.update(["allowed_roots": [root.path]], save: false)
+                return ProductionFixture(
                     root: root,
                     projectRoot: project,
-                    app: ForgeApp.bootstrap(home: home),
+                    app: app,
                     clientID: ClientID(clientName)
                 )
             } catch {

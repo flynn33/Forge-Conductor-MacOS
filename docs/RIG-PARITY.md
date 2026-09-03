@@ -32,4 +32,9 @@
 `ManagerSettingsView`: **Start / Stop / Restart**, settings form (host/port/refresh/watchdog/TTL/shell/auto-restart), prune, doctor. It uses an in-process `ManagerNode` only when the GUI owns the service; with the normal LaunchAgent topology it uses the typed native `ManagerDashboardClient` and does not compete for the dashboard port.
 
 ## Tests
-Swift package suite: **122 tests**, last verified with **0 failures**. The Xcode scheme mirrors the same sources for distribution builds.
+The current full Swift package Release suite executes **1,001 tests**, with
+**5 declared environment skips** and **0 failures** under warnings-as-errors.
+The dedicated Apple Development-signed `ForgeConductorAppTests` Xcode scheme
+executes **2 app-hosted contract tests** with **0 failures**. These regression
+results do not replace the still-open native UI, real-provider, filesystem E2,
+P10, or release-signing qualification lanes.

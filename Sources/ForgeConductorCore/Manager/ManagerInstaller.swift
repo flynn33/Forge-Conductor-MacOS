@@ -7,6 +7,7 @@
 import Foundation
 import Darwin
 import Security
+import ForgeFilesystemProtocol
 
 enum ManagerArtifactKind: Equatable {
     case executable
@@ -43,18 +44,34 @@ enum ManagerArtifactSignatureState: Equatable {
 struct ManagerArtifactSignatureInspection: Equatable {
     var state: ManagerArtifactSignatureState
     var identifier: String?
+    var teamIdentifier: String?
+    var sealedDaemonCodeDirectoryHashes: [String: String]?
     var validationStatus: OSStatus
 }
 
 protocol ManagerCodeSignatureInspecting {
-    func inspect(_ url: URL, kind: ManagerArtifactKind) throws
+    func inspect(
+        _ url: URL,
+        kind: ManagerArtifactKind,
+        requirement: String?
+    ) throws
         -> ManagerArtifactSignatureInspection
+}
+
+extension ManagerCodeSignatureInspecting {
+    func inspect(
+        _ url: URL,
+        kind: ManagerArtifactKind
+    ) throws -> ManagerArtifactSignatureInspection {
+        try inspect(url, kind: kind, requirement: nil)
+    }
 }
 
 struct SecurityManagerCodeSignatureInspector: ManagerCodeSignatureInspecting {
     func inspect(
         _ url: URL,
-        kind: ManagerArtifactKind
+        kind: ManagerArtifactKind,
+        requirement requirementText: String?
     ) throws -> ManagerArtifactSignatureInspection {
         var staticCode: SecStaticCode?
         let createStatus = SecStaticCodeCreateWithPath(
@@ -78,19 +95,27 @@ struct SecurityManagerCodeSignatureInspector: ManagerCodeSignatureInspecting {
             validationFlags.formUnion(SecCSFlags(rawValue: kSecCSCheckNestedCode))
         }
 
+        var compiledRequirement: SecRequirement?
+        if let requirementText {
+            let requirementStatus = SecRequirementCreateWithString(
+                requirementText as CFString,
+                SecCSFlags(rawValue: 0),
+                &compiledRequirement
+            )
+            guard requirementStatus == errSecSuccess, compiledRequirement != nil else {
+                throw inspectionError(
+                    url: url,
+                    operation: "compile code-signing requirement",
+                    status: requirementStatus
+                )
+            }
+        }
+
         let validationStatus = SecStaticCodeCheckValidity(
             staticCode,
             validationFlags,
-            nil
+            compiledRequirement
         )
-        if validationStatus == errSecSuccess {
-            return ManagerArtifactSignatureInspection(
-                state: .valid,
-                identifier: nil,
-                validationStatus: validationStatus
-            )
-        }
-
         var rawInformation: CFDictionary?
         let informationStatus = SecCodeCopySigningInformation(
             staticCode,
@@ -107,6 +132,20 @@ struct SecurityManagerCodeSignatureInspector: ManagerCodeSignatureInspecting {
         }
 
         let identifier = information[kSecCodeInfoIdentifier] as? String
+        let teamIdentifier = information[kSecCodeInfoTeamIdentifier] as? String
+        let sealedDaemonCodeDirectoryHashes = sealedDaemonCodeDirectoryHashes(
+            in: information[kSecCodeInfoPList]
+        )
+        if validationStatus == errSecSuccess {
+            return ManagerArtifactSignatureInspection(
+                state: .valid,
+                identifier: identifier,
+                teamIdentifier: teamIdentifier,
+                sealedDaemonCodeDirectoryHashes: sealedDaemonCodeDirectoryHashes,
+                validationStatus: validationStatus
+            )
+        }
+
         let flagsNumber = information[kSecCodeInfoFlags] as? NSNumber
         let certificates = information[kSecCodeInfoCertificates] as? [Any]
         let cms = information[kSecCodeInfoCMS] as? Data
@@ -127,6 +166,8 @@ struct SecurityManagerCodeSignatureInspector: ManagerCodeSignatureInspecting {
         return ManagerArtifactSignatureInspection(
             state: state,
             identifier: identifier,
+            teamIdentifier: teamIdentifier,
+            sealedDaemonCodeDirectoryHashes: sealedDaemonCodeDirectoryHashes,
             validationStatus: validationStatus
         )
     }
@@ -143,6 +184,344 @@ struct SecurityManagerCodeSignatureInspector: ManagerCodeSignatureInspecting {
             userInfo: [NSLocalizedDescriptionKey:
                 "Cannot \(operation) for \(url.path) (Security \(status)): \(detail)"]
         )
+    }
+
+    private func sealedDaemonCodeDirectoryHashes(
+        in rawPropertyList: Any?
+    ) -> [String: String]? {
+        let propertyList: [String: Any]
+        if let dictionary = rawPropertyList as? [String: Any] {
+            propertyList = dictionary
+        } else if let dictionary = rawPropertyList as? NSDictionary,
+                  let bridged = dictionary as? [String: Any] {
+            propertyList = bridged
+        } else {
+            return nil
+        }
+
+        var hashes: [String: String] = [:]
+        for key in ForgeFilesystemCodeIdentity.daemonCodeDirectoryHashInfoPlistKeys
+            where propertyList[key] != nil {
+            guard let rawHash = propertyList[key] as? String,
+                  let hash = ForgeFilesystemCodeIdentity
+                    .normalizedCodeDirectoryHash(rawHash) else {
+                return nil
+            }
+            hashes[key] = hash
+        }
+        return hashes.isEmpty ? nil : hashes
+    }
+}
+
+protocol ManagerPrivilegedApplicationIdentityValidating {
+    func validate(applicationBundle: URL, invokedBy sourceExecutable: URL) throws
+    func validateStaged(applicationBundle: URL, executable: URL) throws
+}
+
+protocol ManagerExecutableCodeDirectoryHashInspecting {
+    func hashesByInfoPlistKey(at executable: URL) throws -> [String: String]
+}
+
+struct CodesignManagerExecutableCodeDirectoryHashInspector:
+    ManagerExecutableCodeDirectoryHashInspecting
+{
+    private let runner: ProcessRunner
+
+    init(runner: ProcessRunner = ProcessRunner()) {
+        self.runner = runner
+    }
+
+    func hashesByInfoPlistKey(at executable: URL) throws -> [String: String] {
+        let architectureResult = try runner.run(
+            executable: "/usr/bin/lipo",
+            arguments: ["-archs", executable.path],
+            timeoutSec: 10
+        )
+        guard architectureResult.exitCode == 0, !architectureResult.timedOut else {
+            throw inspectionError(
+                "Cannot read daemon architectures at \(executable.path): "
+                    + architectureResult.stderr
+            )
+        }
+
+        let architectures = architectureResult.stdout
+            .split(whereSeparator: \.isWhitespace)
+            .map(String.init)
+        guard !architectures.isEmpty else {
+            throw inspectionError("Daemon has no Mach-O architectures at \(executable.path)")
+        }
+
+        var hashes: [String: String] = [:]
+        for architecture in architectures {
+            let key: String
+            switch architecture {
+            case "arm64":
+                key = ForgeFilesystemCodeIdentity
+                    .daemonArm64CodeDirectoryHashInfoPlistKey
+            case "x86_64":
+                key = ForgeFilesystemCodeIdentity
+                    .daemonX86_64CodeDirectoryHashInfoPlistKey
+            default:
+                throw inspectionError(
+                    "Daemon contains unsupported architecture \(architecture) at "
+                        + executable.path
+                )
+            }
+
+            let signatureResult = try runner.run(
+                executable: "/usr/bin/codesign",
+                arguments: [
+                    "--display",
+                    "--verbose=4",
+                    "--arch", architecture,
+                    executable.path,
+                ],
+                timeoutSec: 10
+            )
+            guard signatureResult.exitCode == 0, !signatureResult.timedOut else {
+                throw inspectionError(
+                    "Cannot inspect daemon CodeDirectory hash for \(architecture) at "
+                        + "\(executable.path): \(signatureResult.stderr)"
+                )
+            }
+
+            let signatureDetails = signatureResult.stdout + "\n" + signatureResult.stderr
+            let rawHash = signatureDetails
+                .split(separator: "\n")
+                .map(String.init)
+                .first(where: { $0.hasPrefix("CDHash=") })?
+                .dropFirst("CDHash=".count)
+            guard let rawHash,
+                  let hash = ForgeFilesystemCodeIdentity
+                    .normalizedCodeDirectoryHash(String(rawHash)) else {
+                throw inspectionError(
+                    "Daemon has no valid CodeDirectory hash for \(architecture) at "
+                        + executable.path
+                )
+            }
+            hashes[key] = hash
+        }
+        return hashes
+    }
+
+    private func inspectionError(_ message: String) -> NSError {
+        NSError(
+            domain: "ManagerInstaller",
+            code: 14,
+            userInfo: [NSLocalizedDescriptionKey: message]
+        )
+    }
+}
+
+struct SecurityManagerPrivilegedApplicationIdentityValidator:
+    ManagerPrivilegedApplicationIdentityValidating
+{
+    private enum ExecutableContext: Equatable {
+        case invocation
+        case stagedCopy
+    }
+
+    private let signatureInspector: any ManagerCodeSignatureInspecting
+    private let codeDirectoryHashInspector:
+        any ManagerExecutableCodeDirectoryHashInspecting
+
+    init(
+        signatureInspector: any ManagerCodeSignatureInspecting =
+            SecurityManagerCodeSignatureInspector(),
+        codeDirectoryHashInspector:
+            any ManagerExecutableCodeDirectoryHashInspecting =
+                CodesignManagerExecutableCodeDirectoryHashInspector()
+    ) {
+        self.signatureInspector = signatureInspector
+        self.codeDirectoryHashInspector = codeDirectoryHashInspector
+    }
+
+    func validate(applicationBundle: URL, invokedBy sourceExecutable: URL) throws {
+        try validate(
+            applicationBundle: applicationBundle,
+            executable: sourceExecutable,
+            context: .invocation
+        )
+    }
+
+    func validateStaged(applicationBundle: URL, executable: URL) throws {
+        try validate(
+            applicationBundle: applicationBundle,
+            executable: executable,
+            context: .stagedCopy
+        )
+    }
+
+    private func validate(
+        applicationBundle: URL,
+        executable: URL,
+        context: ExecutableContext
+    ) throws {
+        let expectedTeam = ForgeFilesystemProtocolConstants.activeTeamIdentifier
+        let executableRole = context == .invocation
+            ? "invoking executable"
+            : "staged executable"
+        let allowedExecutableIdentifiers: Set<String> = context == .invocation
+            ? [
+                ForgeFilesystemProtocolConstants.appIdentifier,
+                ForgeFilesystemProtocolConstants.managerIdentifier,
+            ]
+            : [ForgeFilesystemProtocolConstants.managerIdentifier]
+        let executableIdentity = try validateIdentity(
+            at: executable,
+            kind: .executable,
+            role: executableRole,
+            allowedIdentifiers: allowedExecutableIdentifiers,
+            expectedTeam: expectedTeam
+        )
+        let applicationIdentity = try validateIdentity(
+            at: applicationBundle,
+            kind: .applicationBundle,
+            role: "Forge Conductor app",
+            allowedIdentifiers: [ForgeFilesystemProtocolConstants.appIdentifier],
+            expectedTeam: expectedTeam
+        )
+        let daemon = applicationBundle
+            .appendingPathComponent("Contents/MacOS", isDirectory: true)
+            .appendingPathComponent(
+                ForgeFilesystemProtocolConstants.daemonExecutableName
+            )
+        _ = try validateIdentity(
+            at: daemon,
+            kind: .executable,
+            role: "privileged filesystem daemon",
+            allowedIdentifiers: [ForgeFilesystemProtocolConstants.daemonIdentifier],
+            expectedTeam: expectedTeam
+        )
+        let daemonHashes = try codeDirectoryHashInspector
+            .hashesByInfoPlistKey(at: daemon)
+
+        if executableIdentity.identifier == ForgeFilesystemProtocolConstants.managerIdentifier {
+            try validateSealedDaemonHashes(
+                executableIdentity.sealedDaemonCodeDirectoryHashes,
+                role: context == .invocation
+                    ? "invoking manager executable"
+                    : "staged manager executable",
+                actualDaemonHashes: daemonHashes
+            )
+        } else {
+            try validateApplicationInvocationPath(
+                executable,
+                applicationBundle: applicationBundle
+            )
+        }
+        try validateSealedDaemonHashes(
+            applicationIdentity.sealedDaemonCodeDirectoryHashes,
+            role: "Forge Conductor app",
+            actualDaemonHashes: daemonHashes
+        )
+
+        // This binds the staged pair to the daemon shipped in this build. It does not provide
+        // monotonic whole-product rollback freshness; that remains a separate release gate.
+    }
+
+    private func validateApplicationInvocationPath(
+        _ executable: URL,
+        applicationBundle: URL
+    ) throws {
+        let expectedExecutable = applicationBundle
+            .appendingPathComponent("Contents/MacOS", isDirectory: true)
+            .appendingPathComponent(ManagerInstaller.appDisplayName)
+        guard resolvedPath(executable) == resolvedPath(expectedExecutable) else {
+            throw NSError(
+                domain: "ManagerInstaller",
+                code: 17,
+                userInfo: [NSLocalizedDescriptionKey:
+                    "Refusing to treat app-identity executable at \(executable.path) as the "
+                    + "Forge Conductor app entry point. Expected the exact validated bundle "
+                    + "executable at \(expectedExecutable.path)."]
+            )
+        }
+    }
+
+    private func resolvedPath(_ url: URL) -> String {
+        url.resolvingSymlinksInPath().standardizedFileURL.path
+    }
+
+    private func validateIdentity(
+        at url: URL,
+        kind: ManagerArtifactKind,
+        role: String,
+        allowedIdentifiers: Set<String>,
+        expectedTeam: String
+    ) throws -> ManagerArtifactSignatureInspection {
+        let requirements = allowedIdentifiers.sorted().compactMap { identifier in
+            ForgeFilesystemProtocolConstants.requiredProductCodeSigningRequirement(
+                identifier: identifier,
+                teamIdentifier: expectedTeam
+            )
+        }
+        guard requirements.count == allowedIdentifiers.count else {
+            throw NSError(
+                domain: "ManagerInstaller",
+                code: 18,
+                userInfo: [NSLocalizedDescriptionKey:
+                    "Refusing to stage \(role) because its exact product signing policy is unavailable."]
+            )
+        }
+        let requirement = requirements.count == 1
+            ? requirements[0]
+            : requirements.map { "(\($0))" }.joined(separator: " or ")
+        let inspection = try signatureInspector.inspect(
+            url,
+            kind: kind,
+            requirement: requirement
+        )
+        guard inspection.state == .valid,
+              let identifier = inspection.identifier,
+              allowedIdentifiers.contains(identifier),
+              inspection.teamIdentifier == expectedTeam else {
+            let expectedIdentifiers = allowedIdentifiers.sorted().joined(separator: ", ")
+            throw NSError(
+                domain: "ManagerInstaller",
+                code: 13,
+                userInfo: [NSLocalizedDescriptionKey:
+                    "Refusing to stage \(role) with an untrusted signing identity at "
+                    + "\(url.path). Expected Team ID \(expectedTeam) and identifier "
+                    + "\(expectedIdentifiers); found Team ID "
+                    + "\(inspection.teamIdentifier ?? "(unavailable)") and identifier "
+                    + "\(inspection.identifier ?? "(unavailable)")."]
+            )
+        }
+        return inspection
+    }
+
+    private func validateSealedDaemonHashes(
+        _ sealedHashes: [String: String]?,
+        role: String,
+        actualDaemonHashes: [String: String]
+    ) throws {
+        guard let sealedHashes else {
+            throw NSError(
+                domain: "ManagerInstaller",
+                code: 15,
+                userInfo: [NSLocalizedDescriptionKey:
+                    "Refusing to stage \(role) because its code-signature-secured Info.plist "
+                    + "does not seal the privileged filesystem daemon CodeDirectory hash."]
+            )
+        }
+        guard sealedHashes == actualDaemonHashes else {
+            let expected = actualDaemonHashes
+                .sorted(by: { $0.key < $1.key })
+                .map { "\($0.key)=\($0.value)" }
+                .joined(separator: ", ")
+            let found = sealedHashes
+                .sorted(by: { $0.key < $1.key })
+                .map { "\($0.key)=\($0.value)" }
+                .joined(separator: ", ")
+            throw NSError(
+                domain: "ManagerInstaller",
+                code: 16,
+                userInfo: [NSLocalizedDescriptionKey:
+                    "Refusing to stage \(role) because its sealed daemon CodeDirectory hashes "
+                    + "do not match the signed daemon. Expected \(expected); found \(found)."]
+            )
+        }
     }
 }
 
@@ -179,6 +558,22 @@ private struct FileManagerArtifactReplacer: ManagerArtifactReplacing {
         } else if hadOriginal {
             try fm.moveItem(at: target, to: backup)
         }
+    }
+}
+
+protocol ManagerLaunchctlRunning {
+    func run(arguments: [String], timeoutSec: TimeInterval) throws -> ProcessResult
+}
+
+private struct ProcessManagerLaunchctlRunner: ManagerLaunchctlRunning {
+    private let runner = ProcessRunner()
+
+    func run(arguments: [String], timeoutSec: TimeInterval) throws -> ProcessResult {
+        try runner.run(
+            executable: "/bin/launchctl",
+            arguments: arguments,
+            timeoutSec: timeoutSec
+        )
     }
 }
 
@@ -352,6 +747,8 @@ public final class ManagerInstaller: @unchecked Sendable {
     public static let bundleIdentifier = "com.forge-conductor.app"
     public static let appDisplayName = "Forge Conductor"
     public static let preferredBinaryName = "forge-conductor"
+    public static let runtimeLauncherName = RuntimeLaunchGate.executableName
+    public static let embeddedManagerRelativePath = "Contents/Helpers/forge-conductor"
 
     /// Legacy Python/bash LaunchAgents that show as "bash" / "python3" in Login Items.
     public static let staleLaunchAgentLabels = [
@@ -365,6 +762,9 @@ public final class ManagerInstaller: @unchecked Sendable {
     private let artifactValidator: any ManagerArtifactValidating
     private let artifactCopier: any ManagerArtifactCopying
     private let artifactReplacer: any ManagerArtifactReplacing
+    private let privilegedApplicationIdentityValidator:
+        any ManagerPrivilegedApplicationIdentityValidating
+    private let launchctlRunner: any ManagerLaunchctlRunning
 
     public init(paths: AppPaths, config: ConfigStore) {
         self.paths = paths
@@ -372,6 +772,9 @@ public final class ManagerInstaller: @unchecked Sendable {
         self.artifactValidator = CodesignManagerArtifactValidator()
         self.artifactCopier = FileManagerArtifactCopier()
         self.artifactReplacer = FileManagerArtifactReplacer()
+        self.privilegedApplicationIdentityValidator =
+            SecurityManagerPrivilegedApplicationIdentityValidator()
+        self.launchctlRunner = ProcessManagerLaunchctlRunner()
     }
 
     init(
@@ -379,13 +782,20 @@ public final class ManagerInstaller: @unchecked Sendable {
         config: ConfigStore,
         artifactValidator: any ManagerArtifactValidating,
         artifactCopier: any ManagerArtifactCopying = FileManagerArtifactCopier(),
-        artifactReplacer: any ManagerArtifactReplacing = FileManagerArtifactReplacer()
+        artifactReplacer: any ManagerArtifactReplacing = FileManagerArtifactReplacer(),
+        privilegedApplicationIdentityValidator:
+            any ManagerPrivilegedApplicationIdentityValidating =
+                SecurityManagerPrivilegedApplicationIdentityValidator(),
+        launchctlRunner: (any ManagerLaunchctlRunning)? = nil
     ) {
         self.paths = paths
         self.config = config
         self.artifactValidator = artifactValidator
         self.artifactCopier = artifactCopier
         self.artifactReplacer = artifactReplacer
+        self.privilegedApplicationIdentityValidator =
+            privilegedApplicationIdentityValidator
+        self.launchctlRunner = launchctlRunner ?? ProcessManagerLaunchctlRunner()
     }
 
     public convenience init(app: ForgeApp) {
@@ -397,6 +807,11 @@ public final class ManagerInstaller: @unchecked Sendable {
     public var installedBinaryURL: URL {
         paths.home.appendingPathComponent("bin", isDirectory: true)
             .appendingPathComponent(Self.preferredBinaryName)
+    }
+
+    public var installedRuntimeLauncherURL: URL {
+        paths.home.appendingPathComponent("bin", isDirectory: true)
+            .appendingPathComponent(Self.runtimeLauncherName)
     }
 
     /// App bundle so Login Items shows "Forge Conductor" instead of "bash".
@@ -434,11 +849,23 @@ public final class ManagerInstaller: @unchecked Sendable {
 
     @discardableResult
     public func installBinary(from source: URL? = nil) throws -> URL {
+        try installBinary(from: source, requiringPrivilegedApplication: false)
+    }
+
+    @discardableResult
+    private func installBinary(
+        from source: URL?,
+        requiringPrivilegedApplication: Bool
+    ) throws -> URL {
         let src = try (source ?? Self.currentExecutableURL()).resolvingSymlinksInPath()
         let commandLink = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".local/bin", isDirectory: true)
             .appendingPathComponent("forge-conductor-swift")
-        let dest = try stageInstalledArtifacts(from: src, commandLink: commandLink)
+        let dest = try stageInstalledArtifacts(
+            from: src,
+            commandLink: commandLink,
+            requiringPrivilegedApplication: requiringPrivilegedApplication
+        )
 
         // LM Studio registration is explicit only (install-lmstudio-plugin / GUI Install Plugin).
         // Never mutate ~/.lmstudio as a side effect of copying the binary.
@@ -450,7 +877,8 @@ public final class ManagerInstaller: @unchecked Sendable {
     @discardableResult
     func stageInstalledArtifacts(
         from sourceExecutable: URL,
-        commandLink: URL? = nil
+        commandLink: URL? = nil,
+        requiringPrivilegedApplication: Bool = false
     ) throws -> URL {
         try paths.ensureLayout()
         let fm = FileManager.default
@@ -468,10 +896,49 @@ public final class ManagerInstaller: @unchecked Sendable {
             )
         }
 
+        let sourceApplication = try sourceApplicationBundle(
+            for: src,
+            requiringPrivilegedApplication: requiringPrivilegedApplication
+        )
+        let binarySource = try managerBinarySource(
+            invokedBy: src,
+            sourceApplication: sourceApplication
+        )
+        let runtimeLauncherSource = try runtimeLauncherSource(
+            managerBinary: binarySource,
+            sourceApplication: sourceApplication
+        )
+        if requiringPrivilegedApplication, let sourceApplication {
+            if isInstalledExecutable(src),
+               sameResolvedPath(sourceApplication, appBundleURL) {
+                try privilegedApplicationIdentityValidator.validateStaged(
+                    applicationBundle: sourceApplication,
+                    executable: src
+                )
+            } else {
+                try privilegedApplicationIdentityValidator.validate(
+                    applicationBundle: sourceApplication,
+                    invokedBy: src
+                )
+            }
+            if !sameResolvedPath(binarySource, src) {
+                try privilegedApplicationIdentityValidator.validate(
+                    applicationBundle: sourceApplication,
+                    invokedBy: binarySource
+                )
+            }
+        }
+
         let transactionID = UUID().uuidString
         let binaryTarget = installedBinaryURL.standardizedFileURL
         let binaryStage = temporarySibling(
             of: binaryTarget,
+            marker: "stage",
+            transactionID: transactionID
+        )
+        let runtimeLauncherTarget = installedRuntimeLauncherURL.standardizedFileURL
+        let runtimeLauncherStage = temporarySibling(
+            of: runtimeLauncherTarget,
             marker: "stage",
             transactionID: transactionID
         )
@@ -484,7 +951,15 @@ public final class ManagerInstaller: @unchecked Sendable {
             marker: "stage",
             transactionID: transactionID
         )
-        let sourceFramework = sourceFramework(for: src)
+        let sourceFramework = sourceFramework(
+            for: src,
+            sourceApplication: sourceApplication
+        )
+        if requiringPrivilegedApplication, sourceFramework == nil {
+            throw privilegedPayloadError(
+                "Required manager framework is unavailable for privileged staging"
+            )
+        }
         let frameworkStage = sourceFramework.map { _ in
             temporarySibling(
                 of: frameworkTarget,
@@ -509,6 +984,7 @@ public final class ManagerInstaller: @unchecked Sendable {
 
         let temporaryURLs = [
             binaryStage,
+            runtimeLauncherStage,
             frameworkStage,
             mirroredFrameworkStage,
             appStage,
@@ -520,10 +996,18 @@ public final class ManagerInstaller: @unchecked Sendable {
             }
         }
 
-        try artifactCopier.copyItem(at: src, to: binaryStage)
+        try artifactCopier.copyItem(at: binarySource, to: binaryStage)
         try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: binaryStage.path)
         try artifactValidator.prepareAndSign(binaryStage, kind: .executable)
         try artifactValidator.verify(binaryStage, kind: .executable)
+
+        try artifactCopier.copyItem(at: runtimeLauncherSource, to: runtimeLauncherStage)
+        try fm.setAttributes(
+            [.posixPermissions: 0o755],
+            ofItemAtPath: runtimeLauncherStage.path
+        )
+        try artifactValidator.prepareAndSign(runtimeLauncherStage, kind: .executable)
+        try artifactValidator.verify(runtimeLauncherStage, kind: .executable)
 
         if let sourceFramework, let frameworkStage, let mirroredFrameworkStage {
             try artifactCopier.copyItem(at: sourceFramework, to: frameworkStage)
@@ -535,10 +1019,13 @@ public final class ManagerInstaller: @unchecked Sendable {
         }
 
         try stageApplicationBundle(
-            from: src,
+            sourceApplication: sourceApplication,
+            invokedBy: src,
             executable: binaryStage,
+            runtimeLauncher: runtimeLauncherStage,
             framework: frameworkStage,
-            at: appStage
+            at: appStage,
+            requiringPrivilegedApplication: requiringPrivilegedApplication
         )
 
         if let commandLinkTarget, let commandLinkStage {
@@ -555,6 +1042,7 @@ public final class ManagerInstaller: @unchecked Sendable {
         var replacements = [
             ArtifactReplacement(target: frameworkTarget, staged: frameworkStage),
             ArtifactReplacement(target: mirroredFrameworkTarget, staged: mirroredFrameworkStage),
+            ArtifactReplacement(target: runtimeLauncherTarget, staged: runtimeLauncherStage),
             ArtifactReplacement(target: binaryTarget, staged: binaryStage),
             ArtifactReplacement(target: appTarget, staged: appStage),
         ]
@@ -581,8 +1069,34 @@ public final class ManagerInstaller: @unchecked Sendable {
         }
 
         try paths.ensureLayout()
+        if sourceExecutable == nil, itemExists(at: appBundleURL) {
+            do {
+                try validatePrivilegedApplicationPayload(at: appBundleURL)
+                try privilegedApplicationIdentityValidator.validateStaged(
+                    applicationBundle: appBundleURL,
+                    executable: installedBinaryURL
+                )
+                return appBundleURL
+            } catch {
+                guard !privilegedApplicationPayloadIsPresent(at: appBundleURL) else {
+                    throw error
+                }
+            }
+        }
+
         let source = (sourceExecutable ?? installedBinaryURL).resolvingSymlinksInPath()
-        let framework = sourceFramework(for: source)
+        let sourceApplication = try sourceApplicationBundle(
+            for: source,
+            requiringPrivilegedApplication: false
+        )
+        let runtimeLauncher = try runtimeLauncherSource(
+            managerBinary: source,
+            sourceApplication: sourceApplication
+        )
+        let framework = sourceFramework(
+            for: source,
+            sourceApplication: sourceApplication
+        )
             ?? {
                 let installed = installedBinaryURL.deletingLastPathComponent()
                     .appendingPathComponent("ForgeConductorCore.framework")
@@ -601,10 +1115,13 @@ public final class ManagerInstaller: @unchecked Sendable {
         }
 
         try stageApplicationBundle(
-            from: source,
+            sourceApplication: sourceApplication,
+            invokedBy: source,
             executable: installedBinaryURL,
+            runtimeLauncher: runtimeLauncher,
             framework: framework,
-            at: stagedApp
+            at: stagedApp,
+            requiringPrivilegedApplication: false
         )
         try commitArtifactReplacements([
             ArtifactReplacement(target: appBundleURL, staged: stagedApp),
@@ -613,21 +1130,34 @@ public final class ManagerInstaller: @unchecked Sendable {
     }
 
     private func stageApplicationBundle(
-        from sourceExecutable: URL,
+        sourceApplication: URL?,
+        invokedBy sourceExecutable: URL,
         executable: URL,
+        runtimeLauncher: URL,
         framework: URL?,
-        at stagedBundle: URL
+        at stagedBundle: URL,
+        requiringPrivilegedApplication: Bool
     ) throws {
         let fm = FileManager.default
-        if let sourceBundle = sourceAppBundle(containing: sourceExecutable) {
+        if let sourceBundle = sourceApplication {
             try artifactCopier.copyItem(at: sourceBundle, to: stagedBundle)
         } else {
+            guard !requiringPrivilegedApplication else {
+                throw privilegedApplicationUnavailableError(
+                    invokedBy: sourceExecutable,
+                    rejectedCandidates: []
+                )
+            }
             try createMinimalAppBundle(
                 at: stagedBundle,
                 executable: executable,
+                runtimeLauncher: runtimeLauncher,
                 framework: framework
             )
         }
+
+        let runtimeLauncherURL = embeddedRuntimeLauncher(in: stagedBundle)
+        try requirePayloadItem(runtimeLauncherURL, type: S_IFREG, executable: true)
 
         let executableURL = applicationExecutable(in: stagedBundle)
         guard fm.isExecutableFile(atPath: executableURL.path) else {
@@ -641,21 +1171,32 @@ public final class ManagerInstaller: @unchecked Sendable {
         try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executableURL.path)
         try artifactValidator.prepareAndSign(stagedBundle, kind: .applicationBundle)
         try artifactValidator.verify(stagedBundle, kind: .applicationBundle)
+        if requiringPrivilegedApplication {
+            try validatePrivilegedApplicationPayload(at: stagedBundle)
+            try privilegedApplicationIdentityValidator.validateStaged(
+                applicationBundle: stagedBundle,
+                executable: executable
+            )
+        }
     }
 
     private func createMinimalAppBundle(
         at bundleURL: URL,
         executable: URL,
+        runtimeLauncher: URL,
         framework: URL?
     ) throws {
         let fm = FileManager.default
         let contents = bundleURL.appendingPathComponent("Contents", isDirectory: true)
         let macos = contents.appendingPathComponent("MacOS", isDirectory: true)
         let resources = contents.appendingPathComponent("Resources", isDirectory: true)
+        let helpers = contents.appendingPathComponent("Helpers", isDirectory: true)
         try fm.createDirectory(at: macos, withIntermediateDirectories: true)
         try fm.createDirectory(at: resources, withIntermediateDirectories: true)
+        try fm.createDirectory(at: helpers, withIntermediateDirectories: true)
 
         let version = ForgeApp.version
+        let buildVersion = ForgeApp.buildVersion
         let infoPlist = """
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -678,7 +1219,7 @@ public final class ManagerInstaller: @unchecked Sendable {
           <key>CFBundleShortVersionString</key>
           <string>\(escapeXML(version))</string>
           <key>CFBundleVersion</key>
-          <string>\(escapeXML(version))</string>
+          <string>\(escapeXML(buildVersion))</string>
           <key>LSMinimumSystemVersion</key>
           <string>26.0</string>
           <key>LSUIElement</key>
@@ -704,6 +1245,13 @@ public final class ManagerInstaller: @unchecked Sendable {
         try artifactCopier.copyItem(at: executable, to: exe)
         try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: exe.path)
 
+        let bundledRuntimeLauncher = embeddedRuntimeLauncher(in: bundleURL)
+        try artifactCopier.copyItem(at: runtimeLauncher, to: bundledRuntimeLauncher)
+        try fm.setAttributes(
+            [.posixPermissions: 0o755],
+            ofItemAtPath: bundledRuntimeLauncher.path
+        )
+
         if let framework {
             let frameworks = contents.appendingPathComponent("Frameworks", isDirectory: true)
             try fm.createDirectory(at: frameworks, withIntermediateDirectories: true)
@@ -714,10 +1262,13 @@ public final class ManagerInstaller: @unchecked Sendable {
         }
     }
 
-    private func sourceFramework(for sourceExecutable: URL) -> URL? {
+    private func sourceFramework(
+        for sourceExecutable: URL,
+        sourceApplication: URL?
+    ) -> URL? {
         let name = "ForgeConductorCore.framework"
         var candidates: [URL] = []
-        if let sourceBundle = sourceAppBundle(containing: sourceExecutable) {
+        if let sourceBundle = sourceApplication {
             candidates.append(
                 sourceBundle
                     .appendingPathComponent("Contents/Frameworks", isDirectory: true)
@@ -733,10 +1284,48 @@ public final class ManagerInstaller: @unchecked Sendable {
         return candidates.first(where: { FileManager.default.fileExists(atPath: $0.path) })
     }
 
+    private func managerBinarySource(
+        invokedBy sourceExecutable: URL,
+        sourceApplication: URL?
+    ) throws -> URL {
+        guard let sourceApplication,
+              sameResolvedPath(
+                sourceExecutable,
+                applicationExecutable(in: sourceApplication)
+              ) else {
+            return sourceExecutable
+        }
+
+        let embeddedManager = embeddedManagerExecutable(in: sourceApplication)
+        try requirePayloadItem(embeddedManager, type: S_IFREG, executable: true)
+        return embeddedManager
+    }
+
+    private func runtimeLauncherSource(
+        managerBinary: URL,
+        sourceApplication: URL?
+    ) throws -> URL {
+        let source = sourceApplication.map { embeddedRuntimeLauncher(in: $0) }
+            ?? managerBinary.deletingLastPathComponent()
+                .appendingPathComponent(Self.runtimeLauncherName)
+        try requirePayloadItem(source, type: S_IFREG, executable: true)
+        return source
+    }
+
     private func applicationExecutable(in bundleURL: URL) -> URL {
         bundleURL
             .appendingPathComponent("Contents/MacOS", isDirectory: true)
             .appendingPathComponent(Self.appDisplayName)
+    }
+
+    private func embeddedManagerExecutable(in bundleURL: URL) -> URL {
+        bundleURL.appendingPathComponent(Self.embeddedManagerRelativePath)
+    }
+
+    private func embeddedRuntimeLauncher(in bundleURL: URL) -> URL {
+        bundleURL
+            .appendingPathComponent("Contents/Helpers", isDirectory: true)
+            .appendingPathComponent(Self.runtimeLauncherName)
     }
 
     private func temporarySibling(
@@ -843,16 +1432,220 @@ public final class ManagerInstaller: @unchecked Sendable {
             || (try? FileManager.default.destinationOfSymbolicLink(atPath: url.path)) != nil
     }
 
+    private func sameResolvedPath(_ lhs: URL, _ rhs: URL) -> Bool {
+        lhs.resolvingSymlinksInPath().standardizedFileURL.path
+            == rhs.resolvingSymlinksInPath().standardizedFileURL.path
+    }
+
+    private func isInstalledExecutable(_ executable: URL) -> Bool {
+        sameResolvedPath(executable, installedBinaryURL)
+    }
+
+    private func privilegedApplicationPayloadIsPresent(at bundle: URL) -> Bool {
+        let daemon = bundle.appendingPathComponent(
+            "Contents/MacOS/\(ForgeFilesystemProtocolConstants.daemonExecutableName)"
+        )
+        let launchDaemon = bundle.appendingPathComponent(
+            "Contents/Library/LaunchDaemons/"
+                + ForgeFilesystemProtocolConstants.daemonPlistName
+        )
+        return itemExists(at: daemon) || itemExists(at: launchDaemon)
+    }
+
+    private func sourceApplicationBundle(
+        for executable: URL,
+        requiringPrivilegedApplication: Bool
+    ) throws -> URL? {
+        let containingBundle = sourceAppBundle(containing: executable)
+        let isInstalledPrivilegedInvocation = requiringPrivilegedApplication
+            && isInstalledExecutable(executable)
+        let siblingBundle = isInstalledPrivilegedInvocation
+            ? nil
+            : executable.deletingLastPathComponent()
+                .appendingPathComponent("\(Self.appDisplayName).app", isDirectory: true)
+        let installedBundle = isInstalledPrivilegedInvocation
+            ? appBundleURL
+            : nil
+        var candidates: [URL] = []
+        var candidatePaths = Set<String>()
+        for candidate in [containingBundle, siblingBundle, installedBundle].compactMap({ $0 }) {
+            let standardized = candidate.standardizedFileURL
+            if candidatePaths.insert(standardized.path).inserted {
+                candidates.append(standardized)
+            }
+        }
+
+        if !requiringPrivilegedApplication, let containingBundle {
+            return containingBundle
+        }
+
+        var rejectedCandidates: [String] = []
+        for candidate in candidates where itemExists(at: candidate) {
+            do {
+                try validatePrivilegedApplicationPayload(at: candidate)
+                return candidate
+            } catch {
+                rejectedCandidates.append("\(candidate.path): \(error.localizedDescription)")
+            }
+        }
+
+        guard requiringPrivilegedApplication else { return nil }
+        throw privilegedApplicationUnavailableError(
+            invokedBy: executable,
+            rejectedCandidates: rejectedCandidates
+        )
+    }
+
+    private func validatePrivilegedApplicationPayload(at bundle: URL) throws {
+        let contents = bundle.appendingPathComponent("Contents", isDirectory: true)
+        let macOS = contents.appendingPathComponent("MacOS", isDirectory: true)
+        let helpers = contents.appendingPathComponent("Helpers", isDirectory: true)
+        let frameworks = contents.appendingPathComponent("Frameworks", isDirectory: true)
+        let managerFramework = frameworks.appendingPathComponent(
+            "ForgeConductorCore.framework",
+            isDirectory: true
+        )
+        let library = contents.appendingPathComponent("Library", isDirectory: true)
+        let launchDaemons = library.appendingPathComponent(
+            "LaunchDaemons",
+            isDirectory: true
+        )
+        let infoPlist = contents.appendingPathComponent("Info.plist")
+        let appExecutable = applicationExecutable(in: bundle)
+        let managerExecutable = embeddedManagerExecutable(in: bundle)
+        let runtimeLauncher = embeddedRuntimeLauncher(in: bundle)
+        let daemonExecutable = macOS.appendingPathComponent(
+            ForgeFilesystemProtocolConstants.daemonExecutableName
+        )
+        let daemonPlist = launchDaemons.appendingPathComponent(
+            ForgeFilesystemProtocolConstants.daemonPlistName
+        )
+
+        for directory in [
+            bundle,
+            contents,
+            macOS,
+            helpers,
+            frameworks,
+            managerFramework,
+            library,
+            launchDaemons,
+        ] {
+            try requirePayloadItem(directory, type: S_IFDIR, executable: false)
+        }
+        try requirePayloadItem(infoPlist, type: S_IFREG, executable: false)
+        try requirePayloadItem(appExecutable, type: S_IFREG, executable: true)
+        try requirePayloadItem(managerExecutable, type: S_IFREG, executable: true)
+        try requirePayloadItem(runtimeLauncher, type: S_IFREG, executable: true)
+        try requirePayloadItem(daemonExecutable, type: S_IFREG, executable: true)
+        try requirePayloadItem(daemonPlist, type: S_IFREG, executable: false)
+
+        let appInformation = try readPropertyList(at: infoPlist)
+        guard appInformation["CFBundleIdentifier"] as? String
+                == ForgeFilesystemProtocolConstants.appIdentifier,
+              appInformation["CFBundleExecutable"] as? String == Self.appDisplayName else {
+            throw privilegedPayloadError(
+                "App Info.plist must identify \(ForgeFilesystemProtocolConstants.appIdentifier) "
+                + "with executable \(Self.appDisplayName)"
+            )
+        }
+
+        let daemonInformation = try readPropertyList(at: daemonPlist)
+        let machServices = daemonInformation["MachServices"] as? [String: Any]
+        guard daemonInformation["Label"] as? String
+                == ForgeFilesystemProtocolConstants.serviceName,
+              daemonInformation["BundleProgram"] as? String
+                == "Contents/MacOS/\(ForgeFilesystemProtocolConstants.daemonExecutableName)",
+              daemonInformation["UserName"] as? String == "root",
+              machServices?[ForgeFilesystemProtocolConstants.serviceName] as? Bool == true else {
+            throw privilegedPayloadError(
+                "LaunchDaemon plist does not declare the required root service "
+                + ForgeFilesystemProtocolConstants.serviceName
+            )
+        }
+    }
+
+    private func requirePayloadItem(
+        _ url: URL,
+        type: mode_t,
+        executable: Bool
+    ) throws {
+        var information = stat()
+        let status = url.path.withCString { Darwin.lstat($0, &information) }
+        let hasExecutableBit = information.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH) != 0
+        guard status == 0,
+              information.st_mode & S_IFMT == type,
+              !executable || hasExecutableBit else {
+            let expected = type == S_IFDIR
+                ? "directory"
+                : (executable ? "regular executable" : "regular file")
+            throw privilegedPayloadError(
+                "Required \(expected) is missing or unsafe: \(url.path)"
+            )
+        }
+    }
+
+    private func readPropertyList(at url: URL) throws -> [String: Any] {
+        do {
+            let data = try Data(contentsOf: url, options: [.mappedIfSafe])
+            let value = try PropertyListSerialization.propertyList(
+                from: data,
+                options: [],
+                format: nil
+            )
+            guard let dictionary = value as? [String: Any] else {
+                throw privilegedPayloadError("Property list is not a dictionary: \(url.path)")
+            }
+            return dictionary
+        } catch {
+            if (error as NSError).domain == "ManagerInstaller" {
+                throw error
+            }
+            throw privilegedPayloadError(
+                "Cannot read required property list \(url.path): \(error.localizedDescription)"
+            )
+        }
+    }
+
+    private func privilegedPayloadError(_ message: String) -> NSError {
+        NSError(
+            domain: "ManagerInstaller",
+            code: 12,
+            userInfo: [NSLocalizedDescriptionKey: message]
+        )
+    }
+
+    private func privilegedApplicationUnavailableError(
+        invokedBy executable: URL,
+        rejectedCandidates: [String]
+    ) -> NSError {
+        let detail = rejectedCandidates.isEmpty
+            ? "No enclosing or sibling \(Self.appDisplayName).app was found."
+            : rejectedCandidates.joined(separator: "; ")
+        return NSError(
+            domain: "ManagerInstaller",
+            code: 11,
+            userInfo: [NSLocalizedDescriptionKey:
+                "Cannot install the manager Login Item from \(executable.path) because a "
+                + "complete signed \(Self.appDisplayName).app with its embedded manager CLI, "
+                + "manager framework, privileged filesystem daemon, and LaunchDaemon plist "
+                + "is unavailable. \(detail)"]
+        )
+    }
+
     private func sourceAppBundle(containing executable: URL) -> URL? {
-        let macOSDirectory = executable.deletingLastPathComponent()
-        guard macOSDirectory.lastPathComponent == "MacOS" else { return nil }
-        let contents = macOSDirectory.deletingLastPathComponent()
+        let executableDirectory = executable.deletingLastPathComponent()
+        guard executableDirectory.lastPathComponent == "MacOS"
+                || executableDirectory.lastPathComponent == "Helpers" else {
+            return nil
+        }
+        let contents = executableDirectory.deletingLastPathComponent()
         guard contents.lastPathComponent == "Contents" else { return nil }
         let bundle = contents.deletingLastPathComponent()
         guard bundle.lastPathComponent == "\(Self.appDisplayName).app" else { return nil }
-        let expectedExecutable = bundle
-            .appendingPathComponent("Contents/MacOS", isDirectory: true)
-            .appendingPathComponent(Self.appDisplayName)
+        let expectedExecutable = executableDirectory.lastPathComponent == "MacOS"
+            ? applicationExecutable(in: bundle)
+            : embeddedManagerExecutable(in: bundle)
         guard expectedExecutable.standardizedFileURL.path == executable.standardizedFileURL.path,
               FileManager.default.isExecutableFile(atPath: expectedExecutable.path) else {
             return nil
@@ -939,7 +1732,9 @@ public final class ManagerInstaller: @unchecked Sendable {
     public func installLoginAgent(openBrowser: Bool = false) throws -> URL {
         // Always stage from this process before launchd starts the manager. Reusing an existing
         // executable here can silently keep an older manager and framework running after upgrade.
-        _ = try installBinary()
+        // The Login Item must retain the complete signed app payload because that app owns the
+        // privileged SMAppService daemon. A synthesized display-only bundle is insufficient.
+        _ = try installBinary(from: nil, requiringPrivilegedApplication: true)
 
         try FileManager.default.createDirectory(at: launchAgentsDir, withIntermediateDirectories: true)
 
@@ -1021,34 +1816,302 @@ public final class ManagerInstaller: @unchecked Sendable {
             timeoutSec: 5
         )
 
-        let load = try ProcessRunner().run(
-            executable: "/bin/launchctl",
-            arguments: ["bootstrap", "gui/\(uid)", launchAgentURL.path],
-            timeoutSec: 15
-        )
-        if load.exitCode != 0 {
-            let load2 = try ProcessRunner().run(
-                executable: "/bin/launchctl",
-                arguments: ["load", "-w", launchAgentURL.path],
+        try loadLoginAgent(plistURL: launchAgentURL, uid: uid)
+
+        return launchAgentURL
+    }
+
+    /// Loads the LaunchAgent through the modern bootstrap path with the established
+    /// legacy fallback, then proves launchd owns a live process for the exact job label.
+    /// A successful legacy `load` exit alone is not readiness evidence.
+    func loadLoginAgent(
+        plistURL: URL,
+        uid: uid_t,
+        readinessAttempts: Int = 5,
+        readinessDelaySec: TimeInterval = 0.2
+    ) throws {
+        let userDomain = "gui/\(uid)"
+        let jobTarget = "\(userDomain)/\(Self.launchAgentLabel)"
+        func cleanupDetail() -> String {
+            cleanupFailedLoginAgent(
+                jobTarget: jobTarget,
+                plistURL: plistURL,
+                verificationAttempts: readinessAttempts,
+                verificationDelaySec: readinessDelaySec
+            )
+        }
+        let beforeLoad: ProcessResult
+        do {
+            beforeLoad = try launchctlRunner.run(
+                arguments: ["print", jobTarget],
+                timeoutSec: 5
+            )
+        } catch {
+            let cleanup = cleanupDetail()
+            throw launchAgentReadinessError(
+                jobTarget: jobTarget,
+                bootstrap: nil,
+                legacyLoad: nil,
+                detail: "could not prove the exact job absent before load: "
+                    + error.localizedDescription + "; " + cleanup
+            )
+        }
+        guard launchAgentIsProvenAbsent(beforeLoad) else {
+            let cleanup = cleanupDetail()
+            throw launchAgentReadinessError(
+                jobTarget: jobTarget,
+                bootstrap: nil,
+                legacyLoad: nil,
+                detail: "exact job was still present or absence was ambiguous before load "
+                    + "(exit \(beforeLoad.exitCode), timed_out=\(beforeLoad.timedOut)); "
+                    + cleanup
+            )
+        }
+
+        let bootstrap: ProcessResult
+        do {
+            bootstrap = try launchctlRunner.run(
+                arguments: ["bootstrap", userDomain, plistURL.path],
                 timeoutSec: 15
             )
-            if load2.exitCode != 0 {
-                throw NSError(
-                    domain: "ManagerInstaller",
-                    code: 2,
-                    userInfo: [NSLocalizedDescriptionKey:
-                        "launchctl load failed: \(load.stderr) \(load2.stderr)"]
+        } catch {
+            let cleanup = cleanupDetail()
+            throw launchAgentReadinessError(
+                jobTarget: jobTarget,
+                bootstrap: nil,
+                legacyLoad: nil,
+                detail: "launchctl bootstrap failed: \(error.localizedDescription); \(cleanup)"
+            )
+        }
+
+        var legacyLoad: ProcessResult?
+        if bootstrap.exitCode != 0 || bootstrap.timedOut {
+            let fallback: ProcessResult
+            do {
+                fallback = try launchctlRunner.run(
+                    arguments: ["load", "-w", plistURL.path],
+                    timeoutSec: 15
+                )
+            } catch {
+                let cleanup = cleanupDetail()
+                throw launchAgentReadinessError(
+                    jobTarget: jobTarget,
+                    bootstrap: bootstrap,
+                    legacyLoad: nil,
+                    detail: "legacy launchctl load failed: "
+                        + error.localizedDescription + "; " + cleanup
+                )
+            }
+            legacyLoad = fallback
+            if fallback.exitCode != 0 || fallback.timedOut {
+                let cleanup = cleanupDetail()
+                throw launchAgentReadinessError(
+                    jobTarget: jobTarget,
+                    bootstrap: bootstrap,
+                    legacyLoad: fallback,
+                    detail: "legacy launchctl load returned an unsuccessful result; " + cleanup
                 )
             }
         }
 
-        _ = try? ProcessRunner().run(
-            executable: "/bin/launchctl",
-            arguments: ["kickstart", "-k", "gui/\(uid)/\(Self.launchAgentLabel)"],
+        _ = try? launchctlRunner.run(
+            arguments: ["kickstart", "-k", jobTarget],
             timeoutSec: 10
         )
 
-        return launchAgentURL
+        let attemptLimit = max(1, min(readinessAttempts, 10))
+        let retryDelay = max(0, min(readinessDelaySec, 1))
+        let expectedProgramPath = canonicalExecutablePath(appExecutableURL.path)
+            ?? appExecutableURL.standardizedFileURL.path
+        var lastReadinessDetail = "launchctl print was not attempted"
+        for attempt in 1...attemptLimit {
+            do {
+                let readiness = try launchctlRunner.run(
+                    arguments: ["print", jobTarget],
+                    timeoutSec: 5
+                )
+                let identity = launchAgentIdentity(from: readiness.stdout)
+                let programMatches = identity.programPath
+                    .flatMap(canonicalExecutablePath)
+                    .map { $0 == expectedProgramPath }
+                    ?? false
+                if readiness.exitCode == 0,
+                   !readiness.timedOut,
+                   identity.pid != nil,
+                   programMatches {
+                    return
+                }
+                lastReadinessDetail = "launchctl print did not report both a positive pid "
+                    + "and expected program \(appExecutableURL.path) "
+                    + "on attempt \(attempt)/\(attemptLimit) "
+                    + "(exit \(readiness.exitCode), timed_out=\(readiness.timedOut), "
+                    + "observed_pid=\(identity.pid.map(String.init) ?? "none"), "
+                    + "observed_program=\(identity.programPath ?? "none"))"
+            } catch {
+                lastReadinessDetail = "launchctl print failed on attempt "
+                    + "\(attempt)/\(attemptLimit): \(error.localizedDescription)"
+            }
+
+            if attempt < attemptLimit, retryDelay > 0 {
+                Thread.sleep(forTimeInterval: retryDelay)
+            }
+        }
+
+        let cleanup = cleanupDetail()
+        throw launchAgentReadinessError(
+            jobTarget: jobTarget,
+            bootstrap: bootstrap,
+            legacyLoad: legacyLoad,
+            detail: lastReadinessDetail + "; " + cleanup
+        )
+    }
+
+    private func launchAgentIsProvenAbsent(_ result: ProcessResult) -> Bool {
+        let missingService = "Could not find service \"\(Self.launchAgentLabel)\""
+        return result.exitCode == 113
+            && !result.timedOut
+            && result.stdout.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && result.stderr.contains(missingService)
+    }
+
+    private func launchAgentIdentity(from output: String) -> (
+        pid: Int32?,
+        programPath: String?
+    ) {
+        var pid: Int32?
+        var programPath: String?
+        for rawLine in output.split(separator: "\n", omittingEmptySubsequences: true) {
+            let fields = rawLine.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+            guard fields.count == 2 else { continue }
+            let key = fields[0].trimmingCharacters(in: .whitespaces)
+            let value = launchctlScalarValue(fields[1])
+            switch key {
+            case "pid":
+                if let parsedPID = Int32(value), parsedPID > 0 {
+                    pid = parsedPID
+                }
+            case "program":
+                if value.hasPrefix("/") {
+                    programPath = value
+                }
+            default:
+                break
+            }
+        }
+        return (pid, programPath)
+    }
+
+    private func launchctlScalarValue(_ rawValue: Substring) -> String {
+        var value = rawValue.trimmingCharacters(in: .whitespaces)
+        if value.count >= 2,
+           (value.first == "\"" && value.last == "\"")
+            || (value.first == "'" && value.last == "'") {
+            value.removeFirst()
+            value.removeLast()
+        }
+        return value
+    }
+
+    private func canonicalExecutablePath(_ path: String) -> String? {
+        guard path.hasPrefix("/") else { return nil }
+        return URL(fileURLWithPath: path)
+            .standardizedFileURL
+            .resolvingSymlinksInPath()
+            .path
+    }
+
+    private func cleanupFailedLoginAgent(
+        jobTarget: String,
+        plistURL: URL,
+        verificationAttempts: Int,
+        verificationDelaySec: TimeInterval
+    ) -> String {
+        var commandSummaries: [String] = []
+        for (arguments, timeoutSec) in [
+            (["bootout", jobTarget], TimeInterval(10)),
+            (["disable", jobTarget], TimeInterval(5)),
+            (["unload", "-w", plistURL.path], TimeInterval(10)),
+        ] {
+            do {
+                let result = try launchctlRunner.run(
+                    arguments: arguments,
+                    timeoutSec: timeoutSec
+                )
+                commandSummaries.append(
+                    "\(arguments[0])_exit=\(result.exitCode) "
+                        + "\(arguments[0])_timed_out=\(result.timedOut)"
+                )
+            } catch {
+                commandSummaries.append(
+                    "\(arguments[0])_error="
+                        + String(error.localizedDescription.prefix(256))
+                )
+            }
+        }
+
+        if FileManager.default.fileExists(atPath: plistURL.path) {
+            try? FileManager.default.removeItem(at: plistURL)
+        }
+        let plistAbsent = !FileManager.default.fileExists(atPath: plistURL.path)
+
+        let attemptLimit = max(1, min(verificationAttempts, 10))
+        let retryDelay = max(0, min(verificationDelaySec, 1))
+        var exactJobAbsent = false
+        var verificationSummary = "cleanup print was not attempted"
+        for attempt in 1...attemptLimit {
+            do {
+                let result = try launchctlRunner.run(
+                    arguments: ["print", jobTarget],
+                    timeoutSec: 5
+                )
+                if launchAgentIsProvenAbsent(result) {
+                    exactJobAbsent = true
+                    verificationSummary = "cleanup print proved exact job absent "
+                        + "on attempt \(attempt)/\(attemptLimit)"
+                    break
+                }
+                let identity = launchAgentIdentity(from: result.stdout)
+                verificationSummary = "cleanup print retained or ambiguously reported job "
+                    + "on attempt \(attempt)/\(attemptLimit) "
+                    + "(exit \(result.exitCode), timed_out=\(result.timedOut), "
+                    + "pid=\(identity.pid.map(String.init) ?? "none"), "
+                    + "program=\(identity.programPath ?? "none"))"
+            } catch {
+                verificationSummary = "cleanup print failed on attempt "
+                    + "\(attempt)/\(attemptLimit): "
+                    + String(error.localizedDescription.prefix(256))
+            }
+
+            if attempt < attemptLimit, retryDelay > 0 {
+                Thread.sleep(forTimeInterval: retryDelay)
+            }
+        }
+
+        return "cleanup_exact_job_absent=\(exactJobAbsent) "
+            + "cleanup_plist_absent=\(plistAbsent) "
+            + commandSummaries.joined(separator: " ") + "; "
+            + verificationSummary
+    }
+
+    private func launchAgentReadinessError(
+        jobTarget: String,
+        bootstrap: ProcessResult?,
+        legacyLoad: ProcessResult?,
+        detail: String
+    ) -> NSError {
+        let bootstrapSummary = bootstrap.map {
+            "bootstrap_exit=\($0.exitCode) bootstrap_timed_out=\($0.timedOut)"
+        } ?? "bootstrap_not_attempted=true"
+        let fallback = legacyLoad.map {
+            " legacy_load_exit=\($0.exitCode) legacy_load_timed_out=\($0.timedOut)"
+        } ?? ""
+        return NSError(
+            domain: "ManagerInstaller",
+            code: 2,
+            userInfo: [NSLocalizedDescriptionKey:
+                "launchctl load failed: expected live job \(jobTarget); \(detail); "
+                + "\(bootstrapSummary)\(fallback)"]
+        )
     }
 
     /// Retains a small, fixed number of bounded launchd log tails during reinstall.
@@ -1231,7 +2294,11 @@ public final class ManagerInstaller: @unchecked Sendable {
     // MARK: - Firewall
 
     public func tryAllowFirewall() -> [String: Any] {
-        var pathsToAllow = [installedBinaryURL.path, appExecutableURL.path]
+        var pathsToAllow = [
+            installedBinaryURL.path,
+            installedRuntimeLauncherURL.path,
+            appExecutableURL.path,
+        ]
         pathsToAllow = pathsToAllow.filter { FileManager.default.fileExists(atPath: $0) }
         guard !pathsToAllow.isEmpty else {
             return ["ok": false, "message": "binary not installed"]
