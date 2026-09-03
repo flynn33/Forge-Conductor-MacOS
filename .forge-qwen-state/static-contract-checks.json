@@ -1,0 +1,45 @@
+{
+  "passed": false,
+  "checks": [
+    {
+      "name": "shell-default-enabled",
+      "passed": true,
+      "detail": "shell policy source must default enabled"
+    },
+    {
+      "name": "shell-exec-registered",
+      "passed": true,
+      "detail": "legacy shell tool remains registered"
+    },
+    {
+      "name": "generic-completion-validator-removed",
+      "passed": false,
+      "detail": "production runtime must not use generic evidence hashes"
+    },
+    {
+      "name": "package-queue-present",
+      "passed": false,
+      "detail": "missing until P04"
+    },
+    {
+      "name": "project-reset-service",
+      "passed": false,
+      "detail": "missing until P05"
+    },
+    {
+      "name": "xpc-runtime",
+      "passed": false,
+      "detail": "missing until P07"
+    },
+    {
+      "name": "no-empty-button-actions",
+      "passed": false,
+      "detail": "empty actions: ['Button(\"Checkpoint Now\") {}', 'Button(\"Request Early Rollover\") {}', 'Button(\"Relink\u2026\") {}', 'Button(\"Test Connection\") {}', 'Button(\"Run Contract Probe\") {}']"
+    },
+    {
+      "name": "xcode-test-parity",
+      "passed": false,
+      "detail": "missing: ['LMStudioContractFixtureTests.swift', 'LMStudioContractFixtureServer.swift']"
+    }
+  ]
+}

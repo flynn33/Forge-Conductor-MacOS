@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "finding_id": "FCA-001",
+  "status": "resolved",
+  "summary": "Production completion uses only registered deterministic validators; bypass tests pass.",
+  "source_manifest_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "work_packages": ["P01"],
+  "gate_ids": ["G02"],
+  "evidence_receipts": [".forge-qwen-state/gate-results/G02/example.json"],
+  "residual_risk": "none",
+  "closure_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+}

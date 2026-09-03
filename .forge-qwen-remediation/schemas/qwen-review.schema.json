@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://forge-conductor.local/schemas/qwen-review.schema.json",
+  "title": "Qwen advisory remediation review",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "work_package_id",
+    "verdict",
+    "findings",
+    "required_follow_up",
+    "can_pass_gate"
+  ],
+  "properties": {
+    "work_package_id": {
+      "type": "string",
+      "pattern": "^P(?:0[0-9]|1[0-4])$"
+    },
+    "verdict": {
+      "type": "string",
+      "enum": [
+        "accept_slice",
+        "changes_required",
+        "inconclusive"
+      ]
+    },
+    "findings": {
+      "type": "array",
+      "maxItems": 40,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "severity",
+          "title",
+          "evidence",
+          "recommendation"
+        ],
+        "properties": {
+          "severity": {
+            "type": "string",
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "evidence": {
+            "type": "string",
+            "maxLength": 3000
+          },
+          "recommendation": {
+            "type": "string",
+            "maxLength": 3000
+          }
+        }
+      }
+    },
+    "required_follow_up": {
+      "type": "array",
+      "maxItems": 30,
+      "items": {
+        "type": "string",
+        "maxLength": 2000
+      }
+    },
+    "can_pass_gate": {
+      "const": false
+    }
+  }
+}

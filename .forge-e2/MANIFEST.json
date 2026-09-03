@@ -1,0 +1,412 @@
+{
+  "schema_version": 1,
+  "package": "Forge-Conductor-E2-Secure-Filesystem-Codex-Package",
+  "generated_at": "2026-08-28T10:30:15.592639+00:00",
+  "authoritative_repository": "flynn33/Forge-Conductor-MacOS",
+  "minimum_baseline_commit": "6288210d82270b26add5f0e078d150bc4377bd62",
+  "finding": "FC-FILESYSTEM-PATH-TOCTOU-001",
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "bytes": 2176,
+      "sha256": "526d33211d17499343b776e55737104faf9b21db1152638ac05c011f726d8a70",
+      "executable": false
+    },
+    {
+      "path": "CODEX-START-HERE.md",
+      "bytes": 4157,
+      "sha256": "05d3222d41ff64af07c9ac8321ed894d79005ad39cc2bb3418f483166b57acf5",
+      "executable": false
+    },
+    {
+      "path": "INSTALLATION.md",
+      "bytes": 747,
+      "sha256": "e660ecc6f6fa587c69fbb1262594f8f75e2520778187426fc188820d163700b7",
+      "executable": false
+    },
+    {
+      "path": "PACKAGE_VALIDATION.json",
+      "bytes": 1350,
+      "sha256": "9db996f0cb5c94f993dbf08343944b7672423ef4d9c40181ce45786a535b3d42",
+      "executable": false
+    },
+    {
+      "path": "README.md",
+      "bytes": 3253,
+      "sha256": "8b5aca42cebb6a85078ffde38ff21688bbf0c5f126bfcc5a12f0c26e4d024411",
+      "executable": false
+    },
+    {
+      "path": "blueprints/CForgeSecureFS/include/CForgeSecureFS.h",
+      "bytes": 2037,
+      "sha256": "3b4e8be7266858395ca51e58a935eedda84513362d3a336f6e8edb0531eab25b",
+      "executable": false
+    },
+    {
+      "path": "blueprints/CForgeSecureFS/src/CForgeSecureFS.c",
+      "bytes": 6164,
+      "sha256": "1236c4ec112995d2aa0e81fb17890d646e4ed011449a3b5918bbacc64c24dc2c",
+      "executable": false
+    },
+    {
+      "path": "blueprints/Swift/AtomicNamespaceTransaction.swift",
+      "bytes": 5588,
+      "sha256": "dcf16f4f6f2a1db8d6c4a04629e85c4d78157922eec0d2a34825877b2a58882f",
+      "executable": false
+    },
+    {
+      "path": "blueprints/Swift/SecureFilesystemBroker.swift",
+      "bytes": 2331,
+      "sha256": "922650d98aaf2e3e7f9f3274c65b526d4cb3847b51d996ebb9c01aeff29fdda5",
+      "executable": false
+    },
+    {
+      "path": "blueprints/Swift/SecureFilesystemTypes.swift",
+      "bytes": 2615,
+      "sha256": "ed4d64f38bf8166bc6904d7c41e940891195a54a007f15d9eacb0092b3f4457c",
+      "executable": false
+    },
+    {
+      "path": "blueprints/Tests/AtomicLeafSwapHarness.md",
+      "bytes": 1181,
+      "sha256": "054c11fb0a5d674f2297215c8239648f76d9d232bcea923c9ecd5769bdeef93d",
+      "executable": false
+    },
+    {
+      "path": "blueprints/Tests/AtomicSwapAttacker.c",
+      "bytes": 2222,
+      "sha256": "cb3f29887435af944f20c4d9a312d3b09fd70b9e890b638a4954e9068e716601",
+      "executable": false
+    },
+    {
+      "path": "docs/01-E2-RESEARCH-CONCLUSION.md",
+      "bytes": 4261,
+      "sha256": "499df5d20695c2c5002105ebcd15c5af430091d118f5b581a999cad583d16958",
+      "executable": false
+    },
+    {
+      "path": "docs/02-THREAT-MODEL-AND-SECURITY-INVARIANTS.md",
+      "bytes": 3942,
+      "sha256": "07208833e605e3a3e1f243c9a0014f06b7cbf2fe5e3791e40552e3872ad865b2",
+      "executable": false
+    },
+    {
+      "path": "docs/03-TARGET-ARCHITECTURE.md",
+      "bytes": 4013,
+      "sha256": "92ef69cbb690f82871a5265b8d932b7a219e6d8754b55cf98557df8f9f51b5ca",
+      "executable": false
+    },
+    {
+      "path": "docs/04-SECURE-FILESYSTEM-ALGORITHMS.md",
+      "bytes": 6264,
+      "sha256": "8c6c1a259f1b3e71b4f9896274c5488a908b3ab7e569f8f6d0ba6ee9b393520d",
+      "executable": false
+    },
+    {
+      "path": "docs/05-AUTHORIZATION-CAPABILITY-REFACTOR.md",
+      "bytes": 2068,
+      "sha256": "73ce3adb6157b48a3ab103a13b46db52ce61ee5173c88ca0fa3da201b555a802",
+      "executable": false
+    },
+    {
+      "path": "docs/06-TRANSACTION-LEDGER-AND-CRASH-RECOVERY.md",
+      "bytes": 2824,
+      "sha256": "d2d3d7bc04824bb620c7bf461fe150e08c43a72f94109a96a5c5bdf86a148c3d",
+      "executable": false
+    },
+    {
+      "path": "docs/07-PACKAGE-INGESTION-HARDENING.md",
+      "bytes": 1930,
+      "sha256": "41dffd1fafc523a0ffaf764eb0f285f453ac230c05bddc8ffbda505976a317ee",
+      "executable": false
+    },
+    {
+      "path": "docs/08-CROSS-VOLUME-AND-HARD-LINKS.md",
+      "bytes": 2879,
+      "sha256": "717ba7bc52f0b83571f912b0dd666df747dee7179154debc5be475a50d2aa7d3",
+      "executable": false
+    },
+    {
+      "path": "docs/09-TEST-AND-ADVERSARIAL-QUALIFICATION.md",
+      "bytes": 3128,
+      "sha256": "425d4a441c82feaa158908b6bba6638666cf15e998388de1fede82b460ad8b4c",
+      "executable": false
+    },
+    {
+      "path": "docs/10-FAIL-FORWARD-EXECUTION-RUNBOOK.md",
+      "bytes": 2299,
+      "sha256": "c023fec3548d1e6221365ec137a4c1a5d1c7a02621c81c533bddd4f3d19a834c",
+      "executable": false
+    },
+    {
+      "path": "docs/11-PERFORMANCE-AND-RESOURCE-BUDGETS.md",
+      "bytes": 1949,
+      "sha256": "6e50d6afd5193874ec60f060504872ac2986da5a0b78f0d607e19b419b3837df",
+      "executable": false
+    },
+    {
+      "path": "docs/12-SHELL-PRESERVATION-GATE.md",
+      "bytes": 1260,
+      "sha256": "91c159373305f868ede267f3cc453cc4526902c4410b1e2bff2e3801196c3f4c",
+      "executable": false
+    },
+    {
+      "path": "docs/13-RELEASE-COMPLETION-CONTRACT.md",
+      "bytes": 2364,
+      "sha256": "a3ea3ad87e38b7d949bc51d4c6fab85d4b118e6291024cb0828891107be70026",
+      "executable": false
+    },
+    {
+      "path": "docs/14-SOURCE-EVIDENCE.md",
+      "bytes": 1774,
+      "sha256": "3d183fbe96473c71bfd975859fae012e80a0c6cf9cc67f331b4a085e90cce28f",
+      "executable": false
+    },
+    {
+      "path": "docs/15-RESEARCH-SOURCES.md",
+      "bytes": 3348,
+      "sha256": "4a35b316eb6bc416e8a73edd3362e09024e4c1cbe5f5e7651b66ae1f17cca53f",
+      "executable": false
+    },
+    {
+      "path": "docs/16-FEATURE-PRESERVATION-MATRIX.md",
+      "bytes": 1632,
+      "sha256": "11f5bc5b04138dbf55a8849832b4ff6384e4adb1a90dc4f609814c082d3e974d",
+      "executable": false
+    },
+    {
+      "path": "docs/17-ATOMIC-CAPTURE-PSEUDOCODE.md",
+      "bytes": 10206,
+      "sha256": "1acf10b054ba91a916422096652d1223ae8d829104050c6a26f92b2678bf4bae",
+      "executable": false
+    },
+    {
+      "path": "docs/18-IMPLEMENTATION-CHANGE-MAP.md",
+      "bytes": 6679,
+      "sha256": "d078ea3b4f3c5644e7e93df0c613c356e6e339f8f9fa72884d8d2a7ee51eb2fa",
+      "executable": false
+    },
+    {
+      "path": "docs/19-E2-CLOSURE-ARGUMENT.md",
+      "bytes": 4762,
+      "sha256": "be449c73694632b715be47fc442c34ae10114b1ed21d176906eeb48a4bba258d",
+      "executable": false
+    },
+    {
+      "path": "docs/20-FILESYSTEM-CAPABILITY-AND-VOLUME-MATRIX.md",
+      "bytes": 2713,
+      "sha256": "00ce95cc9bcc6ea67a1e1c2f05fcb341f835342c28b83568e8c68f6539e2fee7",
+      "executable": false
+    },
+    {
+      "path": "docs/21-MIGRATION-ROLLOUT-AND-COMPATIBILITY.md",
+      "bytes": 3093,
+      "sha256": "150ab34e0374f0229dcd599a6be91564691c9828898c228c847f320966aa9b8b",
+      "executable": false
+    },
+    {
+      "path": "evidence/PR11-RESIDUAL.md",
+      "bytes": 515,
+      "sha256": "eac27da53e83736d30173ebaeb205ea4754aabb2ec6435356613b74773fb411f",
+      "executable": false
+    },
+    {
+      "path": "evidence/apple-api-matrix.json",
+      "bytes": 1883,
+      "sha256": "b315acb451ab007abd23f991a33c37ff0d1f20164de2b76626a69edaa814973f",
+      "executable": false
+    },
+    {
+      "path": "evidence/source-baseline.json",
+      "bytes": 674,
+      "sha256": "c35294aa01757d76b3f2617a6d2318a30a4d8fabb3c4b9e905fa2a55e8d9e4fa",
+      "executable": false
+    },
+    {
+      "path": "inputs/Forge-Conductor-MacOS-main.zip",
+      "bytes": 15040337,
+      "sha256": "3e344d4b3bb0fff80487f99a7c69e7ceadf22aa1e64da3a6f2640ea2fa0072dd",
+      "executable": false
+    },
+    {
+      "path": "inputs/INPUTS-NOTICE.md",
+      "bytes": 416,
+      "sha256": "f73739d7d470c9fb716680ca7747b078a98fcae3cf83842f0bbf4874f1dba1d0",
+      "executable": false
+    },
+    {
+      "path": "inputs/Plan Forge Conductor Autonomy.txt",
+      "bytes": 16653,
+      "sha256": "e623b1f078173f71cf45279e74ddb6fa25309a221e2e3312d7ce24b38a5d2ded",
+      "executable": false
+    },
+    {
+      "path": "schemas/filesystem-capability.schema.json",
+      "bytes": 1364,
+      "sha256": "f8694fdc18411a793a5e5104edc59be1aa58c866334f47b2298c5f302ade5c3e",
+      "executable": false
+    },
+    {
+      "path": "schemas/filesystem-receipt.schema.json",
+      "bytes": 1166,
+      "sha256": "505dc3f9c9332dfc192b05d0e5aed04485f5ae186bd76fa5d13492fe069c9546",
+      "executable": false
+    },
+    {
+      "path": "schemas/filesystem-transaction.schema.json",
+      "bytes": 2768,
+      "sha256": "a8f2b9b4e519c2aac405178d372f03b6be12f0566adb124a165a3b90da7c6f2b",
+      "executable": false
+    },
+    {
+      "path": "schemas/filesystem-transactions.sql",
+      "bytes": 1887,
+      "sha256": "2ec964d2fcaa080f8bd165d5f212b050d0a82cb4783677d927a6d633de3fcabe",
+      "executable": false
+    },
+    {
+      "path": "scripts/bootstrap.sh",
+      "bytes": 556,
+      "sha256": "5cd7d7803f33f61c22871d10fbc311387898b3311f1bc15452d2f56e6ae0d2cb",
+      "executable": true
+    },
+    {
+      "path": "scripts/check_attribution.py",
+      "bytes": 1007,
+      "sha256": "fe1278a86af0417032ee7280e0b1ce4a6e3b9863f8f51ef0be3070c57d487f49",
+      "executable": true
+    },
+    {
+      "path": "scripts/check_shell_preservation.py",
+      "bytes": 665,
+      "sha256": "7e1a6dfb8eaa0ad40b00bbb12c816c6905318aaff4e4816afb1446e96ffa4061",
+      "executable": true
+    },
+    {
+      "path": "scripts/doctor.py",
+      "bytes": 1621,
+      "sha256": "c32fa5d5ca236e9e52920e0b4301ee6f0b0f558b68d121f93153bccfea214b16",
+      "executable": true
+    },
+    {
+      "path": "scripts/generate_manifest.py",
+      "bytes": 1053,
+      "sha256": "9e8b2b50626e051dc8ef321bf8834ee893862c89d4ba670a0dd8f3e1f741bcfb",
+      "executable": true
+    },
+    {
+      "path": "scripts/initialize_run_state.py",
+      "bytes": 1101,
+      "sha256": "984e70c1a5f3fc6c82be2d4c15d47c84b811e0fd0dc223219fcec5636daa5827",
+      "executable": true
+    },
+    {
+      "path": "scripts/install_into_repo.sh",
+      "bytes": 1675,
+      "sha256": "0a1dddb182c2b166094616c1b18e28d4adca9ef6f41b74dfeee3de6e328ce2b7",
+      "executable": true
+    },
+    {
+      "path": "scripts/macos_api_probe.c",
+      "bytes": 9615,
+      "sha256": "4dc74e4da4c15a8f18d2fe38001dac7505754980e7ac74228e2afb2b2ed6d8c8",
+      "executable": false
+    },
+    {
+      "path": "scripts/record_checkpoint.py",
+      "bytes": 1283,
+      "sha256": "86073534e915ce0e2ce8ece8b98ef9971d0e079de27f27ebe095f85e55142deb",
+      "executable": true
+    },
+    {
+      "path": "scripts/record_gate.py",
+      "bytes": 1605,
+      "sha256": "fb66f878ea8555fc2a4bb0af5545efa58a95286d6a5d98390790e89b4b318e19",
+      "executable": true
+    },
+    {
+      "path": "scripts/run_e2_qualification.sh",
+      "bytes": 1788,
+      "sha256": "887596992713b761744d76921b495f44fac4017452fd44462a078718c4e3195a",
+      "executable": true
+    },
+    {
+      "path": "scripts/run_macos_api_probe.sh",
+      "bytes": 374,
+      "sha256": "c3e9821dd206e02073fd3026c27fd6a1b8d5a2f2943d2f56b425ceb84126da56",
+      "executable": true
+    },
+    {
+      "path": "scripts/secret_scan.py",
+      "bytes": 1538,
+      "sha256": "3c0822072e583c02e85f8762db9a31b95a9ca01356e005f4a6a0b8df3baf8949",
+      "executable": true
+    },
+    {
+      "path": "scripts/select_next_work.py",
+      "bytes": 1098,
+      "sha256": "4855adefe151785f4a1caaba92f2bf026c1d7c2d84248607771fad54cabb7a3e",
+      "executable": true
+    },
+    {
+      "path": "scripts/source_guard.py",
+      "bytes": 1653,
+      "sha256": "79b6fbfdca55263f81c79e38b3c579d9f91aff3315baad9bf5eade726cefe9e6",
+      "executable": true
+    },
+    {
+      "path": "scripts/validate_completion.py",
+      "bytes": 997,
+      "sha256": "defb69a2063b1010ba2307e151c95afeb695598098f61cb7c6847c9a2930641b",
+      "executable": true
+    },
+    {
+      "path": "scripts/validate_manifest.py",
+      "bytes": 1949,
+      "sha256": "cdf5f06b5be26dd1d029331a3b01dd3ab3c81bb77a97d0c86b0f585a70859db1",
+      "executable": true
+    },
+    {
+      "path": "scripts/validate_package.py",
+      "bytes": 5706,
+      "sha256": "8a135982e0d8cd9c3426260b2acf35f147a65b2f14435c026348f1818c03899a",
+      "executable": true
+    },
+    {
+      "path": "scripts/verify_baseline.py",
+      "bytes": 2855,
+      "sha256": "ccd54e8fddfc60f2ef996a0478e31963015b6434bd8443bce5b34bf455dfc8ba",
+      "executable": true
+    },
+    {
+      "path": "work/acceptance-gates.json",
+      "bytes": 2636,
+      "sha256": "b411368835d263e7a89f5830c8436a1a3213c3be0b90055e3eda17dbb31cb8bd",
+      "executable": false
+    },
+    {
+      "path": "work/completion-checklist.md",
+      "bytes": 861,
+      "sha256": "b3e217c283d24a2c9246d3c80ec040da9878ef1af59eb1afe50613fce423d773",
+      "executable": false
+    },
+    {
+      "path": "work/decision-log-template.md",
+      "bytes": 268,
+      "sha256": "6cc788679aac4f726cddc728c233919e67f6d990a63309d945c7890b6d259a55",
+      "executable": false
+    },
+    {
+      "path": "work/state-template.json",
+      "bytes": 2808,
+      "sha256": "6a1584bbefcfa00505f6d2505bc035fe24b81a411e428d789cc7ec524b0ec31e",
+      "executable": false
+    },
+    {
+      "path": "work/work-packages.json",
+      "bytes": 7994,
+      "sha256": "3aae44276543254da15cb13d9e258b2313642c4afba0704d17e8b10b91d236cb",
+      "executable": false
+    }
+  ]
+}

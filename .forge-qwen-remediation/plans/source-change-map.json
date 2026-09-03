@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "critical_existing_files": [
+    {
+      "path": "Sources/ForgeConductorCore/Application/ManagedProjectRunStepExecutor.swift",
+      "change": "remove model-supplied gate proof mapping; completion request starts manager validators only"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/ManagedAutonomyRuntime.swift",
+      "change": "replace EvidenceBoundCompletionValidator production wiring"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/ToolRouter.swift",
+      "change": "managed-mode continuity routing; preserve external compatibility explicitly"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/ContinuityAutomation.swift",
+      "change": "remove global authority and manual blocker from managed mode"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Manager/ManagerNode.swift",
+      "change": "reset, queue, provider, runtime, continuity commands and projections"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Telemetry/TelemetryService.swift",
+      "change": "ring buffer and single-source host sample cadence"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Infrastructure/ResourcePolicy.swift",
+      "change": "wire pressure coordinator and consumers"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Dashboard/DashboardServer.swift",
+      "change": "connection registry, cap, deadlines, cancellation"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Dashboard/ManagerRoutes.swift",
+      "change": "authorize sensitive reads and add typed mutation routes"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/Tools/FilesystemToolPack.swift",
+      "change": "integrate atomic namespace transaction broker"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/AppModel.swift",
+      "change": "add Work Queue tab without removing existing tabs"
+    },
+    {
+      "path": "ForgeConductor.xcodeproj/project.pbxproj",
+      "change": "add missing tests and new XPC/C target membership"
+    },
+    {
+      "path": "Package.swift",
+      "change": "add secure filesystem C target and shared XPC model target where supported; keep all existing products"
+    }
+  ],
+  "new_modules": [
+    "GateRegistry.swift",
+    "GateExecutionService.swift",
+    "PackageIngestionService.swift",
+    "PackageCatalogRepository.swift",
+    "PackageQueueService.swift",
+    "PackageQueueRepository.swift",
+    "ProjectResetService.swift",
+    "ResourcePressureCoordinator.swift",
+    "DashboardConnectionRegistry.swift",
+    "ForgeRuntimeXPC service/client/protocol",
+    "WorkQueueViewModel.swift",
+    "WorkQueueOperatorView.swift",
+    "ReleaseAttestationService.swift"
+  ]
+}

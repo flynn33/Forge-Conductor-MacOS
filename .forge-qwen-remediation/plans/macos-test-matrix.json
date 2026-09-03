@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "suites": [
+    {
+      "id": "swiftpm-debug",
+      "command": "swift test -Xswiftc -warnings-as-errors --no-parallel",
+      "required": true
+    },
+    {
+      "id": "swiftpm-release",
+      "command": "swift test -c release -Xswiftc -warnings-as-errors --no-parallel",
+      "required": true
+    },
+    {
+      "id": "xcode-unit",
+      "command": "xcodebuild test -project ForgeConductor.xcodeproj -scheme ForgeConductor -destination platform=macOS",
+      "required": true
+    },
+    {
+      "id": "xcode-ui-signed",
+      "command": "xcodebuild test using the signed local test configuration and ForgeConductorUITests",
+      "required": true
+    },
+    {
+      "id": "asan",
+      "command": "xcodebuild test with Address Sanitizer, serial",
+      "required": true
+    },
+    {
+      "id": "tsan",
+      "command": "xcodebuild test with Thread Sanitizer, serial",
+      "required": true
+    },
+    {
+      "id": "instruments-allocations",
+      "command": "xcrun xctrace record using the supplied navigation/autonomy fixture",
+      "required": true
+    },
+    {
+      "id": "instruments-time-profiler",
+      "command": "xcrun xctrace record during telemetry and queue load",
+      "required": true
+    },
+    {
+      "id": "metal-system-trace",
+      "command": "xcrun xctrace record while Rig visible then hidden",
+      "required": true
+    },
+    {
+      "id": "real-lmstudio-rollover",
+      "command": "scripted manager-owned forced-threshold test against a locally loaded LM Studio model",
+      "required": true
+    },
+    {
+      "id": "shell-native",
+      "command": "signed UI Settings -> manager -> MCP shell_exec and job flow",
+      "required": true
+    },
+    {
+      "id": "xpc-sandbox",
+      "command": "signed helper allow/deny/network/descendant tests",
+      "required": true
+    },
+    {
+      "id": "e2-race",
+      "command": "C atomic-swap attacker qualification across supported local volumes",
+      "required": true
+    },
+    {
+      "id": "endurance",
+      "command": "accelerated or 24-hour two-package autonomous soak",
+      "required": true
+    }
+  ]
+}

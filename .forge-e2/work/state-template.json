@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "mission": "Close FC-FILESYSTEM-PATH-TOCTOU-001",
+  "baseline": null,
+  "active_work_id": "E2-00",
+  "work": {
+    "E2-00": {
+      "status": "pending",
+      "attempts": 0,
+      "evidence": []
+    },
+    "E2-01": {
+      "status": "pending",
+      "attempts": 0,
+      "evidence": []
+    },
+    "E2-02": {
+      "status": "pending",
+      "attempts": 0,
+      "evidence": []
+    },
+    "E2-03": {
+      "status": "pending",
+      "attempts": 0,
+      "evidence": []
+    },
+    "E2-04": {
+      "status": "pending",
+      "attempts": 0,
+      "evidence": []
+    },
+    "E2-05": {
+      "status": "pending",
+      "attempts": 0,
+      "evidence": []
+    },
+    "E2-06": {
+      "status": "pending",
+      "attempts": 0,
+      "evidence": []
+    },
+    "E2-07": {
+      "status": "pending",
+      "attempts": 0,
+      "evidence": []
+    },
+    "E2-08": {
+      "status": "pending",
+      "attempts": 0,
+      "evidence": []
+    },
+    "E2-09": {
+      "status": "pending",
+      "attempts": 0,
+      "evidence": []
+    },
+    "E2-10": {
+      "status": "pending",
+      "attempts": 0,
+      "evidence": []
+    },
+    "E2-11": {
+      "status": "pending",
+      "attempts": 0,
+      "evidence": []
+    }
+  },
+  "gates": {
+    "E2-G01": {
+      "status": "pending",
+      "evidence": []
+    },
+    "E2-G02": {
+      "status": "pending",
+      "evidence": []
+    },
+    "E2-G03": {
+      "status": "pending",
+      "evidence": []
+    },
+    "E2-G04": {
+      "status": "pending",
+      "evidence": []
+    },
+    "E2-G05": {
+      "status": "pending",
+      "evidence": []
+    },
+    "E2-G06": {
+      "status": "pending",
+      "evidence": []
+    },
+    "E2-G07": {
+      "status": "pending",
+      "evidence": []
+    },
+    "E2-G08": {
+      "status": "pending",
+      "evidence": []
+    },
+    "E2-G09": {
+      "status": "pending",
+      "evidence": []
+    },
+    "E2-G10": {
+      "status": "pending",
+      "evidence": []
+    },
+    "E2-G11": {
+      "status": "pending",
+      "evidence": []
+    },
+    "E2-G12": {
+      "status": "pending",
+      "evidence": []
+    },
+    "E2-G13": {
+      "status": "pending",
+      "evidence": []
+    },
+    "E2-G14": {
+      "status": "pending",
+      "evidence": []
+    },
+    "E2-G15": {
+      "status": "pending",
+      "evidence": []
+    },
+    "E2-G16": {
+      "status": "pending",
+      "evidence": []
+    },
+    "E2-G17": {
+      "status": "pending",
+      "evidence": []
+    },
+    "E2-G18": {
+      "status": "pending",
+      "evidence": []
+    },
+    "E2-G19": {
+      "status": "pending",
+      "evidence": []
+    },
+    "E2-G20": {
+      "status": "pending",
+      "evidence": []
+    }
+  },
+  "open_findings": [
+    "FC-FILESYSTEM-PATH-TOCTOU-001"
+  ],
+  "deferred_environment_release_blockers": [],
+  "last_updated_at": null
+}

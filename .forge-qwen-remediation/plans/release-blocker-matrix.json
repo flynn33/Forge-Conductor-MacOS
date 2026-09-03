@@ -1,0 +1,450 @@
+{
+  "schema_version": 1,
+  "blockers": [
+    {
+      "finding_id": "FCA-001",
+      "severity": "Critical",
+      "title": "Completion gates are satisfied by generic tool-result hashes rather than gate-specific validators",
+      "release_blocking": true,
+      "work_packages": [
+        "P01"
+      ],
+      "required_gates": [
+        "G02"
+      ],
+      "closure_rule": "immutable closure receipt on the final source manifest; no open residual for Critical or High"
+    },
+    {
+      "finding_id": "FCA-002",
+      "severity": "Critical",
+      "title": "Instruction-package ingestion, immutable store, durable Work Queue, and package tools are absent",
+      "release_blocking": true,
+      "work_packages": [
+        "P03",
+        "P04"
+      ],
+      "required_gates": [
+        "G04",
+        "G05"
+      ],
+      "closure_rule": "immutable closure receipt on the final source manifest; no open residual for Critical or High"
+    },
+    {
+      "finding_id": "FCA-003",
+      "severity": "Critical",
+      "title": "Legacy fixed-count continuity still blocks the manager-owned autonomous provider loop and instructs manual chat rollover",
+      "release_blocking": true,
+      "work_packages": [
+        "P02"
+      ],
+      "required_gates": [
+        "G03"
+      ],
+      "closure_rule": "immutable closure receipt on the final source manifest; no open residual for Critical or High"
+    },
+    {
+      "finding_id": "FCA-004",
+      "severity": "High",
+      "title": "Project reset only increments generation; it does not reset memory or continuity safely",
+      "release_blocking": true,
+      "work_packages": [
+        "P05"
+      ],
+      "required_gates": [
+        "G06"
+      ],
+      "closure_rule": "immutable closure receipt on the final source manifest; no open residual for Critical or High"
+    },
+    {
+      "finding_id": "FCA-005",
+      "severity": "High",
+      "title": "Global latest-handoff and global continuity projections remain active",
+      "release_blocking": true,
+      "work_packages": [
+        "P02"
+      ],
+      "required_gates": [
+        "G03"
+      ],
+      "closure_rule": "immutable closure receipt on the final source manifest; no open residual for Critical or High"
+    },
+    {
+      "finding_id": "FCA-006",
+      "severity": "High",
+      "title": "Manager-owned real-provider forced rollover is not proven end to end",
+      "release_blocking": true,
+      "work_packages": [
+        "P02",
+        "P12"
+      ],
+      "required_gates": [
+        "G03",
+        "G14",
+        "G15",
+        "G16",
+        "G18"
+      ],
+      "closure_rule": "immutable closure receipt on the final source manifest; no open residual for Critical or High"
+    },
+    {
+      "finding_id": "FCA-007",
+      "severity": "High",
+      "title": "Descriptor-relative E2 filesystem race remains mitigated but not eliminated",
+      "release_blocking": true,
+      "work_packages": [
+        "P03",
+        "P10"
+      ],
+      "required_gates": [
+        "G04",
+        "G12"
+      ],
+      "closure_rule": "immutable closure receipt on the final source manifest; no open residual for Critical or High"
+    },
+    {
+      "finding_id": "FCA-008",
+      "severity": "High",
+      "title": "The hardened App Sandbox XPC runtime scaffold was not implemented",
+      "release_blocking": true,
+      "work_packages": [
+        "P07"
+      ],
+      "required_gates": [
+        "G08",
+        "G14"
+      ],
+      "closure_rule": "immutable closure receipt on the final source manifest; no open residual for Critical or High"
+    },
+    {
+      "finding_id": "FCA-009",
+      "severity": "High",
+      "title": "ResourcePolicy pressure-adjusted execution, gauge cadence, and event limits are largely unused",
+      "release_blocking": true,
+      "work_packages": [
+        "P08",
+        "P13"
+      ],
+      "required_gates": [
+        "G09",
+        "G10",
+        "G17",
+        "G19"
+      ],
+      "closure_rule": "immutable closure receipt on the final source manifest; no open residual for Critical or High"
+    },
+    {
+      "finding_id": "FCA-010",
+      "severity": "High",
+      "title": "Provider operator status and controls are placeholders",
+      "release_blocking": true,
+      "work_packages": [
+        "P06"
+      ],
+      "required_gates": [
+        "G07"
+      ],
+      "closure_rule": "immutable closure receipt on the final source manifest; no open residual for Critical or High"
+    },
+    {
+      "finding_id": "FCA-011",
+      "severity": "High",
+      "title": "Root instructions require design packages that are absent from the archive",
+      "release_blocking": true,
+      "work_packages": [
+        "P00",
+        "P11"
+      ],
+      "required_gates": [
+        "G00",
+        "G01",
+        "G13"
+      ],
+      "closure_rule": "immutable closure receipt on the final source manifest; no open residual for Critical or High"
+    },
+    {
+      "finding_id": "FCA-012",
+      "severity": "High",
+      "title": "The bundled release state references multiple branches/commits and cannot be independently tied to the archive",
+      "release_blocking": true,
+      "work_packages": [
+        "P00",
+        "P11"
+      ],
+      "required_gates": [
+        "G00",
+        "G01",
+        "G13"
+      ],
+      "closure_rule": "immutable closure receipt on the final source manifest; no open residual for Critical or High"
+    },
+    {
+      "finding_id": "FCA-013",
+      "severity": "High",
+      "title": "The signed native UI matrix has not run",
+      "release_blocking": true,
+      "work_packages": [
+        "P12"
+      ],
+      "required_gates": [
+        "G14",
+        "G15",
+        "G16",
+        "G18"
+      ],
+      "closure_rule": "immutable closure receipt on the final source manifest; no open residual for Critical or High"
+    },
+    {
+      "finding_id": "FCA-014",
+      "severity": "High",
+      "title": "Shell is enabled in source, but native Settings-to-manager compatibility remains unproven",
+      "release_blocking": true,
+      "work_packages": [
+        "P12"
+      ],
+      "required_gates": [
+        "G14",
+        "G15",
+        "G16",
+        "G18"
+      ],
+      "closure_rule": "immutable closure receipt on the final source manifest; no open residual for Critical or High"
+    },
+    {
+      "finding_id": "FCA-015",
+      "severity": "High",
+      "title": "The Rig can instantiate roughly 288 native Metal gauge surfaces from bounded lists",
+      "release_blocking": true,
+      "work_packages": [
+        "P08",
+        "P13"
+      ],
+      "required_gates": [
+        "G09",
+        "G10",
+        "G17",
+        "G19"
+      ],
+      "closure_rule": "immutable closure receipt on the final source manifest; no open residual for Critical or High"
+    },
+    {
+      "finding_id": "FCA-016",
+      "severity": "High",
+      "title": "Autonomy/control-plane event and provider history tables have no bounded archival policy",
+      "release_blocking": true,
+      "work_packages": [
+        "P08",
+        "P13"
+      ],
+      "required_gates": [
+        "G09",
+        "G10",
+        "G17",
+        "G19"
+      ],
+      "closure_rule": "immutable closure receipt on the final source manifest; no open residual for Critical or High"
+    },
+    {
+      "finding_id": "FCA-017",
+      "severity": "Medium",
+      "title": "Project relink is displayed but disabled",
+      "release_blocking": true,
+      "work_packages": [
+        "P06"
+      ],
+      "required_gates": [
+        "G07"
+      ],
+      "closure_rule": "immutable closure receipt on the final source manifest; no open residual for Critical or High"
+    },
+    {
+      "finding_id": "FCA-018",
+      "severity": "Medium",
+      "title": "Durable job cancellation exists in the backend but the native Cancel Job action is disabled",
+      "release_blocking": true,
+      "work_packages": [
+        "P06"
+      ],
+      "required_gates": [
+        "G07"
+      ],
+      "closure_rule": "immutable closure receipt on the final source manifest; no open residual for Critical or High"
+    },
+    {
+      "finding_id": "FCA-019",
+      "severity": "Medium",
+      "title": "Checkpoint and early-rollover controls are disabled placeholders",
+      "release_blocking": true,
+      "work_packages": [
+        "P06"
+      ],
+      "required_gates": [
+        "G07"
+      ],
+      "closure_rule": "immutable closure receipt on the final source manifest; no open residual for Critical or High"
+    },
+    {
+      "finding_id": "FCA-020",
+      "severity": "Medium",
+      "title": "Forge recompose appends an additional history point from the last host sample",
+      "release_blocking": true,
+      "work_packages": [
+        "P08",
+        "P13"
+      ],
+      "required_gates": [
+        "G09",
+        "G10",
+        "G17",
+        "G19"
+      ],
+      "closure_rule": "immutable closure receipt on the final source manifest; no open residual for Critical or High"
+    },
+    {
+      "finding_id": "FCA-021",
+      "severity": "Medium",
+      "title": "Frequent telemetry publication repeatedly shifts and copies history arrays",
+      "release_blocking": true,
+      "work_packages": [
+        "P08",
+        "P13"
+      ],
+      "required_gates": [
+        "G09",
+        "G10",
+        "G17",
+        "G19"
+      ],
+      "closure_rule": "immutable closure receipt on the final source manifest; no open residual for Critical or High"
+    },
+    {
+      "finding_id": "FCA-022",
+      "severity": "Medium",
+      "title": "gauge.surfaces.visible measures attached surfaces, not actual visibility",
+      "release_blocking": true,
+      "work_packages": [
+        "P08",
+        "P13"
+      ],
+      "required_gates": [
+        "G09",
+        "G10",
+        "G17",
+        "G19"
+      ],
+      "closure_rule": "immutable closure receipt on the final source manifest; no open residual for Critical or High"
+    },
+    {
+      "finding_id": "FCA-023",
+      "severity": "Medium",
+      "title": "Loopback HTTP connections have no explicit admission cap or idle read deadline",
+      "release_blocking": true,
+      "work_packages": [
+        "P09"
+      ],
+      "required_gates": [
+        "G11"
+      ],
+      "closure_rule": "immutable closure receipt on the final source manifest; no open residual for Critical or High"
+    },
+    {
+      "finding_id": "FCA-024",
+      "severity": "Medium",
+      "title": "Sensitive manager status and operator snapshot reads are exempt from authorization",
+      "release_blocking": true,
+      "work_packages": [
+        "P09"
+      ],
+      "required_gates": [
+        "G11"
+      ],
+      "closure_rule": "immutable closure receipt on the final source manifest; no open residual for Critical or High"
+    },
+    {
+      "finding_id": "FCA-025",
+      "severity": "Medium",
+      "title": "Two LM Studio contract fixture test files are absent from the Xcode test target",
+      "release_blocking": true,
+      "work_packages": [
+        "P11"
+      ],
+      "required_gates": [
+        "G13"
+      ],
+      "closure_rule": "immutable closure receipt on the final source manifest; no open residual for Critical or High"
+    },
+    {
+      "finding_id": "FCA-026",
+      "severity": "Medium",
+      "title": "The source archive contains large build/evidence state and hundreds of absolute local paths",
+      "release_blocking": true,
+      "work_packages": [
+        "P00",
+        "P11"
+      ],
+      "required_gates": [
+        "G00",
+        "G01",
+        "G13"
+      ],
+      "closure_rule": "immutable closure receipt on the final source manifest; no open residual for Critical or High"
+    },
+    {
+      "finding_id": "FCA-027",
+      "severity": "Medium",
+      "title": "Version and continuity documentation remain on 0.9.0/manual-new-chat semantics",
+      "release_blocking": true,
+      "work_packages": [
+        "P11"
+      ],
+      "required_gates": [
+        "G13"
+      ],
+      "closure_rule": "immutable closure receipt on the final source manifest; no open residual for Critical or High"
+    },
+    {
+      "finding_id": "FCA-028",
+      "severity": "Medium",
+      "title": "Runtime and provider version/health projections remain incomplete",
+      "release_blocking": true,
+      "work_packages": [
+        "P06"
+      ],
+      "required_gates": [
+        "G07"
+      ],
+      "closure_rule": "immutable closure receipt on the final source manifest; no open residual for Critical or High"
+    },
+    {
+      "finding_id": "FCA-029",
+      "severity": "Low",
+      "title": "Very large core files and extensive @unchecked Sendable usage increase regression risk",
+      "release_blocking": true,
+      "work_packages": [
+        "P11"
+      ],
+      "required_gates": [
+        "G13"
+      ],
+      "closure_rule": "immutable closure receipt on the final source manifest; no open residual for Critical or High"
+    },
+    {
+      "finding_id": "FCA-030",
+      "severity": "Low",
+      "title": "The package cannot be built or tested in the current Linux audit environment",
+      "release_blocking": true,
+      "work_packages": [
+        "P00",
+        "P12"
+      ],
+      "required_gates": [
+        "G00",
+        "G01",
+        "G14",
+        "G15",
+        "G16",
+        "G18"
+      ],
+      "closure_rule": "immutable closure receipt on the final source manifest; no open residual for Critical or High"
+    }
+  ]
+}

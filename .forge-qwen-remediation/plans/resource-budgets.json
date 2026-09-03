@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "principles": [
+    "budgets are release gates, not hints",
+    "correctness evidence and active continuity records are never discarded",
+    "pressure adaptation must be observable"
+  ],
+  "profiles": [
+    {
+      "id": "constrained",
+      "physical_memory_gib_max": 8,
+      "max_concurrent_runs": 1,
+      "max_runtime_jobs": 2,
+      "telemetry_history_points": 180,
+      "visible_gauge_fps": 20,
+      "background_gauge_fps": 0,
+      "provider_event_memory_cap": 500,
+      "db_event_retention_days": 7,
+      "db_event_row_cap_per_project": 50000,
+      "target_idle_rss_mib": 350,
+      "target_active_rss_mib": 900
+    },
+    {
+      "id": "standard",
+      "physical_memory_gib_min": 9,
+      "physical_memory_gib_max": 24,
+      "max_concurrent_runs": 2,
+      "max_runtime_jobs": 4,
+      "telemetry_history_points": 300,
+      "visible_gauge_fps": 30,
+      "background_gauge_fps": 0,
+      "provider_event_memory_cap": 1000,
+      "db_event_retention_days": 14,
+      "db_event_row_cap_per_project": 100000,
+      "target_idle_rss_mib": 500,
+      "target_active_rss_mib": 1400
+    },
+    {
+      "id": "expanded",
+      "physical_memory_gib_min": 25,
+      "max_concurrent_runs": 4,
+      "max_runtime_jobs": 8,
+      "telemetry_history_points": 600,
+      "visible_gauge_fps": 45,
+      "background_gauge_fps": 0,
+      "provider_event_memory_cap": 2000,
+      "db_event_retention_days": 30,
+      "db_event_row_cap_per_project": 250000,
+      "target_idle_rss_mib": 700,
+      "target_active_rss_mib": 2400
+    }
+  ],
+  "common": {
+    "maximum_single_tool_output_bytes": 1048576,
+    "maximum_package_manifest_bytes": 2097152,
+    "maximum_ingestion_uncompressed_bytes": 1073741824,
+    "maximum_ingestion_files": 100000,
+    "maximum_dashboard_connections": 32,
+    "dashboard_idle_read_seconds": 10,
+    "maximum_header_bytes": 32768,
+    "maximum_request_body_bytes": 1048576,
+    "minimum_free_disk_gib": 5
+  }
+}

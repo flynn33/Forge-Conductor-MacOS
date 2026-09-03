@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://forge-conductor.local/schemas/remediation-run-state.schema.json",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema_version",
+    "mission",
+    "source_archive_sha256",
+    "source_manifest_sha256",
+    "status",
+    "ready_to_ship",
+    "shipped",
+    "current_work_package",
+    "completed_work_packages",
+    "gate_status",
+    "baseline_source_manifest_sha256",
+    "current_source_manifest_sha256",
+    "gate_receipts",
+    "finding_status",
+    "open_findings",
+    "work_package_status"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "mission": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_archive_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "status": {
+      "enum": [
+        "not_started",
+        "in_progress",
+        "blocked",
+        "ready"
+      ]
+    },
+    "ready_to_ship": {
+      "type": "boolean"
+    },
+    "shipped": {
+      "const": false
+    },
+    "current_work_package": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "completed_work_packages": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "blocked_work_packages": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "gate_status": {
+      "type": "object",
+      "additionalProperties": {
+        "enum": [
+          "pending",
+          "running",
+          "passed",
+          "failed",
+          "blocked_environment"
+        ]
+      }
+    },
+    "baseline_source_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "current_source_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "gate_receipts": {
+      "type": "object",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "finding_status": {
+      "type": "object",
+      "additionalProperties": {
+        "enum": [
+          "open",
+          "resolved"
+        ]
+      }
+    },
+    "open_findings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^FCA-[0-9]{3}$"
+      }
+    },
+    "work_package_status": {
+      "type": "object",
+      "additionalProperties": {
+        "enum": [
+          "pending",
+          "selected",
+          "in_progress",
+          "blocked",
+          "completed"
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "status": "initial",
+  "current_work_package": "P00",
+  "next_actions": [
+    "validate package",
+    "bootstrap repository",
+    "run doctor",
+    "establish baseline"
+  ],
+  "ready_to_ship": false,
+  "shipped": false
+}
