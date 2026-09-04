@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "reviewed_base": "ffcf6bf9a2ea0c76a54788041cfa00c0dc8c7db4",
+  "documents": [
+    {
+      "path": "README.md",
+      "status": "not_applicable",
+      "reason": "This checkpoint restores execution dispatch and records fresh baseline evidence; product behavior and identity remain unchanged. Product documentation changes accompany the implementation checkpoint."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "status": "not_applicable",
+      "reason": "This checkpoint restores execution dispatch and records fresh baseline evidence; product behavior and identity remain unchanged. Product documentation changes accompany the implementation checkpoint."
+    },
+    {
+      "path": "USER-GUIDE.md",
+      "status": "not_applicable",
+      "reason": "This checkpoint restores execution dispatch and records fresh baseline evidence; product behavior and identity remain unchanged. Product documentation changes accompany the implementation checkpoint."
+    },
+    {
+      "path": "XCODE.md",
+      "status": "not_applicable",
+      "reason": "This checkpoint restores execution dispatch and records fresh baseline evidence; product behavior and identity remain unchanged. Product documentation changes accompany the implementation checkpoint."
+    }
+  ]
+}

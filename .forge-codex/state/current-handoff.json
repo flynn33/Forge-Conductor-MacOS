@@ -98,7 +98,7 @@
     "Do not request operator decisions.",
     "Do not add automated authorship credits."
   ],
-  "created_at": "2026-09-01T11:26:56.042813+00:00",
+  "created_at": "2026-09-04T22:47:38.256763+00:00",
   "current_work": {
     "active_files": [],
     "phase_id": "P10",
@@ -667,6 +667,12 @@
     "EVID-20260901T111032Z-3e4b6e0d96",
     "EVID-20260901T111225Z-c749bdbf18",
     "EVID-20260901T111318Z-c887522fd4",
+    "EVID-20260904T223512Z-bb65d3d81b",
+    "EVID-20260904T223636Z-42cab7ed45",
+    "EVID-20260904T223840Z-e70cbfb34e",
+    "EVID-20260904T223924Z-c8a0db1c37",
+    "EVID-20260904T224012Z-657ceed997",
+    "EVID-20260904T224149Z-2c2b1503ec",
     "a5466d4e5b4d7a10f87df64ddfdb58b6b8ca5159a57c20527e98802a822245d7",
     "a5d4276cbf14db3a91baa7f6b79fb8cdb3fb042a2eaf663d3219ff36b5451667",
     "aae6f19ed3e2d7207dddc80cf4013ce72f7b0898f72f19a10a701d2ece7e7920",
@@ -688,7 +694,7 @@
     "f1d06d7dd23bf3bd71f138fc1a9a5799dc4aa0e474e9a60552dfcecb68f41dc2",
     "fa52a67ada4051cdaf064cb6fc52cdd72cd7957006924443b4e414e2f5abda61"
   ],
-  "handoff_id": "908fd0b4-28df-4440-8886-1f3a0fce1544",
+  "handoff_id": "cc4bd67e-7a1d-4dd3-962e-58e7a43f514b",
   "host_state": {
     "adapter_id": null,
     "context_budget_source": null,
@@ -697,26 +703,26 @@
     "retry": null
   },
   "integrity": {
-    "content_sha256": "4ac2ee2a95bf83435c42e1397953fa421c27288e19a538df0ded53236336f285",
+    "content_sha256": "3c18c73d3a070d77363241ef788147967a174c144ff5214bde0713178f146284",
     "redaction_complete": true
   },
   "memory_references": [],
-  "mission": "# Execution directive\n\nExecute the Forge Conductor repair and extension package end to end.\n\n1. Read the repository root `AGENTS.md` and every document it marks as required.\n2. Load `.forge-codex/state/run-state.json`; initialize it only if absent.\n3. Use the included audit evidence as the starting hypothesis set, then prove runtime reachability before labeling source-level lifecycle risks as live leaks.\n4. Preserve every current capability and compatibility surface. Build a feature baseline and executable parity tests before behavior-changing refactors.\n5. Repair the known telemetry, gauge, lifecycle, concurrency, and performance defects.\n6. implement the project-scoped memory MCP and autonomous continuity system described by the contracts.\n7. Build a supported host adapter as an internal plugin target when automatic session creation is not already supplied by the host. Never use private UI scripting as a substitute for a supported session API.\n8. Build, test, profile, debug, repair, and repeat until every hard gate passes.\n9. Persist progress, evidence, decisions, and handoffs after every material step. Resume automatically after interruption.\n10. Do not ask the operator for decisions. Follow the fail-forward and decision policies.\n11. Do not add generator credits, automated-author notices, watermarks, or authorship trailers to source, documentation, commits, assets, or metadata.\n12. Do not declare completion until `.forge-codex/scripts/verify_completion.py` exits successfully and the resulting completion report points to the underlying evidence.\n\nBegin with phase P00 and continue through P12 in dependency order, while executing independent ready work whenever a non-global gate is blocked.\n",
+  "mission": "# Shipping execution\n\nThe owner selected the September 4, 2026 shipping package as the current\nexecution authority. Earlier instruction packages remain historical inputs;\ndo not reinstall them or use their independent state systems. Preserve\nexisting feature, security, continuity, and evidence requirements.\n\nUse work orders A through E in `work-orders/`, the\n`SYNC-DOCS-VERSION-CONTRACT.md`, `MACOS-VALIDATION-RUNBOOK.md`, and\n`RELEASE-GATES.md`. The authoritative state remains `.forge-codex/state`.\nImplementation, local commits, and permitted branch synchronization are\nauthorized. The owner performs shipping; do not merge protected branches,\npublish a release, or submit distribution without appropriate authority.\n\nRun the existing doctor, statectl show, and selector on resume, read the\ncurrent handoff, inspect live Git state, and continue current ready work.\nDo not restart completed phases because an old dispatch package is missing.\nAll hard gates remain binding, including unresolved filesystem containment,\nreal manager-owned rollover, native product paths, and hardware evidence.\nKeep skipped, blocked, failed, and passed distinct.\n\nEach coherent change includes targeted tests, Xcode membership, a build/version\ndecision, CHANGELOG when behavior changes, and README/USER-GUIDE/XCODE review.\nOnly the integrator edits shared project/version/state files or controls live\nmanager, provider, service, and signing state. Independent work uses separate\nworktrees and explicit file ownership. No destructive Git cleanup, automatic\nstash, force push, user-data deletion, or attribution credits/trailers.\n\nThe package targets 24 hours from the recorded start; time is not a release\nwaiver. Three attempts without new evidence require a diagnostic change.\nContinue independent implementation while external qualification is blocked.\n\nThe schema-v2 feature baseline is validated with\n`python3 .forge-codex/scripts/test_p10_feature_baseline.py`; never overwrite it\nwith the legacy schema-v1 inventory generator. Completion still requires\n`.forge-codex/scripts/verify_completion.py` to exit zero with current evidence.\n",
   "next_actions": [
     {
-      "action": "Continue P10 by implementing and executing the next bounded production-path feature slice; do not promote features from source presence, unit, fixture, app-hosted, build-only, or synthetic evidence.",
+      "action": "Review provider and build lane commits; integrate source and all native memberships, then run focused product tests.",
       "command": null,
       "order": 1,
       "success_condition": null
     },
     {
-      "action": "Keep filesystem E2, native UI and signing, shell Settings qualification, real-provider continuity, privileged lifecycle, provider configuration, and owner-deferred hardware open until their required evidence exists.",
+      "action": "Review preserved filesystem recovery changes; signed worker implementation was stopped by an automated security check. Containment remains unresolved.",
       "command": null,
       "order": 2,
       "success_condition": null
     },
     {
-      "action": "Before the next checkpoint push, read back draft PR #20 head and base from GitHub, record any state-only transport advance, and keep merge and release authority false.",
+      "action": "Run native UI readiness again only after owner enables macOS Automation Mode; preserve existing failures.",
       "command": null,
       "order": 3,
       "success_condition": null
@@ -784,23 +790,45 @@
       "summary": "Clean install lacks a supported managed-provider configuration path"
     }
   ],
-  "operation_id": "ee767d3a-884c-49ca-82ca-49abdd8c5085",
+  "operation_id": "c1f39c80-7a62-417e-88d6-42289044d842",
   "predecessor_session": {
     "model": null,
     "provider_session_id": null,
-    "session_id": "codex-current"
+    "session_id": "shipping-integration"
   },
   "project": {
-    "branch": "release/0.9.0-product-readiness",
-    "commit": "ea52c2779dd1f90ad718e93faa07459fc4ead511",
+    "branch": "release/0.9.0-shipping",
+    "commit": "ffcf6bf9a2ea0c76a54788041cfa00c0dc8c7db4",
     "dirty_summary": [
-      "M .forge-codex/state/environment.json",
+      "M .forge-codex/state/current-handoff.json",
+      " M .forge-codex/state/environment.json",
       " M .forge-codex/state/events.jsonl",
-      " M .forge-codex/state/run-state.json"
+      " M .forge-codex/state/release-handoff.md",
+      " M .forge-codex/state/run-state.json",
+      " M AGENTS.md",
+      "?? .forge-codex/evidence/EVID-20260904T223512Z-bb65d3d81b.json",
+      "?? .forge-codex/evidence/EVID-20260904T223512Z-bb65d3d81b.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260904T223512Z-bb65d3d81b.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260904T223636Z-42cab7ed45.json",
+      "?? .forge-codex/evidence/EVID-20260904T223636Z-42cab7ed45.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260904T223636Z-42cab7ed45.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260904T223840Z-e70cbfb34e.json",
+      "?? .forge-codex/evidence/EVID-20260904T223840Z-e70cbfb34e.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260904T223840Z-e70cbfb34e.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260904T223924Z-c8a0db1c37.json",
+      "?? .forge-codex/evidence/EVID-20260904T223924Z-c8a0db1c37.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260904T223924Z-c8a0db1c37.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260904T224012Z-657ceed997.json",
+      "?? .forge-codex/evidence/EVID-20260904T224012Z-657ceed997.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260904T224012Z-657ceed997.stdout.txt",
+      "?? .forge-codex/evidence/EVID-20260904T224149Z-2c2b1503ec.json",
+      "?? .forge-codex/evidence/EVID-20260904T224149Z-2c2b1503ec.stderr.txt",
+      "?? .forge-codex/evidence/EVID-20260904T224149Z-2c2b1503ec.stdout.txt",
+      "?? .forge-codex/shipping/"
     ],
-    "display_name": "Forge-Conductor-E2-Next",
-    "project_id": "0ece4408-5617-5b9a-87cb-ae1d75a5c8a8",
-    "repository_root": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next"
+    "display_name": "Forge-Conductor-MacOS",
+    "project_id": "480a50c5-4d23-5ce5-828c-b65d96ef74e4",
+    "repository_root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
   },
   "schema_version": 1,
   "successor_session": null,

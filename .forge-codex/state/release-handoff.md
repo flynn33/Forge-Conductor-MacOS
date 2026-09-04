@@ -1,6 +1,48 @@
 # Forge Conductor checkpoint and historical release handoff
 
-## Current checkpoint status — not release-qualified
+## Current shipping run — not release-qualified
+
+The September 4 shipping package is the active dispatch. Recorded start:
+2026-09-04 22:33:06 UTC / 17:33:06 America/Chicago. The canonical and execution
+checkout is `/Users/jimdaley/GitHub/Forge-Conductor-MacOS`, on
+`release/0.9.0-shipping`, created from live `origin/main` at
+`ffcf6bf9a2ea0c76a54788041cfa00c0dc8c7db4`. The prior branch and its HEAD
+`829c06af9365928ead82eedd6fec66f053a56f05` are preserved. Live GitHub readback
+confirmed PR #20 merged as `868d4678966b33cad79c96720d25e1311dfaef81` and no
+open PRs. No shipping branch push or protected merge has occurred at this
+baseline. The owner performs shipping manually.
+
+Fresh baseline evidence:
+
+- `EVID-20260904T223512Z-bb65d3d81b`: 34 feature-baseline checks passed.
+- `EVID-20260904T223636Z-42cab7ed45`: Debug SwiftPM, 1,001 tests, five declared
+  environment skips, zero failures, warnings as errors.
+- `EVID-20260904T224012Z-657ceed997`: Release SwiftPM, 1,001 tests, five declared
+  environment skips, zero failures, warnings as errors.
+- `EVID-20260904T223840Z-e70cbfb34e`: coherent Apple Development-signed native
+  Debug app build passed with compiler warnings as errors.
+- `EVID-20260904T223924Z-c8a0db1c37` and
+  `EVID-20260904T224149Z-2c2b1503ec`: native UI runner initialization failed
+  before app assertions with automation-mode timeout. The second command
+  selects one exact test. macOS reports Automation Mode disabled and requiring
+  user authentication; Developer mode itself is already enabled.
+
+The host is macOS 26.6.2 / 25G83, Xcode 26.6 / 17F113, Apple Swift 6.3.3,
+arm64, 48 GiB. A valid Apple Development identity is available; no Developer ID
+identity is available. LM Studio 0.4.23+1 serves port 1234 with no model loaded
+at inventory. Product identity remains 0.9.0/build 1 pending the owner’s
+distributed-build inventory. No current candidate or distribution is frozen.
+
+Provider, filesystem recovery, build/integrity, and native onboarding changes
+are developed in isolated worktrees. The integrator owns Xcode membership,
+version, top-level docs and `.forge-codex/state`. G09–G12 and all substantive
+security, lifecycle, production-path and hardware blockers below remain open.
+Raw build/test artifacts and result bundles are retained under
+`/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z`
+and the existing evidence recorder paths. Consult `current-handoff.json` for
+the next action; do not restart old package bootstraps.
+
+## Historical product-readiness checkpoint — superseded branch description
 
 The active branch is `release/0.9.0-product-readiness`. Its immutable source
 checkpoint is `2cc41ee2d95255761582792ed6c70c00702ff2f6`, based on `main` at

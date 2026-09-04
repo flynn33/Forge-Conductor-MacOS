@@ -1,11 +1,12 @@
 {
-  "captured_at": "2026-08-30T01:22:36.998623+00:00",
+  "captured_at": "2026-09-04T22:35:11.865904+00:00",
   "environment_keys_present": [
     "CODEX_APP_TOOLS_PIPE_PATH",
     "CODEX_CI",
     "CODEX_INTERNAL_ORIGINATOR_OVERRIDE",
     "CODEX_MCP_NODE_PATH",
     "CODEX_PERMISSION_PROFILE",
+    "CODEX_SAGE_BACKFILL_TRACKER_TAB_REUSE",
     "CODEX_SESSION_ID",
     "CODEX_SHELL",
     "CODEX_THREAD_ID"
@@ -13,27 +14,18 @@
   "execution_state": {
     "available": true,
     "checkpoint_identity": {
-      "active_branch": "release/0.9.0-product-readiness",
+      "active_branch": "release/0.9.0-shipping",
       "base_branch": "main",
-      "base_sha": "2e2ad93228c47e1fd16fb034e528d9a70cb61417",
-      "github_readback_verified": true,
-      "head_sha": "ea52c2779dd1f90ad718e93faa07459fc4ead511",
-      "identity_resolution": "verified",
+      "base_sha": "ffcf6bf9a2ea0c76a54788041cfa00c0dc8c7db4",
+      "github_readback_verified": false,
+      "head_sha": "ffcf6bf9a2ea0c76a54788041cfa00c0dc8c7db4",
+      "identity_resolution": "open_pull_request_not_found",
       "main_branch": "main",
-      "main_sha": "2e2ad93228c47e1fd16fb034e528d9a70cb61417",
-      "publication_head_branch": "release/0.9.0-product-readiness",
+      "main_sha": "ffcf6bf9a2ea0c76a54788041cfa00c0dc8c7db4",
+      "publication_head_branch": "main",
       "publication_remote": "origin",
-      "pull_request": {
-        "baseRefName": "main",
-        "baseRefOid": "2e2ad93228c47e1fd16fb034e528d9a70cb61417",
-        "headRefName": "release/0.9.0-product-readiness",
-        "headRefOid": "ea52c2779dd1f90ad718e93faa07459fc4ead511",
-        "isDraft": true,
-        "number": 20,
-        "state": "OPEN",
-        "url": "https://github.com/flynn33/Forge-Conductor-MacOS/pull/20"
-      },
-      "remote_head_sha": "ea52c2779dd1f90ad718e93faa07459fc4ead511"
+      "pull_request": null,
+      "remote_head_sha": "ffcf6bf9a2ea0c76a54788041cfa00c0dc8c7db4"
     },
     "completion_authority_current": false,
     "current_work": "P10",
@@ -231,7 +223,7 @@
       "does_not_close_p10_e2_native_continuity_or_hardware": true,
       "merge_authorized": false,
       "merge_requires_residuals_in_pr_state_doctor_and_selector": true,
-      "reviewable": true,
+      "reviewable": false,
       "simulator_or_current_host_results_do_not_pass_owner_deferred_g11": true
     },
     "release_authorized": false,
@@ -239,7 +231,7 @@
       "branch": "repair/swift6-test-targets",
       "commit": "62604e1f0f8abba649998679f22e55b0ecb89014",
       "dirty": true,
-      "root": "/Users/jimdaley/GitHub/Forge-Conductor"
+      "root": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next"
     },
     "run_status": "active"
   },
@@ -247,7 +239,7 @@
   "macos_runtime_capable": true,
   "platform": "macOS-26.6.2-arm64-arm-64bit",
   "project_markers": {
-    "package_swift": "/Users/jimdaley/GitHub/Forge-Conductor/Package.swift",
+    "package_swift": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Package.swift",
     "projects": [
       "ForgeConductor.xcodeproj"
     ],
@@ -255,7 +247,7 @@
       "ForgeConductor.xcworkspace"
     ]
   },
-  "repository_root": "/Users/jimdaley/GitHub/Forge-Conductor",
+  "repository_root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
   "schema_version": 1,
   "tools": {
     "bash": {
