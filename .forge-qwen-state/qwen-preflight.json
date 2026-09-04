@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-09-02T12:09:04.648852+00:00",
+  "passed": false,
+  "checks": [
+    {
+      "name": "qwen-install",
+      "passed": false,
+      "detail": "Qwen Code CLI is not installed. Set QWEN_AUTO_INSTALL=1 to permit installation.\n"
+    }
+  ]
+}

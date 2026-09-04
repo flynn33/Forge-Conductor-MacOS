@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://forge-conductor.local/schemas/finding-closure.schema.json",
+  "title": "FindingClosureReceipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "finding_id",
+    "status",
+    "summary",
+    "source_manifest_sha256",
+    "work_packages",
+    "gate_ids",
+    "evidence_receipts",
+    "residual_risk",
+    "closure_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "finding_id": { "type": "string", "pattern": "^FCA-[0-9]{3}$" },
+    "status": { "const": "resolved" },
+    "summary": { "type": "string", "minLength": 1 },
+    "source_manifest_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "work_packages": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^P[0-9]{2}$" }
+    },
+    "gate_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^G[0-9]{2}$" }
+    },
+    "evidence_receipts": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "residual_risk": { "type": "string", "minLength": 1 },
+    "closure_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

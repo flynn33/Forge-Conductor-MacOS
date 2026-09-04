@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-09-02T11:44:45.250190+00:00",
+  "work_package": {
+    "id": "P00",
+    "title": "Establish authoritative baseline and repair ledger",
+    "priority": "critical",
+    "depends_on": [],
+    "findings": [
+      "FCA-011",
+      "FCA-012",
+      "FCA-026",
+      "FCA-030"
+    ],
+    "objective": "Create one reproducible source identity, feature baseline, environment report, and restartable evidence ledger before product edits.",
+    "source_targets": [
+      "AGENTS.md",
+      ".forge-codex",
+      ".forge-autonomy-state",
+      "Package.swift",
+      "ForgeConductor.xcodeproj/project.pbxproj"
+    ],
+    "deliverables": [
+      "current source manifest",
+      "feature and MCP schema snapshots",
+      "environment capability report",
+      "clean worktree or exact extracted-source baseline",
+      "open finding ledger",
+      "do-not-ship guard"
+    ],
+    "required_tests": [
+      "package and source manifest verification",
+      "SwiftPM/Xcode source membership inventory",
+      "shell baseline static contract check",
+      "publication hygiene and secret scan"
+    ],
+    "gates": [
+      "G00",
+      "G01"
+    ],
+    "fail_forward": "If Git history is unavailable, use the supplied archive hash and generated source manifest as authority. Do not invent commit lineage."
+  },
+  "source_manifest_sha256": "8eb2f78b27d0127922e4ac7d4b1d8ea607e3ee217d82f73684eb604ac7618a9c",
+  "handoff": {
+    "schema_version": 1,
+    "status": "initial",
+    "current_work_package": "P00",
+    "next_actions": [
+      "validate package",
+      "bootstrap repository",
+      "run doctor",
+      "establish baseline"
+    ],
+    "ready_to_ship": false,
+    "shipped": false
+  },
+  "provider": {
+    "schema_version": 1,
+    "captured_at": "2026-09-02T11:39:16.878616+00:00",
+    "configured": false,
+    "model_match": true,
+    "quantization_verified": false,
+    "candidate_endpoints": [
+      {
+        "base_url": "http://127.0.0.1:1234/v1",
+        "available": true,
+        "http_status": 200,
+        "models": [
+          "qwen/qwen3.8-27b",
+          "openai/gpt-oss-20b",
+          "qwen/qwen3.6-35b-a3b",
+          "text-embedding-nomic-embed-text-v1.5"
+        ]
+      }
+    ],
+    "downgrades": [],
+    "base_url": "http://127.0.0.1:1234/v1",
+    "model_id": "qwen/qwen3.8-27b",
+    "quantization_evidence": "qwen/qwen3.8-27b  organization_owner    ",
+    "context_window_size": 65536,
+    "max_output_tokens": 8192,
+    "max_tool_calls": 24,
+    "max_session_turns": 18,
+    "optional_reasoning_fields_enabled": true,
+    "settings_path": "/Users/jimdaley/GitHub/Forge-Conductor/.qwen/settings.json",
+    "settings_backup": null
+  },
+  "gate_status": {
+    "G00": "pending",
+    "G01": "pending"
+  },
+  "card_path": ".forge-qwen-remediation/qwen/work-package-cards/P00.md"
+}

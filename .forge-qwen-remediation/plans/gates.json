@@ -1,0 +1,460 @@
+{
+  "schema_version": 1,
+  "gates": [
+    {
+      "id": "G00",
+      "title": "Baseline and source identity",
+      "work_package": "P00",
+      "kind": "deterministic",
+      "mandatory": true,
+      "platform": "any",
+      "pass_criteria": [
+        "input archive SHA matches",
+        "source manifest recorded",
+        "environment report recorded",
+        "run ledger initialized"
+      ],
+      "suggested_commands": [],
+      "validator_id": "baseline-source-identity",
+      "validator_version": "1.0.0",
+      "required_platform": "any",
+      "timeout_seconds": 900,
+      "acceptance_contract": "audit/Build-Test-Evidence.md",
+      "forbidden_substitutes": []
+    },
+    {
+      "id": "G01",
+      "title": "Feature and protocol baseline",
+      "work_package": "P00",
+      "kind": "deterministic",
+      "mandatory": true,
+      "platform": "any",
+      "pass_criteria": [
+        "MCP tools/schema snapshot recorded",
+        "UI tab and accessibility baseline recorded",
+        "settings/migration baseline recorded",
+        "shell contract recorded"
+      ],
+      "suggested_commands": [],
+      "validator_id": "feature-contract-baseline",
+      "validator_version": "1.0.0",
+      "required_platform": "any",
+      "timeout_seconds": 900,
+      "acceptance_contract": "tests/FeatureParityTests.md",
+      "forbidden_substitutes": []
+    },
+    {
+      "id": "G02",
+      "title": "Gate-specific completion truth",
+      "work_package": "P01",
+      "kind": "automated",
+      "mandatory": true,
+      "platform": "any",
+      "pass_criteria": [
+        "production uses registered validators",
+        "all bypass and stale-context tests pass",
+        "generic result hashes cannot pass gates"
+      ],
+      "suggested_commands": [],
+      "validator_id": "completion-integrity-regression",
+      "validator_version": "1.0.0",
+      "required_platform": "macOS",
+      "timeout_seconds": 3600,
+      "acceptance_contract": "tests/CompletionValidationTests.md",
+      "forbidden_substitutes": []
+    },
+    {
+      "id": "G03",
+      "title": "Single continuity authority",
+      "work_package": "P02",
+      "kind": "automated",
+      "mandatory": true,
+      "platform": "any",
+      "pass_criteria": [
+        "managed mode never uses manual blocker/global fallback",
+        "external compatibility mode remains explicit",
+        "cross-project isolation tests pass"
+      ],
+      "suggested_commands": [],
+      "validator_id": "continuity-authority-regression",
+      "validator_version": "1.0.0",
+      "required_platform": "macOS",
+      "timeout_seconds": 3600,
+      "acceptance_contract": "tests/ContinuityIntegrationTests.md",
+      "forbidden_substitutes": []
+    },
+    {
+      "id": "G04",
+      "title": "Secure immutable package ingestion",
+      "work_package": "P03",
+      "kind": "automated",
+      "mandatory": true,
+      "platform": "any",
+      "pass_criteria": [
+        "all archive/path/race tests pass",
+        "accepted content immutable and hash-addressed",
+        "uncertain inputs quarantined"
+      ],
+      "suggested_commands": [],
+      "validator_id": "immutable-package-ingestion",
+      "validator_version": "1.0.0",
+      "required_platform": "macOS",
+      "timeout_seconds": 5400,
+      "acceptance_contract": "tests/QueueIntegrationTests.md",
+      "forbidden_substitutes": []
+    },
+    {
+      "id": "G05",
+      "title": "Durable autonomous work queue",
+      "work_package": "P04",
+      "kind": "integration",
+      "mandatory": true,
+      "platform": "any",
+      "pass_criteria": [
+        "two queued packages complete in order without operator action",
+        "restart/lease/rollover recovery passes",
+        "only deterministic validators complete work"
+      ],
+      "suggested_commands": [],
+      "validator_id": "durable-work-queue",
+      "validator_version": "1.0.0",
+      "required_platform": "macOS",
+      "timeout_seconds": 7200,
+      "acceptance_contract": "tests/QueueIntegrationTests.md",
+      "forbidden_substitutes": []
+    },
+    {
+      "id": "G06",
+      "title": "Selective project reset",
+      "work_package": "P05",
+      "kind": "integration",
+      "mandatory": true,
+      "platform": "any",
+      "pass_criteria": [
+        "all reset modes isolate data correctly",
+        "generation increments once",
+        "stale work rejected",
+        "backup and recovery pass"
+      ],
+      "suggested_commands": [],
+      "validator_id": "selective-project-reset",
+      "validator_version": "1.0.0",
+      "required_platform": "macOS",
+      "timeout_seconds": 5400,
+      "acceptance_contract": "tests/ProjectResetTests.md",
+      "forbidden_substitutes": []
+    },
+    {
+      "id": "G07",
+      "title": "Operator controls complete",
+      "work_package": "P06",
+      "kind": "ui",
+      "mandatory": true,
+      "platform": "any",
+      "pass_criteria": [
+        "no placeholder/empty actions remain",
+        "typed authenticated manager routes pass",
+        "projections reflect authoritative state"
+      ],
+      "suggested_commands": [],
+      "validator_id": "operator-controls-native",
+      "validator_version": "1.0.0",
+      "required_platform": "signed-macOS",
+      "timeout_seconds": 5400,
+      "acceptance_contract": "tests/NativeUIQualification.md",
+      "forbidden_substitutes": []
+    },
+    {
+      "id": "G08",
+      "title": "Hardened XPC runtime",
+      "work_package": "P07",
+      "kind": "security",
+      "mandatory": true,
+      "platform": "any",
+      "pass_criteria": [
+        "signed sandbox helper executes allowed work",
+        "denied paths/network fail",
+        "cancellation kills descendants",
+        "workspaceIsolated remains accurately labeled"
+      ],
+      "suggested_commands": [],
+      "validator_id": "hardened-xpc-sandbox",
+      "validator_version": "1.0.0",
+      "required_platform": "signed-macOS",
+      "timeout_seconds": 7200,
+      "acceptance_contract": "tests/RuntimeXPCQualification.md",
+      "forbidden_substitutes": []
+    },
+    {
+      "id": "G09",
+      "title": "Resource pressure integration",
+      "work_package": "P08",
+      "kind": "performance",
+      "mandatory": true,
+      "platform": "any",
+      "pass_criteria": [
+        "pressure profile changes all declared consumers",
+        "concurrency/history/FPS/event limits enforce bounds",
+        "active evidence is preserved"
+      ],
+      "suggested_commands": [],
+      "validator_id": "resource-pressure-integration",
+      "validator_version": "1.0.0",
+      "required_platform": "macOS",
+      "timeout_seconds": 5400,
+      "acceptance_contract": "tests/ResourcePressureAndTelemetryTests.md",
+      "forbidden_substitutes": []
+    },
+    {
+      "id": "G10",
+      "title": "Telemetry and Metal correctness",
+      "work_package": "P08",
+      "kind": "performance",
+      "mandatory": true,
+      "platform": "any",
+      "pass_criteria": [
+        "one history point per host sample",
+        "ring buffer no shifting growth",
+        "visibility metric accurate",
+        "hidden gauges draw zero recurring frames"
+      ],
+      "suggested_commands": [],
+      "validator_id": "telemetry-metal-qualification",
+      "validator_version": "1.0.0",
+      "required_platform": "instruments",
+      "timeout_seconds": 7200,
+      "acceptance_contract": "tests/ResourcePressureAndTelemetryTests.md",
+      "forbidden_substitutes": [
+        "static source inspection alone",
+        "one-time RSS comparison"
+      ]
+    },
+    {
+      "id": "G11",
+      "title": "Dashboard hardening",
+      "work_package": "P09",
+      "kind": "security",
+      "mandatory": true,
+      "platform": "any",
+      "pass_criteria": [
+        "connection limits/deadlines pass",
+        "sensitive reads require auth",
+        "minimal health route is redacted"
+      ],
+      "suggested_commands": [],
+      "validator_id": "dashboard-security-regression",
+      "validator_version": "1.0.0",
+      "required_platform": "macOS",
+      "timeout_seconds": 3600,
+      "acceptance_contract": "tests/DashboardSecurityTests.md",
+      "forbidden_substitutes": []
+    },
+    {
+      "id": "G12",
+      "title": "E2 atomic filesystem closure",
+      "work_package": "P10",
+      "kind": "security",
+      "mandatory": true,
+      "platform": "any",
+      "pass_criteria": [
+        "atomic-swap adversarial matrix passes",
+        "no destructive pathname verify-then-mutate windows remain",
+        "unsupported volumes fail closed",
+        "closure argument reviewed"
+      ],
+      "suggested_commands": [],
+      "validator_id": "e2-atomic-filesystem-race",
+      "validator_version": "1.0.0",
+      "required_platform": "signed-macOS",
+      "timeout_seconds": 10800,
+      "acceptance_contract": "tests/E2Qualification.md",
+      "forbidden_substitutes": [
+        "additional pre-unlink identity checks without atomic capture"
+      ]
+    },
+    {
+      "id": "G13",
+      "title": "Repository and documentation integrity",
+      "work_package": "P11",
+      "kind": "deterministic",
+      "mandatory": true,
+      "platform": "any",
+      "pass_criteria": [
+        "SwiftPM/Xcode source parity",
+        "clean archive and no absolute local paths",
+        "docs describe current autonomous behavior",
+        "strict concurrency passes"
+      ],
+      "suggested_commands": [],
+      "validator_id": "repository-release-integrity",
+      "validator_version": "1.0.0",
+      "required_platform": "macOS",
+      "timeout_seconds": 5400,
+      "acceptance_contract": "tests/FeatureParityTests.md",
+      "forbidden_substitutes": []
+    },
+    {
+      "id": "G14",
+      "title": "Shell native end-to-end",
+      "work_package": "P12",
+      "kind": "native",
+      "mandatory": true,
+      "platform": "any",
+      "pass_criteria": [
+        "shell defaults enabled",
+        "explicit opt-out preserved",
+        "shell_exec behavior unchanged",
+        "Settings-manager-MCP command succeeds across restart/reset"
+      ],
+      "suggested_commands": [],
+      "validator_id": "shell-native-end-to-end",
+      "validator_version": "1.0.0",
+      "required_platform": "signed-macOS",
+      "timeout_seconds": 5400,
+      "acceptance_contract": "tests/NativeUIQualification.md",
+      "forbidden_substitutes": [
+        "static default check",
+        "direct ProcessRunner unit test only"
+      ]
+    },
+    {
+      "id": "G15",
+      "title": "Real-provider autonomous rollover",
+      "work_package": "P12",
+      "kind": "native",
+      "mandatory": true,
+      "platform": "any",
+      "pass_criteria": [
+        "real LM Studio threshold triggers",
+        "fresh root exact ack",
+        "one successor accepted",
+        "predecessor fenced",
+        "automatic continuation with GUI closed",
+        "all crash states recover"
+      ],
+      "suggested_commands": [],
+      "validator_id": "real-provider-autonomous-rollover",
+      "validator_version": "1.0.0",
+      "required_platform": "real-provider",
+      "timeout_seconds": 10800,
+      "acceptance_contract": "tests/ContinuityIntegrationTests.md",
+      "forbidden_substitutes": [
+        "synthetic provider",
+        "manual new chat",
+        "operator copy/paste"
+      ]
+    },
+    {
+      "id": "G16",
+      "title": "Signed native UI matrix",
+      "work_package": "P12",
+      "kind": "native",
+      "mandatory": true,
+      "platform": "any",
+      "pass_criteria": [
+        "XCUITests execute, not merely build",
+        "all operator actions and settings pass",
+        "LaunchAgent reconnect and no duplicate scheduler"
+      ],
+      "suggested_commands": [],
+      "validator_id": "signed-native-ui-matrix",
+      "validator_version": "1.0.0",
+      "required_platform": "signed-macOS",
+      "timeout_seconds": 7200,
+      "acceptance_contract": "tests/NativeUIQualification.md",
+      "forbidden_substitutes": [
+        "build-for-testing without executed XCUITest"
+      ]
+    },
+    {
+      "id": "G17",
+      "title": "Low-memory and endurance budgets",
+      "work_package": "P13",
+      "kind": "performance",
+      "mandatory": true,
+      "platform": "any",
+      "pass_criteria": [
+        "8/16/large profiles pass declared RSS/CPU/GPU/disk budgets",
+        "no monotonic unbounded growth after warmup",
+        "database retention bounded"
+      ],
+      "suggested_commands": [],
+      "validator_id": "low-memory-endurance-budget",
+      "validator_version": "1.0.0",
+      "required_platform": "instruments",
+      "timeout_seconds": 86400,
+      "acceptance_contract": "tests/ResourcePressureAndTelemetryTests.md",
+      "forbidden_substitutes": [
+        "unconstrained host without enforced profile or representative machine"
+      ]
+    },
+    {
+      "id": "G18",
+      "title": "Crash recovery matrix",
+      "work_package": "P12",
+      "kind": "recovery",
+      "mandatory": true,
+      "platform": "any",
+      "pass_criteria": [
+        "manager termination at every durable transition recovers",
+        "no duplicate irreversible effect",
+        "receipts truthful"
+      ],
+      "suggested_commands": [],
+      "validator_id": "durable-crash-recovery-matrix",
+      "validator_version": "1.0.0",
+      "required_platform": "macOS",
+      "timeout_seconds": 21600,
+      "acceptance_contract": "plans/crash-recovery-matrix.json",
+      "forbidden_substitutes": []
+    },
+    {
+      "id": "G19",
+      "title": "Integrated two-package autonomy",
+      "work_package": "P13",
+      "kind": "end_to_end",
+      "mandatory": true,
+      "platform": "any",
+      "pass_criteria": [
+        "two packages finish across manager restart and context rollover",
+        "validators and artifacts correct",
+        "no operator action"
+      ],
+      "suggested_commands": [],
+      "validator_id": "integrated-two-package-autonomy",
+      "validator_version": "1.0.0",
+      "required_platform": "real-provider",
+      "timeout_seconds": 86400,
+      "acceptance_contract": "tests/QueueIntegrationTests.md",
+      "forbidden_substitutes": [
+        "single package",
+        "synthetic provider",
+        "operator-triggered continuation"
+      ]
+    },
+    {
+      "id": "G20",
+      "title": "Release-ready, not shipped",
+      "work_package": "P14",
+      "kind": "attestation",
+      "mandatory": true,
+      "platform": "any",
+      "pass_criteria": [
+        "all mandatory gates passed",
+        "ready_to_ship true",
+        "shipped false",
+        "no publication action occurred",
+        "attestation binds source/toolchain/evidence"
+      ],
+      "suggested_commands": [],
+      "validator_id": "release-readiness-attestation",
+      "validator_version": "1.0.0",
+      "required_platform": "signed-macOS",
+      "timeout_seconds": 7200,
+      "acceptance_contract": "docs/10-SHIPPABLE-NOT-SHIPPED.md",
+      "forbidden_substitutes": [
+        "publication, notarization submission, release tag, distribution"
+      ]
+    }
+  ]
+}

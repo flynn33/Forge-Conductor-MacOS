@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-09-01T11:26:46.545170+00:00",
+  "captured_at": "2026-08-30T01:22:36.998623+00:00",
   "environment_keys_present": [
     "CODEX_APP_TOOLS_PIPE_PATH",
     "CODEX_CI",
@@ -236,10 +236,10 @@
     },
     "release_authorized": false,
     "repository": {
-      "branch": "release/0.9.0-product-readiness",
-      "commit": "ea52c2779dd1f90ad718e93faa07459fc4ead511",
-      "dirty": false,
-      "root": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next"
+      "branch": "repair/swift6-test-targets",
+      "commit": "62604e1f0f8abba649998679f22e55b0ecb89014",
+      "dirty": true,
+      "root": "/Users/jimdaley/GitHub/Forge-Conductor"
     },
     "run_status": "active"
   },
@@ -247,7 +247,7 @@
   "macos_runtime_capable": true,
   "platform": "macOS-26.6.2-arm64-arm-64bit",
   "project_markers": {
-    "package_swift": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next/Package.swift",
+    "package_swift": "/Users/jimdaley/GitHub/Forge-Conductor/Package.swift",
     "projects": [
       "ForgeConductor.xcodeproj"
     ],
@@ -255,7 +255,7 @@
       "ForgeConductor.xcworkspace"
     ]
   },
-  "repository_root": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next",
+  "repository_root": "/Users/jimdaley/GitHub/Forge-Conductor",
   "schema_version": 1,
   "tools": {
     "bash": {

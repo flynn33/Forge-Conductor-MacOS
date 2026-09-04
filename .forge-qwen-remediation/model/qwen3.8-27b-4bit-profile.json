@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "profile_id": "qwen-code-qwen3.8-27b-4bit-local",
+  "model_family": "Qwen3.8",
+  "parameter_class": "27B dense",
+  "required_quantization": "4-bit",
+  "execution_host": "Qwen Code CLI",
+  "provider_protocol": "OpenAI-compatible loopback HTTP",
+  "provider_policy": {
+    "loopback_only": true,
+    "exact_model_match_required": true,
+    "quantization_metadata_required": true,
+    "unverified_quantization_override": "QWEN_ACCEPT_UNVERIFIED_QUANTIZATION=1",
+    "remote_provider_fallback": false,
+    "silent_model_fallback": false
+  },
+  "reasoning": {
+    "enabled_when_provider_supports_it": true,
+    "temperature": 1.0,
+    "top_p": 0.95,
+    "top_k": 20,
+    "presence_penalty": 0.0,
+    "optional_fields_may_be_removed_after_probe_failure": true
+  },
+  "session_policy": {
+    "fresh_session_per_plan": true,
+    "fresh_session_per_implementation_slice": true,
+    "subagents_disabled": true,
+    "managed_qwen_memory_disabled": true,
+    "structured_terminal_output_is_not_gate_evidence": true,
+    "default_max_files_per_slice": 6,
+    "default_no_progress_limit": 3
+  },
+  "host_memory_profiles": [
+    {
+      "physical_memory_gib": "<24",
+      "context_window": 16384,
+      "max_output_tokens": 4096,
+      "max_tool_calls": 14,
+      "max_session_turns": 12
+    },
+    {
+      "physical_memory_gib": "24-31",
+      "context_window": 32768,
+      "max_output_tokens": 6144,
+      "max_tool_calls": 18,
+      "max_session_turns": 15
+    },
+    {
+      "physical_memory_gib": "32-63",
+      "context_window": 65536,
+      "max_output_tokens": 8192,
+      "max_tool_calls": 24,
+      "max_session_turns": 18
+    },
+    {
+      "physical_memory_gib": ">=64",
+      "context_window": 98304,
+      "max_output_tokens": 12288,
+      "max_tool_calls": 32,
+      "max_session_turns": 22
+    }
+  ],
+  "absolute_context_ceiling": 262144,
+  "implementation_wall_time": "45m",
+  "planning_wall_time": "12m",
+  "do_not_ship": true,
+  "no_attribution": true
+}

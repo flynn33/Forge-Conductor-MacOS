@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://forge-conductor.local/schemas/gate-result.schema.json",
+  "title": "GateValidationReceipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "execution_id",
+    "gate_id",
+    "work_package",
+    "validator_id",
+    "validator_version",
+    "project_id",
+    "project_generation",
+    "source_manifest_before",
+    "source_manifest_after",
+    "started_at",
+    "ended_at",
+    "passed",
+    "status",
+    "artifacts",
+    "receipt_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "execution_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "gate_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "validator_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "validator_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project_generation": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "package_run_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "run_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "source_manifest_before": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source_manifest_after": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "command": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "native_action": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "ended_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "passed": {
+      "type": "boolean"
+    },
+    "status": {
+      "enum": [
+        "passed",
+        "failed",
+        "blocked_environment",
+        "cancelled",
+        "timed_out"
+      ]
+    },
+    "summary": {
+      "type": "string"
+    },
+    "exit_code": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "artifacts": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "role",
+          "path",
+          "bytes",
+          "sha256"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "minLength": 1
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "receipt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "work_package": {
+      "type": "string",
+      "pattern": "^P[0-9]{2}$"
+    },
+    "parameters_sha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "duration_milliseconds": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    }
+  }
+}

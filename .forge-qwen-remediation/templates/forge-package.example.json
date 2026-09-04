@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "package_id": "forge.example.remediation",
+  "version": "1.0.0",
+  "mission": "Apply one bounded change and satisfy the registered deterministic gates.",
+  "project_id": null,
+  "entry_documents": [
+    "QWEN-START-HERE.md"
+  ],
+  "dependencies": [],
+  "requested_capabilities": [
+    "fs_read",
+    "fs_write",
+    "process.run"
+  ],
+  "completion_gates": [
+    {
+      "schema_version": 1,
+      "gate_id": "package.tests",
+      "validator_id": "swift-test",
+      "validator_version": "1.0.0",
+      "project_id": "project-example",
+      "project_generation": 1,
+      "package_run_id": null,
+      "run_id": null,
+      "parameters_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "timeout_seconds": 3600,
+      "required_platform": "macOS",
+      "mandatory": true
+    }
+  ],
+  "resource_policy": {
+    "profile": "project-default",
+    "maximum_seconds": 7200,
+    "maximum_artifact_bytes": 1073741824
+  },
+  "artifacts": [
+    {
+      "role": "test-report",
+      "path": "artifacts/tests.json",
+      "required": true
+    }
+  ],
+  "metadata": {
+    "owner": "Forge Conductor"
+  }
+}

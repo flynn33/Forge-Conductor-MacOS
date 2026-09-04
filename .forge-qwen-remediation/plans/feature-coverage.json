@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "packages": [
+    {
+      "package": "FC-CTX-001",
+      "feature": "Durable project context and bindings",
+      "state": "Implemented",
+      "coverage": "Exact ProjectID/ProjectGeneration context models, durable bindings, authorization scope, stale-generation fencing, manager/UI projections.",
+      "gaps": "Release-native integration still depends on open UI gate.",
+      "evidence": "ProjectContextService.swift; ProjectControlPlaneRepository.swift; ToolAuthorizationService.swift"
+    },
+    {
+      "package": "FC-CONT-001",
+      "feature": "Canonical continuity consolidation",
+      "state": "Partial",
+      "coverage": "Project-scoped ContinuityCoordinator, V2 handoffs, operation persistence, recovery, exact acknowledgment models.",
+      "gaps": "Legacy global fallback/manual client blocker remains active and authoritative on routed tools.",
+      "evidence": "ContinuityCoordinator.swift; ManagedContinuityWorker.swift; ContinuityAutomation.swift; ToolRouter.swift"
+    },
+    {
+      "package": "FC-RESET-001",
+      "feature": "Safe project reset and Settings UI",
+      "state": "Missing",
+      "coverage": "Generation-reset primitive and stale-generation fencing exist.",
+      "gaps": "No selectable memory/continuity/combined/history reset, verified backup/rotation, complete maintenance barrier, or reset UI contract.",
+      "evidence": "ManagerNode.resetProjectGeneration; ProjectsOperatorView"
+    },
+    {
+      "package": "FC-RUNTIME-001",
+      "feature": "Durable execution jobs and direct processes",
+      "state": "Implemented",
+      "coverage": "Durable job repository/service, direct process profile, output bounds, deadlines, cancellation, process groups, project generation binding.",
+      "gaps": "Native cancel UI disabled; pressure-adjusted admission incomplete.",
+      "evidence": "ExecutionJobService.swift; RuntimeJobRepository.swift; RuntimeJobToolPack.swift"
+    },
+    {
+      "package": "FC-RUNTIME-002",
+      "feature": "Shell and Bash",
+      "state": "Implemented",
+      "coverage": "shell_exec compatibility, shell.run, bash.run, enabled default, migration, explicit opt-out, bounded jobs.",
+      "gaps": "Signed native Settings/restart qualification remains open.",
+      "evidence": "AppConfig.swift; ConfigStore.swift; ShellToolPack.swift; RuntimeJobSubsystem.swift"
+    },
+    {
+      "package": "FC-RUNTIME-003",
+      "feature": "Python, PowerShell, and hardened XPC",
+      "state": "Partial",
+      "coverage": "python.run and powershell.run with isolated/no-profile invocations and capability detection.",
+      "gaps": "No signed App Sandbox XPC helper, security-scoped bookmark lifecycle, or hardenedXPC qualification.",
+      "evidence": "ExecutionJobService.swift; Package.swift"
+    },
+    {
+      "package": "FC-QUEUE-001",
+      "feature": "Instruction-package ingestion/catalog",
+      "state": "Missing",
+      "coverage": "No product implementation located.",
+      "gaps": "No immutable Store/Quarantine/Artifacts ingestion, manifest validation, or compatibility importer.",
+      "evidence": "Repository-wide zero-match scan"
+    },
+    {
+      "package": "FC-QUEUE-002",
+      "feature": "Durable queue, leases, runs, and Work Queue UI",
+      "state": "Missing",
+      "coverage": "Manual autonomous run creation exists.",
+      "gaps": "No queue state machine, QueueAssignment, reservation/lease scheduler, package tools, deterministic package validators, or Work Queue UI.",
+      "evidence": "Repository-wide zero-match scan; AppTab inventory"
+    },
+    {
+      "package": "FC-HOST-001",
+      "feature": "Real LM Studio driver and tool broker",
+      "state": "Partial",
+      "coverage": "Production ForgeNativeSessionHostPlugin uses real LM Studio transport/provider; synthetic transport is rejected in production; persistent provider-turn/tool broker structures exist.",
+      "gaps": "Manager-owned real-provider end-to-end authority remains unproven; provider operator UI is incomplete.",
+      "evidence": "ForgeNativeSessionHostPlugin.swift; host-capability-report.json"
+    },
+    {
+      "package": "FC-AUTO-001",
+      "feature": "Autonomous package/run supervisor",
+      "state": "Partial",
+      "coverage": "AutonomySupervisor, ProjectRunCoordinator, watchdog, provider/tool loop, durable run state, GUI-independent manager ownership.",
+      "gaps": "No package queue; completion validator can accept unrelated hashes; pressure adaptation incomplete.",
+      "evidence": "ManagedAutonomyRuntime.swift; ManagedProjectRunStepExecutor.swift; AutonomySupervisor.swift"
+    },
+    {
+      "package": "FC-AUTO-002",
+      "feature": "Autonomous real-session rollover",
+      "state": "Partial",
+      "coverage": "ContextBudgetSupervisor, rollover state machine, successor acknowledgment, predecessor fencing, continuation and recovery code exist.",
+      "gaps": "Legacy blocker conflicts; real threshold-forced manager E2E gate open.",
+      "evidence": "ContextBudgetSupervisor.swift; ManagedContinuityWorker.swift; ToolRouter.swift; host-capability-report.json"
+    },
+    {
+      "package": "FC-HARDEN-001",
+      "feature": "Security, recovery, performance, migration, release gates",
+      "state": "Partial",
+      "coverage": "Latest-value telemetry backpressure, shared/on-demand Metal resources, runtime bounds, migration safeguards, project generation fencing, mutation auth, extensive tests.",
+      "gaps": "E2 open; signed UI/shell/autonomy gates open; dashboard read/connection issues; gauge scale; retention and pressure integration gaps.",
+      "evidence": "TelemetryService.swift; MetalGaugeResources.swift; current handoff/completion report"
+    }
+  ]
+}

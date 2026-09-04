@@ -1,0 +1,264 @@
+{
+  "schema_version": 1,
+  "baseline": {
+    "repository": "flynn33/Forge-Conductor-MacOS",
+    "branch": "main",
+    "minimum_commit": "6288210d82270b26add5f0e078d150bc4377bd62"
+  },
+  "completion_gate": "E2-G20",
+  "packages": [
+    {
+      "id": "E2-00",
+      "title": "Baseline, feature inventory, and reproducer",
+      "depends_on": [],
+      "status": "pending",
+      "max_attempts": 3,
+      "deliverables": [
+        "Record branch, HEAD, toolchain, macOS, Xcode, SDK, filesystem types.",
+        "Map every path-sensitive call site in current source.",
+        "Add characterization tests for every filesystem tool and shell contract.",
+        "Add a deterministic final-leaf swap reproducer against the pre-fix implementation."
+      ],
+      "gates": [
+        "E2-G01"
+      ]
+    },
+    {
+      "id": "E2-01",
+      "title": "Public API and volume capability probe",
+      "depends_on": [
+        "E2-00"
+      ],
+      "status": "pending",
+      "max_attempts": 3,
+      "deliverables": [
+        "Compile and run the macOS API probe.",
+        "Record flag values from public SDK headers.",
+        "Probe APFS and every supported qualification volume.",
+        "Define fail-closed errors for unsupported atomicity.",
+        "Measure strict versus leaf-only final-symlink rename behavior.",
+        "Persist a per-volume capability class and invalidate it on mount or OS change."
+      ],
+      "gates": [
+        "E2-G02"
+      ]
+    },
+    {
+      "id": "E2-02",
+      "title": "Typed root capabilities and authorization boundary",
+      "depends_on": [
+        "E2-00"
+      ],
+      "status": "pending",
+      "max_attempts": 5,
+      "deliverables": [
+        "Persist project root identity and bookmark metadata.",
+        "Refactor internal authorization to carry typed capabilities.",
+        "Remove path strings as mutation authority.",
+        "Fence stale project generations."
+      ],
+      "gates": [
+        "E2-G03"
+      ]
+    },
+    {
+      "id": "E2-03",
+      "title": "Darwin shim and descriptor primitives",
+      "depends_on": [
+        "E2-01",
+        "E2-02"
+      ],
+      "status": "pending",
+      "max_attempts": 5,
+      "deliverables": [
+        "Add CForgeSecureFS target.",
+        "Implement RAII Swift descriptor types.",
+        "Implement strict component walker and hierarchy creator.",
+        "Add error and capability reporting."
+      ],
+      "gates": [
+        "E2-G03",
+        "E2-G04"
+      ]
+    },
+    {
+      "id": "E2-04",
+      "title": "Read, list, glob, mkdir, write, and edit",
+      "depends_on": [
+        "E2-03"
+      ],
+      "status": "pending",
+      "max_attempts": 5,
+      "deliverables": [
+        "Descriptor-read with version token.",
+        "Descriptor list and in-process glob.",
+        "Race-safe mkdir hierarchy.",
+        "Staged atomic write and swap-based edit.",
+        "Remove Foundation and find-based authority from these paths."
+      ],
+      "gates": [
+        "E2-G04",
+        "E2-G05"
+      ]
+    },
+    {
+      "id": "E2-05",
+      "title": "Atomic-capture delete",
+      "depends_on": [
+        "E2-03"
+      ],
+      "status": "pending",
+      "max_attempts": 5,
+      "deliverables": [
+        "Create same-volume private transaction namespace.",
+        "Make capture rename the linearization point.",
+        "Descriptor-recursive disposal.",
+        "Version conflict restore or quarantine.",
+        "Truthful cancellation and commit receipts.",
+        "Use a manager-reserved same-volume transaction root excluded from model-facing grants."
+      ],
+      "gates": [
+        "E2-G06"
+      ]
+    },
+    {
+      "id": "E2-06",
+      "title": "Same-volume move",
+      "depends_on": [
+        "E2-03"
+      ],
+      "status": "pending",
+      "max_attempts": 5,
+      "deliverables": [
+        "Direct exclusive atomic move for current-entry contract.",
+        "Capture/verify/publish for exact-version contract.",
+        "Destination hierarchy and parent durability.",
+        "No precompare/rename window."
+      ],
+      "gates": [
+        "E2-G07"
+      ]
+    },
+    {
+      "id": "E2-07",
+      "title": "Cross-volume move and descriptor copy",
+      "depends_on": [
+        "E2-05",
+        "E2-06"
+      ],
+      "status": "pending",
+      "max_attempts": 6,
+      "deliverables": [
+        "Capture source before copy.",
+        "Replace /bin/cp with bounded descriptor copier.",
+        "Publish synchronized destination staging.",
+        "Recover every cross-volume state.",
+        "Define hard-link and metadata behavior.",
+        "Qualify fcopyfile on open descriptors for data, ACL, xattr, resource-fork, and metadata preservation."
+      ],
+      "gates": [
+        "E2-G08"
+      ]
+    },
+    {
+      "id": "E2-08",
+      "title": "Immutable package ingestion",
+      "depends_on": [
+        "E2-03",
+        "E2-07"
+      ],
+      "status": "pending",
+      "max_attempts": 5,
+      "deliverables": [
+        "Snapshot archive and directory inputs through descriptors.",
+        "Validate only managed immutable copies.",
+        "Harden extraction against path and normalization attacks.",
+        "Bind queue records to store hashes."
+      ],
+      "gates": [
+        "E2-G09"
+      ]
+    },
+    {
+      "id": "E2-09",
+      "title": "Durable transaction repository and recovery worker",
+      "depends_on": [
+        "E2-05",
+        "E2-06",
+        "E2-07"
+      ],
+      "status": "pending",
+      "max_attempts": 6,
+      "deliverables": [
+        "Integrate transaction schema into control plane.",
+        "Persist intent before side effects.",
+        "Implement restart recovery and leases.",
+        "Implement bounded quarantine and reset interaction."
+      ],
+      "gates": [
+        "E2-G10"
+      ]
+    },
+    {
+      "id": "E2-10",
+      "title": "Adversarial, compatibility, and resource qualification",
+      "depends_on": [
+        "E2-04",
+        "E2-08",
+        "E2-09"
+      ],
+      "status": "pending",
+      "max_attempts": 6,
+      "deliverables": [
+        "Run deterministic and stress race matrix.",
+        "Run serial/parallel SwiftPM and Xcode suites.",
+        "Prove shell preservation.",
+        "Prove memory, fd, transaction, and quarantine budgets.",
+        "Run attribution, secret, and source guards.",
+        "Run exact MCP tools/list and /bin/bash -lc shell smoke after restart and reset.",
+        "Run kill/restart recovery at every nonterminal transaction phase."
+      ],
+      "gates": [
+        "E2-G11",
+        "E2-G12",
+        "E2-G13",
+        "E2-G14",
+        "E2-G15",
+        "E2-G16",
+        "E2-G17",
+        "E2-G18"
+      ]
+    },
+    {
+      "id": "E2-11",
+      "title": "Finding closure, documentation, and pull request",
+      "depends_on": [
+        "E2-10"
+      ],
+      "status": "pending",
+      "max_attempts": 3,
+      "deliverables": [
+        "Update finding with complete evidence.",
+        "Update architecture and operator documentation.",
+        "Create focused mergeable PR against current main.",
+        "Run final doctor and state selector."
+      ],
+      "gates": [
+        "E2-G19",
+        "E2-G20"
+      ]
+    }
+  ],
+  "autonomy_policy": {
+    "operator_intervention": "forbidden",
+    "recoverable_failure": "persist evidence, apply bounded retry or compensation, then continue with the next unblocked action",
+    "missing_native_environment": "record deferred_environment_release_blocker, continue host-independent work, and never mark the native gate passed",
+    "source_divergence": "adapt to the current descendant without reverting later fixes",
+    "data_safety": "prefer restore or quarantine over destructive cleanup when state is ambiguous"
+  },
+  "security_decision": {
+    "linearization": "atomic descriptor-relative capture or publication",
+    "exact_precondition": "capture, verify, restore-or-quarantine",
+    "forbidden": "validate a pathname entry and later destroy or rename that same pathname based on the earlier observation"
+  }
+}

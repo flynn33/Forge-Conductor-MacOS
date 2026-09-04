@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-09-02T11:39:16.878616+00:00",
+  "configured": false,
+  "model_match": true,
+  "quantization_verified": false,
+  "candidate_endpoints": [
+    {
+      "base_url": "http://127.0.0.1:1234/v1",
+      "available": true,
+      "http_status": 200,
+      "models": [
+        "qwen/qwen3.8-27b",
+        "openai/gpt-oss-20b",
+        "qwen/qwen3.6-35b-a3b",
+        "text-embedding-nomic-embed-text-v1.5"
+      ]
+    }
+  ],
+  "downgrades": [],
+  "base_url": "http://127.0.0.1:1234/v1",
+  "model_id": "qwen/qwen3.8-27b",
+  "quantization_evidence": "qwen/qwen3.8-27b  organization_owner    ",
+  "context_window_size": 65536,
+  "max_output_tokens": 8192,
+  "max_tool_calls": 24,
+  "max_session_turns": 18,
+  "optional_reasoning_fields_enabled": true,
+  "settings_path": "/Users/jimdaley/GitHub/Forge-Conductor/.qwen/settings.json",
+  "settings_backup": null
+}

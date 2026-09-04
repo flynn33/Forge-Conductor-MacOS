@@ -1,0 +1,187 @@
+{
+  "schema_version": 1,
+  "source_manifest_sha256": "ec972a40dbbce289e560267cbe55bc48a294cf69a932fca5bfba9f091971612d",
+  "mcp_tool_packs": [
+    {
+      "source": "Sources/ForgeConductorCore/Application/Tools/AgentToolPack.swift",
+      "tools": [
+        "forge_status",
+        "agent_list",
+        "agent_get",
+        "agent_context",
+        "agent_recommend",
+        "agent_run_start",
+        "agent_run_status",
+        "agent_run_complete"
+      ]
+    },
+    {
+      "source": "Sources/ForgeConductorCore/Application/Tools/ContinuityLifecycleToolPack.swift",
+      "tools": [
+        "continuity.checkpoint",
+        "continuity.prepare_handoff",
+        "continuity.request_rollover",
+        "continuity.get_pending_handoff",
+        "continuity.acknowledge_handoff",
+        "continuity.resume",
+        "continuity.status"
+      ]
+    },
+    {
+      "source": "Sources/ForgeConductorCore/Application/Tools/ContinuityToolPack.swift",
+      "tools": [
+        "session_checkpoint",
+        "session_handoff",
+        "context_get",
+        "context_list"
+      ]
+    },
+    {
+      "source": "Sources/ForgeConductorCore/Application/Tools/DocsToolPack.swift",
+      "tools": [
+        "pdf_write",
+        "pdf_from_file"
+      ]
+    },
+    {
+      "source": "Sources/ForgeConductorCore/Application/Tools/FilesystemToolPack.swift",
+      "tools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "fs_list",
+        "fs_glob",
+        "fs_mkdir",
+        "fs_delete",
+        "fs_move"
+      ]
+    },
+    {
+      "source": "Sources/ForgeConductorCore/Application/Tools/GitToolPack.swift",
+      "tools": [
+        "git_status",
+        "git_diff",
+        "git_log",
+        "git_add",
+        "git_commit"
+      ]
+    },
+    {
+      "source": "Sources/ForgeConductorCore/Application/Tools/MemoryToolPack.swift",
+      "tools": [
+        "memory_set",
+        "memory_get",
+        "memory_list",
+        "memory_delete",
+        "memory_search"
+      ]
+    },
+    {
+      "source": "Sources/ForgeConductorCore/Application/Tools/ProjectMemoryToolPack.swift",
+      "tools": [
+        "project_memory.export",
+        "project_memory.forget",
+        "project_memory.get",
+        "project_memory.import",
+        "project_memory.initialize",
+        "project_memory.link",
+        "project_memory.list_recent",
+        "project_memory.remember",
+        "project_memory.remember_batch",
+        "project_memory.search",
+        "project_memory.status",
+        "project_memory.update"
+      ]
+    },
+    {
+      "source": "Sources/ForgeConductorCore/Application/Tools/RuntimeJobToolPack.swift",
+      "tools": [
+        "bash.run",
+        "job.cancel",
+        "job.list",
+        "job.read_output",
+        "job.status",
+        "powershell.run",
+        "process.run",
+        "python.run",
+        "runtime.capabilities",
+        "shell.run"
+      ]
+    },
+    {
+      "source": "Sources/ForgeConductorCore/Application/Tools/SearchToolPack.swift",
+      "tools": [
+        "search_text"
+      ]
+    },
+    {
+      "source": "Sources/ForgeConductorCore/Application/Tools/ShellToolPack.swift",
+      "tools": [
+        "shell_exec"
+      ]
+    }
+  ],
+  "app_tabs": [
+    {
+      "id": "rig",
+      "label": "FORGE RIG"
+    },
+    {
+      "id": "mcp",
+      "label": "LM Studio MCP"
+    },
+    {
+      "id": "agents",
+      "label": "Agents"
+    },
+    {
+      "id": "tools",
+      "label": "Tools"
+    },
+    {
+      "id": "feed",
+      "label": "Live Feed"
+    },
+    {
+      "id": "projects",
+      "label": "Projects"
+    },
+    {
+      "id": "autonomy",
+      "label": "Autonomy"
+    },
+    {
+      "id": "continuity",
+      "label": "Continuity"
+    },
+    {
+      "id": "runtimes",
+      "label": "Runtimes"
+    },
+    {
+      "id": "provider",
+      "label": "Provider"
+    },
+    {
+      "id": "evidence",
+      "label": "Events & Evidence"
+    },
+    {
+      "id": "diagnostics",
+      "label": "Diagnostics"
+    },
+    {
+      "id": "manager",
+      "label": "Manager"
+    }
+  ],
+  "nonnegotiable_contracts": [
+    "shell_exec remains registered and preserves its established request and result contract",
+    "shell access defaults enabled and explicit user opt-out remains respected",
+    "project memory remains isolated by ProjectID and ProjectGeneration",
+    "existing MCP tool names and JSON fields remain compatible",
+    "manager-owned autonomy remains GUI-independent",
+    "telemetry latest-value delivery and shared Metal resources are not regressed",
+    "no feature may be removed to satisfy a performance or security gate"
+  ]
+}

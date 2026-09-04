@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://forge-conductor.local/schemas/release-readiness.schema.json",
+  "title": "ReleaseReadinessAttestation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_manifest_sha256",
+    "toolchain",
+    "release_candidate_path",
+    "release_candidate_sha256",
+    "mandatory_gate_results",
+    "mandatory_gate_receipts",
+    "open_findings",
+    "ready_to_ship",
+    "shipped",
+    "attestation_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "source_archive_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "git_commit": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "git_tree": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "toolchain": {
+      "type": "object",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "number",
+          "boolean",
+          "null"
+        ]
+      }
+    },
+    "release_candidate_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "mandatory_gate_results": {
+      "type": "object",
+      "additionalProperties": {
+        "enum": [
+          "passed"
+        ]
+      }
+    },
+    "open_findings": {
+      "type": "array",
+      "maxItems": 0
+    },
+    "ready_to_ship": {
+      "const": true
+    },
+    "shipped": {
+      "const": false
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "attestation_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "release_candidate_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "mandatory_gate_receipts": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

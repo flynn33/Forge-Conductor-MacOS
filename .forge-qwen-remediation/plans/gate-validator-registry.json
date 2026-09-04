@@ -1,0 +1,402 @@
+{
+  "schema_version": 1,
+  "validators": [
+    {
+      "gate_id": "G00",
+      "validator_id": "baseline-source-identity",
+      "validator_version": "1.0.0",
+      "runner_kind": "command",
+      "implementation_entrypoint": "script/qualification/validate_baseline.py",
+      "required_platform": "any",
+      "timeout_seconds": 900,
+      "required_artifacts": [
+        "baseline-report.json",
+        "source-manifest.json",
+        "environment.json"
+      ],
+      "pass_predicate": "all contract assertions pass; no skipped mandatory scenario; receipt source manifest equals current source manifest",
+      "blocked_predicate": "only an objectively unavailable required host capability; never converted to pass",
+      "forbidden_substitutes": [],
+      "acceptance_contract": "audit/Build-Test-Evidence.md"
+    },
+    {
+      "gate_id": "G01",
+      "validator_id": "feature-contract-baseline",
+      "validator_version": "1.0.0",
+      "runner_kind": "xctest",
+      "implementation_entrypoint": "FeatureParityAcceptanceTests",
+      "required_platform": "any",
+      "timeout_seconds": 900,
+      "required_artifacts": [
+        "mcp-schema-snapshot.json",
+        "ui-contract-snapshot.json",
+        "settings-migration-snapshot.json"
+      ],
+      "pass_predicate": "all contract assertions pass; no skipped mandatory scenario; receipt source manifest equals current source manifest",
+      "blocked_predicate": "only an objectively unavailable required host capability; never converted to pass",
+      "forbidden_substitutes": [],
+      "acceptance_contract": "tests/FeatureParityTests.md"
+    },
+    {
+      "gate_id": "G02",
+      "validator_id": "completion-integrity-regression",
+      "validator_version": "1.0.0",
+      "runner_kind": "xctest",
+      "implementation_entrypoint": "CompletionValidationTests",
+      "required_platform": "macOS",
+      "timeout_seconds": 3600,
+      "required_artifacts": [
+        "test-result.xcresult",
+        "completion-validator-wiring.json"
+      ],
+      "pass_predicate": "all contract assertions pass; no skipped mandatory scenario; receipt source manifest equals current source manifest",
+      "blocked_predicate": "only an objectively unavailable required host capability; never converted to pass",
+      "forbidden_substitutes": [],
+      "acceptance_contract": "tests/CompletionValidationTests.md"
+    },
+    {
+      "gate_id": "G03",
+      "validator_id": "continuity-authority-regression",
+      "validator_version": "1.0.0",
+      "runner_kind": "xctest",
+      "implementation_entrypoint": "ContinuityAuthorityAcceptanceTests",
+      "required_platform": "macOS",
+      "timeout_seconds": 3600,
+      "required_artifacts": [
+        "test-result.xcresult",
+        "continuity-mode-transcript.json"
+      ],
+      "pass_predicate": "all contract assertions pass; no skipped mandatory scenario; receipt source manifest equals current source manifest",
+      "blocked_predicate": "only an objectively unavailable required host capability; never converted to pass",
+      "forbidden_substitutes": [],
+      "acceptance_contract": "tests/ContinuityIntegrationTests.md"
+    },
+    {
+      "gate_id": "G04",
+      "validator_id": "immutable-package-ingestion",
+      "validator_version": "1.0.0",
+      "runner_kind": "xctest",
+      "implementation_entrypoint": "PackageIngestionSecurityTests",
+      "required_platform": "macOS",
+      "timeout_seconds": 5400,
+      "required_artifacts": [
+        "test-result.xcresult",
+        "ingestion-crash-matrix.json"
+      ],
+      "pass_predicate": "all contract assertions pass; no skipped mandatory scenario; receipt source manifest equals current source manifest",
+      "blocked_predicate": "only an objectively unavailable required host capability; never converted to pass",
+      "forbidden_substitutes": [],
+      "acceptance_contract": "tests/QueueIntegrationTests.md"
+    },
+    {
+      "gate_id": "G05",
+      "validator_id": "durable-work-queue",
+      "validator_version": "1.0.0",
+      "runner_kind": "xctest",
+      "implementation_entrypoint": "PackageQueueEndToEndTests",
+      "required_platform": "macOS",
+      "timeout_seconds": 7200,
+      "required_artifacts": [
+        "test-result.xcresult",
+        "queue-recovery-transcript.json"
+      ],
+      "pass_predicate": "all contract assertions pass; no skipped mandatory scenario; receipt source manifest equals current source manifest",
+      "blocked_predicate": "only an objectively unavailable required host capability; never converted to pass",
+      "forbidden_substitutes": [],
+      "acceptance_contract": "tests/QueueIntegrationTests.md"
+    },
+    {
+      "gate_id": "G06",
+      "validator_id": "selective-project-reset",
+      "validator_version": "1.0.0",
+      "runner_kind": "xctest",
+      "implementation_entrypoint": "ProjectResetAcceptanceTests",
+      "required_platform": "macOS",
+      "timeout_seconds": 5400,
+      "required_artifacts": [
+        "test-result.xcresult",
+        "reset-receipts.json"
+      ],
+      "pass_predicate": "all contract assertions pass; no skipped mandatory scenario; receipt source manifest equals current source manifest",
+      "blocked_predicate": "only an objectively unavailable required host capability; never converted to pass",
+      "forbidden_substitutes": [],
+      "acceptance_contract": "tests/ProjectResetTests.md"
+    },
+    {
+      "gate_id": "G07",
+      "validator_id": "operator-controls-native",
+      "validator_version": "1.0.0",
+      "runner_kind": "xcuitest",
+      "implementation_entrypoint": "OperatorControlUITests",
+      "required_platform": "signed-macOS",
+      "timeout_seconds": 5400,
+      "required_artifacts": [
+        "ui-test.xcresult",
+        "manager-command-transcript.json"
+      ],
+      "pass_predicate": "all contract assertions pass; no skipped mandatory scenario; receipt source manifest equals current source manifest",
+      "blocked_predicate": "only an objectively unavailable required host capability; never converted to pass",
+      "forbidden_substitutes": [],
+      "acceptance_contract": "tests/NativeUIQualification.md"
+    },
+    {
+      "gate_id": "G08",
+      "validator_id": "hardened-xpc-sandbox",
+      "validator_version": "1.0.0",
+      "runner_kind": "native-security",
+      "implementation_entrypoint": "RuntimeXPCSecurityHarness",
+      "required_platform": "signed-macOS",
+      "timeout_seconds": 7200,
+      "required_artifacts": [
+        "xpc-test.xcresult",
+        "entitlements.json",
+        "sandbox-denial-transcript.json"
+      ],
+      "pass_predicate": "all contract assertions pass; no skipped mandatory scenario; receipt source manifest equals current source manifest",
+      "blocked_predicate": "only an objectively unavailable required host capability; never converted to pass",
+      "forbidden_substitutes": [],
+      "acceptance_contract": "tests/RuntimeXPCQualification.md"
+    },
+    {
+      "gate_id": "G09",
+      "validator_id": "resource-pressure-integration",
+      "validator_version": "1.0.0",
+      "runner_kind": "xctest",
+      "implementation_entrypoint": "ResourcePressureIntegrationTests",
+      "required_platform": "macOS",
+      "timeout_seconds": 5400,
+      "required_artifacts": [
+        "test-result.xcresult",
+        "resource-policy-observations.json"
+      ],
+      "pass_predicate": "all contract assertions pass; no skipped mandatory scenario; receipt source manifest equals current source manifest",
+      "blocked_predicate": "only an objectively unavailable required host capability; never converted to pass",
+      "forbidden_substitutes": [],
+      "acceptance_contract": "tests/ResourcePressureAndTelemetryTests.md"
+    },
+    {
+      "gate_id": "G10",
+      "validator_id": "telemetry-metal-qualification",
+      "validator_version": "1.0.0",
+      "runner_kind": "instruments",
+      "implementation_entrypoint": "TelemetryMetalQualificationHarness",
+      "required_platform": "instruments",
+      "timeout_seconds": 7200,
+      "required_artifacts": [
+        "allocations.trace",
+        "time-profiler.trace",
+        "metal-system-trace.trace",
+        "metrics.json"
+      ],
+      "pass_predicate": "all contract assertions pass; no skipped mandatory scenario; receipt source manifest equals current source manifest",
+      "blocked_predicate": "only an objectively unavailable required host capability; never converted to pass",
+      "forbidden_substitutes": [
+        "static source inspection alone",
+        "one-time RSS comparison"
+      ],
+      "acceptance_contract": "tests/ResourcePressureAndTelemetryTests.md"
+    },
+    {
+      "gate_id": "G11",
+      "validator_id": "dashboard-security-regression",
+      "validator_version": "1.0.0",
+      "runner_kind": "xctest",
+      "implementation_entrypoint": "DashboardSecurityAcceptanceTests",
+      "required_platform": "macOS",
+      "timeout_seconds": 3600,
+      "required_artifacts": [
+        "test-result.xcresult",
+        "connection-flood-transcript.json"
+      ],
+      "pass_predicate": "all contract assertions pass; no skipped mandatory scenario; receipt source manifest equals current source manifest",
+      "blocked_predicate": "only an objectively unavailable required host capability; never converted to pass",
+      "forbidden_substitutes": [],
+      "acceptance_contract": "tests/DashboardSecurityTests.md"
+    },
+    {
+      "gate_id": "G12",
+      "validator_id": "e2-atomic-filesystem-race",
+      "validator_version": "1.0.0",
+      "runner_kind": "native-security",
+      "implementation_entrypoint": "E2AtomicRaceQualificationHarness",
+      "required_platform": "signed-macOS",
+      "timeout_seconds": 10800,
+      "required_artifacts": [
+        "race-results.json",
+        "volume-capabilities.json",
+        "closure-argument.md"
+      ],
+      "pass_predicate": "all contract assertions pass; no skipped mandatory scenario; receipt source manifest equals current source manifest",
+      "blocked_predicate": "only an objectively unavailable required host capability; never converted to pass",
+      "forbidden_substitutes": [
+        "additional pre-unlink identity checks without atomic capture"
+      ],
+      "acceptance_contract": "tests/E2Qualification.md"
+    },
+    {
+      "gate_id": "G13",
+      "validator_id": "repository-release-integrity",
+      "validator_version": "1.0.0",
+      "runner_kind": "composite",
+      "implementation_entrypoint": "RepositoryIntegrityValidator",
+      "required_platform": "macOS",
+      "timeout_seconds": 5400,
+      "required_artifacts": [
+        "swiftpm-debug.log",
+        "swiftpm-release.log",
+        "xcode-parity.json",
+        "publication-scan.txt",
+        "documentation-contract.json"
+      ],
+      "pass_predicate": "all contract assertions pass; no skipped mandatory scenario; receipt source manifest equals current source manifest",
+      "blocked_predicate": "only an objectively unavailable required host capability; never converted to pass",
+      "forbidden_substitutes": [],
+      "acceptance_contract": "tests/FeatureParityTests.md"
+    },
+    {
+      "gate_id": "G14",
+      "validator_id": "shell-native-end-to-end",
+      "validator_version": "1.0.0",
+      "runner_kind": "native-end-to-end",
+      "implementation_entrypoint": "ShellNativeEndToEndHarness",
+      "required_platform": "signed-macOS",
+      "timeout_seconds": 5400,
+      "required_artifacts": [
+        "ui-test.xcresult",
+        "mcp-transcript.json",
+        "restart-reset-transcript.json"
+      ],
+      "pass_predicate": "all contract assertions pass; no skipped mandatory scenario; receipt source manifest equals current source manifest",
+      "blocked_predicate": "only an objectively unavailable required host capability; never converted to pass",
+      "forbidden_substitutes": [
+        "static default check",
+        "direct ProcessRunner unit test only"
+      ],
+      "acceptance_contract": "tests/NativeUIQualification.md"
+    },
+    {
+      "gate_id": "G15",
+      "validator_id": "real-provider-autonomous-rollover",
+      "validator_version": "1.0.0",
+      "runner_kind": "real-provider",
+      "implementation_entrypoint": "RealProviderRolloverHarness",
+      "required_platform": "real-provider",
+      "timeout_seconds": 10800,
+      "required_artifacts": [
+        "provider-metadata.json",
+        "rollover-transcript.json",
+        "crash-state-results.json"
+      ],
+      "pass_predicate": "all contract assertions pass; no skipped mandatory scenario; receipt source manifest equals current source manifest",
+      "blocked_predicate": "only an objectively unavailable required host capability; never converted to pass",
+      "forbidden_substitutes": [
+        "synthetic provider",
+        "manual new chat",
+        "operator copy/paste"
+      ],
+      "acceptance_contract": "tests/ContinuityIntegrationTests.md"
+    },
+    {
+      "gate_id": "G16",
+      "validator_id": "signed-native-ui-matrix",
+      "validator_version": "1.0.0",
+      "runner_kind": "xcuitest",
+      "implementation_entrypoint": "SignedNativeUIMatrix",
+      "required_platform": "signed-macOS",
+      "timeout_seconds": 7200,
+      "required_artifacts": [
+        "ui-test.xcresult",
+        "launchagent-transcript.json"
+      ],
+      "pass_predicate": "all contract assertions pass; no skipped mandatory scenario; receipt source manifest equals current source manifest",
+      "blocked_predicate": "only an objectively unavailable required host capability; never converted to pass",
+      "forbidden_substitutes": [
+        "build-for-testing without executed XCUITest"
+      ],
+      "acceptance_contract": "tests/NativeUIQualification.md"
+    },
+    {
+      "gate_id": "G17",
+      "validator_id": "low-memory-endurance-budget",
+      "validator_version": "1.0.0",
+      "runner_kind": "instruments",
+      "implementation_entrypoint": "LowMemoryEnduranceHarness",
+      "required_platform": "instruments",
+      "timeout_seconds": 86400,
+      "required_artifacts": [
+        "machine-profile.json",
+        "allocations.trace",
+        "memgraph-set.json",
+        "database-growth.json",
+        "budget-report.json"
+      ],
+      "pass_predicate": "all contract assertions pass; no skipped mandatory scenario; receipt source manifest equals current source manifest",
+      "blocked_predicate": "only an objectively unavailable required host capability; never converted to pass",
+      "forbidden_substitutes": [
+        "unconstrained host without enforced profile or representative machine"
+      ],
+      "acceptance_contract": "tests/ResourcePressureAndTelemetryTests.md"
+    },
+    {
+      "gate_id": "G18",
+      "validator_id": "durable-crash-recovery-matrix",
+      "validator_version": "1.0.0",
+      "runner_kind": "fault-injection",
+      "implementation_entrypoint": "CrashRecoveryMatrixHarness",
+      "required_platform": "macOS",
+      "timeout_seconds": 21600,
+      "required_artifacts": [
+        "crash-matrix-results.json",
+        "exactly-once-receipts.json"
+      ],
+      "pass_predicate": "all contract assertions pass; no skipped mandatory scenario; receipt source manifest equals current source manifest",
+      "blocked_predicate": "only an objectively unavailable required host capability; never converted to pass",
+      "forbidden_substitutes": [],
+      "acceptance_contract": "plans/crash-recovery-matrix.json"
+    },
+    {
+      "gate_id": "G19",
+      "validator_id": "integrated-two-package-autonomy",
+      "validator_version": "1.0.0",
+      "runner_kind": "real-provider",
+      "implementation_entrypoint": "IntegratedTwoPackageAutonomyHarness",
+      "required_platform": "real-provider",
+      "timeout_seconds": 86400,
+      "required_artifacts": [
+        "queue-transcript.json",
+        "handoffs.json",
+        "gate-receipts.json",
+        "artifacts-index.json"
+      ],
+      "pass_predicate": "all contract assertions pass; no skipped mandatory scenario; receipt source manifest equals current source manifest",
+      "blocked_predicate": "only an objectively unavailable required host capability; never converted to pass",
+      "forbidden_substitutes": [
+        "single package",
+        "synthetic provider",
+        "operator-triggered continuation"
+      ],
+      "acceptance_contract": "tests/QueueIntegrationTests.md"
+    },
+    {
+      "gate_id": "G20",
+      "validator_id": "release-readiness-attestation",
+      "validator_version": "1.0.0",
+      "runner_kind": "composite",
+      "implementation_entrypoint": "ReleaseReadinessAttestationValidator",
+      "required_platform": "signed-macOS",
+      "timeout_seconds": 7200,
+      "required_artifacts": [
+        "release-readiness.json",
+        "release-candidate.sha256",
+        "feature-parity-final.json",
+        "no-ship-report.json"
+      ],
+      "pass_predicate": "all contract assertions pass; no skipped mandatory scenario; receipt source manifest equals current source manifest",
+      "blocked_predicate": "only an objectively unavailable required host capability; never converted to pass",
+      "forbidden_substitutes": [
+        "publication, notarization submission, release tag, distribution"
+      ],
+      "acceptance_contract": "docs/10-SHIPPABLE-NOT-SHIPPED.md"
+    }
+  ]
+}

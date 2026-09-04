@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://forge-conductor.local/schemas/reset-receipt.schema.json",
+  "title": "ProjectResetReceipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "reset_id",
+    "project_id",
+    "old_generation",
+    "new_generation",
+    "mode",
+    "started_at",
+    "ended_at",
+    "status",
+    "affected_counts",
+    "fenced_authorities",
+    "receipt_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "reset_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "old_generation": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "new_generation": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "mode": {
+      "enum": [
+        "memory",
+        "continuity",
+        "memoryAndContinuity",
+        "runHistory"
+      ]
+    },
+    "backup_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "backup_sha256": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "ended_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "enum": [
+        "completed",
+        "failed_before_mutation",
+        "recovered_completed",
+        "restored"
+      ]
+    },
+    "affected_counts": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "fenced_authorities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "receipt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

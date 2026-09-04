@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://forge-conductor.local/schemas/evidence-record.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_id",
+    "kind",
+    "work_package",
+    "source_manifest_before",
+    "source_manifest_after",
+    "started_at",
+    "ended_at",
+    "status",
+    "artifacts",
+    "record_sha256",
+    "cwd",
+    "environment",
+    "duration_milliseconds",
+    "maximum_stream_bytes",
+    "stdout_truncated",
+    "stderr_truncated"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "evidence_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "type": "string",
+      "minLength": 1
+    },
+    "work_package": {
+      "type": "string",
+      "minLength": 1
+    },
+    "gate_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "source_manifest_before": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source_manifest_after": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "command": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "ended_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "enum": [
+        "passed",
+        "failed",
+        "blocked",
+        "cancelled",
+        "timed_out"
+      ]
+    },
+    "exit_code": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "bytes",
+          "sha256"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "record_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "cwd": {
+      "type": "string",
+      "minLength": 1
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "number",
+          "boolean",
+          "null"
+        ]
+      }
+    },
+    "duration_milliseconds": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "maximum_stream_bytes": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "stdout_truncated": {
+      "type": "boolean"
+    },
+    "stderr_truncated": {
+      "type": "boolean"
+    }
+  }
+}

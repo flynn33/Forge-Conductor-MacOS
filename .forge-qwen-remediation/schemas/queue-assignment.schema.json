@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://forge-conductor.local/schemas/queue-assignment.schema.json",
+  "title": "QueueAssignment",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "assignment_id",
+    "package_id",
+    "package_digest",
+    "package_run_id",
+    "project_id",
+    "project_generation",
+    "lease_epoch",
+    "mission",
+    "allowed_tools",
+    "canonical_roots",
+    "completion_gate_ids",
+    "artifact_root",
+    "issued_at",
+    "expires_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "assignment_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "package_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "package_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "package_run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "project_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project_generation": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "lease_epoch": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "mission": {
+      "type": "string",
+      "minLength": 1
+    },
+    "allowed_tools": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "canonical_roots": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "completion_gate_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "artifact_root": {
+      "type": "string",
+      "minLength": 1
+    },
+    "issued_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "resource_profile": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

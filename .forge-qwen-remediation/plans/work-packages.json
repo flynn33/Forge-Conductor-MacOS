@@ -1,0 +1,649 @@
+{
+  "schema_version": 1,
+  "work_packages": [
+    {
+      "id": "P00",
+      "title": "Establish authoritative baseline and repair ledger",
+      "priority": "critical",
+      "depends_on": [],
+      "findings": [
+        "FCA-011",
+        "FCA-012",
+        "FCA-026",
+        "FCA-030"
+      ],
+      "objective": "Create one reproducible source identity, feature baseline, environment report, and restartable evidence ledger before product edits.",
+      "source_targets": [
+        "AGENTS.md",
+        ".forge-codex",
+        ".forge-autonomy-state",
+        "Package.swift",
+        "ForgeConductor.xcodeproj/project.pbxproj"
+      ],
+      "deliverables": [
+        "current source manifest",
+        "feature and MCP schema snapshots",
+        "environment capability report",
+        "clean worktree or exact extracted-source baseline",
+        "open finding ledger",
+        "do-not-ship guard"
+      ],
+      "required_tests": [
+        "package and source manifest verification",
+        "SwiftPM/Xcode source membership inventory",
+        "shell baseline static contract check",
+        "publication hygiene and secret scan"
+      ],
+      "gates": [
+        "G00",
+        "G01"
+      ],
+      "fail_forward": "If Git history is unavailable, use the supplied archive hash and generated source manifest as authority. Do not invent commit lineage."
+    },
+    {
+      "id": "P01",
+      "title": "Make completion truth manager-owned and gate-specific",
+      "priority": "critical",
+      "depends_on": [
+        "P00"
+      ],
+      "findings": [
+        "FCA-001"
+      ],
+      "objective": "Eliminate generic evidence-hash gate bypass and require registered deterministic validators for every completion gate.",
+      "source_targets": [
+        "Sources/ForgeConductorCore/Application/ManagedProjectRunStepExecutor.swift",
+        "Sources/ForgeConductorCore/Application/ManagedAutonomyRuntime.swift",
+        "Sources/ForgeConductorCore/Application/ProjectRunCoordinator.swift",
+        "Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift"
+      ],
+      "deliverables": [
+        "GateRegistry",
+        "GateDefinition and GateExecution persistence",
+        "DeterministicCompletionValidator wired in production",
+        "completion request tool that cannot nominate proof hashes",
+        "immutable validator receipts"
+      ],
+      "required_tests": [
+        "unrelated hash rejected",
+        "failed tool result rejected",
+        "wrong run rejected",
+        "wrong project generation rejected",
+        "invented hash rejected",
+        "stale validator version rejected",
+        "reused evidence across gates rejected",
+        "all declared gates required"
+      ],
+      "gates": [
+        "G02"
+      ],
+      "fail_forward": "Keep runs in validatingCompletion or blocked with a machine-readable reason; never fall back to the current hash-presence validator."
+    },
+    {
+      "id": "P02",
+      "title": "Unify continuity authority and remove managed-mode manual rollover",
+      "priority": "critical",
+      "depends_on": [
+        "P01"
+      ],
+      "findings": [
+        "FCA-003",
+        "FCA-005",
+        "FCA-006"
+      ],
+      "objective": "Make project-scoped canonical continuity the only authority in managed autonomous mode while retaining an explicitly labeled external-host compatibility mode.",
+      "source_targets": [
+        "Sources/ForgeConductorCore/Application/ToolRouter.swift",
+        "Sources/ForgeConductorCore/Application/ContinuityAutomation.swift",
+        "Sources/ForgeConductorCore/Application/ContextContinuityService.swift",
+        "Sources/ForgeConductorCore/Application/ContinuityCoordinator.swift",
+        "Sources/ForgeConductorCore/Application/ManagedContinuityWorker.swift"
+      ],
+      "deliverables": [
+        "ContinuityMode routing",
+        "managed-mode bypass/removal of legacy fixed-count blocker",
+        "project-local projections only",
+        "no global latest fallback for bootstrap authority",
+        "typed checkpoint and rollover commands"
+      ],
+      "required_tests": [
+        "managed loop never emits manual-new-chat instruction",
+        "external compatibility mode remains functional",
+        "cross-project latest handoff cannot leak",
+        "threshold rollover enqueues canonical operation",
+        "legacy projections cannot authorize tools"
+      ],
+      "gates": [
+        "G03"
+      ],
+      "fail_forward": "If an external host cannot create sessions, report externalMCPCompatibility truthfully; do not block or misrepresent managed mode."
+    },
+    {
+      "id": "P03",
+      "title": "Implement immutable instruction-package ingestion and catalog",
+      "priority": "critical",
+      "depends_on": [
+        "P00",
+        "P10"
+      ],
+      "findings": [
+        "FCA-002",
+        "FCA-007"
+      ],
+      "objective": "Accept directories, ZIP, .forgepackage, and compatible .forge-codex inputs through secure immutable ingestion without executing from source locations.",
+      "source_targets": [
+        "new PackageIngestionService and PackageCatalogRepository",
+        "Sources/ForgeConductorCore/Application/Tools/FilesystemToolPack.swift",
+        "Sources/ForgeConductorCore/Infrastructure/AppPaths.swift",
+        "Package.swift"
+      ],
+      "deliverables": [
+        "managed Store/Quarantine/Artifacts layout",
+        "manifest validation",
+        "archive/path/size/symlink controls",
+        "hash-addressed immutable content",
+        "compatibility importer",
+        "ingestion receipts"
+      ],
+      "required_tests": [
+        "zip-slip rejected",
+        "symlink escape rejected",
+        "case/unicode collision rejected",
+        "mutation during ingestion rejected or quarantined",
+        "duplicate content deduplicated",
+        "source deletion after ingestion does not affect stored package",
+        "crash recovery at every ingestion state"
+      ],
+      "gates": [
+        "G04"
+      ],
+      "fail_forward": "Quarantine uncertain candidates with a durable reason. Never execute partially validated content."
+    },
+    {
+      "id": "P04",
+      "title": "Build durable Work Queue, leases, scheduler, package tools, and UI",
+      "priority": "critical",
+      "depends_on": [
+        "P01",
+        "P02",
+        "P03"
+      ],
+      "findings": [
+        "FCA-002"
+      ],
+      "objective": "Create a manager-owned durable queue that automatically reserves, runs, checkpoints, validates, completes, and advances packages without operator intervention.",
+      "source_targets": [
+        "new PackageQueueService",
+        "new QueueRepository migrations",
+        "Sources/ForgeConductorCore/Application/AutonomySupervisor.swift",
+        "Sources/ForgeConductorCore/Application/ProjectRunCoordinator.swift",
+        "Sources/ForgeConductorApp/AppModel.swift",
+        "new WorkQueue operator UI"
+      ],
+      "deliverables": [
+        "queue state machine",
+        "QueueAssignment",
+        "reservation leases and heartbeat",
+        "package progress/block/complete/artifact tools",
+        "retry and dependency policy",
+        "Work Queue tab and view model",
+        "restart recovery"
+      ],
+      "required_tests": [
+        "two packages execute in order",
+        "lease expiry recovery",
+        "manager crash recovery",
+        "context rollover during package",
+        "validator failure blocks completion",
+        "pause/resume/cancel/retry",
+        "project generation fencing",
+        "no duplicate active assignment"
+      ],
+      "gates": [
+        "G05"
+      ],
+      "fail_forward": "A lease ambiguity must resolve to at most one accepted active run. Preserve the package in a recoverable nonterminal state."
+    },
+    {
+      "id": "P05",
+      "title": "Implement safe selective project reset",
+      "priority": "high",
+      "depends_on": [
+        "P02",
+        "P04"
+      ],
+      "findings": [
+        "FCA-004"
+      ],
+      "objective": "Add memory, continuity, combined, and run-history reset operations with maintenance barriers, backup, generation fencing, receipts, and native UI.",
+      "source_targets": [
+        "new ProjectResetService",
+        "Sources/ForgeConductorCore/Manager/ManagerNode.swift",
+        "Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift",
+        "Sources/ForgeConductorCore/Infrastructure/ProjectMemoryRepository.swift",
+        "Sources/ForgeConductorApp/OperatorConsole/Views/ProjectsOperatorView.swift"
+      ],
+      "deliverables": [
+        "ResetMode",
+        "ProjectMaintenanceLease",
+        "optional verified backup",
+        "repository eviction/rotation",
+        "reset receipt",
+        "stale result fencing",
+        "selective reset UI"
+      ],
+      "required_tests": [
+        "memory-only preserves continuity",
+        "continuity-only preserves memory",
+        "combined clears both",
+        "history cleanup preserves current project identity",
+        "stale job/tool/provider result rejected",
+        "crash recovery per reset state",
+        "backup restore verification"
+      ],
+      "gates": [
+        "G06"
+      ],
+      "fail_forward": "If backup or fencing cannot be proven, abort before mutation and return a durable nonretrying receipt."
+    },
+    {
+      "id": "P06",
+      "title": "Complete operator controls and authoritative projections",
+      "priority": "high",
+      "depends_on": [
+        "P02",
+        "P04",
+        "P05"
+      ],
+      "findings": [
+        "FCA-010",
+        "FCA-017",
+        "FCA-018",
+        "FCA-019",
+        "FCA-028"
+      ],
+      "objective": "Replace disabled placeholders with authenticated typed manager commands and accurate provider/runtime/project/continuity projections.",
+      "source_targets": [
+        "Sources/ForgeConductorApp/OperatorConsole",
+        "Sources/ForgeConductorCore/Manager/ManagerNode.swift",
+        "Sources/ForgeConductorCore/Dashboard/ManagerRoutes.swift"
+      ],
+      "deliverables": [
+        "project relink",
+        "job cancel",
+        "checkpoint now",
+        "early rollover",
+        "provider connection test",
+        "provider contract probe",
+        "complete version/health/lifecycle fields",
+        "operation receipts and event streaming"
+      ],
+      "required_tests": [
+        "each control invokes the intended manager route",
+        "stale generation rejected",
+        "double-click idempotency",
+        "disabled state reflects actual capability",
+        "accessibility identifiers stable",
+        "error and recovery state displayed"
+      ],
+      "gates": [
+        "G07"
+      ],
+      "fail_forward": "Controls remain enabled only when the manager publishes capability and authorization; unsupported actions show a precise reason, not an empty button."
+    },
+    {
+      "id": "P07",
+      "title": "Implement and qualify hardened XPC runtime isolation",
+      "priority": "high",
+      "depends_on": [
+        "P00",
+        "P05"
+      ],
+      "findings": [
+        "FCA-008"
+      ],
+      "objective": "Add a separately signed App Sandbox XPC helper for hardened runtime profiles while keeping existing shell and workspace-isolated execution intact.",
+      "source_targets": [
+        "Package.swift",
+        "ForgeConductor.xcodeproj/project.pbxproj",
+        "new ForgeRuntimeXPC service",
+        "new shared XPC protocol/client",
+        "runtime settings and capability models"
+      ],
+      "deliverables": [
+        "XPC service target",
+        "entitlements",
+        "security-scoped bookmark lifecycle",
+        "no-network hardened profile",
+        "bounded request/output protocol",
+        "cancellation and descendant termination",
+        "workspaceIsolated vs hardenedXPC labels"
+      ],
+      "required_tests": [
+        "allowed project access succeeds",
+        "other project/home access denied",
+        "network denied profile verified",
+        "stale bookmark recovery",
+        "cancel kills descendants",
+        "Intel and arm64 build compatibility",
+        "shell_exec unchanged"
+      ],
+      "gates": [
+        "G08",
+        "G14"
+      ],
+      "fail_forward": "If a runtime cannot operate under the declared sandbox, report it unsupported for hardenedXPC and retain workspaceIsolated with truthful labeling."
+    },
+    {
+      "id": "P08",
+      "title": "Wire resource pressure, retention, telemetry, and gauge efficiency",
+      "priority": "high",
+      "depends_on": [
+        "P00"
+      ],
+      "findings": [
+        "FCA-009",
+        "FCA-015",
+        "FCA-016",
+        "FCA-020",
+        "FCA-021",
+        "FCA-022"
+      ],
+      "objective": "Make physical-memory and pressure policy operational across scheduler, runtime, provider, telemetry, event retention, and Metal rendering.",
+      "source_targets": [
+        "Sources/ForgeConductorCore/Infrastructure/ResourcePolicy.swift",
+        "Sources/ForgeConductorCore/Telemetry/TelemetryService.swift",
+        "Sources/ForgeConductorApp/Metal",
+        "Sources/ForgeConductorApp/Views/Rig",
+        "ProjectControlPlaneRepository.swift",
+        "SQLiteStore.swift"
+      ],
+      "deliverables": [
+        "ResourcePressureCoordinator",
+        "bounded DB archival/pruning",
+        "ring-buffer telemetry histories",
+        "single host-sample cadence",
+        "real visibility metrics",
+        "surface virtualization/batching or measured alternative",
+        "adaptive concurrency/FPS/history limits"
+      ],
+      "required_tests": [
+        "duplicate history point absent",
+        "ring buffer capacity invariant",
+        "pressure transitions reduce work",
+        "hidden/offscreen gauges stop drawing",
+        "visible metric matches window/tab state",
+        "retention pruning preserves active records",
+        "8/16/large-memory profiles"
+      ],
+      "gates": [
+        "G09",
+        "G10",
+        "G17"
+      ],
+      "fail_forward": "Reduce concurrency and visual cadence before dropping correctness data. Active run/continuity evidence cannot be pruned."
+    },
+    {
+      "id": "P09",
+      "title": "Harden loopback dashboard transport and authorization",
+      "priority": "high",
+      "depends_on": [
+        "P00"
+      ],
+      "findings": [
+        "FCA-023",
+        "FCA-024"
+      ],
+      "objective": "Bound accepted connections and require authorization for sensitive reads while retaining a minimal unauthenticated health surface.",
+      "source_targets": [
+        "Sources/ForgeConductorCore/Dashboard/DashboardServer.swift",
+        "Sources/ForgeConductorCore/Dashboard/ManagerRoutes.swift",
+        "HTTPResponder.swift"
+      ],
+      "deliverables": [
+        "connection registry and cap",
+        "idle/header/body deadlines",
+        "stop-time cancellation",
+        "sensitive-read bearer authorization",
+        "redacted minimal health endpoint",
+        "diagnostics counters"
+      ],
+      "required_tests": [
+        "connection cap enforced",
+        "slowloris timeout",
+        "oversized request rejected",
+        "stop cancels peers",
+        "missing/bad token denied",
+        "health endpoint leaks no project data",
+        "constant-time token comparison retained"
+      ],
+      "gates": [
+        "G11"
+      ],
+      "fail_forward": "Fail closed for sensitive routes and shed excess connections predictably; never increase unbounded queues."
+    },
+    {
+      "id": "P10",
+      "title": "Close E2 filesystem race through atomic namespace capture",
+      "priority": "critical",
+      "depends_on": [
+        "P00"
+      ],
+      "findings": [
+        "FCA-007"
+      ],
+      "objective": "Integrate and complete the supplied E2 secure-filesystem design so verification and destructive mutation are not separate pathname operations.",
+      "source_targets": [
+        ".forge-e2 work packages",
+        "FilesystemToolPack.swift",
+        "ToolAuthorizationService.swift",
+        "new CForgeSecureFS target",
+        "filesystem transaction repository"
+      ],
+      "deliverables": [
+        "descriptor-bound capabilities",
+        "atomic capture/restore/quarantine transactions",
+        "same-volume linearization",
+        "cross-volume staged copy from descriptors",
+        "crash recovery",
+        "formal closure argument"
+      ],
+      "required_tests": [
+        "full atomic swap attacker matrix",
+        "parent/leaf/symlink/hard-link races",
+        "cross-volume and Unicode/case tests",
+        "cancel/crash/reset recovery",
+        "outside-root sentinel unchanged",
+        "volume capability matrix"
+      ],
+      "gates": [
+        "G12"
+      ],
+      "fail_forward": "Do not mark E2 closed for quarantine-and-verify alone. If a platform/volume lacks required atomicity, reject that operation with a precise unsupported result."
+    },
+    {
+      "id": "P11",
+      "title": "Restore source/test parity, package cleanliness, documentation, and modularity",
+      "priority": "high",
+      "depends_on": [
+        "P01",
+        "P02",
+        "P03",
+        "P04",
+        "P05",
+        "P06",
+        "P07",
+        "P08",
+        "P09",
+        "P10"
+      ],
+      "findings": [
+        "FCA-011",
+        "FCA-012",
+        "FCA-025",
+        "FCA-026",
+        "FCA-027",
+        "FCA-029"
+      ],
+      "objective": "Make repository instructions self-contained, align SwiftPM and Xcode tests, remove transient/local artifacts, update documentation, and reduce risk in touched large files.",
+      "source_targets": [
+        "AGENTS.md",
+        ".gitignore",
+        "ForgeConductor.xcodeproj/project.pbxproj",
+        "README.md",
+        "USER-GUIDE.md",
+        "docs",
+        "large touched source files"
+      ],
+      "deliverables": [
+        "installed continuity/E2 design references or superseding docs",
+        "Xcode test parity",
+        "clean source archive rules",
+        "no absolute local paths in shipping docs/state",
+        "current autonomous continuity docs",
+        "targeted file decomposition",
+        "unchecked Sendable audit"
+      ],
+      "required_tests": [
+        "SwiftPM/Xcode source parity",
+        "clean archive content scan",
+        "absolute path scan",
+        "documentation contract tests",
+        "strict concurrency warnings as errors",
+        "publication hygiene scan"
+      ],
+      "gates": [
+        "G13"
+      ],
+      "fail_forward": "Do not rewrite stable large files merely for style. Split only along tested ownership boundaries and preserve public contracts."
+    },
+    {
+      "id": "P12",
+      "title": "Run signed native, shell, provider, continuity, and crash qualification",
+      "priority": "critical",
+      "depends_on": [
+        "P02",
+        "P04",
+        "P05",
+        "P06",
+        "P07",
+        "P08",
+        "P09",
+        "P10",
+        "P11"
+      ],
+      "findings": [
+        "FCA-006",
+        "FCA-013",
+        "FCA-014",
+        "FCA-030"
+      ],
+      "objective": "Prove the real macOS product path rather than relying on compile-only or synthetic evidence.",
+      "source_targets": [
+        "Xcode schemes and test plans",
+        "LaunchAgent manager",
+        "LM Studio adapter",
+        "native UI tests",
+        "runtime/XPC tests"
+      ],
+      "deliverables": [
+        "signed local test app/helper",
+        "executed XCUITest report",
+        "real LM Studio threshold rollover transcript",
+        "shell Settings-manager-MCP transcript",
+        "LaunchAgent and Keychain recovery evidence",
+        "crash-state matrix results"
+      ],
+      "required_tests": [
+        "G14 shell flow",
+        "G15 real provider rollover",
+        "G16 signed UI",
+        "G18 crash recovery"
+      ],
+      "gates": [
+        "G14",
+        "G15",
+        "G16",
+        "G18"
+      ],
+      "fail_forward": "Use an ephemeral local code-signing identity when distribution credentials are unavailable. Do not substitute build-for-testing for executed tests."
+    },
+    {
+      "id": "P13",
+      "title": "Integrated low-memory and endurance qualification",
+      "priority": "critical",
+      "depends_on": [
+        "P12"
+      ],
+      "findings": [
+        "FCA-009",
+        "FCA-015",
+        "FCA-016",
+        "FCA-020",
+        "FCA-021",
+        "FCA-022"
+      ],
+      "objective": "Demonstrate two-package autonomous execution, rollover, restart, queue advancement, bounded memory, and quiescent rendering under constrained profiles.",
+      "source_targets": [
+        "entire application",
+        "test fixtures and profiling scripts"
+      ],
+      "deliverables": [
+        "8 GiB-equivalent pressure run",
+        "16 GiB run",
+        "large-memory run",
+        "Allocations/Leaks/Time Profiler/Metal traces",
+        "24-hour or accelerated endurance evidence",
+        "two-package autonomous scenario"
+      ],
+      "required_tests": [
+        "queue package A then B across restart and rollover",
+        "GUI closed operation",
+        "no monotonic unbounded RSS after warmup",
+        "hidden gauge draw rate zero",
+        "database retention remains bounded",
+        "no lost or duplicate tool effects"
+      ],
+      "gates": [
+        "G17",
+        "G19"
+      ],
+      "fail_forward": "If a budget fails, preserve the failing trace and return to the owning phase. Do not relax the budget without a recorded design decision and replacement user-visible contract."
+    },
+    {
+      "id": "P14",
+      "title": "Produce a shippable release candidate and stop before shipping",
+      "priority": "critical",
+      "depends_on": [
+        "P13"
+      ],
+      "findings": [],
+      "objective": "Create a locally validated release candidate, source/evidence attestation, and readiness report while performing no publication or distribution action.",
+      "source_targets": [
+        "version files",
+        "release notes",
+        "archive scripts",
+        "attestation generator"
+      ],
+      "deliverables": [
+        "release candidate archive",
+        "SBOM or dependency inventory",
+        "release-readiness.json",
+        "signed source/evidence attestation",
+        "known-issues report with no Critical/High entries",
+        "shipped=false marker"
+      ],
+      "required_tests": [
+        "all mandatory gates passed",
+        "archive reproducibility check",
+        "Gatekeeper/local launch check",
+        "secret and publication hygiene scan",
+        "do-not-ship guard"
+      ],
+      "gates": [
+        "G20"
+      ],
+      "fail_forward": "Stop with ready_to_ship=false if any mandatory gate is incomplete. Never tag, merge, publish, upload, submit, or distribute."
+    }
+  ]
+}

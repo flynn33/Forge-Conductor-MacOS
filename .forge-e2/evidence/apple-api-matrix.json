@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "target_platform": "macOS 26",
+  "apis": [
+    {
+      "name": "O_RESOLVE_BENEATH",
+      "source": "apple-oss-distributions/xnu/bsd/sys/fcntl.h",
+      "required": true,
+      "purpose": "Reject resolution that escapes dirfd."
+    },
+    {
+      "name": "O_NOFOLLOW_ANY",
+      "source": "apple-oss-distributions/xnu/bsd/sys/fcntl.h",
+      "required": true,
+      "purpose": "Reject any symlink component."
+    },
+    {
+      "name": "O_UNIQUE",
+      "source": "apple-oss-distributions/xnu/bsd/sys/fcntl.h",
+      "required": true,
+      "purpose": "Reject multi-link regular file at open time."
+    },
+    {
+      "name": "renameatx_np",
+      "source": "apple-oss-distributions/xnu/bsd/sys/stdio.h",
+      "required": true,
+      "purpose": "Descriptor-relative atomic rename."
+    },
+    {
+      "name": "RENAME_EXCL",
+      "source": "apple-oss-distributions/xnu/bsd/sys/stdio.h",
+      "required": true,
+      "purpose": "No-overwrite publication."
+    },
+    {
+      "name": "RENAME_NOFOLLOW_ANY",
+      "source": "apple-oss-distributions/xnu/bsd/sys/stdio.h",
+      "required": true,
+      "purpose": "No symlink traversal during rename."
+    },
+    {
+      "name": "RENAME_RESOLVE_BENEATH",
+      "source": "apple-oss-distributions/xnu/bsd/sys/stdio.h",
+      "required": true,
+      "purpose": "Keep rename paths under starting descriptors."
+    },
+    {
+      "name": "RENAME_SWAP",
+      "source": "apple-oss-distributions/xnu/bsd/sys/stdio.h",
+      "required": true,
+      "purpose": "Atomic replace/rollback workflow."
+    },
+    {
+      "name": "fcopyfile",
+      "source": "Apple copyfile(3) manual",
+      "required": false,
+      "purpose": "Descriptor-to-descriptor regular-file data and metadata copy; qualify per volume and cancellation policy."
+    }
+  ],
+  "fallback_policy": "fail closed; no Foundation path mutation fallback"
+}

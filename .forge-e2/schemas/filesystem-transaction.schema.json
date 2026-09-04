@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://forge-conductor.local/schemas/filesystem-transaction.schema.json",
+  "title": "Filesystem transaction evidence record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "transaction_id",
+    "project_id",
+    "project_generation",
+    "operation",
+    "state",
+    "source"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "transaction_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project_generation": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "operation": {
+      "enum": [
+        "delete",
+        "move",
+        "write",
+        "edit",
+        "packageImport",
+        "cleanup",
+        "restore"
+      ]
+    },
+    "state": {
+      "enum": [
+        "prepared",
+        "sourceCaptured",
+        "sourceVerified",
+        "destinationStaged",
+        "destinationPublished",
+        "sourceDisposed",
+        "committed",
+        "cancelled",
+        "restorePending",
+        "cleanupPending",
+        "quarantined",
+        "failedRecoverable",
+        "failedTerminal"
+      ]
+    },
+    "source": {
+      "$ref": "#/$defs/location"
+    },
+    "destination": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/location"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "captured_identity": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/identity"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "result": {
+      "type": [
+        "object",
+        "null"
+      ]
+    }
+  },
+  "$defs": {
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "root_id",
+        "relative_path"
+      ],
+      "properties": {
+        "root_id": {
+          "type": "string"
+        },
+        "relative_path": {
+          "type": "string"
+        }
+      }
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "device",
+        "inode",
+        "mode"
+      ],
+      "properties": {
+        "device": {
+          "type": "integer"
+        },
+        "inode": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "mode": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "link_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    }
+  }
+}

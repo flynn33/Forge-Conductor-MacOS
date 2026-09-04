@@ -1,0 +1,1533 @@
+{
+  "schema_version": 1,
+  "file_count": 305,
+  "total_bytes": 17559154,
+  "manifest_sha256": "ec972a40dbbce289e560267cbe55bc48a294cf69a932fca5bfba9f091971612d",
+  "entries": [
+    {
+      "path": ".agents/skills/forge-conductor-repair/SKILL.md",
+      "bytes": 1296,
+      "sha256": "a45baa0754a41337e70a1ad3185e5bf15f1dec0107ace320af787bb324c3a362"
+    },
+    {
+      "path": ".agents/skills/forge-continuity/SKILL.md",
+      "bytes": 1237,
+      "sha256": "9078d47a651196605fe662bf5dcbcf61bbf3008f633206ef6ab1690fe7d5b195"
+    },
+    {
+      "path": ".agents/skills/forge-project-memory/SKILL.md",
+      "bytes": 1244,
+      "sha256": "9df20e3560d7652fea89feb00f9006373df6bc60ddd13550b615869de1a79739"
+    },
+    {
+      "path": ".agents/skills/forge-runtime-evidence/SKILL.md",
+      "bytes": 1333,
+      "sha256": "60e67af2cf38265f37403925e60dc399134532b1d99349b407b360a013178daf"
+    },
+    {
+      "path": ".agents/skills/forge-telemetry-gauges/SKILL.md",
+      "bytes": 1282,
+      "sha256": "e8895a1cad565f7a9c816b356e5abf6d3095fce117928805f66dc641108d88a3"
+    },
+    {
+      "path": ".codex/environments/environment.toml",
+      "bytes": 181,
+      "sha256": "f71687608a7dd1fc83b071a3b6e57aaa2369c1241a3954bf21442c8c819e2daa"
+    },
+    {
+      "path": ".github/FUNDING.yaml",
+      "bytes": 63,
+      "sha256": "40bef4cae743d7a4049964a4bf6a218ed820d138370ac67a4756d0cc6109ba03"
+    },
+    {
+      "path": ".github/FUNDING.yml",
+      "bytes": 63,
+      "sha256": "40bef4cae743d7a4049964a4bf6a218ed820d138370ac67a4756d0cc6109ba03"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/bug_report.md",
+      "bytes": 661,
+      "sha256": "b71be1421c385723cc4943f30eb73cf0f18e3e02a15e9a56d0cee6afdd640767"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/config.yml",
+      "bytes": 45,
+      "sha256": "e71bea835ed1158881306294d96968f125b0b0c5eff66cd94df559336bd0b210"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/feature_request.md",
+      "bytes": 603,
+      "sha256": "e3574a6d4a51d78e54db6ef1b74c8fb79f451fbeba6b30ae9d99e48f725d067c"
+    },
+    {
+      "path": ".github/PULL_REQUEST_TEMPLATE.md",
+      "bytes": 854,
+      "sha256": "86f23cff28909209a87f49d10baf4b334b00f922e078a4eabec5b119e3af473a"
+    },
+    {
+      "path": ".github/agents/attribution-guard.agent.md",
+      "bytes": 2113,
+      "sha256": "f492540064b7d705be317816b0bda89603e6bc7715d9e148cc02d74d6204e2fa"
+    },
+    {
+      "path": ".gitignore",
+      "bytes": 474,
+      "sha256": "f5ad36c09b4c4518d9c8079eea6a9540311fd96e925a6df535fc9fb996784924"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Assets.xcassets/AppIcon.appiconset/Contents.json",
+      "bytes": 1257,
+      "sha256": "13b1c7461192863c9f3ab3ceab313acd6f6531898360983495bf13d48dfc967f"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Assets.xcassets/AppIcon.appiconset/icon_128x128.png",
+      "bytes": 29471,
+      "sha256": "73fc32b410ee1ccd4d9de19e98ee01026496ed4fc49afb70204c6b2bcf9cd53e"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Assets.xcassets/AppIcon.appiconset/icon_128x128@2x.png",
+      "bytes": 108418,
+      "sha256": "cbbedd835a69a06812832f28f6e4504bf6d18aebc873bbc6c0d7114b02da5753"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Assets.xcassets/AppIcon.appiconset/icon_16x16.png",
+      "bytes": 822,
+      "sha256": "582c2c29ddcfd8eba1eeecff222346a9b33972c0a6bccacb0fc9dbbf031771de"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Assets.xcassets/AppIcon.appiconset/icon_16x16@2x.png",
+      "bytes": 2660,
+      "sha256": "aa33af964e1316b0cad43d5fc1d4899b0af0647a4146169142a68c3b92afdeb9"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Assets.xcassets/AppIcon.appiconset/icon_256x256.png",
+      "bytes": 108418,
+      "sha256": "cbbedd835a69a06812832f28f6e4504bf6d18aebc873bbc6c0d7114b02da5753"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Assets.xcassets/AppIcon.appiconset/icon_256x256@2x.png",
+      "bytes": 351551,
+      "sha256": "6e3b3779cd73a983d75ece1d2e053a691af04c669e07855c03fe58dfba518fc8"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Assets.xcassets/AppIcon.appiconset/icon_32x32.png",
+      "bytes": 2660,
+      "sha256": "aa33af964e1316b0cad43d5fc1d4899b0af0647a4146169142a68c3b92afdeb9"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Assets.xcassets/AppIcon.appiconset/icon_32x32@2x.png",
+      "bytes": 8500,
+      "sha256": "0fbbd36df6f98187d3997fdaf6bf34baa1ff02c313c254bf5eddfa195b830a84"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Assets.xcassets/AppIcon.appiconset/icon_512x512.png",
+      "bytes": 351551,
+      "sha256": "6e3b3779cd73a983d75ece1d2e053a691af04c669e07855c03fe58dfba518fc8"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Assets.xcassets/AppIcon.appiconset/icon_512x512@2x.png",
+      "bytes": 867823,
+      "sha256": "0e5eb2425d3dd7dad5f1f024a1351635e25d0bf7120a265493da28d33c4432aa"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Assets.xcassets/Contents.json",
+      "bytes": 60,
+      "sha256": "f5fb0e1f3a8142892ed092efb5955c1c2cc537003a89ad7bbdb9dade7fe8985f"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Forge-Conductor.icns",
+      "bytes": 1805264,
+      "sha256": "47b2c18dbe355fb94a5fcabfeebaf6f8433fc6fa4f3502574a27b55921fa3192"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Forge-Conductor.iconset/icon_128x128.png",
+      "bytes": 29471,
+      "sha256": "73fc32b410ee1ccd4d9de19e98ee01026496ed4fc49afb70204c6b2bcf9cd53e"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Forge-Conductor.iconset/icon_128x128@2x.png",
+      "bytes": 108418,
+      "sha256": "cbbedd835a69a06812832f28f6e4504bf6d18aebc873bbc6c0d7114b02da5753"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Forge-Conductor.iconset/icon_16x16.png",
+      "bytes": 822,
+      "sha256": "582c2c29ddcfd8eba1eeecff222346a9b33972c0a6bccacb0fc9dbbf031771de"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Forge-Conductor.iconset/icon_16x16@2x.png",
+      "bytes": 2660,
+      "sha256": "aa33af964e1316b0cad43d5fc1d4899b0af0647a4146169142a68c3b92afdeb9"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Forge-Conductor.iconset/icon_256x256.png",
+      "bytes": 108418,
+      "sha256": "cbbedd835a69a06812832f28f6e4504bf6d18aebc873bbc6c0d7114b02da5753"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Forge-Conductor.iconset/icon_256x256@2x.png",
+      "bytes": 351551,
+      "sha256": "6e3b3779cd73a983d75ece1d2e053a691af04c669e07855c03fe58dfba518fc8"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Forge-Conductor.iconset/icon_32x32.png",
+      "bytes": 2660,
+      "sha256": "aa33af964e1316b0cad43d5fc1d4899b0af0647a4146169142a68c3b92afdeb9"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Forge-Conductor.iconset/icon_32x32@2x.png",
+      "bytes": 8500,
+      "sha256": "0fbbd36df6f98187d3997fdaf6bf34baa1ff02c313c254bf5eddfa195b830a84"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Forge-Conductor.iconset/icon_512x512.png",
+      "bytes": 351551,
+      "sha256": "6e3b3779cd73a983d75ece1d2e053a691af04c669e07855c03fe58dfba518fc8"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/Forge-Conductor.iconset/icon_512x512@2x.png",
+      "bytes": 867823,
+      "sha256": "0e5eb2425d3dd7dad5f1f024a1351635e25d0bf7120a265493da28d33c4432aa"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/README.md",
+      "bytes": 1215,
+      "sha256": "0c73eb3567caece10c633d1319afbcd066905ca0a4743731c034ad113f0b2236"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/manifest.json",
+      "bytes": 5697,
+      "sha256": "3ce520b6aed14ace4863bdec5fe4e414654a36306f75145ccaebac1565bc94fa"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/png/forge-conductor-1024.png",
+      "bytes": 867823,
+      "sha256": "0e5eb2425d3dd7dad5f1f024a1351635e25d0bf7120a265493da28d33c4432aa"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/png/forge-conductor-128.png",
+      "bytes": 29471,
+      "sha256": "73fc32b410ee1ccd4d9de19e98ee01026496ed4fc49afb70204c6b2bcf9cd53e"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/png/forge-conductor-16.png",
+      "bytes": 822,
+      "sha256": "582c2c29ddcfd8eba1eeecff222346a9b33972c0a6bccacb0fc9dbbf031771de"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/png/forge-conductor-256.png",
+      "bytes": 108418,
+      "sha256": "cbbedd835a69a06812832f28f6e4504bf6d18aebc873bbc6c0d7114b02da5753"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/png/forge-conductor-32.png",
+      "bytes": 2660,
+      "sha256": "aa33af964e1316b0cad43d5fc1d4899b0af0647a4146169142a68c3b92afdeb9"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/png/forge-conductor-512.png",
+      "bytes": 351551,
+      "sha256": "6e3b3779cd73a983d75ece1d2e053a691af04c669e07855c03fe58dfba518fc8"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/png/forge-conductor-64.png",
+      "bytes": 8500,
+      "sha256": "0fbbd36df6f98187d3997fdaf6bf34baa1ff02c313c254bf5eddfa195b830a84"
+    },
+    {
+      "path": "Assets/Forge-Conductor-Apple-Icon-Pack/preview/forge-conductor-icon-pack-preview.png",
+      "bytes": 1814298,
+      "sha256": "52ae92363ef905d0a3be5760b4dd4f8e4566ed14b0ae56eefaa374a2e1bfdd05"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "bytes": 11808,
+      "sha256": "8d6e6230a89504220ff883c817c5442c297d68ec005949663d33938cb5f313b0"
+    },
+    {
+      "path": "CODE_OF_CONDUCT.md",
+      "bytes": 5536,
+      "sha256": "e7876dc747bd285e6f0e3ea5c54f6d207328c77d737657bf54238327987e2a9a"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "bytes": 1840,
+      "sha256": "b0fa5bba0c6629ad97445db7d6beb6b9e16b9528e851ef965d359e3967661ad8"
+    },
+    {
+      "path": "ForgeConductor.xcodeproj/project.pbxproj",
+      "bytes": 150630,
+      "sha256": "c9c7be48de036dbc33b6052cf4f9abe9003e3eb9733857f2f75b102d1ef4d80f"
+    },
+    {
+      "path": "ForgeConductor.xcodeproj/project.xcworkspace/contents.xcworkspacedata",
+      "bytes": 135,
+      "sha256": "7f3b00b5c3fdb45242d7b87e1e5c4e25d1fa8129a16c94295ecc4e8ea2235c5f"
+    },
+    {
+      "path": "ForgeConductor.xcodeproj/xcshareddata/xcschemes/ForgeConductor.xcscheme",
+      "bytes": 3820,
+      "sha256": "88f51015359ae04de669309f43af9530895c4320def345938280c331c29edaa2"
+    },
+    {
+      "path": "ForgeConductor.xcodeproj/xcshareddata/xcschemes/forge-conductor.xcscheme",
+      "bytes": 4215,
+      "sha256": "975225d645f85779c8e16e18cab5d3bd773b40300b9d3bced4c3c49d9f1b3d26"
+    },
+    {
+      "path": "ForgeConductor.xcworkspace/contents.xcworkspacedata",
+      "bytes": 160,
+      "sha256": "610ffaa72bed1d0962563a492100fbad801e42255b5d76f4e6d078eced0e421d"
+    },
+    {
+      "path": "LICENSE",
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "NOTICE",
+      "bytes": 220,
+      "sha256": "760c83d776e8e7e284d4f56ac9733ca87bcfe8d113a5415bef71747ee9ea2b8a"
+    },
+    {
+      "path": "Package.swift",
+      "bytes": 2447,
+      "sha256": "36c54b6aadb94eaf67c6213f85f580c699b9628758d2d9529573380aa1bb5f1c"
+    },
+    {
+      "path": "README.md",
+      "bytes": 8803,
+      "sha256": "a02171a7680f7298e8a87e3b496972cc57d1a763aaa60909814c1b1e42027c4f"
+    },
+    {
+      "path": "SECURITY.md",
+      "bytes": 1361,
+      "sha256": "32d4760c426a0a500b023859c3229f4b5e48be8369141c23ebd3f51da0b83934"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/AppDeployController.swift",
+      "bytes": 1046,
+      "sha256": "872e4e08cdaf5f83f439456d691d7805ec8a2bf964a5dbef677b7ba0a422a160"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/AppModel.swift",
+      "bytes": 30448,
+      "sha256": "e35171a66d2257f8dccdd75b3985b71e75f89dfb56e9b78725cf97d3f496b82a"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/AppTelemetryBinding.swift",
+      "bytes": 5753,
+      "sha256": "557e19d3ef5135b0fdd4ef5121a25d21a35c4c19ed678776564473cb136fb8cb"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/ForgeConductorApp.swift",
+      "bytes": 5518,
+      "sha256": "e7ffde90980b3890911965b10473a97394e91bdff4502b2817e85ae4db3af4da"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/Metal/LoadTraceRenderer.swift",
+      "bytes": 5093,
+      "sha256": "2c08d052073e9c54de640524d43f9a2e6322658f371c2d172be368b322cb4ac3"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/Metal/MetalGaugeKit.swift",
+      "bytes": 20292,
+      "sha256": "dee9d7e533403cb935e0b14e5a901aee61b284ffd8b992e2141fa3edf2dadb57"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/Metal/MetalGaugeResources.swift",
+      "bytes": 5128,
+      "sha256": "03070d0e78f79bce568e73c7834c68bdf9b92581a5ac1297039b3c20476a5c4d"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/Metal/MetalLoadChart.swift",
+      "bytes": 1042,
+      "sha256": "42474d73eefd108e0b522e30ad80dfd31c01dc4c2b351831814f57cb60c1056d"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/Metal/MetalMeterView.swift",
+      "bytes": 397,
+      "sha256": "ddcb1018f5c435132eb6f5f5f4c7b7333615cfff58d4463c096b624a65fbafed"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/Metal/MultiSeriesLoadRenderer.swift",
+      "bytes": 7933,
+      "sha256": "f09f7b2bc9be88309a181b0bcfec71fc46dec09ea4aa8cb7d9b20fc66d0037f2"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/OperatorConsole/Models/OperatorConsoleModels.swift",
+      "bytes": 24318,
+      "sha256": "3c7739af66dfa4322f058ebb46e988eefb87519f25c1bbd0cfe4976c5b89f3da"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/OperatorConsole/Services/OperatorManagerClient.swift",
+      "bytes": 14225,
+      "sha256": "76a5b7a8785f1159f217deff28c22e6dbd39a60400252bfe0b41cd3356374cd5"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/OperatorConsole/ViewModels/AutonomyViewModel.swift",
+      "bytes": 9354,
+      "sha256": "b26b8a65cfadf7e8ea6c1d192c22e7dd03c4dc764c4d9fe3b843171d5a883dd6"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/OperatorConsole/ViewModels/ContinuityViewModel.swift",
+      "bytes": 2104,
+      "sha256": "0f11f21ff0e79b1b430f25711ec27251e616f763e6b792d7a23c2ab701f1e1fa"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/OperatorConsole/ViewModels/EvidenceViewModel.swift",
+      "bytes": 2866,
+      "sha256": "2fdb375b8e28aeefa919793c1ff756c45a642942a997141fc013354c0cd299f0"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/OperatorConsole/ViewModels/ProjectsViewModel.swift",
+      "bytes": 4384,
+      "sha256": "a54349b19534d3d4d6cc00a18c4201b20b799e3fbf0cb570d453cc1b42837d6d"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/OperatorConsole/ViewModels/ProviderViewModel.swift",
+      "bytes": 1285,
+      "sha256": "ae98e2cbcc54499665f753a0914d990af0a6e4987b8dd071df1dc96a597b9fb4"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/OperatorConsole/ViewModels/RuntimesViewModel.swift",
+      "bytes": 2722,
+      "sha256": "4ac37e1fb306bfcbdd8466a069ceea6d5dde1548248fa276f4d20742190f9919"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/OperatorConsole/Views/AutonomyOperatorView.swift",
+      "bytes": 12716,
+      "sha256": "a2412d95364760c092cbc1850eddbb4332e5dc9bf3c34e3a369101d0793092e4"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/OperatorConsole/Views/ContinuityOperatorView.swift",
+      "bytes": 10501,
+      "sha256": "628f4452118d849f0e4266129c5113992b5c76f63aa88f697e243cbfd0f0c968"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/OperatorConsole/Views/EvidenceOperatorView.swift",
+      "bytes": 4124,
+      "sha256": "abc869132ae3d6ebf7946bfb082cdd5a2f35cc240e5f75c38653d5c321784977"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/OperatorConsole/Views/OperatorConsoleComponents.swift",
+      "bytes": 4152,
+      "sha256": "7c17fe1981a7b0b2049d505c7d7a7cee7338d572dca3bf5c022be7c76f2ad151"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/OperatorConsole/Views/ProjectsOperatorView.swift",
+      "bytes": 10812,
+      "sha256": "5fae52ca0225a11345908ec2944825664735355d1fbc77bb7f8616f2c35b15a5"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/OperatorConsole/Views/ProviderOperatorView.swift",
+      "bytes": 4584,
+      "sha256": "0e1aeb2bc225d223a4d5150835db617292ade5ec945d553e3d280991b5d58080"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/OperatorConsole/Views/RuntimesOperatorView.swift",
+      "bytes": 8825,
+      "sha256": "8c69aac7721e748db6ea7a78cabc42f540d5585f3bb9e4add1df28739b1bf0eb"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/Resources/Assets.xcassets/AppIcon.appiconset/Contents.json",
+      "bytes": 1257,
+      "sha256": "13b1c7461192863c9f3ab3ceab313acd6f6531898360983495bf13d48dfc967f"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/Resources/Assets.xcassets/AppIcon.appiconset/icon_128x128.png",
+      "bytes": 29471,
+      "sha256": "73fc32b410ee1ccd4d9de19e98ee01026496ed4fc49afb70204c6b2bcf9cd53e"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/Resources/Assets.xcassets/AppIcon.appiconset/icon_128x128@2x.png",
+      "bytes": 108418,
+      "sha256": "cbbedd835a69a06812832f28f6e4504bf6d18aebc873bbc6c0d7114b02da5753"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/Resources/Assets.xcassets/AppIcon.appiconset/icon_16x16.png",
+      "bytes": 822,
+      "sha256": "582c2c29ddcfd8eba1eeecff222346a9b33972c0a6bccacb0fc9dbbf031771de"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/Resources/Assets.xcassets/AppIcon.appiconset/icon_16x16@2x.png",
+      "bytes": 2660,
+      "sha256": "aa33af964e1316b0cad43d5fc1d4899b0af0647a4146169142a68c3b92afdeb9"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/Resources/Assets.xcassets/AppIcon.appiconset/icon_256x256.png",
+      "bytes": 108418,
+      "sha256": "cbbedd835a69a06812832f28f6e4504bf6d18aebc873bbc6c0d7114b02da5753"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/Resources/Assets.xcassets/AppIcon.appiconset/icon_256x256@2x.png",
+      "bytes": 351551,
+      "sha256": "6e3b3779cd73a983d75ece1d2e053a691af04c669e07855c03fe58dfba518fc8"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/Resources/Assets.xcassets/AppIcon.appiconset/icon_32x32.png",
+      "bytes": 2660,
+      "sha256": "aa33af964e1316b0cad43d5fc1d4899b0af0647a4146169142a68c3b92afdeb9"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/Resources/Assets.xcassets/AppIcon.appiconset/icon_32x32@2x.png",
+      "bytes": 8500,
+      "sha256": "0fbbd36df6f98187d3997fdaf6bf34baa1ff02c313c254bf5eddfa195b830a84"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/Resources/Assets.xcassets/AppIcon.appiconset/icon_512x512.png",
+      "bytes": 351551,
+      "sha256": "6e3b3779cd73a983d75ece1d2e053a691af04c669e07855c03fe58dfba518fc8"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/Resources/Assets.xcassets/AppIcon.appiconset/icon_512x512@2x.png",
+      "bytes": 867823,
+      "sha256": "0e5eb2425d3dd7dad5f1f024a1351635e25d0bf7120a265493da28d33c4432aa"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/Resources/Assets.xcassets/Contents.json",
+      "bytes": 60,
+      "sha256": "f5fb0e1f3a8142892ed092efb5955c1c2cc537003a89ad7bbdb9dade7fe8985f"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/Resources/Forge-Conductor.icns",
+      "bytes": 1805264,
+      "sha256": "47b2c18dbe355fb94a5fcabfeebaf6f8433fc6fa4f3502574a27b55921fa3192"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/Resources/ForgeConductor.entitlements",
+      "bytes": 181,
+      "sha256": "97704a8960b4facceef54397a08fb5d0a456247c3627359215aa2a27df22656c"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/Resources/Info.plist",
+      "bytes": 1162,
+      "sha256": "0ca663f42ac9c88a88808109beeb8320896e17783858a1b7ed9373ba0d6fd10a"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/Views/AgentsView.swift",
+      "bytes": 2787,
+      "sha256": "792e81e7c25f088f3c232e06ea7bba139018f213c0ff3333527ef915c7558ab7"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/Views/AppSidebarView.swift",
+      "bytes": 3590,
+      "sha256": "df7d3f7c33d3218076f081369eb268b17c9dc58a5c17cd0c9fe9e5798f90a91e"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/Views/ContentView.swift",
+      "bytes": 5101,
+      "sha256": "4878cd62185f19b46b9114b3ac31005faefe383eed8eec8d204f6b8d334619ea"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/Views/DiagnosticsView.swift",
+      "bytes": 5981,
+      "sha256": "13cbc9c98d197f2493efd63855da7a29d292e8f8f9f56ea8d5b992f07c8243be"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/Views/LiveFeedView.swift",
+      "bytes": 3171,
+      "sha256": "1ab2e6f14066211ce6c6b95df6fbdbdb6dcce8897a6ca988436c7eddba9a9b5b"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/Views/MCPServersView.swift",
+      "bytes": 9503,
+      "sha256": "634eda76fb5e443fb12426c6655859e83c09e906a8bb3576370ff6425b5e9a40"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/Views/ManagerSettingsView.swift",
+      "bytes": 8017,
+      "sha256": "4844fd73e5fbbfbfd6f5968da619c93ae99c4543ddf42cb93923718ab089e185"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/Views/Rig/RigDashboardView.swift",
+      "bytes": 31644,
+      "sha256": "a4aff2f8f725ff71c407ae74f8438dbbf1599722e9bc6fa535ebd67c26c42ec7"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/Views/TelemetryDashboardView.swift",
+      "bytes": 8685,
+      "sha256": "f1e3b29a8ff7b84025534ed2e0d65e6856fc5707cba08e770e4338af26390e99"
+    },
+    {
+      "path": "Sources/ForgeConductorApp/Views/ToolsView.swift",
+      "bytes": 5934,
+      "sha256": "976a954eab57134ac2b33883d986c801553726e1adb378d40d3a7144ae67c6cd"
+    },
+    {
+      "path": "Sources/ForgeConductorCLI/ForgeConductorMain.swift",
+      "bytes": 25904,
+      "sha256": "db7a210062c0af1b139f4448d41423c265e4765d4220d744c06fdb0f9f7ec9b1"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/AgentCatalog.swift",
+      "bytes": 21945,
+      "sha256": "e5bb41f33660dba2a20fb97da0cb3df9147b6a4d40da0d2a760f650603ad3a48"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/AgentSessionService.swift",
+      "bytes": 28176,
+      "sha256": "5c59ebb87f5f6f5a2c2339b135cb58510615dbab5adf7059f9753673b5980624"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/AutonomySupervisor.swift",
+      "bytes": 8415,
+      "sha256": "956c7ff8f0ee4c0fc77d87101e435057292f2b07cd61bb02e36b90ce80ac2d23"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/ContextBudgetSupervisor.swift",
+      "bytes": 23067,
+      "sha256": "d1e6021df7ed7b62a92805a050f41c656018d4126e2f937bd578b87f0691bf12"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/ContextContinuityService.swift",
+      "bytes": 32297,
+      "sha256": "d4e016dd74acdc5c5c659b3cf7800e6c5e2c14b07d09aa0fa02e60d945a53f02"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/ContinuityAutomation.swift",
+      "bytes": 18629,
+      "sha256": "88434d07abca45950775f80e100ccf7647a525a108fd8d9c208af21cc2572e06"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/ContinuityCoordinator.swift",
+      "bytes": 74804,
+      "sha256": "d5d3f7e15c247f80368edda83ebcb750b23f64b377438de72b4823bb0855e599"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/ExecutionJobService.swift",
+      "bytes": 106351,
+      "sha256": "cb8d063cbd6c95a5d075b58ed47653891322bf9a70ed5f21a5ac781b59743ae9"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/ForgeApp.swift",
+      "bytes": 17124,
+      "sha256": "0faa09e3fe9bf80efd9ff28c0e8c64fabc611f18e8506252df99eeb4568c8f85"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/ForgeProcessEntry.swift",
+      "bytes": 4513,
+      "sha256": "2d2392db2799103426aea6e179099c5f2b4a1170c90b4adec7fa49fe4bd59060"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/LegacyContinuityMigrator.swift",
+      "bytes": 10027,
+      "sha256": "28459954ddac2ffa7bc37948ab8b588da48826a709bb22b0ddd412dcfbf492f1"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/ManagedAutonomyRuntime.swift",
+      "bytes": 12956,
+      "sha256": "b0a00c4db02b0b9c4db19a575c568c909cd6e942292c1d41a21a7ebb88367956"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/ManagedContinuityWorker.swift",
+      "bytes": 34046,
+      "sha256": "0d9940cb6cdc2a3325bdcf89efd8a1f30d3fe6340ffb67e2e48512f652dce35e"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/ManagedProjectRunStepExecutor.swift",
+      "bytes": 33926,
+      "sha256": "c5e3a90d04d1247d03e372d2810bf283d55470081e03d3b4b7c30c615cdeec27"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/PersistedManagedRunBudgetEvaluator.swift",
+      "bytes": 8373,
+      "sha256": "408a21d0dc5adebdfd5d06f99ca1a9faaf367f2660f048836af70933651c8096"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/ProjectContextService.swift",
+      "bytes": 16975,
+      "sha256": "3d28a5f8e0eafe0858f74c23ef5a089c8e4fa11abea7b468f82b0e86bf1bbdf0"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/ProjectMemoryService.swift",
+      "bytes": 56905,
+      "sha256": "4e921c07a1815160b274b3b638dc02dfd0d752d29e2285f06fa3df2a57a06c78"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/ProjectRunCoordinator.swift",
+      "bytes": 28509,
+      "sha256": "08229e961a0422609b2e68a192fe4ba6b054ab027fc87f52eb48aaf8b9bc3564"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/RuntimeJobSubsystem.swift",
+      "bytes": 17942,
+      "sha256": "32eafea9900039f5849f09ef7e1f86ed8db789e720f84becb34b2dfa087a7fbe"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/ToolAuthorizationService.swift",
+      "bytes": 20256,
+      "sha256": "3450ec943b36af39c87681928a3e052a15f5644a1a53b93347cf54b3622a1739"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/ToolDefinitionCatalog.swift",
+      "bytes": 21305,
+      "sha256": "b3a5c95b6625091f6399170815781c5814729ba0909b800bccab986c70e02702"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/ToolInvocationBroker.swift",
+      "bytes": 54278,
+      "sha256": "d2aaad9c444e3bb18827c1b021e4ee3456f1affe261304648bfcb1a8fbe8f0c0"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/ToolRouter.swift",
+      "bytes": 49440,
+      "sha256": "a54f34689c1abc060c750eb230c6aa00f75df985862fa7ca73fd9722884a644b"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/Tools/AgentToolPack.swift",
+      "bytes": 6072,
+      "sha256": "9fab961430271d7d8dc520e37e54bbca43f1a659231eeeb0a5989c95272ca628"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/Tools/ContinuityLifecycleToolPack.swift",
+      "bytes": 7357,
+      "sha256": "d8d92fc566459374aa354291153c3898a84c66584ecb8477f341c769bd1805ff"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/Tools/ContinuityToolPack.swift",
+      "bytes": 3317,
+      "sha256": "4fb4cb8546b93a0a1b481ddb4ba2cfe48d1d603f2f8de0d281ba43a64d10df7a"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/Tools/DocsToolPack.swift",
+      "bytes": 6277,
+      "sha256": "9bb219bf301b5945cd61dc1c8da36747c55aba63cc48be87a43b6d6def0a9239"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/Tools/FilesystemToolPack.swift",
+      "bytes": 149680,
+      "sha256": "e5529f265706d38fe721a7c8ee29320af98ac8ddbfab1a1607798a12e2653296"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/Tools/GitToolPack.swift",
+      "bytes": 19262,
+      "sha256": "b791eb8d1ca5c5aa4ac9063cc98c702873d59f5a012e880f7a08821ce010bcaf"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/Tools/MemoryToolPack.swift",
+      "bytes": 9088,
+      "sha256": "bb6ff249c1ad9356efbd885f6657f41c9e018165a99ad2372ba7558659d01805"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/Tools/ProjectMemoryToolPack.swift",
+      "bytes": 17903,
+      "sha256": "8934d411ee4c8311d00fa927d8ec1d0b075de30a1d7a2bfbb2327cfbd1057c00"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/Tools/RuntimeJobToolPack.swift",
+      "bytes": 20034,
+      "sha256": "818e2b204708a308445af451a5b92c5584e0cc11d61f2da0a7b6e0231c6ee87b"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/Tools/SearchToolPack.swift",
+      "bytes": 2078,
+      "sha256": "aee3d2ba26981d5ac8f71a6f9f8c3f58cc55e77894c368976faec7ebc34775c6"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/Tools/ShellToolPack.swift",
+      "bytes": 2616,
+      "sha256": "70a3dc2cb75ddff4f51774486955deb634ae97b85e8ce46ca50f45129876488e"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Application/Tools/ToolArgHelpers.swift",
+      "bytes": 8646,
+      "sha256": "2ccd4c9daa7f80b8db1b630c40b141e093b1d5fd4ae903eea60d0da777fc50e6"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Dashboard/DashboardHTML.swift",
+      "bytes": 19569,
+      "sha256": "633d99084d90b2ccbf3b46d336f81d1d53267ce815cc12e9f3e305994a632d05"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Dashboard/DashboardHTTPRequest.swift",
+      "bytes": 7246,
+      "sha256": "c77b002f3c1e0ae390e7a32e3ff5101d37a60816260783c736b277493692d391"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Dashboard/DashboardServer.swift",
+      "bytes": 12851,
+      "sha256": "8691aee3f7f70158c03269e3e38e5cdb88f95086daaa5e017c51748fa6e1a232"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Dashboard/HTTPResponder.swift",
+      "bytes": 12830,
+      "sha256": "fbf30dd2c5aa48a840667b79088c645ca931feda4c49c989272eb59711509ad6"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Dashboard/ManagerRoutes.swift",
+      "bytes": 22349,
+      "sha256": "d794c1b3b0781d2bc877a9ed6b1a9e57b4cfc00f7c1316b46ccd1746b50ca763"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Dashboard/OperationalRoutes.swift",
+      "bytes": 3964,
+      "sha256": "3fe7b816c4b1f0ae327d7a208aae5fd8087b6908861cb0dfd8eb6149d0761f15"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Dashboard/TelemetryRoutes.swift",
+      "bytes": 5220,
+      "sha256": "3f186a190594309c124ccc0ae8cfb134b1ea4f8f4e9abc25d2092af4b36cc43f"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Domain/AppConfig.swift",
+      "bytes": 15883,
+      "sha256": "facd45b8b541a9c80be1de94563b38faa0b9903ac73c963bd41c71014e7ec3a4"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Domain/AutonomyModels.swift",
+      "bytes": 28578,
+      "sha256": "a83fa39c9848fe87a467c4a89c2ce4a2b625cea19c807be7e4c322377855212e"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Domain/ContextBudgetModels.swift",
+      "bytes": 43385,
+      "sha256": "88f34a6f072df514b5c7e654be157836e164f4251f35c9c64c6d247941e87410"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Domain/ContinuityModels.swift",
+      "bytes": 16004,
+      "sha256": "175dc875f5e2173194e296f1abfb8862bd7a2bfd5fc4bec15b369cb31271eff6"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Domain/ContinuityV2Models.swift",
+      "bytes": 40655,
+      "sha256": "6fb33a657d8319eb91be4d9414a79b7490421dd30dda562fb936da762736e211"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Domain/DoctorModels.swift",
+      "bytes": 3950,
+      "sha256": "0ae82a822763a0002256e6c63afa5819fdd575ce26e120ff6bf3c4e62bff5bad"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Domain/ForgeSnapshot.swift",
+      "bytes": 17196,
+      "sha256": "0ab04c9a01356d5f22703cf6c5976c05afc65abfedd76965bd0c37182454f4a7"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Domain/HandoffPacket.swift",
+      "bytes": 13780,
+      "sha256": "12dab4e7b7dce8dfb7a065539ccaaf1fa410e91c3e84b90445b50fd3b50a1982"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Domain/HostAdapterRegistry.swift",
+      "bytes": 4145,
+      "sha256": "6faec46bdd69f10da2fecbf21a8f79f3c771f46d2682ae73c0616a7c01989c22"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Domain/JSONSupport.swift",
+      "bytes": 3006,
+      "sha256": "3e883d037ca3fcc8b63369c4b3b26cd0bfd4a2ae53f37af4eb70e0f2b61c0a0f"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Domain/LMStudioConnector.swift",
+      "bytes": 4507,
+      "sha256": "951eb172b76cc9829346e4a23eaf04c653406ccb1993aa561f431dd4692e2fff"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Domain/ManagedModelProvider.swift",
+      "bytes": 19273,
+      "sha256": "57c173d0601b73ba359a29f9485207fd8fd043bad5c430396a76e382a1f1ad1f"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Domain/ManagerModels.swift",
+      "bytes": 30849,
+      "sha256": "07971e9bb88fb3489bfd257c9ec82ec883d245b2feece6bf74d8f01aa6ed98e7"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Domain/Models.swift",
+      "bytes": 12422,
+      "sha256": "d71f812c181d22c35e449e1bd293f3e056f8290e5b8131f6a1727d8ca5a6fc30"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Domain/ProjectContextModels.swift",
+      "bytes": 11310,
+      "sha256": "1e394da3ce2491c578c58ccaacd5076fb2ea7604b21b0443cfa3e54e06923aa3"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Domain/ProjectMemoryModels.swift",
+      "bytes": 7190,
+      "sha256": "a47b36b95e09fabd07eb72227d9b02cb397d0453d5431562d7cce678400428cc"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Domain/Protocols.swift",
+      "bytes": 8939,
+      "sha256": "5e4142aca411ef7d6e9b3b879c2312f1945e831c14de77c7f8aa848487c5ce55"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Domain/RuntimeJobModels.swift",
+      "bytes": 15573,
+      "sha256": "025bf4e4c87b434774b13b179fa2f25c4a5c3e87dfbc0f552c81a87845896186"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Infrastructure/AppPaths.swift",
+      "bytes": 6248,
+      "sha256": "a802adfdbb3cd0775cc9c1334428788b621f3d08b00e1a0862b762efe33a6c49"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Infrastructure/AuditService.swift",
+      "bytes": 7289,
+      "sha256": "2558a0b0d026032fd4aa50256677d8aed0922bf0ffa6917f76ed8aaab08b5dd2"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Infrastructure/ConfigStore.swift",
+      "bytes": 27443,
+      "sha256": "82b1122f4af6f1a7fe3c5dd91ad13bf79e448644f24dfe5deeb03e0ddeb5b2a6"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Infrastructure/DashboardPortGuard.swift",
+      "bytes": 5344,
+      "sha256": "2b0237ff6b35518fa8c34dffa31ffeff7356d9bf6eafcd6d1d9436a2fd96c244"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Infrastructure/DiagnosticLog.swift",
+      "bytes": 22789,
+      "sha256": "ec7d3d5c8f0cccbd51aa8a70afb5245db595523ae3d628b7fbb90843c4d66be8"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Infrastructure/FilesystemQuarantineLedger.swift",
+      "bytes": 26313,
+      "sha256": "c2c34e38d7820b432d4f340c509ceba013920fc636a34db46179ae943878a610"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Infrastructure/OwnerOnlyAtomicFile.swift",
+      "bytes": 11056,
+      "sha256": "282fd466f07daf6b23b4e97e85146e6b4e9b5b974e90575cf109900d99375d25"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Infrastructure/PDFWriter.swift",
+      "bytes": 8582,
+      "sha256": "f781fbdd9c62ff3d1f22f9f2df71992b90c42ed324c63b1d3aa282feffa2d796"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Infrastructure/ProcessRunner.swift",
+      "bytes": 23955,
+      "sha256": "bbf1a89cdc54f150c3aa0c2c169ebc73c318a52e1c50b6e7a67d6ccaee901c41"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Infrastructure/ProjectControlPlaneRepository.swift",
+      "bytes": 263383,
+      "sha256": "8df71c402adf2eb2c7f2e16ab219d3a74b4f435230fab469d235d4d654a1de72"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Infrastructure/ProjectMemoryRepository.swift",
+      "bytes": 187726,
+      "sha256": "4b40e05505c96d28873a4016a12444fdc0c4aa546a11367f99eee0779aea523a"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Infrastructure/ResourceBundle.swift",
+      "bytes": 713,
+      "sha256": "b10d2446c18d240a5cd072130e6d47046f96addfc0c47bb3a501ead01dfc58a7"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Infrastructure/ResourcePolicy.swift",
+      "bytes": 12996,
+      "sha256": "cc500f44120dd141f944d2a26a2c7f8624437fe01960e29b4a90f302e220dd84"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Infrastructure/RuntimeJobRepository.swift",
+      "bytes": 102318,
+      "sha256": "d5330bf53c9ca6072d3ee449f1ba5f63d7d9877d79c68f4fc5d1ac39e3230af1"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Infrastructure/RuntimeObservability.swift",
+      "bytes": 6982,
+      "sha256": "b1477822a5ec4187c9a44128c2bd9225a485166130c981484c3ebbab80c1e917"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift",
+      "bytes": 68938,
+      "sha256": "b3b5397fd65016dcb4f739d4a6be890a24c9898157d36643409b892fca483a01"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Infrastructure/SQLiteStore.swift",
+      "bytes": 87970,
+      "sha256": "2ac08686b59022ccf9f79a453d8ecb5434d4e9567ad1cf7e9034d1196623789e"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Infrastructure/VerifiedMigrationBackup.swift",
+      "bytes": 124475,
+      "sha256": "d70fdf4a903b131e20196ddaf434ae57b0b722b4feaa8e6790e83861f9719ae2"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/MCP/MCPServeVerifier.swift",
+      "bytes": 14586,
+      "sha256": "a22b0588b7c02dd7acec676881362bf55a8247a030b0d2ebba73c21c8e2df6a0"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/MCP/MCPServer.swift",
+      "bytes": 31174,
+      "sha256": "3373eb6d5f506b1fb07c490dae0d3800f3b0fcf6df4f5aa8f69092177990ada2"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Manager/ManagerDashboardClient.swift",
+      "bytes": 4600,
+      "sha256": "5afa4f6a645817bb10393dfd0721bc00c68e3f44032e2b198af0e6371d64bf45"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Manager/ManagerInstaller.swift",
+      "bytes": 53983,
+      "sha256": "c653d945ea5ac8762683707b06ac08056faf7f47460b2dc2ec12b5d2d5c3617a"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Manager/ManagerNode.swift",
+      "bytes": 52998,
+      "sha256": "334ddfb16faf0d06dbacd8ac93a383aeec224db44cef8ee9720b22544caade35"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Manager/ManagerPIDFile.swift",
+      "bytes": 1710,
+      "sha256": "2b10e83c9c47a0cd963814d803e71a11832db4f5272d29d010c894cf670e1151"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Manager/ManagerRuntime.swift",
+      "bytes": 2867,
+      "sha256": "84da181cfa1674c963e916de78fe01f7f010adb3f878056b3c7b2f5b64e9a9a8"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Manager/ManagerSettingsNormalizer.swift",
+      "bytes": 2975,
+      "sha256": "f74e4a5ff587ba4f69ae2cdbc909d7e94ed57e97ee549a37e0c102b2fd50ebac"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Resources/Agents/debug.md",
+      "bytes": 1789,
+      "sha256": "4013e3cfa6a4af1b51d69d4dc8445cc1e0590b0658fb5d250b4a431c70224bef"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Resources/Agents/docs.md",
+      "bytes": 4047,
+      "sha256": "e1118265e19562bf5e470ad6de16cd0c4e009b01e55f263049b24f714649ee55"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Resources/Agents/explore.md",
+      "bytes": 2703,
+      "sha256": "0cfd24d91a74e24a64a8716e7fb6f57bb4a5a6388f5f0d2d843bbc4775e09b92"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Resources/Agents/implement.md",
+      "bytes": 2130,
+      "sha256": "1459a82d77ceebd099a6fce5ef2504bffac451f0bd9e41c96318c3ff85a70142"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Resources/Agents/plan.md",
+      "bytes": 1670,
+      "sha256": "89e9ad8543beaa7a681c48a153569b9b340bdf7fd4f34a9164354c5a6874aaff"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Resources/Agents/precommit-audit.md",
+      "bytes": 1383,
+      "sha256": "9dc5693035148f124b1b990e8177aa799b5149fd818da7b9a1d447d537db8ea0"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Resources/Agents/research.md",
+      "bytes": 1301,
+      "sha256": "e5b0141797297ae5a5f647d9487445cfbffb43956ce1093e2edfad18ce4cb7e5"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Resources/Agents/review.md",
+      "bytes": 1523,
+      "sha256": "cfab52c5a3ecb384dba6bfa022db773729a0b48c2828e7716d970b873826a9cc"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Resources/Agents/security.md",
+      "bytes": 1453,
+      "sha256": "b7a7bd4a6174499b75ce095f9208cbec26f6e158a0cd7cffd9d204d782340c99"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Resources/Agents/test.md",
+      "bytes": 1381,
+      "sha256": "bc29c81555acd940eccfe692d4ded50717f43b87943a13644c62b11783d30cc0"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Resources/TelemetryStatic/app.js",
+      "bytes": 33418,
+      "sha256": "2c8d2a00098d54ca65bea6466190e85a9c89553e8d2e7edd6d1eeb1484a83d59"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Resources/TelemetryStatic/index.html",
+      "bytes": 7280,
+      "sha256": "5a53d1914bedaf55753b6d9764f1234c129b64cc25c81e7e6a074849fdd9d98e"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Resources/TelemetryStatic/style.css",
+      "bytes": 26920,
+      "sha256": "ac153c71e36b8655593c6bc539506145f49814375f6c00c8a40125889f4a1e58"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Resources/TelemetryStatic/tools-catalog.js",
+      "bytes": 2849,
+      "sha256": "22ff17d52ce37e4712a2e2bf06480cd774f46fc8a8285887189f5acc7ac38924"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Telemetry/Collectors/CPUCollector.swift",
+      "bytes": 8467,
+      "sha256": "df7b189a9e49c59d1f8d7f2cf32c42c79e367e9dea92cadc6549562cfe97b8a4"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Telemetry/Collectors/CPUFrequencyEstimator.swift",
+      "bytes": 7140,
+      "sha256": "93a620385f935139e0f9c9874e8588e5225210aa2b3255b47178156ddcfe2fea"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Telemetry/Collectors/DiskIOCollector.swift",
+      "bytes": 3952,
+      "sha256": "dbf823cec35dc9d66daf86b0a4a902f8920dbe6fd58525efc950052115f4baba"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Telemetry/Collectors/DiskVolumeCollector.swift",
+      "bytes": 1671,
+      "sha256": "67ff326c79e011fd308b0d98575dba07b449d813b5991279d73b487dcaebc6db"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Telemetry/Collectors/GPUCollector.swift",
+      "bytes": 3928,
+      "sha256": "76a0f5fff242984b16a36458648183c6676e9bbcb3af263dda3b90f51c0bcf1f"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Telemetry/Collectors/IOKitPropertyWalk.swift",
+      "bytes": 3463,
+      "sha256": "041ccafc91d4eab011e91a7aad78c7ef5c234db3b870ff63d09bfc978217480a"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Telemetry/Collectors/PowerSourcesCollector.swift",
+      "bytes": 4519,
+      "sha256": "b35507ff32b50f62cd64a43bd7d1a4c084a512a701ed782a1ae70d9b5bed0572"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Telemetry/Collectors/ProcessMetricsCollector.swift",
+      "bytes": 8978,
+      "sha256": "320925650251f5fa4e75f861a0232bba74fc3d1fb405d60e9e7785099431f177"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Telemetry/Collectors/RAMCollector.swift",
+      "bytes": 2768,
+      "sha256": "f91c4c2f796bb9de86b7008bcc9112ee068589fa5bc26146ad5399c66c68053f"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Telemetry/ForgeCollector.swift",
+      "bytes": 34622,
+      "sha256": "713d67c8d213d6aa4cf7514a7cd42d0ae836ce8d97e71364f070cb15d40d61cc"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Telemetry/LMStudioDeployService.swift",
+      "bytes": 26800,
+      "sha256": "5efceb87a91409f1f06eb7cac43652bddd860b41000c7b47ff3373fc3200a341"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Telemetry/LMStudioEnvironment.swift",
+      "bytes": 17531,
+      "sha256": "8bb930fa635d1ea1c47f331e14c028f1e1290b6615d7d39f5c778abb2196428c"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Telemetry/LMStudioMCPPluginInstaller.swift",
+      "bytes": 21120,
+      "sha256": "da120074ca73ff9310724ea314f4f8f976809558489c81a51a4ea0f35c0bc084"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Telemetry/LatestValueMailbox.swift",
+      "bytes": 8039,
+      "sha256": "93cbd7228b64a502432363046ba06160b485accd7fe36acca10f3ddb2a58d70a"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Telemetry/Models/ForgeUIModels.swift",
+      "bytes": 10402,
+      "sha256": "9fcc28a4558b20cea5fa03037b68f0aba3901f87c012780d8d6b193d716bee99"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Telemetry/Models/TelemetryModels.swift",
+      "bytes": 16814,
+      "sha256": "34ae112218eef1e196d68a7164f8bbee33cd7a6b156d6ac861117d16ce9c4147"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Telemetry/ProcessDiscovery.swift",
+      "bytes": 16055,
+      "sha256": "72e284524428ccadff64f238eb3d39ba962f4a1f15ddd1ba3a283508da54d983"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Telemetry/RealtimeMetricsEngine.swift",
+      "bytes": 5575,
+      "sha256": "4781a5ef0aa8e0f05b5924d61ca72107dfa3c7f6809c0f45be4b45e48e54b3e4"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Telemetry/SystemCollector.swift",
+      "bytes": 4421,
+      "sha256": "4debde7c121533cfae1b0d8a0637e41fd3d213937c2887853747e0598842b88f"
+    },
+    {
+      "path": "Sources/ForgeConductorCore/Telemetry/TelemetryService.swift",
+      "bytes": 16525,
+      "sha256": "87473a08ca767716bb04731fb0f0b693ce33383629460082593469d96c5eb4ef"
+    },
+    {
+      "path": "Sources/ForgeNativeSessionHostPlugin/ForgeNativeSessionHostPlugin.swift",
+      "bytes": 179744,
+      "sha256": "6c8be0474594f043424a769bd92fe9874ccb81f656c63f1daa73961d74052c6d"
+    },
+    {
+      "path": "Sources/ForgeRuntimeLauncher/main.swift",
+      "bytes": 6295,
+      "sha256": "45c168095351ebdc85dce254184419f9364c8c41c76919a25c91aeb73178cb66"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/AppConfigAndDoctorTests.swift",
+      "bytes": 15676,
+      "sha256": "cca9deb617803a52f9c1e489803d53b2da8af1317fef99f8426354a2d6c342b8"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/AutonomousContinuityAcceptanceTests.swift",
+      "bytes": 33800,
+      "sha256": "4e7bb7bf82e37f5fc7572b3cd4f152b4e0c0dee25dc1882361eabb79427934e8"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/AutonomySupervisorTests.swift",
+      "bytes": 54259,
+      "sha256": "2ebb4dfc9b1126f81db110cc15df53651d70aa7dcbaf9d31cd575fbb37b6c985"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/CommittedResultRecoveryTests.swift",
+      "bytes": 40681,
+      "sha256": "3ed1649900d33fe2cd8359996bf8b365a0499cded1199638bf33f292c627db4a"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/ContextBudgetSupervisorTests.swift",
+      "bytes": 30358,
+      "sha256": "03063f0f2b0f9fa6b09c649835f7e208f8ea5a48e057f16f1f24c6010f3ccebc"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/ContinuityCoordinatorTests.swift",
+      "bytes": 15593,
+      "sha256": "a34b732d2a8e24b15c009561c17c3f7e208069b8369243d25991fc1d0090c7e4"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/ContinuityTests.swift",
+      "bytes": 181788,
+      "sha256": "79b0fd70b1b00468267513267156cab070d181cf4fc437b90d92f9769a222dbc"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/ContinuityV2Tests.swift",
+      "bytes": 122927,
+      "sha256": "18e76cdd17d565d444bb3f78b9ca8c2d97df809cea37a57ac16ab5a87d2dfece"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/CoreTests.swift",
+      "bytes": 37546,
+      "sha256": "86db60bb8316ea3022c6c462262eb2af8611136a0380a487bcb3bbca870cddcc"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/DashboardSecurityTests.swift",
+      "bytes": 8991,
+      "sha256": "10b4126754847a5f179aea6cf77ab57296041751044236115dcd1aa13e1acfdd"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/DashboardTests.swift",
+      "bytes": 5662,
+      "sha256": "86d204f931cb5ff096f919a311404df7091704546bc7a3a8ab89795455d1f3df"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/DiagnosticBoundaryTests.swift",
+      "bytes": 4061,
+      "sha256": "7b93eef350fdd4f35d8a536c03b3f4e8d13470cfee1db528dc1552482b5df252"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/FilesystemCancellationTests.swift",
+      "bytes": 108436,
+      "sha256": "aeb17f8a553b257c25914f5beb76a5237a682992be6c4854b9e2ed7e05e2954e"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/Fixtures/LMStudio/models-loaded.json",
+      "bytes": 977,
+      "sha256": "efd9088e83cc14e8f253caa7b11aa7d1a1e4b2dc239a3813f858a0ca94ec6683"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/Fixtures/LMStudio/responses-continuation.sse",
+      "bytes": 1074,
+      "sha256": "38315214a040f5aeeaf8aa3d207f1cda3c5c79fd5a7ac1b854953cabd94450ec"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/Fixtures/LMStudio/responses-root.sse",
+      "bytes": 2000,
+      "sha256": "faf0fa4aaa312a6fcfbe71f83de86d48825f41dc1c55755238b9271c574193a8"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/Fixtures/telemetry_contract_keys.json",
+      "bytes": 481,
+      "sha256": "6856f9c0c0f4ba3fa30b9426ca16e3d9f0da793aa017f27c6e93698df2f76e7d"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/ForgeProcessEntryTests.swift",
+      "bytes": 2298,
+      "sha256": "8acef891eb5d90328b0d6678a4c80c0454106ba63f6f570fb7d9e3a789bd615a"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/G1G10AcceptanceTests.swift",
+      "bytes": 16550,
+      "sha256": "1904cb88cb53dfda4fcfd299c2de7c39b3d10068007442726d3f71e260bb55e7"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/HTTPTestHelpers.swift",
+      "bytes": 2957,
+      "sha256": "4f5d6e61240b16b9fd360871331f3e42430d49f9b30f67a5ccba6ddbd0e149c9"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/LMStudioConnectorReliabilityTests.swift",
+      "bytes": 12960,
+      "sha256": "786fe26f30b24912537b0d497093a195596f57746cee77eda6f0454c6764179e"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/LMStudioContractFixtureServer.swift",
+      "bytes": 21130,
+      "sha256": "3d82f84d3c00fe42a50d0ccb35131b00b4b021a4de52ed211b41323c60b58d54"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/LMStudioContractFixtureTests.swift",
+      "bytes": 20541,
+      "sha256": "c95caf613a4e14c3fe69dca018eaff231f2a4c81ff865e1f5ec6950560f4b6f6"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/LatestValueMailboxTests.swift",
+      "bytes": 4912,
+      "sha256": "9d4007b7bff2d01d6d0a9b4870cb51c546a7c994b26f28735cb8b86c0bc7b737"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/LegacyContinuityCancellationTests.swift",
+      "bytes": 50588,
+      "sha256": "ce4700f113ff96719423c0de08ea8c089144eec5db71fa05a7c5fb607411b300"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/LifecycleOwnershipTests.swift",
+      "bytes": 3071,
+      "sha256": "d0a824f6b53cfc5286d1eb590b4529bda446aba6074f2ff71b8ab4337c007809"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/LiveCollectorEvidenceTests.swift",
+      "bytes": 32613,
+      "sha256": "1ff19c3905b8a37327d19b7d03c750779cc23856a8c86a8bb87635eaf2fdda1e"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/MCPProtocolAndDiagnosticsTests.swift",
+      "bytes": 51631,
+      "sha256": "3bd9252bb265eb0cc4ff0dcb3fc61aafb720731f5a95487a65b34667ae3f3acd"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/MachHostMetricsTests.swift",
+      "bytes": 4436,
+      "sha256": "8a80df933714f844b3e68d446118ce577b7ca5b0f6ff175bdb543f9222f81c0e"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/ManagedAutonomyRuntimeTests.swift",
+      "bytes": 29557,
+      "sha256": "3fec6fdc58ed4a42394c0e76bcbf1b4bda48c2215ce68665e73db3b02872bec6"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/ManagedContinuityWorkerTests.swift",
+      "bytes": 43595,
+      "sha256": "269a649c1b0835b58cb3784ee46ff8bc09eb81ef1fefe39328875bac36704eeb"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/ManagedModelProviderBridgeTests.swift",
+      "bytes": 14257,
+      "sha256": "c19eb7a2cc7c66dc12e41d85569c68f8df78b787d286df8953401d89abd7ffc1"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/ManagedProjectRunStepExecutorTests.swift",
+      "bytes": 24785,
+      "sha256": "3e89a96d1889073362fd762a44950acdd4555791e448284eb299e4f2a6dddd26"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/ManagerTests.swift",
+      "bytes": 62402,
+      "sha256": "3f72da5dc8f1b6f8f7fa8563e70ab1d2b7f7a3f5733966696af02df5b6fa67dc"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/MemoryToolTests.swift",
+      "bytes": 18462,
+      "sha256": "f32eaeef50ebbe62acb8a382fb18cf779102e553eb13648d877621bee4e36761"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/NativeAppSmokeTests.swift",
+      "bytes": 2885,
+      "sha256": "8e92f334a43155d6ec3006f3063a2e30588a279bdefd3a55adc9189ca9441433"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/NativeSessionHostPluginTests.swift",
+      "bytes": 67716,
+      "sha256": "8e3b2b32b2752b62a06302c0c8862153752c1aab052db8f0e5c357394199fc85"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/NativeTelemetryTests.swift",
+      "bytes": 2706,
+      "sha256": "4b8fe5bdf994ebfb1a3eab1db20efc75920164e12da94cec6c4698a3af760181"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/OwnerOnlyAtomicFileTests.swift",
+      "bytes": 6478,
+      "sha256": "3b67f920e2c3b6392916964b0b2bdec8019132093c539c5d13d51641e7c02e71"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/ProcessRunnerTests.swift",
+      "bytes": 15787,
+      "sha256": "c5c0047a22eb6c4b29e6d4a7122d948d465b2337fab417bdfcc31253ec0195ef"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/ProductPathReliabilityTests.swift",
+      "bytes": 16954,
+      "sha256": "47624179f122a787fdcb5e57c42f9600459d375a0434f31d7f8b75958a975662"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/ProjectContextIntegrationTests.swift",
+      "bytes": 11498,
+      "sha256": "47a6ff0e5327e828303fcf3756c2a1bcd178d8a9e33fca36214bac4d0a9e209f"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/ProjectControlPlaneRepositoryTests.swift",
+      "bytes": 48224,
+      "sha256": "7df6b661a044a4ed49e146ed242b96b01922929e7c68ddf7b54b2f45e7d0c99d"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/ProjectMemoryTests.swift",
+      "bytes": 66130,
+      "sha256": "9e413534eb331a9dbbc670507b576c96b68122f47f4d01891df11b89bc257487"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/RealtimeStreamTests.swift",
+      "bytes": 8728,
+      "sha256": "b38b4644e70d7e3b780322f906d9f9b9798f8393a2cec060b3cc720a5f077d51"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/ReleaseStressTests.swift",
+      "bytes": 33991,
+      "sha256": "469676b23acf954993a3f0f534d796df46e8fe5d9e8235a102ebfe9f3733942d"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/ResourcePolicyTests.swift",
+      "bytes": 11496,
+      "sha256": "52bc75de516bc6decddbd93be25b676e80bfdea3c671640043f8e838f82a5982"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/RigParityTests.swift",
+      "bytes": 10175,
+      "sha256": "951b7de30abff5646bf046ec48f04b3758066f056679d30ac0349e91c580395b"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/RuntimeExecutionJobTests.swift",
+      "bytes": 206016,
+      "sha256": "29647686131cddbc1cd5c081051847a4d998952b3665f402f7047074e3e83a6a"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/RuntimeObservabilityTests.swift",
+      "bytes": 2516,
+      "sha256": "90803ec1753268faee78ef755f8c859b33401d08ba083cd413439d3bc38625aa"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/TelemetryContractTests.swift",
+      "bytes": 2435,
+      "sha256": "429ecc631bdac4fa7cf7e94ecc0bb572abdd6e7f0087161528de89a9951b8fa4"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/ToolDefinitionCatalogTests.swift",
+      "bytes": 9258,
+      "sha256": "7fad9b7a8880d6f09f0173abf52d2cef0e0a88f77d26ec18cf0941827ba12458"
+    },
+    {
+      "path": "Tests/ForgeConductorTests/ToolRouterDeadlineTests.swift",
+      "bytes": 11978,
+      "sha256": "d220d98191408b6d25af02c4bb03e945b3b907f7a617869b3a6996e10149bb4b"
+    },
+    {
+      "path": "Tests/ForgeConductorUITests/ForgeConductorUITests.swift",
+      "bytes": 31192,
+      "sha256": "2bb4dabb62db800c62060ee5a4087924b767c38476582fe40d34ab718d0e41de"
+    },
+    {
+      "path": "USER-GUIDE.md",
+      "bytes": 17331,
+      "sha256": "55aaa0a3c1e0ceebebec732faa5f523c380a76edb20ab617cf0e5a8c5f8bd50c"
+    },
+    {
+      "path": "XCODE.md",
+      "bytes": 2549,
+      "sha256": "c9ec805e3adf892b72aabb3a52796b237881a05f91c950880ebc526c9d154480"
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "bytes": 7769,
+      "sha256": "1957916a80c05c6b19f4eb8e804f4070086fc63a47749680b3822a8b8189e5f5"
+    },
+    {
+      "path": "docs/AUDIT-2026-07-22.md",
+      "bytes": 8978,
+      "sha256": "47c877072dba364f40ebd4ffee7fb21f3e9da15aa6a207c21cdd02f69ab138ca"
+    },
+    {
+      "path": "docs/AUDIT-2026-07-23.md",
+      "bytes": 4720,
+      "sha256": "33603520200e865a66b79f1a518ab20ba8736be3b1ee35f78efc2722876b8a17"
+    },
+    {
+      "path": "docs/AUDIT-2026-07-27.md",
+      "bytes": 11977,
+      "sha256": "5716468c37d818b8d7d9fac47ed1ae93d64cef292f965ec853c49c3998de8d5e"
+    },
+    {
+      "path": "docs/AUDIT-2026-08-01.md",
+      "bytes": 3876,
+      "sha256": "18af717f3881f691387a9375b09ff031dfe206ba92b621e59216ce6e3c9453c2"
+    },
+    {
+      "path": "docs/CONTEXT-AGENT-CONTINUITY.md",
+      "bytes": 3905,
+      "sha256": "b84468596833f350b268a4887862f841aa81e7a196896e49e058df5849ab383d"
+    },
+    {
+      "path": "docs/DURABLE-MEMORY.md",
+      "bytes": 1665,
+      "sha256": "5526ee8f07fdd120e042107b8987057efe81f3729659a3eef5adc9de499b9f21"
+    },
+    {
+      "path": "docs/ENDPOINT-PROTECTION.md",
+      "bytes": 4932,
+      "sha256": "4deb6ce3a807470a2ed751be5996649b64a92bc7e299a1b039a987d87a116070"
+    },
+    {
+      "path": "docs/G1-G10-STATUS.md",
+      "bytes": 3288,
+      "sha256": "ad4459037559af9e0256cece21f4ed36e946b0bb903731864e5e98bd68e8ecb7"
+    },
+    {
+      "path": "docs/G1-G7-STATUS.md",
+      "bytes": 1464,
+      "sha256": "ea0050bcd333c6bc1f14f2a2440b15924e1dcb1928774bb1b7796a5baa17fc7a"
+    },
+    {
+      "path": "docs/HOST-METRICS-APIS.md",
+      "bytes": 1463,
+      "sha256": "410a0f246dfd808a660d778d16477a867a938bc12283ec90b5dd7f0fc46558b6"
+    },
+    {
+      "path": "docs/LM-STUDIO-CONNECTION.md",
+      "bytes": 10808,
+      "sha256": "b4528de46e57527e10e1037ca39396960fc23e219b2509a4dd3741fca3426ead"
+    },
+    {
+      "path": "docs/RELEASE-0.5.0-TEST.md",
+      "bytes": 2441,
+      "sha256": "6bcf962d6e68477287bd9d252f876deeae88e3e6b75ef2bf4d979eb5a154dde5"
+    },
+    {
+      "path": "docs/RIG-PARITY.md",
+      "bytes": 2133,
+      "sha256": "53c5291cb819b94ce0ba48f745fb26d9fcfa10ca0d06c8de8a9d71d09c3485bf"
+    },
+    {
+      "path": "docs/TELEMETRY.md",
+      "bytes": 1788,
+      "sha256": "44de7b2ecd97c8d3021c9edca08132398888cc0ff6d2c1b588d3cdfab6f46286"
+    },
+    {
+      "path": "script/build_and_run.sh",
+      "bytes": 5194,
+      "sha256": "6aabd9b26ffd1c07b1e50ccb17d194ce4027bac07f80d17f1bd7ad45139d5d0d"
+    }
+  ]
+}

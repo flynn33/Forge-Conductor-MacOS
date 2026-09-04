@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "inputs": [
+    {
+      "file": "Forge-Conductor-MacOS-main.zip",
+      "bytes": 51891157,
+      "sha256": "8b38cd6bf86f0e90a4fa0567fcc8e7e7ead88285f64e03880efe894d19c6aeb7"
+    },
+    {
+      "file": "Forge-Conductor-Current-State-Full-Audit.zip",
+      "bytes": 91844,
+      "sha256": "def9191b4440e0fc21ea7b54944c444c3d5e778b9ae8dfbcd0b8baed38d45d19"
+    },
+    {
+      "file": "Forge-Conductor-Autonomous-Continuity-Implementation-Design.zip",
+      "bytes": 14546310,
+      "sha256": "0cfa84f06ba72835dfa46e68ca3d993c784d4b75eb269322ab727db8b7bf80a8"
+    },
+    {
+      "file": "Forge-Conductor-E2-Secure-Filesystem-Codex-Package.zip",
+      "bytes": 14482047,
+      "sha256": "b33da6850c1f7a0414275e88d403b222c8f68874a6d360792dcd40bba6c931ab"
+    },
+    {
+      "file": "Plan Forge Conductor Autonomy.txt",
+      "bytes": 16653,
+      "sha256": "e623b1f078173f71cf45279e74ddb6fa25309a221e2e3312d7ce24b38a5d2ded"
+    }
+  ]
+}
