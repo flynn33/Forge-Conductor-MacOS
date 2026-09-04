@@ -12,7 +12,7 @@ Version **0.9.0**, build **1**. This guide is for operators who run Forge Conduc
 | Project memory, durable jobs, and telemetry have current-source regression coverage. The SwiftPM Release suite executes 1,001 tests with 5 declared environment skips and 0 failures; a dedicated signed Xcode app-hosted contract suite executes 2 tests with 0 failures. A bounded signed installed-app scenario passed shell policy, migration, `tools/list`, established `shell_exec` through app and raw CLI, app relaunch, and installed-manager PID-replacement checks. | Production Settings control and post-Settings re-enable through XCUI, Developer ID Release, and exact P10 production qualification. |
 | Durable continuity state, provider receipt storage, successor/fencing models, and tool-effect reconciliation are implemented. | Manager-owned threshold-forced real-provider rollover, exact successor acknowledgment, automatic continuation, GUI-closed operation, and durable crash recovery. |
 | Protected regular-file/symlink deletion has protocol-v5 capture and recovery machinery. | Production `fs_move`, recursive directory `fs_delete`, signed distinct-process filesystem E2, and recovery qualification. |
-| The managed adapter can load and validate an existing LM Studio configuration. | A supported clean-install app/CLI/manager control for creating and updating that configuration. |
+| Provider controls save endpoint/model settings and Keychain credential changes through the manager. | Current native onboarding, Keychain, real-server connection and manager-restart acceptance. |
 | Package P10/G10 evidence remains available for qualification review. | Package P10/G10 and current G09-G12 remain open; representative physical-hardware qualification is owner-deferred. |
 
 Where implementation has only unit, synthetic-host, simulator, focused Debug,
@@ -186,6 +186,30 @@ continuity as qualified.
 Unit and synthetic-host tests do not close this gate. The authority run must use
 the real provider with the GUI closed and recover from every durable crash state.
 
+### Configure the managed provider
+
+Open **Provider** and enter the LM Studio endpoint (normally
+`http://127.0.0.1:1234`). Remote endpoints require HTTPS. Enter the model's exact
+identifier, or leave it empty when exactly one supported model is loaded.
+Choose **Keep existing credential**, **Replace credential**, or **Clear credential**.
+Replacement tokens are stored in Keychain and are never returned in snapshots.
+
+Select **Save**. Saving persists settings even when LM Studio is offline; it
+does not load a model or test the connection. **Refresh Models** queries the saved
+endpoint and shows available models and their loaded state. Select a model and
+save again to use that selection. **Test Connection** checks the saved endpoint
+and loaded model. **Run Contract Probe** also checks the provider capabilities
+required for managed execution. Load models in LM Studio itself.
+
+Finish or cancel existing managed runs before changing settings. An in-flight
+probe or active run blocks a conflicting save. Invalid settings leave the last
+saved revision intact; if another control changed that revision, refresh and
+review it before retrying. If a save is cancelled or the connection is lost,
+refresh to reconcile the persisted result. A credential cleanup notice means
+settings were saved but Keychain cleanup needs a retry after Keychain is unlocked.
+These controls configure Forge-managed sessions; LM Studio MCP deployment remains
+in **LM Studio MCP**.
+
 ### 6.1 Provider-response recovery boundary
 
 Accepted provider receipts are durable across manager restart. If Forge crashes
@@ -340,14 +364,19 @@ LM Studio may send all `tools/call` traffic to one of them (often fallback). Tha
 - The current checkpoint does not yet qualify manager-owned autonomous
   succession. A directly invoked provider-adapter test is not a substitute for
   the required forced-rollover scenario.
+- An interrupted protected deletion can retain a recovery handle and prevent
+  new mutations on that protected volume. Path absence alone is not a successful
+  delete receipt. Preserve the recovery identifier; do not remove protected
+  transaction files manually. Signed recovery and retained-entry disposition
+  qualification remain open.
 - Protected filesystem capture and quarantine mitigate known destructive-path
   races but do not eliminate them. E2 remains mandatory until the signed
   distinct-process 57-case matrix and formal predicates pass. Production
   `fs_move` and recursive directory `fs_delete` are unavailable until their
   additive signed-helper protocols are implemented and qualified.
-- Managed Autonomy is not operable on a clean install until the product can
-  create and validate its LM Studio provider configuration; test-written files
-  are not a supported operator workflow.
+- Configure the managed provider using Provider controls and test the saved
+  connection before starting Autonomy. Native onboarding and real-provider
+  qualification remain open.
 - Current G09-G12, native Settings/release/signing, exact shell UI
   qualification, real-provider continuity, and owner-deferred representative
   physical-hardware gates remain open; this guide is not a ship authorization.

@@ -87,7 +87,7 @@ separate release requirements.
 | **Agents / Tools / Feed** | Playbooks and tool audit for local-model agent runs |
 | **Projects** | Durable project identity, generation, bindings, memory, and continuity state |
 | **Autonomy / Continuity** | Manager-owned runs, provider leases, budgets, handoffs, successor acknowledgment, and fencing state |
-| **Runtimes / Provider** | Effective shell policy, durable jobs, redacted provider configuration, and contract health |
+| **Runtimes / Provider** | Effective shell policy, durable jobs, editable provider settings, redacted credentials, and contract health |
 | **Events & Evidence / Diagnostics** | Bounded manager events, durable evidence references, logs, and doctor signals |
 | **Manager** | Start/Stop/Restart control, authorized folders, project-shell policy, protected-filesystem service controls, maintenance, and doctor |
 
@@ -164,11 +164,11 @@ production-path qualification for every feature listed below.
   Settings control and post-Settings re-enable remain blocked for the Xcode XCUI
   lane. Developer ID Release signing and P10 exact-production qualification also
   remain open.
-- **Managed provider setup:** the adapter can load a valid LM Studio provider
-  configuration, but a clean installation currently has no supported app, CLI,
-  or manager control that creates it. Test-only file provisioning is not a
-  working product setup path, so Provider and managed Autonomy configuration
-  remain release-blocking.
+- **Managed provider setup:** Provider now saves endpoint, model and Keychain
+  credential changes through authenticated manager controls. Save supports an
+  offline server; Refresh Models and Test Connection separately verify the
+  saved configuration. Current native onboarding and real-provider acceptance
+  remain open; a successful save alone does not qualify managed Autonomy.
 - **Provider continuity:** an unresolved provider-response crash is fenced for
   660 seconds. LM Studio exposes no request-ID receipt lookup; after the fence,
   each retry can create at most one duplicate model inference, and repeated

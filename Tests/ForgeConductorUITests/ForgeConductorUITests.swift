@@ -493,6 +493,37 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(fixture.mutationAuthorizationCount, 3)
     }
 
+    func testProviderSettingsSaveUsesRedactedManagerStateAndSurvivesViewReopen() throws {
+        let fixture = try OperatorManagerUITestFixture()
+        relaunch(with: fixture)
+        let provider = app.buttons["tab-provider"]
+        XCTAssertTrue(provider.waitForExistence(timeout: 8))
+        provider.click()
+        let endpoint = app.textFields["provider-endpoint"]
+        let model = app.textFields["provider-model-key"]
+        let save = app.buttons["provider-save"]
+        XCTAssertTrue(waitForEnabled(save, timeout: 5))
+        XCTAssertTrue(endpoint.exists)
+        XCTAssertTrue(model.exists)
+        makeHittable(model)
+        model.click()
+        model.typeKey("a", modifierFlags: .command)
+        model.typeText("fixture/configured-model")
+        makeHittable(save)
+        save.click()
+        XCTAssertTrue(waitUntil(timeout: 5) { fixture.providerConfigurationSaveCount == 1 })
+        XCTAssertEqual(fixture.providerConfiguredModel, "fixture/configured-model")
+        XCTAssertTrue(fixture.providerProbeRecords.isEmpty, "Save must not report or fabricate a connection probe")
+        let notice = app.descendants(matching: .any)["provider-probe-notice"]
+        XCTAssertTrue(notice.waitForExistence(timeout: 5))
+        XCTAssertTrue(element(notice, contains: "Settings saved"))
+        app.buttons["tab-projects"].click()
+        provider.click()
+        XCTAssertTrue(waitForValue("fixture/configured-model", on: app.textFields["provider-model-key"]))
+        XCTAssertTrue(app.buttons["provider-test-connection"].exists)
+        XCTAssertTrue(app.buttons["provider-refresh-models"].exists)
+    }
+
     func testProviderControlsSendExactProtectedRequestsAndSurfaceSuccessAndFailure() throws {
         let fixture = try OperatorManagerUITestFixture(failContractProbe: true)
         relaunch(with: fixture)
@@ -1029,6 +1060,10 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     private var mutableProviderProbeRecords: [ProviderProbeRecord] = []
     private var mutableProviderProbeBodies: [Data] = []
     private var mutableProviderProbeAuthorizationCount = 0
+    private var mutableProviderConfigurationSaveCount = 0
+    private var mutableProviderConfigurationRevision = "0"
+    private var mutableProviderConfiguredModel = ""
+    private var mutableProviderConfiguredEndpoint = "http://127.0.0.1:1234"
     private var mutableProviderHealth = "healthy"
     private var mutableProviderLastProbeMode: String?
     private var mutableProviderLastProbeError: String?
@@ -1053,6 +1088,8 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     var projectRoot: String { locked { mutableProjectRoot } }
     var projectGeneration: UInt64 { locked { mutableProjectGeneration } }
     var relinkRequestCount: Int { locked { mutableRelinkRequestCount } }
+    var providerConfigurationSaveCount: Int { locked { mutableProviderConfigurationSaveCount } }
+    var providerConfiguredModel: String { locked { mutableProviderConfiguredModel } }
     var providerProbeRecords: [ProviderProbeRecord] { locked { mutableProviderProbeRecords } }
     var providerProbeBodies: [Data] { locked { mutableProviderProbeBodies } }
     var providerProbeAuthorizationCount: Int {
@@ -1307,6 +1344,36 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             } else {
                 respond(status: outcome.status, object: outcome.receipt, to: connection)
             }
+        case "/api/manager/provider/configuration":
+            guard request.headers["authorization"]?.hasPrefix("Bearer ") == true else {
+                respond(status: 401, object: ["message": "missing provider configuration authorization"], to: connection)
+                return
+            }
+            if !request.body.isEmpty {
+                guard let object = try? JSONSerialization.jsonObject(with: request.body) as? [String: Any],
+                      Set(object.keys).isSubset(of: ["expectedRevision", "endpoint", "modelKey", "credentialAction"]),
+                      object["expectedRevision"] as? String == locked({ mutableProviderConfigurationRevision }),
+                      let endpoint = object["endpoint"] as? String,
+                      object["credentialAction"] as? String == "keep" else {
+                    respond(status: 409, object: ["message": "invalid or stale provider configuration"], to: connection)
+                    return
+                }
+                locked {
+                    mutableProviderConfiguredEndpoint = endpoint
+                    mutableProviderConfiguredModel = object["modelKey"] as? String ?? ""
+                    mutableProviderConfigurationRevision = UUID().uuidString.lowercased()
+                    mutableProviderConfigurationSaveCount += 1
+                }
+            }
+            let configuration: [String: Any] = locked {
+                ["revision": mutableProviderConfigurationRevision,
+                 "endpoint": mutableProviderConfiguredEndpoint,
+                 "modelKey": mutableProviderConfiguredModel,
+                 "credentialConfigured": false,
+                 "saved": mutableProviderConfigurationRevision != "0",
+                 "credentialCleanupPending": false]
+            }
+            respond(status: 200, object: configuration, to: connection)
         case "/api/manager/provider/probe":
             guard request.headers["authorization"]?.hasPrefix("Bearer ") == true,
                   let object = try? JSONSerialization.jsonObject(with: request.body) as? [String: Any],

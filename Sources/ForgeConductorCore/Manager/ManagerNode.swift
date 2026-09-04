@@ -107,6 +107,9 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     private let projectRegistrationCheckpoint: @Sendable (
         ManagerProjectRegistrationCheckpoint
     ) throws -> Void
+    private var providerConfigurationInProgress = false
+    private var providerRunOperations = 0
+    private var providerConfigurationService: (any ProviderConfigurationServicing)?
     private var activeProviderProbeID: UUID?
     private var managedAutonomy: ManagedAutonomyRuntime?
 
@@ -1422,6 +1425,85 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
 
     // MARK: - Managed provider controls
 
+    public func readProviderConfiguration() throws -> ProviderConfigurationSnapshot {
+        try performProviderConfiguration { service in try await service.read() }
+    }
+
+    public func updateProviderConfiguration(_ request: ProviderConfigurationUpdate) throws -> ProviderConfigurationSnapshot {
+        try performProviderConfiguration { service in
+            // This query includes paused/recoverable runs. Changing an endpoint under
+            // any durable session would invalidate its receipt reconciliation domain.
+            let runs = try await self.app.projectContexts.repository.nonterminalAutonomousRuns(limit: 1)
+            guard runs.isEmpty else { throw ProviderConfigurationError.busy }
+            if let autonomy = self.providerAutonomyRuntime(),
+               !(await autonomy.snapshot()).supervisor.activeRunIDs.isEmpty {
+                throw ProviderConfigurationError.busy
+            }
+            let saved = try await service.update(request)
+            self.clearProviderProbeState()
+            return saved
+        }
+    }
+
+    public func providerModels() throws -> ProviderModelInventory {
+        try performProviderConfiguration { service in try await service.models() }
+    }
+
+    private func performProviderConfiguration<Value: Sendable>(
+        _ operation: @escaping @Sendable (any ProviderConfigurationServicing) async throws -> Value
+    ) throws -> Value {
+        lock.lock()
+        guard !providerConfigurationInProgress, !runtime.providerProbeInProgress,
+              providerRunOperations == 0 else {
+            lock.unlock()
+            throw ProviderConfigurationError.busy
+        }
+        providerConfigurationInProgress = true
+        let existing = providerConfigurationService
+        lock.unlock()
+        let service: any ProviderConfigurationServicing
+        do {
+            service = try existing ?? hostAdapterRegistry.configurationService(
+                identifier: Self.nativeSessionHostAdapterID,
+                storageDirectory: providerStorageDirectory(adapterID: Self.nativeSessionHostAdapterID)
+            )
+        } catch {
+            finishProviderConfiguration()
+            throw error
+        }
+        lock.lock(); providerConfigurationService = service; lock.unlock()
+        // Admission is released by actual task completion, even after a deadline.
+        // A cancelled request can never overlap a subsequent settings transaction.
+        return try Self.waitForAsync(timeoutSeconds: 20) {
+            defer { self.finishProviderConfiguration() }
+            return try await operation(service)
+        }
+    }
+
+    private func providerAutonomyRuntime() -> ManagedAutonomyRuntime? {
+        lock.lock(); defer { lock.unlock() }; return managedAutonomy
+    }
+
+    private func finishProviderConfiguration() {
+        lock.lock()
+        providerConfigurationInProgress = false
+        lock.unlock()
+    }
+
+    private func clearProviderProbeState() {
+        lock.lock(); runtime.providerProbeState = nil; lock.unlock()
+    }
+
+    private func beginProviderRunOperation() throws {
+        lock.lock(); defer { lock.unlock() }
+        guard !providerConfigurationInProgress else { throw ProviderConfigurationError.busy }
+        providerRunOperations += 1
+    }
+
+    private func finishProviderRunOperation() {
+        lock.lock(); providerRunOperations -= 1; lock.unlock()
+    }
+
     /// Probes the statically registered native session-host provider. The caller
     /// selects only an exact registered adapter identifier and probe mode; storage,
     /// configuration, credentials, and the provider instance remain manager-owned.
@@ -1440,7 +1522,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         let startedAt = ISO8601.string(from: app.clock.now())
         let probeID = UUID()
         lock.lock()
-        guard !runtime.providerProbeInProgress else {
+        guard !runtime.providerProbeInProgress, !providerConfigurationInProgress else {
             lock.unlock()
             throw ManagerProviderProbeError.probeInProgress
         }
@@ -1655,8 +1737,10 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 maximumInlineOutputBytes: maximumInlineOutputBytes
             )
         )
+        try beginProviderRunOperation()
         let run = try Self.waitForAsync(timeoutSeconds: 15) {
-            try await autonomy.createRun(request)
+            defer { self.finishProviderRunOperation() }
+            return try await autonomy.createRun(request)
         }
         return try autonomousRunDictionary(run)
     }
@@ -1691,8 +1775,10 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         let autonomy = managedAutonomy
         lock.unlock()
         guard let autonomy else { throw AutonomyError.shutdown }
+        try beginProviderRunOperation()
         let run = try Self.waitForAsync(timeoutSeconds: 15) {
-            try await autonomy.controlRun(runID, action: action)
+            defer { self.finishProviderRunOperation() }
+            return try await autonomy.controlRun(runID, action: action)
         }
         return try autonomousRunDictionary(run)
     }

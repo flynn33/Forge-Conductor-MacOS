@@ -5,22 +5,22 @@
     {
       "path": "README.md",
       "status": "updated",
-      "reason": "Explains development smoke scope, coherent Xcode installation and the limits of native CI."
+      "reason": "Explains editable managed-provider settings and separates saved configuration from current acceptance."
     },
     {
       "path": "CHANGELOG.md",
       "status": "updated",
-      "reason": "Records build identity validation, deterministic installation guidance, native CI and the documentation snapshot regression fix."
+      "reason": "Records native provider persistence and production onboarding tests alongside build and CI improvements."
     },
     {
       "path": "USER-GUIDE.md",
       "status": "updated",
-      "reason": "Directs installation and updates through the complete signed artifact installer and clarifies development smoke scope."
+      "reason": "Documents endpoint/model and Keychain controls, explicit probes, revision and cancellation recovery."
     },
     {
       "path": "XCODE.md",
       "status": "updated",
-      "reason": "Replaces wildcard individual-product copying with deterministic signed staging and supported transactional installation; documents native CI and manual distribution."
+      "reason": "Documents provider source/test membership, native onboarding execution and its environment requirements."
     }
   ],
   "version_impact": "Marketing 0.9.0 retained; build remains 1 for source validation, with new candidate identity pending private distribution inventory before candidate freeze."

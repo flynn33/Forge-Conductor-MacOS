@@ -17,9 +17,8 @@ qualification, Developer ID Release/native lifecycle
 validation, manager-owned
 real-provider autonomous continuity, owner-deferred representative physical-
 hardware qualification, and current G09-G12 remain open and release-blocking.
-Clean-install managed-provider configuration is also open: the adapter reads a
-validated LM Studio configuration when present, but the product does not yet
-provide a supported control that creates it.
+Provider settings now have native and manager save controls. Current native
+onboarding, credential and real-provider acceptance remain open.
 
 ### Verified current-source evidence
 
@@ -47,6 +46,19 @@ provide a supported control that creates it.
   evidence.
 
 ### Changed
+
+- Filesystem recovery now rejects terminal receipts that contradict retained
+  protected entries, avoids recapturing replacement data after an interrupted
+  intent, and blocks fresh mutations while a prior effect is unresolved.
+  Signed recovery qualification and parent-relocation containment remain open.
+
+- Provider controls now persist endpoint/model settings and keep, replace or clear
+  Keychain credentials through authenticated manager routes. Revision checks,
+  active-run admission and recoverable credential updates protect saved state;
+  model discovery and connection tests remain explicit actions.
+- Native onboarding tests exercise the real folder picker, offline provider
+  saves and rejection, manager process replacement, and optional live-provider
+  discovery. They require actual Xcode execution before acceptance.
 
 - The development build/run script rejects inconsistent build-number overrides,
   malformed identities and unsupported invocation modes before compilation. Its

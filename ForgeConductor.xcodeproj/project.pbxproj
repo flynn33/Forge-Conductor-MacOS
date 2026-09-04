@@ -254,6 +254,11 @@
 		E2A000000000000000000006 /* libForgeFilesystemProtocol.a in Frameworks */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000014 /* libForgeFilesystemProtocol.a */; };
 		E2A000000000000000000007 /* libForgeFilesystemQualificationSupport.a in Frameworks */ = {isa = PBXBuildFile; fileRef = E2A000000000000000000013 /* libForgeFilesystemQualificationSupport.a */; };
 		E2A000000000000000000008 /* libForgeFilesystemProtocol.a in Frameworks */ = {isa = PBXBuildFile; fileRef = E2F500000000000000000014 /* libForgeFilesystemProtocol.a */; };
+		B09B00000000000000000051 /* Domain/ProviderConfigurationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B09F00000000000000000051 /* Domain/ProviderConfigurationService.swift */; };
+		B09B00000000000000000052 /* LMStudioConfigurationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B09F00000000000000000052 /* LMStudioConfigurationService.swift */; };
+		B09B00000000000000000053 /* ProviderConfigurationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B09F00000000000000000053 /* ProviderConfigurationTests.swift */; };
+		B09B00000000000000000054 /* ProviderConfigurationAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B09F00000000000000000054 /* ProviderConfigurationAppTests.swift */; };
+		B09B00000000000000000055 /* ProductionOnboardingUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B09F00000000000000000055 /* ProductionOnboardingUITests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -714,6 +719,11 @@
 		E2A000000000000000000013 /* libForgeFilesystemQualificationSupport.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libForgeFilesystemQualificationSupport.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		E2A000000000000000000014 /* forge-filesystem-qualification-harness */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "forge-filesystem-qualification-harness"; sourceTree = BUILT_PRODUCTS_DIR; };
 		E2A000000000000000000015 /* forge-filesystem-qualification-adversary */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "forge-filesystem-qualification-adversary"; sourceTree = BUILT_PRODUCTS_DIR; };
+		B09F00000000000000000051 /* Domain/ProviderConfigurationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/ProviderConfigurationService.swift; sourceTree = "<group>"; };
+		B09F00000000000000000052 /* LMStudioConfigurationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/ForgeNativeSessionHostPlugin/LMStudioConfigurationService.swift; sourceTree = "SOURCE_ROOT"; };
+		B09F00000000000000000053 /* ProviderConfigurationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderConfigurationTests.swift; sourceTree = "<group>"; };
+		B09F00000000000000000054 /* ProviderConfigurationAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderConfigurationAppTests.swift; sourceTree = "<group>"; };
+		B09F00000000000000000055 /* ProductionOnboardingUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductionOnboardingUITests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -837,6 +847,7 @@
 			isa = PBXGroup;
 			children = (
 				BE153ABEB86940BF8945EE52 /* Tests/ForgeConductorTests/OperatorProjectContractTests.swift */,
+				B09F00000000000000000054 /* ProviderConfigurationAppTests.swift */,
 				E2F500000000000000000013 /* ForgeFilesystemProtocolTests.swift */,
 				E2F500000000000000000044 /* SecureFilesystemMutationTests.swift */,
 				E2F500000000000000000055 /* SecureFilesystemQualificationHealthSessionTests.swift */,
@@ -862,6 +873,7 @@
 				P10F00000000000000000015 /* LatestValueMailboxTests.swift */,
 				P10F00000000000000000016 /* LifecycleOwnershipTests.swift */,
 				P10F00000000000000000017 /* NativeSessionHostPluginTests.swift */,
+				B09F00000000000000000053 /* ProviderConfigurationTests.swift */,
 				P10F00000000000000000018 /* ProjectMemoryTests.swift */,
 				P10F00000000000000000019 /* ResourcePolicyTests.swift */,
 				P10F00000000000000000020 /* RuntimeObservabilityTests.swift */,
@@ -929,6 +941,7 @@
 			isa = PBXGroup;
 			children = (
 				FFD816A0133440729A01A3EF /* ForgeConductorUITests.swift */,
+				B09F00000000000000000055 /* ProductionOnboardingUITests.swift */,
 			);
 			path = Tests/ForgeConductorUITests;
 			sourceTree = SOURCE_ROOT;
@@ -1070,6 +1083,7 @@
 				A26F00000000000000000015 /* Domain/ContextBudgetModels.swift */,
 				A26F00000000000000000016 /* Domain/ContinuityV2Models.swift */,
 				A26F00000000000000000017 /* Domain/ManagedModelProvider.swift */,
+				B09F00000000000000000051 /* Domain/ProviderConfigurationService.swift */,
 				A26F00000000000000000018 /* Domain/ProjectContextModels.swift */,
 				A26F00000000000000000019 /* Domain/RuntimeJobModels.swift */,
 				A26F00000000000000000020 /* Infrastructure/ProjectControlPlaneRepository.swift */,
@@ -1079,6 +1093,7 @@
 				P10F00000000000000000002 /* Application/Tools/ContinuityLifecycleToolPack.swift */,
 				P10F00000000000000000003 /* Domain/ContinuityModels.swift */,
 				P10F00000000000000000004 /* ForgeNativeSessionHostPlugin.swift */,
+				B09F00000000000000000052 /* LMStudioConfigurationService.swift */,
 				P10F00000000000000000005 /* Domain/HostAdapterRegistry.swift */,
 				P10F00000000000000000006 /* Telemetry/LatestValueMailbox.swift */,
 				P10F00000000000000000008 /* Domain/ProjectMemoryModels.swift */,
@@ -1555,6 +1570,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				14782D2FE9544A59A1AED446 /* Tests/ForgeConductorTests/OperatorProjectContractTests.swift in Sources */,
+				B09B00000000000000000054 /* ProviderConfigurationAppTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1587,6 +1603,7 @@
 				P10B00000000000000000015 /* LatestValueMailboxTests.swift in Sources */,
 				P10B00000000000000000016 /* LifecycleOwnershipTests.swift in Sources */,
 				P10B00000000000000000017 /* NativeSessionHostPluginTests.swift in Sources */,
+				B09B00000000000000000053 /* ProviderConfigurationTests.swift in Sources */,
 				P10B00000000000000000018 /* ProjectMemoryTests.swift in Sources */,
 				P10B00000000000000000019 /* ResourcePolicyTests.swift in Sources */,
 				P10B00000000000000000020 /* RuntimeObservabilityTests.swift in Sources */,
@@ -1667,6 +1684,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				84CB0CFAB0294499A42EE9BE /* ForgeConductorUITests.swift in Sources */,
+				B09B00000000000000000055 /* ProductionOnboardingUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1703,6 +1721,7 @@
 				A26B00000000000000000015 /* Domain/ContextBudgetModels.swift in Sources */,
 				A26B00000000000000000016 /* Domain/ContinuityV2Models.swift in Sources */,
 				A26B00000000000000000017 /* Domain/ManagedModelProvider.swift in Sources */,
+				B09B00000000000000000051 /* Domain/ProviderConfigurationService.swift in Sources */,
 				A26B00000000000000000018 /* Domain/ProjectContextModels.swift in Sources */,
 				A26B00000000000000000019 /* Domain/RuntimeJobModels.swift in Sources */,
 				A26B00000000000000000020 /* Infrastructure/ProjectControlPlaneRepository.swift in Sources */,
@@ -1712,6 +1731,7 @@
 				P10B00000000000000000002 /* Application/Tools/ContinuityLifecycleToolPack.swift in Sources */,
 				P10B00000000000000000003 /* Domain/ContinuityModels.swift in Sources */,
 				P10B00000000000000000004 /* ForgeNativeSessionHostPlugin.swift in Sources */,
+				B09B00000000000000000052 /* LMStudioConfigurationService.swift in Sources */,
 				P10B00000000000000000005 /* Domain/HostAdapterRegistry.swift in Sources */,
 				P10B00000000000000000006 /* Telemetry/LatestValueMailbox.swift in Sources */,
 				P10B00000000000000000008 /* Domain/ProjectMemoryModels.swift in Sources */,
@@ -2009,6 +2029,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Manual;
+				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -2239,6 +2262,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Manual;
+				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
 				GENERATE_INFOPLIST_FILE = YES;

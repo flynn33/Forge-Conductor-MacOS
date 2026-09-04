@@ -305,6 +305,10 @@ public final class ManagerRoutes: @unchecked Sendable {
             return
         }
         switch (method, target.path) {
+        case ("GET", "/api/manager/provider/configuration"),
+             ("PUT", "/api/manager/provider/configuration"),
+             ("GET", "/api/manager/provider/models"):
+            dispatchProviderConfiguration(method: method, path: target.path, body: body, connection: connection)
         case ("GET", "/api/manager/status"):
             http.respondJSON(connection, status: 200, object: manager.status())
         case ("GET", "/api/manager/settings"):
@@ -796,6 +800,55 @@ public final class ManagerRoutes: @unchecked Sendable {
             }
         default:
             http.respond(connection, status: 404, body: "Not Found", contentType: "text/plain")
+        }
+    }
+
+    private func dispatchProviderConfiguration(method: String, path: String, body: Data, connection: NWConnection) {
+        let manager = self.manager
+        let http = self.http
+        guard body.count <= 16 * 1024 else {
+            http.respondJSON(connection, status: 413, object: ["ok": false, "message": "Provider configuration request is oversized"])
+            return
+        }
+        Self.providerProbeQueue.async {
+            do {
+                let data: Data
+                if method == "PUT" {
+                    guard let object = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
+                          Set(object.keys).isSubset(of: ["expectedRevision", "endpoint", "modelKey", "credentialAction", "token"]),
+                          let update = try? JSONDecoder().decode(ProviderConfigurationUpdate.self, from: body) else {
+                        throw ProviderConfigurationError.invalidRequest
+                    }
+                    data = try JSONEncoder().encode(manager.updateProviderConfiguration(update))
+                } else if path.hasSuffix("/models") {
+                    data = try JSONEncoder().encode(manager.providerModels())
+                } else {
+                    data = try JSONEncoder().encode(manager.readProviderConfiguration())
+                }
+                let object = try JSONSupport.object(from: data)
+                http.respondJSON(connection, status: 200, object: object)
+            } catch let error as ProviderConfigurationError {
+                let status: Int
+                switch error {
+                case .invalidRequest: status = 400
+                case .busy, .revisionConflict: status = 409
+                case .credentialUnavailable: status = 422
+                case .unavailable: status = 503
+                case .persistenceFailed: status = 500
+                case .authenticationFailed, .offline, .timeout, .modelEndpointUnavailable, .connectionFailed: status = 502
+                }
+                http.respondJSON(connection, status: status, object: [
+                    "ok": false, "code": "provider_configuration_" + error.rawValue,
+                    "message": error.localizedDescription,
+                ])
+            } catch {
+                // Provider payloads and arbitrary localized errors are not an
+                // approved diagnostic channel for credential material.
+                http.respondJSON(connection, status: 502, object: [
+                    "ok": false, "code": "provider_configuration_connection_failed",
+                    "message": "Cannot retrieve provider models. Check the server, credential, and connection, then retry.",
+                ])
+            }
         }
     }
 

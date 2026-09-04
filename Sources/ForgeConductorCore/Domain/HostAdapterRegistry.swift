@@ -50,12 +50,14 @@ public struct HostPluginManifest: Sendable, Equatable {
 public final class HostAdapterRegistry: @unchecked Sendable {
     public static let shared = HostAdapterRegistry()
     public typealias Factory = @Sendable (URL) throws -> any SessionHostAdapter
+    public typealias ConfigurationFactory = @Sendable (URL) throws -> any ProviderConfigurationServicing
     public typealias ManagedProviderFactory = @Sendable (URL) throws -> any ManagedModelProvider
 
     private struct Registration {
         var manifest: HostPluginManifest
         var factory: Factory
         var managedProviderFactory: ManagedProviderFactory?
+        var configurationFactory: ConfigurationFactory?
     }
 
     private let lock = NSLock()
@@ -66,13 +68,15 @@ public final class HostAdapterRegistry: @unchecked Sendable {
     public func register(
         manifest: HostPluginManifest,
         managedProviderFactory: ManagedProviderFactory? = nil,
+        configurationFactory: ConfigurationFactory? = nil,
         factory: @escaping Factory
     ) {
         lock.lock()
         registrations[manifest.identifier] = Registration(
             manifest: manifest,
             factory: factory,
-            managedProviderFactory: managedProviderFactory
+            managedProviderFactory: managedProviderFactory,
+            configurationFactory: configurationFactory
         )
         lock.unlock()
     }
@@ -96,6 +100,14 @@ public final class HostAdapterRegistry: @unchecked Sendable {
         lock.unlock()
         guard let registration else { throw ContinuityRunError.hostCapabilityUnavailable }
         return try registration.managedProviderFactory?(storageDirectory)
+    }
+
+    public func configurationService(identifier: String, storageDirectory: URL) throws -> any ProviderConfigurationServicing {
+        lock.lock()
+        let factory = registrations[identifier]?.configurationFactory
+        lock.unlock()
+        guard let factory else { throw ProviderConfigurationError.unavailable }
+        return try factory(storageDirectory)
     }
 
     public var manifests: [HostPluginManifest] {

@@ -101,6 +101,7 @@ public struct LMStudioProviderConfiguration: Codable, Sendable, Equatable {
     public static let fileName = "lmstudio-provider.json"
     public static let maximumFileBytes = 64 * 1024
 
+    public var revision: String = "0"
     public var baseURL: URL
     public var modelKey: String?
     public var keychainTokenReference: String?
@@ -152,6 +153,7 @@ public struct LMStudioProviderConfiguration: Codable, Sendable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
+        case revision
         case baseURL = "base_url"
         case modelKey = "model_key"
         case keychainTokenReference = "keychain_token_reference"
@@ -214,9 +216,13 @@ public struct LMStudioProviderConfiguration: Codable, Sendable, Equatable {
                 Int.self, forKey: .maximumOutputTokens
             ) ?? 4_096
         )
+        revision = try values.decodeIfPresent(String.self, forKey: .revision) ?? "0"
     }
 
     public func validated() throws -> LMStudioProviderConfiguration {
+        guard revision == "0" || UUID(uuidString: revision) != nil else {
+            throw LMStudioProviderError.invalidConfiguration("configuration revision is invalid")
+        }
         guard let scheme = baseURL.scheme?.lowercased(), ["http", "https"].contains(scheme),
               let host = baseURL.host?.lowercased(), !host.isEmpty,
               baseURL.user == nil, baseURL.password == nil,
@@ -227,6 +233,9 @@ public struct LMStudioProviderConfiguration: Codable, Sendable, Equatable {
             || host == "::1" || host == "[::1]"
         guard scheme == "https" || loopback else {
             throw LMStudioProviderError.invalidConfiguration("non-loopback providers require HTTPS")
+        }
+        guard baseURL.port.map({ (1...65_535).contains($0) }) ?? true else {
+            throw LMStudioProviderError.invalidConfiguration("base URL port is outside supported bounds")
         }
         guard baseURL.path.isEmpty || baseURL.path == "/" else {
             throw LMStudioProviderError.invalidConfiguration("base URL must not include an API path")
@@ -301,7 +310,7 @@ public struct LMStudioProviderConfiguration: Codable, Sendable, Equatable {
     ) throws {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, trimmed.utf8.count <= maximumBytes,
-              !trimmed.contains("\n"), !trimmed.contains("\r") else {
+              !trimmed.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else {
             throw LMStudioProviderError.invalidConfiguration("invalid \(field)")
         }
     }
@@ -369,13 +378,9 @@ public struct LMStudioKeychainAuthorization: LMStudioAuthorizationProviding {
 
     private static func systemLookup(reference: String) throws -> Data? {
         #if canImport(Security)
-        let query: [CFString: Any] = [
-            kSecClass: kSecClassGenericPassword,
-            kSecAttrService: service,
-            kSecAttrAccount: reference,
-            kSecMatchLimit: kSecMatchLimitOne,
-            kSecReturnData: true,
-        ]
+        var query = LMStudioKeychainCredentialStore.query(reference)
+        query[kSecMatchLimit] = kSecMatchLimitOne
+        query[kSecReturnData] = true
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
         switch status {
@@ -1461,11 +1466,20 @@ public actor LMStudioRESTClient {
         }
         let selected: LMStudioModel
         if let configured = configuration.modelKey {
-            guard let match = candidates.first(where: { $0.key == configured }) else {
-                throw LMStudioProviderError.invalidConfiguration("configured model is not loaded and tool-capable")
+            guard let match = inventory.models.first(where: { $0.key == configured }) else {
+                throw LMStudioProviderError.invalidConfiguration("configured model was not found; refresh models and select an available identifier")
+            }
+            guard !match.loadedInstances.isEmpty else {
+                throw LMStudioProviderError.invalidConfiguration("configured model is unloaded; load it in LM Studio and retry")
+            }
+            guard match.capabilities?.trainedForToolUse == true else {
+                throw LMStudioProviderError.invalidConfiguration("configured model does not support tool use; select a tool-capable model")
             }
             selected = match
         } else {
+            guard !inventory.models.isEmpty else {
+                throw LMStudioProviderError.invalidConfiguration("no models are available; add a model in LM Studio")
+            }
             guard candidates.count == 1, let only = candidates.first else {
                 throw LMStudioProviderError.invalidConfiguration("select exactly one loaded tool-capable model")
             }
@@ -4669,6 +4683,9 @@ public enum ForgeNativeSessionHostPlugin {
                     storageDirectory: storageDirectory,
                     transport: try transportFactory(storageDirectory)
                 )
+            },
+            configurationFactory: { storageDirectory in
+                LMStudioConfigurationService(storageDirectory: storageDirectory)
             }
         ) { storageDirectory in
             return try LMStudioManagedSessionHostAdapter(

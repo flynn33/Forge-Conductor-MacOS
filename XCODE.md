@@ -109,7 +109,7 @@ archive, notarization, staple, Gatekeeper, protected-service lifecycle, or full
 native UI matrix pass. Those release checks remain open.
 
 Package P10/G10, filesystem E2, production move/recursive-directory deletion,
-clean-install managed-provider setup, production Settings shell qualification,
+native managed-provider onboarding, production Settings shell qualification,
 manager-owned real-provider forced rollover,
 representative physical hardware, and final G09-G12 completion evidence also
 remain open. The current-source SwiftPM Release suite executes
@@ -185,3 +185,27 @@ Developer ID team policy and secure timestamps. The shipping
 [validation runbook](.forge-codex/shipping/MACOS-VALIDATION-RUNBOOK.md) describes
 artifact checks, notarization and installation proof. The owner performs
 shipping manually after the hard gates pass.
+
+### Provider and onboarding test membership
+
+The Core target includes the provider configuration contract and native LM Studio
+configuration service. Service/store tests run in `ForgeConductorTests`; native
+HTTP-client and manager-route tests run in `ForgeConductorAppTests`.
+`ProductionOnboardingUITests` is in the native UI target and uses the actual
+folder panel and normal app bootstrap. Run it serially with UI Automation enabled:
+
+```bash
+xcodebuild -workspace ForgeConductor.xcworkspace -scheme ForgeConductor   -destination 'platform=macOS,arch=arm64' -parallel-testing-enabled NO   -only-testing:ForgeConductorUITests/ProductionOnboardingUITests test
+```
+
+The live-provider method requires `FORGE_SHIPPING_PROVIDER_ENDPOINT` and
+`FORGE_SHIPPING_PROVIDER_MODEL` in the test runner environment; without them it
+records an explicit skip. Keep the result bundle, selected/executed counts and
+attachments. Build success and fixture UI tests do not qualify production
+onboarding. The qualification-support SwiftPM tests remain in their dedicated
+package target; Xcode builds the support library and native harness separately.
+
+The unhosted Core unit-test bundle also uses Apple Development team `9AQ2C2838M`
+to match its adjacent runtime launcher. Ad-hoc test signing is rejected by the
+existing development-test trust check. Optimized native tests must build their
+product dependencies with the documented development Release overrides.

@@ -23,6 +23,9 @@ protocol OperatorManagerClientProtocol: Sendable {
     func runStatus(runID: String) async throws -> OperatorRun
     func controlRun(runID: String, action: OperatorRunControlAction) async throws -> OperatorRun
     func cancelRuntimeJob(jobID: String) async throws -> OperatorRuntimeJob
+    func providerConfiguration() async throws -> ProviderConfigurationSnapshot
+    func updateProviderConfiguration(_ update: ProviderConfigurationUpdate) async throws -> ProviderConfigurationSnapshot
+    func providerModels() async throws -> ProviderModelInventory
     func probeProvider(
         adapterID: String,
         mode: OperatorProviderProbeMode
@@ -30,6 +33,12 @@ protocol OperatorManagerClientProtocol: Sendable {
 }
 
 extension OperatorManagerClientProtocol {
+    func providerConfiguration() async throws -> ProviderConfigurationSnapshot { throw ProviderConfigurationError.unavailable }
+    func updateProviderConfiguration(_ update: ProviderConfigurationUpdate) async throws -> ProviderConfigurationSnapshot {
+        throw ProviderConfigurationError.unavailable
+    }
+    func providerModels() async throws -> ProviderModelInventory { throw ProviderConfigurationError.unavailable }
+
     func snapshot(limit: Int) async throws -> OperatorSnapshot {
         try await snapshot(limit: limit, cursor: nil)
     }
@@ -99,6 +108,18 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
             credentials: resolvedCredentials
         )
         encoder.outputFormatting = [.sortedKeys]
+    }
+
+    func providerConfiguration() async throws -> ProviderConfigurationSnapshot {
+        try await request(method: "GET", path: "/api/manager/provider/configuration", timeoutInterval: 25)
+    }
+
+    func updateProviderConfiguration(_ update: ProviderConfigurationUpdate) async throws -> ProviderConfigurationSnapshot {
+        try await request(method: "PUT", path: "/api/manager/provider/configuration", body: update, timeoutInterval: 25)
+    }
+
+    func providerModels() async throws -> ProviderModelInventory {
+        try await request(method: "GET", path: "/api/manager/provider/models", timeoutInterval: 25)
     }
 
     func snapshot(limit: Int = 100, cursor: String? = nil) async throws -> OperatorSnapshot {

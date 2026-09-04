@@ -209,6 +209,9 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
         try writeProviderConfiguration(baseURL: baseURL, modelKey: modelKey, paths: app.paths)
         let projectRoot = home.appendingPathComponent("project", isDirectory: true)
         try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+        // The production manager requires an explicit root grant even for this
+        // disposable continuity fixture; registration does not confer authority.
+        try app.config.update(["allowed_roots": [projectRoot.path]], save: true)
         try Data("\(Self.successorMarker)\n".utf8).write(
             to: projectRoot.appendingPathComponent("successor-only.txt"),
             options: .atomic
@@ -287,7 +290,10 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
             bearerToken: bearerToken,
             timeout: 30
         )
-        XCTAssertEqual(started.status, 202)
+        guard started.status == 202 else {
+            throw LiveQualificationError.managerRouteRejected(status: started.status,
+                code: started.object["code"] as? String ?? "unreported")
+        }
         XCTAssertEqual(started.object["run_id"] as? String, runID.description)
         let runtime = try XCTUnwrap(holder.load())
         let thresholdRun = try await driveUntilExactRollover(
@@ -1340,6 +1346,7 @@ private struct ReplayedPhase {
 
 private enum LiveQualificationError: Error, LocalizedError {
     case invalidProviderInventory
+    case managerRouteRejected(status: Int, code: String)
     case unexpectedProviderContext(expected: Int, actual: Int)
     case predecessorToolInvocation(sequence: Int64)
     case unexpectedThreshold(action: String, source: String, used: Int?, remaining: Int?)
@@ -1349,6 +1356,8 @@ private enum LiveQualificationError: Error, LocalizedError {
 
     var errorDescription: String? {
         switch self {
+        case .managerRouteRejected(let status, let code):
+            "Manager start route rejected the disposable fixture: HTTP \(status), code \(code)"
         case .invalidProviderInventory:
             "LM Studio did not expose exactly one valid loaded instance for the selected model"
         case .unexpectedProviderContext(let expected, let actual):

@@ -898,6 +898,26 @@ public enum ForgeFilesystemTransactionRecoveryPolicy {
     }
 }
 
+/// A durable outcome describes an effect; it cannot override contradictory
+/// protected disk state. This policy applies before query, replay, admission,
+/// and acknowledgement. It does not authorize disposal of a retained entry.
+public enum ForgeFilesystemTerminalReceiptPolicy {
+    public static func agreesWithProtectedLeaf(
+        disposition: ForgeFilesystemTransactionDisposition,
+        leafExists: Bool,
+        leafMatchesCaptureReceipt: Bool
+    ) -> Bool {
+        switch disposition {
+        case .committed, .restored, .rejected, .conflicted:
+            return !leafExists
+        case .quarantined:
+            return leafExists && leafMatchesCaptureReceipt
+        case .unavailable, .recoveryRequired:
+            return false
+        }
+    }
+}
+
 public enum ForgeFilesystemCapturedLeafRollbackDisposition: Equatable, Sendable {
     case retainForRecovery
 }

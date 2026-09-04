@@ -193,7 +193,16 @@ final class PrivilegedLeafDeleteEngine {
                 requesterUID: requesterUID,
                 rootInformation: rootInformation,
                 in: inventory
-            ), !transaction.acknowledging else {
+            ) else {
+                return unavailableStatus(
+                    code: ForgeFilesystemErrorCode.transactionUnavailable,
+                    message: "The filesystem transaction is unavailable"
+                )
+            }
+            if let issue = transaction.recoveryIssue {
+                return recoveryRequiredStatus(for: transaction, message: issue)
+            }
+            guard !transaction.acknowledging else {
                 return unavailableStatus(
                     code: ForgeFilesystemErrorCode.transactionUnavailable,
                     message: "The filesystem transaction is unavailable"
@@ -203,16 +212,9 @@ final class PrivilegedLeafDeleteEngine {
                 try synchronize(try requiredDescriptor(for: transaction.slot).rawValue)
                 return outcome.status()
             }
-            return ForgeFilesystemTransactionStatus(
-                transactionID: transaction.record.transactionID,
-                disposition: .recoveryRequired,
-                code: ForgeFilesystemErrorCode.transactionNotTerminal,
-                message: "The filesystem transaction requires explicit recovery",
-                terminal: false,
-                committed: false,
-                durabilityConfirmed: false,
-                recoveryRequired: true,
-                acknowledgementRequired: false
+            return recoveryRequiredStatus(
+                for: transaction,
+                message: "The filesystem transaction requires explicit recovery"
             )
         }
     }
@@ -234,7 +236,11 @@ final class PrivilegedLeafDeleteEngine {
                 requesterUID: requesterUID,
                 rootInformation: rootInformation,
                 in: inventory
-            ), !transaction.acknowledging else {
+            ) else {
+                return transactionUnavailableResponse()
+            }
+            try requireConsistentRecoveryState(transaction)
+            guard !transaction.acknowledging else {
                 return transactionUnavailableResponse()
             }
             if let outcome = transaction.outcome {
@@ -291,6 +297,7 @@ final class PrivilegedLeafDeleteEngine {
             guard let transaction else {
                 throw EngineFailure.transactionUnavailable()
             }
+            try requireConsistentRecoveryState(transaction)
             return try preservingRecoveryIdentity(
                 transactionID: transaction.record.transactionID
             ) {
@@ -399,6 +406,32 @@ final class PrivilegedLeafDeleteEngine {
         return transaction
     }
 
+    private func recoveryRequiredStatus(
+        for transaction: ActiveTransaction,
+        message: String
+    ) -> ForgeFilesystemTransactionStatus {
+        ForgeFilesystemTransactionStatus(
+            transactionID: transaction.record.transactionID,
+            disposition: .recoveryRequired,
+            code: ForgeFilesystemErrorCode.transactionNotTerminal,
+            message: message,
+            terminal: false,
+            committed: false,
+            durabilityConfirmed: false,
+            recoveryRequired: true,
+            acknowledgementRequired: false
+        )
+    }
+
+    private func requireConsistentRecoveryState(_ transaction: ActiveTransaction) throws {
+        if let issue = transaction.recoveryIssue {
+            throw EngineFailure.namespace(
+                issue,
+                recoveryTransactionID: transaction.record.transactionID
+            )
+        }
+    }
+
     private func performDelete(
         _ request: ForgeFilesystemMutationRequest,
         authorizedRootDescriptor: Int32,
@@ -454,6 +487,19 @@ final class PrivilegedLeafDeleteEngine {
                 }
             }
 
+            // Inventory is reconstructed under the protected namespace lock for
+            // every admission, including the first call after daemon restart.
+            // Explicit recovery of an exact transaction remains reachable above.
+            // Never allocate another slot or advance a binding while a prior
+            // effect is unresolved, even when the caller lost its own ledger.
+            guard !inventory.active.contains(where: {
+                $0.recoveryIssue != nil || $0.outcome == nil
+            }) else {
+                throw EngineFailure.namespace(
+                    "Protected filesystem transactions require recovery before a new mutation"
+                )
+            }
+
             let parent = try openSourceParent(
                 rootDescriptor: root.rawValue,
                 components: request.relativePathComponents,
@@ -502,7 +548,8 @@ final class PrivilegedLeafDeleteEngine {
                     ActiveTransaction(slot: slot, phase: .intent, record: record),
                     transactionID: request.transactionID,
                     rootDescriptor: root.rawValue,
-                    requesterUID: requesterUID
+                    requesterUID: requesterUID,
+                    allowInitialCapture: true
                 )
             }
         }
@@ -936,14 +983,32 @@ final class PrivilegedLeafDeleteEngine {
             outcome = nil
         }
 
+        // Read the physical entry while the protected namespace lock is held.
+        // Metadata receipts may be durable even when the corresponding effect
+        // was rolled back by crash recovery, and must never conceal retained data.
+        let protectedLeaf = try namedInformationIfExists("leaf", in: slotDescriptor)
+        let durableOutcome = outcome ?? acknowledgement?.outcome
+        let recoveryIssue: String?
+        if let durableOutcome,
+           !ForgeFilesystemTerminalReceiptPolicy.agreesWithProtectedLeaf(
+               disposition: durableOutcome.disposition,
+               leafExists: protectedLeaf != nil,
+               leafMatchesCaptureReceipt: protectedLeaf.map {
+                   durableOutcome.capturedIdentity?.matches($0) == true
+               } ?? false
+           ) {
+            recoveryIssue = "The terminal receipt disagrees with the protected filesystem entry"
+        } else {
+            recoveryIssue = nil
+        }
+
         if let acknowledgement {
             guard
                   selectedRecord == nil || selectedRecord == acknowledgement.record,
-                  outcome == nil || outcome == acknowledgement.outcome,
-                  try namedInformationIfExists("leaf", in: slotDescriptor) == nil else {
+                  outcome == nil || outcome == acknowledgement.outcome else {
                 throw EngineFailure.namespace("A protected acknowledgement is invalid")
             }
-            if reconcileAcknowledgements {
+            if reconcileAcknowledgements, recoveryIssue == nil {
                 try finishAcknowledgement(slotDescriptor: slotDescriptor)
                 return nil
             }
@@ -952,12 +1017,13 @@ final class PrivilegedLeafDeleteEngine {
                 phase: selectedPhase ?? acknowledgement.outcome.terminalPhase,
                 record: acknowledgement.record,
                 outcome: acknowledgement.outcome,
-                acknowledging: true
+                acknowledging: true,
+                recoveryIssue: recoveryIssue
             )
         }
 
         guard let selectedRecord, let selectedPhase else {
-            if try namedInformationIfExists("leaf", in: slotDescriptor) != nil {
+            if protectedLeaf != nil {
                 throw EngineFailure.namespace("An untracked protected leaf requires recovery")
             }
             if reconcileAcknowledgements {
@@ -973,7 +1039,8 @@ final class PrivilegedLeafDeleteEngine {
             phase: selectedPhase,
             record: selectedRecord,
             outcome: outcome,
-            acknowledging: false
+            acknowledging: false,
+            recoveryIssue: recoveryIssue
         )
     }
 
@@ -981,7 +1048,8 @@ final class PrivilegedLeafDeleteEngine {
         _ transaction: ActiveTransaction,
         transactionID: String,
         rootDescriptor: Int32,
-        requesterUID: uid_t
+        requesterUID: uid_t,
+        allowInitialCapture: Bool = false
     ) throws -> ForgeFilesystemResponse {
         guard ForgeFilesystemRequesterPolicy.matchesPersistedRequester(
             transaction.record.requesterUID,
@@ -991,6 +1059,7 @@ final class PrivilegedLeafDeleteEngine {
                 "The filesystem transaction belongs to a different requester"
             )
         }
+        try requireConsistentRecoveryState(transaction)
         if let outcome = transaction.outcome {
             return outcome.response()
         }
@@ -1021,24 +1090,11 @@ final class PrivilegedLeafDeleteEngine {
 
         case .captured:
             if protectedInformation == nil {
-                do {
-                    try synchronize(slotDescriptor)
-                    try writePhase(
-                        .committed,
-                        record: transaction.record,
-                        slotDescriptor: slotDescriptor
-                    )
-                } catch {
-                    throw EngineFailure.namespace(
-                        "The terminal deletion is present without a durable committed receipt",
-                        committed: true,
-                        recoveryTransactionID: transactionID
-                    )
-                }
-                return try terminalResponse(
-                    disposition: .committed,
-                    record: transaction.record,
-                    slotDescriptor: slotDescriptor
+                // Absence does not prove the unlink completed. Preserve the
+                // recovery handle instead of manufacturing a success receipt.
+                throw EngineFailure.namespace(
+                    "The captured entry is absent without a durable committed receipt",
+                    recoveryTransactionID: transactionID
                 )
             }
             return try preservingRecoveryIdentity(
@@ -1183,6 +1239,16 @@ final class PrivilegedLeafDeleteEngine {
                         )
                     }
                 }
+            }
+
+            // Only the invocation that just published this intent may select
+            // the current source entry. After a lost reply or restart the name
+            // may denote replacement data; replay is not fresh authorization.
+            guard allowInitialCapture else {
+                throw EngineFailure.namespace(
+                    "The interrupted capture requires explicit disposition before retry",
+                    recoveryTransactionID: transactionID
+                )
             }
 
             let parent = try preservingRecoveryIdentity(
@@ -2231,6 +2297,22 @@ final class PrivilegedLeafDeleteEngine {
         guard outcome.isValid(for: record) else {
             throw EngineFailure.namespace("A terminal transaction outcome is invalid")
         }
+        // The same physical-state rule applies to the first response as to
+        // replay. A stale capture identity must not publish a terminal receipt
+        // that the very next inventory scan would reject.
+        let protectedLeaf = try namedInformationIfExists("leaf", in: slotDescriptor)
+        guard ForgeFilesystemTerminalReceiptPolicy.agreesWithProtectedLeaf(
+            disposition: outcome.disposition,
+            leafExists: protectedLeaf != nil,
+            leafMatchesCaptureReceipt: protectedLeaf.map {
+                outcome.capturedIdentity?.matches($0) == true
+            } ?? false
+        ) else {
+            throw EngineFailure.namespace(
+                "The terminal outcome disagrees with the protected filesystem entry",
+                recoveryTransactionID: record.transactionID
+            )
+        }
         do {
             try writeTerminalOutcome(outcome, slotDescriptor: slotDescriptor)
         } catch {
@@ -2934,19 +3016,22 @@ private struct ActiveTransaction {
     let record: TransactionRecord
     let outcome: TransactionTerminalOutcome?
     let acknowledging: Bool
+    let recoveryIssue: String?
 
     init(
         slot: TransactionSlot,
         phase: TransactionPhase,
         record: TransactionRecord,
         outcome: TransactionTerminalOutcome? = nil,
-        acknowledging: Bool = false
+        acknowledging: Bool = false,
+        recoveryIssue: String? = nil
     ) {
         self.slot = slot
         self.phase = phase
         self.record = record
         self.outcome = outcome
         self.acknowledging = acknowledging
+        self.recoveryIssue = recoveryIssue
     }
 }
 
