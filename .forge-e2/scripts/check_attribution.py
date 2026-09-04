@@ -4,10 +4,11 @@ import re, sys
 from pathlib import Path
 
 root = Path(sys.argv[1] if len(sys.argv) > 1 else ".").resolve()
+# Detector tokens are split so this file is not itself treated as attribution.
 patterns = [
-    re.compile(r"Co-authored-by:\s*(ChatGPT|OpenAI|Codex|Claude|Gemini)", re.I),
-    re.compile(r"(generated|written|authored)\s+by\s+(an?\s+)?(AI|assistant|model)", re.I),
-    re.compile(r"\bAI[- ]generated\b", re.I),
+    re.compile(r"Co-" r"authored-by:\s*(ChatGPT|OpenAI|Codex|Claude|Gemini)", re.I),
+    re.compile(r"(generated|written|authored)" r"\s+by\s+(an?\s+)?(AI|assistant|model)", re.I),
+    re.compile(r"\bAI[- ]" r"generated\b", re.I),
 ]
 skip = {".git", ".build", "DerivedData", ".forge-e2"}
 hits = []
