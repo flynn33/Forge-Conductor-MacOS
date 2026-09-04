@@ -32,6 +32,9 @@ echo "Native CI records compilation and test evidence; signed runtime and distri
 case "$MODE" in
   integrity)
     run_logged utility-tests python3 -m unittest discover -s .forge-codex/shipping/tests -v
+    run_logged attribution-policy-tests python3 -m unittest discover -s .forge-codex/scripts -p test_attribution_policy_examples.py -v
+    run_logged attribution-scanner-tests python3 -m unittest discover -s .forge-codex/scripts -p test_release_scanners_hardening.py -v
+    run_logged attribution python3 .forge-codex/scripts/scan_attribution.py --root "$ROOT_DIR"
     run_logged versions python3 .forge-codex/shipping/scripts/shipping_guard.py versions --repo "$ROOT_DIR"
     run_logged membership python3 .forge-codex/shipping/scripts/shipping_guard.py xcode --repo "$ROOT_DIR"
     run_logged project-list xcodebuild -list -workspace ForgeConductor.xcworkspace
