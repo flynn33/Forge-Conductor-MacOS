@@ -69,6 +69,15 @@ forge-conductor manager start --open   # native dashboard / manager
 # LM Studio starts MCP via ~/.lmstudio/mcp.json → forge-conductor serve (Swift stdio)
 ```
 
+The build/run script stages a development smoke bundle. Its optional build
+override must equal the compiled canonical build; Developer ID distribution
+uses the Xcode archive/export path. Follow the deterministic
+[Xcode installation instructions](XCODE.md#install-the-exact-xcode-build) to
+install the complete matching app, CLI, runtime launcher and framework.
+Native CI covers source integrity, Debug/Release Swift tests, and native app/CLI
+compilation. Signed UI, service lifecycle and distribution evidence remain
+separate release requirements.
+
 ## What the UI shows
 
 | Surface | Meaning |

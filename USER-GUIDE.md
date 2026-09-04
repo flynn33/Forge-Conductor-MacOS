@@ -83,6 +83,14 @@ Primary and fallback are two registrations of the **same** binary with `FORGE_MC
 
 ## 4. Install and deploy
 
+For a complete signed Xcode installation or update, use the
+[explicit Xcode build and transactional installer](XCODE.md#install-the-exact-xcode-build).
+It selects one build directory and keeps the app, CLI, runtime launcher and
+framework together. The convenience build/run script produces a development
+smoke bundle; it rejects a build override that disagrees with the compiled
+identity. Release distribution uses Xcode archive/export and the owner’s manual
+shipping process after qualification.
+
 From this repository, after a successful build:
 
 ```bash

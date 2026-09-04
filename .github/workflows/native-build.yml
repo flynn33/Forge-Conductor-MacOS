@@ -1,0 +1,82 @@
+name: Native Build and Tests
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Verified against the published macos-26 arm64 image manifest, 2026-09-04.
+  DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+
+jobs:
+  integrity:
+    name: Native source integrity
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify selected toolchain
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = arm64
+          test "$(xcodebuild -version)" = $'Xcode 26.6\nBuild version 17F113'
+      - name: Check utility regressions, version identity, and native membership
+        env:
+          FORGE_CI_OUTPUT_DIR: ${{ runner.temp }}/forge-native-integrity
+        run: bash .forge-codex/shipping/scripts/native_ci.sh integrity
+      - name: Retain integrity results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-integrity-${{ github.sha }}
+          path: ${{ runner.temp }}/forge-native-integrity/*
+          retention-days: 14
+
+  native:
+    name: ${{ matrix.lane }}
+    needs: integrity
+    runs-on: macos-26
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        lane: [swift-debug, swift-release, xcode-debug, xcode-release]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify selected toolchain
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = arm64
+          test "$(xcodebuild -version)" = $'Xcode 26.6\nBuild version 17F113'
+      - name: Compile and test the selected lane
+        env:
+          FORGE_CI_OUTPUT_DIR: ${{ runner.temp }}/forge-native-${{ matrix.lane }}
+          NATIVE_LANE: ${{ matrix.lane }}
+        run: bash .forge-codex/shipping/scripts/native_ci.sh "$NATIVE_LANE"
+      - name: Retain native results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-${{ matrix.lane }}-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/forge-native-${{ matrix.lane }}/*.log
+            ${{ runner.temp }}/forge-native-${{ matrix.lane }}/*.txt
+            ${{ runner.temp }}/forge-native-${{ matrix.lane }}/*.json
+            ${{ runner.temp }}/forge-native-${{ matrix.lane }}/*.xml
+            ${{ runner.temp }}/forge-native-${{ matrix.lane }}/*.xcresult
+          retention-days: 14

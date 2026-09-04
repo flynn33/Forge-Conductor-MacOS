@@ -48,6 +48,18 @@ provide a supported control that creates it.
 
 ### Changed
 
+- The development build/run script rejects inconsistent build-number overrides,
+  malformed identities and unsupported invocation modes before compilation. Its
+  signed optimized mode requires Apple Development and the matching development
+  trust policy; Developer ID distribution uses Xcode archive/export.
+- Xcode installation instructions now select one explicit build directory and
+  use the supported transactional installer for the complete matching app, CLI,
+  runtime launcher and framework, followed by installed-manager readback.
+- Added native source-integrity, Debug/Release Swift regression and native
+  app/CLI compilation CI. Documentation validation now reads the selected Git
+  snapshot and rejects removed or nonregular required documents, including when
+  a recreated working-tree file would otherwise conceal a staged deletion.
+
 - Manager project and run responses now use complete shared read-model
   projections. Project bind and run start authority is limited to roots
   configured by the operator. Provider probes execute outside dashboard

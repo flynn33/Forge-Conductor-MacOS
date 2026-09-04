@@ -126,7 +126,10 @@ results do not satisfy the still-open Developer ID Release, native UI, or P10
 boundaries. A successful Xcode build or focused test does not mark those items
 complete.
 
-The SwiftPM convenience bundle supports the same explicit local signing mode:
+The SwiftPM convenience bundle is a development smoke path. It rejects a
+`FORGE_BUILD_NUMBER` that differs from the compiled canonical build and rejects
+Developer ID signing. A signed optimized smoke build requires the explicit
+development mode:
 
 ```bash
 FORGE_BUILD_CONFIGURATION=release \
@@ -139,16 +142,46 @@ That bundle is statically linked and remains suitable for app and CLI smoke
 tests; it does not replace the Xcode framework layout required by the
 privileged Login Item and filesystem-service qualification.
 
-## After building from Xcode
+## Install the exact Xcode build
 
-Products land in DerivedData. To install for daily use:
+Choose one explicit output directory and validate its complete signed bundle.
+The following is a local development installation; it does not qualify a
+distribution artifact. Close the running GUI before replacing its installation.
 
 ```bash
-PROD=$(ls -d ~/Library/Developer/Xcode/DerivedData/ForgeConductor-*/Build/Products/Debug | head -1)
-cp -f "$PROD/forge-conductor" ~/.forge-conductor/bin/
-cp -R "$PROD/ForgeConductorCore.framework" ~/.forge-conductor/bin/
-cp -R "$PROD/Forge Conductor.app" ~/.forge-conductor/
-open ~/.forge-conductor/Forge\ Conductor.app
+cd /path/to/Forge-Conductor-MacOS
+DERIVED_DATA="$PWD/.build/Xcode-Debug"
+xcodebuild -workspace ForgeConductor.xcworkspace -scheme ForgeConductor \
+  -configuration Debug -destination 'platform=macOS,arch=arm64' \
+  -derivedDataPath "$DERIVED_DATA" build
+APP="$DERIVED_DATA/Build/Products/Debug/Forge Conductor.app"
+./.forge-codex/scripts/check_privileged_filesystem_bundle.sh "$APP" Debug
+
+# The embedded CLI stages its matching app, CLI, launcher and Core framework
+# transactionally, then replaces the registered manager. Preserve other agents.
+"$APP/Contents/Helpers/forge-conductor" manager install-login --keep-stale
+"$HOME/.forge-conductor/bin/forge-conductor" version
+"$HOME/.forge-conductor/bin/forge-conductor" manager status
+open "$HOME/.forge-conductor/Forge Conductor.app"
 ```
 
-Or just **Run** the **ForgeConductor** scheme from Xcode (⌘R).
+Use the installer result and manager PID/path/version to confirm replacement.
+An error or rollback remains a failed installation; copying individual binaries
+from another output directory cannot repair a coherent signed installation.
+For GUI development without installation, run the **ForgeConductor** scheme
+from this workspace (⌘R).
+
+## Continuous validation and distribution
+
+The native workflow checks utility regressions, source versions and Xcode
+membership on a verified macOS 26 / Xcode 26.6 runner. It runs Debug/Release
+SwiftPM tests with warnings as errors and compiles the native app and CLI in
+both configurations. Unsigned CI builds are compilation evidence; signed
+app-hosted, UI, installed-service and distribution qualification run separately
+on an authorized Mac.
+
+Use the canonical Release archive/export path for distribution, with matching
+Developer ID team policy and secure timestamps. The shipping
+[validation runbook](.forge-codex/shipping/MACOS-VALIDATION-RUNBOOK.md) describes
+artifact checks, notarization and installation proof. The owner performs
+shipping manually after the hard gates pass.
