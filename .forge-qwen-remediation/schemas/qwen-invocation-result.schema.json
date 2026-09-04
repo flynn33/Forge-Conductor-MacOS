@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://forge-conductor.local/schemas/qwen-invocation-result.schema.json",
+  "title": "Qwen bounded remediation invocation result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "work_package_id",
+    "status",
+    "summary",
+    "changed_files",
+    "tests",
+    "evidence_records",
+    "open_risks",
+    "next_action",
+    "handoff_updated",
+    "claims_gate_passed",
+    "shipped"
+  ],
+  "properties": {
+    "work_package_id": {
+      "type": "string",
+      "pattern": "^P(?:0[0-9]|1[0-4])$"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "progress",
+        "blocked",
+        "needs_replan",
+        "slice_complete"
+      ]
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 5000
+    },
+    "changed_files": {
+      "type": "array",
+      "maxItems": 100,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "maxLength": 500
+      }
+    },
+    "tests": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "result"
+        ],
+        "properties": {
+          "command": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "passed",
+              "failed",
+              "blocked",
+              "not_run"
+            ]
+          },
+          "detail": {
+            "type": "string",
+            "maxLength": 3000
+          },
+          "evidence_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 200
+          }
+        }
+      }
+    },
+    "evidence_records": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "type": "string",
+        "maxLength": 500
+      }
+    },
+    "open_risks": {
+      "type": "array",
+      "maxItems": 30,
+      "items": {
+        "type": "string",
+        "maxLength": 2000
+      }
+    },
+    "next_action": {
+      "type": "string",
+      "minLength": 5,
+      "maxLength": 3000
+    },
+    "handoff_updated": {
+      "type": "boolean"
+    },
+    "claims_gate_passed": {
+      "const": false
+    },
+    "shipped": {
+      "const": false
+    }
+  }
+}

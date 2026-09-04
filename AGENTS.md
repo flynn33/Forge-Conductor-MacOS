@@ -1,3 +1,9 @@
+<!-- FORGE-QWEN-REMEDIATION:BEGIN -->
+# Shippable remediation contract
+
+Read `.forge-qwen-remediation/AGENTS.md` and use its doctor, selector, deterministic gates, and do-not-ship boundary. Shell access and every current feature must remain available.
+<!-- FORGE-QWEN-REMEDIATION:END -->
+
 <!-- FORGE-AUTONOMOUS-CONTINUITY-DESIGN:BEGIN -->
 # Autonomous continuity implementation supplement
 

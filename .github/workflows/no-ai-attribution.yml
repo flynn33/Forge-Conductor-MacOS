@@ -281,7 +281,9 @@ jobs:
             case "$FILE" in
               .github/workflows/no-ai-attribution.yml|\
               .github/agents/attribution-guard.agent.md|\
-              .github/PULL_REQUEST_TEMPLATE.md)
+              .github/PULL_REQUEST_TEMPLATE.md|\
+              .forge-codex/scripts/scan_attribution.py|\
+              .forge-e2/scripts/check_attribution.py)
                 continue
                 ;;
             esac
@@ -319,13 +321,45 @@ jobs:
 
           echo "Scanning ref and changed-path names for AI attribution..."
 
-          # Token-bounded tool/vendor names. Bare "ai" is included for path/branch
-          # attribution (e.g. ai-generated/, claude-fix). Policy files that
-          # intentionally contain these tokens are exempted below.
-          TOKEN_PATTERN='(^|[/_.-])(ai|assistant|claude|codex|chatgpt|gpt|openai|anthropic|copilot|gemini|llm|cursor|grok|xai|devin|aider|codeium|cody|tabnine|windsurf|jules|sourcery)($|[/_.-])'
+          # A vendor token is not credit by itself. Flag only identity paths
+          # (a path component that is the tool name) or role compounds
+          # (ai-generated, claude-fix, generated-by-codex). First-party
+          # control-plane paths such as .forge-codex/ are not attribution.
+          BRANDS='ai|assistant|claude|codex|chatgpt|gpt|openai|anthropic|copilot|gemini|llm|cursor|grok|xai|devin|aider|codeium|cody|tabnine|windsurf|jules|sourcery'
+          ROLES='generated|authored|written|assisted|created|draft|output|fix'
           FAILED=0
 
-          if echo "$REF_NAME" | grep -qPi "$TOKEN_PATTERN"; then
+          path_is_attribution() {
+            local value="$1" part base
+            case "$value" in
+              .forge-codex|.forge-codex/*|*/.forge-codex|.forge-codex/*/*)
+                return 1
+                ;;
+            esac
+            local rest="$value"
+            while [ -n "$rest" ]; do
+              part="${rest%%/*}"
+              if [ "$rest" = "$part" ]; then
+                rest=""
+              else
+                rest="${rest#*/}"
+              fi
+              [ -z "$part" ] && continue
+              base="${part%.*}"
+              if echo "$base" | grep -qiE "^(${BRANDS})$"; then
+                return 0
+              fi
+              if echo "$base" | grep -qiE "^(${BRANDS})[-_.](${ROLES})([-.].*)?$"; then
+                return 0
+              fi
+              if echo "$base" | grep -qiE "^(${ROLES})[-_.]((by|with|using)[-_.])?(${BRANDS})([-.].*)?$"; then
+                return 0
+              fi
+            done
+            return 1
+          }
+
+          if path_is_attribution "$REF_NAME"; then
             echo "::error::AI attribution token found in ref/branch name: $REF_NAME"
             FAILED=1
           fi
@@ -341,11 +375,13 @@ jobs:
             case "$FILE" in
               .github/workflows/no-ai-attribution.yml|\
               .github/agents/attribution-guard.agent.md|\
-              .github/PULL_REQUEST_TEMPLATE.md)
+              .github/PULL_REQUEST_TEMPLATE.md|\
+              .forge-codex/scripts/scan_attribution.py|\
+              .forge-e2/scripts/check_attribution.py)
                 continue
                 ;;
             esac
-            if echo "$FILE" | grep -qPi "$TOKEN_PATTERN"; then
+            if path_is_attribution "$FILE"; then
               echo "::error file=$FILE::AI attribution token found in changed path"
               FAILED=1
             fi

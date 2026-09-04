@@ -1,0 +1,79 @@
+{
+  "security": {
+    "auth": {
+      "selectedType": "openai"
+    }
+  },
+  "model": {
+    "name": "__MODEL_ID__",
+    "maxSessionTurns": 18,
+    "maxWallTimeSeconds": 2700,
+    "maxToolCalls": 24,
+    "sessionTokenLimit": 55296
+  },
+  "modelProviders": {
+    "openai": [
+      {
+        "id": "__MODEL_ID__",
+        "name": "Qwen3.8 27B 4-bit local",
+        "envKey": "FORGE_QWEN_LOCAL_API_KEY",
+        "baseUrl": "__BASE_URL__",
+        "generationConfig": {
+          "timeout": 600000,
+          "streamIdleTimeoutMs": 600000,
+          "maxRetries": 1,
+          "contextWindowSize": 65536,
+          "samplingParams": {
+            "temperature": 1.0,
+            "top_p": 0.95,
+            "top_k": 20,
+            "max_tokens": 8192,
+            "presence_penalty": 0.0
+          },
+          "extra_body": {
+            "chat_template_kwargs": {
+              "enable_thinking": true,
+              "preserve_thinking": true
+            },
+            "reasoning_effort": "xhigh"
+          }
+        }
+      }
+    ]
+  },
+  "tools": {
+    "approvalMode": "yolo"
+  },
+  "memory": {
+    "enableManagedAutoMemory": false,
+    "enableManagedAutoDream": false,
+    "enableAutoSkill": false,
+    "enableTeamMemory": false,
+    "enableTeamMemorySync": false
+  },
+  "privacy": {
+    "usageStatisticsEnabled": false
+  },
+  "review": {
+    "attribution": false
+  },
+  "general": {
+    "chatRecording": true,
+    "preventSystemSleep": true
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "run_shell_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \".forge-qwen-remediation/scripts/qwen_pretool_guard.py\"",
+            "name": "forge-do-not-ship-guard",
+            "timeout": 10000
+          }
+        ]
+      }
+    ]
+  }
+}

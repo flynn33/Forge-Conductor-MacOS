@@ -1,0 +1,95 @@
+{
+  "schema_version": 2,
+  "captured_at": "2026-09-02T11:44:44.449409+00:00",
+  "repo": "/Users/jimdaley/GitHub/Forge-Conductor",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "machine": "arm64",
+  "python": "3.9.6",
+  "tools": {
+    "git": {
+      "available": true,
+      "exit_code": 0,
+      "output": "git version 2.50.1 (Apple Git-155)"
+    },
+    "swift": {
+      "available": true,
+      "exit_code": 0,
+      "output": "swift-driver version: 1.148.6 Apple Swift version 6.3.3 (swiftlang-6.3.3.1.3 clang-2100.1.1.101)\nTarget: arm64-apple-macosx26.0"
+    },
+    "xcodebuild": {
+      "available": true,
+      "exit_code": 0,
+      "output": "Xcode 26.6\nBuild version 17F113"
+    },
+    "codesign": {
+      "available": true,
+      "exit_code": 2,
+      "output": "codesign: unrecognized option `--version'\nUsage: codesign -s identity [-fv*] [-o flags] [-r reqs] [-i ident] path ... # sign\n       codesign -v [-v*] [-R=<req string>|-R <req file path>] path|[+]pid ... # verify\n       codesign -d [options] path ... # display contents\n       codesign -h pid ... # display hosting paths\n       codesign --validate-constraint path ... # check the supplied constraint plist"
+    },
+    "security_identities": {
+      "available": true,
+      "exit_code": 0,
+      "output": "1) 9B7686E2D3760441E3C9200F1FFE8F6C65D7E5BC \"Apple Development: James Daley (FW94K6ZY57)\" (CSSMERR_TP_CERT_REVOKED)\n  2) 3E6B7EA813299330FC3235BBA34BE9237F0F1644 \"Apple Development: James Daley (FW94K6ZY57)\"\n     2 valid identities found"
+    },
+    "lms": {
+      "available": false,
+      "exit_code": null,
+      "output": "not found"
+    },
+    "qwen": {
+      "available": false,
+      "exit_code": null,
+      "output": "not found"
+    },
+    "pwsh": {
+      "available": false,
+      "exit_code": null,
+      "output": "not found"
+    },
+    "xctrace": {
+      "available": true,
+      "exit_code": 0,
+      "output": "xctrace version 16.0 (17F113)"
+    }
+  },
+  "qwen_provider": {
+    "schema_version": 1,
+    "captured_at": "2026-09-02T11:39:16.878616+00:00",
+    "configured": false,
+    "model_match": true,
+    "quantization_verified": false,
+    "candidate_endpoints": [
+      {
+        "base_url": "http://127.0.0.1:1234/v1",
+        "available": true,
+        "http_status": 200,
+        "models": [
+          "qwen/qwen3.8-27b",
+          "openai/gpt-oss-20b",
+          "qwen/qwen3.6-35b-a3b",
+          "text-embedding-nomic-embed-text-v1.5"
+        ]
+      }
+    ],
+    "downgrades": [],
+    "base_url": "http://127.0.0.1:1234/v1",
+    "model_id": "qwen/qwen3.8-27b",
+    "quantization_evidence": "qwen/qwen3.8-27b  organization_owner    ",
+    "context_window_size": 65536,
+    "max_output_tokens": 8192,
+    "max_tool_calls": 24,
+    "max_session_turns": 18,
+    "optional_reasoning_fields_enabled": true,
+    "settings_path": "/Users/jimdaley/GitHub/Forge-Conductor/.qwen/settings.json",
+    "settings_backup": null
+  },
+  "qwen_preflight": null,
+  "paths": {
+    "package_swift": true,
+    "xcode_project": true,
+    "build_script": true,
+    "qwen_settings": true,
+    "qwen_contract": true
+  },
+  "do_not_ship": true
+}

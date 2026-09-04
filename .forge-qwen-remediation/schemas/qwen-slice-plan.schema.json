@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://forge-conductor.local/schemas/qwen-slice-plan.schema.json",
+  "title": "Qwen bounded remediation slice plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "work_package_id",
+    "objective",
+    "evidence_to_read",
+    "files_to_modify",
+    "tests_to_run",
+    "risks",
+    "stop_condition"
+  ],
+  "properties": {
+    "work_package_id": {
+      "type": "string",
+      "pattern": "^P(?:0[0-9]|1[0-4])$"
+    },
+    "objective": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 1200
+    },
+    "evidence_to_read": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": {
+        "type": "string",
+        "maxLength": 500
+      }
+    },
+    "files_to_modify": {
+      "type": "array",
+      "maxItems": 12,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "maxLength": 500
+      }
+    },
+    "tests_to_run": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {
+        "type": "string",
+        "maxLength": 1000
+      }
+    },
+    "risks": {
+      "type": "array",
+      "maxItems": 12,
+      "items": {
+        "type": "string",
+        "maxLength": 1000
+      }
+    },
+    "rollback": {
+      "type": "string",
+      "maxLength": 2000
+    },
+    "stop_condition": {
+      "type": "string",
+      "minLength": 5,
+      "maxLength": 1200
+    },
+    "requires_broader_atomic_change": {
+      "type": "boolean"
+    },
+    "broader_change_justification": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 2000
+    }
+  }
+}

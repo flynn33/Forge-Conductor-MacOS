@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://forge-conductor.local/schemas/filesystem-receipt.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "transaction_id",
+    "status",
+    "committed",
+    "durability_confirmed"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "transaction_id": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "committed",
+        "conflict_restored",
+        "conflict_quarantined",
+        "failed_before_commit",
+        "unsupported"
+      ]
+    },
+    "committed": {
+      "type": "boolean"
+    },
+    "durability_confirmed": {
+      "type": "boolean"
+    },
+    "source_exists": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "destination_exists": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "quarantine_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "code": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "message": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

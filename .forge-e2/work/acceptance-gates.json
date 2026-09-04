@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "gates": [
+    {
+      "id": "E2-G01",
+      "hard": true,
+      "description": "Baseline, feature inventory, and old-race reproducer recorded."
+    },
+    {
+      "id": "E2-G02",
+      "hard": true,
+      "description": "Public macOS API probe and per-volume strict/leaf-only capability matrix pass."
+    },
+    {
+      "id": "E2-G03",
+      "hard": true,
+      "description": "Typed root capabilities replace path-string mutation authority."
+    },
+    {
+      "id": "E2-G04",
+      "hard": true,
+      "description": "Descriptor resolution covers read/list/glob/mkdir."
+    },
+    {
+      "id": "E2-G05",
+      "hard": true,
+      "description": "Write/edit use staged atomic publication and conflicts."
+    },
+    {
+      "id": "E2-G06",
+      "hard": true,
+      "description": "Delete uses atomic capture before disposal."
+    },
+    {
+      "id": "E2-G07",
+      "hard": true,
+      "description": "Same-volume move has no final compare/mutate race."
+    },
+    {
+      "id": "E2-G08",
+      "hard": true,
+      "description": "Cross-volume move captures and descriptor-copies."
+    },
+    {
+      "id": "E2-G09",
+      "hard": true,
+      "description": "Package ingestion uses immutable managed snapshot."
+    },
+    {
+      "id": "E2-G10",
+      "hard": true,
+      "description": "Every transaction state recovers after restart."
+    },
+    {
+      "id": "E2-G11",
+      "hard": true,
+      "description": "Adversarial sentinel matrix passes."
+    },
+    {
+      "id": "E2-G12",
+      "hard": true,
+      "description": "SwiftPM serial and parallel suites pass."
+    },
+    {
+      "id": "E2-G13",
+      "hard": true,
+      "description": "Xcode Debug and Release build/test pass."
+    },
+    {
+      "id": "E2-G14",
+      "hard": true,
+      "description": "Shell defaults enabled; real MCP shell_exec preserves /bin/bash -lc and survives restart/reset."
+    },
+    {
+      "id": "E2-G15",
+      "hard": true,
+      "description": "Memory, continuity, autonomy, manager regressions pass."
+    },
+    {
+      "id": "E2-G16",
+      "hard": true,
+      "description": "Resource budgets pass."
+    },
+    {
+      "id": "E2-G17",
+      "hard": true,
+      "description": "Attribution and secret scans pass."
+    },
+    {
+      "id": "E2-G18",
+      "hard": true,
+      "description": "Forbidden path mutation source guard passes."
+    },
+    {
+      "id": "E2-G19",
+      "hard": true,
+      "description": "Focused PR contains evidence and exact residual statement."
+    },
+    {
+      "id": "E2-G20",
+      "hard": true,
+      "description": "Doctor and selector report no open E2 item."
+    }
+  ]
+}

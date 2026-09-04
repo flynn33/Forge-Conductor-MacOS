@@ -1272,8 +1272,8 @@
     }
   },
   "repository": {
-    "branch": "release/0.9.0-product-readiness",
-    "commit": "ea52c2779dd1f90ad718e93faa07459fc4ead511",
+    "branch": "repair/swift6-test-targets",
+    "commit": "62604e1f0f8abba649998679f22e55b0ecb89014",
     "dirty": true,
     "root": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next"
   },

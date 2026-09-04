@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "source_archive_sha256": "8b38cd6bf86f0e90a4fa0567fcc8e7e7ead88285f64e03880efe894d19c6aeb7",
+  "source_manifest_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "git_commit": null,
+  "git_tree": null,
+  "toolchain": {
+    "swift": "<recorded>",
+    "xcode": "<recorded>",
+    "sdk": "<recorded>"
+  },
+  "release_candidate_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "mandatory_gate_results": {
+    "G00": "passed"
+  },
+  "open_findings": [],
+  "ready_to_ship": true,
+  "shipped": false,
+  "created_at": "2026-08-28T00:00:00Z",
+  "attestation_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+  "release_candidate_path": ".forge-qwen-state/release-candidate/Forge-Conductor-local-release-candidate.zip",
+  "mandatory_gate_receipts": {
+    "G00": ".forge-qwen-state/gate-results/G00/example.json"
+  }
+}

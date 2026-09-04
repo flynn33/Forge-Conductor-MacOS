@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "execution_id": "gate-execution-example",
+  "gate_id": "G02",
+  "work_package": "P01",
+  "validator_id": "completion-integrity-regression",
+  "validator_version": "1.0.0",
+  "project_id": "forge-conductor-remediation",
+  "project_generation": 1,
+  "package_run_id": null,
+  "run_id": "remediation-run-example",
+  "parameters_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "source_manifest_before": "2222222222222222222222222222222222222222222222222222222222222222",
+  "source_manifest_after": "2222222222222222222222222222222222222222222222222222222222222222",
+  "command": {
+    "executable": "/usr/bin/xcrun",
+    "arguments": ["swift", "test", "--filter", "CompletionValidationTests"]
+  },
+  "native_action": null,
+  "started_at": "2026-08-28T00:00:00Z",
+  "ended_at": "2026-08-28T00:01:00Z",
+  "duration_milliseconds": 60000,
+  "passed": true,
+  "status": "passed",
+  "summary": "All completion-integrity bypass cases were rejected.",
+  "exit_code": 0,
+  "artifacts": [
+    {
+      "role": "test-result",
+      "path": ".forge-qwen-state/evidence/example.xcresult",
+      "bytes": 1,
+      "sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+    }
+  ],
+  "receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+}

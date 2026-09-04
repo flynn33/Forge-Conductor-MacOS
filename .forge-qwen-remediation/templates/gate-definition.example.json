@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "gate_id": "package.tests",
+  "validator_id": "swift-test",
+  "validator_version": "1.0.0",
+  "project_id": "project-example",
+  "project_generation": 4,
+  "package_run_id": "package-run-example",
+  "run_id": "run-example",
+  "parameters_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "timeout_seconds": 3600,
+  "required_platform": "macOS",
+  "mandatory": true
+}

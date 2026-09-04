@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://forge-conductor.local/schemas/gate-definition.schema.json",
+  "title": "GateDefinition",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "gate_id",
+    "validator_id",
+    "validator_version",
+    "project_id",
+    "project_generation",
+    "parameters_sha256",
+    "timeout_seconds",
+    "required_platform"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "gate_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "validator_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "validator_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project_generation": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "package_run_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "run_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "parameters_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "timeout_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 86400
+    },
+    "required_platform": {
+      "enum": [
+        "any",
+        "macOS",
+        "signed-macOS",
+        "real-provider",
+        "instruments"
+      ]
+    },
+    "mandatory": {
+      "type": "boolean"
+    }
+  }
+}

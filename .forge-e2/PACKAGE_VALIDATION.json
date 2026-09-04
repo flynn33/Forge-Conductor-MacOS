@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-08-28T10:30:00Z",
+  "package": "Forge-Conductor-E2-Secure-Filesystem-Codex-Package",
+  "result": "package-qualified",
+  "checks": [
+    {"name": "required-content", "status": "passed"},
+    {"name": "json-parse-and-schema-self-check", "status": "passed"},
+    {"name": "python-ast-and-compile", "status": "passed"},
+    {"name": "shell-syntax", "status": "passed"},
+    {"name": "sqlite-schema-execution", "status": "passed"},
+    {"name": "work-package-dag", "status": "passed"},
+    {"name": "state-and-gate-id-consistency", "status": "passed"},
+    {"name": "manifest-hashes", "status": "passed-before-final-regeneration"},
+    {"name": "attribution-scan", "status": "passed"},
+    {"name": "secret-scan", "status": "passed"},
+    {"name": "clean-fixture-installer", "status": "passed"},
+    {"name": "historical-baseline-refusal", "status": "passed"}
+  ],
+  "native_environment": {
+    "macos_api_probe": "release-blocking; must run on macOS 26 with public SDK",
+    "swiftpm_and_xcode": "release-blocking; Codex must run in implementation checkout",
+    "adversarial_race_suite": "release-blocking; supplied as implementation and acceptance contract",
+    "application_modified": false
+  },
+  "claim": "This validates the instruction package, not the Forge Conductor application or E2 closure."
+}

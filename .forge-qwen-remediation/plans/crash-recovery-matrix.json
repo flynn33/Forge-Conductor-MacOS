@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "transitions": [
+    {
+      "subsystem": "package ingestion",
+      "crash_boundary": "candidate discovered",
+      "required_recovery": "revalidate source and transaction intent"
+    },
+    {
+      "subsystem": "package ingestion",
+      "crash_boundary": "content copied before manifest commit",
+      "required_recovery": "verify hash; commit or quarantine"
+    },
+    {
+      "subsystem": "queue",
+      "crash_boundary": "lease committed before worker starts",
+      "required_recovery": "recover lease or expire and re-reserve"
+    },
+    {
+      "subsystem": "queue",
+      "crash_boundary": "worker starts before heartbeat",
+      "required_recovery": "reconcile worker identity and lease epoch"
+    },
+    {
+      "subsystem": "completion",
+      "crash_boundary": "claim persisted before validators",
+      "required_recovery": "resume registered validators"
+    },
+    {
+      "subsystem": "completion",
+      "crash_boundary": "some gates passed",
+      "required_recovery": "reuse only matching immutable receipts; run remaining gates"
+    },
+    {
+      "subsystem": "reset",
+      "crash_boundary": "maintenance lease acquired",
+      "required_recovery": "resume or release before mutation"
+    },
+    {
+      "subsystem": "reset",
+      "crash_boundary": "backup committed before rotation",
+      "required_recovery": "verify backup then resume reset"
+    },
+    {
+      "subsystem": "reset",
+      "crash_boundary": "database rotated before generation increment",
+      "required_recovery": "complete increment and binding invalidation"
+    },
+    {
+      "subsystem": "continuity",
+      "crash_boundary": "handoff committed before successor request",
+      "required_recovery": "resume successor request"
+    },
+    {
+      "subsystem": "continuity",
+      "crash_boundary": "provider root created before local acceptance",
+      "required_recovery": "discover/idempotently accept one or quarantine duplicates"
+    },
+    {
+      "subsystem": "continuity",
+      "crash_boundary": "ack accepted before predecessor seal",
+      "required_recovery": "seal predecessor and issue continuation once"
+    },
+    {
+      "subsystem": "runtime job",
+      "crash_boundary": "process launched before PID receipt",
+      "required_recovery": "reconcile process identity or mark unknown safely"
+    },
+    {
+      "subsystem": "filesystem E2",
+      "crash_boundary": "entry captured before validation",
+      "required_recovery": "validate then commit/restore/quarantine"
+    },
+    {
+      "subsystem": "filesystem E2",
+      "crash_boundary": "destination published before source disposal",
+      "required_recovery": "preserve committed destination and resume source transaction"
+    },
+    {
+      "subsystem": "retention",
+      "crash_boundary": "archive written before deletion",
+      "required_recovery": "verify archive hash then prune"
+    }
+  ]
+}

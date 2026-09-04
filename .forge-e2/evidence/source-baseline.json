@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-08-28T00:00:00Z",
+  "repository": "flynn33/Forge-Conductor-MacOS",
+  "default_branch": "main",
+  "authoritative_commit": "6288210d82270b26add5f0e078d150bc4377bd62",
+  "merged_pull_request": 11,
+  "pr_title": "Harden descriptor-relative filesystem mutations",
+  "open_finding": "FC-FILESYSTEM-PATH-TOCTOU-001",
+  "severity": "High",
+  "evidence_basis": [
+    "Merged PR #11 metadata",
+    "Current main FilesystemToolPack.swift",
+    "Current main ToolAuthorizationService.swift",
+    "Apple XNU public headers, man pages, and tests"
+  ],
+  "uploaded_archive_role": "historical input only; do not overwrite current checkout"
+}

@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://forge-conductor.local/schemas/filesystem-capability.schema.json",
+  "title": "Persisted filesystem root identity",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "project_id",
+    "project_generation",
+    "root_id",
+    "display_path",
+    "device",
+    "inode",
+    "mode",
+    "access"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "project_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project_generation": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "root_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "display_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "volume_identifier": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "device": {
+      "type": "integer"
+    },
+    "inode": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "mode": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "owner": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "bookmark_digest": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "access": {
+      "enum": [
+        "read",
+        "readWrite"
+      ]
+    }
+  }
+}
