@@ -25,6 +25,9 @@ installed-stack and production-feature acceptance remain separate gates.
 - The native graph guard now rejects omitted production resources. An actual
   telemetry-resource omission reproduced the prior false pass; regression
   coverage also rejects wrong-target and duplicate resource membership.
+- Git-hook regression fixtures resolve native Git through the scoped toolchain
+  path, supporting runners with versioned Xcode installations. Native validation
+  instructions distinguish Release app testability and clean candidate builds.
 - Completion now runs installed native validators. Model-selected hashes and
   decoded receipts cannot approve a run; missing policy blocks completion.
   Prebuilt package gates bind the approved candidate source, test package,

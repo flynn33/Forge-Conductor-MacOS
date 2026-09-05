@@ -37,7 +37,7 @@ xcodebuild -project ForgeConductor.xcodeproj -scheme forge-conductor \
   -derivedDataPath "$OUT/DerivedData-CLI" \
   SWIFT_TREAT_WARNINGS_AS_ERRORS=YES GCC_TREAT_WARNINGS_AS_ERRORS=YES build
 
-xcodebuild -project ForgeConductor.xcodeproj -scheme ForgeConductor \
+xcodebuild -project ForgeConductor.xcodeproj -scheme forge-conductor \
   -configuration Debug -destination "$DEST" \
   -derivedDataPath "$OUT/DerivedData-Debug" \
   -resultBundlePath "$OUT/Unit-Debug.xcresult" \
@@ -48,7 +48,21 @@ xcodebuild -project ForgeConductor.xcodeproj -scheme ForgeConductorAppTests \
   -derivedDataPath "$OUT/DerivedData-AppHosted" \
   -resultBundlePath "$OUT/AppHosted-Debug.xcresult" \
   -only-testing:ForgeConductorAppTests test
+
+xcodebuild -project ForgeConductor.xcodeproj -scheme ForgeConductorAppTests \
+  -configuration Release -destination "$DEST" \
+  -derivedDataPath "$OUT/DerivedData-AppHosted-Release" \
+  -resultBundlePath "$OUT/AppHosted-Release.xcresult" \
+  ENABLE_TESTABILITY=YES -only-testing:ForgeConductorAppTests test
 ```
+
+The Release app test target imports the host with `@testable`; enable testability
+for that test invocation while retaining Release optimization. Use the current
+authorized signing identity for local tests. Do not apply testability overrides
+to the distributable archive. Xcode may add XCTest entitlements and test bundles
+to test products, including helpers. Build a fresh candidate in separate
+DerivedData for ordinary bundle inspection; never strip or re-sign test output
+to present it as an ordinary candidate.
 
 Read executed counts and every skip. Address warnings in source/configuration rather than globally suppressing them. A build tool metadata warning needs a precise disposition; do not hide real compiler warnings. Add a separate test invocation for `ForgeFilesystemQualificationSupportTests` and any newly introduced target according to its actual shared scheme/SwiftPM mapping.
 

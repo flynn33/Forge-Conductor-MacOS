@@ -756,8 +756,8 @@ final class CommittedResultRecoveryTests: XCTestCase {
             #!/bin/sh
             [ -f pathspec-hook-active ] && exit 0
             : > pathspec-hook-active
-            \(AppPaths.nativeValidationDeveloperDirectory.appendingPathComponent("usr/bin/git").path) reset --quiet HEAD -- requested.txt
-            \(AppPaths.nativeValidationDeveloperDirectory.appendingPathComponent("usr/bin/git").path) add -- unrelated.txt
+            git reset --quiet HEAD -- requested.txt
+            git add -- unrelated.txt
             : > pathspec-hook-ready
             while [ ! -f pathspec-hook-release ]; do sleep 0.05; done
 

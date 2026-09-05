@@ -201,6 +201,9 @@ and copy phases, including asset-catalog descendants. A visible file reference
 or membership in a different target does not satisfy the check. Info templates
 and entitlements are reported separately for native metadata validation;
 resource contents and final copy destinations still require bundle inspection.
+Release app-hosted tests require `ENABLE_TESTABILITY=YES` for that test
+invocation. Keep their instrumented products separate from clean candidate
+builds and archives, as detailed in the native validation runbook.
 
 The initial September 5 shipping snapshot failed the Python interpreter
 containment test in CI. That repair and the later external-lock startup repair
