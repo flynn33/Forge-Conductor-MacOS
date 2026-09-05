@@ -206,33 +206,28 @@ public struct AppConfig: Sendable, Equatable, Codable {
             if let disabled = shell["user_disabled"] as? Bool { base.shell.userDisabled = disabled }
             if let version = integer(shell["policy_version"]) { base.shell.policyVersion = version }
             if let origin = shell["policy_origin"] as? String { base.shell.policyOrigin = origin }
-            if let t = shell["default_timeout_sec"] as? Int { base.shell.defaultTimeoutSec = t }
-            else if let t = shell["default_timeout_sec"] as? Double { base.shell.defaultTimeoutSec = Int(t) }
+            if let t = integer(shell["default_timeout_sec"]) { base.shell.defaultTimeoutSec = t }
         }
         if let dash = dict["dashboard"] as? [String: Any] {
             if let h = dash["host"] as? String { base.dashboard.host = h }
-            if let p = dash["port"] as? Int { base.dashboard.port = p }
-            else if let p = dash["port"] as? Double { base.dashboard.port = Int(p) }
-            if let r = dash["refresh_interval_sec"] as? Int { base.dashboard.refreshIntervalSec = r }
-            else if let r = dash["refresh_interval_sec"] as? Double { base.dashboard.refreshIntervalSec = Int(r) }
+            if let p = integer(dash["port"]) { base.dashboard.port = p }
+            if let r = integer(dash["refresh_interval_sec"]) { base.dashboard.refreshIntervalSec = r }
         }
         if let mgr = dict["manager"] as? [String: Any] {
             if let v = mgr["auto_restart"] as? Bool { base.manager.autoRestart = v }
-            if let v = mgr["watchdog_interval_sec"] as? Int { base.manager.watchdogIntervalSec = v }
-            else if let v = mgr["watchdog_interval_sec"] as? Double { base.manager.watchdogIntervalSec = Int(v) }
+            if let v = integer(mgr["watchdog_interval_sec"]) { base.manager.watchdogIntervalSec = v }
             if let v = mgr["open_browser_on_start"] as? Bool { base.manager.openBrowserOnStart = v }
         }
         if let mcp = dict["mcp"] as? [String: Any], let role = mcp["role"] as? String {
             base.mcp.role = role
         }
         if let sessions = dict["sessions"] as? [String: Any] {
-            if let t = sessions["idle_ttl_sec"] as? Int { base.sessions.idleTTLSec = t }
-            else if let t = sessions["idle_ttl_sec"] as? Double { base.sessions.idleTTLSec = Int(t) }
+            if let t = integer(sessions["idle_ttl_sec"]) { base.sessions.idleTTLSec = t }
         }
         if let c = dict["coordinator"] as? [String: Any] {
             if let v = c["enabled"] as? Bool { base.coordinator.enabled = v }
-            if let v = c["lease_ttl_sec"] as? Int { base.coordinator.leaseTTLSec = v }
-            if let v = c["presence_ttl_sec"] as? Int { base.coordinator.presenceTTLSec = v }
+            if let v = integer(c["lease_ttl_sec"]) { base.coordinator.leaseTTLSec = v }
+            if let v = integer(c["presence_ttl_sec"]) { base.coordinator.presenceTTLSec = v }
         }
         return base
     }
@@ -270,10 +265,7 @@ public struct AppConfig: Sendable, Equatable, Codable {
     }
 
     private static func integer(_ value: Any?) -> Int? {
-        if let value = value as? Int { return value }
-        if let value = value as? Double { return Int(value) }
-        if let value = value as? NSNumber { return value.intValue }
-        return nil
+        JSONSupport.exactInteger(value)
     }
 }
 

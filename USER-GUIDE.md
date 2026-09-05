@@ -165,6 +165,10 @@ compatibility scenarios pass; shipment does not.
 
 ---
 
+Numeric settings require whole numbers within the field's supported range. An
+invalid request returns the field and permitted range without saving any part
+of the request. Correct the value and save again; the manager remains available.
+
 Settings controls become editable after saved settings load. If startup fails,
 Settings shows the error and **Retry startup**. Operator screens also wait for
 startup to finish and provide retry if it fails. Settings saves run in the

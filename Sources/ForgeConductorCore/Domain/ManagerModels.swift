@@ -285,16 +285,36 @@ public enum ManagerModelError: Error, LocalizedError, Sendable {
 
 private enum ManagerJSONValue {
     static func int(_ value: Any?) -> Int? {
-        if let value = value as? Int { return value }
-        if let value = value as? NSNumber { return value.intValue }
-        if let value = value as? String { return Int(value) }
-        return nil
+        JSONSupport.exactInteger(value, allowString: true)
     }
 
     static func bool(_ value: Any?) -> Bool? {
         if let value = value as? Bool { return value }
         if let value = value as? NSNumber { return value.boolValue }
         return nil
+    }
+}
+
+public struct ManagerSettingsValidationError: Error, LocalizedError, Sendable, Equatable {
+    public let field: String
+    public let reason: String
+    public let permittedRange: String?
+
+    public init(field: String, reason: String, permittedRange: String? = nil) {
+        self.field = field
+        self.reason = reason
+        self.permittedRange = permittedRange
+    }
+
+    public var errorDescription: String? { "Invalid settings field \(field): \(reason)" }
+
+    public func asDictionary() -> [String: Any] {
+        var result: [String: Any] = [
+            "ok": false, "code": "invalid_settings", "field": field,
+            "reason": reason, "message": errorDescription ?? "Invalid settings",
+        ]
+        if let permittedRange { result["permitted_range"] = permittedRange }
+        return result
     }
 }
 

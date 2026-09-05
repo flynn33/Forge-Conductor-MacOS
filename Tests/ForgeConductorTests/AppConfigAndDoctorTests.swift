@@ -6,6 +6,33 @@ import XCTest
 @testable import ForgeConductorCore
 
 final class AppConfigAndDoctorTests: XCTestCase {
+    func testSettingsIntegerDecoderRejectsTrapsAndFoundationCoercion() {
+        let invalid: [Any] = [
+            Double.infinity, -Double.infinity, Double.nan, Double.greatestFiniteMagnitude,
+            Double(Int.max), 1.5, true, false, NSNumber(value: true), UInt64.max,
+            NSDecimalNumber(string: "1.00000000000000001"), NSDecimalNumber.notANumber,
+            "1.5", "9223372036854775808", NSNull(),
+        ]
+        for value in invalid {
+            XCTAssertNil(ManagerSettingsNormalizer.intValue(value), "Unexpected coercion: \(value)")
+            XCTAssertNil(JSONSupport.exactInteger(value), "Unexpected JSON integer: \(value)")
+            let config = AppConfig.fromDictionary([
+                "shell": ["default_timeout_sec": value], "dashboard": ["port": value],
+                "manager": ["watchdog_interval_sec": value], "sessions": ["idle_ttl_sec": value],
+            ])
+            XCTAssertEqual(config.shell.defaultTimeoutSec, AppConfig.default.shell.defaultTimeoutSec)
+            XCTAssertEqual(config.dashboard.port, AppConfig.default.dashboard.port)
+            XCTAssertEqual(config.manager.watchdogIntervalSec, AppConfig.default.manager.watchdogIntervalSec)
+            XCTAssertEqual(config.sessions.idleTTLSec, AppConfig.default.sessions.idleTTLSec)
+        }
+        for (value, expected) in [(Int.max as Any, Int.max), (Int.min as Any, Int.min),
+                                  (42.0 as Any, 42), ("42" as Any, 42),
+                                  (NSDecimalNumber(string: "9007199254740993") as Any, 9_007_199_254_740_993)] {
+            XCTAssertEqual(ManagerSettingsNormalizer.intValue(value), expected)
+        }
+        XCTAssertNil(JSONSupport.exactInteger("42"))
+    }
+
     func testAppConfigRoundTripDictionary() {
         var cfg = AppConfig.default
         cfg.dashboard.port = 8899

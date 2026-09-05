@@ -185,9 +185,7 @@ public final class ConfigStore: ConfigurationProviding, @unchecked Sendable {
 
     public func int(_ keys: String..., default def: Int) -> Int {
         let dict = model.asDictionary()
-        if let i = nested(keys, in: dict) as? Int { return i }
-        if let d = nested(keys, in: dict) as? Double { return Int(d) }
-        return def
+        return JSONSupport.exactInteger(nested(keys, in: dict)) ?? def
     }
 
     public func string(_ keys: String..., default def: String) -> String {
@@ -597,10 +595,7 @@ public final class ConfigStore: ConfigurationProviding, @unchecked Sendable {
     }
 
     private static func integer(_ value: Any?) -> Int? {
-        if let value = value as? Int { return value }
-        if let value = value as? Double { return Int(value) }
-        if let value = value as? NSNumber { return value.intValue }
-        return nil
+        JSONSupport.exactInteger(value)
     }
 
     private static func deepMergeStatic(_ base: [String: Any], _ over: [String: Any]) -> [String: Any] {

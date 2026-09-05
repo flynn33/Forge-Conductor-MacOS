@@ -351,11 +351,23 @@ public final class ManagerRoutes: @unchecked Sendable {
             ])
             manager.requestShutdown(delayMs: 350)
         case ("POST", "/api/manager/settings"), ("PUT", "/api/manager/settings"):
-            let obj = (try? JSONSupport.object(from: body)) ?? [:]
-            let apply = (obj["apply"] as? Bool) ?? true
-            let patch = obj["settings"] as? [String: Any] ?? obj
-            let result = try manager.updateSettings(patch, apply: apply)
-            http.respondJSON(connection, status: 200, object: result)
+            do {
+                guard body.count <= 65_536 else {
+                    throw ManagerSettingsValidationError(field: "settings", reason: "body_too_large")
+                }
+                guard let obj = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any] else {
+                    throw ManagerSettingsValidationError(field: "settings", reason: "expected_json_object")
+                }
+                if let settings = obj["settings"], !(settings is [String: Any]) {
+                    throw ManagerSettingsValidationError(field: "settings", reason: "expected_object")
+                }
+                let apply = (obj["apply"] as? Bool) ?? true
+                let patch = obj["settings"] as? [String: Any] ?? obj
+                let result = try manager.updateSettings(patch, apply: apply)
+                http.respondJSON(connection, status: 200, object: result)
+            } catch let error as ManagerSettingsValidationError {
+                http.respondJSON(connection, status: 400, object: error.asDictionary())
+            }
         case ("POST", "/api/manager/projects/register"):
             guard body.count <= Self.maximumProjectRegistrationBodyBytes else {
                 http.respondJSON(connection, status: 413, object: [

@@ -22,6 +22,11 @@ installed-stack and production-feature acceptance remain separate gates.
 
 ### Completion authority and protected validation
 
+- Manager settings reject nonfinite, fractional, boolean and overflowing numeric
+  values with a field-specific error before writing any part of the request.
+  Shared configuration decoding no longer traps on an infinite number or rounds
+  a fractional decimal into an integer; valid legacy integer strings remain
+  supported at the settings boundary.
 - SwiftPM smoke staging now includes Core resources, preserving agent and
   telemetry folders. The app and embedded CLI resolve the staged resource
   bundle without requiring the checkout's build directory.

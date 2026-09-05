@@ -1315,6 +1315,64 @@ final class ManagerTests: XCTestCase {
         XCTAssertTrue(try app.store.presenceRecords().isEmpty)
     }
 
+    func testManagerRejectsInvalidNumericSettingsWithoutMutation() throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        let node = ManagerNode(app: app)
+        let original = app.config.model
+        let bytes = try Data(contentsOf: app.paths.configJSON)
+        let invalid: [Any] = [Double.infinity, Double.nan, Double(Int.max), 1.5, true, UInt64.max, -1, 601]
+        for value in invalid {
+            XCTAssertThrowsError(try node.updateSettings([
+                "shell": ["default_timeout_sec": value], "log_level": "debug",
+            ], apply: false)) { error in
+                let invalid = error as? ManagerSettingsValidationError
+                XCTAssertEqual(invalid?.field, "shell.default_timeout_sec")
+                XCTAssertEqual(invalid?.permittedRange, "1...600")
+            }
+            XCTAssertEqual(app.config.model, original)
+            XCTAssertEqual(try Data(contentsOf: app.paths.configJSON), bytes)
+        }
+        let valid = try node.updateSettings(["shell": ["default_timeout_sec": "41"]], apply: false)
+        XCTAssertEqual((valid["shell"] as? [String: Any])?["default_timeout_sec"] as? Int, 41)
+    }
+
+    func testNativeSettingsRouteRejectsMalformedNumbersAndRemainsAvailable() async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        let port = try Self.availableLoopbackPort()
+        try app.config.update(["dashboard": ["port": port]], save: true)
+        let node = ManagerNode(app: app)
+        _ = try node.startService()
+        let credential = ManagerControlCredentialStore(paths: app.paths)
+        let original = try Data(contentsOf: app.paths.configJSON)
+        for numeric in ["true", "1.5", "1e100", "9223372036854775808", "-1", "601", "null"] {
+            var request = URLRequest(url: URL(string: "http://127.0.0.1:\(port)/api/manager/settings")!)
+            request.httpMethod = "POST"
+            request.timeoutInterval = 5
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("Bearer \(try credential.bearerToken())", forHTTPHeaderField: "Authorization")
+            request.httpBody = Data("{\"settings\":{\"shell\":{\"default_timeout_sec\":\(numeric)},\"log_level\":\"debug\"},\"apply\":false}".utf8)
+            let (data, response) = try await URLSession.shared.data(for: request)
+            XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 400)
+            let error = try JSONSupport.object(from: data)
+            XCTAssertEqual(error["code"] as? String, "invalid_settings")
+            XCTAssertEqual(error["field"] as? String, "shell.default_timeout_sec")
+            XCTAssertEqual(try Data(contentsOf: app.paths.configJSON), original)
+        }
+        let client = ManagerDashboardClient(host: "127.0.0.1", port: port, credentials: credential)
+        do {
+            _ = try await client.updateSettings(ManagerSettingsPatch(shellTimeoutSec: 601), apply: false)
+            XCTFail("Typed client accepted an invalid timeout")
+        } catch let error as ManagerSettingsValidationError {
+            XCTAssertEqual(error.field, "shell.default_timeout_sec")
+            XCTAssertEqual(error.permittedRange, "1...600")
+        }
+        let live = try await client.status()
+        XCTAssertTrue(live.serviceActive)
+        let saved = try await client.updateSettings(ManagerSettingsPatch(shellTimeoutSec: 41), apply: false)
+        XCTAssertEqual(saved.shellTimeoutSec, 41)
+        _ = node
+    }
+
     func testManagerSettingsPersist() throws {
         let app = try ForgeApp.bootstrap(home: home)
         let port = Int.random(in: 19_000...28_000)
