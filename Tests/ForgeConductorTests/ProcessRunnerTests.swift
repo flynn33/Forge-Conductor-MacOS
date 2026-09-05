@@ -10,6 +10,24 @@ final class ProcessRunnerTests: XCTestCase {
         ProcessRunner(terminationGraceSec: 0.05, forcedTerminationGraceSec: 0.5)
     }
 
+    /// Invoked in a separate native test process by the gate-producer regression.
+    /// The manager pins the prebuilt test plan; the work product is the variable.
+    func testNativeGateEffectFixture() throws {
+        guard let path = ProcessInfo.processInfo.environment["FORGE_NATIVE_GATE_FIXTURE_FILE"] else {
+            throw XCTSkip("Native gate effect fixture runs only under its parent qualification harness")
+        }
+        let data = try OwnerOnlyAtomicFile.read(from: URL(fileURLWithPath: path), maximumBytes: 128)
+        XCTAssertEqual(String(decoding: data, as: UTF8.self), "required native effect\n")
+    }
+
+    func testNativeValidationProcessUsesOnlyExplicitEnvironment() throws {
+        let result = try ProcessRunner(inheritEnvironment: false).run(
+            executable: "/usr/bin/env", environment: ["FORGE_NATIVE_ENV_FIXTURE": "explicit"], timeoutSec: 2
+        )
+        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertEqual(result.stdout, "FORGE_NATIVE_ENV_FIXTURE=explicit\n")
+    }
+
     func testNormalAndNonzeroExitStatuses() throws {
         let runner = fastRunner()
 
@@ -20,6 +38,14 @@ final class ProcessRunnerTests: XCTestCase {
         let failure = try runner.run(executable: "/usr/bin/false", timeoutSec: 1)
         XCTAssertEqual(failure.exitCode, 1)
         XCTAssertFalse(failure.timedOut)
+        XCTAssertNil(failure.terminationSignal)
+
+        let exitFifteen = try runner.run(executable: "/bin/bash", arguments: ["-c", "exit 15"], timeoutSec: 1)
+        let terminated = try runner.run(executable: "/bin/bash", arguments: ["-c", "kill -TERM $$"], timeoutSec: 1)
+        XCTAssertEqual(exitFifteen.exitCode, 15)
+        XCTAssertNil(exitFifteen.terminationSignal)
+        XCTAssertEqual(terminated.exitCode, SIGTERM)
+        XCTAssertEqual(terminated.terminationSignal, SIGTERM)
     }
 
     func testLaunchFailureDoesNotPoisonTheNextRun() throws {

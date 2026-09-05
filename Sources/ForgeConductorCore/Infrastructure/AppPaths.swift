@@ -65,6 +65,15 @@ public final class AppPaths: @unchecked Sendable {
     public var runtimeArtifactsDir: URL {
         home.appendingPathComponent("runtime-artifacts", isDirectory: true)
     }
+    /// Manager-installed validation policy, pinned packages, and native results.
+    /// Model filesystem and runtime grants never authorize this namespace.
+    public static let nativeValidationDeveloperDirectory = URL(fileURLWithPath: "/Applications/Xcode.app/Contents/Developer", isDirectory: true)
+
+    public static let nativeValidationToolchainDirectory = nativeValidationDeveloperDirectory.deletingLastPathComponent().deletingLastPathComponent()
+
+    public var nativeValidationDir: URL {
+        home.appendingPathComponent("native-validation", isDirectory: true)
+    }
     /// Durable configuration and idempotency ledgers for statically registered
     /// manager-owned model providers. Each adapter receives its own child directory.
     public var managedProvidersDir: URL {

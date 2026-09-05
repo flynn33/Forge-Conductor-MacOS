@@ -69,7 +69,21 @@ final class ManagedProjectRunStepExecutorTests: XCTestCase {
             },
             broker: broker
         )
-        let validator = EvidenceBoundCompletionValidator()
+        let validator = try GateValidatorRegistry(validators: [CompletionGateValidator(gate: "tests") { candidate in
+            let snapshot = await provider.snapshot()
+            let invocation = try await repository.toolInvocation(
+                sessionID: candidate.activeSessionID ?? "", providerCallID: "call-read"
+            )
+            return CompletionGateResult(
+                gate: "tests",
+                passed: invocation?.runID == candidate.runID && invocation?.projectID == candidate.projectID
+                    && invocation?.projectGeneration == candidate.projectGeneration && invocation?.state == .completed
+                    && toolExecutor.callCount == 1 && snapshot.receivedToolOutput
+                    && snapshot.previousResponseID == "resp-root",
+                summary: "Assert the actual bound tool execution and provider continuation",
+                evidenceReferences: invocation?.resultSHA256.map { [$0] } ?? []
+            )
+        }])
         let coordinator = try ProjectRunCoordinator(
             runID: run.runID,
             repository: repository,

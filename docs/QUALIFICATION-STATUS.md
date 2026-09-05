@@ -65,6 +65,24 @@ three assertion failures**. These failures are not waived by the local results
 above. [Debug log](https://github.com/flynn33/Forge-Conductor-MacOS/actions/runs/33938816255/job/101232081482)
 · [Release log](https://github.com/flynn33/Forge-Conductor-MacOS/actions/runs/33938816255/job/101232081493).
 
+### Subsequent rescue repairs
+
+The Python containment repair and external-lock startup regression were
+subsequently delivered through [PR #26](https://github.com/flynn33/Forge-Conductor-MacOS/pull/26).
+Its checks passed at `5523c10` before the owner's squash merge `e10f92b`.
+[PR #27](https://github.com/flynn33/Forge-Conductor-MacOS/pull/27) added the
+correction contract and native provider test membership; checks passed at
+`8d34a29`. These observations do not qualify later local P01 changes.
+
+The active P01 work replaces approving hash membership with installed native
+completion policy and protects its storage from project tools. A signed native
+regression has exercised an actual failed assertion, a passing result with
+changed inputs, and a fresh passing result. The first two left the disposable
+run incomplete; only the last completed it. This is completion-authority proof
+for a work-product fixture. Full current-source matrices and the remaining
+rescue phases retain separate evidence requirements. See
+[native completion policy](NATIVE-COMPLETION.md) for the implemented boundary.
+
 ## Supported workflows and remaining work
 
 Use [Provider](../USER-GUIDE.md#configure-the-managed-provider) to save the

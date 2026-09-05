@@ -459,6 +459,7 @@ public actor ExecutionJobService: ExecutionJobServicing {
     private let discoveredCapabilities: RuntimeCapabilities
     private let processEnvironment: [String: String]
     private let launcherURL: URL
+    private let protectedDirectories: [URL]
     private var recoveredProcessController: any RuntimeRecoveredProcessControlling =
         DarwinRuntimeRecoveredProcessController()
     private var pending: [UUID: PendingExecution] = [:]
@@ -477,6 +478,7 @@ public actor ExecutionJobService: ExecutionJobServicing {
         repository: RuntimeJobRepository,
         contextValidator: any RuntimeJobContextValidating,
         artifactRoot: URL,
+        protectedDirectories: [URL] = [],
         limits: RuntimeJobLimits = .current,
         capabilityDiscoverer: RuntimeCapabilityDiscoverer = RuntimeCapabilityDiscoverer(),
         environment: [String: String] = ProcessInfo.processInfo.environment,
@@ -523,6 +525,7 @@ public actor ExecutionJobService: ExecutionJobServicing {
         self.launchObserver = launchObserver
         self.terminalPersistenceHook = terminalPersistenceHook
         self.artifactRoot = canonicalArtifactRoot
+        self.protectedDirectories = protectedDirectories
         self.limits = limits
         launcherURL = installedLauncher
         discoveredCapabilities = capabilityDiscoverer.discover(limits: limits)
@@ -2229,7 +2232,8 @@ public actor ExecutionJobService: ExecutionJobServicing {
             canonicalWritableRoots: request.context.authorizationScope.writableRoots,
             managerReadDirectory: spool.canonicalDirectory,
             scratchDirectory: spool.canonicalScratchDirectory,
-            networkAllowed: request.context.authorizationScope.networkAllowed
+            networkAllowed: request.context.authorizationScope.networkAllowed,
+            protectedDirectories: protectedDirectories
         )
         return (
             sandboxedPlan,

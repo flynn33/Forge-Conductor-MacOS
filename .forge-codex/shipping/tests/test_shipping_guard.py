@@ -195,6 +195,61 @@ class XcodeTests(unittest.TestCase):
         self.doc['objects']['FILE']['path']='$(DERIVED_FILE_DIR)/Generated.swift'
         with self.assertRaises(g.ExecutionError): self.memberships()
 
+    def resource_fixture(self):
+        path='Sources/ForgeConductorApp/Resources/app.js'
+        (self.root/path).parent.mkdir(parents=True)
+        (self.root/path).write_text('window.fixture = true;')
+        objects=self.doc['objects']
+        objects['RESOURCE']={'isa':'PBXFileReference','sourceTree':'<group>','path':'Resources/app.js'}
+        objects['GROUP']['children'].append('RESOURCE')
+        objects['RESOURCE_BUILD']={'isa':'PBXBuildFile','fileRef':'RESOURCE'}
+        objects['RESOURCES']={'isa':'PBXResourcesBuildPhase','files':['RESOURCE_BUILD']}
+        objects['TARGET']['buildPhases'].append('RESOURCES')
+        return path
+
+    def resources(self):
+        return g.XcodeProject(self.doc,self.root).resource_memberships()
+
+    def test_resource_requires_actual_build_phase_membership(self):
+        path=self.resource_fixture()
+        self.assertEqual(g.check_resource_memberships([path],self.resources()),(1,[]))
+        self.doc['objects']['RESOURCES']['files']=[]
+        with self.assertRaisesRegex(g.IntegrityError,'absent from intended Xcode target'):
+            g.check_resource_memberships([path],self.resources())
+
+    def test_resource_in_different_target_cannot_satisfy_membership(self):
+        path=self.resource_fixture()
+        self.doc['objects']['TARGET']['name']='ForgeConductorCore'
+        with self.assertRaises(g.IntegrityError):
+            g.check_resource_memberships([path],self.resources())
+
+    def test_resource_folder_reference_covers_asset_descendants(self):
+        path=self.resource_fixture()
+        self.doc['objects']['RESOURCE']['path']='Resources'
+        self.doc['objects']['RESOURCE']['lastKnownFileType']='folder'
+        self.assertEqual(g.check_resource_memberships([path],self.resources()),(1,[]))
+
+    def test_resource_group_visibility_does_not_copy_contents(self):
+        self.resource_fixture()
+        self.doc['objects']['RESOURCE']['isa']='PBXGroup'
+        with self.assertRaises(g.ExecutionError): self.resources()
+
+    def test_missing_or_duplicate_resource_is_rejected(self):
+        path=self.resource_fixture()
+        self.doc['objects']['RESOURCES']['files'].append('RESOURCE_BUILD')
+        with self.assertRaises(g.IntegrityError): self.resources()
+        self.doc['objects']['RESOURCES']['files'].pop()
+        (self.root/path).unlink()
+        with self.assertRaises(g.IntegrityError): self.resources()
+
+    def test_resource_unknown_module_requires_mapping(self):
+        with self.assertRaises(g.ExecutionError):
+            g.check_resource_memberships(['Sources/NewModule/Resources/image.png'],{})
+
+    def test_resource_metadata_is_explicitly_separate(self):
+        path='Sources/ForgeConductorApp/Resources/Info.plist'
+        self.assertEqual(g.check_resource_memberships([path],{}),(0,[path]))
+
 class CLIIntegrationTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)

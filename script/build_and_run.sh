@@ -98,6 +98,7 @@ BUILD_BINARY="$BUILD_DIR/$BUILD_PRODUCT"
 BUILD_CLI_EXECUTABLE="$BUILD_DIR/$CLI_PRODUCT"
 BUILD_RUNTIME_HELPER="$BUILD_DIR/$RUNTIME_HELPER_PRODUCT"
 BUILD_FILESYSTEM_DAEMON="$BUILD_DIR/$FILESYSTEM_DAEMON_PRODUCT"
+CORE_RESOURCE_BUNDLE="$BUILD_DIR/ForgeConductor_ForgeConductorCore.bundle"
 
 if [[ ! -x "$BUILD_BINARY" ]]; then
   echo "built GUI executable was not found at $BUILD_BINARY" >&2
@@ -119,6 +120,10 @@ if [[ ! -f "$FILESYSTEM_DAEMON_PLIST_SOURCE" ]]; then
   echo "filesystem daemon property list was not found at $FILESYSTEM_DAEMON_PLIST_SOURCE" >&2
   exit 1
 fi
+if [[ ! -d "$CORE_RESOURCE_BUNDLE/Agents" || ! -d "$CORE_RESOURCE_BUNDLE/TelemetryStatic" ]]; then
+  echo "built Core resources are missing or have an incompatible layout at $CORE_RESOURCE_BUNDLE" >&2
+  exit 1
+fi
 
 # APP_BUNDLE is deliberately fixed beneath this repository's dist directory.
 rm -rf "$APP_BUNDLE"
@@ -133,6 +138,7 @@ chmod 0755 "$APP_BUNDLE" "$APP_CONTENTS" "$APP_MACOS" "$APP_HELPERS" "$APP_RESOU
 chmod 0755 "$APP_BINARY" "$CLI_EXECUTABLE" "$RUNTIME_HELPER" "$FILESYSTEM_DAEMON"
 cp "$ROOT_DIR/Sources/ForgeConductorApp/Resources/Info.plist" "$INFO_PLIST"
 cp "$ROOT_DIR/Sources/ForgeConductorApp/Resources/Forge-Conductor.icns" "$APP_RESOURCES/Forge-Conductor.icns"
+/usr/bin/ditto "$CORE_RESOURCE_BUNDLE" "$APP_RESOURCES/ForgeConductor_ForgeConductorCore.bundle"
 chmod 0644 "$INFO_PLIST" "$APP_RESOURCES/Forge-Conductor.icns" "$FILESYSTEM_DAEMON_PLIST"
 
 /usr/bin/plutil -lint "$FILESYSTEM_DAEMON_PLIST" >/dev/null

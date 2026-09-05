@@ -20,6 +20,37 @@ Provider settings now have native and manager save controls. Four native product
 onboarding scenarios passed; disposable Keychain tests also executed. Complete
 installed-stack and production-feature acceptance remain separate gates.
 
+### Completion authority and protected validation
+
+- SwiftPM smoke staging now includes Core resources, preserving agent and
+  telemetry folders. The app and embedded CLI resolve the staged resource
+  bundle without requiring the checkout's build directory.
+- Telemetry asset lookup also supports Xcode's flat framework resources;
+  fresh installations no longer return 404 for the packaged dashboard assets.
+  The flat lookup excludes agent playbooks and bundle metadata.
+- Native candidate checks inspect signed helpers and distinguish an older
+  same-version process by its actual executable path and code identity.
+  Version drift diagnostics identify the candidate Info.plist path.
+- The native graph guard now rejects omitted production resources. An actual
+  telemetry-resource omission reproduced the prior false pass; regression
+  coverage also rejects wrong-target and duplicate resource membership.
+- Git-hook regression fixtures resolve native Git through the scoped toolchain
+  path, supporting runners with versioned Xcode installations. Native validation
+  instructions distinguish Release app testability and clean candidate builds.
+- Completion now runs installed native validators. Model-selected hashes and
+  decoded receipts cannot approve a run; missing policy blocks completion.
+  Prebuilt package gates bind the approved candidate source, test package,
+  generation, lease, policy, job identity, and actual XCTest semantics.
+- Native regressions execute failure, stale success, and fresh success through
+  the installed registry. Only a fresh qualified result permits completion.
+  These disposable work-product checks do not qualify live CLU or desktop use.
+- Validation storage and Xcode's complete toolchain are protected from project
+  writes. Text operations reject swapped parent links. Git/search/glob and
+  compatibility shell children use project sandboxing; Git recovery keeps its
+  existing effect checks with private scratch and native tool binaries.
+- [Native completion policy](docs/NATIVE-COMPLETION.md) documents ownership,
+  compatibility, limits, and evidence boundaries. Version remains 0.9.0 build 1.
+
 ### Verified current-source evidence
 
 - Native Xcode tests now include the provider bridge and continuity cases that

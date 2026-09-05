@@ -65,6 +65,17 @@ public actor ProjectControlPlaneRepository {
 
     private let clock: any Clock
     private var connection: ControlPlaneSQLiteConnection?
+    // Ephemeral manager authority is deliberately not decoded from workspace JSON
+    // or persisted as a bearer credential. Restart requires fresh validation.
+    // This separates model tools from the manager, not a hostile unrestricted UID.
+    private struct CompletionApproval {
+        let run: AutonomousRunRecord
+        let ownerID: String
+        let leaseEpoch: UInt64
+        let proofSHA256: String
+        let expiresAt: Date
+    }
+    private var completionApprovals: [RunID: CompletionApproval] = [:]
     private var openRegistration: SQLiteOpenRegistration?
     private var busyRetryObserver: (@Sendable () -> Void)?
     private var beforeCommitObserver: (@Sendable () throws -> Void)?
@@ -154,6 +165,7 @@ public actor ProjectControlPlaneRepository {
     }
 
     public func close() {
+        completionApprovals.removeAll()
         connection?.close()
         connection = nil
         VerifiedMigrationBackup.unregisterOpenDatabase(openRegistration)
@@ -2777,14 +2789,57 @@ public actor ProjectControlPlaneRepository {
         }
     }
 
+    /// Called only by the native coordinator after its installed validator returns.
+    /// No public tool or decoded request may issue this process-local authority.
+    func recordTrustedCompletionValidation(
+        _ receipt: CompletionValidationReceipt,
+        for run: AutonomousRunRecord,
+        lease: RunLease
+    ) throws {
+        let now = clock.now()
+        completionApprovals = completionApprovals.filter { $0.value.expiresAt > now }
+        guard lease.runID == run.runID, receipt.runID == run.runID,
+              receipt.expectedRevision == run.revision, receipt.passed,
+              try Self.validCompletionReceipt(receipt),
+              run.state == .validatingCompletion,
+              !run.specification.completionGates.isEmpty,
+              Set(run.specification.completionGates).count == run.specification.completionGates.count,
+              receipt.results.count == run.specification.completionGates.count,
+              Set(receipt.results.map(\.gate)) == Set(run.specification.completionGates),
+              try receipt.results.allSatisfy({ result in
+                  guard result.passed, result.blocker == nil else { return false }
+                  return try result.invocation?.matches(run) == true
+              }),
+              let expiresAt = lease.expirationDate, expiresAt > now,
+              completionApprovals[run.runID] != nil || completionApprovals.count < 256 else {
+            throw AutonomyError.completionValidationFailed
+        }
+        let connection = try requiredConnection()
+        try verifyRunLeaseUnlocked(lease, timestamp: ISO8601.string(from: now), connection: connection)
+        guard try autonomousRunUnlocked(run.runID, connection: connection) == run,
+              let project = try projectUnlocked(run.projectID, connection: connection),
+              project.generation == run.projectGeneration,
+              project.lifecycleState == .active else {
+            throw AutonomyError.transitionConflict
+        }
+        completionApprovals[run.runID] = CompletionApproval(
+            run: run, ownerID: lease.ownerID, leaseEpoch: lease.epoch,
+            proofSHA256: receipt.proofSHA256, expiresAt: expiresAt
+        )
+    }
+
     @discardableResult
     public func completeAutonomousRun(
         runID: RunID,
         lease: RunLease,
         receipt: CompletionValidationReceipt
     ) throws -> AutonomousRunRecord {
-        guard receipt.runID == runID, receipt.passed,
-              try Self.validCompletionReceipt(receipt) else {
+        guard lease.runID == runID, receipt.runID == runID, receipt.passed,
+              try Self.validCompletionReceipt(receipt),
+              let approval = completionApprovals.removeValue(forKey: runID),
+              approval.expiresAt > clock.now(),
+              approval.ownerID == lease.ownerID, approval.leaseEpoch == lease.epoch,
+              approval.proofSHA256 == receipt.proofSHA256 else {
             throw AutonomyError.completionValidationFailed
         }
         let connection = try requiredConnection()
@@ -2795,8 +2850,20 @@ public actor ProjectControlPlaneRepository {
                 throw AutonomyError.runNotFound(runID)
             }
             guard current.state == .validatingCompletion,
-                  current.revision == receipt.expectedRevision else {
+                  current.revision == receipt.expectedRevision,
+                  current == approval.run,
+                  let project = try projectUnlocked(current.projectID, connection: connection),
+                  project.generation == current.projectGeneration,
+                  project.lifecycleState == .active else {
                 throw AutonomyError.transitionConflict
+            }
+            let requiredGates = current.specification.completionGates
+            let receivedGates = receipt.results.map(\.gate)
+            guard !requiredGates.isEmpty,
+                  Set(requiredGates).count == requiredGates.count,
+                  receivedGates.count == requiredGates.count,
+                  Set(receivedGates) == Set(requiredGates) else {
+                throw AutonomyError.completionValidationFailed
             }
             let receiptData = try Self.sortedJSONEncoder.encode(receipt)
             let changed = try connection.execute(
@@ -4530,7 +4597,7 @@ public actor ProjectControlPlaneRepository {
         .recovering: [.running, .ready, .waitingProvider, .waitingResource, .retryWait,
                       .paused, .blockedConfiguration, .failedRecoverable,
                       .cancelRequested, .failedTerminal],
-        .validatingCompletion: [.running, .paused, .failedRecoverable,
+        .validatingCompletion: [.running, .paused, .blockedConfiguration, .failedRecoverable,
                                 .cancelRequested, .failedTerminal],
         .waitingProvider: [.recovering, .starting, .running, .retryWait,
                            .paused, .blockedConfiguration, .cancelRequested, .failedTerminal],
@@ -5513,6 +5580,7 @@ public actor ProjectControlPlaneRepository {
 
     private static func validCompletionReceipt(_ receipt: CompletionValidationReceipt) throws -> Bool {
         guard ISO8601.date(from: receipt.validatedAt) != nil else { return false }
+        guard try sortedJSONEncoder.encode(receipt).count <= 4 * 1_048_576 else { return false }
         try validateSHA256(receipt.proofSHA256, field: "completion proof SHA-256")
         return receipt.hasValidProof()
     }

@@ -723,7 +723,7 @@ final class MCPProtocolAndDiagnosticsTests: XCTestCase {
             """
             #!/bin/sh
             printf 'hook-adjusted\n' > tracked.txt
-            /usr/bin/git add tracked.txt
+            git add tracked.txt
 
             """.utf8
         ).write(to: preCommitHook)

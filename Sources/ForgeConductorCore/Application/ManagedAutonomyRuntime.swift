@@ -286,17 +286,10 @@ public struct EvidenceBoundCompletionValidator: RunCompletionValidating, Sendabl
         let results = run.specification.completionGates.map { gate in
             let key = "completion_gate.\(gate).proof_sha256"
             let proof = run.specification.work.metadata[key]
-            let passed = proof.map { value in
-                value.count == 64
-                    && value.allSatisfy(\.isHexDigit)
-                    && run.specification.work.evidenceReferences.contains(value)
-            } ?? false
             return CompletionGateResult(
                 gate: gate,
-                passed: passed,
-                summary: passed
-                    ? "Deterministic evidence reference is present"
-                    : "No manager-verified evidence reference is registered for this gate",
+                passed: false,
+                summary: "Stored payload hashes are provenance and cannot approve completion",
                 evidenceReferences: proof.map { [$0] } ?? []
             )
         }
@@ -316,6 +309,7 @@ public actor ManagedAutonomyRuntime {
 
     private let repository: ProjectControlPlaneRepository
     private let runtimeJobs: RuntimeJobSubsystem
+    private let installedCompletionRegistry: InstalledNativeGateRegistry?
     private let supervisor: AutonomySupervisor
     private let clock: any Clock
     private var started = false
@@ -328,7 +322,8 @@ public actor ManagedAutonomyRuntime {
         managerID: String? = nil,
         maximumConcurrentRuns: Int? = nil,
         contextBudgetPolicy: ContextBudgetPolicy? = nil,
-        continuityFactory: ContinuityFactory? = nil
+        continuityFactory: ContinuityFactory? = nil,
+        completionValidator: (any RunCompletionValidating)? = nil
     ) throws {
         // The optional composition policy supports deterministic threshold
         // qualification. Provider capacity and reserve calculations are never overridden.
@@ -346,6 +341,10 @@ public actor ManagedAutonomyRuntime {
         )
         let providerRoot = app.paths.managedProvidersDir
         let clock = app.clock
+        let installedRegistry = completionValidator == nil
+            ? InstalledNativeGateRegistry(repository: repository, paths: app.paths, clock: clock) : nil
+        installedCompletionRegistry = installedRegistry
+        let resolvedCompletionValidator: any RunCompletionValidating = completionValidator ?? installedRegistry!
         let resolvedManagerID = managerID
             ?? "manager:\(ProcessInfo.processInfo.processIdentifier):\(UUID().uuidString.lowercased())"
         let concurrentRuns = maximumConcurrentRuns ?? Self.recommendedConcurrency()
@@ -430,7 +429,7 @@ public actor ManagedAutonomyRuntime {
                 repository: repository,
                 managerID: resolvedManagerID,
                 stepExecutor: stepExecutor,
-                completionValidator: EvidenceBoundCompletionValidator(clock: clock),
+                completionValidator: resolvedCompletionValidator,
                 clock: clock,
                 maximumSteps: 16
             )
@@ -764,6 +763,7 @@ public actor ManagedAutonomyRuntime {
         guard started || startupReport != nil else { return }
         started = false
         await supervisor.shutdown()
+        await installedCompletionRegistry?.shutdown()
         await runtimeJobs.shutdown()
     }
 

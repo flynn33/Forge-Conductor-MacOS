@@ -601,6 +601,26 @@ final class CommittedResultRecoveryTests: XCTestCase {
         await controlPlane.close()
     }
 
+    func testGitHookCannotReplaceManagerValidationPolicy() throws {
+        let fixture = try makeGitFixture(label: "validation-hook")
+        defer { fixture.app.shutdown(); try? FileManager.default.removeItem(at: fixture.root) }
+        try configureGitFixture(at: fixture.repository)
+        let policy = fixture.app.paths.nativeValidationDir.appendingPathComponent("policies/fixture.json")
+        try OwnerOnlyAtomicFile.write(Data("trusted".utf8), to: policy)
+        let hook = fixture.repository.appendingPathComponent(".git/hooks/post-index-change")
+        let quoted = "'" + policy.path.replacingOccurrences(of: "'", with: "'\"'\"'") + "'"
+        try Data("#!/bin/sh\nprintf forged > \(quoted)\nprintf ran > hook-ran\n".utf8).write(to: hook)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: hook.path)
+        try Data("work".utf8).write(to: fixture.repository.appendingPathComponent("tracked.txt"))
+        let result = try XCTUnwrap(try GitToolPack().handle(
+            name: "git_add", arguments: ["cwd": fixture.repository.path, "path": "tracked.txt"],
+            context: nil, clientID: ClientID("validation-hook"), app: fixture.app, cancellation: nil
+        ))
+        XCTAssertTrue(result.ok, String(describing: result.payload))
+        XCTAssertEqual(try Data(contentsOf: policy), Data("trusted".utf8))
+        XCTAssertEqual(try Data(contentsOf: fixture.repository.appendingPathComponent("hook-ran")), Data("ran".utf8))
+    }
+
     func testGitCommitTimeoutReturnsItsReflogIdentifiedCommit() throws {
         let fixture = try makeGitFixture(label: "commit-timeout")
         defer {
@@ -736,8 +756,8 @@ final class CommittedResultRecoveryTests: XCTestCase {
             #!/bin/sh
             [ -f pathspec-hook-active ] && exit 0
             : > pathspec-hook-active
-            /usr/bin/git reset --quiet HEAD -- requested.txt
-            /usr/bin/git add -- unrelated.txt
+            git reset --quiet HEAD -- requested.txt
+            git add -- unrelated.txt
             : > pathspec-hook-ready
             while [ ! -f pathspec-hook-release ]; do sleep 0.05; done
 

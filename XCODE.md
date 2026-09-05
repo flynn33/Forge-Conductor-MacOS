@@ -129,6 +129,12 @@ the still-open Developer ID Release, complete installed/native matrix, or P10
 boundaries. A successful Xcode build or focused test does not mark those items
 complete.
 
+The SwiftPM convenience bundle includes the Core resource bundle under
+`Contents/Resources`, shared by the app and embedded CLI. Agent and telemetry
+folders retain their layout, so the staged product does not require resources
+from a checkout or DerivedData. Test this with a fresh home and denied access
+to the source/build directories; seeded home resources can conceal omissions.
+
 The SwiftPM convenience bundle is a development smoke path. It rejects a
 `FORGE_BUILD_NUMBER` that differs from the compiled canonical build and rejects
 Developer ID signing. A signed optimized smoke build requires the explicit
@@ -196,11 +202,23 @@ both configurations. Unsigned CI builds are compilation evidence; signed
 app-hosted, UI, installed-service and distribution qualification run separately
 on an authorized Mac.
 
-For the September 5 shipping snapshot, GitHub native source integrity and Xcode
-Debug/Release compilation passed, but both SwiftPM lanes failed the Python
-interpreter containment test. The passing local suites and native onboarding
-results have separate retained source bindings. See the
-[qualification summary](docs/QUALIFICATION-STATUS.md) for counts and evidence.
+The graph guard checks tracked production resources against actual resource
+and copy phases, including asset-catalog descendants. A visible file reference
+or membership in a different target does not satisfy the check. Info templates
+and entitlements are reported separately for native metadata validation;
+resource contents and final copy destinations still require bundle inspection.
+Release app-hosted tests require `ENABLE_TESTABILITY=YES` for that test
+invocation. Keep their instrumented products separate from clean candidate
+builds and archives, as detailed in the native validation runbook.
+
+The initial September 5 shipping snapshot failed the Python interpreter
+containment test in CI. That repair and the later external-lock startup repair
+passed the follow-up CI runs. Local P01 completion-authority changes require
+fresh regression and native evidence at their own source binding. See the
+[qualification summary](docs/QUALIFICATION-STATUS.md) for the revision boundaries
+and [native completion policy](docs/NATIVE-COMPLETION.md) for trusted job setup.
+Native gate validation uses prebuilt, signed test products and semantic result
+records; unsigned app compilation does not provide that qualification.
 
 Use the canonical Release archive/export path for distribution, with matching
 Developer ID team policy and secure timestamps. The shipping

@@ -6,6 +6,21 @@ import XCTest
 @testable import ForgeConductorCore
 
 final class NativeTelemetryTests: XCTestCase {
+    func testPackagedTelemetryResourcesLoadWithoutSeededHomeFiles() throws {
+        let home = FileManager.default.temporaryDirectory
+            .appendingPathComponent("forge-packaged-telemetry-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: home) }
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: app.telemetry.staticDir.path))
+        for name in ["index.html", "style.css", "app.js", "tools-catalog.js"] {
+            let resource = try XCTUnwrap(app.telemetry.loadStatic(name), "Missing packaged resource: \(name)")
+            XCTAssertFalse(resource.0.isEmpty)
+        }
+        XCTAssertNil(app.telemetry.loadStatic("debug.md"), "Agent resources are not public telemetry assets")
+        XCTAssertNil(app.telemetry.loadStatic("Info.plist"), "Bundle metadata is not a public telemetry asset")
+    }
+
     func testNativeSnapshotContractWithoutNode() throws {
         let home = FileManager.default.temporaryDirectory
             .appendingPathComponent("forge-native-\(UUID().uuidString)", isDirectory: true)

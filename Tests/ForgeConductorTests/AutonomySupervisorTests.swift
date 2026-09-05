@@ -870,6 +870,602 @@ final class AutonomySupervisorTests: XCTestCase {
         }
     }
 
+    func testNativeResultSemanticsRequireCasesWithoutFailuresOrSkips() throws {
+        let caseID = "RequiredTests/testEffect()"
+        let summary: [String: Any] = [
+            "startTime": 100.0, "finishTime": 101.0, "environmentDescription": "macOS fixture",
+            "result": "Passed", "totalTestCount": 1, "passedTests": 1,
+            "failedTests": 0, "skippedTests": 0, "expectedFailures": 0, "testFailures": [],
+        ]
+        let testCase: [String: Any] = [
+            "nodeType": "Test Case", "name": "testEffect()", "nodeIdentifier": caseID, "result": "Passed",
+        ]
+        let tests: [String: Any] = [
+            "devices": [["deviceId": "fixture", "architecture": "arm64", "osVersion": "26.6.2"]],
+            "testPlanConfigurations": [["configurationId": "1"]], "testNodes": [testCase],
+        ]
+        func check(_ overview: [String: Any], _ tree: [String: Any]) throws -> Bool {
+            try XCTestResultAdjudicator.adjudicate(
+                summary: JSONSerialization.data(withJSONObject: overview),
+                tests: JSONSerialization.data(withJSONObject: tree),
+                requiredCases: [caseID], minimumCaseCount: 1
+            ).passed
+        }
+        XCTAssertTrue(try check(summary, tests))
+        for status in ["Failed", "Skipped", "Expected Failure", "unknown"] {
+            var changedCase = testCase
+            changedCase["result"] = status
+            var changed = tests
+            changed["testNodes"] = [changedCase]
+            XCTAssertFalse(try check(summary, changed), status)
+        }
+        var missing = tests
+        missing["testNodes"] = []
+        XCTAssertFalse(try check(summary, missing))
+        var wrongCase = testCase
+        wrongCase["nodeIdentifier"] = "Unrelated/testStatus()"
+        missing["testNodes"] = [wrongCase]
+        XCTAssertFalse(try check(summary, missing))
+        missing["testNodes"] = [testCase, testCase]
+        XCTAssertThrowsError(try check(summary, missing))
+        for field in ["failedTests", "skippedTests", "expectedFailures", "totalTestCount"] {
+            var changed = summary
+            changed[field] = 2
+            XCTAssertFalse(try check(changed, tests), field)
+        }
+        var crashed = summary
+        crashed["testFailures"] = [["failureText": "Test process crashed"]]
+        XCTAssertFalse(try check(crashed, tests))
+        XCTAssertThrowsError(try XCTestResultAdjudicator.adjudicate(
+            summary: Data("{\"passed\":true}".utf8), tests: Data("{".utf8),
+            requiredCases: [caseID], minimumCaseCount: 1
+        ))
+    }
+
+    func testCompletionInvocationRejectsCrossIdentityAndStaleReceiptReplay() async throws {
+        try await withRepository { repository, root in
+            let fixture = try await makeRun(repository: repository, root: root)
+            let lease = try await repository.acquireRunLease(
+                runID: fixture.run.runID, ownerID: "receipt-replay", policy: fixture.leasePolicy
+            )
+            var run = fixture.run
+            for state in [AutonomousRunState.validating, .ready, .starting, .running, .validatingCompletion] {
+                run = try await repository.transitionAutonomousRun(
+                    runID: run.runID, lease: lease, transition: transition(run, to: state)
+                )
+            }
+            let registry = try GateValidatorRegistry(validators: [CompletionGateValidator(gate: "tests") { _ in
+                CompletionGateResult(gate: "tests", passed: true, summary: "Native fixture assertion passed")
+            }])
+            let receipt = try await registry.validate(run)
+            let result = try XCTUnwrap(receipt.results.first)
+            let original = try JSONSerialization.jsonObject(with: JSONEncoder().encode(result)) as! [String: Any]
+            let mismatches: [(String, Any)] = [
+                ("run_id", try JSONSerialization.jsonObject(with: JSONEncoder().encode(RunID()))),
+                ("project_id", try JSONSerialization.jsonObject(with: JSONEncoder().encode(ProjectID()))),
+                ("project_generation", try JSONSerialization.jsonObject(with: JSONEncoder().encode(ProjectGeneration(2)))),
+                ("expected_revision", run.revision + 1),
+                ("specification_sha256", String(repeating: "0", count: 64)),
+            ]
+            for (field, value) in mismatches {
+                var object = original
+                var invocation = try XCTUnwrap(object["invocation"] as? [String: Any])
+                invocation[field] = value
+                object["invocation"] = invocation
+                let altered = try JSONDecoder().decode(
+                    CompletionGateResult.self, from: JSONSerialization.data(withJSONObject: object)
+                )
+                let replay = try CompletionValidationReceipt.make(
+                    runID: run.runID, expectedRevision: run.revision, results: [altered], validatedAt: receipt.validatedAt
+                )
+                XCTAssertTrue(replay.hasValidProof(), "A valid hash cannot authorize an identity mismatch")
+                await assertAutonomyError(code: "completion_validation_failed") {
+                    try await repository.recordTrustedCompletionValidation(replay, for: run, lease: lease)
+                }
+            }
+            try await repository.recordTrustedCompletionValidation(receipt, for: run, lease: lease)
+            run = try await repository.transitionAutonomousRun(
+                runID: run.runID, lease: lease, transition: transition(run, to: .running)
+            )
+            run = try await repository.transitionAutonomousRun(
+                runID: run.runID, lease: lease, transition: transition(run, to: .validatingCompletion)
+            )
+            await assertAutonomyError(code: "autonomous_run_transition_conflict") {
+                _ = try await repository.completeAutonomousRun(runID: run.runID, lease: lease, receipt: receipt)
+            }
+            let fresh = try await registry.validate(run)
+            XCTAssertNotEqual(fresh.results.first?.invocation?.jobID, receipt.results.first?.invocation?.jobID)
+            try await repository.recordTrustedCompletionValidation(fresh, for: run, lease: lease)
+            let completed = try await repository.completeAutonomousRun(runID: run.runID, lease: lease, receipt: fresh)
+            XCTAssertEqual(completed.state, .completed)
+            await assertAutonomyError(code: "completion_validation_failed") {
+                _ = try await repository.completeAutonomousRun(runID: run.runID, lease: lease, receipt: fresh)
+            }
+        }
+    }
+
+    func testNativeGateHandlerRequiresCurrentJobInputsAndSemanticResults() async throws {
+        try await withRepository { repository, root in
+            let fixture = try await makeRun(repository: repository, root: root)
+            let lease = try await repository.acquireRunLease(
+                runID: fixture.run.runID, ownerID: "native-job-fixture", policy: fixture.leasePolicy
+            )
+            var run = fixture.run
+            for state in [AutonomousRunState.validating, .ready, .starting, .running, .validatingCompletion] {
+                run = try await repository.transitionAutonomousRun(
+                    runID: run.runID, lease: lease, transition: transition(run, to: state)
+                )
+            }
+            for scenario in ["pass", "job", "nonce", "handler", "exit", "signal", "timeout", "truncated",
+                             "source", "observed-inputs", "policy", "environment", "old-result", "failed-case", "skipped-case"] {
+                let capture = NativeGateInputFixture(changesSource: scenario == "source")
+                let handler = try NativeXCTestGateHandler(
+                    gate: "tests", version: 3, handler: "installed.xctest.fixture.v1",
+                    policyRevision: scenario == "policy" ? "different" : "policy-v1",
+                    environmentIdentity: scenario == "environment" ? "different" : "macOS-fixture",
+                    requiredCases: ["Required/testEffect()"], minimumCaseCount: 1,
+                    captureInputs: { _ in try await capture.next() },
+                    execute: { job, inputs in
+                        let timestamp = scenario == "old-result" ? 1 : Date().timeIntervalSince1970
+                        let status = scenario == "failed-case" ? "Failed" : scenario == "skipped-case" ? "Skipped" : "Passed"
+                        let summary: [String: Any] = [
+                            "startTime": timestamp, "finishTime": timestamp, "environmentDescription": "native executor fixture",
+                            "result": status, "totalTestCount": 1, "passedTests": status == "Passed" ? 1 : 0,
+                            "failedTests": status == "Failed" ? 1 : 0, "skippedTests": status == "Skipped" ? 1 : 0,
+                            "expectedFailures": 0, "testFailures": [],
+                        ]
+                        let tests: [String: Any] = [
+                            "devices": [["deviceId": "fixture", "architecture": "arm64", "osVersion": "26.6.2"]],
+                            "testPlanConfigurations": [["configurationId": "1"]],
+                            "testNodes": [["nodeType": "Test Case", "name": "testEffect()",
+                                           "nodeIdentifier": "Required/testEffect()", "result": status]],
+                        ]
+                        let observedInputs = scenario == "observed-inputs" ? try NativeGateInputs(
+                            sourceManifestSHA256: String(repeating: "c", count: 64), buildIdentity: "build",
+                            policyRevision: "policy-v1", environmentIdentity: "macOS-fixture"
+                        ) : inputs
+                        return ObservedNativeGateExecution(
+                            jobID: scenario == "job" ? UUID() : job.jobID,
+                            nonce: scenario == "nonce" ? UUID() : job.nonce,
+                            inputs: observedInputs,
+                            handler: scenario == "handler" ? "unrelated.status" : "installed.xctest.fixture.v1",
+                            artifactPath: root.appendingPathComponent("fixture.xcresult").path,
+                            artifactSHA256: String(repeating: "b", count: 64),
+                            exitCode: scenario == "exit" ? 65 : 0,
+                            terminationSignal: scenario == "signal" ? 9 : nil,
+                            timedOut: scenario == "timeout", outputTruncated: scenario == "truncated",
+                            summary: try JSONSerialization.data(withJSONObject: summary),
+                            tests: try JSONSerialization.data(withJSONObject: tests)
+                        )
+                    }
+                )
+                let receipt = try await GateValidatorRegistry(validators: [handler.validator]).validate(run)
+                XCTAssertEqual(receipt.passed, scenario == "pass", scenario)
+                if receipt.passed {
+                    XCTAssertEqual(receipt.results.first?.invocation?.gateVersion, 3)
+                    XCTAssertEqual(receipt.results.first?.nativeEvidence?.testReport.cases.count, 1)
+                } else {
+                    await assertAutonomyError(code: "completion_validation_failed") {
+                        try await repository.recordTrustedCompletionValidation(receipt, for: run, lease: lease)
+                    }
+                }
+            }
+        }
+    }
+
+    func testInstalledNativePolicyRejectsUntrustedAndStaleDefinitions() async throws {
+        for scenario in ["missing", "malformed", "oversized", "public-mode", "hard-link", "parent-link",
+                         "wrong-run", "wrong-generation", "wrong-source", "old-policy", "duplicate-gate", "path-traversal",
+                         "unknown-gate", "missing-correction-case"] {
+            try await withRepository { repository, root in
+                let gate = scenario == "missing-correction-case" ? "G01" : "tests"
+                let fixture = try await makeRun(repository: repository, root: root, completionGates: [gate])
+                let project = root.appendingPathComponent("project")
+                try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+                try Data("qualification input".utf8).write(to: project.appendingPathComponent("source.txt"))
+                let lease = try await repository.acquireRunLease(runID: fixture.run.runID, ownerID: "policy-regression", policy: fixture.leasePolicy)
+                var run = fixture.run
+                for state in [AutonomousRunState.validating, .ready, .starting, .running, .validatingCompletion] {
+                    run = try await repository.transitionAutonomousRun(runID: run.runID, lease: lease, transition: transition(run, to: state))
+                }
+                let definition = InstalledNativeGatePolicy.Gate(
+                    id: scenario == "unknown-gate" ? "other" : gate, version: 2, packageID: UUID(),
+                    packageInputs: ["plan.xctestrun", "product"], packageSHA256: String(repeating: "a", count: 64),
+                    signedProducts: ["product"], testRunPath: scenario == "path-traversal" ? "../plan.xctestrun" : "plan.xctestrun",
+                    testIdentifiers: ["ForgeConductorTests/Effect/testWork"], requiredCases: ["Effect/testWork()"],
+                    minimumCaseCount: 1, timeoutSeconds: 1
+                )
+                let candidateSource = try await QualificationInputSnapshotter(root: project, inputs: ["source.txt"]).capture()
+                let policy = InstalledNativeGatePolicy(
+                    schemaVersion: 1,
+                    policyRevision: scenario == "old-policy" ? "old" : CompletionGateAcceptancePolicy.correction001Revision,
+                    runID: scenario == "wrong-run" ? RunID() : run.runID, projectID: run.projectID,
+                    projectGeneration: scenario == "wrong-generation" ? ProjectGeneration(2) : run.projectGeneration,
+                    sourceInputs: ["source.txt"], candidateSourceSHA256: scenario == "wrong-source" ? String(repeating: "0", count: 64) : candidateSource.sha256,
+                    buildIdentity: "policy-fixture", xcodeVersion: "Xcode fixture", architecture: "arm64",
+                    correctionCaseBindings: [:], gates: scenario == "duplicate-gate" ? [definition, definition] : [definition]
+                )
+                let paths = AppPaths(home: root.appendingPathComponent("manager"))
+                let policyFile = paths.nativeValidationDir.appendingPathComponent("policies/\(run.runID.description).json")
+                if scenario != "missing" {
+                    let data = scenario == "malformed" ? Data("not JSON".utf8)
+                        : scenario == "oversized" ? Data(repeating: 32, count: 256 * 1_024 + 1) : try JSONEncoder().encode(policy)
+                    try OwnerOnlyAtomicFile.write(data, to: policyFile)
+                    if scenario == "public-mode" {
+                        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: policyFile.path)
+                    }
+                    if scenario == "hard-link" {
+                        try FileManager.default.linkItem(at: policyFile, to: root.appendingPathComponent("aliased-policy"))
+                    }
+                    if scenario == "parent-link" {
+                        let parent = policyFile.deletingLastPathComponent()
+                        let moved = root.appendingPathComponent("external-policies")
+                        try FileManager.default.moveItem(at: parent, to: moved)
+                        try FileManager.default.createSymbolicLink(at: parent, withDestinationURL: moved)
+                    }
+                }
+                let registry = InstalledNativeGateRegistry(repository: repository, paths: paths)
+                let receipt = try await registry.validate(run)
+                XCTAssertFalse(receipt.passed, scenario)
+                XCTAssertEqual(receipt.results.count, 1)
+                XCTAssertNotNil(receipt.results.first?.blocker, scenario)
+                if ["unknown-gate", "missing-correction-case"].contains(scenario) {
+                    XCTAssertEqual(receipt.results.first?.blocker, .unregisteredValidator, scenario)
+                }
+                XCTAssertFalse(FileManager.default.fileExists(atPath: paths.nativeValidationDir.appendingPathComponent("results").path), scenario)
+                await registry.shutdown()
+            }
+        }
+    }
+
+    func testNativeJobFailurePreventsCompletionUntilActualEffectIsCorrected() async throws {
+        try await qualifyNativeGateEffect(useInstalledPolicy: false)
+    }
+
+    func testInstalledNativeJobFailurePreventsCompletionUntilActualEffectIsCorrected() async throws {
+        try await qualifyNativeGateEffect(useInstalledPolicy: true)
+    }
+
+    private func qualifyNativeGateEffect(useInstalledPolicy: Bool) async throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let packagePath = environment["FORGE_NATIVE_GATE_TEST_PACKAGE"],
+              let planName = environment["FORGE_NATIVE_GATE_TEST_PLAN"],
+              let evidencePath = environment["FORGE_NATIVE_GATE_EVIDENCE_ROOT"] else {
+            throw XCTSkip("Native job qualification requires an explicitly prepared test package and evidence directory")
+        }
+        let originalPackageRoot = URL(fileURLWithPath: packagePath, isDirectory: true)
+        let evidenceRoot = URL(fileURLWithPath: evidencePath, isDirectory: true)
+        let installedPaths = AppPaths(home: evidenceRoot.appendingPathComponent("manager"))
+        let installedPackageID = UUID()
+        let packageRoot = useInstalledPolicy
+            ? installedPaths.nativeValidationDir.appendingPathComponent("packages/\(installedPackageID.uuidString.lowercased())")
+            : originalPackageRoot
+        if useInstalledPolicy {
+            try FileManager.default.createDirectory(at: packageRoot, withIntermediateDirectories: true)
+            try FileManager.default.copyItem(at: originalPackageRoot.appendingPathComponent("Debug"), to: packageRoot.appendingPathComponent("Debug"))
+        }
+        let developer = URL(fileURLWithPath: "/Applications/Xcode.app/Contents/Developer", isDirectory: true)
+        let version = try ProcessRunner().run(executable: developer.appendingPathComponent("usr/bin/xcodebuild").path,
+                                              arguments: ["-version"], timeoutSec: 10)
+        XCTAssertEqual(version.exitCode, 0)
+        let xcodeVersion = version.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        #if arch(arm64)
+        let architecture = "arm64"
+        #else
+        let architecture = "x86_64"
+        #endif
+        try await withRepository { repository, root in
+            let fixture = try await makeRun(repository: repository, root: root)
+            let projectRoot = root.appendingPathComponent("project", isDirectory: true)
+            try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+            let workProduct = projectRoot.appendingPathComponent("work-product.txt")
+            let sourceMarker = projectRoot.appendingPathComponent("qualification-state.txt")
+            let fixturePlanName = "native-gate-\(UUID().uuidString.lowercased()).xctestrun"
+            let fixturePlan = packageRoot.appendingPathComponent(fixturePlanName)
+            var plan = try XCTUnwrap(PropertyListSerialization.propertyList(
+                from: OwnerOnlyAtomicFile.read(from: originalPackageRoot.appendingPathComponent(planName), maximumBytes: 4 * 1_048_576),
+                format: nil
+            ) as? [String: Any])
+            var configurations = try XCTUnwrap(plan["TestConfigurations"] as? [[String: Any]])
+            for index in configurations.indices {
+                var targets = try XCTUnwrap(configurations[index]["TestTargets"] as? [[String: Any]])
+                for target in targets.indices {
+                    var variables = targets[target]["EnvironmentVariables"] as? [String: String] ?? [:]
+                    variables["FORGE_NATIVE_GATE_FIXTURE_FILE"] = workProduct.path
+                    targets[target]["EnvironmentVariables"] = variables
+                }
+                configurations[index]["TestTargets"] = targets
+            }
+            plan["TestConfigurations"] = configurations
+            let planData = try PropertyListSerialization.data(fromPropertyList: plan, format: .xml, options: 0)
+            try OwnerOnlyAtomicFile.write(planData, to: fixturePlan)
+            defer { if !useInstalledPolicy { try? FileManager.default.removeItem(at: fixturePlan) } }
+            try OwnerOnlyAtomicFile.write(planData, to: evidenceRoot.appendingPathComponent(fixturePlanName))
+            let testContents = "Debug/ForgeConductorTests.xctest/Contents/"
+            let packageInputs = [fixturePlanName, testContents + "Info.plist", testContents + "MacOS",
+                                 testContents + "_CodeSignature", testContents + "Resources",
+                                 testContents + "Frameworks/ForgeConductorCore.framework/Versions/A",
+                                 "Debug/ForgeConductorCore.framework/Versions/A", "Debug/forge-conductor",
+                                 "Debug/forge-filesystem-daemon", "Debug/forge-runtime-launcher"]
+            let packageSnapshot = try await QualificationInputSnapshotter(
+                root: packageRoot, inputs: packageInputs, maximumFileBytes: 128 * 1_048_576
+            ).capture()
+            let source = try QualificationInputSnapshotter(root: projectRoot, inputs: ["work-product.txt", "qualification-state.txt"])
+            let artifactRoot = useInstalledPolicy
+                ? installedPaths.nativeValidationDir.appendingPathComponent("results/\(fixture.run.runID.description)/tests")
+                : evidenceRoot.appendingPathComponent("native-jobs-\(UUID().uuidString.lowercased())", isDirectory: true)
+            let requiredCase = "ProcessRunnerTests/testNativeGateEffectFixture()"
+            let buildIdentity = packageSnapshot.sha256
+            let inputCapture: NativeXCTestGateHandler.InputCapture = { _ in
+                let snapshot = try await source.capture()
+                return try NativeGateInputs(sourceManifestSHA256: snapshot.sha256, buildIdentity: buildIdentity,
+                                            policyRevision: "native-job-fixture-v1", environmentIdentity: xcodeVersion)
+            }
+            let signedProducts = ["Debug/ForgeConductorTests.xctest", "Debug/ForgeConductorCore.framework",
+                                  "Debug/forge-conductor", "Debug/forge-filesystem-daemon", "Debug/forge-runtime-launcher"]
+            let installedRegistry = InstalledNativeGateRegistry(repository: repository, paths: installedPaths)
+            if useInstalledPolicy {
+                let definition = InstalledNativeGatePolicy.Gate(
+                    id: "tests", version: 2, packageID: installedPackageID, packageInputs: packageInputs,
+                    packageSHA256: packageSnapshot.sha256, signedProducts: signedProducts, testRunPath: fixturePlanName,
+                    testIdentifiers: ["ForgeConductorTests/ProcessRunnerTests/testNativeGateEffectFixture"],
+                    requiredCases: [requiredCase], minimumCaseCount: 1, timeoutSeconds: 60
+                )
+                let policy = InstalledNativeGatePolicy(
+                    schemaVersion: 1, policyRevision: CompletionGateAcceptancePolicy.correction001Revision,
+                    runID: fixture.run.runID, projectID: fixture.run.projectID, projectGeneration: fixture.run.projectGeneration,
+                    sourceInputs: ["work-product.txt", "qualification-state.txt"], candidateSourceSHA256: nil, buildIdentity: buildIdentity, xcodeVersion: xcodeVersion,
+                    architecture: architecture, correctionCaseBindings: [:], gates: [definition]
+                )
+                try OwnerOnlyAtomicFile.write(try JSONEncoder().encode(policy),
+                    to: installedPaths.nativeValidationDir.appendingPathComponent("policies/\(fixture.run.runID.description).json"))
+            }
+            let stages = useInstalledPolicy ? ["failed", "stale", "corrected"] : ["failed", "corrected"]
+            for stage in stages {
+                let corrected = stage == "corrected"
+                try OwnerOnlyAtomicFile.write(Data((stage == "failed" ? "incorrect effect\n" : "required native effect\n").utf8), to: workProduct)
+                try OwnerOnlyAtomicFile.write(Data("before-\(stage)".utf8), to: sourceMarker)
+                let inputs = try await inputCapture(fixture.run)
+                let jobPolicy = try NativeXCTestJobPolicy(
+                    packageRoot: packageRoot, packageInputs: packageInputs, packageSHA256: packageSnapshot.sha256,
+                    signedProducts: signedProducts,
+                    testRunPath: fixturePlanName, artifactRoot: artifactRoot, developerDirectory: developer,
+                    xcodeVersion: xcodeVersion,
+                    testIdentifiers: ["ForgeConductorTests/ProcessRunnerTests/testNativeGateEffectFixture"],
+                    inputs: inputs, architecture: architecture, timeoutSeconds: 60
+                )
+                let executor = NativeXCTestJobExecutor(repository: repository, policy: jobPolicy)
+                let handler = try NativeXCTestGateHandler(
+                    gate: "tests", version: 2, handler: NativeXCTestJobExecutor.handlerIdentity,
+                    policyRevision: "native-job-fixture-v1", environmentIdentity: xcodeVersion,
+                    requiredCases: [requiredCase], minimumCaseCount: 1, captureInputs: inputCapture,
+                    execute: { job, captured in try await executor.execute(job, inputs: captured) }
+                )
+                let validator: any RunCompletionValidating = useInstalledPolicy
+                    ? installedRegistry : try GateValidatorRegistry(validators: [handler.validator])
+                let coordinator = try ProjectRunCoordinator(
+                    runID: fixture.run.runID, repository: repository, managerID: "native-job-proof",
+                    leasePolicy: fixture.leasePolicy, stepExecutor: CompletionRequestStepper(),
+                    completionValidator: validator, maximumSteps: 8
+                )
+                let existingJobs = Set((try? FileManager.default.contentsOfDirectory(atPath: artifactRoot.path)) ?? [])
+                let sourceMutation: Task<Bool, Error>? = stage == "stale" ? Task {
+                    let deadline = ContinuousClock.now + .seconds(15)
+                    while ContinuousClock.now < deadline {
+                        try Task.checkCancellation()
+                        let jobs = (try? FileManager.default.contentsOfDirectory(at: artifactRoot, includingPropertiesForKeys: nil)) ?? []
+                        if let job = jobs.first(where: { !existingJobs.contains($0.lastPathComponent)
+                            && FileManager.default.fileExists(atPath: $0.appendingPathComponent("result.xcresult").path) }) {
+                            guard !FileManager.default.fileExists(atPath: job.appendingPathComponent("process.json").path) else { return false }
+                            try OwnerOnlyAtomicFile.write(Data("changed during native execution".utf8), to: sourceMarker)
+                            let change: [String: String] = ["job": job.lastPathComponent, "changedAt": ISO8601.string(from: Date()),
+                                                            "condition": "result bundle exists; native process receipt not yet committed"]
+                            try OwnerOnlyAtomicFile.write(try JSONEncoder().encode(change), to: evidenceRoot.appendingPathComponent("source-change.json"))
+                            return true
+                        }
+                        try await Task.sleep(for: .milliseconds(10))
+                    }
+                    return false
+                } : nil
+                defer { sourceMutation?.cancel() }
+                let outcome = try await coordinator.runActivation()
+                if let sourceMutation {
+                    let changedDuringExecution = try await sourceMutation.value
+                    XCTAssertTrue(changedDuringExecution, "source mutation must occur while the native validation process is active")
+                }
+                let storedValue = try await repository.autonomousRun(fixture.run.runID)
+                let stored = try XCTUnwrap(storedValue)
+                XCTAssertEqual(outcome.finalState, corrected ? .completed : .running, stored.lastErrorSummary ?? "")
+                try OwnerOnlyAtomicFile.write(try JSONEncoder().encode(stored),
+                                              to: evidenceRoot.appendingPathComponent(corrected ? "corrected-run.json" : stage == "stale" ? "stale-run.json" : "rejected-run.json"))
+                if corrected {
+                    let receipt = try JSONDecoder().decode(CompletionValidationReceipt.self,
+                        from: Data(try XCTUnwrap(stored.completionRequestJSON).utf8))
+                    XCTAssertTrue(receipt.passed)
+                    XCTAssertEqual(receipt.results.first?.nativeEvidence?.testReport.cases.map(\.identifier), [requiredCase])
+                } else {
+                    XCTAssertEqual(stored.lastErrorCode, "completion_validation_failed")
+                }
+                await executor.shutdown()
+            }
+            await installedRegistry.shutdown()
+            let results = try FileManager.default.contentsOfDirectory(at: artifactRoot, includingPropertiesForKeys: nil)
+            XCTAssertEqual(results.count, stages.count, "One native job per attempted completion")
+            let exitCodes = try results.map { directory -> Int in
+                let object = try XCTUnwrap(JSONSerialization.jsonObject(with: OwnerOnlyAtomicFile.read(
+                    from: directory.appendingPathComponent("process.json"), maximumBytes: 16 * 1_024
+                )) as? [String: Any])
+                return try XCTUnwrap(object["exitCode"] as? Int)
+            }.sorted()
+            XCTAssertEqual(exitCodes, useInstalledPolicy ? [0, 0, 65] : [0, 65], "Native failures, stale passes, and fresh passes retain actual process outcomes")
+        }
+    }
+
+    func testCorrectionRequirementsRejectMissingAndUnrelatedEvidence() async throws {
+        let requiredCase = "AutonomySupervisorTests/testCorrectionRequirementsRejectMissingAndUnrelatedEvidence()"
+        let policy = try CompletionGateAcceptancePolicy.correction001(caseBindings: ["CLU-C01-23": requiredCase])
+        XCTAssertEqual(Set(CompletionGateAcceptancePolicy.correction001Cases.values.flatMap { $0 }).count, 24)
+        XCTAssertThrowsError(try CompletionGateAcceptancePolicy.correction001(caseBindings: ["unrelated": requiredCase]))
+        XCTAssertThrowsError(try CompletionGateAcceptancePolicy.correction001(caseBindings: [
+            "CLU-C01-23": requiredCase, "CLU-C01-22": requiredCase,
+        ]))
+        XCTAssertFalse(try CompletionGateAcceptancePolicy.correction001(caseBindings: [:]).isConfigured(for: "G01"))
+        XCTAssertFalse(policy.isConfigured(for: "G13"), "API evidence cannot configure the desktop scope gate")
+        try await withRepository { repository, root in
+            let fixture = try await makeRun(repository: repository, root: root, completionGates: ["G01"])
+            let lease = try await repository.acquireRunLease(
+                runID: fixture.run.runID, ownerID: "correction-gate-fixture", policy: fixture.leasePolicy
+            )
+            var run = fixture.run
+            for state in [AutonomousRunState.validating, .ready, .starting, .running, .validatingCompletion] {
+                run = try await repository.transitionAutonomousRun(
+                    runID: run.runID, lease: lease, transition: transition(run, to: state)
+                )
+            }
+            for scenario in ["missing", "old-policy", "old-version", "unrelated", "skipped", "failed", "truncated", "fixture-pass"] {
+                let inputs = try NativeGateInputs(
+                    sourceManifestSHA256: String(repeating: "a", count: 64), buildIdentity: "fixture-build",
+                    policyRevision: scenario == "old-policy" ? "original-package" : CompletionGateAcceptancePolicy.correction001Revision,
+                    environmentIdentity: "fixture-only"
+                )
+                let report = XCTestResultAdjudicator.Report(
+                    passed: scenario != "failed", cases: [.init(
+                        identifier: scenario == "unrelated" ? "Unrelated/testStatus()" : requiredCase,
+                        result: scenario == "skipped" ? "Skipped" : "Passed"
+                    )], failures: [], startedAt: Date(), finishedAt: Date()
+                )
+                let evidence = NativeGateEvidence(
+                    inputs: inputs, handler: "native-fixture", artifactPath: root.appendingPathComponent("fixture.xcresult").path,
+                    artifactSHA256: String(repeating: "b", count: 64), summarySHA256: String(repeating: "c", count: 64),
+                    testsSHA256: String(repeating: "d", count: 64), exitCode: 0, terminationSignal: nil,
+                    timedOut: false, outputTruncated: scenario == "truncated", testReport: report
+                )
+                let validator = CompletionGateValidator(gate: "G01", version: scenario == "old-version" ? 1 : 2, operation: { _ in
+                    CompletionGateResult(
+                        gate: "G01", passed: true, summary: "Synthetic evaluator input; no product qualification claim",
+                        evidenceReferences: [String(repeating: "e", count: 64)],
+                        nativeEvidence: scenario == "missing" ? nil : evidence
+                    )
+                })
+                let receipt = try await GateValidatorRegistry(validators: [validator], acceptancePolicy: policy).validate(run)
+                XCTAssertEqual(receipt.passed, scenario == "fixture-pass", scenario)
+                if !receipt.passed {
+                    await assertAutonomyError(code: "completion_validation_failed") {
+                        try await repository.recordTrustedCompletionValidation(receipt, for: run, lease: lease)
+                    }
+                }
+            }
+            let unconfigured = try GateValidatorRegistry(
+                validators: [CompletionGateValidator(gate: "G01", version: 2, operation: { _ in
+                    XCTFail("Unbound acceptance requirements must stop before job execution")
+                    return CompletionGateResult(gate: "G01", passed: true, summary: "unreachable")
+                })], acceptancePolicy: .correction001(caseBindings: [:])
+            )
+            let blocked = try await unconfigured.validate(run)
+            XCTAssertFalse(blocked.passed)
+            XCTAssertEqual(blocked.results.first?.blocker, .unregisteredValidator)
+        }
+    }
+
+    func testQualificationSnapshotTracksInputsAndRejectsFilesystemAliases() async throws {
+        try await withRepository { _, root in
+            let project = root.appendingPathComponent("snapshot-inputs", isDirectory: true)
+            let sources = project.appendingPathComponent("Sources", isDirectory: true)
+            try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
+            let source = sources.appendingPathComponent("Subject.swift")
+            try Data("original source".utf8).write(to: source)
+            let snapshotter = try QualificationInputSnapshotter(root: project, inputs: ["Sources", "Tests"])
+            let original = try await snapshotter.capture()
+            XCTAssertEqual(original.files.count, 1)
+            XCTAssertEqual(original.absentInputs, ["Tests"])
+            try Data("new evidence".utf8).write(to: project.appendingPathComponent("evidence.json"))
+            let afterEvidence = try await snapshotter.capture()
+            XCTAssertEqual(original.sha256, afterEvidence.sha256, "Evidence must not become a self-referential qualification input")
+            try Data("changed source".utf8).write(to: source)
+            let changed = try await snapshotter.capture()
+            XCTAssertNotEqual(original.sha256, changed.sha256)
+            let alias = sources.appendingPathComponent("Alias.swift")
+            try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: source)
+            do {
+                _ = try await snapshotter.capture()
+                XCTFail("A linked input must not be followed")
+            } catch let error as AutonomyError {
+                XCTAssertTrue(error.localizedDescription.contains("without following links"))
+            }
+            try FileManager.default.removeItem(at: alias)
+            try FileManager.default.linkItem(at: source, to: alias)
+            do {
+                _ = try await snapshotter.capture()
+                XCTFail("Hard-linked input aliases must be rejected")
+            } catch let error as AutonomyError {
+                XCTAssertTrue(error.localizedDescription.contains("hard links"))
+            }
+            try FileManager.default.removeItem(at: alias)
+            let bounded = try QualificationInputSnapshotter(root: project, inputs: ["Sources"], maximumBytes: 1)
+            do {
+                _ = try await bounded.capture()
+                XCTFail("Qualification reads must enforce their byte budget")
+            } catch let error as AutonomyError {
+                XCTAssertTrue(error.localizedDescription.contains("byte budget"))
+            }
+        }
+    }
+
+    func testRecordedPayloadHashDoesNotApproveCompletion() async throws {
+        for payload in ["failed command exit 1", "unrelated successful status query", "{\"passed\":true}"] {
+            try await withRepository { repository, root in
+                let fixture = try await makeRun(repository: repository, root: root)
+                let lease = try await repository.acquireRunLease(
+                    runID: fixture.run.runID, ownerID: "hash-rejection", policy: fixture.leasePolicy
+                )
+                var run = fixture.run
+                for state in [AutonomousRunState.validating, .ready, .starting, .running, .validatingCompletion] {
+                    var work = run.specification.work
+                    let hash = JSONSupport.sha256Hex(payload)
+                    work.evidenceReferences = [hash]
+                    work.metadata["completion_gate.tests.proof_sha256"] = hash
+                    run = try await repository.transitionAutonomousRun(
+                        runID: run.runID, lease: lease,
+                        transition: AutonomousRunTransition(
+                            expectedState: run.state, expectedRevision: run.revision, nextState: state,
+                            eventType: "hash_rejection_fixture", eventSummary: "Exercise untrusted result provenance",
+                            work: work
+                        )
+                    )
+                }
+                let receipt = try await EvidenceBoundCompletionValidator().validate(run)
+                XCTAssertFalse(receipt.passed, "Recorded payload is provenance only: \(payload)")
+            }
+        }
+    }
+
+    func testCompletionTransactionRejectsWrongAndDuplicateGateSets() async throws {
+        for gates in [["tests"], ["unrelated"], ["tests", "tests"], ["tests", "unrelated"]] {
+            try await withRepository { repository, root in
+                let fixture = try await makeRun(repository: repository, root: root)
+                let lease = try await repository.acquireRunLease(
+                    runID: fixture.run.runID, ownerID: "gate-set-rejection", policy: fixture.leasePolicy
+                )
+                var run = fixture.run
+                for state in [AutonomousRunState.validating, .ready, .starting, .running, .validatingCompletion] {
+                    run = try await repository.transitionAutonomousRun(
+                        runID: run.runID, lease: lease, transition: transition(run, to: state)
+                    )
+                }
+                let receipt = try CompletionValidationReceipt.make(
+                    runID: run.runID, expectedRevision: run.revision,
+                    results: gates.map { CompletionGateResult(gate: $0, passed: true, summary: "fabricated") },
+                    validatedAt: ISO8601.string(from: Date())
+                )
+                await assertAutonomyError(code: "completion_validation_failed") {
+                    _ = try await repository.completeAutonomousRun(runID: run.runID, lease: lease, receipt: receipt)
+                }
+                let current = try await repository.autonomousRun(run.runID)
+                XCTAssertEqual(current?.state, .validatingCompletion)
+            }
+        }
+    }
+
     func testCoordinatorPersistsIntentAndOnlyValidatorCanCompleteRun() async throws {
         try await withRepository { repository, root in
             let fixture = try await makeRun(repository: repository, root: root)
@@ -1187,7 +1783,8 @@ final class AutonomySupervisorTests: XCTestCase {
     private func makeRun(
         repository: ProjectControlPlaneRepository,
         root: URL,
-        allowedTools: [String] = ["fixture.read"]
+        allowedTools: [String] = ["fixture.read"],
+        completionGates: [String] = ["tests"]
     ) async throws -> RunFixture {
         let projectID = ProjectID()
         let projectRoot = root.appendingPathComponent("project", isDirectory: true)
@@ -1204,7 +1801,7 @@ final class AutonomySupervisorTests: XCTestCase {
             modelKey: "fixture-model",
             specification: AutonomousRunSpecification(
                 allowedTools: allowedTools,
-                completionGates: ["tests"]
+                completionGates: completionGates
             ),
             authorizationScope: ToolAuthorizationScope(
                 canonicalRoots: [projectRoot],
@@ -1269,6 +1866,21 @@ final class AutonomySupervisorTests: XCTestCase {
         } catch {
             XCTFail("Unexpected error: \(error)", file: file, line: line)
         }
+    }
+}
+
+private actor NativeGateInputFixture {
+    private let changesSource: Bool
+    private var calls = 0
+
+    init(changesSource: Bool) { self.changesSource = changesSource }
+
+    func next() throws -> NativeGateInputs {
+        calls += 1
+        return try NativeGateInputs(
+            sourceManifestSHA256: String(repeating: changesSource && calls > 1 ? "f" : "a", count: 64),
+            buildIdentity: "build", policyRevision: "policy-v1", environmentIdentity: "macOS-fixture"
+        )
     }
 }
 

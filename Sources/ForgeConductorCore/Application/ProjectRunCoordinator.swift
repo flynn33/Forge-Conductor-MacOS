@@ -48,42 +48,85 @@ public struct SystemAutonomySleeper: AutonomySleeping, Sendable {
     }
 }
 
-public struct CompletionGateValidator: Sendable {
-    public let gate: String
-    private let operation: @Sendable (AutonomousRunRecord) async throws -> CompletionGateResult
+public struct CompletionGateJob: Sendable {
+    public let run: AutonomousRunRecord
+    public let jobID: UUID
+    public let nonce: UUID
+    public let startedAt: String
 
-    public init(
-        gate: String,
-        operation: @escaping @Sendable (AutonomousRunRecord) async throws -> CompletionGateResult
-    ) {
-        self.gate = gate
-        self.operation = operation
-    }
-
-    public func evaluate(_ run: AutonomousRunRecord) async throws -> CompletionGateResult {
-        try await operation(run)
+    init(run: AutonomousRunRecord, clock: any Clock) {
+        self.run = run
+        jobID = UUID()
+        nonce = UUID()
+        startedAt = ISO8601.string(from: clock.now())
     }
 }
 
-public struct DeterministicCompletionValidator: RunCompletionValidating, Sendable {
+public struct CompletionGateValidator: Sendable {
+    public let gate: String
+    public let version: UInt64
+    private let operation: @Sendable (CompletionGateJob) async throws -> CompletionGateResult
+
+    public init(
+        gate: String,
+        version: UInt64 = 1,
+        operation: @escaping @Sendable (AutonomousRunRecord) async throws -> CompletionGateResult
+    ) {
+        self.gate = gate
+        self.version = version
+        self.operation = { try await operation($0.run) }
+    }
+
+    public init(
+        gate: String,
+        version: UInt64,
+        jobOperation: @escaping @Sendable (CompletionGateJob) async throws -> CompletionGateResult
+    ) {
+        self.gate = gate
+        self.version = version
+        self.operation = jobOperation
+    }
+
+    public func evaluate(_ run: AutonomousRunRecord) async throws -> CompletionGateResult {
+        try await operation(CompletionGateJob(run: run, clock: SystemClock()))
+    }
+
+    func evaluate(_ job: CompletionGateJob) async throws -> CompletionGateResult {
+        try await operation(job)
+    }
+}
+
+/// Installed native policy is the only source of gate handlers. This type is not
+/// decodable and has no model-tool registration surface. An empty registry denies
+/// every gate; missing policy must never select a provenance-only fallback.
+public struct GateValidatorRegistry: RunCompletionValidating, Sendable {
     private let validators: [String: CompletionGateValidator]
     private let clock: any Clock
+    private let acceptancePolicy: CompletionGateAcceptancePolicy?
 
     public init(
         validators: [CompletionGateValidator],
-        clock: any Clock = SystemClock()
+        clock: any Clock = SystemClock(),
+        acceptancePolicy: CompletionGateAcceptancePolicy? = nil
     ) throws {
-        guard !validators.isEmpty, validators.count <= 256,
-              Set(validators.map(\.gate)).count == validators.count else {
+        guard validators.count <= 256,
+              Set(validators.map(\.gate)).count == validators.count,
+              validators.allSatisfy({ !$0.gate.isEmpty && $0.gate.utf8.count <= 512 && $0.version > 0 }) else {
             throw AutonomyError.invalidRequest("completion validators must be unique and bounded")
         }
         self.validators = Dictionary(uniqueKeysWithValues: validators.map { ($0.gate, $0) })
         self.clock = clock
+        self.acceptancePolicy = acceptancePolicy
     }
 
     public func validate(_ run: AutonomousRunRecord) async throws -> CompletionValidationReceipt {
         guard run.state == .validatingCompletion else {
             throw AutonomyError.completionValidationRequired
+        }
+        guard !run.specification.completionGates.isEmpty,
+              run.specification.completionGates.count <= 256,
+              Set(run.specification.completionGates).count == run.specification.completionGates.count else {
+            throw AutonomyError.completionValidationFailed
         }
         var results: [CompletionGateResult] = []
         results.reserveCapacity(run.specification.completionGates.count)
@@ -92,11 +135,21 @@ public struct DeterministicCompletionValidator: RunCompletionValidating, Sendabl
                 results.append(CompletionGateResult(
                     gate: gate,
                     passed: false,
-                    summary: "No deterministic validator is registered for this gate"
+                    summary: "No deterministic validator is registered for this gate",
+                    blocker: .unregisteredValidator
                 ))
                 continue
             }
-            let result = try await validator.evaluate(run)
+            if let acceptancePolicy, !acceptancePolicy.isConfigured(for: gate) {
+                results.append(CompletionGateResult(
+                    gate: gate, passed: false,
+                    summary: "Required acceptance cases have no installed native test binding",
+                    blocker: .unregisteredValidator
+                ))
+                continue
+            }
+            let job = CompletionGateJob(run: run, clock: clock)
+            let result = try await validator.evaluate(job)
             guard result.gate == gate else {
                 throw AutonomyError.invalidRequest("completion validator returned the wrong gate identity")
             }
@@ -105,7 +158,24 @@ public struct DeterministicCompletionValidator: RunCompletionValidating, Sendabl
                   result.evidenceReferences.allSatisfy({ $0.utf8.count <= 2_048 }) else {
                 throw AutonomyError.invalidRequest("completion result exceeds its durable bound")
             }
-            results.append(result)
+            // The handler cannot select the invocation's run, attempt, or version.
+            // A decoded receipt still needs the repository's process-local approval.
+            let acceptancePassed = acceptancePolicy?.accepts(result, version: validator.version) ?? true
+            results.append(CompletionGateResult(
+                gate: gate,
+                passed: result.passed && result.blocker == nil
+                    && acceptancePassed,
+                summary: !acceptancePassed
+                    ? "Required current-policy native acceptance evidence is missing or non-passing" : result.summary,
+                evidenceReferences: result.evidenceReferences,
+                nativeEvidence: result.nativeEvidence,
+                invocation: try CompletionGateInvocation(
+                    run: run, gateVersion: validator.version,
+                    jobID: job.jobID, nonce: job.nonce,
+                    startedAt: job.startedAt, finishedAt: ISO8601.string(from: clock.now())
+                ),
+                blocker: result.blocker
+            ))
         }
         return try CompletionValidationReceipt.make(
             runID: run.runID,
@@ -113,6 +183,71 @@ public struct DeterministicCompletionValidator: RunCompletionValidating, Sendabl
             results: results,
             validatedAt: ISO8601.string(from: clock.now())
         )
+    }
+}
+
+/// A native composition rule for separately authorized qualification packages.
+/// Case bindings are installed handler policy, never model completion metadata.
+/// The correction requires all 24 cases, including live-provider and desktop
+/// assertions; a binding names a test, it does not claim that the test exists or ran.
+public struct CompletionGateAcceptancePolicy: Sendable {
+    public static let correction001Revision = "CLU-CORRECTION-001:0aa7cb3529ed1c68a6ec0bc0becdc58f5e17ed876593d5346a3aa4e6af01d779"
+    public static let correction001Cases: [String: Set<String>] = [
+        "G01": ["CLU-C01-23"],
+        "G04": ["CLU-C01-01", "CLU-C01-02", "CLU-C01-03", "CLU-C01-04", "CLU-C01-05",
+                "CLU-C01-07", "CLU-C01-08", "CLU-C01-09", "CLU-C01-10", "CLU-C01-11"],
+        "G05": ["CLU-C01-06", "CLU-C01-16"],
+        "G06": ["CLU-C01-12"], "G07": ["CLU-C01-13"], "G08": ["CLU-C01-14"],
+        "G09": ["CLU-C01-15"], "G10": ["CLU-C01-17", "CLU-C01-21"],
+        "G12": ["CLU-C01-18", "CLU-C01-19", "CLU-C01-20"],
+        "G13": ["CLU-C01-22"], "G14": ["CLU-C01-24"],
+    ]
+    private let caseBindings: [String: String]
+
+    public static func correction001(caseBindings: [String: String]) throws -> Self {
+        let known = Set(correction001Cases.values.flatMap { $0 })
+        guard Set(caseBindings.keys).isSubset(of: known),
+              Set(caseBindings.values).count == caseBindings.count,
+              caseBindings.values.allSatisfy({ !$0.isEmpty && $0.utf8.count <= 2_048 }) else {
+            throw AutonomyError.invalidRequest("correction acceptance bindings must be known, unique native case identities")
+        }
+        return Self(caseBindings: caseBindings)
+    }
+
+    func isConfigured(for gate: String) -> Bool {
+        guard let required = Self.correction001Cases[gate] else { return true }
+        return required.allSatisfy { caseBindings[$0] != nil }
+    }
+
+    func accepts(_ result: CompletionGateResult, version: UInt64) -> Bool {
+        guard let required = Self.correction001Cases[result.gate] else { return true }
+        guard isConfigured(for: result.gate), version >= 2,
+              let evidence = result.nativeEvidence,
+              evidence.inputs.policyRevision == Self.correction001Revision,
+              evidence.exitCode == 0, evidence.terminationSignal == nil,
+              !evidence.timedOut, !evidence.outputTruncated,
+              evidence.testReport.passed, evidence.testReport.failures.isEmpty else { return false }
+        let cases = evidence.testReport.cases
+        let identifiers = Set(cases.map(\.identifier))
+        return cases.allSatisfy { $0.result == "Passed" }
+            && identifiers.count == cases.count
+            && required.allSatisfy { caseBindings[$0].map(identifiers.contains) == true }
+    }
+}
+
+/// Compatibility entrypoint for callers that install native deterministic handlers.
+public struct DeterministicCompletionValidator: RunCompletionValidating, Sendable {
+    private let registry: GateValidatorRegistry
+
+    public init(validators: [CompletionGateValidator], clock: any Clock = SystemClock()) throws {
+        guard !validators.isEmpty else {
+            throw AutonomyError.invalidRequest("completion validators must be unique and bounded")
+        }
+        registry = try GateValidatorRegistry(validators: validators, clock: clock)
+    }
+
+    public func validate(_ run: AutonomousRunRecord) async throws -> CompletionValidationReceipt {
+        try await registry.validate(run)
     }
 }
 
@@ -566,6 +701,7 @@ public actor ProjectRunCoordinator {
         }
         let receipt = protected.value
         if receipt.passed {
+            try await repository.recordTrustedCompletionValidation(receipt, for: run, lease: protected.lease)
             return try await repository.completeAutonomousRun(
                 runID: run.runID,
                 lease: protected.lease,
@@ -575,13 +711,14 @@ public actor ProjectRunCoordinator {
         var work = run.specification.work
         work.pendingIntent = nil
         work.metadata["completion_proof_sha256"] = receipt.proofSHA256
+        let blocked = receipt.results.contains { $0.blocker != nil }
         return try await transition(
-            run, to: .running, lease: protected.lease,
+            run, to: blocked ? .blockedConfiguration : .running, lease: protected.lease,
             event: "autonomous_completion_rejected",
             summary: "One or more deterministic completion gates failed",
             work: work,
             errorCode: AutonomyError.completionValidationFailed.code,
-            errorSummary: "Completion gates did not all pass"
+            errorSummary: blocked ? "Install the required native gate policy or restore its required environment" : "Completion gates did not all pass"
         )
     }
 
