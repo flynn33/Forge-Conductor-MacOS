@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-09-05T12:43:42.624463+00:00",
+  "captured_at": "2026-09-05T11:59:07.373301+00:00",
   "environment_keys_present": [
     "CODEX_APP_TOOLS_PIPE_PATH",
     "CODEX_CI",
@@ -14,18 +14,18 @@
   "execution_state": {
     "available": true,
     "checkpoint_identity": {
-      "active_branch": "fix/archive-daemon-identity",
+      "active_branch": "docs/current-release-alignment",
       "base_branch": "main",
       "base_sha": "20958b93c26023ae7632cbeae6e3eff2a93374cf",
       "github_readback_verified": false,
       "head_sha": "20958b93c26023ae7632cbeae6e3eff2a93374cf",
-      "identity_resolution": "open_pull_request_not_found",
+      "identity_resolution": "no_configured_upstream",
       "main_branch": "main",
       "main_sha": "20958b93c26023ae7632cbeae6e3eff2a93374cf",
-      "publication_head_branch": "main",
-      "publication_remote": "origin",
+      "publication_head_branch": null,
+      "publication_remote": null,
       "pull_request": null,
-      "remote_head_sha": "20958b93c26023ae7632cbeae6e3eff2a93374cf"
+      "remote_head_sha": null
     },
     "completion_authority_current": false,
     "current_work": "P10",

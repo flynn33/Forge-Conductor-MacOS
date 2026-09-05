@@ -32,9 +32,24 @@
 `ManagerSettingsView`: **Start / Stop / Restart**, settings form (host/port/refresh/watchdog/TTL/shell/auto-restart), prune, doctor. It uses an in-process `ManagerNode` only when the GUI owns the service; with the normal LaunchAgent topology it uses the typed native `ManagerDashboardClient` and does not compete for the dashboard port.
 
 ## Tests
-The current full Swift package Release suite executes **1,001 tests**, with
-**5 declared environment skips** and **0 failures** under warnings-as-errors.
-The dedicated Apple Development-signed `ForgeConductorAppTests` Xcode scheme
-executes **2 app-hosted contract tests** with **0 failures**. These regression
-results do not replace the still-open native UI, real-provider, filesystem E2,
-P10, or release-signing qualification lanes.
+The [qualification status](QUALIFICATION-STATUS.md) records the exact local and
+CI counts, source bindings, and version **0.9.0**, build **1** identity. The
+retained local app-hosted tests and four production onboarding scenarios passed;
+the installed-app qualifier remains partial because its own System Events
+Settings step was not run. The separate native Settings off/on case passed.
+Subsequent Swift Debug/Release CI failed the Python containment test when the
+sandbox blocked its Xcode framework dependency. The earlier local passes do not
+make those later CI runs green.
+
+The native Release gauge component run passed four tests, including 100
+lifecycle cycles, hidden/visible draw behavior, buffer reuse, and weak-owner
+release assertions. Closed fixture windows accumulated to 101, so these results
+do not establish whole-app window or leak closure. The older 100-cycle Rig/MCP
+navigation result remains historical supporting evidence.
+
+Source bindings and artifact IDs are retained in the
+[shipping checkpoint](../.forge-codex/state/release-handoff.md#retained-qualification).
+This documentation update does not rerun those tests. The complete
+installed/native UI and service-lifecycle matrix, manager-owned real-provider
+rollover, filesystem E2, P10, Developer ID distribution, and representative
+physical-hardware qualification remain open.

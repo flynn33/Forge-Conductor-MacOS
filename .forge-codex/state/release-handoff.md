@@ -1,3 +1,61 @@
+# Documentation alignment checkpoint — September 5, 2026
+
+The owner requested alignment of the README, changelog, detailed documents,
+wiki and Xcode version surfaces. Canonical and execution checkout are now both
+`/Users/jimdaley/GitHub/Forge-Conductor`, on `docs/current-release-alignment`,
+based on merged main `20958b93c26023ae7632cbeae6e3eff2a93374cf`. The remote is
+`https://github.com/flynn33/Forge-Conductor-MacOS.git` for fetch and push.
+
+Product identity remains **0.9.0, build 1**. Resolved Debug/Release settings for
+the app, Core, CLI, runtime launcher and filesystem daemon agree. This change
+updates documentation and evidence/state only; it creates no new product
+artifact, archive, export, distribution hash, or release qualification.
+
+The four top-level operating documents, six detailed documents and
+`docs/QUALIFICATION-STATUS.md` now distinguish implemented Provider controls,
+focused native Settings/onboarding passes, the partial installed-app qualifier,
+source-bound local tests, the known GitHub Python containment failure and the
+failed full manager rollover. Thirteen wiki pages are aligned with the same
+facts and the explicit Xcode build-directory installer. Historical release
+entries, dated audits, immutable command evidence and gate statuses are retained.
+
+Documentation review is recorded in `documentation-impact.json`. The existing
+version, Xcode membership and attribution guards plus Markdown link/history
+checks are used for this documentation-only change. Runtime tests are not rerun
+or relabeled. The product remains blocked on the previously recorded hard gates.
+
+Documentation source is `ee1ea7b48a27607d174aa6e93a720a9af6fe30cf`.
+All six bounded documentation checks passed with unchanged production manifest
+`4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14`:
+
+| Check | Command record |
+|---|---|
+| Product and resolved Xcode versions | EVID-20260905T121451Z-2dbfd5b525 |
+| Documentation impact and actual changes | EVID-20260905T121504Z-53e45bccad |
+| Xcode source membership | EVID-20260905T121505Z-b79572fa05 |
+| Attribution scan | EVID-20260905T121505Z-d9390276e5 |
+| Published wiki and frozen-content readback | EVID-20260905T121714Z-c68d973c75 |
+| Repository links, fragments and historical sections | EVID-20260905T121951Z-6dd6a0d0fc |
+
+The wiki is published at `21ad902e70e41769e2401282ad8ec4e3e4d7802f`, matching
+remote master. Validation covered 17 wiki pages and 123 links/images, plus 60
+local repository links and 10 heading fragments across the eleven changed
+public documents. General external HTTP links were inventoried, not fetched.
+The gate and phase ledgers are unchanged from the start of this update.
+
+Exact documentation/source and delivery commits, repository PR, wiki commit,
+remote readback and check results are retained after publication under:
+`/Users/jimdaley/Projects/Forge-Conductor/documentation-evidence/20260905T115919Z`.
+Repository changes are submitted for review; the owner performs shipment only
+after the required product gates pass. This documentation work grants no new
+service, model, filesystem mutation or distribution authority.
+
+The shipping checkpoint below is historical source/artifact provenance. Its
+old checkout, branch, merge and cleanup descriptions apply to that recorded
+run; the canonical checkout and merged main above supersede its local location.
+
+---
+
 # Forge Conductor shipping checkpoint
 
 ## Decision: BLOCKED checkpoint; not shippable

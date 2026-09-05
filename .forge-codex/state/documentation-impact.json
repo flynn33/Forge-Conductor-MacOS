@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "reviewed_base": "20958b93c26023ae7632cbeae6e3eff2a93374cf",
+  "documents": [
+    {
+      "path": "README.md",
+      "status": "updated",
+      "reason": "Links the source-bound qualification summary and aligned wiki operator workflow."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "status": "updated",
+      "reason": "Records documentation corrections under Unreleased without changing historical releases or product behavior."
+    },
+    {
+      "path": "USER-GUIDE.md",
+      "status": "updated",
+      "reason": "Connects supported native provider controls with retained local evidence and the known CI limitation."
+    },
+    {
+      "path": "XCODE.md",
+      "status": "updated",
+      "reason": "Distinguishes passing native compilation from failed Swift CI while retaining explicit build-directory installation."
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "status": "updated",
+      "reason": "Describes current provider controls and the separate native onboarding and installed-app evidence scopes."
+    },
+    {
+      "path": "docs/CONTEXT-AGENT-CONTINUITY.md",
+      "status": "updated",
+      "reason": "Documents supported provider setup while preserving the failed full-manager rollover and open crash-recovery qualification."
+    },
+    {
+      "path": "docs/G1-G10-STATUS.md",
+      "status": "updated",
+      "reason": "Adds the current qualification boundary while retaining the historical gate table unchanged."
+    },
+    {
+      "path": "docs/LM-STUDIO-CONNECTION.md",
+      "status": "updated",
+      "reason": "Corrects provider configuration instructions and distinguishes native HTTP transport from external stdio registration."
+    },
+    {
+      "path": "docs/QUALIFICATION-STATUS.md",
+      "status": "updated",
+      "reason": "Centralizes current product identity and source-specific local and CI results with links to immutable evidence."
+    },
+    {
+      "path": "docs/RIG-PARITY.md",
+      "status": "updated",
+      "reason": "Scopes current test results, the CI failure and gauge fixture limitations without changing historical evidence."
+    },
+    {
+      "path": "docs/TELEMETRY.md",
+      "status": "updated",
+      "reason": "Documents bounded latest-value delivery and hidden gauge behavior with the retained qualification limits."
+    }
+  ],
+  "version_impact": "Documentation-only update. Product remains 0.9.0, build 1; resolved Debug and Release shipping target settings match. No source, build or resource changes and no new product artifact. Existing distribution and release gates remain open."
+}

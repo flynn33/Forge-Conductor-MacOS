@@ -1,0 +1,18 @@
+{
+  "status": "passed",
+  "report": "/Users/jimdaley/Projects/Forge-Conductor/documentation-evidence/20260905T115919Z/repository-doc-validation-recorded.json",
+  "head": "ee1ea7b48a27607d174aa6e93a720a9af6fe30cf",
+  "summary": {
+    "public_markdown_files": 11,
+    "expected_public_markdown_files": 11,
+    "fenced_blocks": 22,
+    "local_links_passed": 60,
+    "local_links_failed": 0,
+    "local_fragments_checked": 10,
+    "external_links_not_checked": 24,
+    "historical_sections_unchanged": 2,
+    "changed_source_or_build_input_count": 0,
+    "failure_count": 0
+  },
+  "failures": []
+}
