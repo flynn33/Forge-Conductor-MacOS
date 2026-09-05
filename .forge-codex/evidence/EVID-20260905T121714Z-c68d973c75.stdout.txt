@@ -1,0 +1,1 @@
+{"result": "passed", "wiki_commit": "21ad902e70e41769e2401282ad8ec4e3e4d7802f", "changed_pages": 13, "validated_pages": 17, "remote_matches": true, "content_matches_frozen_validation": true}

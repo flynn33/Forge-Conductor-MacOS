@@ -8,7 +8,7 @@ Telemetry is a **continuous native stream**, not a multi-second snapshot poll.
 |-------|----------|
 | `RealtimeMetricsEngine` | Samples host CPU/RAM/GPU/disk/process at ~30 Hz via Apple APIs |
 | `TelemetryService` | Publishes a live frame on every host sample; forge/MCP recomposed on a short utility cadence |
-| Native GUI | Subscribes to the stream; `TimelineView` paints at display rate against latest sample |
+| Native GUI | Receives bounded latest-value delivery; Metal gauges draw on demand, stop while hidden/detached, and resume with the latest values |
 | Web UI (`telemetry/static`) | Primary: `EventSource /api/stream?hz=20`; fallback: `/api/live` only if stream stalls |
 | HTTP current frame | `GET /api/live` (alias `/api/snapshot`) returns the **current** live frame for tools/compat |
 
@@ -43,16 +43,23 @@ service listener frames, multi-event SSE).
 
 ## Qualification boundary
 
-Telemetry contract and stream tests qualify only this subsystem. They do not
-close P10, filesystem E2, current G09-G12, Developer ID Release signing and
-the full native UI/settings/service matrix, the live shell app/installed-
-manager restart scenario,
-manager-owned real-provider autonomous continuity, or owner-deferred
-representative physical-hardware qualification.
+Telemetry contract and stream tests qualify only this subsystem. The retained
+Apple Development installed-app qualifier passed bounded shell app/manager
+restart checks but remains partial because its own System Events Settings step
+was not run. A separate native Xcode run passed four production onboarding
+scenarios, including Settings shell off/on with fresh MCP processes.
 
-The earlier exact-revision Apple Development-signed 100-cycle Rig/MCP navigation
-test is supporting evidence; the final current-source rerun and broader release
-runs remain required.
+The later native Release gauge component run passed four tests, including 100
+lifecycle cycles, hidden/visible draw behavior, buffer reuse, and weak-owner
+release assertions. Closed fixture windows accumulated to 101; whole-app
+window/leak closure is not established. The earlier exact-revision 100-cycle
+Rig/MCP navigation result remains historical supporting evidence. See
+[qualification status](QUALIFICATION-STATUS.md) for local/CI test counts and source scopes.
+
+P10, filesystem E2, current G09-G12, Developer ID Release signing, the complete
+installed/native UI/settings/service matrix, manager-owned real-provider
+autonomous continuity, long-duration resource budgets, and owner-deferred
+representative physical-hardware qualification remain open.
 
 ## Version
 

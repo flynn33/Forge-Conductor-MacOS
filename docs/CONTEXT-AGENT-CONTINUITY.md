@@ -87,10 +87,23 @@ predecessor fencing and idempotent sealing, automatic continuation, GUI-closed
 operation, and recovery from every durable crash state. Unit and synthetic-host
 tests do not satisfy that boundary.
 
-The adapter currently requires a validated managed-provider configuration file.
-This snapshot does not yet provide a supported clean-install app, CLI, or
-manager control that creates it; test-only file provisioning is not a product
-configuration workflow.
+The native **Provider** screen creates and updates validated, revisioned
+endpoint/model settings through authenticated manager routes. Credentials can
+be kept, replaced, or cleared; replacement tokens are stored in Keychain and
+are not returned in snapshots. **Save** persists settings even while LM Studio
+is offline. **Refresh Models**, **Test Connection**, and **Run Contract Probe**
+use the saved configuration; load models in LM Studio itself. See the
+[provider workflow](../USER-GUIDE.md#configure-the-managed-provider).
+
+Separate native onboarding tests passed offline save/rejection/manager
+replacement and real-provider discovery/connection. These configure and probe
+the provider; they do not prove autonomous rollover. The retained final
+manager-owned run failed before an accepted bootstrap receipt and did not reach
+the intended injected crash. A smaller passing fresh-root/continuation
+diagnostic remains supporting evidence, as recorded in the
+[shipping checkpoint](../.forge-codex/state/release-handoff.md#retained-qualification).
+See [qualification status](QUALIFICATION-STATUS.md) for the current summary of
+retained local and CI results.
 
 ## Bootstrap (new chat)
 

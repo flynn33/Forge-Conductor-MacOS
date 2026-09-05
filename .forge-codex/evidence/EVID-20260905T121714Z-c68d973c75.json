@@ -1,0 +1,120 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 3496,
+      "path": "/Users/jimdaley/Projects/Forge-Conductor/documentation-evidence/20260905T115919Z/wiki-validation.json",
+      "portability": "origin-host-required",
+      "sha256": "9aea9b0103d3222d2eb51a65bb2757419dccc31385f4132591f9636a9954798a",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 7008,
+      "path": "/Users/jimdaley/Projects/Forge-Conductor/documentation-evidence/20260905T115919Z/wiki-validator.py",
+      "portability": "origin-host-required",
+      "sha256": "9ee60ea4a4b3c0e4d9809a43f0c6e40bc9acba854b52de270b01888d3c4cc04d",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 420,
+      "path": "/Users/jimdaley/Projects/Forge-Conductor/documentation-evidence/20260905T115919Z/wiki-delivery-readback.json",
+      "portability": "origin-host-required",
+      "sha256": "7a4383ff3d0ba79a3df1c950bb879a4ed639ccd7bf4459b8875afff2991bf53a",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 1153,
+      "path": "/Users/jimdaley/Projects/Forge-Conductor/documentation-evidence/20260905T115919Z/verify-wiki-delivery.py",
+      "portability": "origin-host-required",
+      "sha256": "078132410f9be86868eabbb9f02025b874f328ed0a9de31a40d7b77f59288e26",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 191,
+      "path": ".forge-codex/evidence/EVID-20260905T121714Z-c68d973c75.stdout.txt",
+      "sha256": "dd96fd2a1519649f149758382fff7c3f35d744b19f3efc69fd312e677242ef9e",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260905T121714Z-c68d973c75.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "child_evidence_context": {
+    "binding_schema_version": 1,
+    "evidence_id": "EVID-20260905T121714Z-c68d973c75",
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "20958b93c26023ae7632cbeae6e3eff2a93374cf",
+      "branch": "docs/current-release-alignment",
+      "head_sha": "ee1ea7b48a27607d174aa6e93a720a9af6fe30cf",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor"
+    },
+    "schema_version": 1,
+    "source_manifest": {
+      "bytes": 13422208,
+      "file_count": 392,
+      "schema_version": 1,
+      "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "command": "python3 /Users/jimdaley/Projects/Forge-Conductor/documentation-evidence/20260905T115919Z/verify-wiki-delivery.py",
+  "ended_at": "2026-09-05T12:17:15.178474+00:00",
+  "environment": {
+    "architecture": "arm64",
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor",
+    "machine_identifier": "Mac16,7",
+    "macos_build": "25G83",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "execution_provenance": {
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "20958b93c26023ae7632cbeae6e3eff2a93374cf",
+      "branch": "docs/current-release-alignment",
+      "head_sha": "ee1ea7b48a27607d174aa6e93a720a9af6fe30cf",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "exit_code": 0,
+  "id": "EVID-20260905T121714Z-c68d973c75",
+  "kind": "documentation-wiki-publication",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [],
+  "related_gates": [],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 13422208,
+    "file_count": 392,
+    "schema_version": 1,
+    "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"
+  },
+  "source_manifest_after": {
+    "bytes": 13422208,
+    "file_count": 392,
+    "schema_version": 1,
+    "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-09-05T12:17:14.832248+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}
