@@ -5,7 +5,7 @@ PKG="$ROOT/.forge-codex"
 RESULT="$PKG/state/gate-results"
 mkdir -p "$RESULT"
 "$PKG/scripts/doctor.sh" > "$RESULT/G00.doctor.log"
-"$PKG/scripts/validate_package.py" --root "$PKG" > "$RESULT/G00.package.log"
+"$PKG/scripts/validate_package.py" --root "$PKG" --report "$RESULT/G00.package-validation.json" > "$RESULT/G00.package.log"
 "$PKG/scripts/statectl.py" --repo "$ROOT" validate > "$RESULT/G00.state.log"
 bash -n "$ROOT/script/build_and_run.sh" > "$RESULT/G00.build-script.log"
 python3 - "$ROOT" "$RESULT" <<'PY'
@@ -17,7 +17,7 @@ def a(path):
 criteria=[
  {"criterion":"environment doctor exits with recorded capability status","passed":True,"evidence":[a(out/"G00.doctor.log"),a(root/".forge-codex/state/environment.json")]},
  {"criterion":"repository shape and Git state recorded","passed":True,"evidence":[a(root/".forge-codex/state/run-state.json")]},
- {"criterion":"package validation passes","passed":True,"evidence":[a(out/"G00.package.log"),a(root/".forge-codex/PACKAGE_VALIDATION.json")]},
+ {"criterion":"package validation passes","passed":True,"evidence":[a(out/"G00.package.log"),a(out/"G00.package-validation.json")]},
  {"criterion":"reproducible build entrypoint exists or tracked implementation task is active","passed":(root/"script/build_and_run.sh").is_file(),"evidence":[a(out/"G00.build-script.log"),a(root/"script/build_and_run.sh")]}
 ]
 json.dump({"criteria_results":criteria},open(out/"G00.criteria.json","w"),indent=2)

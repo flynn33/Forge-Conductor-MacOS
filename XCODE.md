@@ -241,7 +241,11 @@ responsiveness, bounded admission, cancellation, retry, owner release and actual
 disposable diagnostics export. `NativeGaugeLifecycleTests` uses real AppKit
 windows and Metal draws, including hide/show and release postconditions. Set
 `TEST_RUNNER_FORGE_GAUGE_LIFECYCLE_CYCLES=100` for the repeated Release flow;
-the test validates this bounded count. Run GUI and app-hosted tests serially.
+the test validates this bounded count. Optimized app-hosted test invocations
+also require `ENABLE_TESTABILITY=YES` so their `@testable` imports can resolve
+the app module. Keep this override on the test invocation and retain Release
+optimization; ordinary installable builds use their default visibility. Run
+GUI and app-hosted tests serially.
 
 Address Sanitizer and Thread Sanitizer use separate DerivedData and result
 bundles. Process-runner regressions exercise large output on both streams,
@@ -249,8 +253,10 @@ continuous output with timeout, termination-handler output, cancellation and
 process-group reaping. A sanitizer pass is not a clean performance profile;
 retained Thread Performance Checker diagnostics still need their own assessment.
 
-The UI test runner intentionally has no app sandbox, matching the ordinary
-product. This is a test-target entitlement choice: it lets native Settings tests
+The UI test runner explicitly sets `com.apple.security.app-sandbox` to false,
+matching the ordinary product. Removing the key alone does not work: Xcode
+merges a true default from its XCTRunner RunnerEntitlements.plist. The explicit
+false preserves all other injected automation permissions. This is a test-target entitlement choice: it lets native Settings tests
 launch the signed MCP executable, whose shell policy creates its own sandbox.
 A sandboxed runner prevented that nested sandbox with `sandbox_apply` exit 71,
 so it could not measure the ordinary product path. Production entitlements and

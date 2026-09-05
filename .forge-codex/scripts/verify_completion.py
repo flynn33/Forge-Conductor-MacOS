@@ -800,6 +800,8 @@ class CompletionEvaluation:
                 str(self.package / "scripts/validate_package.py"),
                 "--root",
                 str(self.package),
+                "--report",
+                str(self.package / "state/completion-package-validation.json"),
             ],
             "package validation",
         )

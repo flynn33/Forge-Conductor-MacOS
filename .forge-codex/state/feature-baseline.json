@@ -1788,7 +1788,7 @@
       ]
     },
     {
-      "baseline_status": "present_broken",
+      "baseline_status": "present",
       "category": "integration",
       "evidence": [
         "Sources/ForgeNativeSessionHostPlugin/ForgeNativeSessionHostPlugin.swift",
@@ -1830,7 +1830,7 @@
       ]
     }
   ],
-  "generated_at": "2026-09-04T23:59:54.280513+00:00",
+  "generated_at": "2026-09-05T00:20:18.301986+00:00",
   "historical_static_inventory": {
     "authority": "historical_discovery_only",
     "bytes": 97584,
@@ -1976,10 +1976,10 @@
       ".forge-codex/state/feature-baseline.json"
     ],
     "manifest": {
-      "bytes": 13276732,
-      "file_count": 389,
+      "bytes": 13287126,
+      "file_count": 391,
       "schema_version": 1,
-      "sha256": "6c80140d7ab945ad642f7ce4cc4458310e3d461f3bab4fec720f9c7b98882602"
+      "sha256": "adfba9a7d96d0346f250977d2d77ff38efeed6c65ce2cd9e4a20ec75046e94d9"
     },
     "schema_version": 1,
     "scope": "current_controlled_source_excluding_feature_baseline"

@@ -62,6 +62,9 @@ installed-stack and complete production-feature acceptance remain separate gates
 - The feature qualifier includes a reviewed installed CLI version/help scenario
   bound to its recorded ordinary build, actual installation, signatures and raw
   process observations. The complete production-feature matrix remains required.
+- Gate discovery preserves the pinned historical inventory. Current package
+  validation reports are written under the evidence state directory so recording
+  a new check does not rewrite the original package report.
 
 - Provider request admission now rejects overlapping work before queuing
   credential payloads. Unsaved provider edits must be saved before model refresh

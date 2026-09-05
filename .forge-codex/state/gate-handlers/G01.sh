@@ -5,7 +5,7 @@ PKG="$ROOT/.forge-codex"
 RESULT="$PKG/state/gate-results"
 BASE="$PKG/state/baseline"
 mkdir -p "$RESULT"
-"$PKG/scripts/feature_inventory.py" --repo "$ROOT" --output "$RESULT/G01.static-inventory.json" > "$RESULT/G01.inventory.log"
+"$PKG/scripts/feature_inventory.py" --repo "$ROOT" --output "$RESULT/G01.current-static-inventory.json" > "$RESULT/G01.inventory.log"
 python3 - "$ROOT" "$RESULT" "$BASE" <<'PY'
 import hashlib,json,sys
 from pathlib import Path

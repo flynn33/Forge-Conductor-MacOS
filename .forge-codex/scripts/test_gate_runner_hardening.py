@@ -691,7 +691,8 @@ class GateRunnerHardeningTests(unittest.TestCase):
                         "#!/usr/bin/env python3\n"
                         "import json, pathlib, sys\n"
                         "package = pathlib.Path(sys.argv[sys.argv.index('--root') + 1])\n"
-                        "(package / 'PACKAGE_VALIDATION.json').write_text(json.dumps({'valid': True}) + '\\n', encoding='utf-8')\n"
+                        "report = pathlib.Path(sys.argv[sys.argv.index('--report') + 1])\n"
+                        "report.write_text(json.dumps({'valid': True}) + '\\n', encoding='utf-8')\n"
                         "print(package)\n",
                         encoding="utf-8",
                     )
