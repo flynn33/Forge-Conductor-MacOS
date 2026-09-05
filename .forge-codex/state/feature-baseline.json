@@ -1976,10 +1976,10 @@
       ".forge-codex/state/feature-baseline.json"
     ],
     "manifest": {
-      "bytes": 13314347,
+      "bytes": 13323129,
       "file_count": 391,
       "schema_version": 1,
-      "sha256": "0b01fa2b05168f508eecd42ea26035ee7c614be5dac4b8e99b7d0955f1b387b8"
+      "sha256": "6cca1a8ea8f225bed4d9399c86fbd63c9d294cf39c3d8e54d43a7b66771acd5b"
     },
     "schema_version": 1,
     "scope": "current_controlled_source_excluding_feature_baseline"
