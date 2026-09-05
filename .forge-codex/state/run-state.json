@@ -743,6 +743,10 @@
     "EVID-20260905T121505Z-d9390276e5",
     "EVID-20260905T121714Z-c68d973c75",
     "EVID-20260905T121951Z-6dd6a0d0fc",
+    "EVID-20260905T125338Z-846fba9fea",
+    "EVID-20260905T125627Z-34ff699278",
+    "EVID-20260905T125628Z-9c5637aa67",
+    "EVID-20260905T152217Z-7a8b9ece87",
     "a1277de1a0f15a9f0472b5212f88448647ff367f124793fe46bd2a5caad59f8e",
     "a5466d4e5b4d7a10f87df64ddfdb58b6b8ca5159a57c20527e98802a822245d7",
     "a5d4276cbf14db3a91baa7f6b79fb8cdb3fb042a2eaf663d3219ff36b5451667",
@@ -1411,7 +1415,7 @@
       "updated_at": "2026-09-05T02:19:55.997987+00:00"
     }
   ],
-  "last_event_sequence": 1086,
+  "last_event_sequence": 1093,
   "phases": {
     "P00": {
       "attempts": 1,
@@ -1493,13 +1497,13 @@
     }
   },
   "repository": {
-    "branch": "docs/current-release-alignment",
-    "commit": "ee1ea7b48a27607d174aa6e93a720a9af6fe30cf",
+    "branch": "rescue/clu-shippable-2026-09-05",
+    "commit": "786396991f8159da8919f1812355c19d9445ddbb",
     "dirty": true,
-    "root": "/Users/jimdaley/GitHub/Forge-Conductor"
+    "root": "/Users/jimdaley/GitHub/Forge-Conductor-CLU-Rescue"
   },
   "run_id": "aba90ab1-be80-4cc5-aa0b-23dd54d4a24d",
   "schema_version": 1,
   "status": "blocked_environment",
-  "updated_at": "2026-09-05T12:20:36.921825+00:00"
+  "updated_at": "2026-09-05T15:23:42.890259+00:00"
 }

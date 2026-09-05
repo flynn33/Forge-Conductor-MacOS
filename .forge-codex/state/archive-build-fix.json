@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "source_commit": "4beae21dad28dd336a3502a52097c11d54143604",
+  "canonical_checkout": "/Users/jimdaley/GitHub/Forge-Conductor",
+  "downloaded_checkout": "/Users/jimdaley/Downloads/Forge-Conductor-MacOS-main",
+  "downloaded_user_settings_preserved": true,
+  "changed_project_objects": [
+    "E2F500000000000000000046",
+    "CEFEFE9428CD4B5F869BE9F3",
+    "E2F500000000000000000045",
+    "63739DAB5B654C0B846F75C1"
+  ],
+  "source_comparison": {
+    "canonical_source_files": 188,
+    "different_files": [],
+    "sealed_script_identical": true
+  },
+  "archive_status": "succeeded",
+  "archive_errors": 0,
+  "archive_warnings": 0,
+  "archive_signing": "Apple Development, team 9AQ2C2838M; local validation only",
+  "bundle_signatures_and_daemon_seals": "passed",
+  "product_version": "0.9.0",
+  "product_build": "1",
+  "new_regression_tests": 9,
+  "existing_utility_tests": 84,
+  "evidence_ids": [
+    "EVID-20260905T125338Z-846fba9fea",
+    "EVID-20260905T125627Z-34ff699278",
+    "EVID-20260905T125628Z-9c5637aa67"
+  ],
+  "external_evidence_directory": "/Users/jimdaley/Projects/Forge-Conductor/build-fix-evidence/20260905T124341Z",
+  "sealed_script_changed": false,
+  "shipment_performed": false,
+  "gate_status_changes": false
+}

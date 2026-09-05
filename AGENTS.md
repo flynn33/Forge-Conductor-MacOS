@@ -1,13 +1,18 @@
 <!-- FORGE-SHIPPING:BEGIN -->
-# Active shipping execution contract
+# Active CLU rescue execution contract
 
-The September 4 shipping package supersedes earlier instruction packages.
-Read `.forge-codex/shipping/EXECUTION.md` and its current work order. Use the
-existing `.forge-codex` doctor, selector, evidence recorder, gates, and handoff;
-do not bootstrap historical packages or initialize a competing ledger.
-Preserve the substantive safety, compatibility, ownership, and evidence
-requirements below. Build and test the application; the owner ships manually.
+The owner selected the September 5, 2026 CLU Shippable Rescue package at
+`/Users/jimdaley/Projects/Forge-Conductor/Forge-Conductor-CLU-Shippable-Rescue-2026-09-05`.
+Read its START-HERE.md and CODEX-EXECUTION-PROMPT.md. Its
+`phases/work-packages.json` governs P00-P14 scheduling. The active rescue
+record is `/Users/jimdaley/Projects/Forge-Conductor/rescue-evidence/20260905T145048Z/run-state.json`.
+Use the package selector against that explicit record. Existing doctor,
+state/evidence tools and completion gates remain required evidence tools;
+the historical selector is read-only context, not current dispatch authority.
+Preserve the prior ledger, event chain, feature baseline and all substantive
+safety, compatibility, ownership and qualification requirements below.
 No attribution credits, trailers, or attributed artifact/branch names.
+Build and qualify the candidate; the owner controls protected merges and shipping.
 <!-- FORGE-SHIPPING:END -->
 
 <!-- FORGE-AUTONOMOUS-CONTINUITY-DESIGN:BEGIN -->

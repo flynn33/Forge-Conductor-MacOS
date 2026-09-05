@@ -1,0 +1,19 @@
+{
+  "check": "versions",
+  "status": "passed",
+  "facts": {
+    "repository": "/Users/jimdaley/GitHub/Forge-Conductor",
+    "marketing_version": "0.9.0",
+    "build": "1",
+    "literal_xcode_declarations": {
+      "MARKETING_VERSION": 12,
+      "CURRENT_PROJECT_VERSION": 16
+    },
+    "effective_setting_values_checked": 2,
+    "built_app_checked": true
+  },
+  "warnings": [
+    "Nested Mach-O identities and runtime behavior require the native bundle checker."
+  ],
+  "scope": "Named integrity check only; not product qualification or release authorization."
+}

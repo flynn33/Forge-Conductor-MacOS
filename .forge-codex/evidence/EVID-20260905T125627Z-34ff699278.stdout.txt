@@ -1,0 +1,20 @@
+{
+  "check": "docs",
+  "status": "passed",
+  "facts": {
+    "base": "20958b93c26023ae7632cbeae6e3eff2a93374cf",
+    "snapshot": "HEAD",
+    "release_range": false,
+    "reviewed_documents": [
+      "CHANGELOG.md",
+      "README.md",
+      "USER-GUIDE.md",
+      "XCODE.md"
+    ],
+    "changed_file_count": 10
+  },
+  "warnings": [
+    "Coverage and actual diffs checked; human/agent content review still must verify accuracy."
+  ],
+  "scope": "Named integrity check only; not product qualification or release authorization."
+}

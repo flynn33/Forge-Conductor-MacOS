@@ -51,7 +51,8 @@ class NativeCITests(unittest.TestCase):
         return [json.loads(line) for line in self.log.read_text().splitlines()]
 
     def test_integrity_failures_propagate_through_logging(self):
-        for command in ('unittest', 'scan_attribution.py', 'versions', 'xcode --repo'):
+        for command in ('unittest', 'test_seal_filesystem_daemon_identity.py',
+                        'scan_attribution.py', 'versions', 'xcode --repo'):
             with self.subTest(command=command):
                 result = self.run_lane('integrity', FAIL_COMMAND='python3', FAIL_FRAGMENT=command)
                 self.assertEqual(result.returncode, 77)
@@ -72,6 +73,8 @@ class NativeCITests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             call = [args for args in self.calls() if args[:2] == ['swift', 'test']][-1]
             self.assertIn('-warnings-as-errors', call)
+            self.assertIn('--parallel', call)
+            self.assertEqual(call[call.index('--num-workers') + 1], '1')
             self.assertEqual(call[call.index('--configuration') + 1], configuration)
             self.assertTrue((self.output / 'swift-tests.xml').is_file())
 

@@ -156,7 +156,7 @@ enum RuntimeProcessSandbox {
 
         let readRoots = readAuthorizationRoots.map(\.path)
             + [canonicalManagerRead.path, canonicalScratch.path]
-            + immutableSystemReadRoots
+            + canonicalReadPaths(immutableSystemReadRoots)
         let writeRoots = writableAuthorizationRoots.map(\.path) + [canonicalScratch.path]
         // Sandbox path filters need search access to every parent directory in
         // order for getcwd(3), shell startup, and script opening to reach an
@@ -274,9 +274,16 @@ enum RuntimeProcessSandbox {
 
     static func isImmutableSystemRuntime(_ url: URL) -> Bool {
         let canonical = canonicalExistingURL(url)
-        return immutableSystemReadRoots.contains {
-            contains(canonical, root: canonicalExistingURL(URL(fileURLWithPath: $0)))
+        return canonicalReadPaths(immutableSystemReadRoots).contains {
+            contains(canonical, root: URL(fileURLWithPath: $0))
         }
+    }
+
+    /// Admission and the kernel profile must name the same physical roots.
+    /// Xcode installations may expose Xcode.app as an alias to a versioned app.
+    /// Resolving that existing allowlist does not authorize its parent or siblings.
+    static func canonicalReadPaths(_ paths: [String]) -> [String] {
+        Array(Set(paths.map { canonicalExistingURL(URL(fileURLWithPath: $0)).path })).sorted()
     }
 
     private static func contains(_ child: URL, in roots: [URL]) -> Bool {

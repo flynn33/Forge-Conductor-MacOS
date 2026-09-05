@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-09-05T11:59:07.373301+00:00",
+  "captured_at": "2026-09-05T14:54:01.611753+00:00",
   "environment_keys_present": [
     "CODEX_APP_TOOLS_PIPE_PATH",
     "CODEX_CI",
@@ -14,14 +14,14 @@
   "execution_state": {
     "available": true,
     "checkpoint_identity": {
-      "active_branch": "docs/current-release-alignment",
+      "active_branch": "rescue/clu-shippable-2026-09-05",
       "base_branch": "main",
-      "base_sha": "20958b93c26023ae7632cbeae6e3eff2a93374cf",
+      "base_sha": "4bbdf14079bec7543dfa7705645494593ec64396",
       "github_readback_verified": false,
-      "head_sha": "20958b93c26023ae7632cbeae6e3eff2a93374cf",
+      "head_sha": "8a85dbabbcfdc982fc17e4cbc2ab12b4c3b268c2",
       "identity_resolution": "no_configured_upstream",
       "main_branch": "main",
-      "main_sha": "20958b93c26023ae7632cbeae6e3eff2a93374cf",
+      "main_sha": "4bbdf14079bec7543dfa7705645494593ec64396",
       "publication_head_branch": null,
       "publication_remote": null,
       "pull_request": null,
@@ -254,10 +254,10 @@
     },
     "release_authorized": false,
     "repository": {
-      "branch": "release/0.9.0-shipping",
-      "commit": "b1876cf5b05134292ce0ecc6fb14ee67535c156c",
+      "branch": "rescue/clu-shippable-2026-09-05",
+      "commit": "5f812c3a96ebe72542db417d5d9252b361865f7e",
       "dirty": true,
-      "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
+      "root": "/Users/jimdaley/GitHub/Forge-Conductor-CLU-Rescue"
     },
     "run_status": "blocked_environment"
   },
@@ -265,7 +265,7 @@
   "macos_runtime_capable": true,
   "platform": "macOS-26.6.2-arm64-arm-64bit",
   "project_markers": {
-    "package_swift": "/Users/jimdaley/GitHub/Forge-Conductor/Package.swift",
+    "package_swift": "/Users/jimdaley/GitHub/Forge-Conductor-CLU-Rescue/Package.swift",
     "projects": [
       "ForgeConductor.xcodeproj"
     ],
@@ -273,7 +273,7 @@
       "ForgeConductor.xcworkspace"
     ]
   },
-  "repository_root": "/Users/jimdaley/GitHub/Forge-Conductor",
+  "repository_root": "/Users/jimdaley/GitHub/Forge-Conductor-CLU-Rescue",
   "schema_version": 1,
   "tools": {
     "bash": {

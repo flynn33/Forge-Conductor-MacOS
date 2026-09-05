@@ -1,0 +1,148 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 833393,
+      "path": "/Users/jimdaley/Projects/Forge-Conductor/build-fix-evidence/20260905T124341Z/downloaded-archive.log",
+      "portability": "origin-host-required",
+      "sha256": "ba590f45696736de5f7a22d5bc5cbd1dd24772db6e1c3bd672e438abdcb3e423",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 14865,
+      "path": "/Users/jimdaley/Projects/Forge-Conductor/build-fix-evidence/20260905T124341Z/archived-bundle-validation.log",
+      "portability": "origin-host-required",
+      "sha256": "39dbb00c645c7a6127bf105dab2951d835eed93ff2675eb7f3187d64896ae163",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 96,
+      "path": "/Users/jimdaley/Projects/Forge-Conductor/build-fix-evidence/20260905T124341Z/downloads-source-comparison.json",
+      "portability": "origin-host-required",
+      "sha256": "7a03e4edad7aa099d1e022e259ec45d56e622f4ed72ed63ed152b95849d5dd26",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 50558,
+      "path": "/Users/jimdaley/Projects/Forge-Conductor/build-fix-evidence/20260905T124341Z/canonical-archive-settings.json",
+      "portability": "origin-host-required",
+      "sha256": "60f878790efc37af2009674f84ec9b1431249479e79cd439c6fa847d776c7eab",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 1879,
+      "path": "/Users/jimdaley/Projects/Forge-Conductor/build-fix-evidence/20260905T124341Z/Downloaded-Validation.xcarchive/Products/Applications/Forge Conductor.app/Contents/Info.plist",
+      "portability": "origin-host-required",
+      "sha256": "6a8ac383a6fec1b66f3b2210d206d1feb8a703b9a6d1129331186af2dcf99890",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 3697632,
+      "path": "/Users/jimdaley/Projects/Forge-Conductor/build-fix-evidence/20260905T124341Z/Downloaded-Validation.xcarchive/Products/Applications/Forge Conductor.app/Contents/MacOS/Forge Conductor",
+      "portability": "origin-host-required",
+      "sha256": "bcbbfdf7e122f058071aaa10c0d54cc6d162d6340fdfb167b917421c4f4d76d7",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 768624,
+      "path": "/Users/jimdaley/Projects/Forge-Conductor/build-fix-evidence/20260905T124341Z/Downloaded-Validation.xcarchive/Products/Applications/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon",
+      "portability": "origin-host-required",
+      "sha256": "b7a477366ecef3527b3a7c8ef031a1593bd63e4d75652631a09911f0fa1958b6",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 334000,
+      "path": "/Users/jimdaley/Projects/Forge-Conductor/build-fix-evidence/20260905T124341Z/Downloaded-Validation.xcarchive/Products/Applications/Forge Conductor.app/Contents/Helpers/forge-conductor",
+      "portability": "origin-host-required",
+      "sha256": "90f90c3975b270ddbaac3d7e9c223dc8d837a3f1a179b8ca5d61e2bbff3c2d4a",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 563,
+      "path": ".forge-codex/evidence/EVID-20260905T125628Z-9c5637aa67.stdout.txt",
+      "sha256": "d4db6176ed333e57cc8c3029ee1bae6b930a8f5e5a3007ec3975e8002ce0032a",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260905T125628Z-9c5637aa67.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "child_evidence_context": {
+    "binding_schema_version": 1,
+    "evidence_id": "EVID-20260905T125628Z-9c5637aa67",
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "20958b93c26023ae7632cbeae6e3eff2a93374cf",
+      "branch": "fix/archive-daemon-identity",
+      "head_sha": "4beae21dad28dd336a3502a52097c11d54143604",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor"
+    },
+    "schema_version": 1,
+    "source_manifest": {
+      "bytes": 13433463,
+      "file_count": 393,
+      "schema_version": 1,
+      "sha256": "a36addcee3c9d68f9a4af3f2074775ea38a341f166d02347266c38ac7221f5c1"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "command": "python3 .forge-codex/shipping/scripts/shipping_guard.py versions --repo . --settings /Users/jimdaley/Projects/Forge-Conductor/build-fix-evidence/20260905T124341Z/canonical-archive-settings.json --app '/Users/jimdaley/Projects/Forge-Conductor/build-fix-evidence/20260905T124341Z/Downloaded-Validation.xcarchive/Products/Applications/Forge Conductor.app'",
+  "ended_at": "2026-09-05T12:56:28.301515+00:00",
+  "environment": {
+    "architecture": "arm64",
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor",
+    "machine_identifier": "Mac16,7",
+    "macos_build": "25G83",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "execution_provenance": {
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "20958b93c26023ae7632cbeae6e3eff2a93374cf",
+      "branch": "fix/archive-daemon-identity",
+      "head_sha": "4beae21dad28dd336a3502a52097c11d54143604",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "exit_code": 0,
+  "id": "EVID-20260905T125628Z-9c5637aa67",
+  "kind": "archive-fix-product-identity",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [],
+  "related_gates": [],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 13433463,
+    "file_count": 393,
+    "schema_version": 1,
+    "sha256": "a36addcee3c9d68f9a4af3f2074775ea38a341f166d02347266c38ac7221f5c1"
+  },
+  "source_manifest_after": {
+    "bytes": 13433463,
+    "file_count": 393,
+    "schema_version": 1,
+    "sha256": "a36addcee3c9d68f9a4af3f2074775ea38a341f166d02347266c38ac7221f5c1"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-09-05T12:56:28.249993+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

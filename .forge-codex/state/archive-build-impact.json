@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "reviewed_base": "20958b93c26023ae7632cbeae6e3eff2a93374cf",
+  "documents": [
+    {
+      "path": "README.md",
+      "status": "not_applicable",
+      "reason": "Product overview, version, supported workflows and qualification boundary do not change."
+    },
+    {
+      "path": "USER-GUIDE.md",
+      "status": "not_applicable",
+      "reason": "The fix changes Xcode archive input paths only; operator behavior and setup are unchanged."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "status": "updated",
+      "reason": "Records the archive identity-sealing fix and preserved version/security checks."
+    },
+    {
+      "path": "XCODE.md",
+      "status": "updated",
+      "reason": "Explains the direct archive product path and the specific old-checkout failure."
+    }
+  ],
+  "version_impact": "Build-system correction only. Keep 0.9.0, build 1; no new distributed release."
+}
