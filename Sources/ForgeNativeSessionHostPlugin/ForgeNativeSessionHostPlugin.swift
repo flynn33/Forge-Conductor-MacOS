@@ -1853,11 +1853,20 @@ public actor LMStudioManagedSessionTransport: LMStudioManagedTransporting {
         guard inFlight.count < Self.maximumInFlightOperations else {
             throw LMStudioProviderError.limitExceeded("concurrent provider operation")
         }
-        let task = Task { try await operation() }
+        let task = Task {
+            try Task.checkCancellation()
+            return try await operation()
+        }
         inFlight[idempotencyKey] = task
         if let operationID { operationToIdempotencyKey[operationID] = idempotencyKey }
         do {
-            let turn = try await task.value
+            // Only the creator owns cancellation. A coalesced idempotency waiter
+            // above must not cancel another caller's in-flight provider request.
+            let turn = try await withTaskCancellationHandler {
+                try await task.value
+            } onCancel: {
+                task.cancel()
+            }
             inFlight.removeValue(forKey: idempotencyKey)
             if let operationID { operationToIdempotencyKey.removeValue(forKey: operationID) }
             store(turn, for: idempotencyKey)
@@ -3320,8 +3329,13 @@ public actor LMStudioManagedSessionHostAdapterV2: SessionHostAdapterV2 {
             if let current = currentIndex(keyDigest: keyDigest),
                ledger.records[current].status != .accepted,
                ledger.records[current].status != .cancelled {
-                ledger.records[current].status = failureStatus(error)
-                ledger.records[current].errorCode = errorCode(error)
+                // A stopped manager releases its live request without declaring
+                // the durable continuity operation cancelled. Restart must still
+                // reconcile this exact operation and handoff through its receipt.
+                let ownerInterrupted = Task.isCancelled
+                    && (error is CancellationError || (error as? LMStudioProviderError) == .cancelled)
+                ledger.records[current].status = ownerInterrupted ? .retryableFailure : failureStatus(error)
+                ledger.records[current].errorCode = ownerInterrupted ? "owner_interrupted" : errorCode(error)
                 ledger.records[current].updatedAt = ISO8601.string(from: Date())
                 try? persist()
             }

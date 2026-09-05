@@ -115,6 +115,7 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
 
     private var providers: [String: any ManagedModelProvider] = [:]
     private var activeRequests: [RunID: ActiveProviderRequest] = [:]
+    private var activeContinuity: (runID: RunID, task: Task<ProjectRunStepOutcome, Error>)?
     private var yieldedAfterStep = false
 
     public init(
@@ -175,13 +176,23 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
         try Task.checkCancellation()
         switch intent.kind {
         case .continuity:
+            guard activeContinuity == nil else {
+                throw AutonomyError.invalidRequest("a continuity step is already active on this executor")
+            }
             yieldedAfterStep = true
-            return try await continuity.executeContinuityStep(
-                intent: intent,
-                run: run,
-                context: context,
-                lease: lease
-            )
+            let task = Task { [continuity] in
+                try Task.checkCancellation()
+                return try await continuity.executeContinuityStep(
+                    intent: intent, run: run, context: context, lease: lease
+                )
+            }
+            activeContinuity = (run.runID, task)
+            defer { activeContinuity = nil }
+            return try await withTaskCancellationHandler {
+                try await task.value
+            } onCancel: {
+                task.cancel()
+            }
         case .providerTurn:
             let outcome = try await executeProviderStep(intent, run: run, lease: lease)
             yieldedAfterStep = true
@@ -194,6 +205,9 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
     }
 
     public func cancel(runID: RunID) async {
+        if let active = activeContinuity, active.runID == runID {
+            active.task.cancel()
+        }
         if let active = activeRequests.removeValue(forKey: runID) {
             await active.provider.cancel(requestID: active.requestID)
         }

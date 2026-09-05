@@ -1,8 +1,33 @@
 import Foundation
 
+private final class BootstrapSuspension: @unchecked Sendable {
+    private let lock = NSLock()
+    private var enabled = false
+    private var requests: [ObjectIdentifier: @Sendable () -> Void] = [:]
+    var isEnabled: Bool { lock.withLock { enabled } }
+    var count: Int { lock.withLock { requests.count } }
+    func setEnabled(_ value: Bool) { lock.withLock { enabled = value } }
+    func insert(_ request: ObjectIdentifier, resume: @escaping @Sendable () -> Void) {
+        lock.withLock { requests[request] = resume }
+    }
+    func remove(_ request: ObjectIdentifier) { _ = lock.withLock { requests.removeValue(forKey: request) } }
+    func resumeAll() {
+        let callbacks = lock.withLock {
+            let callbacks = Array(requests.values)
+            requests.removeAll()
+            return callbacks
+        }
+        for callback in callbacks { callback() }
+    }
+}
+
 /// Deterministic URLSession transport for LM Studio contract tests.
 /// It is compiled only into the test target and cannot be registered by product code.
 final class LMStudioContractFixtureServer: URLProtocol, @unchecked Sendable {
+    private static let suspension = BootstrapSuspension()
+    static func suspendBootstrapRequests(_ enabled: Bool) { suspension.setEnabled(enabled) }
+    static var suspendedBootstrapCount: Int { suspension.count }
+    static func resumeBootstrapRequests() { suspension.resumeAll() }
     private static let fixtureDirectory = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
         .appendingPathComponent("Fixtures/LMStudio", isDirectory: true)
@@ -23,6 +48,16 @@ final class LMStudioContractFixtureServer: URLProtocol, @unchecked Sendable {
 
         do {
             let route = try Self.route(request)
+            if route.suspendBootstrap {
+                stateLock.withLock {
+                    guard !stopped else { return }
+                    suspendedBootstrap = true
+                    Self.suspension.insert(ObjectIdentifier(self)) { [weak self] in
+                        self?.deliver(route, url: url)
+                    }
+                }
+                return
+            }
             DispatchQueue.global(qos: .utility).async { [weak self] in
                 if route.delay > 0 {
                     Thread.sleep(forTimeInterval: route.delay)
@@ -37,6 +72,9 @@ final class LMStudioContractFixtureServer: URLProtocol, @unchecked Sendable {
     override func stopLoading() {
         stateLock.lock()
         stopped = true
+        let wasSuspended = suspendedBootstrap
+        suspendedBootstrap = false
+        if wasSuspended { Self.suspension.remove(ObjectIdentifier(self)) }
         stateLock.unlock()
     }
 
@@ -48,10 +86,12 @@ final class LMStudioContractFixtureServer: URLProtocol, @unchecked Sendable {
         var firstByteDelay: TimeInterval = 0
         var interChunkDelay: TimeInterval = 0
         var failureAfterFirstChunk: URLError.Code?
+        var suspendBootstrap = false
     }
 
     private let stateLock = NSLock()
     private var stopped = false
+    private var suspendedBootstrap = false
 
     private func deliver(_ route: Route, url: URL) {
         stateLock.lock()
@@ -98,6 +138,7 @@ final class LMStudioContractFixtureServer: URLProtocol, @unchecked Sendable {
                 data: try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]),
                 encoding: .utf8
             ) ?? ""
+            let shouldSuspend = requestText.contains("fixture-suspend-bootstrap") && Self.suspension.isEnabled
             if requestText.contains("fixture-error-401") {
                 return errorRoute(status: 401, code: "invalid_api_token")
             }
@@ -179,8 +220,10 @@ final class LMStudioContractFixtureServer: URLProtocol, @unchecked Sendable {
             }
             if object["previous_response_id"] == nil {
                 if let route = try capabilityProbeRoute(object) { return route }
-                if let route = try v2BootstrapRoute(object) { return route }
-                return try fixture("responses-root", extension: "sse", contentType: "text/event-stream")
+                var route = try v2BootstrapRoute(object)
+                    ?? fixture("responses-root", extension: "sse", contentType: "text/event-stream")
+                route.suspendBootstrap = shouldSuspend
+                return route
             }
             guard object["previous_response_id"] as? String == "resp_lms_fixture_root" else {
                 return errorRoute(status: 409, code: "previous_response_mismatch")

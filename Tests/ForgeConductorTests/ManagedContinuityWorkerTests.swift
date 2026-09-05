@@ -2,6 +2,59 @@ import XCTest
 @testable import ForgeConductorCore
 
 final class ManagedContinuityWorkerTests: XCTestCase {
+    func testExecutorCancellationStopsActiveContinuityWithoutDiscardingDurableIntent() async throws {
+        let fixture = try await makeFixture(label: "cancel-owner")
+        defer { fixture.destroy() }
+        let adapter = CancellationAwareContinuityAdapter()
+        let worker = ManagedContinuityWorker(repository: fixture.repository, memory: fixture.memory,
+            adapterResolver: { _ in adapter })
+        let tools = ContinuityNoopToolExecutor()
+        let broker = ToolInvocationBroker(repository: fixture.repository, executor: tools,
+            classifier: try StaticToolReplayClassifier(productionToolNames: tools.toolNames,
+                classifications: ["fixture.read": .readOnly]))
+        let executor = try ManagedProjectRunStepExecutor(repository: fixture.repository,
+            providerResolver: { _ in throw ContinuityRunError.hostCapabilityUnavailable },
+            toolDefinitionResolver: { _ in [] }, broker: broker, continuity: worker)
+        let intent = continuityIntent(fixture.run)
+        let run = try await fixture.repository.persistRunSideEffectIntent(runID: fixture.run.runID,
+            lease: fixture.lease, expectedRevision: fixture.run.revision, intent: intent)
+        let context = try await fixture.repository.invocationContext(
+            for: ProjectBindingOwner(kind: .autonomousRun, id: run.runID.description))
+        let execution = Task {
+            try await executor.execute(intent, run: run, context: context, lease: fixture.lease)
+        }
+        for _ in 0..<200 {
+            if await adapter.isActive { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        let entered = await adapter.isActive
+        XCTAssertTrue(entered, "The production continuity worker never entered the adapter")
+        await executor.cancel(runID: run.runID)
+        for _ in 0..<200 {
+            if await !adapter.isActive { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        let survivedCancellation = await adapter.isActive
+        XCTAssertFalse(survivedCancellation, "Executor cancellation left its continuity operation active")
+        // Keep the pre-fix reproducer bounded and close its fixture before cleanup.
+        execution.cancel()
+        do { _ = try await execution.value; XCTFail("Suspended continuity returned success") }
+        catch is CancellationError {}
+        let retainedValue = try await fixture.repository.autonomousRun(run.runID)
+        let retained = try XCTUnwrap(retainedValue)
+        XCTAssertEqual(retained.state, .rollingOver)
+        XCTAssertEqual(retained.specification.work.pendingIntent?.intentID, intent.intentID)
+        let operationID = try XCTUnwrap(retained.activeOperationID)
+        let memory = try fixture.memory.repositoryForProject(run.projectID.description)
+        let operation = try XCTUnwrap(try memory.continuityOperationV2(id: operationID.uuidString.lowercased()))
+        XCTAssertEqual(operation.state, .successorRequested)
+        let handoff = try XCTUnwrap(try memory.continuityHandoffV2(id: operation.handoffID))
+        XCTAssertFalse(handoff.contentSHA256.isEmpty)
+        let candidates = try await fixture.repository.providerSessions(operationID: operationID)
+        XCTAssertTrue(candidates.isEmpty, "Cancellation must not fabricate a successor receipt")
+        await fixture.repository.close()
+    }
+
     func testCreateBootstrapCrashRestartsWithOneSuccessorAndOneAutomaticDispatch() async throws {
         let fixture = try await makeFixture(label: "restart")
         defer { fixture.destroy() }
@@ -1043,6 +1096,26 @@ private final class ContinuityWorkerAdapter: SessionHostAdapterV2, @unchecked Se
 
     func cancel(operationID: UUID) async {}
 
+}
+
+private actor CancellationAwareContinuityAdapter: SessionHostAdapterV2 {
+    nonisolated let identifier = "fixture-v2-adapter"
+    nonisolated let version = "1.0"
+    private(set) var isActive = false
+
+    func capabilitiesV2() async throws -> HostCapabilitiesV2 {
+        HostCapabilitiesV2(atomicCreateAndBootstrap: true, freshRoot: true, usageReporting: true,
+            idempotencyLookup: true, projectGenerationFencing: true)
+    }
+    func createAndBootstrap(request: SessionCreationRequestV2, handoffJSON: Data,
+                            challenge: BootstrapChallenge) async throws -> BootstrapReceipt {
+        isActive = true
+        defer { isActive = false }
+        try await Task.sleep(for: .seconds(10))
+        throw ContinuityRunError.hostCapabilityUnavailable
+    }
+    func receipt(forIdempotencyKey key: String) async throws -> BootstrapReceipt? { nil }
+    func cancel(operationID: UUID) async {}
 }
 
 private func XCTAssertThrowsErrorAsync(

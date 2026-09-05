@@ -73,6 +73,33 @@ private struct FixtureManagedAuthorization: LMStudioAuthorizationProviding {
 }
 
 #if SWIFT_PACKAGE
+/// Holds an actual parsed fixture response at the return boundary, with a finite
+/// fallback, to exercise cancellation after the provider has already completed.
+private actor CompletedResponseTransport: LMStudioManagedTransporting {
+    private let underlying: LMStudioManagedSessionTransport
+    private var delivery: Task<Void, Never>?
+
+    init(_ underlying: LMStudioManagedSessionTransport) { self.underlying = underlying }
+    var holdsCompletedResponse: Bool { delivery != nil }
+    func releaseCompletedResponse() { delivery?.cancel() }
+    func probe() async throws -> LMStudioProviderCapabilities { try await underlying.probe() }
+    func createRoot(_ request: LMStudioRootRequest) async throws -> LMStudioResponseTurn {
+        let turn = try await underlying.createRoot(request)
+        let delivery = Task<Void, Never> { _ = try? await Task.sleep(for: .seconds(2)) }
+        self.delivery = delivery
+        defer { self.delivery = nil }
+        await delivery.value
+        return turn
+    }
+    func continueSession(_ request: LMStudioContinuationRequest) async throws -> LMStudioResponseTurn {
+        try await underlying.continueSession(request)
+    }
+    func receipt(forIdempotencyKey key: String) async -> LMStudioResponseTurn? {
+        await underlying.receipt(forIdempotencyKey: key)
+    }
+    func cancel(operationID: String) async { await underlying.cancel(operationID: operationID) }
+}
+
 private actor ScriptedManagedTransport: LMStudioManagedTransporting {
     enum Mode: Sendable {
         case normal
@@ -367,6 +394,150 @@ final class NativeSessionHostPluginTests: XCTestCase {
     }
 
 #if SWIFT_PACKAGE
+    func testCancellingBootstrapOwnerStopsTransportAndPreservesRestartRecovery() async throws {
+        let root = temporaryRoot("v2-owner-cancel")
+        defer {
+            LMStudioContractFixtureServer.suspendBootstrapRequests(false)
+            try? FileManager.default.removeItem(at: root)
+        }
+        let configuration = LMStudioProviderConfiguration(baseURL: URL(string: "https://lmstudio.fixture")!,
+            modelKey: "fixture/tool-model", connectTimeoutSeconds: 5, firstByteTimeoutSeconds: 120,
+            idleTimeoutSeconds: 600, totalTimeoutSeconds: 600)
+        let session = URLSessionConfiguration.ephemeral
+        session.protocolClasses = [LMStudioContractFixtureServer.self]
+        let transport = try LMStudioManagedSessionTransport(configuration: configuration, sessionConfiguration: session)
+        let adapter = try LMStudioManagedSessionHostAdapterV2(storageDirectory: root, transport: transport)
+        let fixture = try makeV2Fixture(mission: "fixture-suspend-bootstrap",
+            idempotencyKey: "v2-cancel-owner")
+        LMStudioContractFixtureServer.suspendBootstrapRequests(true)
+        let owner = Task {
+            try await adapter.createAndBootstrap(request: fixture.request,
+                handoffJSON: fixture.handoffJSON, challenge: fixture.challenge)
+        }
+        for _ in 0..<400 {
+            if LMStudioContractFixtureServer.suspendedBootstrapCount == 1 { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        XCTAssertEqual(LMStudioContractFixtureServer.suspendedBootstrapCount, 1)
+        owner.cancel()
+        for _ in 0..<200 {
+            if LMStudioContractFixtureServer.suspendedBootstrapCount == 0 { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        XCTAssertEqual(LMStudioContractFixtureServer.suspendedBootstrapCount, 0,
+            "Cancelled continuity owner left its URLSession request alive")
+        // Explicit cleanup keeps this reproducer bounded even before the fix.
+        await transport.cancel(operationID: fixture.request.operationID.uuidString.lowercased())
+        do { _ = try await owner.value; XCTFail("Cancelled bootstrap returned a receipt") }
+        catch is CancellationError {}
+        catch LMStudioProviderError.cancelled {}
+        let ledger = try XCTUnwrap(JSONSerialization.jsonObject(with:
+            Data(contentsOf: root.appendingPathComponent("native-session-ledger.json"))) as? [String: Any])
+        let record = try XCTUnwrap((ledger["records"] as? [[String: Any]])?.first)
+        XCTAssertEqual(record["status"] as? String, "retryable_failure")
+        XCTAssertEqual(record["error_code"] as? String, "owner_interrupted")
+        XCTAssertNil(record["receipt"])
+        LMStudioContractFixtureServer.suspendBootstrapRequests(false)
+        let restarted = try LMStudioManagedSessionHostAdapterV2(storageDirectory: root, transport: try makeV2Transport())
+        let recovered = try await restarted.createAndBootstrap(request: fixture.request,
+            handoffJSON: fixture.handoffJSON, challenge: fixture.challenge)
+        XCTAssertEqual(recovered.acknowledgement.operationID, fixture.request.operationID)
+        XCTAssertEqual(recovered.acknowledgement.handoffSHA256, fixture.handoffSHA256)
+        let replayed = try await restarted.createAndBootstrap(request: fixture.request,
+            handoffJSON: fixture.handoffJSON, challenge: fixture.challenge)
+        XCTAssertEqual(replayed, recovered)
+    }
+
+    func testCancelledCoalescedWaiterCannotCancelTransportOwner() async throws {
+        LMStudioContractFixtureServer.suspendBootstrapRequests(true)
+        defer { LMStudioContractFixtureServer.suspendBootstrapRequests(false) }
+        let transport = try makeV2Transport()
+        let request = LMStudioRootRequest(operationID: "coalesced-owner", modelKey: "fixture/tool-model",
+            systemPrompt: "Fixture", userInput: "fixture-suspend-bootstrap", tools: [],
+            idempotencyKey: "coalesced-owner")
+        let owner = Task { try await transport.createRoot(request) }
+        for _ in 0..<200 {
+            if LMStudioContractFixtureServer.suspendedBootstrapCount == 1 { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        XCTAssertEqual(LMStudioContractFixtureServer.suspendedBootstrapCount, 1)
+        let waiter = Task { try await transport.createRoot(request) }
+        waiter.cancel()
+        // Leave the real URLSession request held while the cancelled waiter runs.
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertEqual(LMStudioContractFixtureServer.suspendedBootstrapCount, 1)
+        LMStudioContractFixtureServer.resumeBootstrapRequests()
+        let original = try await owner.value
+        let shared = try await waiter.value
+        XCTAssertEqual(shared, original)
+        let retained = await transport.receipt(forIdempotencyKey: request.idempotencyKey)
+        XCTAssertEqual(retained, original)
+    }
+
+    func testCompletedBootstrapReceiptWinsOwnerCancellationAndSurvivesRestart() async throws {
+        let root = temporaryRoot("v2-completed-owner-cancel")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let transport = CompletedResponseTransport(try makeV2Transport())
+        let adapter = try LMStudioManagedSessionHostAdapterV2(storageDirectory: root, transport: transport)
+        let fixture = try makeV2Fixture(mission: "Complete before owner cancellation",
+            idempotencyKey: "v2-completed-owner-cancel")
+        let owner = Task {
+            try await adapter.createAndBootstrap(request: fixture.request,
+                handoffJSON: fixture.handoffJSON, challenge: fixture.challenge)
+        }
+        for _ in 0..<200 {
+            if await transport.holdsCompletedResponse { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        let hasActualCompletedResponse = await transport.holdsCompletedResponse
+        XCTAssertTrue(hasActualCompletedResponse)
+        owner.cancel()
+        await transport.releaseCompletedResponse()
+        let accepted = try await owner.value
+        XCTAssertEqual(accepted.acknowledgement.operationID, fixture.request.operationID)
+        XCTAssertEqual(accepted.acknowledgement.handoffSHA256, fixture.handoffSHA256)
+        await adapter.cancel(operationID: fixture.request.operationID)
+        let status = await adapter.candidateStatus(forIdempotencyKey: fixture.request.idempotencyKey)
+        XCTAssertEqual(status, "accepted")
+        let restarted = try LMStudioManagedSessionHostAdapterV2(storageDirectory: root, transport: try makeV2Transport())
+        let retained = try await restarted.receipt(forIdempotencyKey: fixture.request.idempotencyKey)
+        XCTAssertEqual(retained, accepted)
+    }
+
+    func testExplicitBootstrapCancellationRemainsDurablyCancelled() async throws {
+        let root = temporaryRoot("v2-explicit-cancel")
+        defer {
+            LMStudioContractFixtureServer.suspendBootstrapRequests(false)
+            try? FileManager.default.removeItem(at: root)
+        }
+        let adapter = try LMStudioManagedSessionHostAdapterV2(storageDirectory: root, transport: try makeV2Transport())
+        let fixture = try makeV2Fixture(mission: "fixture-suspend-bootstrap",
+            idempotencyKey: "v2-explicit-cancel")
+        LMStudioContractFixtureServer.suspendBootstrapRequests(true)
+        let owner = Task {
+            try await adapter.createAndBootstrap(request: fixture.request,
+                handoffJSON: fixture.handoffJSON, challenge: fixture.challenge)
+        }
+        for _ in 0..<200 {
+            if LMStudioContractFixtureServer.suspendedBootstrapCount == 1 { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        XCTAssertEqual(LMStudioContractFixtureServer.suspendedBootstrapCount, 1)
+        await adapter.cancel(operationID: fixture.request.operationID)
+        do { _ = try await owner.value; XCTFail("Explicit cancellation returned a receipt") }
+        catch LMStudioProviderError.cancelled {}
+        for _ in 0..<200 {
+            if LMStudioContractFixtureServer.suspendedBootstrapCount == 0 { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        XCTAssertEqual(LMStudioContractFixtureServer.suspendedBootstrapCount, 0)
+        let restarted = try LMStudioManagedSessionHostAdapterV2(storageDirectory: root, transport: try makeV2Transport())
+        let status = await restarted.candidateStatus(forIdempotencyKey: fixture.request.idempotencyKey)
+        XCTAssertEqual(status, "cancelled")
+        let receipt = try await restarted.receipt(forIdempotencyKey: fixture.request.idempotencyKey)
+        XCTAssertNil(receipt)
+    }
+
     func testV2FreshRootReceiptPersistsAndReplaysWithoutSyntheticIdentity() async throws {
         let root = temporaryRoot("v2-success")
         defer { try? FileManager.default.removeItem(at: root) }
