@@ -12,6 +12,7 @@ import ForgeNativeSessionHostPlugin
 final class LiveLMStudioManagedAutonomyTests: XCTestCase {
     private static let successorMarker = "SUCCESSOR_ONLY_TOOL_EFFECT"
     private static let missionPaddingScalarCount = 4_620
+    private static let providerTotalTimeoutSeconds: TimeInterval = 600
 
     func testToolInvocationLookupByUUIDIsExactAndBounded() async throws {
         let home = FileManager.default.temporaryDirectory.appendingPathComponent(
@@ -377,11 +378,12 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
         }
         XCTAssertEqual(predecessorTurns.count, predecessorProviderTurnIntentCount)
         try await runtime.tick()
+        // Observe the provider deadline plus cleanup margin before cancelling the manager.
         let interruptedRun = try await waitForQuiescentRun(
             runtime: runtime,
             repository: app.projectContexts.repository,
             runID: runID,
-            timeout: .seconds(300)
+            timeout: .seconds(Self.providerTotalTimeoutSeconds + 30)
         ) { run in
             run.state == .waitingProvider
                 && run.specification.work.pendingIntent?.kind == .continuity
@@ -959,8 +961,8 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
             modelKey: modelKey,
             connectTimeoutSeconds: 5,
             firstByteTimeoutSeconds: 120,
-            idleTimeoutSeconds: 600,
-            totalTimeoutSeconds: 600,
+            idleTimeoutSeconds: Self.providerTotalTimeoutSeconds,
+            totalTimeoutSeconds: Self.providerTotalTimeoutSeconds,
             maximumOutputTokens: 512
         )
         let data = try JSONEncoder().encode(configuration)
