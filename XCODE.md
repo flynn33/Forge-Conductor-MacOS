@@ -216,7 +216,7 @@ The live manager-owned rollover test verifies the exact context reported by
 LM Studio through `FORGE_LIVE_LMSTUDIO_EXPECTED_CONTEXT_LENGTH`. Some MLX runtime
 versions override a requested load context. For a deliberately accelerated
 qualification, `FORGE_LIVE_LMSTUDIO_ACCELERATED_THRESHOLD=yes` selects a validated
-checkpoint/rollover policy of 0.96/0.90 while keeping the emergency fraction at
+checkpoint/rollover policy of 0.78/0.75 while keeping the emergency fraction at
 0.05. The test records this override, the full policy, real provider usage,
 capacity and reserves. Ordinary application construction keeps the default
 policy. This control never shortens the 660-second uncertainty fence.
@@ -236,7 +236,8 @@ runs and representative physical hardware remain separate requirements.
 ### Native startup, gauges and process ownership
 
 `AppBootstrapAppTests.swift` belongs to the app-hosted target and includes both
-`AppBootstrapAppTests` and `AppBackgroundOperationAppTests`. These test main-actor
+`AppBootstrapAppTests`, `OperatorStartupContentAppTests` and
+`AppBackgroundOperationAppTests`. These test main-actor
 responsiveness, bounded admission, cancellation, retry, owner release and actual
 disposable diagnostics export. `NativeGaugeLifecycleTests` uses real AppKit
 windows and Metal draws, including hide/show and release postconditions. Set

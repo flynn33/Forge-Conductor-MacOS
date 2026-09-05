@@ -157,7 +157,9 @@ compatibility scenarios pass; shipment does not.
 ---
 
 Settings controls become editable after saved settings load. If startup fails,
-Settings shows the error and **Retry startup**. Settings saves run in the background. Wait for **Settings saved** before using
+Settings shows the error and **Retry startup**. Operator screens also wait for
+startup to finish and provide retry if it fails. Settings saves run in the
+background. Wait for **Settings saved** before using
 a changed manager address or shell policy. A second settings operation is
 rejected while the first is active. Edits made during a save remain visible and
 are explicitly marked unsaved when the earlier save completes. Diagnostics

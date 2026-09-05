@@ -52,6 +52,8 @@ installed-stack and complete production-feature acceptance remain separate gates
 - Application startup, settings reads/writes, plugin status/deployment and
   diagnostics export use bounded background operations. Delayed settings
   responses preserve newer edits and update clients only after a committed save.
+  Operator screens wait for startup readiness before loading manager data,
+  keeping startup progress, failures and retry visible.
 - Process execution owns nonblocking stdout/stderr drains directly, bounds each
   drain turn and final capture, and continues draining during termination. This
   removes the unbounded callback-shutdown wait while preserving output limits,
