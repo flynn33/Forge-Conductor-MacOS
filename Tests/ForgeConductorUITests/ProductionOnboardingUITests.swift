@@ -329,11 +329,28 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
 
     private func chooseFolderInNativePanel(_ path: String) throws {
         app.typeKey("g", modifierFlags: [.command, .shift])
-        app.typeText(path)
-        let enteredPath = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "value == %@", path)).firstMatch
-        XCTAssertTrue(enteredPath.waitForExistence(timeout: 5), "Native Go to Folder must contain the selected path")
-        app.typeKey(.return, modifierFlags: [])
+        let goToSheet = folderPanel.sheets["GoToWindow"]
+        guard goToSheet.waitForExistence(timeout: 5) else {
+            throw OnboardingFailure.controlUnavailable(identifier: "GoToWindow")
+        }
+        let pathField = goToSheet.textFields["PathTextField"]
+        try replace(pathField, with: path)
+        pathField.typeKey(.return, modifierFlags: [])
+        if !waitUntil(timeout: 5, { !goToSheet.exists }) {
+            // AppKit can restore the previous directory into the still-open
+            // sheet after submission. Re-enter once only when that stale value
+            // is observed; never authorize an unverified remembered directory.
+            guard goToSheet.exists, pathField.exists,
+                  let observed = pathField.value as? String, observed != path else {
+                throw OnboardingFailure.controlUnavailable(identifier: "GoToWindow")
+            }
+            attachScreenshot("native-go-to-folder-stale-path")
+            try replace(pathField, with: path)
+            pathField.typeKey(.return, modifierFlags: [])
+        }
+        guard waitUntil(timeout: 5, { !goToSheet.exists }) else {
+            throw OnboardingFailure.controlUnavailable(identifier: "GoToWindow")
+        }
         try click(folderPanel.buttons["Authorize Folder"])
         XCTAssertTrue(waitUntil { !self.folderPanel.exists })
     }
