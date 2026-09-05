@@ -33,12 +33,6 @@ protocol OperatorManagerClientProtocol: Sendable {
 }
 
 extension OperatorManagerClientProtocol {
-    func providerConfiguration() async throws -> ProviderConfigurationSnapshot { throw ProviderConfigurationError.unavailable }
-    func updateProviderConfiguration(_ update: ProviderConfigurationUpdate) async throws -> ProviderConfigurationSnapshot {
-        throw ProviderConfigurationError.unavailable
-    }
-    func providerModels() async throws -> ProviderModelInventory { throw ProviderConfigurationError.unavailable }
-
     func snapshot(limit: Int) async throws -> OperatorSnapshot {
         try await snapshot(limit: limit, cursor: nil)
     }
@@ -497,6 +491,11 @@ final class UnavailableOperatorManagerClient: OperatorManagerClientProtocol, @un
     func runStatus(runID: String) async throws -> OperatorRun { throw error }
     func controlRun(runID: String, action: OperatorRunControlAction) async throws -> OperatorRun { throw error }
     func cancelRuntimeJob(jobID: String) async throws -> OperatorRuntimeJob { throw error }
+    func providerConfiguration() async throws -> ProviderConfigurationSnapshot { throw error }
+    func updateProviderConfiguration(_ update: ProviderConfigurationUpdate) async throws -> ProviderConfigurationSnapshot {
+        throw error
+    }
+    func providerModels() async throws -> ProviderModelInventory { throw error }
     func probeProvider(
         adapterID: String,
         mode: OperatorProviderProbeMode
@@ -578,6 +577,18 @@ final class OperatorManagerClientRouter: OperatorManagerClientProtocol, @uncheck
 
     func cancelRuntimeJob(jobID: String) async throws -> OperatorRuntimeJob {
         try await current.cancelRuntimeJob(jobID: jobID)
+    }
+
+    func providerConfiguration() async throws -> ProviderConfigurationSnapshot {
+        try await current.providerConfiguration()
+    }
+
+    func updateProviderConfiguration(_ update: ProviderConfigurationUpdate) async throws -> ProviderConfigurationSnapshot {
+        try await current.updateProviderConfiguration(update)
+    }
+
+    func providerModels() async throws -> ProviderModelInventory {
+        try await current.providerModels()
     }
 
     func probeProvider(

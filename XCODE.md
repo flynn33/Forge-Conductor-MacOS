@@ -112,10 +112,10 @@ Package P10/G10, filesystem E2, production move/recursive-directory deletion,
 native managed-provider onboarding, production Settings shell qualification,
 manager-owned real-provider forced rollover,
 representative physical hardware, and final G09-G12 completion evidence also
-remain open. The current-source SwiftPM Release suite executes
-1,001 tests with 5 declared environment skips and 0 failures under
-warnings-as-errors. The dedicated Apple Development-signed app-hosted Xcode
-contract suite executes 2 tests with 0 failures from fresh DerivedData.
+remain open. The initial September 4 SwiftPM baseline executed 1,001 tests in
+both configurations with five skips and no failures. Current expanded suite
+counts, source identities and native result bundles are in the
+[shipping handoff](.forge-codex/state/release-handoff.md).
 A bounded Apple Development-signed Release installed-app run passes clean shell
 defaults and migration, explicit opt-out and denial, `tools/list`, established
 `shell_exec` through app and raw CLI, app relaunch, and installed-manager PID
@@ -198,8 +198,10 @@ folder panel and normal app bootstrap. Run it serially with UI Automation enable
 xcodebuild -workspace ForgeConductor.xcworkspace -scheme ForgeConductor   -destination 'platform=macOS,arch=arm64' -parallel-testing-enabled NO   -only-testing:ForgeConductorUITests/ProductionOnboardingUITests test
 ```
 
-The live-provider method requires `FORGE_SHIPPING_PROVIDER_ENDPOINT` and
-`FORGE_SHIPPING_PROVIDER_MODEL` in the test runner environment; without them it
+For xcodebuild, pass `TEST_RUNNER_FORGE_SHIPPING_PROVIDER_ENDPOINT` and
+`TEST_RUNNER_FORGE_SHIPPING_PROVIDER_MODEL` in the process environment. Xcode
+forwards them as `FORGE_SHIPPING_PROVIDER_ENDPOINT` and
+`FORGE_SHIPPING_PROVIDER_MODEL` to the test runner; without them it
 records an explicit skip. Keep the result bundle, selected/executed counts and
 attachments. Build success and fixture UI tests do not qualify production
 onboarding. The qualification-support SwiftPM tests remain in their dedicated
@@ -209,3 +211,48 @@ The unhosted Core unit-test bundle also uses Apple Development team `9AQ2C2838M`
 to match its adjacent runtime launcher. Ad-hoc test signing is rejected by the
 existing development-test trust check. Optimized native tests must build their
 product dependencies with the documented development Release overrides.
+
+The live manager-owned rollover test verifies the exact context reported by
+LM Studio through `FORGE_LIVE_LMSTUDIO_EXPECTED_CONTEXT_LENGTH`. Some MLX runtime
+versions override a requested load context. For a deliberately accelerated
+qualification, `FORGE_LIVE_LMSTUDIO_ACCELERATED_THRESHOLD=yes` selects a validated
+checkpoint/rollover policy of 0.96/0.90 while keeping the emergency fraction at
+0.05. The test records this override, the full policy, real provider usage,
+capacity and reserves. Ordinary application construction keeps the default
+policy. This control never shortens the 660-second uncertainty fence.
+
+Use separate DerivedData directories for ordinary installable builds and native
+test runs. Xcode can inject test-only entitlements into dependency executables
+while preparing tests; the full bundle checker rejects those artifacts for
+installation. Rebuild the ordinary product into a fresh explicit directory and
+check its entire signed bundle before installing it.
+
+`NativeGaugeLifecycleTests` belongs only to `ForgeConductorAppTests`. Run that
+class serially to observe the production SwiftUI/Metal surfaces, hidden/static
+draw counters, repeated dismantling, and actual buffer/object release. Its
+attachments describe component evidence; full-application profiling, sanitizer
+runs and representative physical hardware remain separate requirements.
+
+### Native startup, gauges and process ownership
+
+`AppBootstrapAppTests.swift` belongs to the app-hosted target and includes both
+`AppBootstrapAppTests` and `AppBackgroundOperationAppTests`. These test main-actor
+responsiveness, bounded admission, cancellation, retry, owner release and actual
+disposable diagnostics export. `NativeGaugeLifecycleTests` uses real AppKit
+windows and Metal draws, including hide/show and release postconditions. Set
+`TEST_RUNNER_FORGE_GAUGE_LIFECYCLE_CYCLES=100` for the repeated Release flow;
+the test validates this bounded count. Run GUI and app-hosted tests serially.
+
+Address Sanitizer and Thread Sanitizer use separate DerivedData and result
+bundles. Process-runner regressions exercise large output on both streams,
+continuous output with timeout, termination-handler output, cancellation and
+process-group reaping. A sanitizer pass is not a clean performance profile;
+retained Thread Performance Checker diagnostics still need their own assessment.
+
+The UI test runner intentionally has no app sandbox, matching the ordinary
+product. This is a test-target entitlement choice: it lets native Settings tests
+launch the signed MCP executable, whose shell policy creates its own sandbox.
+A sandboxed runner prevented that nested sandbox with `sandbox_apply` exit 71,
+so it could not measure the ordinary product path. Production entitlements and
+shell authorization remain unchanged; disabled-policy denial and post-Settings
+reenablement both retain their full executable assertions.

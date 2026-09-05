@@ -509,6 +509,9 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         model.click()
         model.typeKey("a", modifierFlags: .command)
         model.typeText("fixture/configured-model")
+        XCTAssertFalse(app.buttons["provider-test-connection"].isEnabled,
+                       "Unsaved model changes must not test the previous saved configuration")
+        XCTAssertTrue(app.descendants(matching: .any)["provider-unsaved-changes"].exists)
         makeHittable(save)
         save.click()
         XCTAssertTrue(waitUntil(timeout: 5) { fixture.providerConfigurationSaveCount == 1 })

@@ -17,8 +17,8 @@ qualification, Developer ID Release/native lifecycle
 validation, manager-owned
 real-provider autonomous continuity, owner-deferred representative physical-
 hardware qualification, and current G09-G12 remain open and release-blocking.
-Provider settings now have native and manager save controls. Current native
-onboarding, credential and real-provider acceptance remain open.
+Provider settings now have native and manager save controls. Native onboarding and disposable Keychain tests have executed; final source,
+installed-stack and complete production-feature acceptance remain separate gates.
 
 ### Verified current-source evidence
 
@@ -38,14 +38,38 @@ onboarding, credential and real-provider acceptance remain open.
   recovery regressions pass. These are supporting source tests, not the signed
   E2 matrix or real-provider rollover authority run; the final source matrix
   must be rerun after all Unreleased changes settle.
-- The current-source SwiftPM Release configuration builds with
-  warnings treated as errors and executes 1,001 tests with 5 declared
-  environment skips and 0 failures. The dedicated Apple Development-signed
-  Xcode app-hosted project-contract suite executes 2 tests with 0 failures from
-  fresh DerivedData. Neither result replaces feature-specific production-path
-  evidence.
+- The initial September 4 source baseline passed 1,001 SwiftPM tests in both
+  Debug and Release, with five declared skips. Subsequent fixes add provider,
+  startup, subprocess and gauge coverage. Exact checkpoint counts and source
+  identities are retained in the shipping handoff; earlier results do not
+  qualify later source changes.
 
 ### Changed
+
+- Metal renderers now stop draw submission when their window or an ancestor
+  is hidden and redraw pending values when shown. Native tests measure actual
+  draws, static quiescence, resource reuse and repeated object release.
+- Application startup, settings reads/writes, plugin status/deployment and
+  diagnostics export use bounded background operations. Delayed settings
+  responses preserve newer edits and update clients only after a committed save.
+- Process execution owns nonblocking stdout/stderr drains directly, bounds each
+  drain turn and final capture, and continues draining during termination. This
+  removes the unbounded callback-shutdown wait while preserving output limits,
+  process-group cleanup and cancellation behavior.
+- The operator client router now forwards provider configuration methods across
+  manager replacement, so the native Save and discovery controls reach the
+  authenticated manager endpoints.
+- The feature qualifier includes a reviewed installed CLI version/help scenario
+  bound to its recorded ordinary build, actual installation, signatures and raw
+  process observations. The complete production-feature matrix remains required.
+
+- Provider request admission now rejects overlapping work before queuing
+  credential payloads. Unsaved provider edits must be saved before model refresh
+  or probing, so connection results correspond to the displayed saved revision.
+- The native Core test bundle uses the existing development signing identity to
+  match its runtime launcher. An explicit live-test budget policy supports
+  threshold qualification when a provider ignores its requested load context;
+  ordinary runtime defaults, exact capacity and the recovery fence are unchanged.
 
 - Filesystem recovery now rejects terminal receipts that contradict retained
   protected entries, avoids recapturing replacement data after an interrupted

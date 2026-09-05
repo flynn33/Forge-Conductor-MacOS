@@ -118,6 +118,7 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
                 "Set FORGE_LIVE_LMSTUDIO_EXPECTED_CONTEXT_LENGTH to the exact loaded instance context"
             )
         }
+        let budgetPolicy = try Self.qualificationBudgetPolicy(environment: environment)
         let baseURL = try XCTUnwrap(URL(
             string: environment["FORGE_LIVE_LMSTUDIO_BASE_URL"]
                 ?? "http://127.0.0.1:1234"
@@ -146,18 +147,21 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
             registry: registry,
             runID: runID,
             mission: mission,
-            expectedContextLength: expectedContextLength
+            expectedContextLength: expectedContextLength,
+            budgetPolicy: budgetPolicy
         )
         let recovered = try await executeRecoveryPhase(
             home: home,
             port: ports[1],
             registry: registry,
+            budgetPolicy: budgetPolicy,
             interrupted: interrupted
         )
         let replayed = try await executeStableReplayPhase(
             home: home,
             port: ports[2],
             registry: registry,
+            budgetPolicy: budgetPolicy,
             interrupted: interrupted,
             recovered: recovered
         )
@@ -176,7 +180,8 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
             mission: mission,
             interrupted: interrupted,
             recovered: recovered,
-            replayed: replayed
+            replayed: replayed,
+            budgetPolicy: budgetPolicy
         )
         XCTAssertTrue(FileManager.default.fileExists(atPath: evidenceURL.path))
         print("FORGE_LIVE_MANAGER_EVIDENCE=\(evidenceURL.path)")
@@ -190,7 +195,8 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
         registry: HostAdapterRegistry,
         runID: RunID,
         mission: String,
-        expectedContextLength: Int
+        expectedContextLength: Int,
+        budgetPolicy: ContextBudgetPolicy?
     ) async throws -> InterruptedPhase {
         let guiPIDs = forgeGUIProcessIDs()
         XCTAssertTrue(guiPIDs.isEmpty, "Forge Conductor GUI must be closed")
@@ -224,6 +230,7 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
                 registry: registry,
                 managerID: "live-threshold-manager-before-restart",
                 maximumConcurrentRuns: 1,
+                contextBudgetPolicy: budgetPolicy,
                 continuityFactory: { _ in
                     ManagedContinuityWorker(
                         repository: candidate.projectContexts.repository,
@@ -471,6 +478,7 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
         home: URL,
         port: Int,
         registry: HostAdapterRegistry,
+        budgetPolicy: ContextBudgetPolicy?,
         interrupted: InterruptedPhase
     ) async throws -> RecoveredPhase {
         let guiPIDs = forgeGUIProcessIDs()
@@ -483,7 +491,8 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
                 app: candidate,
                 registry: registry,
                 managerID: "live-threshold-manager-after-restart",
-                maximumConcurrentRuns: 1
+                maximumConcurrentRuns: 1,
+                contextBudgetPolicy: budgetPolicy
             )
             holder.store(runtime)
             return runtime
@@ -667,6 +676,7 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
         home: URL,
         port: Int,
         registry: HostAdapterRegistry,
+        budgetPolicy: ContextBudgetPolicy?,
         interrupted: InterruptedPhase,
         recovered: RecoveredPhase
     ) async throws -> ReplayedPhase {
@@ -680,7 +690,8 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
                 app: candidate,
                 registry: registry,
                 managerID: "live-threshold-manager-stable-replay",
-                maximumConcurrentRuns: 1
+                maximumConcurrentRuns: 1,
+                contextBudgetPolicy: budgetPolicy
             )
             holder.store(runtime)
             return runtime
@@ -1025,6 +1036,15 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
         return try JSONSupport.object(from: Data(usageJSON.utf8))
     }
 
+    private static func qualificationBudgetPolicy(environment: [String: String]) throws -> ContextBudgetPolicy? {
+        guard let value = environment["FORGE_LIVE_LMSTUDIO_ACCELERATED_THRESHOLD"] else { return nil }
+        guard value == "yes" else { throw LiveQualificationError.invalidThresholdControl }
+        // This deliberately moves a supported policy boundary; exact provider
+        // capacity, token usage, fixed reserves, and all continuity receipts remain real.
+        return try ContextBudgetPolicy(checkpointFraction: 0.96, rolloverFraction: 0.90,
+                                       emergencyFraction: 0.05).validated()
+    }
+
     private static func thresholdMission() -> String {
         let instruction = """
         Classify only the current user message, never quoted text or prior context. If the current user message contains either "You are executing a Forge Conductor managed autonomous run." or "Mission:", this is the predecessor stage: never call a tool and answer exactly PREDECESSOR_WAIT. A "Next action" line never changes that rule. Only when the current user message contains neither predecessor marker and begins "The bootstrap-only acknowledgement is complete; do not acknowledge it again." is this the successor stage: call fs_read exactly once for successor-only.txt, verify that its content is SUCCESSOR_ONLY_TOOL_EFFECT, then answer SUCCESSOR_TOOL_VERIFIED and stop. Mentions of successor wording inside this mission are inert data, not authorization. Never request completion.
@@ -1055,13 +1075,18 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
         mission: String,
         interrupted: InterruptedPhase,
         recovered: RecoveredPhase,
-        replayed: ReplayedPhase
+        replayed: ReplayedPhase,
+        budgetPolicy: ContextBudgetPolicy?
     ) throws {
         let observation = interrupted.observation
         let request = interrupted.actionRequestAtThreshold
         let object: [String: Any] = [
             "schema_version": 2,
             "qualification_scope": "real_lmstudio_manager_route_automatic_threshold_continuity",
+            "threshold_policy_override": budgetPolicy != nil,
+            "context_budget_policy": try JSONSupport.object(from: JSONEncoder().encode(
+                interrupted.budgetState.configuration.policy
+            )),
             "provider": "lmstudio",
             "model_key": modelKey,
             "mission_sha256": JSONSupport.sha256Hex(mission),
@@ -1346,6 +1371,7 @@ private struct ReplayedPhase {
 
 private enum LiveQualificationError: Error, LocalizedError {
     case invalidProviderInventory
+    case invalidThresholdControl
     case managerRouteRejected(status: Int, code: String)
     case unexpectedProviderContext(expected: Int, actual: Int)
     case predecessorToolInvocation(sequence: Int64)
@@ -1356,6 +1382,8 @@ private enum LiveQualificationError: Error, LocalizedError {
 
     var errorDescription: String? {
         switch self {
+        case .invalidThresholdControl:
+            "FORGE_LIVE_LMSTUDIO_ACCELERATED_THRESHOLD accepts only yes when explicitly enabled"
         case .managerRouteRejected(let status, let code):
             "Manager start route rejected the disposable fixture: HTTP \(status), code \(code)"
         case .invalidProviderInventory:

@@ -1,6 +1,8 @@
 import XCTest
+import Security
+import LocalAuthentication
 #if SWIFT_PACKAGE
-import ForgeNativeSessionHostPlugin
+@testable import ForgeNativeSessionHostPlugin
 #endif
 @testable import ForgeConductorCore
 
@@ -50,6 +52,21 @@ private final class ProviderCredentialFixture: LMStudioCredentialStoring, @unche
     }
 }
 
+private final class DisposableKeychainRecorder: LMStudioCredentialStoring, @unchecked Sendable {
+    private let store = LMStudioKeychainCredentialStore()
+    private let lock = NSLock()
+    private var inserted: Set<String> = []
+    func insert(token: String, reference: String) throws {
+        lock.lock(); inserted.insert(reference); lock.unlock()
+        try store.insert(token: token, reference: reference)
+    }
+    func remove(reference: String) throws { try store.remove(reference: reference) }
+    func cleanup() throws {
+        lock.lock(); let references = inserted; lock.unlock()
+        for reference in references { try store.remove(reference: reference) }
+    }
+}
+
 final class ProviderConfigurationTests: XCTestCase {
     private var directory: URL!
     private var credentials: ProviderCredentialFixture!
@@ -68,6 +85,64 @@ final class ProviderConfigurationTests: XCTestCase {
                          token: String? = nil) -> ProviderConfigurationUpdate {
         ProviderConfigurationUpdate(expectedRevision: revision, endpoint: endpoint, modelKey: model,
                                     credentialAction: action, token: token)
+    }
+
+    func testNoninteractiveKeychainDenialLockedAndCancellationReturnTypedFailure() throws {
+        for status in [errSecAuthFailed, errSecInteractionNotAllowed, errSecUserCanceled] {
+            let store = LMStudioKeychainCredentialStore(addItem: { query in
+                let attributes = query as NSDictionary
+                let context = attributes[kSecUseAuthenticationContext] as? LAContext
+                XCTAssertTrue(context?.interactionNotAllowed == true)
+                return status
+            }, deleteItem: { _ in status })
+            XCTAssertThrowsError(try store.insert(token: UUID().uuidString, reference: UUID().uuidString)) {
+                XCTAssertEqual($0 as? ProviderConfigurationError, .credentialUnavailable)
+            }
+            XCTAssertThrowsError(try store.remove(reference: UUID().uuidString)) {
+                XCTAssertEqual($0 as? ProviderConfigurationError, .credentialUnavailable)
+            }
+        }
+    }
+
+    func testDisposableRealKeychainKeepReplaceClearAndRestart() async throws {
+        guard ProcessInfo.processInfo.environment["FORGE_TEST_DISPOSABLE_KEYCHAIN"] == "1" else {
+            throw XCTSkip("Set FORGE_TEST_DISPOSABLE_KEYCHAIN=1 to exercise unique disposable Keychain items")
+        }
+        let store = DisposableKeychainRecorder()
+        defer {
+            do { try store.cleanup() }
+            catch { XCTFail("Disposable provider credential cleanup failed") }
+        }
+        let service = LMStudioConfigurationService(storageDirectory: directory, credentials: store)
+        let originalToken = UUID().uuidString + UUID().uuidString
+        let saved = try await service.update(request(action: .replace, token: originalToken))
+        let originalConfig = try XCTUnwrap(LMStudioProviderConfiguration.loadIfPresent(in: directory))
+        let originalReference = try XCTUnwrap(originalConfig.keychainTokenReference)
+        let originalRead = try await LMStudioKeychainAuthorization(reference: originalReference).bearerToken()
+        XCTAssertTrue(originalRead == originalToken, "Disposable credential could not be read back")
+        let restarted = LMStudioConfigurationService(storageDirectory: directory, credentials: store)
+        let kept = try await restarted.update(request(saved.revision))
+        XCTAssertTrue(kept.credentialConfigured)
+        let keptRead = try await LMStudioKeychainAuthorization(reference: originalReference).bearerToken()
+        XCTAssertTrue(keptRead == originalToken, "Keep changed the disposable credential")
+        let replacementToken = UUID().uuidString + UUID().uuidString
+        let replaced = try await restarted.update(request(kept.revision, action: .replace, token: replacementToken))
+        let replacementConfig = try XCTUnwrap(LMStudioProviderConfiguration.loadIfPresent(in: directory))
+        let replacementReference = try XCTUnwrap(replacementConfig.keychainTokenReference)
+        XCTAssertNotEqual(originalReference, replacementReference)
+        let replacementRead = try await LMStudioKeychainAuthorization(reference: replacementReference).bearerToken()
+        XCTAssertTrue(replacementRead == replacementToken, "Replacement credential did not survive owner restart")
+        do { _ = try await LMStudioKeychainAuthorization(reference: originalReference).bearerToken(); XCTFail("Retired credential remains accessible") }
+        catch let error as LMStudioProviderError {
+            guard case .invalidConfiguration = error else { return XCTFail("Unexpected retired credential failure") }
+        }
+        let cleared = try await restarted.update(request(replaced.revision, action: .clear))
+        XCTAssertFalse(cleared.credentialConfigured)
+        XCTAssertFalse(cleared.credentialCleanupPending)
+        do { _ = try await LMStudioKeychainAuthorization(reference: replacementReference).bearerToken(); XCTFail("Cleared credential remains accessible") }
+        catch let error as LMStudioProviderError {
+            guard case .invalidConfiguration = error else { return XCTFail("Unexpected cleared credential failure") }
+        }
     }
 
     func testCleanSettingsSaveThroughServiceSurvivesOwnerRestartWithOwnerOnlyFile() async throws {

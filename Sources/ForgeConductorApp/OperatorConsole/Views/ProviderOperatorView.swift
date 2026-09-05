@@ -80,23 +80,28 @@ struct ProviderOperatorView: View {
                         .disabled(viewModel.configuration == nil)
                         .accessibilityIdentifier("provider-save")
                     Button("Refresh Models", action: viewModel.refreshModels)
-                        .disabled(viewModel.configuration?.saved != true)
+                        .disabled(viewModel.configuration?.saved != true || viewModel.hasUnsavedChanges)
                         .accessibilityIdentifier("provider-refresh-models")
                 }
                 Text("Save applies to future managed runs. Finish or cancel existing runs before changing settings. Saving does not test the connection; model loading remains in LM Studio.")
                     .font(.caption).foregroundStyle(.secondary)
-            HStack {
-                Button("Test Connection", action: viewModel.testConnection)
-                    .accessibilityIdentifier("provider-test-connection")
-                Button("Run Contract Probe", action: viewModel.runContractProbe)
-                    .accessibilityIdentifier("provider-run-contract-probe")
-                if viewModel.isProbing {
-                    ProgressView()
-                        .controlSize(.small)
-                        .accessibilityIdentifier("provider-probe-progress")
+                HStack {
+                    Button("Test Connection", action: viewModel.testConnection)
+                        .accessibilityIdentifier("provider-test-connection")
+                    Button("Run Contract Probe", action: viewModel.runContractProbe)
+                        .accessibilityIdentifier("provider-run-contract-probe")
+                    if viewModel.isProbing {
+                        ProgressView()
+                            .controlSize(.small)
+                            .accessibilityIdentifier("provider-probe-progress")
+                    }
                 }
-            }
-            .disabled(viewModel.isBusy)
+                .disabled(viewModel.isBusy || viewModel.hasUnsavedChanges)
+                if viewModel.hasUnsavedChanges {
+                    Text("Save changes before refreshing models or testing this endpoint and model.")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .accessibilityIdentifier("provider-unsaved-changes")
+                }
             }
             .disabled(viewModel.isBusy)
             if viewModel.isSaving || viewModel.isFetchingModels {

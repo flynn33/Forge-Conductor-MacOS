@@ -255,6 +255,9 @@ public final class ManagerRoutes: @unchecked Sendable {
     /// Provider I/O is intentionally isolated from `DashboardServer`'s serial
     /// listener queue. The active-connection cap bounds submitted work, while
     /// `ManagerNode` rejects overlapping probes and owns the operation deadline.
+    // Claim admission before dispatch so connection churn cannot queue retained
+    // token-bearing request bodies behind blocked provider or Keychain work.
+    private static let providerOperationAdmission = DispatchSemaphore(value: 1)
     private static let providerProbeQueue = DispatchQueue(
         label: "forge.dashboard.provider-probe",
         qos: .userInitiated,
@@ -810,7 +813,15 @@ public final class ManagerRoutes: @unchecked Sendable {
             http.respondJSON(connection, status: 413, object: ["ok": false, "message": "Provider configuration request is oversized"])
             return
         }
+        guard Self.providerOperationAdmission.wait(timeout: .now()) == .success else {
+            http.respondJSON(connection, status: 409, object: [
+                "ok": false, "code": "provider_configuration_busy",
+                "message": "A provider operation is already in progress. Retry after it settles.",
+            ])
+            return
+        }
         Self.providerProbeQueue.async {
+            defer { Self.providerOperationAdmission.signal() }
             do {
                 let data: Data
                 if method == "PUT" {
@@ -859,7 +870,15 @@ public final class ManagerRoutes: @unchecked Sendable {
     ) {
         let manager = self.manager
         let http = self.http
+        guard Self.providerOperationAdmission.wait(timeout: .now()) == .success else {
+            http.respondJSON(connection, status: 409, object: [
+                "ok": false, "code": "provider_probe_in_progress",
+                "message": "A provider operation is already in progress. Retry after it settles.",
+            ])
+            return
+        }
         Self.providerProbeQueue.async {
+            defer { Self.providerOperationAdmission.signal() }
             do {
                 http.respondJSON(
                     connection,

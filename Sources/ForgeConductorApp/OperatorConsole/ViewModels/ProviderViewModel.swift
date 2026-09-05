@@ -23,6 +23,11 @@ final class ProviderViewModel: ObservableObject {
     private var configurationTask: Task<Void, Never>?
 
     var isBusy: Bool { isLoading || isProbing || isSaving || isFetchingModels }
+    var hasUnsavedChanges: Bool {
+        guard let configuration else { return false }
+        return endpoint != configuration.endpoint || modelKey != (configuration.modelKey ?? "")
+            || credentialAction != .keep
+    }
 
     private let client: any OperatorManagerClientProtocol
     private var loadTask: Task<Void, Never>?
@@ -96,7 +101,7 @@ final class ProviderViewModel: ObservableObject {
     }
 
     func refreshModels() {
-        guard !isBusy, configuration?.saved == true else { return }
+        guard !isBusy, !hasUnsavedChanges, configuration?.saved == true else { return }
         isFetchingModels = true
         errorMessage = nil; noticeMessage = nil
         configurationTask = Task { [weak self] in
@@ -135,7 +140,7 @@ final class ProviderViewModel: ObservableObject {
     }
 
     private func probe(_ mode: OperatorProviderProbeMode) {
-        guard !isBusy else { return }
+        guard !isBusy, !hasUnsavedChanges else { return }
         loadTask?.cancel()
         probeTask?.cancel()
         isLoading = false

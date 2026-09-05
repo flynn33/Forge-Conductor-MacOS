@@ -9,10 +9,10 @@ Version **0.9.0**, build **1**. This guide is for operators who run Forge Conduc
 |---------------------------------|----------------------------------------|
 | The CLI reports 0.9.0; runtime constants, Xcode settings, and the built app bundle report 0.9.0 build 1. | Signed distinct-process filesystem E2 and recovery qualification. |
 | Native app surfaces build; an earlier exact-revision Apple Development-signed 100-cycle Rig/MCP navigation result remains supporting evidence. | Final current-source navigation/action rerun, Developer ID Release, full native/settings/service lifecycle, archive, notarization, staple, and Gatekeeper validation. |
-| Project memory, durable jobs, and telemetry have current-source regression coverage. The SwiftPM Release suite executes 1,001 tests with 5 declared environment skips and 0 failures; a dedicated signed Xcode app-hosted contract suite executes 2 tests with 0 failures. A bounded signed installed-app scenario passed shell policy, migration, `tools/list`, established `shell_exec` through app and raw CLI, app relaunch, and installed-manager PID-replacement checks. | Production Settings control and post-Settings re-enable through XCUI, Developer ID Release, and exact P10 production qualification. |
+| Project memory, durable jobs and telemetry have regression coverage. The shipping handoff records current build identities, suite counts, native tests and installed shell/manager checks. | Production Settings control and post-Settings re-enable through XCUI, Developer ID Release, and exact P10 production qualification. |
 | Durable continuity state, provider receipt storage, successor/fencing models, and tool-effect reconciliation are implemented. | Manager-owned threshold-forced real-provider rollover, exact successor acknowledgment, automatic continuation, GUI-closed operation, and durable crash recovery. |
 | Protected regular-file/symlink deletion has protocol-v5 capture and recovery machinery. | Production `fs_move`, recursive directory `fs_delete`, signed distinct-process filesystem E2, and recovery qualification. |
-| Provider controls save endpoint/model settings and Keychain credential changes through the manager. | Current native onboarding, Keychain, real-server connection and manager-restart acceptance. |
+| Provider controls save endpoint/model settings and Keychain credential changes through the manager. Native onboarding and disposable Keychain tests have executed. | Final installed-stack and complete provider/autonomy production acceptance. |
 | Package P10/G10 evidence remains available for qualification review. | Package P10/G10 and current G09-G12 remain open; representative physical-hardware qualification is owner-deferred. |
 
 Where implementation has only unit, synthetic-host, simulator, focused Debug,
@@ -156,6 +156,13 @@ compatibility scenarios pass; shipment does not.
 
 ---
 
+Settings controls become editable after saved settings load. If startup fails,
+Settings shows the error and **Retry startup**. Settings saves run in the background. Wait for **Settings saved** before using
+a changed manager address or shell policy. A second settings operation is
+rejected while the first is active. Edits made during a save remain visible and
+are explicitly marked unsaved when the earlier save completes. Diagnostics
+exports also run in the background and report their output paths on completion.
+
 ## 5. Daily use with LM Studio
 
 1. Open Forge Conductor (dashboard) if you want live telemetry. Default: `http://127.0.0.1:7788/`.
@@ -197,7 +204,8 @@ Replacement tokens are stored in Keychain and are never returned in snapshots.
 Select **Save**. Saving persists settings even when LM Studio is offline; it
 does not load a model or test the connection. **Refresh Models** queries the saved
 endpoint and shows available models and their loaded state. Select a model and
-save again to use that selection. **Test Connection** checks the saved endpoint
+save again to use that selection. Unsaved edits disable discovery and probes
+until they are saved. **Test Connection** checks the saved endpoint
 and loaded model. **Run Contract Probe** also checks the provider capabilities
 required for managed execution. Load models in LM Studio itself.
 

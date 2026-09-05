@@ -38,18 +38,16 @@
                ReferencedContainer = "container:ForgeConductor.xcodeproj">
             </BuildableReference>
          </TestableReference>
-      
-      <TestableReference
-         skipped = "NO"
-         parallelizable = "NO">
-         <BuildableReference
-            BuildableIdentifier = "primary"
-            BlueprintIdentifier = "7AEAA3E3769249359E346C15"
-            BuildableName = "ForgeConductorUITests.xctest"
-            BlueprintName = "ForgeConductorUITests"
-            ReferencedContainer = "container:ForgeConductor.xcodeproj">
-         </BuildableReference>
-      </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "7AEAA3E3769249359E346C15"
+               BuildableName = "ForgeConductorUITests.xctest"
+               BlueprintName = "ForgeConductorUITests"
+               ReferencedContainer = "container:ForgeConductor.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction

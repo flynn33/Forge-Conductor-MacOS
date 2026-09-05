@@ -44,7 +44,6 @@ final class LoadTraceRenderer: NSObject, MTKViewDelegate {
             return
         }
         self.samples = samples
-        rebuildVertices()
         requestDraw()
     }
 
@@ -101,6 +100,11 @@ final class LoadTraceRenderer: NSObject, MTKViewDelegate {
             RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedStatic)
             return
         }
+        guard MetalGaugeResources.canRender(view) else {
+            RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedHidden)
+            return
+        }
+        rebuildVertices()
         guard let drawable = view.currentDrawable,
               let rpd = view.currentRenderPassDescriptor,
               let pipeline,
@@ -138,7 +142,7 @@ final class LoadTraceRenderer: NSObject, MTKViewDelegate {
 
     private func requestDraw() {
         dirty = true
-        guard let view, !view.isHidden else {
+        guard let view, MetalGaugeResources.canRender(view) else {
             RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedHidden)
             return
         }

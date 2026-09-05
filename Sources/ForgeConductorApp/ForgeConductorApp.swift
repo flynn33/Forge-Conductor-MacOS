@@ -103,6 +103,7 @@ final class ForgeApplicationDelegate: NSObject, NSApplicationDelegate, Observabl
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        model.cancelBackgroundOperations()
         model.cancelSecureFilesystemServiceOperation()
     }
 

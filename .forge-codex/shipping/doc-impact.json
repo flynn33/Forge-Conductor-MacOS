@@ -5,22 +5,22 @@
     {
       "path": "README.md",
       "status": "updated",
-      "reason": "Explains editable managed-provider settings and separates saved configuration from current acceptance."
+      "reason": "Describes bounded native startup and actions, hidden gauge behavior, real onboarding coverage and source-specific evidence boundaries."
     },
     {
       "path": "CHANGELOG.md",
       "status": "updated",
-      "reason": "Records native provider persistence and production onboarding tests alongside build and CI improvements."
+      "reason": "Records provider router, native startup/actions, pipe ownership, gauge visibility, recovery and installed CLI qualification changes without promoting release gates."
     },
     {
       "path": "USER-GUIDE.md",
       "status": "updated",
-      "reason": "Documents endpoint/model and Keychain controls, explicit probes, revision and cancellation recovery."
+      "reason": "Explains provider persistence and credential controls, asynchronous Settings saves and diagnostics export, with remaining installation and release boundaries."
     },
     {
       "path": "XCODE.md",
       "status": "updated",
-      "reason": "Documents provider source/test membership, native onboarding execution and its environment requirements."
+      "reason": "Documents source and test membership, actual runner environment forwarding, native lifecycle repetitions, distinct sanitizer configurations and ordinary signed build identity."
     }
   ],
   "version_impact": "Marketing 0.9.0 retained; build remains 1 for source validation, with new candidate identity pending private distribution inventory before candidate freeze."

@@ -38,6 +38,7 @@ from evidence_support import (
     source_manifest,
 )
 from record_command import execute_command
+import p10_native_cli_scenario as native_cli
 from p10_feature_baseline import (
     EXPECTED_QUALIFIER,
     FEATURE_BASELINE_PATH,
@@ -120,6 +121,10 @@ def runner_argv(repository: pathlib.Path, probe: dict[str, Any]) -> tuple[list[s
     timeout = runner.get("timeout_seconds")
     if type(timeout) is not int or not (1 <= timeout <= MAXIMUM_PROBE_SECONDS):
         raise EvidenceSupportError(f"probe {probe_label} has an invalid timeout")
+    if kind == native_cli.RUNNER_KIND:
+        if not (native_cli.scenario_valid(probe) or native_cli.scenario_valid(probe, allow_bound_root=True)):
+            raise EvidenceSupportError("native CLI scenario differs from the reviewed contract")
+        return [probe["installation"]["root"] + "/Contents/Helpers/forge-conductor"], timeout
     if kind == "repository_qualification":
         expected_keys = {"kind", "executable", "arguments", "timeout_seconds"}
         if set(runner) != expected_keys:
@@ -282,6 +287,8 @@ def derive_installation_facts(
     *,
     require_live_process: bool,
 ) -> dict[str, Any]:
+    if probe.get("runner", {}).get("kind") == native_cli.RUNNER_KIND:
+        probe = native_cli.probe_from_observation(probe, observation)
     contract = probe.get("installation")
     if not installation_contract_valid(contract):
         raise EvidenceSupportError("P10 production scenario has no exact installation contract")
@@ -646,8 +653,9 @@ def derive_signing_fact(
         if "=" in line:
             key, value = line.split("=", 1)
             fields[key.strip()] = value.strip()
-    flags = fields.get("flags", "")
-    hardened_runtime = "runtime" in flags.lower()
+    # codesign places flags on the CodeDirectory line, not a separate key.
+    flags = re.search(r"\bflags=(0x[0-9a-fA-F]+)", details)
+    hardened_runtime = flags is not None and bool(int(flags.group(1), 16) & 0x10000)
     if (
         display.returncode != 0
         or fields.get("TeamIdentifier") != expected.get("team_id")
@@ -955,6 +963,7 @@ def evaluate_probe_artifact(
     evidence_id: str,
     challenge_nonce: str,
     installation: dict[str, Any] | None = None,
+    repository: pathlib.Path | None = None,
 ) -> tuple[bool, int, dict[str, dict[str, Any]], dict[str, Any] | None]:
     """Re-derive results from the qualifier-owned preserved observation."""
 
@@ -1003,7 +1012,10 @@ def evaluate_probe_artifact(
         if binding is None or selector in by_selector:
             return False, 0, {}, document
         evidence_kind = binding.get("evidence_kind")
-        if evidence_kind == "installed-cli-transcript":
+        if evidence_kind == "native-cli-version-help":
+            if not (native_cli.scenario_valid(probe) or native_cli.scenario_valid(probe, allow_bound_root=True)) or repository is None or not native_cli.validate_result(repository, result, evidence_id=evidence_id, nonce=challenge_nonce, process=document.get("process")):
+                return False, 0, {}, document
+        elif evidence_kind == "installed-cli-transcript":
             if installation is None or not validate_installed_cli_transcript(
                 binding,
                 result,
@@ -1037,6 +1049,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", default=str(pathlib.Path(__file__).resolve().parents[2]))
     parser.add_argument("--report", default=REPORT_PATH)
+    parser.add_argument("--feature", choices=[native_cli.FEATURE_ID], help="Qualify exactly both registered assertions for this feature; full G10 coverage is still required")
+    parser.add_argument("--build-evidence", help="Exact current-source ordinary development Release build recorder ID")
+    parser.add_argument("--installation-evidence", help="Exact supported installation recorder ID with retained app")
+    parser.add_argument(
+        "--cli-app",
+        help="Capture supporting version/help observations from this native app's embedded CLI; does not qualify P10 or establish installation/signing",
+    )
     return parser
 
 
@@ -1058,6 +1077,14 @@ def main() -> int:
         for assertion in feature.get("required_assertions", [])
         if isinstance(assertion, str)
     }
+    global_required = set(required)
+    if arguments.feature is not None:
+        if arguments.cli_app is not None or not arguments.build_evidence or not arguments.installation_evidence:
+            raise EvidenceSupportError("selected canonical CLI qualification requires build/install evidence and cannot use --cli-app")
+        registry = {**registry, "features": [feature for feature in registry.get("features", []) if feature.get("id") == arguments.feature]}
+        required = {item for item in required if item[0] == arguments.feature}
+        if len(required) != 2:
+            raise EvidenceSupportError("selected CLI feature must retain its exact two required assertions")
     expected_limits = {
         "maximum_matrix_seconds": MAXIMUM_MATRIX_SECONDS,
         "maximum_probe_stream_bytes": MAXIMUM_STREAM_BYTES_PER_PROBE,
@@ -1069,6 +1096,8 @@ def main() -> int:
         raise EvidenceSupportError("P10 production probe bounds are not canonical")
     implemented = probes.get("implemented_scenarios")
     implemented = implemented if isinstance(implemented, list) else []
+    if arguments.feature is not None:
+        implemented = [scenario for scenario in implemented if scenario.get("runner", {}).get("kind") == native_cli.RUNNER_KIND]
     if len(implemented) > MAXIMUM_UNIQUE_RUNNERS:
         raise EvidenceSupportError("P10 production probe matrix exceeds the unique-runner bound")
     scenario_ids = [
@@ -1097,6 +1126,8 @@ def main() -> int:
             assertion_id = binding.get("assertion_id") if isinstance(binding, dict) else None
             feature = registry_by_id.get(binding.get("feature_id")) if isinstance(binding, dict) else None
             if isinstance(assertion_id, str) and assertion_id.endswith(".production-path"):
+                if native_cli.scenario_valid(scenario) and binding == native_cli.SCENARIO["assertions"][0]:
+                    continue
                 if canonical_feature_registry and isinstance(feature, dict) and feature.get("category") == "cli":
                     raise EvidenceSupportError(
                         "P10 canonical CLI assertions have no reviewed snapshot-safe semantic contract"
@@ -1119,9 +1150,16 @@ def main() -> int:
             "missing_assertions": [assertion for _, assertion in missing],
         }
         print(json.dumps(diagnostic, sort_keys=True, separators=(",", ":")))
-        return 2
 
     command_argv = [str(pathlib.Path(__file__).resolve()), "--report", REPORT_PATH]
+    if arguments.feature is not None:
+        command_argv.extend(["--feature", arguments.feature])
+    if arguments.build_evidence is not None:
+        command_argv.extend(["--build-evidence", arguments.build_evidence])
+    if arguments.installation_evidence is not None:
+        command_argv.extend(["--installation-evidence", arguments.installation_evidence])
+    if arguments.cli_app is not None:
+        command_argv.extend(["--cli-app", arguments.cli_app])
     started_at = now()
     matrix_deadline = time.monotonic() + MAXIMUM_MATRIX_SECONDS
     execution_environment = probe_environment()
@@ -1132,136 +1170,191 @@ def main() -> int:
     observation_documents: list[dict[str, Any]] = []
     installation_receipts: list[dict[str, Any]] = []
     aggregate_output_bytes = 0
-    for probe in implemented:
-        argv, timeout = runner_argv(repository, probe)
-        timeout = bounded_remaining_seconds(matrix_deadline, timeout)
-        probe_started = now()
-        challenge_nonce = secrets.token_hex(32)
-        with tempfile.TemporaryDirectory(prefix="forge-p10-probe-") as temporary:
-            temporary_root = pathlib.Path(temporary)
-            stdout_path = temporary_root / "stdout"
-            stderr_path = temporary_root / "stderr"
-            observation_path = temporary_root / "observation.json"
-            scenario_environment = {
-                **execution_environment,
-                "FORGE_EVIDENCE_ID": evidence_id,
-                "FORGE_P10_SCENARIO_ID": probe["scenario_id"],
-                "FORGE_P10_CHALLENGE_NONCE": challenge_nonce,
-                "FORGE_P10_OBSERVATION_PATH": str(observation_path),
-            }
-            exit_code, timed_out, stream_limit_exceeded = execute_command(
-                argv,
-                repository,
-                stdout_path,
-                stderr_path,
-                timeout,
-                MAXIMUM_STREAM_BYTES_PER_PROBE,
-                scenario_environment,
-            )
-            stdout = stdout_path.read_bytes()
-            stderr = stderr_path.read_bytes()
-            try:
-                observation_size = observation_path.stat().st_size
-                if observation_size < 1 or observation_size > MAXIMUM_STREAM_BYTES_PER_PROBE:
-                    raise EvidenceSupportError("P10 scenario observation exceeds its exact byte bound")
-                observation_raw = observation_path.read_bytes()
-            except OSError:
-                observation_raw = b""
-        runner_observation_raw = observation_raw
-        aggregate_output_bytes += len(stdout) + len(stderr) + len(runner_observation_raw)
-        if aggregate_output_bytes > MAXIMUM_TOTAL_RAW_OUTPUT_BYTES:
-            raise EvidenceSupportError("P10 production probe matrix exceeded its aggregate output bound")
-        runner_passed, runner_results, runner_document = evaluate_runner_artifact(
-            probe,
-            runner_observation_raw,
-            evidence_id=evidence_id,
-            challenge_nonce=challenge_nonce,
+    supporting_cli = None
+    if arguments.cli_app is not None:
+        feature = registry_by_id.get("CLI-VERSION-HELP")
+        if not isinstance(feature, dict) or "CLI-VERSION-HELP.production-path" not in feature.get("required_assertions", []):
+            raise EvidenceSupportError("CLI supporting capture is not associated with the current feature registry")
+        from p10_cli_version_help import capture
+        supporting_cli = capture(
+            repository, pathlib.Path(arguments.cli_app),
+            evidence_id=evidence_id, challenge_nonce=secrets.token_hex(32),
         )
-        passed = runner_passed
-        installation_facts: dict[str, Any] | None = None
-        scenario_signing: dict[str, dict[str, Any]] = {}
-        scenario_providers: dict[str, dict[str, Any]] = {}
-        if isinstance(runner_document, dict):
-            try:
-                installation_facts = derive_installation_facts(
-                    probe,
-                    runner_document,
-                    require_live_process=True,
-                )
-            except (OSError, UnicodeDecodeError, EvidenceSupportError, subprocess.SubprocessError) as error:
-                print(
-                    f"P10 scenario {probe['scenario_id']} installation rejected: {error}",
-                    file=sys.stderr,
-                )
-                passed = False
-            else:
-                installation_receipts.append(installation_facts)
-                for binding in probe["assertions"]:
-                    assertion_id = binding["assertion_id"]
-                    try:
-                        if signing_artifact_from_assertion(assertion_id) is not None:
-                            selector = binding["selector"]
-                            if selector not in scenario_signing:
-                                scenario_signing[selector] = derive_signing_fact(
-                                    binding,
-                                    installation_facts,
-                                )
-                        elif assertion_id.endswith(".real-provider"):
-                            scenario_providers[binding["selector"]] = derive_provider_fact(
-                                binding,
-                                runner_document,
-                                challenge_nonce=challenge_nonce,
-                            )
-                    except (OSError, UnicodeDecodeError, EvidenceSupportError, subprocess.SubprocessError) as error:
-                        print(
-                            f"P10 scenario {probe['scenario_id']} sensitive fact rejected: {error}",
-                            file=sys.stderr,
-                        )
-                        passed = False
-        qualifier_results: list[dict[str, Any]] = []
-        seen_selectors: set[str] = set()
-        if isinstance(runner_document, dict):
-            for binding in probe["assertions"]:
-                selector = binding["selector"]
-                if selector in seen_selectors:
-                    continue
-                seen_selectors.add(selector)
-                if binding.get("evidence_kind") == "installed-cli-transcript":
-                    try:
-                        if installation_facts is None:
-                            raise EvidenceSupportError("P10 installed CLI observation has no installation receipt")
-                        qualifier_results.append(capture_installed_cli_transcript(
-                            binding,
-                            installation_facts,
-                            challenge_nonce=challenge_nonce,
-                            matrix_deadline=matrix_deadline,
-                        ))
-                    except (OSError, UnicodeDecodeError, EvidenceSupportError, subprocess.SubprocessError) as error:
-                        print(
-                            f"P10 scenario {probe['scenario_id']} CLI observation rejected: {error}",
-                            file=sys.stderr,
-                        )
-                        passed = False
-                else:
-                    sensitive_result = runner_results.get(selector)
-                    if isinstance(sensitive_result, dict):
-                        qualifier_results.append(sensitive_result)
-                    else:
-                        passed = False
-            result_document = {
-                "schema_version": 3,
-                "kind": "p10-qualifier-observations",
-                "evidence_id": evidence_id,
-                "scenario_id": probe["scenario_id"],
-                "challenge_nonce": challenge_nonce,
-                "process": runner_document.get("process"),
-                "provider_process": runner_document.get("provider_process"),
-                "results": qualifier_results,
-            }
-            observation_raw = canonical_bytes(result_document)
-        else:
-            result_document = None
+        aggregate_output_bytes += supporting_cli["bytes"]
+    for probe in implemented:
+        if probe.get("runner", {}).get("kind") == native_cli.RUNNER_KIND:
+            probe_started = now()
+            probe_deadline = time.monotonic() + bounded_remaining_seconds(matrix_deadline, probe["runner"]["timeout_seconds"])
+            challenge_nonce = secrets.token_hex(32)
+            stdout, stderr = b"", b""
+            timed_out = stream_limit_exceeded = False
+            scenario_signing, scenario_providers = {}, {}
+            installation_facts = result_document = None
             observation_raw = b""
+            argv, _ = runner_argv(repository, probe)
+            exit_code, passed = 1, False
+            try:
+                if not arguments.build_evidence or not arguments.installation_evidence:
+                    raise EvidenceSupportError("registered native CLI scenario requires build and installation evidence IDs")
+                probe, native_result, process = native_cli.capture_result(
+                    repository, build_id=arguments.build_evidence,
+                    installation_id=arguments.installation_evidence,
+                    evidence_id=evidence_id, nonce=challenge_nonce,
+                )
+                argv, _ = runner_argv(repository, probe)
+                signing_binding = probe["assertions"][1]
+                result_document = {
+                    "schema_version": 3, "kind": "p10-qualifier-observations",
+                    "evidence_id": evidence_id, "scenario_id": probe["scenario_id"],
+                    "challenge_nonce": challenge_nonce, "process": process,
+                    "provider_process": None, "results": [native_result, {
+                        "selector": signing_binding["selector"], "evidence_kind": "codesign-identity",
+                        "request": {"challenge_nonce": challenge_nonce, "selector": signing_binding["selector"]},
+                        "response": {"challenge_nonce": challenge_nonce, "selector": signing_binding["selector"], "observed": signing_binding["expected"]},
+                    }],
+                }
+                installation_facts = derive_installation_facts(probe, result_document, require_live_process=False)
+                scenario_signing[signing_binding["selector"]] = derive_signing_fact(signing_binding, installation_facts)
+                installation_receipts.append(installation_facts)
+                observation_raw = canonical_bytes(result_document)
+                exit_code, passed = 0, True
+            except (OSError, ValueError, EvidenceSupportError, subprocess.SubprocessError) as error:
+                stderr = str(error).encode("utf-8")[:MAXIMUM_STREAM_BYTES_PER_PROBE]
+                print(f"P10 native CLI scenario rejected: {error}", file=sys.stderr)
+        else:
+            argv, timeout = runner_argv(repository, probe)
+            timeout = bounded_remaining_seconds(matrix_deadline, timeout)
+            probe_started = now()
+            challenge_nonce = secrets.token_hex(32)
+            with tempfile.TemporaryDirectory(prefix="forge-p10-probe-") as temporary:
+                temporary_root = pathlib.Path(temporary)
+                stdout_path = temporary_root / "stdout"
+                stderr_path = temporary_root / "stderr"
+                observation_path = temporary_root / "observation.json"
+                scenario_environment = {
+                    **execution_environment,
+                    "FORGE_EVIDENCE_ID": evidence_id,
+                    "FORGE_P10_SCENARIO_ID": probe["scenario_id"],
+                    "FORGE_P10_CHALLENGE_NONCE": challenge_nonce,
+                    "FORGE_P10_OBSERVATION_PATH": str(observation_path),
+                }
+                exit_code, timed_out, stream_limit_exceeded = execute_command(
+                    argv,
+                    repository,
+                    stdout_path,
+                    stderr_path,
+                    timeout,
+                    MAXIMUM_STREAM_BYTES_PER_PROBE,
+                    scenario_environment,
+                )
+                stdout = stdout_path.read_bytes()
+                stderr = stderr_path.read_bytes()
+                try:
+                    observation_size = observation_path.stat().st_size
+                    if observation_size < 1 or observation_size > MAXIMUM_STREAM_BYTES_PER_PROBE:
+                        raise EvidenceSupportError("P10 scenario observation exceeds its exact byte bound")
+                    observation_raw = observation_path.read_bytes()
+                except OSError:
+                    observation_raw = b""
+            runner_observation_raw = observation_raw
+            aggregate_output_bytes += len(stdout) + len(stderr) + len(runner_observation_raw)
+            if aggregate_output_bytes > MAXIMUM_TOTAL_RAW_OUTPUT_BYTES:
+                raise EvidenceSupportError("P10 production probe matrix exceeded its aggregate output bound")
+            runner_passed, runner_results, runner_document = evaluate_runner_artifact(
+                probe,
+                runner_observation_raw,
+                evidence_id=evidence_id,
+                challenge_nonce=challenge_nonce,
+            )
+            passed = runner_passed
+            installation_facts: dict[str, Any] | None = None
+            scenario_signing: dict[str, dict[str, Any]] = {}
+            scenario_providers: dict[str, dict[str, Any]] = {}
+            if isinstance(runner_document, dict):
+                try:
+                    installation_facts = derive_installation_facts(
+                        probe,
+                        runner_document,
+                        require_live_process=True,
+                    )
+                except (OSError, UnicodeDecodeError, EvidenceSupportError, subprocess.SubprocessError) as error:
+                    print(
+                        f"P10 scenario {probe['scenario_id']} installation rejected: {error}",
+                        file=sys.stderr,
+                    )
+                    passed = False
+                else:
+                    installation_receipts.append(installation_facts)
+                    for binding in probe["assertions"]:
+                        assertion_id = binding["assertion_id"]
+                        try:
+                            if signing_artifact_from_assertion(assertion_id) is not None:
+                                selector = binding["selector"]
+                                if selector not in scenario_signing:
+                                    scenario_signing[selector] = derive_signing_fact(
+                                        binding,
+                                        installation_facts,
+                                    )
+                            elif assertion_id.endswith(".real-provider"):
+                                scenario_providers[binding["selector"]] = derive_provider_fact(
+                                    binding,
+                                    runner_document,
+                                    challenge_nonce=challenge_nonce,
+                                )
+                        except (OSError, UnicodeDecodeError, EvidenceSupportError, subprocess.SubprocessError) as error:
+                            print(
+                                f"P10 scenario {probe['scenario_id']} sensitive fact rejected: {error}",
+                                file=sys.stderr,
+                            )
+                            passed = False
+            qualifier_results: list[dict[str, Any]] = []
+            seen_selectors: set[str] = set()
+            if isinstance(runner_document, dict):
+                for binding in probe["assertions"]:
+                    selector = binding["selector"]
+                    if selector in seen_selectors:
+                        continue
+                    seen_selectors.add(selector)
+                    if binding.get("evidence_kind") == "installed-cli-transcript":
+                        try:
+                            if installation_facts is None:
+                                raise EvidenceSupportError("P10 installed CLI observation has no installation receipt")
+                            qualifier_results.append(capture_installed_cli_transcript(
+                                binding,
+                                installation_facts,
+                                challenge_nonce=challenge_nonce,
+                                matrix_deadline=matrix_deadline,
+                            ))
+                        except (OSError, UnicodeDecodeError, EvidenceSupportError, subprocess.SubprocessError) as error:
+                            print(
+                                f"P10 scenario {probe['scenario_id']} CLI observation rejected: {error}",
+                                file=sys.stderr,
+                            )
+                            passed = False
+                    else:
+                        sensitive_result = runner_results.get(selector)
+                        if isinstance(sensitive_result, dict):
+                            qualifier_results.append(sensitive_result)
+                        else:
+                            passed = False
+                result_document = {
+                    "schema_version": 3,
+                    "kind": "p10-qualifier-observations",
+                    "evidence_id": evidence_id,
+                    "scenario_id": probe["scenario_id"],
+                    "challenge_nonce": challenge_nonce,
+                    "process": runner_document.get("process"),
+                    "provider_process": runner_document.get("provider_process"),
+                    "results": qualifier_results,
+                }
+                observation_raw = canonical_bytes(result_document)
+            else:
+                result_document = None
+                observation_raw = b""
+        if probe.get("runner", {}).get("kind") == native_cli.RUNNER_KIND:
+            aggregate_output_bytes += len(stdout) + len(stderr)
+            if time.monotonic() > probe_deadline:
+                timed_out, passed = True, False
         if len(observation_raw) > MAXIMUM_OBSERVATION_BYTES_PER_SCENARIO:
             raise EvidenceSupportError("P10 qualifier observation exceeds its exact byte bound")
         aggregate_output_bytes += len(observation_raw)
@@ -1273,6 +1366,7 @@ def main() -> int:
             evidence_id=evidence_id,
             challenge_nonce=challenge_nonce,
             installation=installation_facts,
+            repository=repository,
         )
         if parsed_result_document != result_document:
             passed = False
@@ -1402,7 +1496,12 @@ def main() -> int:
         rows.append(
             {
                 "feature_id": feature["id"],
-                "status": "passed" if assertions and all(item["passed"] for item in assertions) else "failed",
+                "status": (
+                    "not_run" if not assertions else
+                    "failed" if not all(item["passed"] for item in assertions) else
+                    "partial" if len(assertions) < len(feature["required_assertions"]) else
+                    "passed"
+                ),
                 "execution_count": sum(item["executed_tests"] for item in assertions),
                 "assertion_count": len(assertions),
                 "assertions": assertions,
@@ -1423,12 +1522,14 @@ def main() -> int:
     installation_receipt = installation_receipts[0] if installation_receipts and all(
         item == installation_receipts[0] for item in installation_receipts
     ) and len(installation_receipts) == len(receipts) else None
+    incomplete = bool(missing) or not required or assertion_count != len(required)
+    exit_code = 2 if incomplete else (0 if passed_count == assertion_count else 1)
     report = {
         "schema_version": 2,
         "qualifier": EXPECTED_QUALIFIER,
         "command": {
             "argv": command_argv,
-            "exit_code": 0 if passed_count == assertion_count else 1,
+            "exit_code": exit_code,
             "timed_out": False,
             "stream_limit_exceeded": False,
         },
@@ -1445,7 +1546,7 @@ def main() -> int:
             "macos_build": os.environ.get("FORGE_EVIDENCE_MACOS_BUILD", platform.version()),
             "machine_identifier": os.environ.get("FORGE_EVIDENCE_MACHINE_IDENTIFIER", "unknown"),
             "configuration": "Release",
-            "installed_product": installation_receipt is not None and passed_count == assertion_count,
+            "installed_product": not incomplete and installation_receipt is not None and passed_count == assertion_count,
             "installation_receipt": installation_receipt,
         },
         "timing": {"started_at": started_at, "ended_at": ended_at},
@@ -1459,8 +1560,35 @@ def main() -> int:
         },
         "results": rows,
     }
+    if arguments.feature is not None:
+        report["selection"] = {
+            "feature_ids": [native_cli.FEATURE_ID], "scope": native_cli.SCOPE,
+            "distribution_qualified": False,
+            "global_required_assertion_count": len(global_required),
+            "global_missing_assertion_ids": sorted(assertion for feature, assertion in global_required - mapped),
+            "build_evidence_id": arguments.build_evidence,
+            "installation_evidence_id": arguments.installation_evidence,
+        }
+    if incomplete or supporting_cli is not None:
+        # Passing-only production reports keep their existing schema. A partial
+        # report preserves real observations without entering that acceptance path.
+        report["schema_version"] = 3
+        report["kind"] = "p10-feature-partial-qualification"
+        report["coverage"] = {
+            "required_assertion_count": len(required),
+            "mapped_assertion_count": len(required & mapped),
+            "missing_assertion_count": len(missing),
+            "missing_assertions": [assertion for _, assertion in missing],
+            "complete": False,
+        }
+        report["supporting_cli"] = supporting_cli
+        if not installation_receipts:
+            report["environment"]["configuration"] = "not_assessed"
+        report["environment"]["installed_product"] = False
+        report["command"]["exit_code"] = 2
+        exit_code = 2
     atomic_write_json(repository / REPORT_PATH, report)
-    return 0 if passed_count == assertion_count else 1
+    return exit_code
 
 
 if __name__ == "__main__":

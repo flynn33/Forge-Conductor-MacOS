@@ -110,6 +110,56 @@ final class ProcessRunnerTests: XCTestCase {
         XCTAssertTrue(result.stdoutTruncated)
     }
 
+    func testSaturatedStreamsContinueDrainingAfterRetentionCapUntilFiniteChildCompletes() throws {
+        let result = try fastRunner().run(
+            executable: "/bin/sh",
+            arguments: ["-c", """
+                (/usr/bin/head -c 524288 /dev/zero; printf 'stdout-complete') &
+                (/usr/bin/head -c 524288 /dev/zero >&2; printf 'stderr-complete' >&2) &
+                wait
+                """],
+            timeoutSec: 3,
+            maximumOutputBytes: 64
+        )
+        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertFalse(result.timedOut)
+        XCTAssertEqual(result.stdout.utf8.count, 64)
+        XCTAssertEqual(result.stderr.utf8.count, 64)
+        XCTAssertTrue(result.stdoutTruncated)
+        XCTAssertTrue(result.stderrTruncated)
+    }
+
+    func testContinuousOutputDoesNotStarveOtherStreamOrTimeout() throws {
+        let started = ContinuousClock.now
+        let result = try fastRunner().run(
+            executable: "/bin/sh",
+            arguments: ["-c", "while :; do printf '%016384d' 0; printf 'stderr-progress\\n' >&2; done"],
+            timeoutSec: 0.1,
+            maximumOutputBytes: 64
+        )
+        XCTAssertTrue(result.timedOut)
+        XCTAssertTrue(result.stdoutTruncated)
+        XCTAssertTrue(result.stderr.contains("stderr-progress"))
+        XCTAssertLessThan(started.duration(to: .now), .seconds(1))
+    }
+
+    func testTerminationGraceDrainsHandlerOutputBeyondPipeCapacity() throws {
+        let result = try ProcessRunner().run(
+            executable: "/bin/sh",
+            arguments: ["-c", """
+                trap 'printf "%0200000d" 0; printf "grace-completed" >&2; exit 0' TERM
+                printf 'ready'
+                while :; do :; done
+                """],
+            timeoutSec: 0.1,
+            maximumOutputBytes: 64
+        )
+        XCTAssertTrue(result.timedOut)
+        XCTAssertEqual(result.exitCode, 0, "A finite TERM flush should finish during the normal grace window")
+        XCTAssertEqual(result.stderr, "grace-completed")
+        XCTAssertTrue(result.stdoutTruncated)
+    }
+
     func testDirectChildExitDoesNotWaitForDescendantPipeEOF() throws {
         let started = ContinuousClock.now
         let result = try fastRunner().run(

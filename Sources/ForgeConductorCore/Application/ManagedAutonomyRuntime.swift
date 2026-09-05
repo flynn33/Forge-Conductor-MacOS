@@ -327,8 +327,12 @@ public actor ManagedAutonomyRuntime {
         registry: HostAdapterRegistry = .shared,
         managerID: String? = nil,
         maximumConcurrentRuns: Int? = nil,
+        contextBudgetPolicy: ContextBudgetPolicy? = nil,
         continuityFactory: ContinuityFactory? = nil
     ) throws {
+        // The optional composition policy supports deterministic threshold
+        // qualification. Provider capacity and reserve calculations are never overridden.
+        let validatedBudgetPolicy = try contextBudgetPolicy?.validated()
         let repository = app.projectContexts.repository
         let toolNames = app.tools.toolNames
         let catalog = try ToolDefinitionCatalog.production(toolNames: toolNames)
@@ -387,7 +391,8 @@ public actor ManagedAutonomyRuntime {
             )
             let budget = PersistedManagedRunBudgetEvaluator(
                 repository: repository,
-                clock: clock
+                clock: clock,
+                policyOverride: validatedBudgetPolicy
             )
             let stepExecutor = try ManagedProjectRunStepExecutor(
                 repository: repository,

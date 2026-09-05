@@ -259,6 +259,8 @@
 		B09B00000000000000000053 /* ProviderConfigurationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B09F00000000000000000053 /* ProviderConfigurationTests.swift */; };
 		B09B00000000000000000054 /* ProviderConfigurationAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B09F00000000000000000054 /* ProviderConfigurationAppTests.swift */; };
 		B09B00000000000000000055 /* ProductionOnboardingUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B09F00000000000000000055 /* ProductionOnboardingUITests.swift */; };
+		B09B00000000000000000056 /* NativeGaugeLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B09F00000000000000000056 /* NativeGaugeLifecycleTests.swift */; };
+		B09B00000000000000000057 /* AppBootstrapAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B09F00000000000000000057 /* AppBootstrapAppTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -724,6 +726,8 @@
 		B09F00000000000000000053 /* ProviderConfigurationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderConfigurationTests.swift; sourceTree = "<group>"; };
 		B09F00000000000000000054 /* ProviderConfigurationAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderConfigurationAppTests.swift; sourceTree = "<group>"; };
 		B09F00000000000000000055 /* ProductionOnboardingUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductionOnboardingUITests.swift; sourceTree = "<group>"; };
+		B09F00000000000000000056 /* NativeGaugeLifecycleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeGaugeLifecycleTests.swift; sourceTree = "<group>"; };
+		B09F00000000000000000057 /* AppBootstrapAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBootstrapAppTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -848,6 +852,8 @@
 			children = (
 				BE153ABEB86940BF8945EE52 /* Tests/ForgeConductorTests/OperatorProjectContractTests.swift */,
 				B09F00000000000000000054 /* ProviderConfigurationAppTests.swift */,
+				B09F00000000000000000056 /* NativeGaugeLifecycleTests.swift */,
+				B09F00000000000000000057 /* AppBootstrapAppTests.swift */,
 				E2F500000000000000000013 /* ForgeFilesystemProtocolTests.swift */,
 				E2F500000000000000000044 /* SecureFilesystemMutationTests.swift */,
 				E2F500000000000000000055 /* SecureFilesystemQualificationHealthSessionTests.swift */,
@@ -1571,6 +1577,8 @@
 			files = (
 				14782D2FE9544A59A1AED446 /* Tests/ForgeConductorTests/OperatorProjectContractTests.swift in Sources */,
 				B09B00000000000000000054 /* ProviderConfigurationAppTests.swift in Sources */,
+				B09B00000000000000000056 /* NativeGaugeLifecycleTests.swift in Sources */,
+				B09B00000000000000000057 /* AppBootstrapAppTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

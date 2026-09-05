@@ -706,7 +706,7 @@ class P10FeatureEvidenceTests(P10FeatureBaselineTests):
             root, manifest = self.create_qualified_repository(pathlib.Path(temporary))
             first = self.evaluate_repository(root, manifest)
             second = self.evaluate_repository(root, manifest)
-            self.assertTrue(any("no concrete runner for 259" in item for item in first.failures), first.failures)
+            self.assertTrue(any("no concrete runner for 257" in item for item in first.failures), first.failures)
             self.assertEqual(first.binding, second.binding)
             self.assertEqual(len(first.binding["feature_records"]), 104)
             self.assertEqual(len(first.binding["evidence_records"]), 1)
@@ -1922,6 +1922,30 @@ class P10FeatureEvidenceTests(P10FeatureBaselineTests):
             self.assertEqual([item["selector"] for item in assertions], ["fixture-first", "fixture-second"])
             self.assertEqual(counter.read_text(), "1")
 
+            # A missing third assertion must not discard either observed proof.
+            registry["features"][0]["required_assertions"].append("BUILD-FIXTURE.missing.production-path")
+            (root / FEATURE_REGISTRY_PATH).write_bytes(encoded(registry))
+            partial = subprocess.run(
+                ["python3", str(REPOSITORY_ROOT / ".forge-codex/scripts/qualify_p10_features.py"),
+                 "--repo", str(root), "--report", FEATURE_QUALIFICATION_REPORT_SOURCE_PATH],
+                cwd=REPOSITORY_ROOT, env=environment,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
+            )
+            self.assertEqual(partial.returncode, 2, partial.stderr.decode())
+            partial_report = json.loads(report_path.read_bytes())
+            self.assertEqual(partial_report["kind"], "p10-feature-partial-qualification")
+            self.assertEqual(partial_report["coverage"]["missing_assertions"], ["BUILD-FIXTURE.missing.production-path"])
+            self.assertEqual(partial_report["execution"]["passed_assertion_count"], 2)
+            self.assertEqual(partial_report["results"][0]["status"], "partial")
+            self.assertFalse(partial_report["environment"]["installed_product"])
+            partial_receipt = json.loads(partial.stdout.splitlines()[-1])
+            self.assertEqual(partial_receipt["kind"], "p10-production-probe-receipt")
+            self.assertEqual(partial_receipt["observed_assertions"], 2)
+            self.assertTrue(partial_report["results"][0]["assertions"][0]["artifact_references"])
+            self.assertEqual(counter.read_text(), "2")
+            registry["features"][0]["required_assertions"].pop()
+            (root / FEATURE_REGISTRY_PATH).write_bytes(encoded(registry))
+
             probe_registry["implemented_scenarios"][0]["runner"]["arguments"][-1] = "invent"
             (root / PRODUCTION_PROBE_REGISTRY_PATH).write_bytes(encoded(probe_registry))
             invented = subprocess.run(
@@ -1940,7 +1964,7 @@ class P10FeatureEvidenceTests(P10FeatureBaselineTests):
                 check=False,
             )
             self.assertNotEqual(invented.returncode, 0)
-            self.assertEqual(counter.read_text(), "2")
+            self.assertEqual(counter.read_text(), "3")
 
             probe_registry["implemented_scenarios"][0]["runner"]["arguments"][-1] = "capture"
             (root / PRODUCTION_PROBE_REGISTRY_PATH).write_bytes(encoded(probe_registry))
@@ -1966,7 +1990,7 @@ class P10FeatureEvidenceTests(P10FeatureBaselineTests):
                 "no reviewed snapshot-safe semantic contract",
                 canonical_snapshot.stderr.decode(),
             )
-            self.assertEqual(counter.read_text(), "2")
+            self.assertEqual(counter.read_text(), "3")
 
     def test_gate_finalization_and_completion_paths_revalidate_ledger_bound_criteria(self) -> None:
         run_gate = (SCRIPT_ROOT / "run_gate.py").read_text()

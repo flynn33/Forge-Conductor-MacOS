@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://forge-conductor.local/schemas/p10-feature-production-qualification.schema.json",
-  "title": "P10 feature production qualification",
+  "$id": "https://forge-conductor.local/schemas/p10-feature-partial-qualification.schema.json",
+  "title": "P10 partial observations; not accepted full qualification",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -12,32 +12,27 @@
     "environment",
     "timing",
     "source_identity",
-    "results"
+    "results",
+    "kind",
+    "coverage",
+    "supporting_cli"
   ],
   "properties": {
     "selection": {"type":"object","additionalProperties":false,"required":["feature_ids","scope","distribution_qualified","global_required_assertion_count","global_missing_assertion_ids","build_evidence_id","installation_evidence_id"],"properties":{"feature_ids":{"const":["CLI-VERSION-HELP"]},"scope":{"const":"development-installed-release"},"distribution_qualified":{"const":false},"global_required_assertion_count":{"const":259},"global_missing_assertion_ids":{"type":"array","minItems":257,"maxItems":257,"uniqueItems":true,"items":{"type":"string","minLength":1,"maxLength":300}},"build_evidence_id":{"type":"string","pattern":"^EVID-[A-Za-z0-9_-]{1,128}$"},"installation_evidence_id":{"type":"string","pattern":"^EVID-[A-Za-z0-9_-]{1,128}$"}}},
-    "schema_version": {"type": "integer", "const": 2},
+    "schema_version": {"type": "integer", "const": 3},
     "qualifier": {
       "type": "object",
       "additionalProperties": false,
       "required": ["name", "version"],
-      "properties": {
-        "name": {"type": "string", "const": "forge-p10-production-matrix"},
-        "version": {"type": "integer", "const": 2}
-      }
+      "properties": {"name": {"type": "string", "const": "forge-p10-production-matrix"}, "version": {"type": "integer", "const": 2}}
     },
     "command": {
       "type": "object",
       "additionalProperties": false,
       "required": ["argv", "exit_code", "timed_out", "stream_limit_exceeded"],
       "properties": {
-        "argv": {
-          "type": "array",
-          "minItems": 3,
-          "maxItems": 64,
-          "items": {"type": "string", "minLength": 1, "maxLength": 4096}
-        },
-        "exit_code": {"type": "integer", "const": 0},
+        "argv": {"type": "array", "minItems": 3, "maxItems": 64, "items": {"type": "string", "minLength": 1, "maxLength": 4096}},
+        "exit_code": {"type": "integer", "const": 2},
         "timed_out": {"type": "boolean", "const": false},
         "stream_limit_exceeded": {"type": "boolean", "const": false}
       }
@@ -47,35 +42,41 @@
       "additionalProperties": false,
       "required": ["count", "assertion_count", "passed_assertion_count", "failed_assertion_count"],
       "properties": {
-        "count": {"type": "integer", "minimum": 1, "maximum": 64},
-        "assertion_count": {"type": "integer", "minimum": 1, "maximum": 1000000},
-        "passed_assertion_count": {"type": "integer", "minimum": 1, "maximum": 1000000},
-        "failed_assertion_count": {"type": "integer", "const": 0}
+        "count": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "assertion_count": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "passed_assertion_count": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "failed_assertion_count": {"type": "integer", "minimum": 0, "maximum": 1000000}
       }
     },
     "environment": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["repository", "platform", "architecture", "macos_build", "machine_identifier", "configuration", "installed_product", "installation_receipt"],
+      "required": [
+        "repository",
+        "platform",
+        "architecture",
+        "macos_build",
+        "machine_identifier",
+        "configuration",
+        "installed_product",
+        "installation_receipt"
+      ],
       "properties": {
         "repository": {"type": "string", "minLength": 1, "maxLength": 4096},
         "platform": {"type": "string", "minLength": 1, "maxLength": 4096},
         "architecture": {"type": "string", "minLength": 1, "maxLength": 256},
         "macos_build": {"type": "string", "minLength": 1, "maxLength": 256},
         "machine_identifier": {"type": "string", "minLength": 1, "maxLength": 256},
-        "configuration": {"type": "string", "const": "Release"},
-        "installed_product": {"type": "boolean", "const": true},
-        "installation_receipt": {"$ref": "#/$defs/installation_receipt"}
+        "configuration": {"enum": ["Release", "not_assessed"]},
+        "installed_product": {"type": "boolean", "const": false},
+        "installation_receipt": {"anyOf": [{"$ref": "#/$defs/installation_receipt"}, {"type": "null"}]}
       }
     },
     "timing": {
       "type": "object",
       "additionalProperties": false,
       "required": ["started_at", "ended_at"],
-      "properties": {
-        "started_at": {"type": "string", "format": "date-time"},
-        "ended_at": {"type": "string", "format": "date-time"}
-      }
+      "properties": {"started_at": {"type": "string", "format": "date-time"}, "ended_at": {"type": "string", "format": "date-time"}}
     },
     "source_identity": {
       "type": "object",
@@ -90,11 +91,38 @@
         "baseline_sha256": {"$ref": "#/$defs/sha256"}
       }
     },
-    "results": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 104,
-      "items": {"$ref": "#/$defs/feature_result"}
+    "results": {"type": "array", "minItems": 0, "maxItems": 104, "items": {"$ref": "#/$defs/feature_result"}},
+    "kind": {"const": "p10-feature-partial-qualification"},
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required_assertion_count", "mapped_assertion_count", "missing_assertion_count", "missing_assertions", "complete"],
+      "properties": {
+        "required_assertion_count": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "mapped_assertion_count": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "missing_assertion_count": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "missing_assertions": {"type": "array", "uniqueItems": true, "maxItems": 1000000, "items": {"type": "string", "minLength": 1, "maxLength": 256}},
+        "complete": {"const": false}
+      }
+    },
+    "supporting_cli": {
+      "anyOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["source_path", "sha256", "bytes", "executed_case_count", "passed", "accepted_p10_assertions", "failures"],
+          "properties": {
+            "source_path": {"const": ".forge-codex/evidence/P10-cli-version-help-observations.json"},
+            "sha256": {"$ref": "#/$defs/sha256"},
+            "bytes": {"type": "integer", "minimum": 1, "maximum": 2097152},
+            "executed_case_count": {"type": "integer", "minimum": 0, "maximum": 7},
+            "passed": {"type": "boolean"},
+            "accepted_p10_assertions": {"const": []},
+            "failures": {"type": "array", "maxItems": 128, "items": {"type": "string", "maxLength": 4096}}
+          }
+        }
+      ]
     }
   },
   "$defs": {
@@ -151,23 +179,30 @@
     "assertion": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "scenario_id", "selector", "runner_kind", "runner_argv", "execution_receipt_sha256", "executed_tests", "observed_assertions", "passed", "result", "artifact_references"],
+      "required": [
+        "id",
+        "scenario_id",
+        "selector",
+        "runner_kind",
+        "runner_argv",
+        "execution_receipt_sha256",
+        "executed_tests",
+        "observed_assertions",
+        "passed",
+        "result",
+        "artifact_references"
+      ],
       "properties": {
         "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,250}$"},
         "scenario_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,250}$"},
         "selector": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,250}$"},
         "runner_kind": {"type": "string", "enum": ["repository_qualification", "native_cli_version_help"]},
-        "runner_argv": {
-          "type": "array",
-          "minItems": 1,
-          "maxItems": 128,
-          "items": {"type": "string", "minLength": 1, "maxLength": 4096}
-        },
+        "runner_argv": {"type": "array", "minItems": 1, "maxItems": 128, "items": {"type": "string", "minLength": 1, "maxLength": 4096}},
         "execution_receipt_sha256": {"$ref": "#/$defs/sha256"},
-        "executed_tests": {"type": "integer", "minimum": 1, "maximum": 1000000},
-        "observed_assertions": {"type": "integer", "minimum": 1, "maximum": 1000000},
-        "passed": {"type": "boolean", "const": true},
-        "result": {"type": "string", "const": "passed"},
+        "executed_tests": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "observed_assertions": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "passed": {"type": "boolean"},
+        "result": {"enum": ["passed", "failed"]},
         "artifact_references": {
           "type": "array",
           "minItems": 1,
@@ -189,10 +224,24 @@
     "signing": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["applicable", "artifact_id", "path", "artifact_sha256", "artifact_bytes", "team_id", "identifier", "cdhash", "designated_requirement_sha256", "hardened_runtime"],
+      "required": [
+        "applicable",
+        "artifact_id",
+        "path",
+        "artifact_sha256",
+        "artifact_bytes",
+        "team_id",
+        "identifier",
+        "cdhash",
+        "designated_requirement_sha256",
+        "hardened_runtime"
+      ],
       "properties": {
         "applicable": {"type": "boolean"},
-        "artifact_id": {"type": ["string", "null"], "enum": ["forge-conductor-app", "forge-conductor-cli", "forge-filesystem-daemon", "forge-runtime-launcher", null]},
+        "artifact_id": {
+          "type": ["string", "null"],
+          "enum": ["forge-conductor-app", "forge-conductor-cli", "forge-filesystem-daemon", "forge-runtime-launcher", null]
+        },
         "path": {"type": ["string", "null"], "maxLength": 4096},
         "artifact_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
         "artifact_bytes": {"type": ["integer", "null"], "minimum": 1, "maximum": 536870912},
@@ -206,7 +255,24 @@
     "provider": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["applicable", "kind", "transport", "endpoint", "model", "real_provider", "provider_pid", "provider_executable_path", "provider_executable_sha256", "provider_executable_bytes", "challenge_nonce", "request_sha256", "response_sha256", "response_id", "request_base64", "response_base64"],
+      "required": [
+        "applicable",
+        "kind",
+        "transport",
+        "endpoint",
+        "model",
+        "real_provider",
+        "provider_pid",
+        "provider_executable_path",
+        "provider_executable_sha256",
+        "provider_executable_bytes",
+        "challenge_nonce",
+        "request_sha256",
+        "response_sha256",
+        "response_id",
+        "request_base64",
+        "response_base64"
+      ],
       "properties": {
         "applicable": {"type": "boolean"},
         "kind": {"type": "string", "enum": ["lm_studio", "not_applicable"]},
@@ -232,15 +298,10 @@
       "required": ["feature_id", "status", "execution_count", "assertion_count", "assertions", "signing", "provider"],
       "properties": {
         "feature_id": {"type": "string", "pattern": "^[A-Z0-9][A-Z0-9._-]{0,250}$"},
-        "status": {"type": "string", "const": "passed"},
-        "execution_count": {"type": "integer", "minimum": 1, "maximum": 1024},
-        "assertion_count": {"type": "integer", "minimum": 1, "maximum": 4096},
-        "assertions": {
-          "type": "array",
-          "minItems": 1,
-          "maxItems": 4096,
-          "items": {"$ref": "#/$defs/assertion"}
-        },
+        "status": {"enum": ["not_run", "partial", "failed", "passed"]},
+        "execution_count": {"type": "integer", "minimum": 0, "maximum": 1024},
+        "assertion_count": {"type": "integer", "minimum": 0, "maximum": 4096},
+        "assertions": {"type": "array", "minItems": 0, "maxItems": 4096, "items": {"$ref": "#/$defs/assertion"}},
         "signing": {"$ref": "#/$defs/signing"},
         "provider": {"$ref": "#/$defs/provider"}
       }

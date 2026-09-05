@@ -131,14 +131,14 @@ work recorded under **Unreleased** in the changelog.
 | **Project memory** | Twelve `project_memory.*` tools provide bounded search, optimistic updates, links, batch writes, health, and checksummed import/export while legacy `memory_*` tools remain available. |
 | **Shell** | Project shell tools are enabled on clean installs, ambiguous legacy disabled state migrates to enabled, explicit opt-out persists, and `shell_exec` retains its registered name, authorized `/bin/bash -lc` behavior, 120-second ceiling, and established result contract. Clean-profile `bash.run` is additive. |
 | **Continuity** | Durable checkpoints, handoffs, successor state, fencing, and a native LM Studio provider adapter are implemented and covered by deterministic recovery tests. Real-provider threshold rollover and the full crash-state matrix remain open below. |
-| **Runtime and telemetry** | Resource policy, lifecycle ownership, diagnostics, bounded latest-value telemetry, shared Metal resources, and durable bounded jobs are implemented. |
+| **Runtime and telemetry** | Startup, settings and diagnostics export run outside the main actor with bounded operation ownership. Hidden windows and hidden ancestors stop Metal draw submission; showing the window redraws pending values. Telemetry, subprocess pipes and durable jobs remain bounded. |
 | **Filesystem mitigation** | Protocol-v5 capture, bounded protected quarantine, durable receipts, and additive `fs_delete_recovery` narrow and record regular-file/symlink deletion race impact. Move and recursive directory deletion remain unavailable in production. |
 
-The current-source SwiftPM Release regression executes 1,001 tests
-with 5 declared environment skips and 0 failures, with compiler warnings treated
-as errors. A dedicated Apple Development-signed Xcode app-hosted contract suite
-also executes 2 tests with 0 failures. This is broad regression evidence, not
-production-path qualification for every feature listed below.
+The [current shipping handoff](.forge-codex/state/release-handoff.md) records
+exact source manifests, Debug/Release regression counts, native tests, separate
+sanitizer runs and signed bundle checks. Provider onboarding now has real native
+folder-panel, save, discovery and restart tests. Broad regression and focused
+native results do not qualify every feature or close the remaining release gates.
 
 ### Open or deferred before shipment
 

@@ -6,10 +6,11 @@
     "name": "forge-p10-production-matrix",
     "version": 2,
     "source_path": ".forge-codex/scripts/qualify_p10_features.py",
-    "source_sha256": "735b2bdb1daf94bcf6395c96f21e448326d29d9b4a131fd7805eb1beadaa90e5"
+    "source_sha256": "da1daec2d49618ff0a1ede9a5b94dc64ce90be97b2362727ab2e39fd54ad783b"
   },
   "allowlisted_runner_kinds": [
-    "repository_qualification"
+    "repository_qualification",
+    "native_cli_version_help"
   ],
   "limits": {
     "maximum_matrix_seconds": 1500,
@@ -18,5 +19,65 @@
     "maximum_total_raw_output_bytes": 8388608,
     "maximum_unique_runners": 64
   },
-  "implemented_scenarios": []
+  "implemented_scenarios": [
+    {
+      "scenario_id": "CLI-VERSION-HELP-NATIVE",
+      "runner": {
+        "kind": "native_cli_version_help",
+        "timeout_seconds": 180
+      },
+      "installation": {
+        "root": "@validated-cli-installation",
+        "configuration": "Release",
+        "process_artifact_id": "forge-conductor-cli",
+        "artifacts": [
+          {
+            "artifact_id": "forge-conductor-app",
+            "relative_path": "Contents/MacOS/Forge Conductor",
+            "kind": "app-executable"
+          },
+          {
+            "artifact_id": "forge-conductor-cli",
+            "relative_path": "Contents/Helpers/forge-conductor",
+            "kind": "helper"
+          },
+          {
+            "artifact_id": "forge-filesystem-daemon",
+            "relative_path": "Contents/MacOS/forge-filesystem-daemon",
+            "kind": "helper"
+          },
+          {
+            "artifact_id": "forge-runtime-launcher",
+            "relative_path": "Contents/Helpers/forge-runtime-launcher",
+            "kind": "helper"
+          }
+        ]
+      },
+      "assertions": [
+        {
+          "feature_id": "CLI-VERSION-HELP",
+          "assertion_id": "CLI-VERSION-HELP.production-path",
+          "selector": "cli.version-help",
+          "evidence_kind": "native-cli-version-help",
+          "expected": {
+            "contract": "native-cli-version-help-v1",
+            "artifact_id": "forge-conductor-cli",
+            "scope": "development-installed-release"
+          }
+        },
+        {
+          "feature_id": "CLI-VERSION-HELP",
+          "assertion_id": "CLI-VERSION-HELP.signed-product.forge-conductor-cli",
+          "selector": "signing.forge-conductor-cli",
+          "evidence_kind": "codesign-identity",
+          "expected": {
+            "artifact_id": "forge-conductor-cli",
+            "team_id": "9AQ2C2838M",
+            "identifier": "com.forge-conductor.cli",
+            "hardened_runtime": true
+          }
+        }
+      ]
+    }
+  ]
 }
