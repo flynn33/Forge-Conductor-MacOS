@@ -72,7 +72,6 @@ private struct FixtureManagedAuthorization: LMStudioAuthorizationProviding {
     func bearerToken() async throws -> String? { "fixture-token" }
 }
 
-#if SWIFT_PACKAGE
 /// Delays one caller's actual transport error so both V2 persistence orders are
 /// exercised. The fallback is finite and no response or error is fabricated.
 private actor OrderedCancellationTransport: LMStudioManagedTransporting {
@@ -262,10 +261,8 @@ private actor ScriptedManagedTransport: LMStudioManagedTransporting {
         )
     }
 }
-#endif
 
 final class NativeSessionHostPluginTests: XCTestCase {
-#if SWIFT_PACKAGE
     func testLMStudioErrorsExposeProviderNeutralFailureDisposition() {
         let cases: [(LMStudioProviderError, ManagedProviderFailureDisposition, String)] = [
             (.invalidConfiguration("fixture"), .blockedConfiguration, "lmstudio_invalid_configuration"),
@@ -284,7 +281,6 @@ final class NativeSessionHostPluginTests: XCTestCase {
         let rateLimit = LMStudioProviderError.rateLimited(retryNanoseconds: 90_000_000_000)
         XCTAssertEqual(rateLimit.managedProviderRetryDelay, 60)
     }
-#endif
 
     func testProductionRegistrationFailsClosedWithoutProviderConfiguration() throws {
         let root = temporaryRoot("registry")
@@ -434,7 +430,6 @@ final class NativeSessionHostPluginTests: XCTestCase {
         }
     }
 
-#if SWIFT_PACKAGE
     func testCancellingBootstrapOwnerStopsTransportAndPreservesRestartRecovery() async throws {
         let root = temporaryRoot("v2-owner-cancel")
         defer {
@@ -1525,7 +1520,6 @@ final class NativeSessionHostPluginTests: XCTestCase {
             try data.write(to: url, options: .atomic)
         }
     }
-#endif
 
     func testFullAutonomousRolloverPersistsOnlyCompactIdentifiers() async throws {
         let fixture = try makeProjectFixture("autonomous")
@@ -1648,7 +1642,6 @@ final class NativeSessionHostPluginTests: XCTestCase {
         XCTAssertEqual(cancellationStats.cancellations, 1)
     }
 
-#if SWIFT_PACKAGE
     private struct V2Fixture {
         var request: SessionCreationRequestV2
         var challenge: BootstrapChallenge
@@ -1810,7 +1803,6 @@ final class NativeSessionHostPluginTests: XCTestCase {
             sessionConfiguration: sessionConfiguration
         )
     }
-#endif
 
     private func temporaryRoot(_ label: String) -> URL {
         FileManager.default.temporaryDirectory

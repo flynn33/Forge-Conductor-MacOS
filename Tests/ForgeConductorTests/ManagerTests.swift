@@ -558,7 +558,6 @@ private func managerProviderRegistry(
     return registry
 }
 
-#if SWIFT_PACKAGE
 private func writeLiveManagerProviderConfiguration(
     baseURL: URL,
     modelKey: String,
@@ -590,7 +589,6 @@ private func writeLiveManagerProviderConfiguration(
         )
     )
 }
-#endif
 
 private final class TestManagerArtifactValidator: ManagerArtifactValidating {
     enum Operation: Equatable {
@@ -5790,7 +5788,6 @@ final class ManagerTests: XCTestCase {
         XCTAssertEqual(calls.probes, 2)
     }
 
-#if SWIFT_PACKAGE
     func testLiveProviderProbeRouteUsesProductionRegistryAndConfiguration() async throws {
         let environment = ProcessInfo.processInfo.environment
         guard let modelKey = environment["FORGE_LIVE_LMSTUDIO_MODEL"], !modelKey.isEmpty else {
@@ -5848,7 +5845,6 @@ final class ManagerTests: XCTestCase {
         XCTAssertEqual(contract.contractFingerprint?.count, 64)
         XCTAssertNil(contract.lastProbeError)
     }
-#endif
 
     func testPIDFileHelpers() throws {
         let paths = AppPaths(home: home)

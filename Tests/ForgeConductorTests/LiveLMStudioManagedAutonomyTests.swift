@@ -7,6 +7,7 @@ import AppKit
 #endif
 #if SWIFT_PACKAGE
 import ForgeNativeSessionHostPlugin
+#endif
 @testable import ForgeConductorCore
 
 final class LiveLMStudioManagedAutonomyTests: XCTestCase {
@@ -1570,4 +1571,3 @@ private enum LiveQualificationError: Error, LocalizedError {
         }
     }
 }
-#endif
