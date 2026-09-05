@@ -51,7 +51,8 @@ class NativeCITests(unittest.TestCase):
         return [json.loads(line) for line in self.log.read_text().splitlines()]
 
     def test_integrity_failures_propagate_through_logging(self):
-        for command in ('unittest', 'scan_attribution.py', 'versions', 'xcode --repo'):
+        for command in ('unittest', 'test_seal_filesystem_daemon_identity.py',
+                        'scan_attribution.py', 'versions', 'xcode --repo'):
             with self.subTest(command=command):
                 result = self.run_lane('integrity', FAIL_COMMAND='python3', FAIL_FRAGMENT=command)
                 self.assertEqual(result.returncode, 77)

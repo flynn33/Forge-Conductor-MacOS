@@ -48,6 +48,13 @@ installed-stack and production-feature acceptance remain separate gates.
   and native Settings shell disable/re-enable with fresh MCP processes. This
   focused result does not close the full installed/native or P10 matrix.
 
+### Fixed
+
+- Xcode Archive now supplies the actual filesystem daemon product to both
+  identity-sealing phases. The declared sandbox input and consumed binary agree
+  when Xcode creates a build-products symlink; signature verification and
+  symlink rejection remain enabled. Product identity stays 0.9.0, build 1.
+
 ### Changed
 
 - Metal renderers now stop draw submission when their window or an ancestor

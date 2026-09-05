@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-09-05T02:02:03.207003+00:00",
+  "captured_at": "2026-09-05T12:43:42.624463+00:00",
   "environment_keys_present": [
     "CODEX_APP_TOOLS_PIPE_PATH",
     "CODEX_CI",
@@ -9,37 +9,23 @@
     "CODEX_SAGE_BACKFILL_TRACKER_TAB_REUSE",
     "CODEX_SESSION_ID",
     "CODEX_SHELL",
-    "CODEX_THREAD_ID",
-    "FORGE_EVIDENCE_ARCHITECTURE",
-    "FORGE_EVIDENCE_BASE_BRANCH",
-    "FORGE_EVIDENCE_BASE_SHA",
-    "FORGE_EVIDENCE_BINDING_SCHEMA_VERSION",
-    "FORGE_EVIDENCE_CONTEXT_SCHEMA_VERSION",
-    "FORGE_EVIDENCE_ID",
-    "FORGE_EVIDENCE_MACHINE_IDENTIFIER",
-    "FORGE_EVIDENCE_MACOS_BUILD",
-    "FORGE_EVIDENCE_PLATFORM",
-    "FORGE_EVIDENCE_REPOSITORY_BRANCH",
-    "FORGE_EVIDENCE_REPOSITORY_HEAD_SHA",
-    "FORGE_EVIDENCE_REPOSITORY_PATH",
-    "FORGE_EVIDENCE_SOURCE_MANIFEST_JSON",
-    "FORGE_GATE_REPOSITORY_ROOT"
+    "CODEX_THREAD_ID"
   ],
   "execution_state": {
     "available": true,
     "checkpoint_identity": {
-      "active_branch": "release/0.9.0-shipping",
+      "active_branch": "fix/archive-daemon-identity",
       "base_branch": "main",
-      "base_sha": "ffcf6bf9a2ea0c76a54788041cfa00c0dc8c7db4",
+      "base_sha": "20958b93c26023ae7632cbeae6e3eff2a93374cf",
       "github_readback_verified": false,
-      "head_sha": "b1876cf5b05134292ce0ecc6fb14ee67535c156c",
+      "head_sha": "20958b93c26023ae7632cbeae6e3eff2a93374cf",
       "identity_resolution": "open_pull_request_not_found",
       "main_branch": "main",
-      "main_sha": "ffcf6bf9a2ea0c76a54788041cfa00c0dc8c7db4",
+      "main_sha": "20958b93c26023ae7632cbeae6e3eff2a93374cf",
       "publication_head_branch": "main",
       "publication_remote": "origin",
       "pull_request": null,
-      "remote_head_sha": "ffcf6bf9a2ea0c76a54788041cfa00c0dc8c7db4"
+      "remote_head_sha": "20958b93c26023ae7632cbeae6e3eff2a93374cf"
     },
     "completion_authority_current": false,
     "current_work": "P10",
@@ -71,7 +57,7 @@
       {
         "evidence_class": "E0",
         "id": "FC-AUTONOMOUS-CONTINUITY-E2E-001",
-        "notes": "Foreground use, Forge app closure and restart, LM Studio qwen/qwen3.8-27b@4bit loading, and substantial memory use are authorized. Unit and synthetic-host tests are supporting evidence only and cannot close this issue. Closure requires one manager-owned threshold-forced rollover against the real provider with exact successor acknowledgment, predecessor fencing and idempotent sealing, automatic linked continuation, GUI-closed operation, and recovery without duplicate provider work from every distinct durable crash state. Current source still lacks complete durable ordinary-response receipt and continuation-side-effect crash evidence. Autonomous continuity remains release-blocking. Source checkpoint 44022da950e75362dfe5120bfd2d92d474ea0ce6 requires exact gate_id and literal current_release_authority true in the shared acceptance path. The historical G09 direct-adapter record remains explicitly non-authoritative and a live validation exits 1. This is admission hardening only. It does not supply a real-provider manager-owned forced rollover, exact successor acknowledgement, predecessor fencing, automatic continuation, GUI-closed operation, or recovery from every durable crash state; G09 and autonomous continuity remain release-blocking.",
+        "notes": "Cancellation ownership and shared-waiter classification have deterministic before/after proof, full Debug and Release regressions, and separate sanitizer coverage. Smaller live fresh-root acknowledgment and continuation passed. Full manager rollover remains failed: EVID-20260905T020600Z-5ede7bf8cf quarantined acknowledgement_mismatch before injected crash. No full rollover/crash-replay qualification or process-kill matrix pass exists.",
         "severity": "High",
         "status": "patching",
         "title": "Autonomous continuity lacks full real-provider forced-rollover authority"
@@ -205,7 +191,7 @@
       {
         "evidence_class": "E0",
         "id": "FC-AUTONOMOUS-CONTINUITY-E2E-001",
-        "notes": "Foreground use, Forge app closure and restart, LM Studio qwen/qwen3.8-27b@4bit loading, and substantial memory use are authorized. Unit and synthetic-host tests are supporting evidence only and cannot close this issue. Closure requires one manager-owned threshold-forced rollover against the real provider with exact successor acknowledgment, predecessor fencing and idempotent sealing, automatic linked continuation, GUI-closed operation, and recovery without duplicate provider work from every distinct durable crash state. Current source still lacks complete durable ordinary-response receipt and continuation-side-effect crash evidence. Autonomous continuity remains release-blocking. Source checkpoint 44022da950e75362dfe5120bfd2d92d474ea0ce6 requires exact gate_id and literal current_release_authority true in the shared acceptance path. The historical G09 direct-adapter record remains explicitly non-authoritative and a live validation exits 1. This is admission hardening only. It does not supply a real-provider manager-owned forced rollover, exact successor acknowledgement, predecessor fencing, automatic continuation, GUI-closed operation, or recovery from every durable crash state; G09 and autonomous continuity remain release-blocking.",
+        "notes": "Cancellation ownership and shared-waiter classification have deterministic before/after proof, full Debug and Release regressions, and separate sanitizer coverage. Smaller live fresh-root acknowledgment and continuation passed. Full manager rollover remains failed: EVID-20260905T020600Z-5ede7bf8cf quarantined acknowledgement_mismatch before injected crash. No full rollover/crash-replay qualification or process-kill matrix pass exists.",
         "severity": "High",
         "status": "patching",
         "title": "Autonomous continuity lacks full real-provider forced-rollover authority"
@@ -253,9 +239,9 @@
       {
         "evidence_class": "E0",
         "id": "SHIPPING-LIVE-BOOTSTRAP-001",
-        "notes": "EVID-20260905T013918Z-faae358156 naturallyfailed1test1failure at418 missingBootstrapReceipt after504.049s; child1/recorder125missing successreport, unchangedsource. Two providerExact predecessors crossedthreshold correctly. WaitingProvider doesnotprove the expected injectedcrash; finalproviderreasonwaslost onfixturecleanup. Smaller real fresh-root/ack/automaticcontinuation EVID-20260905T015037Z-7125c5a46e passed1case169.805s, narrowing problem. Add bounded sanitized diagnostic before receiptchecks/cleanup, preserve all assertions/deadlines/fences, and run one diagnostic manager retry before any speculative productrepair.",
+        "notes": "EVID-20260905T020600Z-5ede7bf8cf naturally failed 1 test with 2 failures after 485.853 seconds on b1876cf. Diagnostic proves quarantined acknowledgement_mismatch, no accepted receipt and no intended injected crash. Summary hash matches the source-defined exactly-one-typed-call error: call count, expected name or JSON-object shape failed before identity-field comparison. The smaller real fresh-root case passed. Next add a bounded test-only transport observer for call count/name/argument shape, output usage/cap and assistant-text bytes/hash, forwarding the unchanged turn to strict validation. The 512 versus 4096 output cap difference is only a hypothesis; no source-proven repair exists.",
         "severity": "High",
-        "status": "patching",
+        "status": "open",
         "title": "Manager rollover lacks an accepted successor bootstrap receipt"
       }
     ],
@@ -273,13 +259,13 @@
       "dirty": true,
       "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
     },
-    "run_status": "active"
+    "run_status": "blocked_environment"
   },
   "machine": "arm64",
   "macos_runtime_capable": true,
   "platform": "macOS-26.6.2-arm64-arm-64bit",
   "project_markers": {
-    "package_swift": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Package.swift",
+    "package_swift": "/Users/jimdaley/GitHub/Forge-Conductor/Package.swift",
     "projects": [
       "ForgeConductor.xcodeproj"
     ],
@@ -287,7 +273,7 @@
       "ForgeConductor.xcworkspace"
     ]
   },
-  "repository_root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+  "repository_root": "/Users/jimdaley/GitHub/Forge-Conductor",
   "schema_version": 1,
   "tools": {
     "bash": {

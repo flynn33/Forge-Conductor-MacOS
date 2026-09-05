@@ -1531,7 +1531,7 @@
 			);
 			inputPaths = (
 				"$(SRCROOT)/script/seal_filesystem_daemon_identity.sh",
-				"$(BUILT_PRODUCTS_DIR)/forge-filesystem-daemon",
+				"$(FORGE_FILESYSTEM_DAEMON_PRODUCT)",
 				"$(SRCROOT)/Sources/ForgeConductorApp/Resources/Info.plist",
 			);
 			name = "Seal Filesystem Daemon Identity";
@@ -1542,7 +1542,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${SRCROOT}/script/seal_filesystem_daemon_identity.sh\" \"${BUILT_PRODUCTS_DIR}/forge-filesystem-daemon\" \"${SRCROOT}/Sources/ForgeConductorApp/Resources/Info.plist\" \"${DERIVED_FILE_DIR}/ForgeConductorApp-Info.plist\"\n";
+			shellScript = "\"${SRCROOT}/script/seal_filesystem_daemon_identity.sh\" \"${FORGE_FILESYSTEM_DAEMON_PRODUCT}\" \"${SRCROOT}/Sources/ForgeConductorApp/Resources/Info.plist\" \"${DERIVED_FILE_DIR}/ForgeConductorApp-Info.plist\"\n";
 			showEnvVarsInLog = 0;
 		};
 		E2F500000000000000000046 /* Seal Filesystem Daemon Identity */ = {
@@ -1554,7 +1554,7 @@
 			);
 			inputPaths = (
 				"$(SRCROOT)/script/seal_filesystem_daemon_identity.sh",
-				"$(BUILT_PRODUCTS_DIR)/forge-filesystem-daemon",
+				"$(FORGE_FILESYSTEM_DAEMON_PRODUCT)",
 				"$(SRCROOT)/Sources/ForgeConductorCLI/Info.plist",
 			);
 			name = "Seal Filesystem Daemon Identity";
@@ -1565,7 +1565,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${SRCROOT}/script/seal_filesystem_daemon_identity.sh\" \"${BUILT_PRODUCTS_DIR}/forge-filesystem-daemon\" \"${SRCROOT}/Sources/ForgeConductorCLI/Info.plist\" \"${DERIVED_FILE_DIR}/ForgeConductorCLI-Info.plist\"\n";
+			shellScript = "\"${SRCROOT}/script/seal_filesystem_daemon_identity.sh\" \"${FORGE_FILESYSTEM_DAEMON_PRODUCT}\" \"${SRCROOT}/Sources/ForgeConductorCLI/Info.plist\" \"${DERIVED_FILE_DIR}/ForgeConductorCLI-Info.plist\"\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
@@ -2093,6 +2093,9 @@
 		63739DAB5B654C0B846F75C1 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				FORGE_FILESYSTEM_DAEMON_PRODUCT = "$(FORGE_FILESYSTEM_DAEMON_PRODUCT_$(DEPLOYMENT_LOCATION))";
+				FORGE_FILESYSTEM_DAEMON_PRODUCT_NO = "$(BUILT_PRODUCTS_DIR)/forge-filesystem-daemon";
+				FORGE_FILESYSTEM_DAEMON_PRODUCT_YES = "$(UNINSTALLED_PRODUCTS_DIR)/$(PLATFORM_NAME)/forge-filesystem-daemon";
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
@@ -2295,6 +2298,9 @@
 		CEFEFE9428CD4B5F869BE9F3 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				FORGE_FILESYSTEM_DAEMON_PRODUCT = "$(FORGE_FILESYSTEM_DAEMON_PRODUCT_$(DEPLOYMENT_LOCATION))";
+				FORGE_FILESYSTEM_DAEMON_PRODUCT_NO = "$(BUILT_PRODUCTS_DIR)/forge-filesystem-daemon";
+				FORGE_FILESYSTEM_DAEMON_PRODUCT_YES = "$(UNINSTALLED_PRODUCTS_DIR)/$(PLATFORM_NAME)/forge-filesystem-daemon";
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;

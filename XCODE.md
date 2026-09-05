@@ -145,6 +145,19 @@ That bundle is statically linked and remains suitable for app and CLI smoke
 tests; it does not replace the Xcode framework layout required by the
 privileged Login Item and filesystem-service qualification.
 
+## Archive identity-sealing inputs
+
+During Archive, Xcode exposes the filesystem daemon in `BUILT_PRODUCTS_DIR`
+through a symlink. The app and CLI identity-sealing phases use
+`FORGE_FILESYSTEM_DAEMON_PRODUCT` to declare and read the actual daemon under
+`UNINSTALLED_PRODUCTS_DIR` for deployment builds. Ordinary builds use the
+regular file in `BUILT_PRODUCTS_DIR`. Both phases retain script sandboxing,
+strict signature verification, and rejection of symlink inputs.
+
+If an older checkout reports `filesystem daemon is missing or linked` from
+**Seal Filesystem Daemon Identity**, update its Xcode project. Removing the
+script's checks or disabling its sandbox is unnecessary.
+
 ## Install the exact Xcode build
 
 Choose one explicit output directory and validate its complete signed bundle.
