@@ -196,6 +196,12 @@ both configurations. Unsigned CI builds are compilation evidence; signed
 app-hosted, UI, installed-service and distribution qualification run separately
 on an authorized Mac.
 
+The graph guard checks tracked production resources against actual resource
+and copy phases, including asset-catalog descendants. A visible file reference
+or membership in a different target does not satisfy the check. Info templates
+and entitlements are reported separately for native metadata validation;
+resource contents and final copy destinations still require bundle inspection.
+
 The initial September 5 shipping snapshot failed the Python interpreter
 containment test in CI. That repair and the later external-lock startup repair
 passed the follow-up CI runs. Local P01 completion-authority changes require

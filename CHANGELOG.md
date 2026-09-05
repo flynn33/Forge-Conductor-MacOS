@@ -22,6 +22,9 @@ installed-stack and production-feature acceptance remain separate gates.
 
 ### Completion authority and protected validation
 
+- The native graph guard now rejects omitted production resources. An actual
+  telemetry-resource omission reproduced the prior false pass; regression
+  coverage also rejects wrong-target and duplicate resource membership.
 - Completion now runs installed native validators. Model-selected hashes and
   decoded receipts cannot approve a run; missing policy blocks completion.
   Prebuilt package gates bind the approved candidate source, test package,

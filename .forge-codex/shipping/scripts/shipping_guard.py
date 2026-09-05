@@ -408,6 +408,79 @@ class XcodeProject:
             result[name] = paths
         return result
 
+    def resource_memberships(self) -> Dict[str, Set[str]]:
+        """Resolve copied source resources, never mere group visibility.
+
+        Build products are checked by native bundle inspection. Info templates
+        and entitlements remain explicit metadata inputs rather than resources.
+        """
+        result: Dict[str, Set[str]] = {}
+        for obj in self.objects.values():
+            if obj.get('isa') != 'PBXNativeTarget':
+                continue
+            name = obj.get('name')
+            if not isinstance(name, str) or name in result:
+                raise ExecutionError('Missing or duplicate native target name.')
+            paths: Set[str] = set()
+            for phase_id in obj.get('buildPhases', []):
+                phase = self.objects.get(phase_id)
+                if phase is None:
+                    raise IntegrityError('Dangling Xcode build-phase reference.')
+                kind = phase.get('isa')
+                if kind not in ('PBXResourcesBuildPhase', 'PBXCopyFilesBuildPhase'):
+                    continue
+                for build_id in phase.get('files', []):
+                    record = self.objects.get(build_id, {})
+                    file_ref = record.get('fileRef')
+                    if not file_ref:
+                        raise ExecutionError('Resource build record has no supported file reference.')
+                    if self.objects.get(file_ref, {}).get('isa') != 'PBXFileReference':
+                        raise ExecutionError('Resource membership requires a file or folder reference, not a group.')
+                    path = self.object_path(file_ref)
+                    if path is None:
+                        if kind == 'PBXCopyFilesBuildPhase':
+                            continue  # Embedded products require native bundle checks.
+                        raise ExecutionError('Unresolved resource reference.')
+                    if not path.exists():
+                        raise IntegrityError('Xcode copies a missing resource: ' + str(path))
+                    try:
+                        relative = path.relative_to(self.root).as_posix()
+                    except ValueError as exc:
+                        raise IntegrityError('Xcode resource is outside the repository.') from exc
+                    if relative in paths:
+                        raise IntegrityError('Duplicate resource membership in target ' + name + ': ' + relative)
+                    paths.add(relative)
+            result[name] = paths
+        return result
+
+
+def check_resource_memberships(tracked: Iterable[str], memberships: Dict[str, Set[str]]) -> tuple:
+    targets = {
+        'Sources/ForgeConductorCore/Resources/': 'ForgeConductorCore',
+        'Sources/ForgeConductorApp/Resources/': 'ForgeConductor',
+    }
+    metadata = {
+        'Sources/ForgeConductorApp/Resources/Info.plist',
+        'Sources/ForgeConductorApp/Resources/ForgeConductor.entitlements',
+    }
+    checked = 0
+    metadata_inputs = []
+    for path in tracked:
+        if path in metadata:
+            metadata_inputs.append(path)
+            continue
+        target = next((name for prefix, name in targets.items() if path.startswith(prefix)), None)
+        if target is None:
+            if path.startswith('Sources/') and '/Resources/' in path:
+                raise ExecutionError('New resource module requires explicit target mapping: ' + path)
+            continue
+        # A folder reference (including an asset catalog) copies its descendants;
+        # an ordinary PBXGroup is never returned as a resource membership.
+        if not any(path == entry or path.startswith(entry + '/') for entry in memberships.get(target, set())):
+            raise IntegrityError('Tracked resource is absent from intended Xcode target ' + target + ': ' + path)
+        checked += 1
+    return checked, sorted(metadata_inputs)
+
 def check_memberships(tracked: Iterable[str], memberships: Dict[str, Set[str]]) -> tuple:
     checked = 0
     review_items = []
@@ -438,14 +511,18 @@ def xcode_command(repo: Repository, args: argparse.Namespace) -> Report:
         document = json.loads(parsed)
     except json.JSONDecodeError as exc:
         raise ExecutionError('Native Xcode project conversion did not produce JSON.') from exc
-    memberships = XcodeProject(document, repo.root).source_memberships()
-    tracked = filter(None, repo.git('ls-files', '-z', '--', 'Sources', 'Tests').split('\0'))
+    project = XcodeProject(document, repo.root)
+    memberships = project.source_memberships()
+    tracked = list(filter(None, repo.git('ls-files', '-z', '--', 'Sources', 'Tests').split('\0')))
     checked, review_items = check_memberships(tracked, memberships)
+    resource_count, metadata_inputs = check_resource_memberships(tracked, project.resource_memberships())
     return Report('xcode', {'production_swift_files_checked':checked,
+                            'production_resource_files_checked':resource_count,
+                            'metadata_inputs_requiring_native_build_validation':metadata_inputs,
                             'native_targets':sorted(memberships),
                             'test_files_requiring_membership_disposition':review_items},
                   ['Any test-source omissions require documented disposition and actual coverage. '
-                   'Resource phases, schemes, linking, signing and native execution are separate checks.'])
+                   'Resource contents, copy destinations, metadata processing, schemes, linking, signing and native execution require separate checks.'])
 
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
