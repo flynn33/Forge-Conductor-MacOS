@@ -12,13 +12,13 @@ under **Unreleased** is not a new qualified release.
 ## [Unreleased]
 
 This is a 0.9.0 development snapshot, not a qualified release. Product version
-surfaces remain 0.9.0 build 1. P10/G10, filesystem E2, production Settings shell
-qualification, Developer ID Release/native lifecycle
-validation, manager-owned
+surfaces remain 0.9.0 build 1. P10/G10, filesystem E2, complete installed/native
+Settings and service qualification, Developer ID Release, manager-owned
 real-provider autonomous continuity, owner-deferred representative physical-
 hardware qualification, and current G09-G12 remain open and release-blocking.
-Provider settings now have native and manager save controls. Native onboarding and disposable Keychain tests have executed; final source,
-installed-stack and complete production-feature acceptance remain separate gates.
+Provider settings now have native and manager save controls. Four native production
+onboarding scenarios passed; disposable Keychain tests also executed. Complete
+installed-stack and production-feature acceptance remain separate gates.
 
 ### Verified current-source evidence
 
@@ -43,6 +43,10 @@ installed-stack and complete production-feature acceptance remain separate gates
   startup, subprocess and gauge coverage. Exact checkpoint counts and source
   identities are retained in the shipping handoff; earlier results do not
   qualify later source changes.
+- All four native production onboarding scenarios passed: real folder
+  authorization and validation, provider save/discovery and manager replacement,
+  and native Settings shell disable/re-enable with fresh MCP processes. This
+  focused result does not close the full installed/native or P10 matrix.
 
 ### Changed
 
@@ -274,7 +278,7 @@ installed-stack and complete production-feature acceptance remain separate gates
 - The shell policy, migration, MCP registration, execution, compatibility
   contract, and restart paths pass current-source Debug and Release regressions.
   Developer Mode is enabled and Apple Development signing uses James Daley on
-  team `9AQ2C2838M`. A bounded current-source signed Release installed-app run
+  team `9AQ2C2838M`. An earlier bounded signed Release installed-app run
   corrected the false-success LaunchAgent fallback and passed clean-install
   enablement, accidental legacy-disabled migration, explicit opt-out and denial,
   `tools/list`, established login-Bash/result compatibility through both the app
@@ -282,15 +286,15 @@ installed-stack and complete production-feature acceptance remain separate gates
   with predecessor exit. The guarded run deliberately did not invoke System
   Events and restored the prior manager job, plist, command link, and launchd
   enablement state exactly. Its result remains partial: native Settings control
-  and post-Settings re-enable are blocked for the Xcode XCUI lane. The installer
-  now stages, signs, verifies, and commits
+  and post-Settings re-enable were not exercised by that run. The separate native
+  onboarding result above covers those controls. The installer now stages,
+  signs, verifies, and commits
   the runtime launcher transactionally beside the raw CLI, embeds it in synthesized
   app layouts, and fails closed on missing or symlinked launcher payloads. A
-  current-source Apple Development-signed Release smoke run also passed
-  installed raw-CLI `version`, `status`, and `doctor`. Production Settings UI,
-  exact current-source P10
-  qualification, production folder-panel observation, privileged-service lifecycle,
-  release signing, and notarization also remain deferred and release-blocking.
+  prior-source Apple Development-signed Release smoke run also passed
+  installed raw-CLI `version`, `status`, and `doctor`. Exact P10 qualification,
+  the complete installed/native matrix, privileged-service lifecycle, Developer ID
+  Release signing, and notarization remain deferred and release-blocking.
 - Exact caller-sealed helper identity prevents helper-only substitution against
   a current caller, but it does not establish whole-product rollback freshness.
   A monotonic root-owned receipt is not implemented; a rolled-back allowlisted

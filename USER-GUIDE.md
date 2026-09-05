@@ -9,7 +9,7 @@ Version **0.9.0**, build **1**. This guide is for operators who run Forge Conduc
 |---------------------------------|----------------------------------------|
 | The CLI reports 0.9.0; runtime constants, Xcode settings, and the built app bundle report 0.9.0 build 1. | Signed distinct-process filesystem E2 and recovery qualification. |
 | Native app surfaces build; an earlier exact-revision Apple Development-signed 100-cycle Rig/MCP navigation result remains supporting evidence. | Final current-source navigation/action rerun, Developer ID Release, full native/settings/service lifecycle, archive, notarization, staple, and Gatekeeper validation. |
-| Project memory, durable jobs and telemetry have regression coverage. The shipping handoff records current build identities, suite counts, native tests and installed shell/manager checks. | Production Settings control and post-Settings re-enable through XCUI, Developer ID Release, and exact P10 production qualification. |
+| Project memory, durable jobs and telemetry have regression coverage. Four native onboarding scenarios passed, including Settings shell disable/re-enable with fresh MCP processes. The shipping handoff records exact evidence and installed shell/manager checks. | Complete installed/native service matrix, Developer ID Release, and exact P10 production qualification. |
 | Durable continuity state, provider receipt storage, successor/fencing models, and tool-effect reconciliation are implemented. | Manager-owned threshold-forced real-provider rollover, exact successor acknowledgment, automatic continuation, GUI-closed operation, and durable crash recovery. |
 | Protected regular-file/symlink deletion has protocol-v5 capture and recovery machinery. | Production `fs_move`, recursive directory `fs_delete`, signed distinct-process filesystem E2, and recovery qualification. |
 | Provider controls save endpoint/model settings and Keychain credential changes through the manager. Native onboarding and disposable Keychain tests have executed. | Final installed-stack and complete provider/autonomy production acceptance. |
@@ -148,10 +148,11 @@ disabled migration, explicit opt-out and denial, one `shell_exec` entry in
 `tools/list`, app close/reopen, and installed LaunchAgent manager replacement by
 a new PID with predecessor exit. The raw installed CLI also passed `version`,
 `status`, and `doctor`, and the launcher beside it was signed and verified. The
-run deliberately did not invoke System Events; native Settings control and post-
-Settings re-enable remain blocked for Xcode XCUI. Developer ID Release signing,
-exact current-source P10 production qualification, the full native UI matrix,
-archive, notarization, and staple/Gatekeeper evidence remain open. The bounded
+installed-app run deliberately did not invoke System Events and remains partial.
+A separate Xcode run passed native Settings shell disable/re-enable and execution
+from fresh MCP processes. Developer ID Release signing, exact P10 production
+qualification, the full installed/native service matrix, archive, notarization,
+and staple/Gatekeeper evidence remain open. The bounded
 compatibility scenarios pass; shipment does not.
 
 ---
@@ -385,11 +386,11 @@ LM Studio may send all `tools/call` traffic to one of them (often fallback). Tha
   `fs_move` and recursive directory `fs_delete` are unavailable until their
   additive signed-helper protocols are implemented and qualified.
 - Configure the managed provider using Provider controls and test the saved
-  connection before starting Autonomy. Native onboarding and real-provider
-  qualification remain open.
-- Current G09-G12, native Settings/release/signing, exact shell UI
-  qualification, real-provider continuity, and owner-deferred representative
-  physical-hardware gates remain open; this guide is not a ship authorization.
+  connection before starting Autonomy. Four native onboarding scenarios passed;
+  complete installed-stack and provider/autonomy qualification remain open.
+- Current G09-G12, the full installed/native service matrix, Developer ID Release,
+  real-provider continuity, and owner-deferred representative physical-hardware
+  gates remain open; this guide is not a ship authorization.
 - `/Applications/Forge Conductor.app` is not updated by `install` if the OS refuses the overwrite. Check **version** on the binary LM Studio actually spawns.
 - `forge-conductor install` from the CLI may stage a **CLI** binary inside `~/.forge-conductor/Forge Conductor.app`. That bundle is not a substitute for the SwiftUI GUI in `dist/` or a proper app-bundle install.
 - Read-only tools can list most of your home directory. Treat that as a real permission, not a sandbox.

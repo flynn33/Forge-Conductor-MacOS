@@ -136,9 +136,10 @@ work recorded under **Unreleased** in the changelog.
 
 The [current shipping handoff](.forge-codex/state/release-handoff.md) records
 exact source manifests, Debug/Release regression counts, native tests, separate
-sanitizer runs and signed bundle checks. Provider onboarding now has real native
-folder-panel, save, discovery and restart tests. Broad regression and focused
-native results do not qualify every feature or close the remaining release gates.
+sanitizer runs and signed bundle checks. All four native production onboarding
+scenarios passed, covering folder authorization, provider save/discovery and
+manager restart, plus Settings shell disable/re-enable with fresh MCP processes.
+These results do not qualify every feature or close the remaining release gates.
 
 ### Open or deferred before shipment
 
@@ -160,15 +161,17 @@ native results do not qualify every feature or close the remaining release gates
   installed LaunchAgent manager PID replacement with predecessor exit. The
   current-source Apple Development-signed Release layout also passes raw
   installed-CLI `version`, `status`, and `doctor` with its adjacent signed
-  runtime launcher. The run deliberately did not invoke System Events; native
-  Settings control and post-Settings re-enable remain blocked for the Xcode XCUI
-  lane. Developer ID Release signing and P10 exact-production qualification also
-  remain open.
+  runtime launcher. That installed-app run deliberately did not invoke System
+  Events and remains partial. A separate Xcode run passed native Settings shell
+  disable/re-enable and execution from fresh MCP processes. The complete
+  installed/native matrix, Developer ID Release signing and P10 exact-production
+  qualification remain open.
 - **Managed provider setup:** Provider now saves endpoint, model and Keychain
   credential changes through authenticated manager controls. Save supports an
   offline server; Refresh Models and Test Connection separately verify the
-  saved configuration. Current native onboarding and real-provider acceptance
-  remain open; a successful save alone does not qualify managed Autonomy.
+  saved configuration. The four native onboarding scenarios passed; complete
+  installed-stack and provider/autonomy qualification remain open. A successful
+  save or connection test alone does not qualify managed Autonomy.
 - **Provider continuity:** an unresolved provider-response crash is fenced for
   660 seconds. LM Studio exposes no request-ID receipt lookup; after the fence,
   each retry can create at most one duplicate model inference, and repeated

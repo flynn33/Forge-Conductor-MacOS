@@ -109,10 +109,12 @@ archive, notarization, staple, Gatekeeper, protected-service lifecycle, or full
 native UI matrix pass. Those release checks remain open.
 
 Package P10/G10, filesystem E2, production move/recursive-directory deletion,
-native managed-provider onboarding, production Settings shell qualification,
-manager-owned real-provider forced rollover,
-representative physical hardware, and final G09-G12 completion evidence also
-remain open. The initial September 4 SwiftPM baseline executed 1,001 tests in
+the complete installed/native provider, Settings and service matrix,
+manager-owned real-provider forced rollover, representative physical hardware,
+and final G09-G12 completion evidence remain open. All four native production
+onboarding scenarios passed, including folder authorization, provider save and
+discovery, manager replacement and Settings shell disable/re-enable with fresh
+MCP processes. The initial September 4 SwiftPM baseline executed 1,001 tests in
 both configurations with five skips and no failures. Current expanded suite
 counts, source identities and native result bundles are in the
 [shipping handoff](.forge-codex/state/release-handoff.md).
@@ -120,9 +122,10 @@ A bounded Apple Development-signed Release installed-app run passes clean shell
 defaults and migration, explicit opt-out and denial, `tools/list`, established
 `shell_exec` through app and raw CLI, app relaunch, and installed-manager PID
 replacement. Its raw CLI also passes `version`, `status`, and `doctor` with the
-adjacent signed launcher. The run deliberately does not invoke System Events;
-Settings control and post-Settings re-enable require the Xcode XCUI lane. These
-results do not satisfy the still-open Developer ID Release, native UI, or P10
+adjacent signed launcher. That installed-app run deliberately omits System
+Events and remains partial; the separate Xcode onboarding run covers native
+Settings control and post-Settings re-enable. These focused results do not satisfy
+the still-open Developer ID Release, complete installed/native matrix, or P10
 boundaries. A successful Xcode build or focused test does not mark those items
 complete.
 
