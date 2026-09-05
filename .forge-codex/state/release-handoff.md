@@ -24,6 +24,25 @@ version, Xcode membership and attribution guards plus Markdown link/history
 checks are used for this documentation-only change. Runtime tests are not rerun
 or relabeled. The product remains blocked on the previously recorded hard gates.
 
+Documentation source is `ee1ea7b48a27607d174aa6e93a720a9af6fe30cf`.
+All six bounded documentation checks passed with unchanged production manifest
+`4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14`:
+
+| Check | Command record |
+|---|---|
+| Product and resolved Xcode versions | EVID-20260905T121451Z-2dbfd5b525 |
+| Documentation impact and actual changes | EVID-20260905T121504Z-53e45bccad |
+| Xcode source membership | EVID-20260905T121505Z-b79572fa05 |
+| Attribution scan | EVID-20260905T121505Z-d9390276e5 |
+| Published wiki and frozen-content readback | EVID-20260905T121714Z-c68d973c75 |
+| Repository links, fragments and historical sections | EVID-20260905T121951Z-6dd6a0d0fc |
+
+The wiki is published at `21ad902e70e41769e2401282ad8ec4e3e4d7802f`, matching
+remote master. Validation covered 17 wiki pages and 123 links/images, plus 60
+local repository links and 10 heading fragments across the eleven changed
+public documents. General external HTTP links were inventoried, not fetched.
+The gate and phase ledgers are unchanged from the start of this update.
+
 Exact documentation/source and delivery commits, repository PR, wiki commit,
 remote readback and check results are retained after publication under:
 `/Users/jimdaley/Projects/Forge-Conductor/documentation-evidence/20260905T115919Z`.

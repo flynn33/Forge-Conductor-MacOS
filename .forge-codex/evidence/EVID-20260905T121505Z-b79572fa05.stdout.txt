@@ -1,0 +1,30 @@
+{
+  "check": "xcode",
+  "status": "passed",
+  "facts": {
+    "production_swift_files_checked": 156,
+    "native_targets": [
+      "ForgeConductor",
+      "ForgeConductorAppTests",
+      "ForgeConductorCore",
+      "ForgeConductorTests",
+      "ForgeConductorUITests",
+      "ForgeFilesystemAdversary",
+      "ForgeFilesystemDaemon",
+      "ForgeFilesystemProtocol",
+      "ForgeFilesystemQualificationHarness",
+      "ForgeFilesystemQualificationSupport",
+      "ForgeRuntimeLauncher",
+      "forge-conductor"
+    ],
+    "test_files_requiring_membership_disposition": [
+      "Tests/ForgeFilesystemQualificationSupportTests/AdmissionProbeTests.swift",
+      "Tests/ForgeFilesystemQualificationSupportTests/H0IsolationTests.swift",
+      "Tests/ForgeFilesystemQualificationSupportTests/QualificationReadinessTests.swift"
+    ]
+  },
+  "warnings": [
+    "Any test-source omissions require documented disposition and actual coverage. Resource phases, schemes, linking, signing and native execution are separate checks."
+  ],
+  "scope": "Named integrity check only; not product qualification or release authorization."
+}
