@@ -7,6 +7,33 @@ import Foundation
 
 /// Pure settings-patch normalization (no process state).
 public enum ManagerSettingsNormalizer {
+    /// The public mutation boundary rejects malformed values before normalizing
+    /// or writing any part of the patch. The legacy pure adapter remains below.
+    public static func validated(_ patch: [String: Any]) throws -> [String: Any] {
+        let fields: [(String, String, ClosedRange<Int>)] = [
+            ("dashboard", "port", 1...65_535),
+            ("dashboard", "refresh_interval_sec", 2...300),
+            ("manager", "watchdog_interval_sec", 1...60),
+            ("sessions", "idle_ttl_sec", 60...Int.max),
+            ("shell", "default_timeout_sec", 1...600),
+        ]
+        for (section, key, range) in fields {
+            guard let rawSection = patch[section] else { continue }
+            guard let values = rawSection as? [String: Any] else {
+                throw ManagerSettingsValidationError(field: section, reason: "expected_object")
+            }
+            guard let raw = values[key] else { continue }
+            guard let value = intValue(raw), range.contains(value) else {
+                throw ManagerSettingsValidationError(
+                    field: section + "." + key,
+                    reason: "expected_finite_integer_in_range",
+                    permittedRange: "\(range.lowerBound)...\(range.upperBound)"
+                )
+            }
+        }
+        return normalize(patch)
+    }
+
     public static func normalize(_ patch: [String: Any]) -> [String: Any] {
         var normalized: [String: Any] = [:]
         if let dash = patch["dashboard"] as? [String: Any] {
@@ -119,10 +146,6 @@ public enum ManagerSettingsNormalizer {
     }
 
     public static func intValue(_ any: Any?) -> Int? {
-        if let i = any as? Int { return i }
-        if let d = any as? Double { return Int(d) }
-        if let s = any as? String { return Int(s) }
-        if let n = any as? NSNumber { return n.intValue }
-        return nil
+        JSONSupport.exactInteger(any, allowString: true)
     }
 }

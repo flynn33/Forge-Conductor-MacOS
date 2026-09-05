@@ -6,6 +6,7 @@
 
 import Foundation
 import CryptoKit
+import CoreFoundation
 
 /// Centralizes deterministic ISO-8601 conversion for persistence and wire adapters.
 ///
@@ -40,6 +41,24 @@ public enum ISO8601 {
 }
 
 public enum JSONSupport {
+    /// Decode an exact machine integer without Foundation's truncating bridges.
+    /// Integer strings are an explicit compatibility option for legacy settings.
+    public static func exactInteger(_ value: Any?, allowString: Bool = false) -> Int? {
+        if allowString, let text = value as? String {
+            guard text.utf8.count <= 32 else { return nil }
+            return Int(text)
+        }
+        guard let number = value as? NSNumber,
+              CFGetTypeID(number) != CFBooleanGetTypeID() else { return nil }
+        // Decimal numbers can bridge to Int or Double after rounding. Their
+        // decimal representation must itself be an integer within Int's range.
+        if number is NSDecimalNumber { return Int(number.stringValue) }
+        switch String(cString: number.objCType) {
+        case "f", "d": return Int(exactly: number.doubleValue)
+        default: return Int(number.stringValue)
+        }
+    }
+
     public static func data(from object: [String: Any]) throws -> Data {
         try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
     }

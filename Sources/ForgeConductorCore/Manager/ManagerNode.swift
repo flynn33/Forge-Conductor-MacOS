@@ -569,7 +569,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         apply: Bool
     ) throws -> [String: Any] {
         let before = app.config.model.dashboard
-        let normalized = ManagerSettingsNormalizer.normalize(patch)
+        let normalized = try ManagerSettingsNormalizer.validated(patch)
         _ = try app.config.update(normalized, save: true)
         let after = app.config.model.dashboard
         let bindChanged = before.host != after.host || before.port != after.port

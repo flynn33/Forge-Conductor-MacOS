@@ -305,6 +305,13 @@ public final class ManagerDashboardClient: @unchecked Sendable {
         }
         let object = (try? JSONSupport.object(from: data)) ?? [:]
         guard (200...299).contains(http.statusCode) else {
+            if http.statusCode == 400, object["code"] as? String == "invalid_settings",
+               let field = object["field"] as? String, let reason = object["reason"] as? String {
+                throw ManagerSettingsValidationError(
+                    field: field, reason: reason,
+                    permittedRange: object["permitted_range"] as? String
+                )
+            }
             let message = (object["message"] as? String)
                 ?? String(data: data, encoding: .utf8)
                 ?? "unknown"
