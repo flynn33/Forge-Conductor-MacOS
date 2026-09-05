@@ -1,3 +1,42 @@
+# Documentation alignment checkpoint — September 5, 2026
+
+The owner requested alignment of the README, changelog, detailed documents,
+wiki and Xcode version surfaces. Canonical and execution checkout are now both
+`/Users/jimdaley/GitHub/Forge-Conductor`, on `docs/current-release-alignment`,
+based on merged main `20958b93c26023ae7632cbeae6e3eff2a93374cf`. The remote is
+`https://github.com/flynn33/Forge-Conductor-MacOS.git` for fetch and push.
+
+Product identity remains **0.9.0, build 1**. Resolved Debug/Release settings for
+the app, Core, CLI, runtime launcher and filesystem daemon agree. This change
+updates documentation and evidence/state only; it creates no new product
+artifact, archive, export, distribution hash, or release qualification.
+
+The four top-level operating documents, six detailed documents and
+`docs/QUALIFICATION-STATUS.md` now distinguish implemented Provider controls,
+focused native Settings/onboarding passes, the partial installed-app qualifier,
+source-bound local tests, the known GitHub Python containment failure and the
+failed full manager rollover. Thirteen wiki pages are aligned with the same
+facts and the explicit Xcode build-directory installer. Historical release
+entries, dated audits, immutable command evidence and gate statuses are retained.
+
+Documentation review is recorded in `documentation-impact.json`. The existing
+version, Xcode membership and attribution guards plus Markdown link/history
+checks are used for this documentation-only change. Runtime tests are not rerun
+or relabeled. The product remains blocked on the previously recorded hard gates.
+
+Exact documentation/source and delivery commits, repository PR, wiki commit,
+remote readback and check results are retained after publication under:
+`/Users/jimdaley/Projects/Forge-Conductor/documentation-evidence/20260905T115919Z`.
+Repository changes are submitted for review; the owner performs shipment only
+after the required product gates pass. This documentation work grants no new
+service, model, filesystem mutation or distribution authority.
+
+The shipping checkpoint below is historical source/artifact provenance. Its
+old checkout, branch, merge and cleanup descriptions apply to that recorded
+run; the canonical checkout and merged main above supersede its local location.
+
+---
+
 # Forge Conductor shipping checkpoint
 
 ## Decision: BLOCKED checkpoint; not shippable

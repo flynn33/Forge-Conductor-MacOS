@@ -183,6 +183,12 @@ both configurations. Unsigned CI builds are compilation evidence; signed
 app-hosted, UI, installed-service and distribution qualification run separately
 on an authorized Mac.
 
+For the September 5 shipping snapshot, GitHub native source integrity and Xcode
+Debug/Release compilation passed, but both SwiftPM lanes failed the Python
+interpreter containment test. The passing local suites and native onboarding
+results have separate retained source bindings. See the
+[qualification summary](docs/QUALIFICATION-STATUS.md) for counts and evidence.
+
 Use the canonical Release archive/export path for distribution, with matching
 Developer ID team policy and secure timestamps. The shipping
 [validation runbook](.forge-codex/shipping/MACOS-VALIDATION-RUNBOOK.md) describes

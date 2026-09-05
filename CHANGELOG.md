@@ -50,6 +50,13 @@ installed-stack and production-feature acceptance remain separate gates.
 
 ### Changed
 
+- Aligned repository documentation and the project wiki with the native provider
+  configuration controls, completed focused Settings/onboarding coverage, and
+  explicit Xcode build-directory installation. The qualification summary records
+  local test results and the separate GitHub Python-containment failure with
+  their source revisions. This documentation update keeps version 0.9.0 build 1
+  and does not change product behavior or release-gate status.
+
 - Metal renderers now stop draw submission when their window or an ancestor
   is hidden and redraw pending values when shown. Native tests measure actual
   draws, static quiescence, resource reuse and repeated object release.

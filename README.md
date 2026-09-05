@@ -21,6 +21,11 @@ Forge Conductor is purpose-built for LM Studio and its local MCP runtime.
 > below. Package P10/G10 records remain open; this documentation does not mark
 > any package gate complete.
 
+The [qualification summary](docs/QUALIFICATION-STATUS.md) identifies the tested
+source revisions, passing local scenarios, and the known GitHub CI failure.
+The [wiki](https://github.com/flynn33/Forge-Conductor-MacOS/wiki) describes the
+same provider setup and installation workflow.
+
 ### How LM Studio connects
 
 LM Studio is the MCP **host**. It spawns a Forge **stdio** server:

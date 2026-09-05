@@ -86,6 +86,14 @@ can create at most one duplicate model inference. LM Studio exposes no request-
 ID receipt lookup, so repeated retries can repeat inference. Durable tool-effect
 reconciliation prevents duplicate tool execution, not duplicate inference.
 
+The native **Provider** screen saves revisioned endpoint/model settings through
+authenticated manager routes and keeps, replaces, or clears credentials in
+Keychain. Saving works while LM Studio is offline; model discovery and probes
+use the saved revision. Unsaved edits, active runs, and overlapping operations
+cannot silently replace that configuration. The router forwards these controls
+to the current manager after replacement. See the
+[provider workflow](../USER-GUIDE.md#configure-the-managed-provider).
+
 ## LM Studio fail-forward lifecycle
 
 ```text
@@ -137,14 +145,22 @@ Release installed-app run executed the established `shell_exec` contract through
 both the app and raw CLI, across app relaunch and installed-manager PID
 replacement. It also proved clean defaults, legacy migration, opt-out denial,
 `tools/list`, raw-CLI `version`/`status`/`doctor`, and exact cleanup restoration
-with the adjacent signed runtime launcher. It deliberately did not invoke System
-Events, so native Settings control and post-Settings re-enable remain blocked for
-Xcode XCUI. Developer ID Release and P10 exact-production qualification remain
-open. An earlier exact-revision Apple Development-signed 100-cycle Rig/MCP
-navigation test is supporting evidence; the final current-source rerun,
-Developer ID Release signing, the full production native UI,
-settings, and service-lifecycle matrix, archive, notarization, and staple/
-Gatekeeper evidence remain release-blocking.
+with the adjacent signed runtime launcher. That installed-app qualifier remains
+partial because its own System Events Settings step was not run. A separate
+native Xcode run passed four production onboarding scenarios: folder
+selection/cancellation/invalid-root handling, offline provider save and manager
+replacement, Settings shell off/on with fresh MCP processes, and real-provider
+model discovery/connection. Those passes retain their recorded source and
+Apple Development scope; they do not complete the installed/native matrix.
+
+The earlier exact-revision 100-cycle Rig/MCP navigation result remains historical
+supporting evidence. A later native Release gauge run passed four tests,
+including 100 lifecycle cycles and draw/buffer/weak-owner assertions, while
+closed fixture windows accumulated to 101. This does not establish whole-app
+window or leak closure. Developer ID Release signing, the full production native
+UI/settings/service-lifecycle matrix, P10, archive, notarization, and
+staple/Gatekeeper evidence remain release-blocking. The retained local and CI
+results are distinguished in [qualification status](QUALIFICATION-STATUS.md).
 
 Autonomous continuity requires the manager-owned, threshold-forced real-provider
 rollover with exact successor acknowledgment, predecessor fencing and idempotent

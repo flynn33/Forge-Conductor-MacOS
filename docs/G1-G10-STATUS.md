@@ -23,17 +23,34 @@ exact historical automated proof · **OPS** = operator-owned follow-up
 | G9 | Installable single product identity | Prefer running app for Deploy; install still multi-path | Resolve + smoke | **You** install one app |
 | G10 | No fake “done” without evidence | This historical matrix; Deploy fails if smoke fails | Completion gates and indexed evidence expose pass/fail state | Operator acceptance |
 
-The active line does not currently claim P10, filesystem E2, live shell
-compatibility, signed native UI and release validation, manager-owned
-real-provider autonomous continuity, owner-deferred representative physical-
-hardware qualification, current G09-G12, or release qualification complete.
-An earlier exact-revision Apple Development-signed 100-cycle Rig/MCP navigation
-test passes as supporting evidence; the final current-source rerun, Developer ID
-Release, and the full native UI/settings/service lifecycle remain deferred and
-release-blocking. Historical or focused unit, UI, simulator,
-synthetic-host, or direct-adapter results do not replace complete current-source
-authority. Filesystem capture and quarantine are mitigation, not
-elimination, until the signed E2 matrix and formal closure pass.
+## Current qualification boundary
+
+The historical table above is unchanged. Current retained local/CI results and
+source scopes are summarized in [qualification status](QUALIFICATION-STATUS.md).
+The local app-hosted suite and four separate native onboarding scenarios passed,
+including provider save/discovery and Settings shell off/on with fresh MCP
+processes. Subsequent Swift Debug/Release CI failed one Python containment test
+with three assertion failures per lane. These are recorded results, not tests
+rerun for this documentation.
+
+The installed-app qualifier passed bounded raw-CLI, shell, migration, and
+app/manager restart checks. It remains partial because its own System Events
+Settings step was not run; the separate native Settings case passed. Only the
+two canonical CLI version/help assertions have been accepted in development
+installed Release scope; the other 257 assertions in the 104-feature P10 matrix
+remain unqualified.
+
+The earlier 100-cycle Rig/MCP navigation result is historical supporting
+evidence. Later native Release gauge component tests passed 100 lifecycle
+cycles and resource assertions, while closed fixture windows accumulated to
+101. Whole-app window/leak closure, the complete installed/native
+UI/settings/service-lifecycle matrix, Developer ID Release and
+archive/notarization/Gatekeeper, manager-owned real-provider autonomous
+continuity, owner-deferred representative physical-hardware qualification,
+current G09-G12, and release qualification remain open. Historical or focused
+unit, UI, simulator, synthetic-host, or direct-adapter results do not replace
+that authority. Filesystem capture and quarantine remain mitigation until the
+signed E2 matrix and formal closure pass.
 
 ## Port ownership behavior
 

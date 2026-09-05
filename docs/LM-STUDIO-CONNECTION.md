@@ -11,11 +11,14 @@ not authorize release; the qualification boundary below remains controlling.
 |-----------|------|
 | **LM Studio** | MCP **host** (spawns stdio servers, routes tool calls from local models) |
 | **Forge Conductor Swift app (GUI)** | Rig / manager / installer UI. With no argv → SwiftUI. |
-| **App binary `…/Forge Conductor serve`** | Same MCP server over stdin/stdout (`ForgeProcessEntry` → `MCPServer.swift`) — **only after that build includes `ForgeProcessEntry`** |
+| **App binary `…/Forge Conductor serve`** | Same MCP server over stdin/stdout (`ForgeProcessEntry` → `MCPServer.swift`) |
 | **CLI `forge-conductor serve`** | Same MCP server (default registration target) |
 
 There is **no** in-process link from the GUI into LM Studio’s address space.  
 There is **no** LM Studio SDK client inside Core for chat/completions.
+Forge-managed sessions use a separate Foundation-native HTTP transport in the
+native session-host plugin; the stdio registration below serves externally
+owned LM Studio chats.
 
 ### Process entry (one binary, three modes)
 
@@ -199,23 +202,30 @@ The two registrations are separate LM Studio-hosted processes with distinct `ser
 4. Confirm the command reports host acknowledgement for primary and fallback; restart is automated only if hot reload is insufficient.
 
 Completing this connector checklist proves only the LM Studio registration and
-stdio path. It does not close P10, filesystem E2, current G09-G12, Developer ID
-Release signing/full native UI and service lifecycle/notarization, raw
-installed-CLI and production Settings shell qualification, manager-owned real-
-provider forced rollover, or owner-deferred representative physical-hardware
-qualification. A bounded Apple Development-signed installed-app scenario has
-passed `shell_exec` after app relaunch and installed-manager PID replacement,
-but it is not P10 or Release authority. The earlier exact-revision Apple
-Development-signed 100-cycle
-navigation test is supporting evidence only; the final current-source rerun is
-open. Unit, synthetic-host, simulator, focused UI, and
-connector-smoke evidence cannot substitute for those release-blocking runs.
+stdio path. The retained Apple Development-signed installed-app qualifier
+passed raw-CLI checks and `shell_exec` across app relaunch and installed-manager
+PID replacement. It remains partial because its own System Events Settings
+step was not run. A separate native Xcode run passed four production onboarding
+scenarios, including Settings shell off/on with fresh MCP processes and real
+provider discovery/connection. The historical 100-cycle navigation result and
+later native gauge component tests retain their distinct source and fixture
+scopes; see [qualification status](QUALIFICATION-STATUS.md).
+
+P10, filesystem E2, current G09-G12, Developer ID Release signing, the complete
+installed/native UI and service-lifecycle matrix, archive/notarization/Gatekeeper,
+manager-owned real-provider forced rollover, and owner-deferred representative
+physical-hardware qualification remain open. Focused connector or onboarding
+passes do not replace those release-blocking runs.
 
 Managed Autonomy uses a separate typed LM Studio provider configuration from
-the MCP plugin registration described above. The adapter can read a valid
-configuration, but this snapshot does not yet expose a supported clean-install
-app, CLI, or manager control that creates or updates it. Tests that write the
-file directly do not establish an operator workflow.
+the MCP plugin registration described above. In **Provider**, enter the endpoint
+and model identifier, choose to keep/replace/clear the Keychain credential, and
+select **Save**. Saving works offline. **Refresh Models** lists available models;
+**Test Connection** and **Run Contract Probe** use the saved settings. Save edits
+before discovery/probes, and load models in LM Studio itself. Active runs and
+in-flight operations block conflicting configuration changes. The native screen
+uses authenticated, revisioned manager controls and follows manager replacement.
+See the [provider workflow](../USER-GUIDE.md#configure-the-managed-provider).
 
 ## Auto-heal
 
