@@ -28,7 +28,8 @@ let package = Package(
             dependencies: ["ForgeFilesystemProtocol"],
             path: "Sources/ForgeConductorCore",
             resources: [
-                .process("Resources"),
+                .copy("Resources/Agents"),
+                .copy("Resources/TelemetryStatic"),
             ]
         ),
         .executableTarget(

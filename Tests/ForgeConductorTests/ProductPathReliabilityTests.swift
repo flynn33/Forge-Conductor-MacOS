@@ -4,10 +4,151 @@
 
 import XCTest
 import Darwin
+import Security
+import ForgeFilesystemProtocol
 @testable import ForgeConductorCore
 
 /// G1/G7: product reliability — MCP negotiate + tools surface without LM Studio UI.
 final class ProductPathReliabilityTests: XCTestCase {
+    func testNativeCandidateBundlesPreserveIdentityAndRejectVersionDrift() throws {
+        let fixture = try nativeCandidateFixture()
+        for name in ["Debug", "DevelopmentRelease"] {
+            let app = fixture.appendingPathComponent(name + "/Forge Conductor.app")
+            let info = try nativeCandidateInfo(app)
+            XCTAssertEqual(info["CFBundleShortVersionString"] as? String, ForgeApp.version)
+            XCTAssertEqual(info["CFBundleVersion"] as? String, ForgeFilesystemProtocolConstants.productBuildVersion)
+            let roles = [
+                ("", ForgeFilesystemProtocolConstants.appIdentifier),
+                ("Contents/Frameworks/ForgeConductorCore.framework", ForgeFilesystemProtocolConstants.coreFrameworkIdentifier),
+                ("Contents/Helpers/forge-conductor", ForgeFilesystemProtocolConstants.managerIdentifier),
+                ("Contents/Helpers/forge-runtime-launcher", ForgeFilesystemProtocolConstants.runtimeLauncherIdentifier),
+                ("Contents/MacOS/forge-filesystem-daemon", ForgeFilesystemProtocolConstants.daemonIdentifier),
+            ]
+            for (relative, identifier) in roles {
+                let path = relative.isEmpty ? app : app.appendingPathComponent(relative)
+                let requirement = try XCTUnwrap(ForgeFilesystemProtocolConstants.requiredProductCodeSigningRequirement(
+                    identifier: identifier, teamIdentifier: ForgeFilesystemProtocolConstants.developmentTeamIdentifier
+                ))
+                let result = try ProcessRunner(inheritEnvironment: false).run(
+                    executable: "/usr/bin/codesign", arguments: ["--verify", "--deep", "--strict", "--all-architectures", "-R=" + requirement, path.path],
+                    timeoutSec: 10, maximumOutputBytes: 64 * 1_024
+                )
+                XCTAssertEqual(result.exitCode, 0, "\(name)/\(relative): \(result.stderr)")
+                XCTAssertFalse(result.timedOut || result.stderrTruncated || result.stdoutTruncated)
+            }
+            XCTAssertFalse(FileManager.default.fileExists(atPath: app.appendingPathComponent("Contents/PlugIns").path),
+                           "Ordinary candidates cannot contain test bundles")
+            XCTAssertFalse(FileManager.default.fileExists(atPath: app.appendingPathComponent("Contents/Helpers/ForgeFilesystemAdversary").path))
+            XCTAssertFalse(FileManager.default.fileExists(atPath: app.appendingPathComponent("Contents/Helpers/ForgeFilesystemQualificationHarness").path))
+            let repository = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+                .deletingLastPathComponent().deletingLastPathComponent()
+            let arguments = [repository.appendingPathComponent(".forge-codex/shipping/scripts/shipping_guard.py").path,
+                             "versions", "--repo", repository.path, "--app"]
+            let intact = try ProcessRunner().run(executable: "/usr/bin/env", arguments: ["python3"] + arguments + [app.path],
+                                                timeoutSec: 10, maximumOutputBytes: 64 * 1_024)
+            XCTAssertEqual(intact.exitCode, 0, intact.stderr)
+            XCTAssertFalse(intact.timedOut || intact.stderrTruncated || intact.stdoutTruncated)
+            let drift = FileManager.default.temporaryDirectory.appendingPathComponent("forge-identity-drift-\(UUID().uuidString)")
+                .appendingPathComponent(name + "/Forge Conductor.app")
+            try FileManager.default.createDirectory(at: drift.appendingPathComponent("Contents"), withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: drift.deletingLastPathComponent().deletingLastPathComponent()) }
+            var changed = info
+            changed["CFBundleVersion"] = try XCTUnwrap(info["CFBundleVersion"] as? String) + "9"
+            try PropertyListSerialization.data(fromPropertyList: changed, format: .xml, options: 0)
+                .write(to: drift.appendingPathComponent("Contents/Info.plist"))
+            let rejected = try ProcessRunner().run(executable: "/usr/bin/env", arguments: ["python3"] + arguments + [drift.path],
+                                                  timeoutSec: 10, maximumOutputBytes: 64 * 1_024)
+            XCTAssertNotEqual(rejected.exitCode, 0, "The actual identity guard must reject the changed build fixture")
+            XCTAssertFalse(rejected.timedOut || rejected.stderrTruncated || rejected.stdoutTruncated)
+            XCTAssertTrue((rejected.stdout + rejected.stderr).contains("CFBundleVersion"))
+            XCTAssertTrue((rejected.stdout + rejected.stderr).contains(drift.path), "Failure must identify the component and configuration")
+        }
+    }
+
+    func testNativeSameVersionPeerReportsDifferentRunningExecutable() throws {
+        let fixture = try nativeCandidateFixture()
+        let candidate = fixture.appendingPathComponent("Debug/Forge Conductor.app")
+        let older = fixture.appendingPathComponent("Older/Forge Conductor.app")
+        XCTAssertEqual(try nativeCandidateInfo(candidate)["CFBundleShortVersionString"] as? String,
+                       try nativeCandidateInfo(older)["CFBundleShortVersionString"] as? String)
+        let currentCore = candidate.appendingPathComponent("Contents/Frameworks/ForgeConductorCore.framework")
+        let olderCore = older.appendingPathComponent("Contents/Frameworks/ForgeConductorCore.framework")
+        XCTAssertNotEqual(try nativeStaticCodeHash(currentCore), try nativeStaticCodeHash(olderCore),
+                          "The older fixture must actually carry different code")
+        let binary = older.appendingPathComponent("Contents/Helpers/forge-conductor")
+        let version = try ProcessRunner(inheritEnvironment: false).run(
+            executable: binary.path, arguments: ["version"], timeoutSec: 10, maximumOutputBytes: 4_096
+        )
+        XCTAssertEqual(version.exitCode, 0, version.stderr)
+        XCTAssertEqual(version.stdout.trimmingCharacters(in: .whitespacesAndNewlines), ForgeApp.version)
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("forge-peer-proof-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        defer { try? FileManager.default.removeItem(at: home) }
+        let input = Pipe()
+        let process = Process()
+        process.executableURL = binary
+        process.arguments = ["serve", "--home", home.path]
+        process.environment = ["PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "HOME": home.path, "TMPDIR": home.path,
+                               "LLVM_PROFILE_FILE": home.appendingPathComponent("peer.profraw").path]
+        process.standardInput = input
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        defer {
+            try? input.fileHandleForWriting.close()
+            let deadline = ContinuousClock.now + .seconds(2)
+            while process.isRunning && ContinuousClock.now < deadline { Thread.sleep(forTimeInterval: 0.01) }
+            if process.isRunning { process.terminate() }
+            let finalDeadline = ContinuousClock.now + .seconds(1)
+            while process.isRunning && ContinuousClock.now < finalDeadline { Thread.sleep(forTimeInterval: 0.01) }
+            if process.isRunning { _ = Darwin.kill(process.processIdentifier, SIGKILL) }
+            let reapDeadline = ContinuousClock.now + .seconds(1)
+            while process.isRunning && ContinuousClock.now < reapDeadline { Thread.sleep(forTimeInterval: 0.01) }
+            XCTAssertFalse(process.isRunning, "The owned peer process must be stopped before fixture cleanup")
+        }
+        var running: SecCode?
+        let deadline = ContinuousClock.now + .seconds(5)
+        while process.isRunning && ContinuousClock.now < deadline {
+            if SecCodeCopyGuestWithAttributes(nil, [kSecGuestAttributePid: process.processIdentifier] as CFDictionary, [], &running) == errSecSuccess { break }
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        let observed = try XCTUnwrap(running, "The exact owned older process must be observable")
+        var staticCode: SecStaticCode?
+        XCTAssertEqual(SecCodeCopyStaticCode(observed, [], &staticCode), errSecSuccess)
+        var path: CFURL?
+        XCTAssertEqual(SecCodeCopyPath(try XCTUnwrap(staticCode), [], &path), errSecSuccess)
+        let executable = try XCTUnwrap(path) as URL
+        XCTAssertEqual(executable.resolvingSymlinksInPath().path, binary.resolvingSymlinksInPath().path)
+        XCTAssertNotEqual(executable.resolvingSymlinksInPath().path,
+                          candidate.appendingPathComponent("Contents/Helpers/forge-conductor").resolvingSymlinksInPath().path,
+                          "Same version is insufficient: the running peer does not belong to the qualified candidate")
+    }
+
+    private func nativeCandidateFixture() throws -> URL {
+        guard let path = ProcessInfo.processInfo.environment["FORGE_NATIVE_CANDIDATE_FIXTURE"] else {
+            throw XCTSkip("Native candidate qualification requires prepared signed bundles and an older same-version peer")
+        }
+        let root = URL(fileURLWithPath: path, isDirectory: true)
+        XCTAssertTrue(root.path.hasPrefix("/"))
+        return root
+    }
+
+    private func nativeCandidateInfo(_ app: URL) throws -> [String: Any] {
+        try XCTUnwrap(PropertyListSerialization.propertyList(
+            from: Data(contentsOf: app.appendingPathComponent("Contents/Info.plist")), format: nil
+        ) as? [String: Any])
+    }
+
+    private func nativeStaticCodeHash(_ path: URL) throws -> Data {
+        var code: SecStaticCode?
+        XCTAssertEqual(SecStaticCodeCreateWithPath(path as CFURL, [], &code), errSecSuccess)
+        let value = try XCTUnwrap(code)
+        XCTAssertEqual(SecStaticCodeCheckValidity(value, SecCSFlags(rawValue: kSecCSStrictValidate), nil), errSecSuccess)
+        var info: CFDictionary?
+        XCTAssertEqual(SecCodeCopySigningInformation(value, SecCSFlags(rawValue: kSecCSSigningInformation), &info), errSecSuccess)
+        return try XCTUnwrap((info as? [CFString: Any])?[kSecCodeInfoUnique] as? Data)
+    }
+
     func testRemoteSettingsCommitReplacesEveryAppModelManagerEndpointBeforeRefresh() throws {
         let repository = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

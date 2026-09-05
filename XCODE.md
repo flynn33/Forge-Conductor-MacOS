@@ -129,6 +129,12 @@ the still-open Developer ID Release, complete installed/native matrix, or P10
 boundaries. A successful Xcode build or focused test does not mark those items
 complete.
 
+The SwiftPM convenience bundle includes the Core resource bundle under
+`Contents/Resources`, shared by the app and embedded CLI. Agent and telemetry
+folders retain their layout, so the staged product does not require resources
+from a checkout or DerivedData. Test this with a fresh home and denied access
+to the source/build directories; seeded home resources can conceal omissions.
+
 The SwiftPM convenience bundle is a development smoke path. It rejects a
 `FORGE_BUILD_NUMBER` that differs from the compiled canonical build and rejects
 Developer ID signing. A signed optimized smoke build requires the explicit

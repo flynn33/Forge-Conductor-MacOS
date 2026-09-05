@@ -181,6 +181,8 @@ def versions_command(repo: Repository, args: argparse.Namespace) -> Report:
         path = Path(args.app) / 'Contents/Info.plist'
         try:
             check_plist_versions(plistlib.loads(path.read_bytes()), version, build)
+        except IntegrityError as exc:
+            raise IntegrityError(str(path) + ': ' + str(exc)) from exc
         except (OSError, ValueError, plistlib.InvalidFileException) as exc:
             raise ExecutionError('Cannot inspect built app Info.plist.') from exc
     return Report('versions', {'repository':str(repo.root), 'marketing_version':version, 'build':build,

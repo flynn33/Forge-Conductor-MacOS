@@ -22,6 +22,15 @@ installed-stack and production-feature acceptance remain separate gates.
 
 ### Completion authority and protected validation
 
+- SwiftPM smoke staging now includes Core resources, preserving agent and
+  telemetry folders. The app and embedded CLI resolve the staged resource
+  bundle without requiring the checkout's build directory.
+- Telemetry asset lookup also supports Xcode's flat framework resources;
+  fresh installations no longer return 404 for the packaged dashboard assets.
+  The flat lookup excludes agent playbooks and bundle metadata.
+- Native candidate checks inspect signed helpers and distinguish an older
+  same-version process by its actual executable path and code identity.
+  Version drift diagnostics identify the candidate Info.plist path.
 - The native graph guard now rejects omitted production resources. An actual
   telemetry-resource omission reproduced the prior false pass; regression
   coverage also rejects wrong-target and duplicate resource membership.

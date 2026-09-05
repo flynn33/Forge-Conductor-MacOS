@@ -336,11 +336,21 @@ public final class TelemetryService: TelemetryProviding, @unchecked Sendable {
         if let data = try? Data(contentsOf: homeURL) {
             return (data, contentType(for: name))
         }
-        if let url = ResourceBundle.bundle.url(
+        let bundle = ResourceBundle.bundle
+        let nested = bundle.url(
             forResource: (name as NSString).deletingPathExtension,
             withExtension: (name as NSString).pathExtension,
             subdirectory: "TelemetryStatic"
-        ), let data = try? Data(contentsOf: url) {
+        )
+        // Xcode copies individual resources into the framework's resource root.
+        // Limit that fallback to public telemetry assets, excluding agent files
+        // and other metadata carried by the same bundle.
+        let publicAssets: Set<String> = ["index.html", "style.css", "app.js", "tools-catalog.js"]
+        let flattened = publicAssets.contains(name) ? bundle.url(
+            forResource: (name as NSString).deletingPathExtension,
+            withExtension: (name as NSString).pathExtension
+        ) : nil
+        if let url = nested ?? flattened, let data = try? Data(contentsOf: url) {
             return (data, contentType(for: name))
         }
         return nil
