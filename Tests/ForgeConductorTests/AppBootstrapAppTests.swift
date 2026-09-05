@@ -1,4 +1,5 @@
 import XCTest
+import SwiftUI
 #if SWIFT_PACKAGE
 @testable import ForgeConductorApp
 #else
@@ -36,6 +37,30 @@ private final class BootstrapProbe: @unchecked Sendable {
 }
 
 private enum BootstrapFixtureError: Error { case expectedFailure, gateDeadline }
+
+@MainActor
+final class OperatorStartupContentAppTests: XCTestCase {
+    func testOperatorScreenConstructionWaitsThroughStartupAndFailureUntilReady() {
+        var constructions = 0
+        for (ready, loading, failure) in [
+            (false, true, Optional<String>.none),
+            (false, false, Optional("Bootstrap failed")),
+            (false, true, Optional<String>.none),
+            (true, false, Optional<String>.none),
+        ] {
+            let gate = OperatorStartupContent(
+                isReady: ready, isLoading: loading, errorMessage: failure,
+                retry: {}, content: {
+                    constructions += 1
+                    return Text("Operator screen")
+                }
+            )
+            XCTAssertEqual(constructions, 0, "Constructing the gate must not eagerly construct an operator screen")
+            _ = gate.body
+            XCTAssertEqual(constructions, ready ? 1 : 0)
+        }
+    }
+}
 
 @MainActor
 final class AppBootstrapAppTests: XCTestCase {
