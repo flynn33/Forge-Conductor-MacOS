@@ -73,6 +73,8 @@ class NativeCITests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             call = [args for args in self.calls() if args[:2] == ['swift', 'test']][-1]
             self.assertIn('-warnings-as-errors', call)
+            self.assertIn('--parallel', call)
+            self.assertEqual(call[call.index('--num-workers') + 1], '1')
             self.assertEqual(call[call.index('--configuration') + 1], configuration)
             self.assertTrue((self.output / 'swift-tests.xml').is_file())
 

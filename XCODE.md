@@ -287,3 +287,12 @@ A sandboxed runner prevented that nested sandbox with `sandbox_apply` exit 71,
 so it could not measure the ordinary product path. Production entitlements and
 shell authorization remain unchanged; disabled-policy denial and post-Settings
 reenablement both retain their full executable assertions.
+
+## SwiftPM runtime and result paths
+
+The SwiftPM CI lanes use the test worker runner with one worker so XCTest
+produces the requested xUnit file while cases remain sequential. Both XCTest
+and Swift Testing stay enabled, and warnings remain errors. Runtime Python
+admission and the process sandbox resolve the existing system runtime roots
+to physical paths, including versioned Xcode app aliases. This does not grant
+read access to sibling applications or user data.

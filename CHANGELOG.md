@@ -50,6 +50,13 @@ installed-stack and production-feature acceptance remain separate gates.
 
 ### Fixed
 
+- Runtime sandbox read rules now resolve the existing system runtime roots to
+  the same physical paths used by interpreter admission, allowing Xcode's
+  versioned Python framework through an existing Xcode.app alias. Authorized
+  roots, write limits and network controls remain enforced.
+- Native CI uses a single test worker to retain XCTest xUnit results; archive
+  dependency regressions cover both normal and deployment product selection.
+
 - Xcode Archive now supplies the actual filesystem daemon product to both
   identity-sealing phases. The declared sandbox input and consumed binary agree
   when Xcode creates a build-products symlink; signature verification and

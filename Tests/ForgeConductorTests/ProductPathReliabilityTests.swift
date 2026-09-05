@@ -655,14 +655,21 @@ final class ProductPathReliabilityTests: XCTestCase {
             "CLI must depend directly on the daemon before sealing its identity"
         )
 
+        for phaseID in ["E2F500000000000000000045", "E2F500000000000000000046"] {
+            let sealPhase = try object(phaseID)
+            XCTAssertTrue(sealPhase.contains("$(FORGE_FILESYSTEM_DAEMON_PRODUCT)"),
+                          "sandbox input must name the selected signed daemon product")
+            XCTAssertTrue(sealPhase.contains("${FORGE_FILESYSTEM_DAEMON_PRODUCT}"),
+                          "seal command must consume the same declared signed dependency")
+        }
+        for configurationID in ["63739DAB5B654C0B846F75C1", "CEFEFE9428CD4B5F869BE9F3"] {
+            let configuration = try object(configurationID)
+            XCTAssertTrue(configuration.contains("$(FORGE_FILESYSTEM_DAEMON_PRODUCT_$(DEPLOYMENT_LOCATION))"))
+            XCTAssertTrue(configuration.contains("FORGE_FILESYSTEM_DAEMON_PRODUCT_NO = \"$(BUILT_PRODUCTS_DIR)/forge-filesystem-daemon\";"))
+            XCTAssertTrue(configuration.contains("FORGE_FILESYSTEM_DAEMON_PRODUCT_YES = \"$(UNINSTALLED_PRODUCTS_DIR)/$(PLATFORM_NAME)/forge-filesystem-daemon\";"),
+                          "Archive must seal the direct product without following a build-products alias")
+        }
         let cliSealPhase = try object("E2F500000000000000000046")
-        XCTAssertTrue(
-            cliSealPhase.contains("$(BUILT_PRODUCTS_DIR)/forge-filesystem-daemon")
-        )
-        XCTAssertTrue(
-            cliSealPhase.contains("${BUILT_PRODUCTS_DIR}/forge-filesystem-daemon"),
-            "CLI seal command must read its signed daemon dependency"
-        )
         XCTAssertFalse(
             cliSealPhase.contains(
                 "$(BUILT_PRODUCTS_DIR)/Forge Conductor.app/Contents/MacOS/"

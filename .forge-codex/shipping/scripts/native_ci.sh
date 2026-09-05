@@ -42,7 +42,9 @@ case "$MODE" in
     ;;
   swift-*)
     CONFIGURATION="${MODE#swift-}"
+    # SwiftPM's worker runner emits XCTest xUnit; one worker preserves sequential cases.
     run_logged swift-tests swift test --configuration "$CONFIGURATION" --jobs 3 \
+      --parallel --num-workers 1 \
       --scratch-path "$OUT/SwiftPM" -Xswiftc -warnings-as-errors \
       --xunit-output "$OUT/swift-tests.xml"
     test -s "$OUT/swift-tests.xml"

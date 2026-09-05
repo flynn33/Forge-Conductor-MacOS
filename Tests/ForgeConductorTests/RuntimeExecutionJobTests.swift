@@ -3792,6 +3792,52 @@ final class RuntimeExecutionJobTests: XCTestCase {
         await fixture.close()
     }
 
+    func testRuntimeReadAliasResolvesForKernelWithoutAuthorizingSiblingData() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("forge-runtime-alias-\(UUID().uuidString)", isDirectory: true)
+        let physical = root.appendingPathComponent("Runtime_26.6", isDirectory: true)
+        let alias = root.appendingPathComponent("Runtime", isDirectory: true)
+        let library = physical.appendingPathComponent("library")
+        let sibling = root.appendingPathComponent("private-sibling")
+        try FileManager.default.createDirectory(at: physical, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try Data("runtime-library".utf8).write(to: library)
+        try Data("private-data".utf8).write(to: sibling)
+        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: physical)
+
+        let paths = RuntimeProcessSandbox.canonicalReadPaths([alias.path])
+        XCTAssertEqual(paths, [RuntimeProcessSandbox.canonicalExistingURL(physical).path])
+        let allowed = try XCTUnwrap(paths.first)
+        let project = root.appendingPathComponent("project", isDirectory: true)
+        let artifacts = root.appendingPathComponent("artifacts", isDirectory: true)
+        let scratch = root.appendingPathComponent("scratch", isDirectory: true)
+        for directory in [project, artifacts, scratch] {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+        let plan = try RuntimeProcessSandbox.plan(
+            executable: URL(fileURLWithPath: "/bin/cat"), arguments: [],
+            workingDirectory: project, environment: [:],
+            canonicalReadRoots: [project], canonicalWritableRoots: [],
+            managerReadDirectory: artifacts, scratchDirectory: scratch,
+            networkAllowed: false
+        )
+        let baseProfile = try XCTUnwrap(plan.arguments.dropFirst().first)
+        let profile = baseProfile + "\n(allow file-read* (subpath \"\(allowed)\"))"
+        let runner = ProcessRunner()
+        let libraryPath = RuntimeProcessSandbox.canonicalExistingURL(library).path
+        let siblingPath = RuntimeProcessSandbox.canonicalExistingURL(sibling).path
+        let success = try runner.run(executable: "/usr/bin/sandbox-exec",
+                                     arguments: ["-p", profile, "/bin/cat", libraryPath],
+                                     timeoutSec: 5)
+        XCTAssertEqual(success.exitCode, 0, success.stderr)
+        XCTAssertEqual(success.stdout, "runtime-library")
+        let denied = try runner.run(executable: "/usr/bin/sandbox-exec",
+                                    arguments: ["-p", profile, "/bin/cat", siblingPath],
+                                    timeoutSec: 5)
+        XCTAssertNotEqual(denied.exitCode, 0)
+        XCTAssertFalse(denied.stdout.contains("private-data"))
+    }
+
     func testRuntimeSandboxProfileIsDenyByDefaultAndExcludesMutableUSRPrefix() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("forge-runtime-profile-\(UUID().uuidString)", isDirectory: true)
