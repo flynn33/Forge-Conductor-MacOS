@@ -1041,7 +1041,7 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
         guard value == "yes" else { throw LiveQualificationError.invalidThresholdControl }
         // This deliberately moves a supported policy boundary; exact provider
         // capacity, token usage, fixed reserves, and all continuity receipts remain real.
-        return try ContextBudgetPolicy(checkpointFraction: 0.96, rolloverFraction: 0.90,
+        return try ContextBudgetPolicy(checkpointFraction: 0.78, rolloverFraction: 0.75,
                                        emergencyFraction: 0.05).validated()
     }
 
