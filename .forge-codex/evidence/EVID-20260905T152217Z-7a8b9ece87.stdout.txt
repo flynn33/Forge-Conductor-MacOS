@@ -1,0 +1,30 @@
+{
+  "source_inputs_unchanged": 290,
+  "qualification_input_sha256": "45f3bd572374b715e179c684b51e071bdbc81ad48285e283e174a28a32c926a8",
+  "lanes": [
+    {
+      "lane": "p02-swift-debug",
+      "raw_execution_passed": true,
+      "receipt_sha256": "267c7293c984cb40c0067144310ab3d34bc7c215c54257dc5d81ef30fb958485"
+    },
+    {
+      "lane": "p02-swift-release",
+      "raw_execution_passed": true,
+      "receipt_sha256": "967397d67f3f227d66786ce5ad92ce6e27f3d04a8588d58e48cb4160173daabe"
+    },
+    {
+      "lane": "p02-xcode-debug",
+      "raw_execution_passed": true,
+      "receipt_sha256": "8851987a97aee9069d72ea861043fc87b095b6448b84563ab9c2367d0872d481"
+    },
+    {
+      "lane": "p02-xcode-release",
+      "raw_execution_passed": true,
+      "receipt_sha256": "61d07050f8cbac41ba95f43c119110b73c448ea59bbaef1297f1492dfb0a2f7f"
+    }
+  ],
+  "swiftpm_scheduled_cases_each": 1046,
+  "skip_semantics": "not preserved by worker XML; mandatory environment gates remain open",
+  "native_ui_test_qualified": false,
+  "release_qualified": false
+}

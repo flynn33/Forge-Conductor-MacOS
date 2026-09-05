@@ -1,0 +1,101 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 2035,
+      "path": "/Users/jimdaley/Projects/Forge-Conductor/rescue-evidence/20260905T145048Z/p02-repair-review.json",
+      "portability": "origin-host-required",
+      "sha256": "880ac745c3032ba61ecf916d1262b8b1740ac6ca54d0900a6fe7ecf02629ce43",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 1049,
+      "path": ".forge-codex/evidence/EVID-20260905T152217Z-7a8b9ece87.stdout.txt",
+      "sha256": "7e4d07bed5f761d82c6605afd64383ef9340fbaa1ee86ec050cdfa3450615abf",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260905T152217Z-7a8b9ece87.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "child_evidence_context": {
+    "binding_schema_version": 1,
+    "evidence_id": "EVID-20260905T152217Z-7a8b9ece87",
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "4bbdf14079bec7543dfa7705645494593ec64396",
+      "branch": "rescue/clu-shippable-2026-09-05",
+      "head_sha": "786396991f8159da8919f1812355c19d9445ddbb",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor-CLU-Rescue"
+    },
+    "schema_version": 1,
+    "source_manifest": {
+      "bytes": 13437694,
+      "file_count": 393,
+      "schema_version": 1,
+      "sha256": "fb5c5871dbd047dd3c9482ce747187483383e0eaf6364160371e2f4413eb98e3"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "command": "python3 /Users/jimdaley/Projects/Forge-Conductor/rescue-evidence/20260905T145048Z/verify-checkpoint.py /Users/jimdaley/GitHub/Forge-Conductor-CLU-Rescue",
+  "ended_at": "2026-09-05T15:22:17.337810+00:00",
+  "environment": {
+    "architecture": "arm64",
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-CLU-Rescue",
+    "machine_identifier": "Mac16,7",
+    "macos_build": "25G83",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "execution_provenance": {
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "4bbdf14079bec7543dfa7705645494593ec64396",
+      "branch": "rescue/clu-shippable-2026-09-05",
+      "head_sha": "786396991f8159da8919f1812355c19d9445ddbb",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor-CLU-Rescue"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "exit_code": 0,
+  "id": "EVID-20260905T152217Z-7a8b9ece87",
+  "kind": "rescue-checkpoint-equivalence",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [
+    "RESCUE-P02-CI"
+  ],
+  "related_gates": [],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 13437694,
+    "file_count": 393,
+    "schema_version": 1,
+    "sha256": "fb5c5871dbd047dd3c9482ce747187483383e0eaf6364160371e2f4413eb98e3"
+  },
+  "source_manifest_after": {
+    "bytes": 13437694,
+    "file_count": 393,
+    "schema_version": 1,
+    "sha256": "fb5c5871dbd047dd3c9482ce747187483383e0eaf6364160371e2f4413eb98e3"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-09-05T15:22:17.297077+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

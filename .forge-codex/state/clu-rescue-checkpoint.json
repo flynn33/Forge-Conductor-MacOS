@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "package_root": "/Users/jimdaley/Projects/Forge-Conductor/Forge-Conductor-CLU-Shippable-Rescue-2026-09-05",
+  "run_record": "/Users/jimdaley/Projects/Forge-Conductor/rescue-evidence/20260905T145048Z/run-state.json",
+  "source_root": "/Users/jimdaley/GitHub/Forge-Conductor-CLU-Rescue",
+  "branch": "rescue/clu-shippable-2026-09-05",
+  "source_commit": "786396991f8159da8919f1812355c19d9445ddbb",
+  "main_commit": "4bbdf14079bec7543dfa7705645494593ec64396",
+  "rescue_phase_status": {
+    "P00": "baseline inventory recorded",
+    "P02": "CI repair implemented; local SwiftPM and unsigned Xcode builds passed; native test/installed qualification remains pending",
+    "P01": "next independent implementation; design and source trace recorded externally",
+    "P03-P14": "not complete"
+  },
+  "qualification": {
+    "source_inputs_unchanged": 290,
+    "qualification_input_sha256": "45f3bd572374b715e179c684b51e071bdbc81ad48285e283e174a28a32c926a8",
+    "lanes": [
+      {
+        "lane": "p02-swift-debug",
+        "raw_execution_passed": true,
+        "receipt_sha256": "267c7293c984cb40c0067144310ab3d34bc7c215c54257dc5d81ef30fb958485"
+      },
+      {
+        "lane": "p02-swift-release",
+        "raw_execution_passed": true,
+        "receipt_sha256": "967397d67f3f227d66786ce5ad92ce6e27f3d04a8588d58e48cb4160173daabe"
+      },
+      {
+        "lane": "p02-xcode-debug",
+        "raw_execution_passed": true,
+        "receipt_sha256": "8851987a97aee9069d72ea861043fc87b095b6448b84563ab9c2367d0872d481"
+      },
+      {
+        "lane": "p02-xcode-release",
+        "raw_execution_passed": true,
+        "receipt_sha256": "61d07050f8cbac41ba95f43c119110b73c448ea59bbaef1297f1492dfb0a2f7f"
+      }
+    ],
+    "swiftpm_scheduled_cases_each": 1046,
+    "skip_semantics": "not preserved by worker XML; mandatory environment gates remain open",
+    "native_ui_test_qualified": false,
+    "release_qualified": false
+  },
+  "evidence_id": "EVID-20260905T152217Z-7a8b9ece87",
+  "external_evidence_root": "/Users/jimdaley/Projects/Forge-Conductor/rescue-evidence/20260905T145048Z",
+  "native_ci_run": 33974398152,
+  "native_ci_status": "queued at last readback",
+  "installed_app": {
+    "path": "/Applications/Forge Conductor.app",
+    "version": "0.9.1",
+    "build": "1",
+    "replaced": false
+  },
+  "lm_studio": {
+    "api_reachable": true,
+    "version": "0.4.23+1",
+    "loaded_model_count": 0
+  },
+  "implementation_complete": false,
+  "native_qualified": false,
+  "release_qualified": false,
+  "integration_complete": false,
+  "next_action": "Read this checkpoint and external run record; inspect CI 33974398152, then implement P01 trusted completion registry using p01-design-notes.json. Do not resume historical P10 selector as rescue authority.",
+  "policy": "No attribution; no protected merge or public release. Original checkout and both state histories preserved."
+}
