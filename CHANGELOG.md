@@ -22,6 +22,9 @@ installed-stack and production-feature acceptance remain separate gates.
 
 ### Verified current-source evidence
 
+- Native Xcode tests now include the provider bridge and continuity cases that
+  were previously compiled only by SwiftPM. Live-provider cases remain explicit
+  opt-ins and cannot qualify an unavailable environment through omission.
 - Dashboard contention tests wait for an externally held configuration lock
   using a separate bounded startup deadline. A delayed-start regression proves
   real lock ownership; product request deadlines and assertions are unchanged.

@@ -7,7 +7,6 @@ import ForgeNativeSessionHostPlugin
 #endif
 @testable import ForgeConductorCore
 
-#if SWIFT_PACKAGE
 private actor ScriptedProviderBridgeTransport: LMStudioManagedTransporting {
     enum Mode: Sendable {
         case completed
@@ -518,4 +517,3 @@ private func providerBridgeTemporaryRoot(_ name: String) -> URL {
         isDirectory: true
     )
 }
-#endif
