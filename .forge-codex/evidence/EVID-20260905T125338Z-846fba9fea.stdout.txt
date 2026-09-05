@@ -1,0 +1,196 @@
+Native CI records compilation and test evidence; signed runtime and distribution gates remain separate.
+test_adhoc_optimized_smoke_build_remains_available (test_build_entrypoint.BuildEntrypointTests) ... ok
+test_ambiguous_marketing_version_is_rejected (test_build_entrypoint.BuildEntrypointTests) ... ok
+test_developer_id_selector_is_rejected_for_every_configuration (test_build_entrypoint.BuildEntrypointTests) ... ok
+test_duplicate_canonical_constants_are_rejected (test_build_entrypoint.BuildEntrypointTests) ... ok
+test_empty_or_malformed_build_override_is_rejected (test_build_entrypoint.BuildEntrypointTests) ... ok
+test_inconsistent_build_override_is_rejected_before_compilation (test_build_entrypoint.BuildEntrypointTests) ... ok
+test_matching_build_and_existing_modes_reach_compilation (test_build_entrypoint.BuildEntrypointTests) ... ok
+test_optimized_development_build_retains_compiled_trust_flag (test_build_entrypoint.BuildEntrypointTests) ... ok
+test_signed_release_without_development_policy_is_rejected (test_build_entrypoint.BuildEntrypointTests) ... ok
+test_unknown_or_extra_modes_do_not_start_compilation (test_build_entrypoint.BuildEntrypointTests) ... ok
+test_debug_and_release_swift_lanes_retain_results_and_warnings_policy (test_native_ci.NativeCITests) ... ok
+test_integrity_failures_propagate_through_logging (test_native_ci.NativeCITests) ... ok
+test_swift_test_failure_is_not_hidden_by_tee (test_native_ci.NativeCITests) ... ok
+test_unknown_lane_does_not_run_tools (test_native_ci.NativeCITests) ... ok
+test_xcode_failure_is_not_hidden_by_tee (test_native_ci.NativeCITests) ... ok
+test_xcode_lanes_compile_both_products_without_signing (test_native_ci.NativeCITests) ... ok
+test_committed_deleted_docs_cannot_pass_using_untracked_copies (test_shipping_guard.CLIIntegrationTests) ... ok
+test_committed_docs_are_checked_independently_of_worktree_deletions (test_shipping_guard.CLIIntegrationTests) ... ok
+test_environment_build_override_fails (test_shipping_guard.CLIIntegrationTests) ... ok
+test_missing_repository_fails_execution (test_shipping_guard.CLIIntegrationTests) ... ok
+test_native_guard_not_run_on_linux (test_shipping_guard.CLIIntegrationTests) ... ok
+test_source_xcode_drift_cli_fails (test_shipping_guard.CLIIntegrationTests) ... ok
+test_staged_deleted_docs_cannot_pass_using_untracked_copies (test_shipping_guard.CLIIntegrationTests) ... ok
+test_staged_docs_are_checked_independently_of_worktree_deletions (test_shipping_guard.CLIIntegrationTests) ... ok
+test_staged_document_symlink_is_not_a_regular_document (test_shipping_guard.CLIIntegrationTests) ... ok
+test_staged_release_doc_review (test_shipping_guard.CLIIntegrationTests) ... ok
+test_unstaged_docs_do_not_count_as_updated (test_shipping_guard.CLIIntegrationTests) ... ok
+test_versions_cli_success (test_shipping_guard.CLIIntegrationTests) ... ok
+test_changed_topical_doc_requires_review (test_shipping_guard.DocumentationTests) ... ok
+test_duplicate_review_rejected (test_shipping_guard.DocumentationTests) ... ok
+test_fake_updated_without_diff_rejected (test_shipping_guard.DocumentationTests) ... ok
+test_missing_review_rejected (test_shipping_guard.DocumentationTests) ... ok
+test_not_reviewed_rejected (test_shipping_guard.DocumentationTests) ... ok
+test_product_change_and_changelog_pass (test_shipping_guard.DocumentationTests) ... ok
+test_product_change_without_changelog_rejected (test_shipping_guard.DocumentationTests) ... ok
+test_release_requires_all_four_updates (test_shipping_guard.DocumentationTests) ... ok
+test_release_review_passes (test_shipping_guard.DocumentationTests) ... ok
+test_trivial_reason_rejected (test_shipping_guard.DocumentationTests) ... ok
+test_unsafe_review_path_rejected (test_shipping_guard.DocumentationTests) ... ok
+test_wrong_base_rejected (test_shipping_guard.DocumentationTests) ... ok
+test_clean_equal_snapshot (test_shipping_guard.RemoteTests) ... ok
+test_credential_url (test_shipping_guard.RemoteTests) ... ok
+test_detached_checkout (test_shipping_guard.RemoteTests) ... ok
+test_dirty_snapshot (test_shipping_guard.RemoteTests) ... ok
+test_expected_delivery_identity (test_shipping_guard.RemoteTests) ... ok
+test_live_branch_absent (test_shipping_guard.RemoteTests) ... ok
+test_live_branch_ambiguous (test_shipping_guard.RemoteTests) ... ok
+test_live_branch_parse (test_shipping_guard.RemoteTests) ... ok
+test_local_remote_divergence (test_shipping_guard.RemoteTests) ... ok
+test_push_fetch_divergence (test_shipping_guard.RemoteTests) ... ok
+test_standard_urls (test_shipping_guard.RemoteTests) ... ok
+test_wrong_host (test_shipping_guard.RemoteTests) ... ok
+test_wrong_repository (test_shipping_guard.RemoteTests) ... ok
+test_built_placeholder_rejected (test_shipping_guard.VersionTests) ... ok
+test_built_plist_match (test_shipping_guard.VersionTests) ... ok
+test_built_stale_version_rejected (test_shipping_guard.VersionTests) ... ok
+test_canonical_pair (test_shipping_guard.VersionTests) ... ok
+test_duplicate_constant_rejected (test_shipping_guard.VersionTests) ... ok
+test_leading_zero_marketing_rejected (test_shipping_guard.VersionTests) ... ok
+test_missing_constant_rejected (test_shipping_guard.VersionTests) ... ok
+test_resolved_settings_empty_rejected (test_shipping_guard.VersionTests) ... ok
+test_resolved_settings_match (test_shipping_guard.VersionTests) ... ok
+test_resolved_settings_mismatch (test_shipping_guard.VersionTests) ... ok
+test_resolved_settings_need_app (test_shipping_guard.VersionTests) ... ok
+test_resolved_settings_placeholder_rejected (test_shipping_guard.VersionTests) ... ok
+test_source_placeholders_allowed (test_shipping_guard.VersionTests) ... ok
+test_xcode_absent_configuration_rejected (test_shipping_guard.VersionTests) ... ok
+test_xcode_literals_match (test_shipping_guard.VersionTests) ... ok
+test_xcode_stale_release_rejected (test_shipping_guard.VersionTests) ... ok
+test_xcode_unresolved_generation_rejected (test_shipping_guard.VersionTests) ... ok
+test_zero_build_rejected (test_shipping_guard.VersionTests) ... ok
+test_cycle_rejected (test_shipping_guard.XcodeTests) ... ok
+test_dangling_file_reference (test_shipping_guard.XcodeTests) ... ok
+test_duplicate_compile_entry (test_shipping_guard.XcodeTests) ... ok
+test_generated_path_needs_explicit_support (test_shipping_guard.XcodeTests) ... ok
+test_missing_compiled_file (test_shipping_guard.XcodeTests) ... ok
+test_plugin_expected_in_xcode_core (test_shipping_guard.XcodeTests) ... ok
+test_production_membership_checked (test_shipping_guard.XcodeTests) ... ok
+test_real_group_and_target_resolution (test_shipping_guard.XcodeTests) ... ok
+test_synchronized_group_not_silent_pass (test_shipping_guard.XcodeTests) ... ok
+test_test_omissions_explicit (test_shipping_guard.XcodeTests) ... ok
+test_unknown_module_requires_review (test_shipping_guard.XcodeTests) ... ok
+test_unwired_new_file_rejected (test_shipping_guard.XcodeTests) ... ok
+test_zero_sources_never_passes (test_shipping_guard.XcodeTests) ... ok
+
+----------------------------------------------------------------------
+Ran 84 tests in 7.944s
+
+OK
+test_both_build_phases_seal_the_declared_direct_product (__main__.SealFilesystemDaemonIdentityTests) ... ok
+test_broken_archive_alias_preserves_existing_seal (__main__.SealFilesystemDaemonIdentityTests) ... ok
+test_build_and_archive_resolve_direct_products_in_both_configurations (__main__.SealFilesystemDaemonIdentityTests) ... ok
+test_linked_source_plist_preserves_existing_seal (__main__.SealFilesystemDaemonIdentityTests) ... ok
+test_missing_daemon_preserves_existing_seal (__main__.SealFilesystemDaemonIdentityTests) ... ok
+test_missing_source_plist_preserves_existing_seal (__main__.SealFilesystemDaemonIdentityTests) ... ok
+test_regular_file_seals_both_architectures_without_archive_context (__main__.SealFilesystemDaemonIdentityTests) ... ok
+test_relative_and_absolute_aliases_remain_rejected (__main__.SealFilesystemDaemonIdentityTests) ... ok
+test_unsigned_regular_and_archive_products_preserve_existing_seal (__main__.SealFilesystemDaemonIdentityTests) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 5.521s
+
+OK
+test_appended_credit_is_detected_at_the_same_workflow_path (test_attribution_policy_examples.AttributionPolicyExampleTests) ... ok
+test_changed_whitespace_and_line_endings_are_not_exempted (test_attribution_policy_examples.AttributionPolicyExampleTests) ... ok
+test_credit_appended_to_each_pinned_line_is_detected (test_attribution_policy_examples.AttributionPolicyExampleTests) ... ok
+test_credit_replacing_each_pinned_line_is_detected (test_attribution_policy_examples.AttributionPolicyExampleTests) ... ok
+test_exact_reviewed_workflow_is_accepted (test_attribution_policy_examples.AttributionPolicyExampleTests) ... ok
+test_identical_line_at_another_position_is_not_exempted (test_attribution_policy_examples.AttributionPolicyExampleTests) ... ok
+test_identical_policy_lines_at_another_path_are_not_exempted (test_attribution_policy_examples.AttributionPolicyExampleTests) ... ok
+test_new_pattern_assignment_does_not_bypass_scanning (test_attribution_policy_examples.AttributionPolicyExampleTests) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.022s
+
+OK
+test_attribution_scan_accepts_exact_file_and_aggregate_bounds (test_release_scanners_hardening.ReleaseScannerHardeningTests) ... ok
+test_attribution_scan_rejects_file_and_aggregate_plus_one (test_release_scanners_hardening.ReleaseScannerHardeningTests) ... ok
+test_attribution_scan_retains_detection_contract (test_release_scanners_hardening.ReleaseScannerHardeningTests) ... ok
+test_pinned_child_output_and_timeout_are_bounded (test_release_scanners_hardening.ReleaseScannerHardeningTests) ... ok
+test_scan_detects_equal_content_path_replacement (test_release_scanners_hardening.ReleaseScannerHardeningTests) ... ok
+test_scanners_reject_symlink_and_hardlink_inputs (test_release_scanners_hardening.ReleaseScannerHardeningTests) ... ok
+test_secret_scan_retains_detection_contract (test_release_scanners_hardening.ReleaseScannerHardeningTests) ... ok
+test_shell_syntax_uses_the_bounded_snapshot (test_release_scanners_hardening.ReleaseScannerHardeningTests) ... ok
+test_traversal_counts_skipped_entries_and_rejects_plus_one (test_release_scanners_hardening.ReleaseScannerHardeningTests) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.137s
+
+OK
+Authorship-attribution scan passed for /Users/jimdaley/GitHub/Forge-Conductor
+{
+  "check": "versions",
+  "status": "passed",
+  "facts": {
+    "repository": "/Users/jimdaley/GitHub/Forge-Conductor",
+    "marketing_version": "0.9.0",
+    "build": "1",
+    "literal_xcode_declarations": {
+      "MARKETING_VERSION": 12,
+      "CURRENT_PROJECT_VERSION": 16
+    },
+    "effective_setting_values_checked": 0,
+    "built_app_checked": false
+  },
+  "warnings": [
+    "Nested Mach-O identities and runtime behavior require the native bundle checker."
+  ],
+  "scope": "Named integrity check only; not product qualification or release authorization."
+}
+{
+  "check": "xcode",
+  "status": "passed",
+  "facts": {
+    "production_swift_files_checked": 156,
+    "native_targets": [
+      "ForgeConductor",
+      "ForgeConductorAppTests",
+      "ForgeConductorCore",
+      "ForgeConductorTests",
+      "ForgeConductorUITests",
+      "ForgeFilesystemAdversary",
+      "ForgeFilesystemDaemon",
+      "ForgeFilesystemProtocol",
+      "ForgeFilesystemQualificationHarness",
+      "ForgeFilesystemQualificationSupport",
+      "ForgeRuntimeLauncher",
+      "forge-conductor"
+    ],
+    "test_files_requiring_membership_disposition": [
+      "Tests/ForgeFilesystemQualificationSupportTests/AdmissionProbeTests.swift",
+      "Tests/ForgeFilesystemQualificationSupportTests/H0IsolationTests.swift",
+      "Tests/ForgeFilesystemQualificationSupportTests/QualificationReadinessTests.swift"
+    ]
+  },
+  "warnings": [
+    "Any test-source omissions require documented disposition and actual coverage. Resource phases, schemes, linking, signing and native execution are separate checks."
+  ],
+  "scope": "Named integrity check only; not product qualification or release authorization."
+}
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -list -workspace ForgeConductor.xcworkspace
+
+Information about workspace "ForgeConductor":
+    Schemes:
+        forge-conductor
+        ForgeConductor
+        ForgeConductorAppTests
+        ForgeFilesystemAdversary
+        ForgeFilesystemDaemon
+        ForgeFilesystemProtocol
+        ForgeFilesystemQualification
+        ForgeFilesystemQualificationSupport
+        ForgeRuntimeLauncher
+

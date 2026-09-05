@@ -1,0 +1,106 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 1069,
+      "path": "/Users/jimdaley/Projects/Forge-Conductor/build-fix-evidence/20260905T124341Z/native-integrity/daemon-identity-tests.log",
+      "portability": "origin-host-required",
+      "sha256": "da15e7cd425a50a79163ce4a496375ab2187b6e358e7a6c633cd3b0cf22cc836",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 6951,
+      "path": "/Users/jimdaley/Projects/Forge-Conductor/build-fix-evidence/20260905T124341Z/native-integrity/utility-tests.log",
+      "portability": "origin-host-required",
+      "sha256": "ec9a38204052248fa73ebc2d8b4d4df77bb80d7b08d47bbcf0577c0864695bc0",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 12658,
+      "path": ".forge-codex/evidence/EVID-20260905T125338Z-846fba9fea.stdout.txt",
+      "sha256": "0c0885e29c21453a6717a9ebf8e7a52834dcec289ea44c261149bb44d1931e56",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 30,
+      "path": ".forge-codex/evidence/EVID-20260905T125338Z-846fba9fea.stderr.txt",
+      "sha256": "542ca724f46d8a3dffb85c3cd4b6e0d2fdf6c1bd4c484e6978dd9ed2f22cd639",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "child_evidence_context": {
+    "binding_schema_version": 1,
+    "evidence_id": "EVID-20260905T125338Z-846fba9fea",
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "20958b93c26023ae7632cbeae6e3eff2a93374cf",
+      "branch": "fix/archive-daemon-identity",
+      "head_sha": "4beae21dad28dd336a3502a52097c11d54143604",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor"
+    },
+    "schema_version": 1,
+    "source_manifest": {
+      "bytes": 13433463,
+      "file_count": 393,
+      "schema_version": 1,
+      "sha256": "a36addcee3c9d68f9a4af3f2074775ea38a341f166d02347266c38ac7221f5c1"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "command": "env FORGE_CI_OUTPUT_DIR=/Users/jimdaley/Projects/Forge-Conductor/build-fix-evidence/20260905T124341Z/native-integrity bash .forge-codex/shipping/scripts/native_ci.sh integrity",
+  "ended_at": "2026-09-05T12:53:53.507157+00:00",
+  "environment": {
+    "architecture": "arm64",
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor",
+    "machine_identifier": "Mac16,7",
+    "macos_build": "25G83",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "execution_provenance": {
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "20958b93c26023ae7632cbeae6e3eff2a93374cf",
+      "branch": "fix/archive-daemon-identity",
+      "head_sha": "4beae21dad28dd336a3502a52097c11d54143604",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "exit_code": 0,
+  "id": "EVID-20260905T125338Z-846fba9fea",
+  "kind": "archive-fix-integrity",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [],
+  "related_gates": [],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 13433463,
+    "file_count": 393,
+    "schema_version": 1,
+    "sha256": "a36addcee3c9d68f9a4af3f2074775ea38a341f166d02347266c38ac7221f5c1"
+  },
+  "source_manifest_after": {
+    "bytes": 13433463,
+    "file_count": 393,
+    "schema_version": 1,
+    "sha256": "a36addcee3c9d68f9a4af3f2074775ea38a341f166d02347266c38ac7221f5c1"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-09-05T12:53:38.248342+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}
