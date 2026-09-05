@@ -22,6 +22,9 @@ installed-stack and production-feature acceptance remain separate gates.
 
 ### Verified current-source evidence
 
+- Dashboard contention tests wait for an externally held configuration lock
+  using a separate bounded startup deadline. A delayed-start regression proves
+  real lock ownership; product request deadlines and assertions are unchanged.
 - The CLI `version` output reports marketing version **0.9.0**. The Swift
   runtime constants, the versioned Xcode configurations, and the built app
   bundle report marketing version **0.9.0**, build **1**.

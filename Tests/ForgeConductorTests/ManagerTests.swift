@@ -1481,6 +1481,20 @@ final class ManagerTests: XCTestCase {
         XCTAssertEqual(ManagerDashboardClient.ordinaryRequestTimeoutSeconds, 2)
     }
 
+    func testExternalConfigLockHolderWaitsForDelayedStartupBeforeMeasuringContention() throws {
+        let paths = AppPaths(home: home)
+        let holder = try Self.startExternalConfigLockHolder(
+            paths: paths, holdSeconds: 1, startupDelaySeconds: 2.25
+        )
+        defer { Self.finishExternalConfigLockHolder(holder) }
+        let descriptor = Darwin.open(paths.configMigrationLock.path, O_RDWR)
+        XCTAssertGreaterThanOrEqual(descriptor, 0)
+        guard descriptor >= 0 else { return }
+        defer { Darwin.close(descriptor) }
+        XCTAssertEqual(Darwin.lockf(descriptor, F_TLOCK, 0), -1)
+        XCTAssertTrue([EAGAIN, EACCES].contains(errno), "Readiness must prove actual external lock ownership")
+    }
+
     func testDashboardClientDelayedRestartSerializesWatchdogAndReturnsDecodedStatus() async throws {
         let app = try ForgeApp.bootstrap(home: home)
         let port = try Self.availableLoopbackPort()
@@ -8768,7 +8782,8 @@ final class ManagerTests: XCTestCase {
 
     private static func startExternalConfigLockHolder(
         paths: AppPaths,
-        holdSeconds: TimeInterval
+        holdSeconds: TimeInterval,
+        startupDelaySeconds: TimeInterval = 0
     ) throws -> ExternalConfigLockHolder {
         try FileManager.default.createDirectory(
             at: paths.configMigrationsDir,
@@ -8785,6 +8800,7 @@ final class ManagerTests: XCTestCase {
         import time
 
         lock_path, ready_path, duration = sys.argv[1], sys.argv[2], float(sys.argv[3])
+        time.sleep(float(sys.argv[4]))
         descriptor = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
         fcntl.lockf(descriptor, fcntl.LOCK_EX)
         ready = os.open(ready_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
@@ -8798,40 +8814,56 @@ final class ManagerTests: XCTestCase {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
         process.arguments = [
+            "-I",
+            "-S",
             "-c",
             script,
             paths.configMigrationLock.path,
             readyURL.path,
             String(holdSeconds),
+            String(startupDelaySeconds),
         ]
         try process.run()
 
-        let deadline = Date().addingTimeInterval(2)
+        // Interpreter startup and lock acquisition are fixture setup, separate
+        // from the unchanged product request deadlines measured by callers.
+        let deadline = ContinuousClock.now + .seconds(10)
         while !FileManager.default.fileExists(atPath: readyURL.path),
               process.isRunning,
-              Date() < deadline {
+              ContinuousClock.now < deadline {
             Thread.sleep(forTimeInterval: 0.01)
         }
-        guard FileManager.default.fileExists(atPath: readyURL.path) else {
-            if process.isRunning {
-                process.terminate()
-            }
-            process.waitUntilExit()
+        guard FileManager.default.fileExists(atPath: readyURL.path), process.isRunning else {
+            let stopped = stopExternalConfigLockProcess(process)
+            try? FileManager.default.removeItem(at: readyURL)
             throw NSError(
                 domain: "ManagerTests.ExternalConfigLockHolder",
-                code: Int(process.terminationStatus),
-                userInfo: [NSLocalizedDescriptionKey: "External configuration lock was not acquired"]
+                code: stopped ? Int(process.terminationStatus) : Int(ETIMEDOUT),
+                userInfo: [NSLocalizedDescriptionKey: "External configuration lock readiness was not confirmed within the 10-second setup deadline"]
             )
         }
         return ExternalConfigLockHolder(process: process, readyURL: readyURL)
     }
 
     private static func finishExternalConfigLockHolder(_ holder: ExternalConfigLockHolder) {
-        if holder.process.isRunning {
-            holder.process.terminate()
-        }
-        holder.process.waitUntilExit()
+        XCTAssertTrue(stopExternalConfigLockProcess(holder.process), "External lock-holder cleanup must be bounded")
         try? FileManager.default.removeItem(at: holder.readyURL)
+    }
+
+    private static func stopExternalConfigLockProcess(_ process: Process) -> Bool {
+        if process.isRunning { process.terminate() }
+        var deadline = ContinuousClock.now + .seconds(1)
+        while process.isRunning, ContinuousClock.now < deadline {
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        if process.isRunning {
+            _ = Darwin.kill(process.processIdentifier, SIGKILL)
+            deadline = ContinuousClock.now + .seconds(1)
+            while process.isRunning, ContinuousClock.now < deadline {
+                Thread.sleep(forTimeInterval: 0.01)
+            }
+        }
+        return !process.isRunning
     }
 
     private static func makeOccupiedLoopbackPort(
