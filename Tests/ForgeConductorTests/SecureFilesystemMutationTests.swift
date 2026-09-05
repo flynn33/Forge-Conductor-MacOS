@@ -3276,7 +3276,12 @@ final class SecureFilesystemMutationTests: XCTestCase {
         )
         let initialState = await originalController.configureLifecycleFence(paths: paths)
         XCTAssertEqual(initialState, .settled)
-        let originalReplacement = Task { try await originalController.reinstall() }
+        let recorder = SecureFilesystemLifecycleObservationRecorder()
+        let context = SecureFilesystemServiceLifecycleObservationContext(generation: 1)
+        originalController.setLifecycleStateObserver { recorder.record($0) }
+        let originalReplacement = Task {
+            try await originalController.reinstall(lifecycleObservationContext: context)
+        }
         await waitForPendingUnregister(on: originalService)
         await waitForPendingTimeout(on: originalTimeout)
         originalTimeout.fire()
@@ -3323,6 +3328,9 @@ final class SecureFilesystemMutationTests: XCTestCase {
 
         originalService.completeUnregister()
         _ = await waitForLifecyclePhase(.registrationPending, on: relaunchedController)
+        // The durable phase can be observed before the late callback releases
+        // its lease. The owner publishes this observation only after release.
+        await waitForObservedLifecyclePhase(.registrationPending, context: context, recorder: recorder)
         // Both stubs model one global SMAppService status; reflect the completed
         // predecessor reap in the relaunched process's observation.
         relaunchedService.status = .notRegistered
