@@ -1,0 +1,8 @@
+2026-09-04 17:40:45.406 xcodebuild[64482:33083179] [MT] IDETestOperationsObserverDebug: 70.639 elapsed -- Testing started completed.
+2026-09-04 17:40:45.406 xcodebuild[64482:33083179] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-09-04 17:40:45.406 xcodebuild[64482:33083179] [MT] IDETestOperationsObserverDebug: 70.639 sec, +70.639 sec -- end
+Testing failed:
+	ForgeConductorUITests-Runner (64628) encountered an error (The test runner failed to initialize for UI testing. (Underlying Error: Timed out while enabling automation mode.))
+
+** TEST FAILED **
+

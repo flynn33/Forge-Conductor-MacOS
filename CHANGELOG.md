@@ -12,14 +12,13 @@ under **Unreleased** is not a new qualified release.
 ## [Unreleased]
 
 This is a 0.9.0 development snapshot, not a qualified release. Product version
-surfaces remain 0.9.0 build 1. P10/G10, filesystem E2, production Settings shell
-qualification, Developer ID Release/native lifecycle
-validation, manager-owned
+surfaces remain 0.9.0 build 1. P10/G10, filesystem E2, complete installed/native
+Settings and service qualification, Developer ID Release, manager-owned
 real-provider autonomous continuity, owner-deferred representative physical-
 hardware qualification, and current G09-G12 remain open and release-blocking.
-Clean-install managed-provider configuration is also open: the adapter reads a
-validated LM Studio configuration when present, but the product does not yet
-provide a supported control that creates it.
+Provider settings now have native and manager save controls. Four native production
+onboarding scenarios passed; disposable Keychain tests also executed. Complete
+installed-stack and production-feature acceptance remain separate gates.
 
 ### Verified current-source evidence
 
@@ -39,14 +38,75 @@ provide a supported control that creates it.
   recovery regressions pass. These are supporting source tests, not the signed
   E2 matrix or real-provider rollover authority run; the final source matrix
   must be rerun after all Unreleased changes settle.
-- The current-source SwiftPM Release configuration builds with
-  warnings treated as errors and executes 1,001 tests with 5 declared
-  environment skips and 0 failures. The dedicated Apple Development-signed
-  Xcode app-hosted project-contract suite executes 2 tests with 0 failures from
-  fresh DerivedData. Neither result replaces feature-specific production-path
-  evidence.
+- The initial September 4 source baseline passed 1,001 SwiftPM tests in both
+  Debug and Release, with five declared skips. Subsequent fixes add provider,
+  startup, subprocess and gauge coverage. Exact checkpoint counts and source
+  identities are retained in the shipping handoff; earlier results do not
+  qualify later source changes.
+- All four native production onboarding scenarios passed: real folder
+  authorization and validation, provider save/discovery and manager replacement,
+  and native Settings shell disable/re-enable with fresh MCP processes. This
+  focused result does not close the full installed/native or P10 matrix.
 
 ### Changed
+
+- Metal renderers now stop draw submission when their window or an ancestor
+  is hidden and redraw pending values when shown. Native tests measure actual
+  draws, static quiescence, resource reuse and repeated object release.
+- Application startup, settings reads/writes, plugin status/deployment and
+  diagnostics export use bounded background operations. Delayed settings
+  responses preserve newer edits and update clients only after a committed save.
+  Operator screens wait for startup readiness before loading manager data,
+  keeping startup progress, failures and retry visible.
+- Continuity shutdown now cancels the execution's owned local provider request.
+  Interrupted operations remain retryable with the same handoff; accepted
+  receipts retain precedence and shared request waiters cannot cancel the owner.
+- Process execution owns nonblocking stdout/stderr drains directly, bounds each
+  drain turn and final capture, and continues draining during termination. This
+  removes the unbounded callback-shutdown wait while preserving output limits,
+  process-group cleanup and cancellation behavior.
+- The operator client router now forwards provider configuration methods across
+  manager replacement, so the native Save and discovery controls reach the
+  authenticated manager endpoints.
+- The feature qualifier includes a reviewed installed CLI version/help scenario
+  bound to its recorded ordinary build, actual installation, signatures and raw
+  process observations. The complete production-feature matrix remains required.
+- Gate discovery preserves the pinned historical inventory. Current package
+  validation reports are written under the evidence state directory so recording
+  a new check does not rewrite the original package report.
+
+- Provider request admission now rejects overlapping work before queuing
+  credential payloads. Unsaved provider edits must be saved before model refresh
+  or probing, so connection results correspond to the displayed saved revision.
+- The native Core test bundle uses the existing development signing identity to
+  match its runtime launcher. An explicit live-test budget policy supports
+  threshold qualification when a provider ignores its requested load context;
+  ordinary runtime defaults, exact capacity and the recovery fence are unchanged.
+
+- Filesystem recovery now rejects terminal receipts that contradict retained
+  protected entries, avoids recapturing replacement data after an interrupted
+  intent, and blocks fresh mutations while a prior effect is unresolved.
+  Signed recovery qualification and parent-relocation containment remain open.
+
+- Provider controls now persist endpoint/model settings and keep, replace or clear
+  Keychain credentials through authenticated manager routes. Revision checks,
+  active-run admission and recoverable credential updates protect saved state;
+  model discovery and connection tests remain explicit actions.
+- Native onboarding tests exercise the real folder picker, offline provider
+  saves and rejection, manager process replacement, and optional live-provider
+  discovery. They require actual Xcode execution before acceptance.
+
+- The development build/run script rejects inconsistent build-number overrides,
+  malformed identities and unsupported invocation modes before compilation. Its
+  signed optimized mode requires Apple Development and the matching development
+  trust policy; Developer ID distribution uses Xcode archive/export.
+- Xcode installation instructions now select one explicit build directory and
+  use the supported transactional installer for the complete matching app, CLI,
+  runtime launcher and framework, followed by installed-manager readback.
+- Added native source-integrity, Debug/Release Swift regression and native
+  app/CLI compilation CI. Documentation validation now reads the selected Git
+  snapshot and rejects removed or nonregular required documents, including when
+  a recreated working-tree file would otherwise conceal a staged deletion.
 
 - Manager project and run responses now use complete shared read-model
   projections. Project bind and run start authority is limited to roots
@@ -218,7 +278,7 @@ provide a supported control that creates it.
 - The shell policy, migration, MCP registration, execution, compatibility
   contract, and restart paths pass current-source Debug and Release regressions.
   Developer Mode is enabled and Apple Development signing uses James Daley on
-  team `9AQ2C2838M`. A bounded current-source signed Release installed-app run
+  team `9AQ2C2838M`. An earlier bounded signed Release installed-app run
   corrected the false-success LaunchAgent fallback and passed clean-install
   enablement, accidental legacy-disabled migration, explicit opt-out and denial,
   `tools/list`, established login-Bash/result compatibility through both the app
@@ -226,15 +286,15 @@ provide a supported control that creates it.
   with predecessor exit. The guarded run deliberately did not invoke System
   Events and restored the prior manager job, plist, command link, and launchd
   enablement state exactly. Its result remains partial: native Settings control
-  and post-Settings re-enable are blocked for the Xcode XCUI lane. The installer
-  now stages, signs, verifies, and commits
+  and post-Settings re-enable were not exercised by that run. The separate native
+  onboarding result above covers those controls. The installer now stages,
+  signs, verifies, and commits
   the runtime launcher transactionally beside the raw CLI, embeds it in synthesized
   app layouts, and fails closed on missing or symlinked launcher payloads. A
-  current-source Apple Development-signed Release smoke run also passed
-  installed raw-CLI `version`, `status`, and `doctor`. Production Settings UI,
-  exact current-source P10
-  qualification, production folder-panel observation, privileged-service lifecycle,
-  release signing, and notarization also remain deferred and release-blocking.
+  prior-source Apple Development-signed Release smoke run also passed
+  installed raw-CLI `version`, `status`, and `doctor`. Exact P10 qualification,
+  the complete installed/native matrix, privileged-service lifecycle, Developer ID
+  Release signing, and notarization remain deferred and release-blocking.
 - Exact caller-sealed helper identity prevents helper-only substitution against
   a current caller, but it does not establish whole-product rollback freshness.
   A monotonic root-owned receipt is not implemented; a rolled-back allowlisted

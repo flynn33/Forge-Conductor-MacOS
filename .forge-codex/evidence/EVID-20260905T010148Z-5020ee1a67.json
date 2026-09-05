@@ -1,0 +1,136 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 60222,
+      "path": "/private/tmp/forge-gauge-window-ownership-retaining-path-20260904.txt",
+      "portability": "origin-host-required",
+      "sha256": "7b9da472eed047efc133689688a4c5ffdee469df56f5b25c483b37efe87e3cac",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 284877,
+      "path": "/private/tmp/forge-gauge-window-ownership-autorelease-pools-20260904.txt",
+      "portability": "origin-host-required",
+      "sha256": "ff2620d82ff21d83a2068949b4f04781f11392e17eb023cf6044d67348769f7d",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 77178,
+      "path": "/private/tmp/forge-gauge-window-ownership-20260904.log",
+      "portability": "origin-host-required",
+      "sha256": "06833020b6d9cc2404aad319dc482f91fac487189249a46d1ddf5b7aba57048c",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 3267,
+      "path": "/private/tmp/provider-continuity-cancel-before.log",
+      "portability": "origin-host-required",
+      "sha256": "b3dd4d97748e84b517b0937fdaa0654a9a396cca924bce18fbb8671ba3627ea8",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 12876,
+      "path": "/private/tmp/provider-continuity-cancel-before-tests.patch",
+      "portability": "origin-host-required",
+      "sha256": "898a93ea24b759a4348a4b5c22cb6803163b24a03b589e63bd07c366cc002d98",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 41,
+      "path": "/private/tmp/provider-continuity-cancel-before-head.txt",
+      "portability": "origin-host-required",
+      "sha256": "f460bb0f426dd0913e1dbdaebb8a53d5f77894d279225671cc553d6a6369f7ee",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 712,
+      "path": ".forge-codex/evidence/EVID-20260905T010148Z-5020ee1a67.stdout.txt",
+      "sha256": "c28cbae22280d96e3ba953a764b62b90c9719d24654df3d66025d37747fee812",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260905T010148Z-5020ee1a67.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "child_evidence_context": {
+    "binding_schema_version": 1,
+    "evidence_id": "EVID-20260905T010148Z-5020ee1a67",
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "ffcf6bf9a2ea0c76a54788041cfa00c0dc8c7db4",
+      "branch": "release/0.9.0-shipping",
+      "head_sha": "9c39a23c5eb8c9b8459b627e3dfc067f3354d3ad",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
+    },
+    "schema_version": 1,
+    "source_manifest": {
+      "bytes": 13384094,
+      "file_count": 392,
+      "schema_version": 1,
+      "sha256": "6d8e98be6c4baf814783be3409ceed5f0b017ef5f1fc474ae7b1c157fe1de884"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "command": "/usr/bin/shasum -a 256 /tmp/forge-gauge-window-ownership-retaining-path-20260904.txt /tmp/forge-gauge-window-ownership-autorelease-pools-20260904.txt /tmp/forge-gauge-window-ownership-20260904.log /tmp/provider-continuity-cancel-before.log /tmp/provider-continuity-cancel-before-tests.patch /tmp/provider-continuity-cancel-before-head.txt",
+  "ended_at": "2026-09-05T01:01:48.281612+00:00",
+  "environment": {
+    "architecture": "arm64",
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine_identifier": "Mac16,7",
+    "macos_build": "25G83",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "execution_provenance": {
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "ffcf6bf9a2ea0c76a54788041cfa00c0dc8c7db4",
+      "branch": "release/0.9.0-shipping",
+      "head_sha": "9c39a23c5eb8c9b8459b627e3dfc067f3354d3ad",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "exit_code": 0,
+  "id": "EVID-20260905T010148Z-5020ee1a67",
+  "kind": "shipping-ownership-before-observations",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [],
+  "related_gates": [
+    "G05"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 13384094,
+    "file_count": 392,
+    "schema_version": 1,
+    "sha256": "6d8e98be6c4baf814783be3409ceed5f0b017ef5f1fc474ae7b1c157fe1de884"
+  },
+  "source_manifest_after": {
+    "bytes": 13384094,
+    "file_count": 392,
+    "schema_version": 1,
+    "sha256": "6d8e98be6c4baf814783be3409ceed5f0b017ef5f1fc474ae7b1c157fe1de884"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-09-05T01:01:48.263337+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

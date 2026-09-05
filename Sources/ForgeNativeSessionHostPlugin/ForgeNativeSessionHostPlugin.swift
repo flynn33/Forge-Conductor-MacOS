@@ -101,6 +101,7 @@ public struct LMStudioProviderConfiguration: Codable, Sendable, Equatable {
     public static let fileName = "lmstudio-provider.json"
     public static let maximumFileBytes = 64 * 1024
 
+    public var revision: String = "0"
     public var baseURL: URL
     public var modelKey: String?
     public var keychainTokenReference: String?
@@ -152,6 +153,7 @@ public struct LMStudioProviderConfiguration: Codable, Sendable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
+        case revision
         case baseURL = "base_url"
         case modelKey = "model_key"
         case keychainTokenReference = "keychain_token_reference"
@@ -214,9 +216,13 @@ public struct LMStudioProviderConfiguration: Codable, Sendable, Equatable {
                 Int.self, forKey: .maximumOutputTokens
             ) ?? 4_096
         )
+        revision = try values.decodeIfPresent(String.self, forKey: .revision) ?? "0"
     }
 
     public func validated() throws -> LMStudioProviderConfiguration {
+        guard revision == "0" || UUID(uuidString: revision) != nil else {
+            throw LMStudioProviderError.invalidConfiguration("configuration revision is invalid")
+        }
         guard let scheme = baseURL.scheme?.lowercased(), ["http", "https"].contains(scheme),
               let host = baseURL.host?.lowercased(), !host.isEmpty,
               baseURL.user == nil, baseURL.password == nil,
@@ -227,6 +233,9 @@ public struct LMStudioProviderConfiguration: Codable, Sendable, Equatable {
             || host == "::1" || host == "[::1]"
         guard scheme == "https" || loopback else {
             throw LMStudioProviderError.invalidConfiguration("non-loopback providers require HTTPS")
+        }
+        guard baseURL.port.map({ (1...65_535).contains($0) }) ?? true else {
+            throw LMStudioProviderError.invalidConfiguration("base URL port is outside supported bounds")
         }
         guard baseURL.path.isEmpty || baseURL.path == "/" else {
             throw LMStudioProviderError.invalidConfiguration("base URL must not include an API path")
@@ -301,7 +310,7 @@ public struct LMStudioProviderConfiguration: Codable, Sendable, Equatable {
     ) throws {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, trimmed.utf8.count <= maximumBytes,
-              !trimmed.contains("\n"), !trimmed.contains("\r") else {
+              !trimmed.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else {
             throw LMStudioProviderError.invalidConfiguration("invalid \(field)")
         }
     }
@@ -369,13 +378,9 @@ public struct LMStudioKeychainAuthorization: LMStudioAuthorizationProviding {
 
     private static func systemLookup(reference: String) throws -> Data? {
         #if canImport(Security)
-        let query: [CFString: Any] = [
-            kSecClass: kSecClassGenericPassword,
-            kSecAttrService: service,
-            kSecAttrAccount: reference,
-            kSecMatchLimit: kSecMatchLimitOne,
-            kSecReturnData: true,
-        ]
+        var query = LMStudioKeychainCredentialStore.query(reference)
+        query[kSecMatchLimit] = kSecMatchLimitOne
+        query[kSecReturnData] = true
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
         switch status {
@@ -1461,11 +1466,20 @@ public actor LMStudioRESTClient {
         }
         let selected: LMStudioModel
         if let configured = configuration.modelKey {
-            guard let match = candidates.first(where: { $0.key == configured }) else {
-                throw LMStudioProviderError.invalidConfiguration("configured model is not loaded and tool-capable")
+            guard let match = inventory.models.first(where: { $0.key == configured }) else {
+                throw LMStudioProviderError.invalidConfiguration("configured model was not found; refresh models and select an available identifier")
+            }
+            guard !match.loadedInstances.isEmpty else {
+                throw LMStudioProviderError.invalidConfiguration("configured model is unloaded; load it in LM Studio and retry")
+            }
+            guard match.capabilities?.trainedForToolUse == true else {
+                throw LMStudioProviderError.invalidConfiguration("configured model does not support tool use; select a tool-capable model")
             }
             selected = match
         } else {
+            guard !inventory.models.isEmpty else {
+                throw LMStudioProviderError.invalidConfiguration("no models are available; add a model in LM Studio")
+            }
             guard candidates.count == 1, let only = candidates.first else {
                 throw LMStudioProviderError.invalidConfiguration("select exactly one loaded tool-capable model")
             }
@@ -1839,11 +1853,20 @@ public actor LMStudioManagedSessionTransport: LMStudioManagedTransporting {
         guard inFlight.count < Self.maximumInFlightOperations else {
             throw LMStudioProviderError.limitExceeded("concurrent provider operation")
         }
-        let task = Task { try await operation() }
+        let task = Task {
+            try Task.checkCancellation()
+            return try await operation()
+        }
         inFlight[idempotencyKey] = task
         if let operationID { operationToIdempotencyKey[operationID] = idempotencyKey }
         do {
-            let turn = try await task.value
+            // Only the creator owns cancellation. A coalesced idempotency waiter
+            // above must not cancel another caller's in-flight provider request.
+            let turn = try await withTaskCancellationHandler {
+                try await task.value
+            } onCancel: {
+                task.cancel()
+            }
             inFlight.removeValue(forKey: idempotencyKey)
             if let operationID { operationToIdempotencyKey.removeValue(forKey: operationID) }
             store(turn, for: idempotencyKey)
@@ -3306,8 +3329,16 @@ public actor LMStudioManagedSessionHostAdapterV2: SessionHostAdapterV2 {
             if let current = currentIndex(keyDigest: keyDigest),
                ledger.records[current].status != .accepted,
                ledger.records[current].status != .cancelled {
-                ledger.records[current].status = failureStatus(error)
-                ledger.records[current].errorCode = errorCode(error)
+                // A stopped manager releases its live request without declaring
+                // the durable continuity operation cancelled. Restart must still
+                // reconcile this exact operation and handoff through its receipt.
+                // Coalesced callers receive the owner's transport cancellation
+                // even when their own task is not cancelled. Only the explicit
+                // operation-cancel path above may make that outcome terminal.
+                let ownerInterrupted = error is CancellationError
+                    || (error as? LMStudioProviderError) == .cancelled
+                ledger.records[current].status = ownerInterrupted ? .retryableFailure : failureStatus(error)
+                ledger.records[current].errorCode = ownerInterrupted ? "owner_interrupted" : errorCode(error)
                 ledger.records[current].updatedAt = ISO8601.string(from: Date())
                 try? persist()
             }
@@ -4669,6 +4700,9 @@ public enum ForgeNativeSessionHostPlugin {
                     storageDirectory: storageDirectory,
                     transport: try transportFactory(storageDirectory)
                 )
+            },
+            configurationFactory: { storageDirectory in
+                LMStudioConfigurationService(storageDirectory: storageDirectory)
             }
         ) { storageDirectory in
             return try LMStudioManagedSessionHostAdapter(

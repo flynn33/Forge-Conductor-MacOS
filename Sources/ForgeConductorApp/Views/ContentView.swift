@@ -115,17 +115,17 @@ struct ContentView: View {
         case .feed:
             LiveFeedView()
         case .projects:
-            ProjectsOperatorView(client: model.operatorManagerClient)
+            operatorContent { ProjectsOperatorView(client: model.operatorManagerClient) }
         case .autonomy:
-            AutonomyOperatorView(client: model.operatorManagerClient)
+            operatorContent { AutonomyOperatorView(client: model.operatorManagerClient) }
         case .continuity:
-            ContinuityOperatorView(client: model.operatorManagerClient)
+            operatorContent { ContinuityOperatorView(client: model.operatorManagerClient) }
         case .runtimes:
-            RuntimesOperatorView(client: model.operatorManagerClient)
+            operatorContent { RuntimesOperatorView(client: model.operatorManagerClient) }
         case .provider:
-            ProviderOperatorView(client: model.operatorManagerClient)
+            operatorContent { ProviderOperatorView(client: model.operatorManagerClient) }
         case .evidence:
-            EvidenceOperatorView(client: model.operatorManagerClient)
+            operatorContent { EvidenceOperatorView(client: model.operatorManagerClient) }
         case .diagnostics:
             DiagnosticsView()
         case .manager:
@@ -133,4 +133,43 @@ struct ContentView: View {
         }
     }
 
+    private func operatorContent<Content: View>(@ViewBuilder content: @escaping () -> Content) -> some View {
+        OperatorStartupContent(
+            isReady: model.hasLoadedInitialSettings,
+            isLoading: model.isBootstrapping,
+            errorMessage: model.lastError,
+            retry: model.bootstrap,
+            content: content
+        )
+    }
+}
+
+/// Do not construct an operator screen (and its one-shot load task) until the
+/// startup snapshot has configured the shared manager client router.
+@MainActor
+struct OperatorStartupContent<Content: View>: View {
+    let isReady: Bool
+    let isLoading: Bool
+    let errorMessage: String?
+    let retry: () -> Void
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        if isReady {
+            content()
+        } else {
+            VStack(spacing: 12) {
+                if isLoading {
+                    ProgressView("Starting Forge Conductor…")
+                } else {
+                    Text(errorMessage ?? "Startup has not completed.")
+                        .foregroundStyle(.secondary)
+                    Button("Retry startup", action: retry)
+                        .accessibilityIdentifier("operator-retry-startup")
+                }
+            }
+            .padding(20)
+            .accessibilityIdentifier("operator-startup")
+        }
+    }
 }

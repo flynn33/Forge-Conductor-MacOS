@@ -39,8 +39,8 @@ public enum ProcessRunnerError: Error, Equatable, Sendable, LocalizedError {
 
 /// Runs allowlisted processes with timeout (no shell injection — argv array).
 ///
-/// Reads stdout/stderr concurrently so large or chatty children cannot deadlock
-/// on full pipe buffers (common with Node diagnostics on stderr).
+/// Multiplexes nonblocking stdout/stderr reads so large or chatty children cannot
+/// deadlock on full pipe buffers while control checks retain a bounded cadence.
 public final class ProcessRunner: @unchecked Sendable {
     private let terminationGraceSec: TimeInterval
     private let forcedTerminationGraceSec: TimeInterval
@@ -89,139 +89,48 @@ public final class ProcessRunner: @unchecked Sendable {
         let outPipe = Pipe()
         let errPipe = Pipe()
 
-        final class BufferBox: @unchecked Sendable {
-            let condition = NSCondition()
+        // Both descriptors belong exclusively to this invocation. Bounded,
+        // alternating nonblocking reads remove callback cancellation waits and
+        // prevent a chatty stream from starving the other stream or control checks.
+        final class BufferBox {
             var data = Data()
             var truncated = false
+            var reachedEOF = false
             let limit: Int
-            var acceptsCallbacks = true
-            var activeCallbacks = 0
+            private var buffer = [UInt8](repeating: 0, count: 16_384)
 
-            init(limit: Int) {
-                self.limit = max(0, limit)
-            }
+            init(limit: Int) { self.limit = limit }
 
-            func append(_ chunk: Data) {
-                condition.lock()
-                defer { condition.unlock() }
-                appendLocked(chunk)
-            }
-
-            func consumeAvailableData(from handle: FileHandle) {
-                condition.lock()
-                guard acceptsCallbacks else {
-                    condition.unlock()
-                    return
-                }
-                activeCallbacks += 1
-                condition.unlock()
-
-                let chunk = handle.availableData
-
-                condition.lock()
-                if !chunk.isEmpty {
-                    appendLocked(chunk)
-                }
-                activeCallbacks -= 1
-                if activeCallbacks == 0 {
-                    condition.broadcast()
-                }
-                condition.unlock()
-            }
-
-            /// Prevents new callbacks and waits for an already-running callback to finish.
-            /// This must happen before a native nonblocking remainder drain.
-            func stopCallbacks(on handle: FileHandle) {
-                condition.lock()
-                let shouldClearHandler = acceptsCallbacks
-                acceptsCallbacks = false
-                condition.unlock()
-
-                if shouldClearHandler {
-                    handle.readabilityHandler = nil
-                }
-
-                condition.lock()
-                while activeCallbacks > 0 {
-                    condition.wait()
-                }
-                condition.unlock()
-            }
-
-            func take() -> (data: Data, truncated: Bool) {
-                condition.lock()
-                defer { condition.unlock() }
-                return (data, truncated)
-            }
-
-            /// Drains bytes that are already readable without waiting for every inherited
-            /// writer to close. A descendant can retain a pipe after the direct child exits,
-            /// so an EOF-based read would make the caller's timeout unbounded.
-            func drainCurrentlyAvailableData(from handle: FileHandle) {
-                let descriptor = handle.fileDescriptor
-                let originalFlags = fcntl(descriptor, F_GETFL)
-                guard originalFlags >= 0 else {
-                    markTruncated()
-                    return
-                }
-
-                let changedFlags = originalFlags & O_NONBLOCK == 0
-                if changedFlags, fcntl(descriptor, F_SETFL, originalFlags | O_NONBLOCK) < 0 {
-                    markTruncated()
-                    return
-                }
-                defer {
-                    if changedFlags {
-                        _ = fcntl(descriptor, F_SETFL, originalFlags)
-                    }
-                }
-
-                var buffer = [UInt8](repeating: 0, count: 16_384)
-                var interruptedReads = 0
-                while shouldContinueNativeDrain() {
+            @discardableResult
+            func drain(_ handle: FileHandle, maximumReads: Int = 8, final: Bool = false) -> Bool {
+                guard !reachedEOF else { return false }
+                var consumed = false
+                for _ in 0..<maximumReads {
                     let count = buffer.withUnsafeMutableBytes { bytes in
-                        Darwin.read(descriptor, bytes.baseAddress, bytes.count)
+                        Darwin.read(handle.fileDescriptor, bytes.baseAddress, bytes.count)
                     }
                     if count > 0 {
-                        interruptedReads = 0
-                        append(Data(buffer.prefix(count)))
+                        consumed = true
+                        let retained = min(max(0, limit - data.count), count)
+                        if retained > 0 { data.append(contentsOf: buffer.prefix(retained)) }
+                        if retained < count { truncated = true }
+                        // Continue discarding after the retention cap: stopping reads
+                        // here could prevent a finite child from reaching its exit.
                         continue
                     }
-                    if count == 0 {
-                        return
+                    if count == 0 { reachedEOF = true; return consumed }
+                    if errno == EINTR { continue } // Included in this finite read budget.
+                    if errno != EAGAIN && errno != EWOULDBLOCK {
+                        truncated = true
+                        reachedEOF = true
                     }
-
-                    let readError = errno
-                    if readError == EINTR {
-                        interruptedReads += 1
-                        if interruptedReads < 8 {
-                            continue
-                        }
-                        markTruncated()
-                    } else if readError != EAGAIN && readError != EWOULDBLOCK {
-                        markTruncated()
-                    }
-                    return
+                    return consumed
                 }
+                if final { truncated = true }
+                return consumed
             }
 
-            private func appendLocked(_ chunk: Data) {
-                let remaining = max(0, limit - data.count)
-                if remaining > 0 { data.append(chunk.prefix(remaining)) }
-                if chunk.count > remaining { truncated = true }
-            }
-
-            private func shouldContinueNativeDrain() -> Bool {
-                condition.lock()
-                defer { condition.unlock() }
-                return !truncated
-            }
-
-            private func markTruncated() {
-                condition.lock()
-                truncated = true
-                condition.unlock()
-            }
+            func take() -> (data: Data, truncated: Bool) { (data, truncated) }
         }
 
         let boundedOutputBytes = min(max(0, maximumOutputBytes), maximumRetainedOutputBytes)
@@ -232,22 +141,16 @@ public final class ProcessRunner: @unchecked Sendable {
         let outWriteHandle = outPipe.fileHandleForWriting
         let errWriteHandle = errPipe.fileHandleForWriting
 
-        outHandle.readabilityHandler = { handle in
-            outBox.consumeAvailableData(from: handle)
-        }
-        errHandle.readabilityHandler = { handle in
-            errBox.consumeAvailableData(from: handle)
-        }
         var outputFinalized = false
         func finalizeOutput(drain: Bool) -> (
             stdout: (data: Data, truncated: Bool),
             stderr: (data: Data, truncated: Bool)
         ) {
-            outBox.stopCallbacks(on: outHandle)
-            errBox.stopCallbacks(on: errHandle)
             if drain {
-                outBox.drainCurrentlyAvailableData(from: outHandle)
-                errBox.drainCurrentlyAvailableData(from: errHandle)
+                // Only already-readable bytes are collected after the terminal
+                // result. An escaped descendant cannot force an EOF wait.
+                outBox.drain(outHandle, maximumReads: 512, final: true)
+                errBox.drain(errHandle, maximumReads: 512, final: true)
             }
             try? outHandle.close()
             try? errHandle.close()
@@ -259,6 +162,13 @@ public final class ProcessRunner: @unchecked Sendable {
             try? errWriteHandle.close()
             if !outputFinalized {
                 _ = finalizeOutput(drain: false)
+            }
+        }
+
+        for handle in [outHandle, errHandle] {
+            let flags = fcntl(handle.fileDescriptor, F_GETFL)
+            guard flags >= 0, fcntl(handle.fileDescriptor, F_SETFL, flags | O_NONBLOCK) >= 0 else {
+                throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
             }
         }
 
@@ -296,10 +206,12 @@ public final class ProcessRunner: @unchecked Sendable {
         func pollTerminalStatus() throws -> Int32? {
             var rawStatus: Int32 = 0
             var waited: pid_t
+            var interruptions = 0
             repeat {
                 waited = Darwin.waitpid(processIdentifier, &rawStatus, WNOHANG)
-            } while waited < 0 && errno == EINTR
-            if waited == 0 { return nil }
+                interruptions += 1
+            } while waited < 0 && errno == EINTR && interruptions < 8
+            if waited == 0 || (waited < 0 && errno == EINTR) { return nil }
             guard waited == processIdentifier else {
                 throw NSError(
                     domain: NSPOSIXErrorDomain,
@@ -342,6 +254,10 @@ public final class ProcessRunner: @unchecked Sendable {
         ) throws -> Bool {
             let deadline = ProcessInfo.processInfo.systemUptime + max(0, maximumSeconds)
             while true {
+                // A TERM handler can flush output before exiting. Keep servicing
+                // both pipes through the existing finite termination deadline.
+                outBox.drain(outHandle)
+                errBox.drain(errHandle)
                 if status == nil {
                     status = try pollTerminalStatus()
                 }
@@ -405,6 +321,7 @@ public final class ProcessRunner: @unchecked Sendable {
         var exitCode: Int32?
         var controlError: Error?
         var timedOut = false
+        var readStdoutNext = true
 
         while exitCode == nil {
             // A directly observed terminal result is authoritative. Checking it both
@@ -432,8 +349,15 @@ public final class ProcessRunner: @unchecked Sendable {
             if let controlRemaining = cancellation?.remainingTimeInterval {
                 remaining = min(remaining, controlRemaining)
             }
+            let consumed = readStdoutNext ? outBox.drain(outHandle) : errBox.drain(errHandle)
+            readStdoutNext.toggle()
+            if consumed { continue }
             if remaining > 0 {
-                Thread.sleep(forTimeInterval: min(0.025, remaining))
+                var descriptors = [
+                    pollfd(fd: outBox.reachedEOF ? -1 : outHandle.fileDescriptor, events: Int16(POLLIN), revents: 0),
+                    pollfd(fd: errBox.reachedEOF ? -1 : errHandle.fileDescriptor, events: Int16(POLLIN), revents: 0),
+                ]
+                _ = Darwin.poll(&descriptors, nfds_t(descriptors.count), Int32(min(25, max(1, remaining * 1_000))))
             }
         }
 

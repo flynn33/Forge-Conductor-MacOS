@@ -1,0 +1,18 @@
+Test Suite 'Selected tests' started at 2026-09-04 21:06:02.204.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-09-04 21:06:02.205.
+Test Suite 'LiveLMStudioManagedAutonomyTests' started at 2026-09-04 21:06:02.205.
+Test Case '-[ForgeConductorTests.LiveLMStudioManagedAutonomyTests testRealProviderAutomaticThresholdRolloverRecoversAfterBootstrapCrashAndContinuesViaManagerRoute]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/LiveLMStudioManagedAutonomyTests.swift:488: error: -[ForgeConductorTests.LiveLMStudioManagedAutonomyTests testRealProviderAutomaticThresholdRolloverRecoversAfterBootstrapCrashAndContinuesViaManagerRoute] : XCTAssertTrue failed - Quiescence must result from the intended bootstrap crash; inspect the sanitized diagnostic
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/LiveLMStudioManagedAutonomyTests.swift:508: error: -[ForgeConductorTests.LiveLMStudioManagedAutonomyTests testRealProviderAutomaticThresholdRolloverRecoversAfterBootstrapCrashAndContinuesViaManagerRoute] : XCTUnwrap failed: expected non-nil value of type "BootstrapReceipt"
+Test Case '-[ForgeConductorTests.LiveLMStudioManagedAutonomyTests testRealProviderAutomaticThresholdRolloverRecoversAfterBootstrapCrashAndContinuesViaManagerRoute]' failed (485.853 seconds).
+Test Suite 'LiveLMStudioManagedAutonomyTests' failed at 2026-09-04 21:14:08.058.
+	 Executed 1 test, with 2 failures (0 unexpected) in 485.853 (485.853) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' failed at 2026-09-04 21:14:08.058.
+	 Executed 1 test, with 2 failures (0 unexpected) in 485.853 (485.853) seconds
+Test Suite 'Selected tests' failed at 2026-09-04 21:14:08.058.
+	 Executed 1 test, with 2 failures (0 unexpected) in 485.853 (485.854) seconds
+FORGE_LIVE_MANAGER_FAILURE_DIAGNOSTIC=/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/live-manager-final-failure-diagnostic.json
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

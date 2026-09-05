@@ -15,6 +15,18 @@ struct ManagerSettingsView: View {
 
     var body: some View {
         Form {
+            if !model.hasLoadedInitialSettings {
+                Section("Startup") {
+                    if model.isBootstrapping {
+                        ProgressView("Loading saved settings…")
+                    } else {
+                        Text(model.lastError ?? "Settings have not loaded.")
+                            .foregroundStyle(.secondary)
+                        Button("Retry startup") { model.bootstrap() }
+                            .accessibilityIdentifier("settings-retry-startup")
+                    }
+                }
+            }
             Section("Authorized project folders") {
                 Text(
                     "Forge Conductor denies project filesystem access until a folder is explicitly authorized. Choose folders here, then select Save settings."
@@ -48,6 +60,7 @@ struct ManagerSettingsView: View {
                                     .labelStyle(.iconOnly)
                             }
                             .buttonStyle(.borderless)
+                            .disabled(!model.hasLoadedInitialSettings)
                             .accessibilityLabel("Remove authorized project folder \(path)")
                             .accessibilityIdentifier("settings-allowed-root-remove-\(index)")
                         }
@@ -61,6 +74,7 @@ struct ManagerSettingsView: View {
                 }
                 .accessibilityLabel("Add authorized project folder")
                 .accessibilityIdentifier("settings-allowed-root-add")
+                .disabled(!model.hasLoadedInitialSettings)
 
                 if let message = model.allowedRootsMessage {
                     Text(message)
@@ -129,11 +143,14 @@ struct ManagerSettingsView: View {
                 }
                 .padding(.vertical, 2)
             }
+            .disabled(!model.hasLoadedInitialSettings)
 
             Section("Project shell") {
                 Toggle("Enable project shell tools", isOn: $model.setShellEnabled)
                     .accessibilityIdentifier("settings-shell-enabled")
+                    .disabled(!model.hasLoadedInitialSettings)
                 TextField("Default timeout (sec)", value: $model.setShellTimeout, format: .number)
+                    .disabled(!model.hasLoadedInitialSettings)
                 Text(
                     model.setShellEnabled
                         ? "Authorized agent sessions may run project-root commands. Canonical path checks and the 120-second shell_exec ceiling still apply."

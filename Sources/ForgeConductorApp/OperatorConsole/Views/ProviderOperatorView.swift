@@ -2,6 +2,7 @@
 // Native redacted provider endpoint, model, capability, and probe evidence surface.
 
 import SwiftUI
+import ForgeConductorCore
 
 struct ProviderOperatorView: View {
     @StateObject private var viewModel: ProviderViewModel
@@ -16,7 +17,7 @@ struct ProviderOperatorView: View {
                 OperatorHeader(
                     title: "Provider",
                     subtitle: "Redacted endpoint, model instance, context, tools, credentials, and contract health",
-                    isLoading: viewModel.isLoading || viewModel.isProbing,
+                    isLoading: viewModel.isBusy,
                     onRefresh: viewModel.load
                 )
                 if let error = viewModel.errorMessage {
@@ -28,6 +29,7 @@ struct ProviderOperatorView: View {
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("provider-probe-notice")
                 }
+                configurationEditor
                 if let provider = viewModel.provider {
                     providerDetail(provider)
                 }
@@ -35,7 +37,78 @@ struct ProviderOperatorView: View {
             .padding(20)
         }
         .task { viewModel.load() }
+        .onDisappear { viewModel.clearCredentialEntry() }
         .accessibilityIdentifier("provider-operator-view")
+    }
+
+    private var configurationEditor: some View {
+        GroupBox("Provider settings") {
+            VStack(alignment: .leading, spacing: 12) {
+                TextField("Endpoint", text: $viewModel.endpoint)
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityIdentifier("provider-endpoint")
+                TextField("Model identifier (optional when exactly one supported model is loaded)", text: $viewModel.modelKey)
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityIdentifier("provider-model-key")
+                if !viewModel.availableModels.isEmpty {
+                    Picker("Available models", selection: $viewModel.modelKey) {
+                        Text("Choose a model").tag("")
+                        if !viewModel.modelKey.isEmpty, !viewModel.availableModels.contains(where: { $0.key == viewModel.modelKey }) {
+                            Text(viewModel.modelKey).tag(viewModel.modelKey)
+                        }
+                        ForEach(viewModel.availableModels, id: \.key) { model in
+                            Text(model.key + (model.loaded ? " (loaded)" : " (unloaded)") + (model.toolUseCapable ? "" : " — no tool use"))
+                                .tag(model.key)
+                        }
+                    }
+                    .accessibilityIdentifier("provider-model-selection")
+                }
+                Picker("Credential", selection: $viewModel.credentialAction) {
+                    Text("Keep existing credential").tag(ProviderCredentialAction.keep)
+                    Text("Replace credential").tag(ProviderCredentialAction.replace)
+                    Text("Clear credential").tag(ProviderCredentialAction.clear)
+                }
+                .accessibilityIdentifier("provider-credential-action")
+                if viewModel.credentialAction == .replace {
+                    SecureField("LM Studio access token", text: $viewModel.token)
+                        .accessibilityIdentifier("provider-token")
+                }
+                Text(viewModel.configuration?.credentialConfigured == true ? "A Keychain credential is configured." : "No Keychain credential is configured.")
+                    .font(.caption).foregroundStyle(.secondary)
+                HStack {
+                    Button("Save", action: viewModel.save)
+                        .disabled(viewModel.configuration == nil)
+                        .accessibilityIdentifier("provider-save")
+                    Button("Refresh Models", action: viewModel.refreshModels)
+                        .disabled(viewModel.configuration?.saved != true || viewModel.hasUnsavedChanges)
+                        .accessibilityIdentifier("provider-refresh-models")
+                }
+                Text("Save applies to future managed runs. Finish or cancel existing runs before changing settings. Saving does not test the connection; model loading remains in LM Studio.")
+                    .font(.caption).foregroundStyle(.secondary)
+                HStack {
+                    Button("Test Connection", action: viewModel.testConnection)
+                        .accessibilityIdentifier("provider-test-connection")
+                    Button("Run Contract Probe", action: viewModel.runContractProbe)
+                        .accessibilityIdentifier("provider-run-contract-probe")
+                    if viewModel.isProbing {
+                        ProgressView()
+                            .controlSize(.small)
+                            .accessibilityIdentifier("provider-probe-progress")
+                    }
+                }
+                .disabled(viewModel.isBusy || viewModel.hasUnsavedChanges)
+                if viewModel.hasUnsavedChanges {
+                    Text("Save changes before refreshing models or testing this endpoint and model.")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .accessibilityIdentifier("provider-unsaved-changes")
+                }
+            }
+            .disabled(viewModel.isBusy)
+            if viewModel.isSaving || viewModel.isFetchingModels {
+                Button("Cancel request", action: viewModel.cancelConfigurationRequest)
+                    .accessibilityIdentifier("provider-cancel-configuration")
+            }
+        }
     }
 
     private func providerDetail(_ provider: OperatorProvider) -> some View {
@@ -96,18 +169,6 @@ struct ProviderOperatorView: View {
                 }
             }
 
-            HStack {
-                Button("Test Connection", action: viewModel.testConnection)
-                    .accessibilityIdentifier("provider-test-connection")
-                Button("Run Contract Probe", action: viewModel.runContractProbe)
-                    .accessibilityIdentifier("provider-run-contract-probe")
-                if viewModel.isProbing {
-                    ProgressView()
-                        .controlSize(.small)
-                        .accessibilityIdentifier("provider-probe-progress")
-                }
-            }
-            .disabled(viewModel.isLoading || viewModel.isProbing)
             Text("Connection testing performs a real provider probe. Contract probing also verifies the stateful response, tool, usage, identity, and idempotency capabilities required by Forge.")
                 .font(.caption)
                 .foregroundStyle(.secondary)

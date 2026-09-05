@@ -1,0 +1,3 @@
+4c10322ec1ffd1dee17514e12bb255364ccea197b8051323c2810502f6f057df  /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Final-Native-Settings-MCP-Attachments/manifest.json
+b7d19880671a542b134df333e1eb70fa80549a0d58840a10e14c53912e21ed76  /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Final-Native-Settings-MCP-Attachments/58E407A9-0632-449D-84FE-5F5F5FBE373B.json
+95ccd4feb69f9dc9c441629e658b01a6f9ae493fa9e1a5ae540f0a8ab7165a05  /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Final-Native-Settings-MCP-Attachments/15E9EFF7-E092-4014-9FC4-16330D1A6109.json

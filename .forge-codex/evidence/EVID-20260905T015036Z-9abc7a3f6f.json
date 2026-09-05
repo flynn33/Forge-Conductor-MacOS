@@ -1,0 +1,108 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 10887,
+      "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/live-manager-calibrated-observations.json",
+      "portability": "origin-host-required",
+      "sha256": "58773e32c8c61315f69cb0b960446447a7c5a0afc608749d43d87dbd81ca8352",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 2107,
+      "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/observe-current-rollover.py",
+      "portability": "origin-host-required",
+      "sha256": "7c6124aa0376a0fc1b33da4bd782fcb450e51647cbe39dc37cb94877b647e21e",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 354,
+      "path": ".forge-codex/evidence/EVID-20260905T015036Z-9abc7a3f6f.stdout.txt",
+      "sha256": "c157e7bd2fead21e59499edac1d5cb3e52b840289d6080396967079a91eb5c83",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260905T015036Z-9abc7a3f6f.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "child_evidence_context": {
+    "binding_schema_version": 1,
+    "evidence_id": "EVID-20260905T015036Z-9abc7a3f6f",
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "ffcf6bf9a2ea0c76a54788041cfa00c0dc8c7db4",
+      "branch": "release/0.9.0-shipping",
+      "head_sha": "7d3fbb4c4def3ca4b0799e9a611a70ea816f881f",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
+    },
+    "schema_version": 1,
+    "source_manifest": {
+      "bytes": 13410842,
+      "file_count": 392,
+      "schema_version": 1,
+      "sha256": "390f7f31fd778e9379e07df217c04bf015a6341a24cc33717d5955cd8e458ffa"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "command": "/usr/bin/shasum -a 256 /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/live-manager-calibrated-observations.json /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/observe-current-rollover.py",
+  "ended_at": "2026-09-05T01:50:37.137534+00:00",
+  "environment": {
+    "architecture": "arm64",
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine_identifier": "Mac16,7",
+    "macos_build": "25G83",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "execution_provenance": {
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "ffcf6bf9a2ea0c76a54788041cfa00c0dc8c7db4",
+      "branch": "release/0.9.0-shipping",
+      "head_sha": "7d3fbb4c4def3ca4b0799e9a611a70ea816f881f",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "exit_code": 0,
+  "id": "EVID-20260905T015036Z-9abc7a3f6f",
+  "kind": "shipping-calibrated-live-progress-import",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [],
+  "related_gates": [
+    "G09"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 13410842,
+    "file_count": 392,
+    "schema_version": 1,
+    "sha256": "390f7f31fd778e9379e07df217c04bf015a6341a24cc33717d5955cd8e458ffa"
+  },
+  "source_manifest_after": {
+    "bytes": 13410842,
+    "file_count": 392,
+    "schema_version": 1,
+    "sha256": "390f7f31fd778e9379e07df217c04bf015a6341a24cc33717d5955cd8e458ffa"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-09-05T01:50:37.110024+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

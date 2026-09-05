@@ -1,0 +1,1 @@
+{"status": "passed", "observed_postconditions": 43, "output": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P10-mcp-memory-observations.json", "failure": null}

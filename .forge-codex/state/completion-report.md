@@ -1,6 +1,6 @@
 # Forge Conductor completion verification
 
-- Evaluated: `2026-08-31T23:02:38.139038+00:00`
+- Evaluated: `2026-09-05T02:14:32.742812+00:00`
 - Passed: **False**
 
 ## Finalization gate
@@ -14,197 +14,186 @@
 - [x] `package-valid` — package validation
 - [x] `attribution-clean` — repository scan
 - [x] `secret-scan-clean` — repository scan
-- [x] `current-git-head-valid` — 44022da950e75362dfe5120bfd2d92d474ea0ce6
-- [x] `current-source-manifest-valid` — {"bytes": 11353041, "file_count": 360, "schema_version": 1, "sha256": "75e2f5ae4d967cce9f9b73e88ca7628ecaea0b90b7d61741706c42c0fd20f854"}
-- [ ] `relevant-source-clean` — relevant source is dirty: M .forge-codex/PACKAGE_VALIDATION.json; relevant source is dirty: M .forge-codex/PACKAGE_VALIDATION.json
-- [ ] `current-source-identity-stable` — ["relevant source is dirty: M .forge-codex/PACKAGE_VALIDATION.json", "relevant source is dirty: M .forge-codex/PACKAGE_VALIDATION.json"]
+- [x] `current-git-head-valid` — b1876cf5b05134292ce0ecc6fb14ee67535c156c
+- [x] `current-source-manifest-valid` — {"bytes": 13422208, "file_count": 392, "schema_version": 1, "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"}
+- [x] `relevant-source-clean` — clean
+- [x] `current-source-identity-stable` — two matching bounded observations
 - [x] `completion-gate-plan-valid` — 13 completion gate identifiers
-- [x] `gate-result-binding:G00` — {"bytes": 3671, "sha256": "ac3dd5f1a39806ffd829b7be1ea84c45b57dd221f296f3ed8a65218b477c07fe"}
-- [ ] `gate-finalized-result:G00` — {"finalized": null, "operation_id": null, "status": "passed"}
-- [ ] `gate-operation-pair:G00` — {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
-- [ ] `gate-current-source-binding:G00` — {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
+- [x] `gate-result-binding:G00` — {"bytes": 4047, "sha256": "9cec2ab17fd6027a47db3bbfe3a755681df084266bab03e77f60e1600229f832"}
+- [x] `gate-finalized-result:G00` — {"finalized": true, "operation_id": "51d171ca-5f5e-4638-a047-9f15e9dacf86", "status": "passed"}
+- [x] `gate-operation-pair:G00` — {"result_operation_id": "51d171ca-5f5e-4638-a047-9f15e9dacf86", "state_operation_id": "51d171ca-5f5e-4638-a047-9f15e9dacf86", "state_status": "passed"}
+- [x] `gate-current-source-binding:G00` — {"expected_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c", "expected_manifest": {"bytes": 13422208, "file_count": 392, "schema_version": 1, "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"}, "result_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c", "result_manifest": {"bytes": 13422208, "file_count": 392, "schema_version": 1, "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"}}
 - [x] `gate-command-contract:G00` — all recorded commands exited zero within their deadline
 - [x] `gate-criteria-contract:G00` — exact ordered criteria with literal Boolean passes
-- [ ] `gate-result-envelope:G00` — schema, timing, environment, and evaluator metadata
+- [x] `gate-result-envelope:G00` — schema, timing, environment, and evaluator metadata
 - [x] `gate-artifacts:G00` — 3 bounded artifact(s) verified
-- [x] `gate-result-binding:G01` — {"bytes": 3020, "sha256": "98b2db86d9cdf182cafee274b2ec75a59604d6260f8bf5333519dfd668317a99"}
-- [ ] `gate-finalized-result:G01` — {"finalized": null, "operation_id": null, "status": "passed"}
-- [ ] `gate-operation-pair:G01` — {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
-- [ ] `gate-current-source-binding:G01` — {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
+- [x] `gate-result-binding:G01` — {"bytes": 3373, "sha256": "b97659a4d6c1846d02b03c66a88d311d729e78f8b725a5f72f3a7f461944560c"}
+- [x] `gate-finalized-result:G01` — {"finalized": true, "operation_id": "b7dc66f1-0d41-41b7-9d41-e3d637d1b2a3", "status": "passed"}
+- [x] `gate-operation-pair:G01` — {"result_operation_id": "b7dc66f1-0d41-41b7-9d41-e3d637d1b2a3", "state_operation_id": "b7dc66f1-0d41-41b7-9d41-e3d637d1b2a3", "state_status": "passed"}
+- [x] `gate-current-source-binding:G01` — {"expected_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c", "expected_manifest": {"bytes": 13422208, "file_count": 392, "schema_version": 1, "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"}, "result_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c", "result_manifest": {"bytes": 13422208, "file_count": 392, "schema_version": 1, "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"}}
 - [x] `gate-command-contract:G01` — all recorded commands exited zero within their deadline
 - [x] `gate-criteria-contract:G01` — exact ordered criteria with literal Boolean passes
-- [ ] `gate-result-envelope:G01` — schema, timing, environment, and evaluator metadata
+- [x] `gate-result-envelope:G01` — schema, timing, environment, and evaluator metadata
 - [x] `gate-artifacts:G01` — 3 bounded artifact(s) verified
-- [x] `gate-result-binding:G02` — {"bytes": 3774, "sha256": "253c6a73ca2b063c3e886623b09c039e030d956bfd5f021c287db7d345719f92"}
-- [ ] `gate-finalized-result:G02` — {"finalized": null, "operation_id": null, "status": "passed"}
-- [ ] `gate-operation-pair:G02` — {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
-- [ ] `gate-current-source-binding:G02` — {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
-- [x] `gate-command-contract:G02` — all recorded commands exited zero within their deadline
-- [x] `gate-criteria-contract:G02` — exact ordered criteria with literal Boolean passes
-- [ ] `gate-result-envelope:G02` — schema, timing, environment, and evaluator metadata
+- [x] `gate-result-binding:G02` — {"bytes": 3606, "sha256": "012b478abdd7674eb3262b87c9ed9e30d540d2c24f8f6cc3632b0e91fb10555c"}
+- [ ] `gate-finalized-result:G02` — {"finalized": true, "operation_id": "707348cc-776b-47f8-99f1-5dad1d37c83b", "status": "failed"}
+- [ ] `gate-operation-pair:G02` — {"result_operation_id": "707348cc-776b-47f8-99f1-5dad1d37c83b", "state_operation_id": "707348cc-776b-47f8-99f1-5dad1d37c83b", "state_status": "failed"}
+- [x] `gate-current-source-binding:G02` — {"expected_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c", "expected_manifest": {"bytes": 13422208, "file_count": 392, "schema_version": 1, "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"}, "result_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c", "result_manifest": {"bytes": 13422208, "file_count": 392, "schema_version": 1, "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"}}
+- [ ] `gate-command-contract:G02` — all recorded commands exited zero within their deadline
+- [ ] `gate-criteria-contract:G02` — exact ordered criteria with literal Boolean passes
+- [x] `gate-result-envelope:G02` — schema, timing, environment, and evaluator metadata
 - [x] `gate-artifacts:G02` — 3 bounded artifact(s) verified
 - [ ] `gate-current-release-authority:G02` — {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G02"}
-- [x] `gate-result-binding:G03` — {"bytes": 4254, "sha256": "0e06e05d9c781b506d87f9c1276fd8b9399250d7b4034ccb61b0c3ae66d019ae"}
-- [ ] `gate-finalized-result:G03` — {"finalized": null, "operation_id": null, "status": "passed"}
-- [ ] `gate-operation-pair:G03` — {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
-- [ ] `gate-current-source-binding:G03` — {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
-- [x] `gate-command-contract:G03` — all recorded commands exited zero within their deadline
-- [x] `gate-criteria-contract:G03` — exact ordered criteria with literal Boolean passes
-- [ ] `gate-result-envelope:G03` — schema, timing, environment, and evaluator metadata
+- [x] `gate-result-binding:G03` — {"bytes": 4608, "sha256": "64cd4d4cdaf0bbcdc173e30e1b025d934bfe9b26488e0fa01a3a28e4a7bf6cad"}
+- [ ] `gate-finalized-result:G03` — {"finalized": true, "operation_id": "b1d2efce-9f1e-4d53-a6b3-0d9b203b2c05", "status": "failed"}
+- [ ] `gate-operation-pair:G03` — {"result_operation_id": "b1d2efce-9f1e-4d53-a6b3-0d9b203b2c05", "state_operation_id": "b1d2efce-9f1e-4d53-a6b3-0d9b203b2c05", "state_status": "failed"}
+- [x] `gate-current-source-binding:G03` — {"expected_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c", "expected_manifest": {"bytes": 13422208, "file_count": 392, "schema_version": 1, "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"}, "result_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c", "result_manifest": {"bytes": 13422208, "file_count": 392, "schema_version": 1, "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"}}
+- [ ] `gate-command-contract:G03` — all recorded commands exited zero within their deadline
+- [ ] `gate-criteria-contract:G03` — exact ordered criteria with literal Boolean passes
+- [x] `gate-result-envelope:G03` — schema, timing, environment, and evaluator metadata
 - [x] `gate-artifacts:G03` — 3 bounded artifact(s) verified
 - [ ] `gate-current-release-authority:G03` — {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G03"}
-- [x] `gate-result-binding:G04` — {"bytes": 4741, "sha256": "482910b281a00aef3a2d85b635f26b589c41003fb8ee96db8fdc1cec6e90c3a0"}
-- [ ] `gate-finalized-result:G04` — {"finalized": null, "operation_id": null, "status": "passed"}
-- [ ] `gate-operation-pair:G04` — {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
-- [ ] `gate-current-source-binding:G04` — {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
-- [x] `gate-command-contract:G04` — all recorded commands exited zero within their deadline
-- [x] `gate-criteria-contract:G04` — exact ordered criteria with literal Boolean passes
-- [ ] `gate-result-envelope:G04` — schema, timing, environment, and evaluator metadata
+- [x] `gate-result-binding:G04` — {"bytes": 4797, "sha256": "a59216db4b81fff361d115f7805256bd5c3b413925de7f3d781ca7e5b4b1b04e"}
+- [ ] `gate-finalized-result:G04` — {"finalized": true, "operation_id": "f554351c-47d0-42b0-bc47-ee4ce816a59c", "status": "failed"}
+- [ ] `gate-operation-pair:G04` — {"result_operation_id": "f554351c-47d0-42b0-bc47-ee4ce816a59c", "state_operation_id": "f554351c-47d0-42b0-bc47-ee4ce816a59c", "state_status": "failed"}
+- [x] `gate-current-source-binding:G04` — {"expected_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c", "expected_manifest": {"bytes": 13422208, "file_count": 392, "schema_version": 1, "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"}, "result_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c", "result_manifest": {"bytes": 13422208, "file_count": 392, "schema_version": 1, "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"}}
+- [ ] `gate-command-contract:G04` — all recorded commands exited zero within their deadline
+- [ ] `gate-criteria-contract:G04` — exact ordered criteria with literal Boolean passes
+- [x] `gate-result-envelope:G04` — schema, timing, environment, and evaluator metadata
 - [x] `gate-artifacts:G04` — 3 bounded artifact(s) verified
 - [ ] `gate-current-release-authority:G04` — {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G04"}
-- [x] `gate-result-binding:G05` — {"bytes": 5030, "sha256": "3ce3a61542f4839b41916b5606f9828affaec8be4bf9c30b555731aac2dfc665"}
-- [ ] `gate-finalized-result:G05` — {"finalized": null, "operation_id": null, "status": "passed"}
-- [ ] `gate-operation-pair:G05` — {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
-- [ ] `gate-current-source-binding:G05` — {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
-- [x] `gate-command-contract:G05` — all recorded commands exited zero within their deadline
-- [x] `gate-criteria-contract:G05` — exact ordered criteria with literal Boolean passes
-- [ ] `gate-result-envelope:G05` — schema, timing, environment, and evaluator metadata
+- [x] `gate-result-binding:G05` — {"bytes": 5385, "sha256": "14eacec31e3ad96970b4135f9af134c4e680c721f2460d498c3961af33cef651"}
+- [ ] `gate-finalized-result:G05` — {"finalized": true, "operation_id": "529fe267-1988-459a-9f07-d973242fb2b1", "status": "failed"}
+- [ ] `gate-operation-pair:G05` — {"result_operation_id": "529fe267-1988-459a-9f07-d973242fb2b1", "state_operation_id": "529fe267-1988-459a-9f07-d973242fb2b1", "state_status": "failed"}
+- [x] `gate-current-source-binding:G05` — {"expected_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c", "expected_manifest": {"bytes": 13422208, "file_count": 392, "schema_version": 1, "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"}, "result_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c", "result_manifest": {"bytes": 13422208, "file_count": 392, "schema_version": 1, "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"}}
+- [ ] `gate-command-contract:G05` — all recorded commands exited zero within their deadline
+- [ ] `gate-criteria-contract:G05` — exact ordered criteria with literal Boolean passes
+- [x] `gate-result-envelope:G05` — schema, timing, environment, and evaluator metadata
 - [x] `gate-artifacts:G05` — 3 bounded artifact(s) verified
 - [ ] `gate-current-release-authority:G05` — {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G05"}
-- [x] `gate-result-binding:G06` — {"bytes": 5057, "sha256": "4381c5498a76e8aec69fda351610305cb594e80abd40136beb854f91bc93d51d"}
-- [ ] `gate-finalized-result:G06` — {"finalized": null, "operation_id": null, "status": "passed"}
-- [ ] `gate-operation-pair:G06` — {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
-- [ ] `gate-current-source-binding:G06` — {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
-- [x] `gate-command-contract:G06` — all recorded commands exited zero within their deadline
-- [x] `gate-criteria-contract:G06` — exact ordered criteria with literal Boolean passes
-- [ ] `gate-result-envelope:G06` — schema, timing, environment, and evaluator metadata
+- [x] `gate-result-binding:G06` — {"bytes": 5415, "sha256": "ead11ab86c8dc35e815f20d14ad320825b84c639b8b46726fb9ee31d777281fb"}
+- [ ] `gate-finalized-result:G06` — {"finalized": true, "operation_id": "3a964a4f-6e36-4526-a817-7810cec09843", "status": "failed"}
+- [ ] `gate-operation-pair:G06` — {"result_operation_id": "3a964a4f-6e36-4526-a817-7810cec09843", "state_operation_id": "3a964a4f-6e36-4526-a817-7810cec09843", "state_status": "failed"}
+- [x] `gate-current-source-binding:G06` — {"expected_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c", "expected_manifest": {"bytes": 13422208, "file_count": 392, "schema_version": 1, "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"}, "result_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c", "result_manifest": {"bytes": 13422208, "file_count": 392, "schema_version": 1, "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"}}
+- [ ] `gate-command-contract:G06` — all recorded commands exited zero within their deadline
+- [ ] `gate-criteria-contract:G06` — exact ordered criteria with literal Boolean passes
+- [x] `gate-result-envelope:G06` — schema, timing, environment, and evaluator metadata
 - [x] `gate-artifacts:G06` — 3 bounded artifact(s) verified
 - [ ] `gate-current-release-authority:G06` — {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G06"}
-- [x] `gate-result-binding:G07` — {"bytes": 5711, "sha256": "e82ed5ae8e1d19c767f32fcc509388d3dabcd89f32eb24795ef7d2754d6dc16c"}
-- [ ] `gate-finalized-result:G07` — {"finalized": null, "operation_id": null, "status": "passed"}
-- [ ] `gate-operation-pair:G07` — {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
-- [ ] `gate-current-source-binding:G07` — {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
-- [x] `gate-command-contract:G07` — all recorded commands exited zero within their deadline
-- [x] `gate-criteria-contract:G07` — exact ordered criteria with literal Boolean passes
-- [ ] `gate-result-envelope:G07` — schema, timing, environment, and evaluator metadata
+- [x] `gate-result-binding:G07` — {"bytes": 6070, "sha256": "a535399994e0267d07b7cafe6e53a67e59f2e4ac0cbf165b04a4a9f874efae50"}
+- [ ] `gate-finalized-result:G07` — {"finalized": true, "operation_id": "87353fef-f876-4596-8109-d06087218939", "status": "failed"}
+- [ ] `gate-operation-pair:G07` — {"result_operation_id": "87353fef-f876-4596-8109-d06087218939", "state_operation_id": "87353fef-f876-4596-8109-d06087218939", "state_status": "failed"}
+- [x] `gate-current-source-binding:G07` — {"expected_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c", "expected_manifest": {"bytes": 13422208, "file_count": 392, "schema_version": 1, "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"}, "result_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c", "result_manifest": {"bytes": 13422208, "file_count": 392, "schema_version": 1, "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"}}
+- [ ] `gate-command-contract:G07` — all recorded commands exited zero within their deadline
+- [ ] `gate-criteria-contract:G07` — exact ordered criteria with literal Boolean passes
+- [x] `gate-result-envelope:G07` — schema, timing, environment, and evaluator metadata
 - [x] `gate-artifacts:G07` — 3 bounded artifact(s) verified
 - [ ] `gate-current-release-authority:G07` — {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G07"}
-- [x] `gate-result-binding:G08` — {"bytes": 3809, "sha256": "f38cca037a3943b88d1055380b2c566075a69739b75def6b07c27aa3f6e4d944"}
-- [ ] `gate-finalized-result:G08` — {"finalized": null, "operation_id": null, "status": "passed"}
-- [ ] `gate-operation-pair:G08` — {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
-- [ ] `gate-current-source-binding:G08` — {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
-- [x] `gate-command-contract:G08` — all recorded commands exited zero within their deadline
+- [x] `gate-result-binding:G08` — {"bytes": 4162, "sha256": "ebe8029a6edd1dd637244f89e85bc9e4ab0c79bc44346a8e585617869da7db45"}
+- [ ] `gate-finalized-result:G08` — {"finalized": true, "operation_id": "480ff36f-51f8-44b0-a857-14ee4230e319", "status": "failed"}
+- [ ] `gate-operation-pair:G08` — {"result_operation_id": "480ff36f-51f8-44b0-a857-14ee4230e319", "state_operation_id": "480ff36f-51f8-44b0-a857-14ee4230e319", "state_status": "failed"}
+- [x] `gate-current-source-binding:G08` — {"expected_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c", "expected_manifest": {"bytes": 13422208, "file_count": 392, "schema_version": 1, "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"}, "result_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c", "result_manifest": {"bytes": 13422208, "file_count": 392, "schema_version": 1, "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"}}
+- [ ] `gate-command-contract:G08` — all recorded commands exited zero within their deadline
 - [x] `gate-criteria-contract:G08` — exact ordered criteria with literal Boolean passes
-- [ ] `gate-result-envelope:G08` — schema, timing, environment, and evaluator metadata
+- [x] `gate-result-envelope:G08` — schema, timing, environment, and evaluator metadata
 - [x] `gate-artifacts:G08` — 3 bounded artifact(s) verified
 - [ ] `gate-current-release-authority:G08` — {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G08"}
-- [x] `gate-result-binding:G09` — {"bytes": 5243, "sha256": "a9864d48d350c53e088dfacf69714f24f18cca1920b3be8d638e5b89df17ec60"}
-- [ ] `gate-finalized-result:G09` — {"finalized": null, "operation_id": null, "status": "passed"}
-- [ ] `gate-operation-pair:G09` — {"result_operation_id": null, "state_operation_id": null, "state_status": "blocked_dependency"}
-- [ ] `gate-current-source-binding:G09` — {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
-- [x] `gate-command-contract:G09` — all recorded commands exited zero within their deadline
+- [x] `gate-result-binding:G09` — {"bytes": 5398, "sha256": "05d7350b627f084f64a76250f653361c7e81e09dbf532fab0ead3dfab1f8f900"}
+- [ ] `gate-finalized-result:G09` — {"finalized": true, "operation_id": "154106f1-3f30-4f0c-b59f-7115fb2ab2f9", "status": "failed"}
+- [ ] `gate-operation-pair:G09` — {"result_operation_id": "154106f1-3f30-4f0c-b59f-7115fb2ab2f9", "state_operation_id": "154106f1-3f30-4f0c-b59f-7115fb2ab2f9", "state_status": "failed"}
+- [x] `gate-current-source-binding:G09` — {"expected_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c", "expected_manifest": {"bytes": 13422208, "file_count": 392, "schema_version": 1, "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"}, "result_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c", "result_manifest": {"bytes": 13422208, "file_count": 392, "schema_version": 1, "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"}}
+- [ ] `gate-command-contract:G09` — all recorded commands exited zero within their deadline
 - [x] `gate-criteria-contract:G09` — exact ordered criteria with literal Boolean passes
-- [ ] `gate-result-envelope:G09` — schema, timing, environment, and evaluator metadata
-- [ ] `gate-artifacts:G09` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.stdout.txt: G09 completion artifact is unavailable: [Errno 2] No such file or directory: '/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.stdout.txt'; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.stderr.txt: G09 completion artifact is unavailable: [Errno 2] No such file or directory: '/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.stderr.txt'; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.criteria.json: G09 completion artifact is unavailable: [Errno 2] No such file or directory: '/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.criteria.json'
+- [x] `gate-result-envelope:G09` — schema, timing, environment, and evaluator metadata
+- [x] `gate-artifacts:G09` — 3 bounded artifact(s) verified
 - [ ] `gate-current-release-authority:G09` — {"authority_scope": "historical_exact_revision", "current_release_authority": false, "record_gate_id": "G09"}
 - [x] `gate-result-binding:G10` — {"bytes": 2549, "sha256": "4525c4685175e758e438f712502be96f15dc526dc0a454b0879954b1d0553b95"}
 - [ ] `gate-finalized-result:G10` — {"finalized": true, "operation_id": "a2f65346-b22b-4e18-aa87-fdac8a805676", "status": "failed"}
 - [ ] `gate-operation-pair:G10` — {"result_operation_id": "a2f65346-b22b-4e18-aa87-fdac8a805676", "state_operation_id": "a2f65346-b22b-4e18-aa87-fdac8a805676", "state_status": "failed"}
-- [ ] `gate-current-source-binding:G10` — {"expected_head": null, "expected_manifest": null, "result_head": "44022da950e75362dfe5120bfd2d92d474ea0ce6", "result_manifest": {"bytes": 11353041, "file_count": 360, "schema_version": 1, "sha256": "75e2f5ae4d967cce9f9b73e88ca7628ecaea0b90b7d61741706c42c0fd20f854"}}
+- [ ] `gate-current-source-binding:G10` — {"expected_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c", "expected_manifest": {"bytes": 13422208, "file_count": 392, "schema_version": 1, "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"}, "result_head": "44022da950e75362dfe5120bfd2d92d474ea0ce6", "result_manifest": {"bytes": 11353041, "file_count": 360, "schema_version": 1, "sha256": "75e2f5ae4d967cce9f9b73e88ca7628ecaea0b90b7d61741706c42c0fd20f854"}}
 - [ ] `gate-command-contract:G10` — all recorded commands exited zero within their deadline
 - [ ] `gate-criteria-contract:G10` — exact ordered criteria with literal Boolean passes
-- [x] `gate-result-envelope:G10` — schema, timing, environment, and evaluator metadata
-- [x] `gate-artifacts:G10` — 2 bounded artifact(s) verified
+- [ ] `gate-result-envelope:G10` — schema, timing, environment, and evaluator metadata
+- [ ] `gate-artifacts:G10` — /Users/jimdaley/GitHub/Forge-Conductor-E2-Next/.forge-codex/state/gate-results/G10.stdout.txt: G10 completion artifact path is outside the repository; /Users/jimdaley/GitHub/Forge-Conductor-E2-Next/.forge-codex/state/gate-results/G10.stderr.txt: G10 completion artifact path is outside the repository
+- [ ] `g10-p10-feature-evidence-binding` — EvidenceSupportError("qualification artifact path is unavailable or contains a symlink: [Errno 2] No such file or directory: 'G10.criteria.json'")
 - [ ] `gate-current-release-authority:G10` — {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G10"}
 - [x] `gate-result-binding:G11` — {"bytes": 4425, "sha256": "a08168447d0ec3c73683784e904273cb3d49dbb5201af45ee37d73afcbe4daca"}
 - [ ] `gate-finalized-result:G11` — {"finalized": null, "operation_id": null, "status": "blocked"}
 - [ ] `gate-operation-pair:G11` — {"result_operation_id": null, "state_operation_id": null, "state_status": "blocked_dependency"}
-- [ ] `gate-current-source-binding:G11` — {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
+- [ ] `gate-current-source-binding:G11` — {"expected_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c", "expected_manifest": {"bytes": 13422208, "file_count": 392, "schema_version": 1, "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"}, "result_head": null, "result_manifest": null}
 - [ ] `gate-command-contract:G11` — all recorded commands exited zero within their deadline
 - [ ] `gate-criteria-contract:G11` — exact ordered criteria with literal Boolean passes
 - [ ] `gate-result-envelope:G11` — schema, timing, environment, and evaluator metadata
 - [ ] `gate-artifacts:G11` — /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.stdout.txt: G11 completion artifact is unavailable: [Errno 2] No such file or directory: '/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.stdout.txt'; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.stderr.txt: G11 completion artifact is unavailable: [Errno 2] No such file or directory: '/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.stderr.txt'; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.criteria.json: G11 completion artifact is unavailable: [Errno 2] No such file or directory: '/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.criteria.json'
 - [ ] `gate-current-release-authority:G11` — {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G11"}
-- [x] `feature-runtime-inventory-complete` — false
-- [x] `feature-parity-counters-zero` — {"additive": 0, "migrated": 0, "preserved": 66, "removed": 0, "unknown": 0, "untested": 0}
-- [x] `all-feature-statuses-valid` — 66 feature records
+- [ ] `feature-baseline-valid` — baseline requires outstanding runtime completion evidence; baseline has 104 features without exact-current production qualification: broken_or_absent=1, fixture_or_source_only=21, production_component=58, signed_supporting=24; baseline broken or absent features block P10: MCP-TOOL-FILESYSTEM; P10 production scenarios do not execute signing qualification for every shipped artifact: signing.forge-conductor-app, signing.forge-filesystem-daemon, signing.forge-runtime-launcher; P10 production probe registry has no concrete runner for 257 authoritative assertions
 - [ ] `findings-resolution-structure` — 41 unique, typed finding record(s)
-- [x] `run-state-issues-structure` — 31 unique, typed issue record(s)
-- [ ] `critical-high-findings-resolved` — ["FC-FILESYSTEM-PATH-TOCTOU-001", "FC-PRIVILEGED-SERVICE-LIFECYCLE-001", "FC-PRIVILEGED-CALLER-IDENTITY-001", "FC-UI-QUALIFICATION-001", "FC-AUTONOMOUS-CONTINUITY-E2E-001"]
-- [ ] `critical-high-run-state-issues-resolved` — ["FC-UI-QUALIFICATION-001", "FC-FILESYSTEM-PATH-TOCTOU-001", "FC-AUTONOMOUS-CONTINUITY-E2E-001", "FC-HARDWARE-QUALIFICATION-001", "FC-PROJECT-ROOT-SETTINGS-001", "FC-PRIVILEGED-SERVICE-LIFECYCLE-001", "FC-PRIVILEGED-CALLER-IDENTITY-001"]
+- [x] `run-state-issues-structure` — 42 unique, typed issue record(s)
+- [ ] `critical-high-findings-resolved` — ["FC-FILESYSTEM-PATH-TOCTOU-001", "FC-PRIVILEGED-SERVICE-LIFECYCLE-001", "FC-PRIVILEGED-CALLER-IDENTITY-001", "FC-SHELL-COMPAT-QUALIFICATION-001", "FC-UI-QUALIFICATION-001", "FC-AUTONOMOUS-CONTINUITY-E2E-001"]
+- [ ] `critical-high-run-state-issues-resolved` — ["FC-UI-QUALIFICATION-001", "FC-FILESYSTEM-PATH-TOCTOU-001", "FC-SHELL-COMPAT-QUALIFICATION-001", "FC-AUTONOMOUS-CONTINUITY-E2E-001", "FC-HARDWARE-QUALIFICATION-001", "FC-PRIVILEGED-SERVICE-LIFECYCLE-001", "FC-PRIVILEGED-CALLER-IDENTITY-001", "FC-FEATURE-OPERABILITY-001", "SHIPPING-LIVE-BOOTSTRAP-001"]
 - [ ] `autonomous-rollover-mode-proven` — forge.native-session-host
 - [x] `supported-api-only` — false
-- [ ] `source-identity-unchanged-through-evaluation` — ["relevant source is dirty: M .forge-codex/PACKAGE_VALIDATION.json"]
+- [x] `source-identity-unchanged-through-evaluation` — Git HEAD, manifest, and relevant-source status remained stable
 
 ## Blocking errors
 
-- relevant-source-clean: relevant source is dirty: M .forge-codex/PACKAGE_VALIDATION.json; relevant source is dirty: M .forge-codex/PACKAGE_VALIDATION.json
-- current-source-identity-stable: ["relevant source is dirty: M .forge-codex/PACKAGE_VALIDATION.json", "relevant source is dirty: M .forge-codex/PACKAGE_VALIDATION.json"]
-- gate-finalized-result:G00: {"finalized": null, "operation_id": null, "status": "passed"}
-- gate-operation-pair:G00: {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
-- gate-current-source-binding:G00: {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
-- gate-result-envelope:G00: schema, timing, environment, and evaluator metadata
-- gate-finalized-result:G01: {"finalized": null, "operation_id": null, "status": "passed"}
-- gate-operation-pair:G01: {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
-- gate-current-source-binding:G01: {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
-- gate-result-envelope:G01: schema, timing, environment, and evaluator metadata
-- gate-finalized-result:G02: {"finalized": null, "operation_id": null, "status": "passed"}
-- gate-operation-pair:G02: {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
-- gate-current-source-binding:G02: {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
-- gate-result-envelope:G02: schema, timing, environment, and evaluator metadata
+- gate-finalized-result:G02: {"finalized": true, "operation_id": "707348cc-776b-47f8-99f1-5dad1d37c83b", "status": "failed"}
+- gate-operation-pair:G02: {"result_operation_id": "707348cc-776b-47f8-99f1-5dad1d37c83b", "state_operation_id": "707348cc-776b-47f8-99f1-5dad1d37c83b", "state_status": "failed"}
+- gate-command-contract:G02: all recorded commands exited zero within their deadline
+- gate-criteria-contract:G02: exact ordered criteria with literal Boolean passes
 - gate-current-release-authority:G02: {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G02"}
-- gate-finalized-result:G03: {"finalized": null, "operation_id": null, "status": "passed"}
-- gate-operation-pair:G03: {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
-- gate-current-source-binding:G03: {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
-- gate-result-envelope:G03: schema, timing, environment, and evaluator metadata
+- gate-finalized-result:G03: {"finalized": true, "operation_id": "b1d2efce-9f1e-4d53-a6b3-0d9b203b2c05", "status": "failed"}
+- gate-operation-pair:G03: {"result_operation_id": "b1d2efce-9f1e-4d53-a6b3-0d9b203b2c05", "state_operation_id": "b1d2efce-9f1e-4d53-a6b3-0d9b203b2c05", "state_status": "failed"}
+- gate-command-contract:G03: all recorded commands exited zero within their deadline
+- gate-criteria-contract:G03: exact ordered criteria with literal Boolean passes
 - gate-current-release-authority:G03: {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G03"}
-- gate-finalized-result:G04: {"finalized": null, "operation_id": null, "status": "passed"}
-- gate-operation-pair:G04: {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
-- gate-current-source-binding:G04: {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
-- gate-result-envelope:G04: schema, timing, environment, and evaluator metadata
+- gate-finalized-result:G04: {"finalized": true, "operation_id": "f554351c-47d0-42b0-bc47-ee4ce816a59c", "status": "failed"}
+- gate-operation-pair:G04: {"result_operation_id": "f554351c-47d0-42b0-bc47-ee4ce816a59c", "state_operation_id": "f554351c-47d0-42b0-bc47-ee4ce816a59c", "state_status": "failed"}
+- gate-command-contract:G04: all recorded commands exited zero within their deadline
+- gate-criteria-contract:G04: exact ordered criteria with literal Boolean passes
 - gate-current-release-authority:G04: {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G04"}
-- gate-finalized-result:G05: {"finalized": null, "operation_id": null, "status": "passed"}
-- gate-operation-pair:G05: {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
-- gate-current-source-binding:G05: {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
-- gate-result-envelope:G05: schema, timing, environment, and evaluator metadata
+- gate-finalized-result:G05: {"finalized": true, "operation_id": "529fe267-1988-459a-9f07-d973242fb2b1", "status": "failed"}
+- gate-operation-pair:G05: {"result_operation_id": "529fe267-1988-459a-9f07-d973242fb2b1", "state_operation_id": "529fe267-1988-459a-9f07-d973242fb2b1", "state_status": "failed"}
+- gate-command-contract:G05: all recorded commands exited zero within their deadline
+- gate-criteria-contract:G05: exact ordered criteria with literal Boolean passes
 - gate-current-release-authority:G05: {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G05"}
-- gate-finalized-result:G06: {"finalized": null, "operation_id": null, "status": "passed"}
-- gate-operation-pair:G06: {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
-- gate-current-source-binding:G06: {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
-- gate-result-envelope:G06: schema, timing, environment, and evaluator metadata
+- gate-finalized-result:G06: {"finalized": true, "operation_id": "3a964a4f-6e36-4526-a817-7810cec09843", "status": "failed"}
+- gate-operation-pair:G06: {"result_operation_id": "3a964a4f-6e36-4526-a817-7810cec09843", "state_operation_id": "3a964a4f-6e36-4526-a817-7810cec09843", "state_status": "failed"}
+- gate-command-contract:G06: all recorded commands exited zero within their deadline
+- gate-criteria-contract:G06: exact ordered criteria with literal Boolean passes
 - gate-current-release-authority:G06: {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G06"}
-- gate-finalized-result:G07: {"finalized": null, "operation_id": null, "status": "passed"}
-- gate-operation-pair:G07: {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
-- gate-current-source-binding:G07: {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
-- gate-result-envelope:G07: schema, timing, environment, and evaluator metadata
+- gate-finalized-result:G07: {"finalized": true, "operation_id": "87353fef-f876-4596-8109-d06087218939", "status": "failed"}
+- gate-operation-pair:G07: {"result_operation_id": "87353fef-f876-4596-8109-d06087218939", "state_operation_id": "87353fef-f876-4596-8109-d06087218939", "state_status": "failed"}
+- gate-command-contract:G07: all recorded commands exited zero within their deadline
+- gate-criteria-contract:G07: exact ordered criteria with literal Boolean passes
 - gate-current-release-authority:G07: {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G07"}
-- gate-finalized-result:G08: {"finalized": null, "operation_id": null, "status": "passed"}
-- gate-operation-pair:G08: {"result_operation_id": null, "state_operation_id": null, "state_status": "passed"}
-- gate-current-source-binding:G08: {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
-- gate-result-envelope:G08: schema, timing, environment, and evaluator metadata
+- gate-finalized-result:G08: {"finalized": true, "operation_id": "480ff36f-51f8-44b0-a857-14ee4230e319", "status": "failed"}
+- gate-operation-pair:G08: {"result_operation_id": "480ff36f-51f8-44b0-a857-14ee4230e319", "state_operation_id": "480ff36f-51f8-44b0-a857-14ee4230e319", "state_status": "failed"}
+- gate-command-contract:G08: all recorded commands exited zero within their deadline
 - gate-current-release-authority:G08: {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G08"}
-- gate-finalized-result:G09: {"finalized": null, "operation_id": null, "status": "passed"}
-- gate-operation-pair:G09: {"result_operation_id": null, "state_operation_id": null, "state_status": "blocked_dependency"}
-- gate-current-source-binding:G09: {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
-- gate-result-envelope:G09: schema, timing, environment, and evaluator metadata
-- gate-artifacts:G09: /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.stdout.txt: G09 completion artifact is unavailable: [Errno 2] No such file or directory: '/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.stdout.txt'; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.stderr.txt: G09 completion artifact is unavailable: [Errno 2] No such file or directory: '/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.stderr.txt'; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.criteria.json: G09 completion artifact is unavailable: [Errno 2] No such file or directory: '/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G09.criteria.json'
+- gate-finalized-result:G09: {"finalized": true, "operation_id": "154106f1-3f30-4f0c-b59f-7115fb2ab2f9", "status": "failed"}
+- gate-operation-pair:G09: {"result_operation_id": "154106f1-3f30-4f0c-b59f-7115fb2ab2f9", "state_operation_id": "154106f1-3f30-4f0c-b59f-7115fb2ab2f9", "state_status": "failed"}
+- gate-command-contract:G09: all recorded commands exited zero within their deadline
 - gate-current-release-authority:G09: {"authority_scope": "historical_exact_revision", "current_release_authority": false, "record_gate_id": "G09"}
 - gate-finalized-result:G10: {"finalized": true, "operation_id": "a2f65346-b22b-4e18-aa87-fdac8a805676", "status": "failed"}
 - gate-operation-pair:G10: {"result_operation_id": "a2f65346-b22b-4e18-aa87-fdac8a805676", "state_operation_id": "a2f65346-b22b-4e18-aa87-fdac8a805676", "state_status": "failed"}
-- gate-current-source-binding:G10: {"expected_head": null, "expected_manifest": null, "result_head": "44022da950e75362dfe5120bfd2d92d474ea0ce6", "result_manifest": {"bytes": 11353041, "file_count": 360, "schema_version": 1, "sha256": "75e2f5ae4d967cce9f9b73e88ca7628ecaea0b90b7d61741706c42c0fd20f854"}}
+- gate-current-source-binding:G10: {"expected_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c", "expected_manifest": {"bytes": 13422208, "file_count": 392, "schema_version": 1, "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"}, "result_head": "44022da950e75362dfe5120bfd2d92d474ea0ce6", "result_manifest": {"bytes": 11353041, "file_count": 360, "schema_version": 1, "sha256": "75e2f5ae4d967cce9f9b73e88ca7628ecaea0b90b7d61741706c42c0fd20f854"}}
 - gate-command-contract:G10: all recorded commands exited zero within their deadline
 - gate-criteria-contract:G10: exact ordered criteria with literal Boolean passes
+- gate-result-envelope:G10: schema, timing, environment, and evaluator metadata
+- gate-artifacts:G10: /Users/jimdaley/GitHub/Forge-Conductor-E2-Next/.forge-codex/state/gate-results/G10.stdout.txt: G10 completion artifact path is outside the repository; /Users/jimdaley/GitHub/Forge-Conductor-E2-Next/.forge-codex/state/gate-results/G10.stderr.txt: G10 completion artifact path is outside the repository
+- g10-p10-feature-evidence-binding: EvidenceSupportError("qualification artifact path is unavailable or contains a symlink: [Errno 2] No such file or directory: 'G10.criteria.json'")
 - gate-current-release-authority:G10: {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G10"}
 - gate-finalized-result:G11: {"finalized": null, "operation_id": null, "status": "blocked"}
 - gate-operation-pair:G11: {"result_operation_id": null, "state_operation_id": null, "state_status": "blocked_dependency"}
-- gate-current-source-binding:G11: {"expected_head": null, "expected_manifest": null, "result_head": null, "result_manifest": null}
+- gate-current-source-binding:G11: {"expected_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c", "expected_manifest": {"bytes": 13422208, "file_count": 392, "schema_version": 1, "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"}, "result_head": null, "result_manifest": null}
 - gate-command-contract:G11: all recorded commands exited zero within their deadline
 - gate-criteria-contract:G11: exact ordered criteria with literal Boolean passes
 - gate-result-envelope:G11: schema, timing, environment, and evaluator metadata
 - gate-artifacts:G11: /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.stdout.txt: G11 completion artifact is unavailable: [Errno 2] No such file or directory: '/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.stdout.txt'; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.stderr.txt: G11 completion artifact is unavailable: [Errno 2] No such file or directory: '/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.stderr.txt'; /Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.criteria.json: G11 completion artifact is unavailable: [Errno 2] No such file or directory: '/Users/jimdaley/GitHub/Forge-Conductor-MacOS-Autonomy/.forge-codex/state/gate-results/G11.criteria.json'
 - gate-current-release-authority:G11: {"authority_scope": null, "current_release_authority": null, "record_gate_id": "G11"}
+- feature-baseline-valid: baseline requires outstanding runtime completion evidence; baseline has 104 features without exact-current production qualification: broken_or_absent=1, fixture_or_source_only=21, production_component=58, signed_supporting=24; baseline broken or absent features block P10: MCP-TOOL-FILESYSTEM; P10 production scenarios do not execute signing qualification for every shipped artifact: signing.forge-conductor-app, signing.forge-filesystem-daemon, signing.forge-runtime-launcher; P10 production probe registry has no concrete runner for 257 authoritative assertions
 - findings-resolution-structure: 41 unique, typed finding record(s)
-- critical-high-findings-resolved: ["FC-FILESYSTEM-PATH-TOCTOU-001", "FC-PRIVILEGED-SERVICE-LIFECYCLE-001", "FC-PRIVILEGED-CALLER-IDENTITY-001", "FC-UI-QUALIFICATION-001", "FC-AUTONOMOUS-CONTINUITY-E2E-001"]
-- critical-high-run-state-issues-resolved: ["FC-UI-QUALIFICATION-001", "FC-FILESYSTEM-PATH-TOCTOU-001", "FC-AUTONOMOUS-CONTINUITY-E2E-001", "FC-HARDWARE-QUALIFICATION-001", "FC-PROJECT-ROOT-SETTINGS-001", "FC-PRIVILEGED-SERVICE-LIFECYCLE-001", "FC-PRIVILEGED-CALLER-IDENTITY-001"]
+- critical-high-findings-resolved: ["FC-FILESYSTEM-PATH-TOCTOU-001", "FC-PRIVILEGED-SERVICE-LIFECYCLE-001", "FC-PRIVILEGED-CALLER-IDENTITY-001", "FC-SHELL-COMPAT-QUALIFICATION-001", "FC-UI-QUALIFICATION-001", "FC-AUTONOMOUS-CONTINUITY-E2E-001"]
+- critical-high-run-state-issues-resolved: ["FC-UI-QUALIFICATION-001", "FC-FILESYSTEM-PATH-TOCTOU-001", "FC-SHELL-COMPAT-QUALIFICATION-001", "FC-AUTONOMOUS-CONTINUITY-E2E-001", "FC-HARDWARE-QUALIFICATION-001", "FC-PRIVILEGED-SERVICE-LIFECYCLE-001", "FC-PRIVILEGED-CALLER-IDENTITY-001", "FC-FEATURE-OPERABILITY-001", "SHIPPING-LIVE-BOOTSTRAP-001"]
 - autonomous-rollover-mode-proven: forge.native-session-host
-- source-identity-unchanged-through-evaluation: ["relevant source is dirty: M .forge-codex/PACKAGE_VALIDATION.json"]

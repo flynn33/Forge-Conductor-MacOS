@@ -16,7 +16,7 @@ struct MetalLoadChart: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> MTKView {
-        let view = MTKView()
+        let view = GaugeMetalView()
         context.coordinator.attach(to: view)
         context.coordinator.update(samples: samples)
         return view

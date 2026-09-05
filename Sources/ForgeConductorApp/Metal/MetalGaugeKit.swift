@@ -76,7 +76,6 @@ final class MetalBarRenderer: NSObject, MTKViewDelegate {
         self.view = view
         view.delegate = self
         surfaceLifetime.attach()
-        rebuild()
         requestDraw()
     }
 
@@ -88,7 +87,6 @@ final class MetalBarRenderer: NSObject, MTKViewDelegate {
         }
         self.fraction = nextFraction
         self.color = color
-        rebuild()
         requestDraw()
     }
 
@@ -118,7 +116,7 @@ final class MetalBarRenderer: NSObject, MTKViewDelegate {
 
     private func requestDraw() {
         dirty = true
-        guard let view, !view.isHidden else {
+        guard let view, MetalGaugeResources.canRender(view) else {
             RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedHidden)
             return
         }
@@ -131,6 +129,11 @@ final class MetalBarRenderer: NSObject, MTKViewDelegate {
             RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedStatic)
             return
         }
+        guard MetalGaugeResources.canRender(view) else {
+            RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedHidden)
+            return
+        }
+        rebuild()
         guard let d = view.currentDrawable, let rpd = view.currentRenderPassDescriptor,
               let pipeline, let queue, let buffer = vertices.buffer,
               let cmd = queue.makeCommandBuffer(), let enc = cmd.makeRenderCommandEncoder(descriptor: rpd) else { return }
@@ -151,7 +154,7 @@ struct MetalBarGauge: NSViewRepresentable {
     func makeCoordinator() -> MetalBarRenderer { MetalBarRenderer() }
 
     func makeNSView(context: Context) -> MTKView {
-        let v = MTKView(frame: NSRect(x: 0, y: 0, width: 48, height: 8))
+        let v = GaugeMetalView(frame: NSRect(x: 0, y: 0, width: 48, height: 8))
         // MTKView has no sensible intrinsic size; without bounds it reports huge
         // preferred sizes and blows out SwiftUI headers/rows.
         v.translatesAutoresizingMaskIntoConstraints = true
@@ -213,7 +216,6 @@ final class MetalRingRenderer: NSObject, MTKViewDelegate {
         self.view = view
         view.delegate = self
         surfaceLifetime.attach()
-        rebuild()
         requestDraw()
     }
 
@@ -225,7 +227,6 @@ final class MetalRingRenderer: NSObject, MTKViewDelegate {
         }
         self.fraction = nextFraction
         self.color = color
-        rebuild()
         requestDraw()
     }
 
@@ -291,6 +292,11 @@ final class MetalRingRenderer: NSObject, MTKViewDelegate {
             RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedStatic)
             return
         }
+        guard MetalGaugeResources.canRender(view) else {
+            RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedHidden)
+            return
+        }
+        rebuild()
         guard let d = view.currentDrawable, let rpd = view.currentRenderPassDescriptor,
               let pipeline, let queue, let buffer = vertices.buffer, count >= 3,
               let cmd = queue.makeCommandBuffer(), let enc = cmd.makeRenderCommandEncoder(descriptor: rpd) else { return }
@@ -312,7 +318,7 @@ final class MetalRingRenderer: NSObject, MTKViewDelegate {
 
     private func requestDraw() {
         dirty = true
-        guard let view, !view.isHidden else {
+        guard let view, MetalGaugeResources.canRender(view) else {
             RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedHidden)
             return
         }
@@ -327,7 +333,7 @@ struct MetalRingGauge: NSViewRepresentable {
 
     func makeCoordinator() -> MetalRingRenderer { MetalRingRenderer() }
     func makeNSView(context: Context) -> MTKView {
-        let v = MTKView()
+        let v = GaugeMetalView()
         context.coordinator.attach(v)
         context.coordinator.set(fraction: Float(fraction), color: MetalGaugePalette.from(swiftUI: tint))
         return v
@@ -384,7 +390,6 @@ final class MetalCoreBarsRenderer: NSObject, MTKViewDelegate {
         self.view = view
         view.delegate = self
         surfaceLifetime.attach()
-        rebuild()
         requestDraw()
     }
 
@@ -394,7 +399,6 @@ final class MetalCoreBarsRenderer: NSObject, MTKViewDelegate {
             return
         }
         self.cores = cores
-        rebuild()
         requestDraw()
     }
 
@@ -446,6 +450,11 @@ final class MetalCoreBarsRenderer: NSObject, MTKViewDelegate {
             RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedStatic)
             return
         }
+        guard MetalGaugeResources.canRender(view) else {
+            RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedHidden)
+            return
+        }
+        rebuild()
         guard let d = view.currentDrawable, let rpd = view.currentRenderPassDescriptor,
               let pipeline, let queue, let buffer = vertices.buffer, count >= 3,
               let cmd = queue.makeCommandBuffer(), let enc = cmd.makeRenderCommandEncoder(descriptor: rpd) else { return }
@@ -467,7 +476,7 @@ final class MetalCoreBarsRenderer: NSObject, MTKViewDelegate {
 
     private func requestDraw() {
         dirty = true
-        guard let view, !view.isHidden else {
+        guard let view, MetalGaugeResources.canRender(view) else {
             RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedHidden)
             return
         }
@@ -479,7 +488,7 @@ struct MetalCoreBarsView: NSViewRepresentable {
     var cores: [Double]
     func makeCoordinator() -> MetalCoreBarsRenderer { MetalCoreBarsRenderer() }
     func makeNSView(context: Context) -> MTKView {
-        let v = MTKView()
+        let v = GaugeMetalView()
         context.coordinator.attach(v)
         context.coordinator.set(cores: cores.map { Float($0) })
         return v

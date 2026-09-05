@@ -946,13 +946,15 @@ final class ProductPathReliabilityTests: XCTestCase {
             #"/usr/bin/codesign --verify --strict --all-architectures --verbose=4 "$RUNTIME_HELPER""#,
             #"/usr/bin/codesign --verify --deep --strict --all-architectures --verbose=4 "$APP_BUNDLE""#,
             #"EXPECTED_TEAM_IDENTIFIER="9AQ2C2838M""#,
-            #"EXPECTED_TEAM_IDENTIFIER="2Y25RTLZET""#,
             #"certificate leaf[field.1.2.840.113635.100.6.1.12] exists"#,
-            #"certificate leaf[field.1.2.840.113635.100.6.1.13] exists"#,
         ]
         for fragment in requiredFragments {
             XCTAssertTrue(entrypoint.contains(fragment), "missing build-entrypoint contract: \(fragment)")
         }
+        XCTAssertFalse(
+            entrypoint.contains("certificate leaf[field.1.2.840.113635.100.6.1.13] exists"),
+            "Developer ID packaging belongs to the canonical Xcode archive/export path"
+        )
 
         let cliSigning = try XCTUnwrap(
             entrypoint.range(of: #"--identifier "$CLI_IDENTIFIER""#)

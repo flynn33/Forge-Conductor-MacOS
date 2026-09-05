@@ -1,0 +1,108 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 22967,
+      "path": ".forge-codex/evidence/EVID-20260905T020541Z-44ebbd3215.artifact-000-P10-feature-production-qualification-report.json",
+      "sha256": "0817ca9c624b4a499d01c249f1f9936cd90ae91fc7fe9f4d4d20e96b046120de",
+      "source_path": ".forge-codex/evidence/P10-feature-production-qualification-report.json",
+      "storage": "evidence-id-specific-copy"
+    },
+    {
+      "bytes": 69930,
+      "path": ".forge-codex/evidence/EVID-20260905T020541Z-44ebbd3215.artifact-001-P10-feature-production-observations.json",
+      "sha256": "34ff90a823d17050b32e2e51fd6a455eea4e25d1c5746ea6296ebe72b3efd56b",
+      "source_path": ".forge-codex/evidence/P10-feature-production-observations.json",
+      "storage": "evidence-id-specific-copy"
+    },
+    {
+      "bytes": 1633,
+      "path": ".forge-codex/evidence/EVID-20260905T020541Z-44ebbd3215.stdout.txt",
+      "sha256": "cf7a067e96f98579c5e3242ce208cb7b52ce70a37d272ff4499f365ef7a6ef13",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260905T020541Z-44ebbd3215.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "child_evidence_context": {
+    "binding_schema_version": 1,
+    "evidence_id": "EVID-20260905T020541Z-44ebbd3215",
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "ffcf6bf9a2ea0c76a54788041cfa00c0dc8c7db4",
+      "branch": "release/0.9.0-shipping",
+      "head_sha": "b1876cf5b05134292ce0ecc6fb14ee67535c156c",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
+    },
+    "schema_version": 1,
+    "source_manifest": {
+      "bytes": 13422208,
+      "file_count": 392,
+      "schema_version": 1,
+      "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "command": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/scripts/qualify_p10_features.py --report .forge-codex/evidence/P10-feature-production-qualification-report.json --feature CLI-VERSION-HELP --build-evidence EVID-20260905T020038Z-e1d79496cc --installation-evidence EVID-20260905T020339Z-bbd5f84078",
+  "ended_at": "2026-09-05T02:05:46.141029+00:00",
+  "environment": {
+    "architecture": "arm64",
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine_identifier": "Mac16,7",
+    "macos_build": "25G83",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "execution_provenance": {
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "ffcf6bf9a2ea0c76a54788041cfa00c0dc8c7db4",
+      "branch": "release/0.9.0-shipping",
+      "head_sha": "b1876cf5b05134292ce0ecc6fb14ee67535c156c",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "exit_code": 0,
+  "id": "EVID-20260905T020541Z-44ebbd3215",
+  "kind": "p10-feature-production-qualification",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 13422208,
+    "file_count": 392,
+    "schema_version": 1,
+    "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"
+  },
+  "source_manifest_after": {
+    "bytes": 13422208,
+    "file_count": 392,
+    "schema_version": 1,
+    "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-09-05T02:05:41.681167+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

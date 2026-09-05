@@ -1,0 +1,9 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -workspace ForgeConductor.xcworkspace -scheme ForgeConductor -configuration Debug -destination platform=macOS,arch=arm64 -derivedDataPath /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug -resultBundlePath /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Provider-Native.xcresult -parallel-testing-enabled NO "-only-testing:ForgeConductorAppTests" "-only-testing:ForgeConductorTests/ProviderConfigurationTests" SWIFT_TREAT_WARNINGS_AS_ERRORS=YES test
+
+Build settings from command line:
+    SWIFT_TREAT_WARNINGS_AS_ERRORS = YES
+
+Writing result bundle at path:
+	/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Provider-Native.xcresult
+

@@ -3,7 +3,7 @@
     {
       "kind": "stdout",
       "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G08.stdout.txt",
-      "sha256": "456c68fd77f436c47987b7dd6b71d21c2b8a43790b473444e99a331b877da09b"
+      "sha256": "62c65ca9e05feb0b66ebec2338606deae601607a54389d4bfa521ce398e43887"
     },
     {
       "kind": "stderr",
@@ -13,19 +13,19 @@
     {
       "kind": "criteria",
       "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G08.criteria.json",
-      "sha256": "9400af9cca98362000bcd1426c6557108e041511a348c24617d1ad85f3d6fce1"
+      "sha256": "0e95964be4d9afc7909660193fa9765aaefc3afe20afc81c2bd0f58d422eaa03"
     }
   ],
   "commands": [
     {
       "command": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-handlers/G08.sh",
-      "exit_code": 0,
+      "exit_code": 1,
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdout_sha256": "456c68fd77f436c47987b7dd6b71d21c2b8a43790b473444e99a331b877da09b",
+      "stdout_sha256": "62c65ca9e05feb0b66ebec2338606deae601607a54389d4bfa521ce398e43887",
       "timed_out": false
     }
   ],
-  "ended_at": "2026-08-23T20:45:54.583740+00:00",
+  "ended_at": "2026-09-05T02:02:24.742342+00:00",
   "environment": {
     "machine": "arm64",
     "platform": "macOS-26.6.2-arm64-arm-64bit",
@@ -62,9 +62,19 @@
     "name": "forge-gate-handler",
     "version": "1"
   },
+  "finalized": true,
   "gate_id": "G08",
   "notes": "",
+  "operation_id": "480ff36f-51f8-44b0-a857-14ee4230e319",
   "schema_version": 1,
-  "started_at": "2026-08-23T20:45:54.286886+00:00",
-  "status": "passed"
+  "source_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c",
+  "source_manifest": {
+    "bytes": 13422208,
+    "file_count": 392,
+    "schema_version": 1,
+    "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"
+  },
+  "started_at": "2026-09-05T02:02:24.525013+00:00",
+  "state_sequence_before": 1052,
+  "status": "failed"
 }

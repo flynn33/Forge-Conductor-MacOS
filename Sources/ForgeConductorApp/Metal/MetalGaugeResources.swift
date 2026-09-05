@@ -62,6 +62,13 @@ final class MetalGaugeResources {
         return pipeline(pixelFormat: view.colorPixelFormat)
     }
 
+    /// AppKit may still invoke a demand-drawn MTKView after its window is
+    /// ordered out. Check the native visibility boundary before scheduling or
+    /// submitting work, including an unattached view and a hidden ancestor.
+    static func canRender(_ view: MTKView) -> Bool {
+        view.window?.isVisible == true && !view.isHiddenOrHasHiddenAncestor
+    }
+
     private static let shader = """
     #include <metal_stdlib>
     using namespace metal;
@@ -72,6 +79,41 @@ final class MetalGaugeResources {
     }
     fragment float4 gauge_fragment(O in [[stage_in]]) { return in.c; }
     """
+}
+
+/// Resumes one pending demand draw at actual native visibility transitions.
+/// Selector observations are scoped to this view's current window and removed
+/// on detach and destruction; no timer or render loop is installed.
+@MainActor
+final class GaugeMetalView: MTKView {
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        NotificationCenter.default.removeObserver(self, name: NSWindow.didChangeOcclusionStateNotification, object: nil)
+        NotificationCenter.default.removeObserver(self, name: NSWindow.didExposeNotification, object: nil)
+        if let window {
+            NotificationCenter.default.addObserver(self, selector: #selector(windowVisibilityChanged),
+                name: NSWindow.didChangeOcclusionStateNotification, object: window)
+            NotificationCenter.default.addObserver(self, selector: #selector(windowVisibilityChanged),
+                name: NSWindow.didExposeNotification, object: window)
+        }
+        resumeDemandDraw()
+    }
+
+    override func viewDidUnhide() {
+        super.viewDidUnhide()
+        resumeDemandDraw()
+    }
+
+    @objc private func windowVisibilityChanged(_ notification: Notification) {
+        resumeDemandDraw()
+    }
+
+    private func resumeDemandDraw() {
+        guard delegate != nil, MetalGaugeResources.canRender(self) else { return }
+        setNeedsDisplay(bounds)
+    }
+
+    deinit { NotificationCenter.default.removeObserver(self) }
 }
 
 @MainActor

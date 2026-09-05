@@ -119,6 +119,15 @@ private final class OperatorProjectContractClient: OperatorManagerClientProtocol
     func cancelRuntimeJob(jobID: String) async throws -> OperatorRuntimeJob {
         throw OperatorProjectContractFixtureError.unexpectedCall
     }
+    func providerConfiguration() async throws -> ProviderConfigurationSnapshot {
+        throw OperatorProjectContractFixtureError.unexpectedCall
+    }
+    func updateProviderConfiguration(_ update: ProviderConfigurationUpdate) async throws -> ProviderConfigurationSnapshot {
+        throw OperatorProjectContractFixtureError.unexpectedCall
+    }
+    func providerModels() async throws -> ProviderModelInventory {
+        throw OperatorProjectContractFixtureError.unexpectedCall
+    }
     func probeProvider(
         adapterID: String,
         mode: OperatorProviderProbeMode

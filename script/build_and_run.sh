@@ -2,6 +2,17 @@
 set -euo pipefail
 
 MODE="${1:-run}"
+case "$MODE" in
+  run|--build-only|build-only|--debug|debug|--logs|logs|--telemetry|telemetry|--verify|verify) ;;
+  *)
+    echo "usage: $0 [run|--build-only|--debug|--logs|--telemetry|--verify]" >&2
+    exit 2
+    ;;
+esac
+if [[ $# -gt 1 ]]; then
+  echo "expected at most one build/run mode" >&2
+  exit 2
+fi
 APP_NAME="Forge Conductor"
 BUILD_PRODUCT="forge-conductor-app"
 CLI_PRODUCT="forge-conductor"
@@ -32,11 +43,11 @@ INFO_PLIST="$APP_CONTENTS/Info.plist"
 FILESYSTEM_DAEMON_PLIST="$APP_LAUNCH_DAEMONS/$FILESYSTEM_DAEMON_IDENTIFIER.plist"
 FILESYSTEM_DAEMON_PLIST_SOURCE="$ROOT_DIR/Sources/ForgeConductorApp/Resources/$FILESYSTEM_DAEMON_IDENTIFIER.plist"
 VERSION_SOURCE="$ROOT_DIR/Sources/ForgeFilesystemProtocol/ForgeFilesystemProtocol.swift"
-APP_MARKETING_VERSION="$(sed -n 's/.*public static let productVersion = "\([0-9][0-9.]*\)".*/\1/p' "$VERSION_SOURCE" | head -1)"
-DEFAULT_BUILD_VERSION="$(sed -n 's/.*public static let productBuildVersion = "\([1-9][0-9]*\)".*/\1/p' "$VERSION_SOURCE" | head -1)"
-APP_BUILD_VERSION="${FORGE_BUILD_NUMBER:-$DEFAULT_BUILD_VERSION}"
+APP_MARKETING_VERSION="$(sed -n 's/^[[:space:]]*public static let productVersion = "\([^"]*\)"[[:space:]]*$/\1/p' "$VERSION_SOURCE")"
+DEFAULT_BUILD_VERSION="$(sed -n 's/^[[:space:]]*public static let productBuildVersion = "\([^"]*\)"[[:space:]]*$/\1/p' "$VERSION_SOURCE")"
+APP_BUILD_VERSION="${FORGE_BUILD_NUMBER-$DEFAULT_BUILD_VERSION}"
 
-if [[ ! "$APP_MARKETING_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+if [[ ! "$APP_MARKETING_VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
   echo "unable to read a semantic version from $VERSION_SOURCE" >&2
   exit 1
 fi
@@ -48,6 +59,10 @@ if [[ ! "$APP_BUILD_VERSION" =~ ^[1-9][0-9]*$ ]]; then
   echo "FORGE_BUILD_NUMBER must be a positive integer" >&2
   exit 1
 fi
+if [[ "$APP_BUILD_VERSION" != "$DEFAULT_BUILD_VERSION" ]]; then
+  echo "FORGE_BUILD_NUMBER must match the compiled canonical build $DEFAULT_BUILD_VERSION; update the source and Xcode identity together" >&2
+  exit 1
+fi
 if [[ "$BINARY_CONFIGURATION" != "debug" && "$BINARY_CONFIGURATION" != "release" ]]; then
   echo "FORGE_BUILD_CONFIGURATION must be debug or release" >&2
   exit 1
@@ -56,6 +71,18 @@ if [[ "$DEVELOPMENT_SIGNING" != "0" && "$DEVELOPMENT_SIGNING" != "1" ]]; then
   echo "FORGE_DEVELOPMENT_SIGNING must be 0 or 1" >&2
   exit 1
 fi
+if [[ "$CODE_SIGN_IDENTITY" != "-" && "$BINARY_CONFIGURATION" == "release" && "$DEVELOPMENT_SIGNING" != "1" ]]; then
+  echo "signed optimized smoke builds require FORGE_DEVELOPMENT_SIGNING=1 and Apple Development signing; use Xcode archive/export for distribution" >&2
+  exit 1
+fi
+case "$CODE_SIGN_IDENTITY" in
+  "Developer ID"*)
+    echo "Developer ID distribution signing requires the canonical Xcode archive/export path" >&2
+    exit 1
+    ;;
+esac
+
+echo "Building a development smoke bundle. Distribution requires the canonical Xcode archive/export path."
 
 cd "$ROOT_DIR"
 SWIFT_BUILD_ARGUMENTS=(--configuration "$BINARY_CONFIGURATION")
@@ -119,9 +146,9 @@ chmod 0644 "$INFO_PLIST" "$APP_RESOURCES/Forge-Conductor.icns" "$FILESYSTEM_DAEM
 /usr/libexec/PlistBuddy -c "Set :LSMinimumSystemVersion $MIN_SYSTEM_VERSION" "$INFO_PLIST"
 /usr/libexec/PlistBuddy -c "Delete :CFBundleIconName" "$INFO_PLIST" >/dev/null 2>&1 || true
 
-# Nested code must be signed before the enclosing bundle so the final resource
-# seal records the exact helper identity and bytes used by the runtime gate.
-/usr/bin/xattr -cr "$APP_BUNDLE"
+# This convenience bundle is for local smoke testing only. Its development
+# signatures are not distribution, privileged-service, or installation proof.
+# Nested code must be signed before the enclosing bundle.
 CODE_SIGN_ARGUMENTS=(
   --force
   --sign "$CODE_SIGN_IDENTITY"
@@ -146,13 +173,8 @@ CODE_SIGN_ARGUMENTS=(
 /usr/bin/codesign --verify --deep --strict --all-architectures --verbose=4 "$APP_BUNDLE"
 
 if [[ "$CODE_SIGN_IDENTITY" != "-" ]]; then
-  if [[ "$BINARY_CONFIGURATION" == "debug" || "$DEVELOPMENT_SIGNING" == "1" ]]; then
-    EXPECTED_TEAM_IDENTIFIER="9AQ2C2838M"
-    EXPECTED_CERTIFICATE_REQUIREMENT='certificate leaf[field.1.2.840.113635.100.6.1.12] exists'
-  else
-    EXPECTED_TEAM_IDENTIFIER="2Y25RTLZET"
-    EXPECTED_CERTIFICATE_REQUIREMENT='certificate leaf[field.1.2.840.113635.100.6.1.13] exists'
-  fi
+  EXPECTED_TEAM_IDENTIFIER="9AQ2C2838M"
+  EXPECTED_CERTIFICATE_REQUIREMENT='certificate leaf[field.1.2.840.113635.100.6.1.12] exists'
   /usr/bin/codesign --verify --strict --all-architectures \
     "-R=anchor apple generic and identifier \"$BUNDLE_ID\" and certificate leaf[subject.OU] = \"$EXPECTED_TEAM_IDENTIFIER\" and $EXPECTED_CERTIFICATE_REQUIREMENT" \
     "$APP_BUNDLE"
@@ -179,7 +201,7 @@ stop_project_gui() {
 
 case "$MODE" in
   --build-only|build-only)
-    echo "$APP_NAME staged at $APP_BUNDLE"
+    echo "$APP_NAME development smoke bundle staged at $APP_BUNDLE"
     ;;
   run)
     stop_project_gui
@@ -204,7 +226,7 @@ case "$MODE" in
     open_app
     for _ in {1..20}; do
       if pgrep -f "^$APP_BINARY$" >/dev/null; then
-        echo "$APP_NAME launched from $APP_BUNDLE"
+        echo "$APP_NAME development smoke process launched from $APP_BUNDLE; product qualification remains separate"
         exit 0
       fi
       sleep 0.25

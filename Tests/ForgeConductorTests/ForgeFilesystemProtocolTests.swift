@@ -4,6 +4,81 @@ import XCTest
 import ForgeFilesystemProtocol
 
 final class ForgeFilesystemProtocolTests: XCTestCase {
+    // These are protocol-policy proofs. Actual protected-slot observation,
+    // daemon restart, and acknowledgement require the signed crash matrix.
+    func testCommittedReceiptPolicyRequiresAbsenceEvenForTheRecordedIdentity() {
+        for identityMatches in [false, true] {
+            XCTAssertFalse(ForgeFilesystemTerminalReceiptPolicy.agreesWithProtectedLeaf(
+                disposition: .committed,
+                leafExists: true,
+                leafMatchesCaptureReceipt: identityMatches
+            ))
+            XCTAssertTrue(ForgeFilesystemTerminalReceiptPolicy.agreesWithProtectedLeaf(
+                disposition: .committed,
+                leafExists: false,
+                leafMatchesCaptureReceipt: identityMatches
+            ))
+        }
+    }
+
+    func testQuarantineReceiptRequiresTheActualRecordedProtectedEntry() {
+        XCTAssertTrue(ForgeFilesystemTerminalReceiptPolicy.agreesWithProtectedLeaf(
+            disposition: .quarantined,
+            leafExists: true,
+            leafMatchesCaptureReceipt: true
+        ))
+        XCTAssertFalse(ForgeFilesystemTerminalReceiptPolicy.agreesWithProtectedLeaf(
+            disposition: .quarantined,
+            leafExists: true,
+            leafMatchesCaptureReceipt: false
+        ))
+        XCTAssertFalse(ForgeFilesystemTerminalReceiptPolicy.agreesWithProtectedLeaf(
+            disposition: .quarantined,
+            leafExists: false,
+            leafMatchesCaptureReceipt: true
+        ))
+        XCTAssertFalse(ForgeFilesystemTerminalReceiptPolicy.agreesWithProtectedLeaf(
+            disposition: .quarantined,
+            leafExists: false,
+            leafMatchesCaptureReceipt: false
+        ))
+    }
+
+    func testNonDeletionTerminalReceiptsCannotReleaseOccupiedSlots() {
+        for disposition: ForgeFilesystemTransactionDisposition in [
+            .restored, .rejected, .conflicted,
+        ] {
+            for identityMatches in [false, true] {
+                XCTAssertFalse(ForgeFilesystemTerminalReceiptPolicy.agreesWithProtectedLeaf(
+                    disposition: disposition,
+                    leafExists: true,
+                    leafMatchesCaptureReceipt: identityMatches
+                ))
+                XCTAssertTrue(ForgeFilesystemTerminalReceiptPolicy.agreesWithProtectedLeaf(
+                    disposition: disposition,
+                    leafExists: false,
+                    leafMatchesCaptureReceipt: identityMatches
+                ))
+            }
+        }
+    }
+
+    func testNonterminalStatusCannotActAsAReceiptRegardlessOfPathAbsence() {
+        for disposition: ForgeFilesystemTransactionDisposition in [
+            .unavailable, .recoveryRequired,
+        ] {
+            for exists in [false, true] {
+                for identityMatches in [false, true] {
+                    XCTAssertFalse(ForgeFilesystemTerminalReceiptPolicy.agreesWithProtectedLeaf(
+                        disposition: disposition,
+                        leafExists: exists,
+                        leafMatchesCaptureReceipt: identityMatches
+                    ))
+                }
+            }
+        }
+    }
+
     func testAtomicCaptureFailurePolicyRejectsOnlyDocumentedNoMutationErrors() {
         for code in [
             EACCES,

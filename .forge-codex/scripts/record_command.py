@@ -411,6 +411,8 @@ def execute_command(
     timeout_seconds: int,
     maximum_stream_bytes: int,
     environment: dict[str, str],
+    *,
+    process_metadata: dict[str, Any] | None = None,
 ) -> tuple[int, bool, bool]:
     timed_out = False
     stream_limit_exceeded = False
@@ -424,6 +426,8 @@ def execute_command(
             start_new_session=True,
             bufsize=0,
         )
+        if process_metadata is not None:
+            process_metadata["pid"] = process.pid
         assert process.stdout is not None
         assert process.stderr is not None
         selector = selectors.DefaultSelector()

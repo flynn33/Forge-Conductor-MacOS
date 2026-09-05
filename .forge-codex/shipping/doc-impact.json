@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "reviewed_base": "ffcf6bf9a2ea0c76a54788041cfa00c0dc8c7db4",
+  "documents": [
+    {
+      "path": "README.md",
+      "status": "updated",
+      "reason": "Describes bounded native startup and actions, hidden gauge behavior, real onboarding coverage and source-specific evidence boundaries."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "status": "updated",
+      "reason": "Records provider router, native startup/actions, pipe ownership, gauge visibility, recovery and installed CLI qualification changes without promoting release gates."
+    },
+    {
+      "path": "USER-GUIDE.md",
+      "status": "updated",
+      "reason": "Explains provider persistence and credential controls, asynchronous Settings saves and diagnostics export, with remaining installation and release boundaries."
+    },
+    {
+      "path": "XCODE.md",
+      "status": "updated",
+      "reason": "Documents source and test membership, actual runner environment forwarding, native lifecycle repetitions, distinct sanitizer configurations and ordinary signed build identity."
+    }
+  ],
+  "version_impact": "Marketing 0.9.0 and build 1 retained for development qualification. The new distribution identity remains blocked on the private distributed-build inventory; no distributable is claimed or published."
+}

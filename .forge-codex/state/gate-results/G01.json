@@ -13,7 +13,7 @@
     {
       "kind": "criteria",
       "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G01.criteria.json",
-      "sha256": "db06fee93b77af7b76208f85e3c0c53c49c5be48c2f61047199f2120f2325daf"
+      "sha256": "4a6fa6783c79614b63f7ba01d2ecd46c4513ceef6486c6c5db4d333a7620222a"
     }
   ],
   "commands": [
@@ -25,7 +25,7 @@
       "timed_out": false
     }
   ],
-  "ended_at": "2026-08-23T18:48:51.235668+00:00",
+  "ended_at": "2026-09-05T02:02:20.941987+00:00",
   "environment": {
     "machine": "arm64",
     "platform": "macOS-26.6.2-arm64-arm-64bit",
@@ -38,7 +38,7 @@
         "evidence": [
           {
             "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/feature-baseline.json",
-            "sha256": "39ff9c4014ad0e558568991aa641a47ee55470898bee2639fb81573193fc0f49"
+            "sha256": "77bef503e4f3b1f2efce0cea9b0803b8a6211d1167460bb2a46d12acc20a1fca"
           }
         ],
         "passed": true
@@ -77,9 +77,19 @@
     "name": "forge-gate-handler",
     "version": "1"
   },
+  "finalized": true,
   "gate_id": "G01",
   "notes": "",
+  "operation_id": "b7dc66f1-0d41-41b7-9d41-e3d637d1b2a3",
   "schema_version": 1,
-  "started_at": "2026-08-23T18:48:47.795319+00:00",
+  "source_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c",
+  "source_manifest": {
+    "bytes": 13422208,
+    "file_count": 392,
+    "schema_version": 1,
+    "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"
+  },
+  "started_at": "2026-09-05T02:02:04.855633+00:00",
+  "state_sequence_before": 1043,
   "status": "passed"
 }

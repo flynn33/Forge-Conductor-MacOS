@@ -15,6 +15,39 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
         try? FileManager.default.removeItem(at: home)
     }
 
+    func testBudgetPolicyOverridePreservesProviderCapacityReservesAndDefaultBehavior() throws {
+        let capabilities = try ProviderCapabilities(providerID: "lmstudio", providerVersion: "fixture-version",
+            modelKey: "fixture/tool-model", providerInstanceID: "exact-fixture-instance",
+            contextLength: 119_552, maximumContextLength: 262_144, statefulResponses: true,
+            streaming: true, customTools: true, mcp: false, structuredOutput: true,
+            usageReporting: true, idempotencyLookup: true, capabilityFingerprintSHA256: String(repeating: "a", count: 64))
+        let original = try PersistedManagedRunBudgetEvaluator.configuration(capabilities: capabilities)
+        let explicitNil = try PersistedManagedRunBudgetEvaluator.configuration(capabilities: capabilities, policyOverride: nil)
+        XCTAssertEqual(original, explicitNil)
+        XCTAssertEqual(original.policy.checkpointFraction, 0.25)
+        XCTAssertEqual(original.policy.rolloverFraction, 0.15)
+        XCTAssertEqual(original.policy.emergencyFraction, 0.05)
+        let override = ContextBudgetPolicy(checkpointFraction: 0.96, rolloverFraction: 0.90, emergencyFraction: 0.05)
+        let configured = try PersistedManagedRunBudgetEvaluator.configuration(capabilities: capabilities, policyOverride: override)
+        XCTAssertEqual(configured.capacity, original.capacity)
+        XCTAssertEqual(configured.reserves, original.reserves)
+        XCTAssertEqual(configured.capacity.capacity, 119_552)
+        XCTAssertEqual(configured.capacity.activeInstanceID, "exact-fixture-instance")
+        XCTAssertEqual(configured.usableCapacity, 100_512)
+        XCTAssertEqual(configured.policy, override)
+        let thresholds = try ContextBudgetMath.thresholds(configuration: configured, projectedNextTurn: 7_000)
+        XCTAssertGreaterThan(configured.usableCapacity - 7_000, thresholds.rollover)
+        XCTAssertLessThanOrEqual(configured.usableCapacity - 14_500, thresholds.rollover)
+        XCTAssertGreaterThan(configured.usableCapacity - 14_500, thresholds.emergency)
+    }
+
+    func testRuntimeRejectsInvalidInjectedBudgetPolicyBeforeStarting() throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let invalid = ContextBudgetPolicy(checkpointFraction: 0.25, rolloverFraction: 0.90)
+        XCTAssertThrowsError(try ManagedAutonomyRuntime(app: app, contextBudgetPolicy: invalid))
+    }
+
     func testDurableRunStartIdentityActivatesOnlyOnFirstExactAcceptance() async throws {
         let app = try ForgeApp.bootstrap(home: home)
         defer { app.shutdown() }

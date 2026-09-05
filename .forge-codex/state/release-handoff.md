@@ -1,6 +1,106 @@
-# Forge Conductor checkpoint and historical release handoff
+# Forge Conductor shipping checkpoint
 
-## Current checkpoint status — not release-qualified
+## Decision: BLOCKED checkpoint; not shippable
+
+The latest package at `/Users/jimdaley/Projects/Forge-Conductor/Forge-Conductor-Codex-Shipping-Package` is the active authority. T0 was 2026-09-04 22:33:06 UTC / 17:33:06 America/Chicago. The owner manually ships. Protected merge and public publication are not authorized by this work. No release, archive/export or notarization has occurred.
+
+| Required source and delivery item | Current observation |
+|---|---|
+| Canonical checkout | `/Users/jimdaley/GitHub/Forge-Conductor-MacOS`, branch `release/0.9.0-shipping`, source HEAD `b1876cf5b05134292ce0ecc6fb14ee67535c156c` before evidence-only delivery |
+| Execution checkout | Same path, branch and HEAD as canonical; Git common directory `/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.git` |
+| Clean/dirty state | Controlled source clean at candidate freeze; final delivery cleanliness is verified in external `delivery-readback.json` after the evidence-only commit |
+| Fetch and push destination | `https://github.com/flynn33/Forge-Conductor-MacOS.git`, remote `origin`; main last read back as `ffcf6bf9a2ea0c76a54788041cfa00c0dc8c7db4`. Final shipping-branch fetch/push readback is retained in external `delivery-readback.json` |
+| Source candidate | `b1876cf5b05134292ce0ecc6fb14ee67535c156c` |
+| Controlled build-input manifest | `4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14`, 392 files, 13,422,208 bytes; full paths and hashes in external `source-candidate-b1876cf-build-inputs.json` |
+| Delivery / merge | The evidence-only commit containing this handoff is identified by external `delivery-readback.json`, produced after commit and push to avoid a self-referential SHA. No merge |
+| Original work preserved | Local `release/0.9.0-product-readiness` at `829c06af9365928ead82eedd6fec66f053a56f05`; separate `/Users/jimdaley/GitHub/Forge-Conductor` and diagnostic worktrees untouched |
+| Product identity | 0.9.0/build 1 for development qualification. Private distributed-build inventory is required before choosing a new distribution build |
+| Xcode | `ForgeConductor.xcworkspace`; schemes `ForgeConductor` and `ForgeConductorAppTests`; explicit membership guard passes for 156 production Swift files |
+| Host and support scope | Mac16,7 arm64, 48 GiB; macOS 26.6.2/25G83; Xcode 26.6/17F113, Swift 6.3.3; deployment macOS 26. No other physical-memory tier was qualified |
+| Documentation | README, CHANGELOG, USER-GUIDE and XCODE updated; current impact review and named docs/version/membership checks pass |
+| Signing | Apple Development team 9AQ2C2838M; Developer ID team 2Y25RTLZET unavailable |
+| Archive / export / distribution hashes | None. The retained Apple Development build is not a distributable release |
+
+## Implemented behavior
+
+Native provider controls now save revisioned endpoint/model settings and keep, replace or clear Keychain credentials through authenticated manager routes. Bounded admission rejects overlapping work before queuing credential bodies; unsaved edits must be saved before discovery/probes. Router forwarding survives manager replacement.
+
+Bootstrap, settings, plugin and diagnostics work has explicit background ownership. Pending saves preserve newer edits; operator screens wait for readiness and retain failure/retry controls. Process output drains are nonblocking and bounded through termination. Hidden or detached gauge surfaces stop drawing and resume only the latest value.
+
+Continuity cancellation releases the creating executor/HTTP request. Coalesced callers cannot cancel the owner or turn shared interruption into terminal cancellation. Both result-delivery orders, accepted receipts, explicit cancellation and same-handoff restart recovery have deterministic tests. The configured 600-second provider bound and 660-second uncertainty fence remain unchanged.
+
+Protected-filesystem recovery rejects contradictory terminal receipts and ambiguous replay and blocks new mutations while recovery debt remains. These changes do not close parent-relocation containment or enable the missing mutation capabilities.
+
+Build identity, native test membership, development signing, CI and canonical installed CLI provenance checks are repaired. Historical inventory is preserved; current G01 validation uses the authoritative schema without promoting incomplete runtime assertions.
+
+## Retained qualification
+
+The full Debug/Release suites, 17 app-hosted tests, four native onboarding tests and focused sanitizers bind source `7d3fbb4c4def3ca4b0799e9a611a70ea816f881f`. Candidate `b1876cf` adds only four documentation files, the live test diagnostics and its baseline snapshot. `final-candidate-production-input-comparison.json` verifies all production source and build inputs are unchanged. The six focused diagnostic tests and ordinary signed build/install/CLI chain bind b1876cf directly. These scopes are retained separately.
+
+External output root: `/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z`. The external `qualification-evidence-index.json` and `.md` enumerate the recorder results and artifact checks. Every command record remains in `.forge-codex/evidence`; failed records and source-specific artifact copies are preserved. Earlier-source results are supporting evidence only.
+
+| Qualification | Observed result and evidence |
+|---|---|
+| Final SwiftPM Debug | `EVID-20260905T012952Z-438ce12991`: 1,043 tests, five skips, zero failures, 181.455 seconds, warnings as errors |
+| Final SwiftPM Release | `EVID-20260905T012426Z-683a8dcacb`: 1,043 tests, five skips, zero failures, 168.070 seconds, warnings as errors |
+| Declared suite skips | Three opt-in live cases, one external helper-only relink case, unavailable PowerShell; each full suite retains its actual skip count |
+| Final native app-hosted | `EVID-20260905T013112Z-d0687b0ed2`: 17 tests, zero skips/failures |
+| Final production onboarding | `EVID-20260905T012552Z-150ad6578a`: all four tests passed with zero skips. Real folder picker/cancel/invalid root, offline provider save/rejection/replacement, Settings shell off/on plus fresh MCP, and real provider discovery/connection |
+| Actual native Keychain | `EVID-20260904T230820Z-6e5b1140b8`: 14 tests passed, including disposable Keychain operations; earlier-source supporting scope |
+| Continuity ASan / TSan | `EVID-20260905T012426Z-5922d79531` / `EVID-20260905T012426Z-b891d547a1`: separate configurations, 29 selected tests each, one opt-in live skip, zero failures and no sanitizer errors |
+| Earlier broader native ASan / TSan | `EVID-20260904T234923Z-11af1c99e5`: 23 tests; `EVID-20260904T234923Z-fb7abff122`: 21 tests, both zero failures. ASan shutdown priority warnings remain a performance limit; no whole-app closure claim |
+| Native Release gauges | `EVID-20260905T001555Z-8e3d919e17`: four tests passed including 100 cycles. Component draw/buffer/weak-owner assertions passed; closed fixture windows accumulated to 101 |
+| Native Release stress | `EVID-20260905T002734Z-868154a9ac`: retained 500 memory records, 100 project cycles, 100 MCP requests, 25 process cycles, 50 logical rollovers, 100 synthetic restarts and five flat post-release RSS samples. Final full Release also passed this workload. Not a soak or physical-hardware matrix |
+| Canonical ordinary build | `EVID-20260905T020038Z-e1d79496cc`, passed; seven exact signed product files plus complete controlled input manifest hash-bound |
+| Canonical bundle check | `EVID-20260905T020337Z-0bf14736d7`, passed with DevelopmentRelease trust policy |
+| Canonical installation | `EVID-20260905T020339Z-bbd5f84078`: overall partial/exit 4; installation, raw CLI, default shell, migration, opt-out and app/manager restart substeps passed. Its own System Events Settings substep is not run; the separate native XCTest Settings case passed |
+| Selected CLI production capture | `EVID-20260905T020541Z-44ebbd3215`, passed; independent reader `EVID-20260905T020559Z-b88b6a3a82` accepts exactly two assertions in development-installed-release scope. Full matrix and distribution qualification remain false |
+| Signed MCP memory | `EVID-20260904T232726Z-eede5c9223`: 43 postconditions, 68 responses across five processes, all 17 memory tools and 12 cross-project denials; supporting scope only |
+| Full MCP compatibility | `EVID-20260904T233148Z-91e3a4f6d2` failed required `fs_move` success; still blocked |
+| Source / documentation checks | Attribution `EVID-20260905T020239Z-43b7016ef7`, docs `EVID-20260905T020239Z-0fcbeca4b2`, membership `EVID-20260905T020239Z-4bcd1d3341`, version `EVID-20260905T020337Z-2d9031f446`, passed |
+| Final ready gates | `EVID-20260905T020201Z-d60f2fc514`, exit 1: current G00/G01 passed; G02-G09 rejected historical authority/bindings. G10-G12 remained dependency-blocked with older result files |
+| Calibrated real managed rollover | EVID-20260905T013918Z-faae358156 failed one test/one failure after 504.049 seconds: missing accepted bootstrap receipt. Two predecessor turns crossed the exact threshold correctly; no recovery pass claimed. Read-only observations bound by EVID-20260905T015036Z-9abc7a3f6f |
+| Smaller real fresh-root diagnostic | EVID-20260905T015037Z-7125c5a46e passed one test in 169.805 seconds: actual context 119,552, exact handoff acknowledgment, fresh root and automatic continuation marker validated |
+| Final diagnostic tests | `EVID-20260905T020038Z-0fd00c88e8`: six SwiftPM tests, zero skips/failures, warnings as errors, including two new diagnostic privacy/bounds cases and four worker regressions. Native selector `EVID-20260905T020200Z-fdaed4e194` ran zero tests and is not qualifying evidence |
+| Final manager diagnostic | `EVID-20260905T020600Z-5ede7bf8cf`: one test, two failures, 485.853 seconds. Child exit 1; recorder 125 because success-only JSON was absent. Sanitized failure artifact retained; no source drift. Ledger quarantined with `acknowledgement_mismatch`, no accepted receipt, intended injected crash not reached |
+| Completion verifier | `EVID-20260905T021429Z-0c934cf27f`: exit 1; 64 of 124 checks passed, 60 failed checks. G12 remains blocked/open; not shippable |
+
+Final development app: `/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Handoff-Release/Build/Products/Release/Forge Conductor.app`. Actual installed copy retained at `Installed-Handoff-Qualification-Home/Forge Conductor.app` under the output root. Build record lists every nested SHA256. Source GUI executable SHA256 is `5ded71fab710208ec45d2db67ebcef8d4787eefab00eda8f61f7dfee47e145a1`; CLI is `ac3431f713fa2f2295e4912c046c40e40e4157ba3d3640f1be3196e7eeb9399f`. These are development product hashes, not a distribution package hash.
+
+Installation cleanup restored `.local/bin/forge-conductor-swift` to `/Users/jimdaley/.forge-conductor/bin/forge-conductor`, restored the relevant launchd disabled state and left no manager job/plist or recorded residuals. The real test cleaned its temporary manager fixture. The task-owned model was idle with no queued requests and was unloaded to restore the initial model state. `final-host-cleanup.json` retains the readback. No privileged filesystem service was installed.
+
+The final failure summary hash matches the source-defined typed-call validation error: exactly one correctly named call with a JSON-object payload is required. This narrows the failure to call count, name or payload shape; it does not establish an identity/checksum/nonce mismatch. The smaller passing fixture allows 4,096 output tokens while the manager fixture allows 512. This difference is a hypothesis, not a proven defect. The transport already requires completed status. The minimum next diagnostic forwards the actual returned turn unchanged and records only call count, expected-name match, argument shape, output usage/cap and assistant-text bytes/hash or exact predecessor-wait match.
+
+## Failed observations and their disposition
+
+First live attempt `EVID-20260905T003625Z-18c26459bd` naturally failed one test/two failures after 486.098 seconds: the previous accelerated thresholds rolled over after only one predecessor turn, followed by cancellation during bootstrap. Child exit 1; recorder 125 because the success-only report was absent. No signals were sent. A later database diagnostic missed the already-cleaned fixture and remains a failed capture. The test threshold and observation-window repairs preserve ordinary policy, exact context, multi-turn requirements and the uncertainty fence.
+
+The creating request and shared cancellation defects each have retained failing before and passing after tests. `EVID-20260905T012500Z-7d8f1ef32b` binds both forced V2 result-delivery orders: three tests/eight before failures, then three passes and 63 focused regressions with one skip. This supports bounded local ownership and recovery classification, not proof that a remote inference server stops immediately.
+
+`EVID-20260905T012251Z-62f9e1131b` binds five failing native window comparisons. Hosting view and wrapper release; the closed window survives. An XCTest outer autorelease-pool retaining edge was observed, but failed pool comparisons do not establish that it is the sole owner. No production window leak/multiplication is established and no speculative fixture or product repair was committed. Raw memgraph remains outside the repository.
+
+CLI capture `EVID-20260905T013354Z-f05c7c618f` selected zero tests because its supplied build recorder kind was not the reviewed canonical kind. A fresh canonical build/install/capture chain above corrected the invocation; the failed record and prior artifact paths remain unchanged.
+
+## Hard blockers and minimum next actions
+
+| Blocker | Evidence / minimum next action |
+|---|---|
+| Filesystem containment and missing mutation contracts | The unprivileged Darwin parent-FD relocation reproducer changed the relocated outside-root leaf. `fs_move` and recursive directory deletion remain disabled. Review an allowed identity-bound containment repair, then execute the signed 57-row E2/crash matrix; do not treat recovery mitigations as elimination |
+| Privileged caller and service lifecycle | Prove installed caller identity/freshness, approval, update/disable/restart and recovery with the coherent signed stack and required owner-controlled consent |
+| Full production-feature matrix | 104 features / 259 assertions; two CLI assertions accepted, 257 still lack concrete production scenarios. Wire and run remaining scenarios through the canonical registry and preserve all compatibility contracts |
+| Real managed continuity | Diagnose the typed acknowledgment call rejected by the larger manager bootstrap. Preserve strict validation, classify malformed or missing calls without publishing prompts/credentials, repair only a reproduced cause, then prove same-handoff acceptance, continuation, fencing and crash/replay. The process-kill matrix remains separate |
+| Native scene lifetime and resource budgets | Profile actual scenes outside the retaining XCTest fixture, finish before/after Release CPU/GPU/wakeup/database and long-duration memory trajectories, and run representative physical-memory tiers |
+| Historical gate authority | G02-G07 include stale source/ledger hashes and some missing historical trace files. G08/G09 criteria have historical authority only. Requalify each actual criterion and missing observation; do not just replace hashes or authority flags |
+| Distribution identity and signing | Obtain private distributed-build inventory and available Developer ID identity, choose a non-conflicting build, rebuild/archive/export and prove notarization/stapling/Gatekeeper and clean install/upgrade before owner publication |
+| Final completion | Resolve the actual failed criteria and High findings, then rerun the verifier; current command failed 60 checks |
+
+Automatic security review rejected the proposed privileged filesystem worker action as a possible cybersecurity risk. The rejected action was not retried through another lane. The remaining containment work is blocked on an allowed repair workflow.
+
+## Resume and publication boundary
+
+All final recorders completed with unchanged controlled source. Preserve all failed records, exact external artifact paths, original local branch and diagnostic worktrees. No public release or protected merge is permitted by this checkpoint; owner publication remains manual. Evidence-only delivery must compare every controlled input against source candidate b1876cf and verify fetch/push server refs after push. A later evidence commit does not make historical gate authority current.
+
+## Historical product-readiness checkpoint — superseded branch description
 
 The active branch is `release/0.9.0-product-readiness`. Its immutable source
 checkpoint is `2cc41ee2d95255761582792ed6c70c00702ff2f6`, based on `main` at

@@ -1,0 +1,487 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -workspace ForgeConductor.xcworkspace -scheme ForgeConductor -configuration Debug -destination platform=macOS,arch=arm64 -derivedDataPath /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug -resultBundlePath /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Provider-Core-Native-2.xcresult -parallel-testing-enabled NO "-only-testing:ForgeConductorTests/ProviderConfigurationTests" "-only-testing:ForgeConductorTests/ForgeFilesystemProtocolTests" SWIFT_TREAT_WARNINGS_AS_ERRORS=YES GCC_TREAT_WARNINGS_AS_ERRORS=YES test
+
+Build settings from command line:
+    GCC_TREAT_WARNINGS_AS_ERRORS = YES
+    SWIFT_TREAT_WARNINGS_AS_ERRORS = YES
+
+Writing result bundle at path:
+	/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Provider-Core-Native-2.xcresult
+
+ComputePackagePrebuildTargetDependencyGraph
+
+Prepare packages
+
+CreateBuildRequest
+
+SendProjectDescription
+
+CreateBuildOperation
+
+ComputeTargetDependencyGraph
+note: Building targets in dependency order
+note: Target dependency graph (8 targets)
+    Target 'ForgeConductorUITests' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeConductor' in project 'ForgeConductor'
+    Target 'ForgeConductorTests' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeConductorCore' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'forge-conductor' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeRuntimeLauncher' in project 'ForgeConductor'
+    Target 'ForgeConductor' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeConductorCore' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeRuntimeLauncher' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeFilesystemDaemon' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'forge-conductor' in project 'ForgeConductor'
+    Target 'forge-conductor' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeConductorCore' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeRuntimeLauncher' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeFilesystemDaemon' in project 'ForgeConductor'
+    Target 'ForgeFilesystemDaemon' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeFilesystemProtocol' in project 'ForgeConductor'
+    Target 'ForgeRuntimeLauncher' in project 'ForgeConductor' (no dependencies)
+    Target 'ForgeConductorCore' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeFilesystemProtocol' in project 'ForgeConductor'
+    Target 'ForgeFilesystemProtocol' in project 'ForgeConductor' (no dependencies)
+
+GatherProvisioningInputs
+
+CreateBuildDescription
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc --version
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -v -E -dM -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -x c -c /dev/null
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/usr/bin/actool --version --output-format xml1
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld -version_details
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/libtool -V
+
+Build description signature: 72702dbfaa18b858bdbe8f60a30ad462
+Build description path: /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/XCBuildData/72702dbfaa18b858bdbe8f60a30ad462.xcbuilddata
+ClangStatCache /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/SDKStatCaches.noindex/macosx26.5-25F70-688ef53f1462e2c8f657fdc38a81448fe082c4a02f00227109f4ed75e425c832.sdkstatcache
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -o /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/SDKStatCaches.noindex/macosx26.5-25F70-688ef53f1462e2c8f657fdc38a81448fe082c4a02f00227109f4ed75e425c832.sdkstatcache
+
+ProcessInfoPlistFile /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeRuntimeLauncher.build/Objects-normal/arm64/Processed-Info.plist /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeRuntimeLauncher.build/empty-forge-runtime-launcher.plist (in target 'ForgeRuntimeLauncher' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-infoPlistUtility /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeRuntimeLauncher.build/empty-forge-runtime-launcher.plist -producttype com.apple.product-type.tool -expandbuildsettings -platform macosx -o /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeRuntimeLauncher.build/Objects-normal/arm64/Processed-Info.plist
+
+ProcessInfoPlistFile /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorCore.framework/Versions/A/Resources/Info.plist /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/empty-ForgeConductorCore.plist (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-infoPlistUtility /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/empty-ForgeConductorCore.plist -producttype com.apple.product-type.framework -expandbuildsettings -platform macosx -o /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorCore.framework/Versions/A/Resources/Info.plist
+
+ProcessInfoPlistFile /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeFilesystemDaemon.build/Objects-normal/arm64/Processed-Info.plist /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeFilesystemDaemon.build/empty-forge-filesystem-daemon.plist (in target 'ForgeFilesystemDaemon' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-infoPlistUtility /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeFilesystemDaemon.build/empty-forge-filesystem-daemon.plist -producttype com.apple.product-type.tool -expandbuildsettings -platform macosx -o /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeFilesystemDaemon.build/Objects-normal/arm64/Processed-Info.plist
+
+ProcessInfoPlistFile /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/forge-conductor.build/Objects-normal/arm64/Processed-Info.plist /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/forge-conductor.build/DerivedSources/ForgeConductorCLI-Info.plist (in target 'forge-conductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-infoPlistUtility /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/forge-conductor.build/DerivedSources/ForgeConductorCLI-Info.plist -producttype com.apple.product-type.tool -expandbuildsettings -platform macosx -o /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/forge-conductor.build/Objects-normal/arm64/Processed-Info.plist
+
+Copy /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/forge_conductor.swiftmodule/arm64-apple-macos.swiftdoc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/forge-conductor.build/Objects-normal/arm64/forge_conductor.swiftdoc (in target 'forge-conductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/forge-conductor.build/Objects-normal/arm64/forge_conductor.swiftdoc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/forge_conductor.swiftmodule/arm64-apple-macos.swiftdoc
+
+ProcessInfoPlistFile /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest/Contents/Info.plist /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/empty-ForgeConductorTests.plist (in target 'ForgeConductorTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-infoPlistUtility /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/empty-ForgeConductorTests.plist -producttype com.apple.product-type.bundle.unit-test -expandbuildsettings -platform macosx -o /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest/Contents/Info.plist
+
+CodeSign /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest/Contents/Frameworks/ForgeConductorCore.framework/Versions/A (in target 'ForgeConductorTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    
+    Signing Identity:     "Apple Development: James Daley (FW94K6ZY57)"
+    
+    /usr/bin/codesign --force --sign 3E6B7EA813299330FC3235BBA34BE9237F0F1644 --timestamp\=none --preserve-metadata\=identifier,entitlements,flags --generate-entitlement-der /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest/Contents/Frameworks/ForgeConductorCore.framework/Versions/A
+/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest/Contents/Frameworks/ForgeConductorCore.framework/Versions/A: replacing existing signature
+
+Copy /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge_Conductor.swiftmodule/Project/arm64-apple-macos.swiftsourceinfo /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge_Conductor.swiftsourceinfo (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge_Conductor.swiftsourceinfo /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge_Conductor.swiftmodule/Project/arm64-apple-macos.swiftsourceinfo
+
+Copy /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge_Conductor.swiftmodule/arm64-apple-macos.swiftmodule /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge_Conductor.swiftmodule (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge_Conductor.swiftmodule /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge_Conductor.swiftmodule/arm64-apple-macos.swiftmodule
+
+Copy /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge_Conductor.swiftmodule/arm64-apple-macos.swiftdoc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge_Conductor.swiftdoc (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge_Conductor.swiftdoc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge_Conductor.swiftmodule/arm64-apple-macos.swiftdoc
+
+Copy /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge_Conductor.swiftmodule/arm64-apple-macos.abi.json /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge_Conductor.abi.json (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge_Conductor.abi.json /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge_Conductor.swiftmodule/arm64-apple-macos.abi.json
+
+ProcessInfoPlistFile /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Info.plist /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/DerivedSources/ForgeConductorApp-Info.plist (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-infoPlistUtility /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/DerivedSources/ForgeConductorApp-Info.plist -producttype com.apple.product-type.application -genpkginfo /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/PkgInfo -expandbuildsettings -platform macosx -additionalcontentfile /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/assetcatalog_generated_info.plist -scanforprivacyfile /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/ForgeConductorCore.framework -o /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Info.plist
+
+CopySwiftLibs /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-swiftStdLibTool --copy --verbose --sign 3E6B7EA813299330FC3235BBA34BE9237F0F1644 --scan-executable /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/MacOS/Forge\ Conductor.debug.dylib --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/PlugIns --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Library/SystemExtensions --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Extensions --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorCore.framework --scan-folder /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk/System/Library/Frameworks/MetalKit.framework --scan-folder /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk/System/Library/Frameworks/SwiftUI.framework --platform macosx --toolchain /var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.CLHpB9/Metal.xctoolchain --toolchain /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --destination /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks --strip-bitcode --strip-bitcode-tool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/bitcode_strip --emit-dependency-info /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/SwiftStdLibToolInputDependencies.dep --filter-for-swift-os
+
+ProcessInfoPlistFile /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorUITests-Runner.app/Contents/PlugIns/ForgeConductorUITests.xctest/Contents/Info.plist /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorUITests.build/empty-ForgeConductorUITests.plist (in target 'ForgeConductorUITests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-infoPlistUtility /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorUITests.build/empty-ForgeConductorUITests.plist -producttype com.apple.product-type.bundle.ui-testing -expandbuildsettings -platform macosx -additionalcontentfile /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorUITests.build/ProductTypeInfoPlistAdditions.plist -o /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorUITests-Runner.app/Contents/PlugIns/ForgeConductorUITests.xctest/Contents/Info.plist
+
+CopySwiftLibs /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest (in target 'ForgeConductorTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-swiftStdLibTool --copy --verbose --sign 3E6B7EA813299330FC3235BBA34BE9237F0F1644 --scan-executable /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest/Contents/MacOS/ForgeConductorTests --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest/Contents/Frameworks --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest/Contents/PlugIns --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest/Contents/Library/SystemExtensions --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest/Contents/Extensions --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorCore.framework --platform macosx --toolchain /var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.CLHpB9/Metal.xctoolchain --toolchain /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --destination /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest/Contents/Frameworks --strip-bitcode --scan-executable /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib/libXCTestSwiftSupport.dylib --strip-bitcode-tool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/bitcode_strip --emit-dependency-info /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/SwiftStdLibToolInputDependencies.dep --filter-for-swift-os
+
+CodeSign /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest (in target 'ForgeConductorTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    
+    Signing Identity:     "Apple Development: James Daley (FW94K6ZY57)"
+    
+    /usr/bin/codesign --force --sign 3E6B7EA813299330FC3235BBA34BE9237F0F1644 --timestamp\=none --generate-entitlement-der /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest
+/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest: replacing existing signature
+
+Test Suite 'Selected tests' started at 2026-09-04 18:06:36.310.
+Test Suite 'ForgeConductorTests.xctest' started at 2026-09-04 18:06:36.310.
+Test Suite 'ForgeFilesystemProtocolTests' started at 2026-09-04 18:06:36.310.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testAcknowledgementIsIdempotentOnlyWhenTransactionIsAbsent]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testAcknowledgementIsIdempotentOnlyWhenTransactionIsAbsent]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testAtomicCaptureFailurePolicyRejectsOnlyDocumentedNoMutationErrors]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testAtomicCaptureFailurePolicyRejectsOnlyDocumentedNoMutationErrors]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testCapturedLeafRollbackPolicyNeverRestoresThroughRelocatableParent]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testCapturedLeafRollbackPolicyNeverRestoresThroughRelocatableParent]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testCaptureFirstCoordinatorCommitsOnlyAfterCapturedVerification]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testCaptureFirstCoordinatorCommitsOnlyAfterCapturedVerification]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testCaptureFirstCoordinatorDoesNotVerifyOrCommitAfterCaptureFailure]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testCaptureFirstCoordinatorDoesNotVerifyOrCommitAfterCaptureFailure]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testCaptureFirstCoordinatorQuarantinesMismatchWithoutCommit]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testCaptureFirstCoordinatorQuarantinesMismatchWithoutCommit]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testCodeDirectoryHashNormalizationIsStrictAndDeterministic]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testCodeDirectoryHashNormalizationIsStrictAndDeterministic]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testCommittedReceiptPolicyRequiresAbsenceEvenForTheRecordedIdentity]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testCommittedReceiptPolicyRequiresAbsenceEvenForTheRecordedIdentity]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testConflictedTransactionStatusIsDurableTerminalAndAcknowledgable]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testConflictedTransactionStatusIsDurableTerminalAndAcknowledgable]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testCurrentRunningCodeIdentityProducesStrictCodeDirectoryHash]' started.
+2026-09-04 18:06:36.318717-0500 xctest[76376:33185184] [logging-persist] cannot open file at line 51044 of [f0ca7bba1c]
+2026-09-04 18:06:36.318727-0500 xctest[76376:33185184] [logging-persist] os_unix.c:51044: (2) open(/private/var/db/DetachedSignatures) - No such file or directory
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testCurrentRunningCodeIdentityProducesStrictCodeDirectoryHash]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testExistingNonterminalBindingFailureRetainsOriginalTransactionIdentity]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testExistingNonterminalBindingFailureRetainsOriginalTransactionIdentity]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testMutationRequestDigestCanonicalizesUUIDCaseAndBindsContract]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testMutationRequestDigestCanonicalizesUUIDCaseAndBindsContract]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testMutationRequestEncodesExactContentContractForTypedDaemonRejection]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testMutationRequestEncodesExactContentContractForTypedDaemonRejection]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testMutationRequestRejectsGenerationOutsideSignedCodingRange]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testMutationRequestRejectsGenerationOutsideSignedCodingRange]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testMutationRequestRejectsSpecialExpectedLeafTypes]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testMutationRequestRejectsSpecialExpectedLeafTypes]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testMutationRequestRejectsUnknownProtocolAndUnboundedOrUnsafeComponents]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testMutationRequestRejectsUnknownProtocolAndUnboundedOrUnsafeComponents]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testMutationRequestRequiresContractSpecificExpectedIdentity]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testMutationRequestRequiresContractSpecificExpectedIdentity]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testMutationRequestSecureCodingRoundTripPreservesBoundedEnvelope]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testMutationRequestSecureCodingRoundTripPreservesBoundedEnvelope]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testMutationRequestSecureDecodingRejectsDigestBoundFieldTamper]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testMutationRequestSecureDecodingRejectsDigestBoundFieldTamper]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testNonDeletionTerminalReceiptsCannotReleaseOccupiedSlots]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testNonDeletionTerminalReceiptsCannotReleaseOccupiedSlots]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testNonterminalStatusCannotActAsAReceiptRegardlessOfPathAbsence]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testNonterminalStatusCannotActAsAReceiptRegardlessOfPathAbsence]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testPeerRequirementsBindExactIdentifiersTeamsAndCertificateClass]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testPeerRequirementsBindExactIdentifiersTeamsAndCertificateClass]' passed (0.002 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testPostIntentPublicationFailureRetainsOriginalTransactionIdentity]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testPostIntentPublicationFailureRetainsOriginalTransactionIdentity]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testProductRequirementsBindEachApprovedTeamToOnlyItsCertificateClass]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testProductRequirementsBindEachApprovedTeamToOnlyItsCertificateClass]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testProjectBindingProbeOrderResolvesInitialHashCollisionsWithinBound]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testProjectBindingProbeOrderResolvesInitialHashCollisionsWithinBound]' passed (0.006 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testQuarantinedTransactionStatusIsDurableTerminalAndNotAcknowledgable]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testQuarantinedTransactionStatusIsDurableTerminalAndNotAcknowledgable]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testQuarantinedTransactionStatusRejectsContradictoryFlagsAndSuccessCode]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testQuarantinedTransactionStatusRejectsContradictoryFlagsAndSuccessCode]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testQuarantineReceiptRequiresTheActualRecordedProtectedEntry]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testQuarantineReceiptRequiresTheActualRecordedProtectedEntry]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testRequesterPolicyRejectsLeafExtendedACLAndEveryProtectedBSDFlag]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testRequesterPolicyRejectsLeafExtendedACLAndEveryProtectedBSDFlag]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testRequesterPolicyRejectsRootAndInvalidUIDs]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testRequesterPolicyRejectsRootAndInvalidUIDs]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testRequesterPolicyRequiresExactPersistedUIDForRetryAndRebind]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testRequesterPolicyRequiresExactPersistedUIDForRetryAndRebind]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testRequesterPolicyRequiresOwnerWriteOnFinalParent]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testRequesterPolicyRequiresOwnerWriteOnFinalParent]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testRequesterPolicyRequiresRequesterOwnershipSearchAndNoACL]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testRequesterPolicyRequiresRequesterOwnershipSearchAndNoACL]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testSecuredInfoDictionaryHashExtractionFailsClosed]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testSecuredInfoDictionaryHashExtractionFailsClosed]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testServiceInfoSecureCodingAndExactRuntimeMatch]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testServiceInfoSecureCodingAndExactRuntimeMatch]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testTerminalResponseSecureCodingPreservesAcknowledgementRequirement]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testTerminalResponseSecureCodingPreservesAcknowledgementRequirement]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testTerminalResponseSecureDecodingRejectsUndurableAcknowledgementSignal]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testTerminalResponseSecureDecodingRejectsUndurableAcknowledgementSignal]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testTransactionAuthorityRequiresExactUIDProjectGenerationAndRootEnvelope]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testTransactionAuthorityRequiresExactUIDProjectGenerationAndRootEnvelope]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testTransactionControlRequestRejectsMismatchedVersionAndInvalidBounds]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testTransactionControlRequestRejectsMismatchedVersionAndInvalidBounds]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testTransactionControlRequestSecureCodingRoundTripPreservesAuthorityEnvelope]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testTransactionControlRequestSecureCodingRoundTripPreservesAuthorityEnvelope]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testTransactionStatusSecureCodingRoundTripPreservesTerminalDisposition]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testTransactionStatusSecureCodingRoundTripPreservesTerminalDisposition]' passed (0.002 seconds).
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testTransactionStatusSecureDecodingRejectsContradictoryTerminalFlags]' started.
+Test Case '-[ForgeConductorTests.ForgeFilesystemProtocolTests testTransactionStatusSecureDecodingRejectsContradictoryTerminalFlags]' passed (0.000 seconds).
+Test Suite 'ForgeFilesystemProtocolTests' passed at 2026-09-04 18:06:36.351.
+	 Executed 42 tests, with 0 failures (0 unexpected) in 0.031 (0.041) seconds
+Test Suite 'ProviderConfigurationTests' started at 2026-09-04 18:06:36.351.
+Test Case '-[ForgeConductorTests.ProviderConfigurationTests testCancellationReleasesInventoryAdmissionWithoutChangingConfiguration]' started.
+Test Case '-[ForgeConductorTests.ProviderConfigurationTests testCancellationReleasesInventoryAdmissionWithoutChangingConfiguration]' passed (0.004 seconds).
+Test Case '-[ForgeConductorTests.ProviderConfigurationTests testCleanSettingsSaveThroughServiceSurvivesOwnerRestartWithOwnerOnlyFile]' started.
+Test Case '-[ForgeConductorTests.ProviderConfigurationTests testCleanSettingsSaveThroughServiceSurvivesOwnerRestartWithOwnerOnlyFile]' passed (0.002 seconds).
+Test Case '-[ForgeConductorTests.ProviderConfigurationTests testCommittedRenameThenSynchronizationFailureKeepsNewCredential]' started.
+Test Case '-[ForgeConductorTests.ProviderConfigurationTests testCommittedRenameThenSynchronizationFailureKeepsNewCredential]' passed (0.004 seconds).
+Test Case '-[ForgeConductorTests.ProviderConfigurationTests testConcurrentUpdatesHaveOneWinnerAndRejectStaleRevisionAfterRestart]' started.
+Test Case '-[ForgeConductorTests.ProviderConfigurationTests testConcurrentUpdatesHaveOneWinnerAndRejectStaleRevisionAfterRestart]' passed (0.004 seconds).
+Test Case '-[ForgeConductorTests.ProviderConfigurationTests testDeniedKeychainRetainsPriorCredentialAndConfiguration]' started.
+Test Case '-[ForgeConductorTests.ProviderConfigurationTests testDeniedKeychainRetainsPriorCredentialAndConfiguration]' passed (0.003 seconds).
+Test Case '-[ForgeConductorTests.ProviderConfigurationTests testInterruptedPersistencePreservesPriorCredentialAndCleansStagedCredential]' started.
+Test Case '-[ForgeConductorTests.ProviderConfigurationTests testInterruptedPersistencePreservesPriorCredentialAndCleansStagedCredential]' passed (0.003 seconds).
+Test Case '-[ForgeConductorTests.ProviderConfigurationTests testInventoryAuthenticationOfflineAndTimeoutAreDistinctAndRedacted]' started.
+Test Case '-[ForgeConductorTests.ProviderConfigurationTests testInventoryAuthenticationOfflineAndTimeoutAreDistinctAndRedacted]' passed (0.003 seconds).
+Test Case '-[ForgeConductorTests.ProviderConfigurationTests testKeepReplaceAndClearCredentialsNeverPersistSecretAndRecoverCleanup]' started.
+Test Case '-[ForgeConductorTests.ProviderConfigurationTests testKeepReplaceAndClearCredentialsNeverPersistSecretAndRecoverCleanup]' passed (0.006 seconds).
+Test Case '-[ForgeConductorTests.ProviderConfigurationTests testMalformedOriginsAndTokenActionsRetainLastValidConfiguration]' started.
+Test Case '-[ForgeConductorTests.ProviderConfigurationTests testMalformedOriginsAndTokenActionsRetainLastValidConfiguration]' passed (0.003 seconds).
+Test Case '-[ForgeConductorTests.ProviderConfigurationTests testModelInventoryUsesExistingTransportAndReportsLoadedState]' started.
+Test Case '-[ForgeConductorTests.ProviderConfigurationTests testModelInventoryUsesExistingTransportAndReportsLoadedState]' passed (0.007 seconds).
+Test Case '-[ForgeConductorTests.ProviderConfigurationTests testNoModelInvalidModelAndUnloadedModelAreActionableAndDistinct]' started.
+Test Case '-[ForgeConductorTests.ProviderConfigurationTests testNoModelInvalidModelAndUnloadedModelAreActionableAndDistinct]' passed (0.002 seconds).
+Test Case '-[ForgeConductorTests.ProviderConfigurationTests testNonterminalDurableRunFencesConfigurationWithoutChangingRun]' started.
+Thread Performance Checker: Thread running at User-initiated quality-of-service class waiting on a lower QoS thread running at Default quality-of-service class. Investigate ways to avoid priority inversions
+PID: 76376, TID: 33185189
+Backtrace
+=================================================================
+0   ForgeConductorCore                  0x000000011043ea98 $s18ForgeConductorCore13ProcessRunnerC3run10executable9arguments16currentDirectory11environment10timeoutSec18maximumOutputBytes12cancellationAA0D6ResultVSS_SaySSGSSSgSDyS2SGSgSdSiAA20ToolCallCancellationCSgtKF9BufferBoxL_C13stopCallbacks2onySo12NSFileHandleC_tF + 444
+1   ForgeConductorCore                  0x000000011043e6d0 $s18ForgeConductorCore13ProcessRunnerC3run10executable9arguments16currentDirectory11environment10timeoutSec18maximumOutputBytes12cancellationAA0D6ResultVSS_SaySSGSSSgSDyS2SGSgSdSiAA20ToolCallCancellationCSgtKF08finalizeO0L_5drain10Foundation4DataV4data_Sb9truncatedt6stdout_AyZ_SbA_t6stderrtSb_tF + 160
+2   ForgeConductorCore                  0x000000011043cfb8 $s18ForgeConductorCore13ProcessRunnerC3run10executable9arguments16currentDirectory11environment10timeoutSec18maximumOutputBytes12cancellationAA0D6ResultVSS_SaySSGSSSgSDyS2SGSgSdSiAA20ToolCallCancellationCSgtKF + 4984
+3   ForgeConductorCore                  0x000000010fc8d764 $s18ForgeConductorCore27RuntimeCapabilityDiscovererV12boundedProbe020_A4AF4730ED0B756A3E1M11A7ED75252BALL_9argumentsAA13ProcessResultVSg10Foundation3URLV_SaySSGtFZ + 416
+4   ForgeConductorCore                  0x000000010fc8cd1c $s18ForgeConductorCore27RuntimeCapabilityDiscovererV11probePython020_A4AF4730ED0B756A3E1M11A7ED75252BALLySb10Foundation3URLVFZ + 492
+5   ForgeConductorCore                  0x000000010fc8cb1c $s18ForgeConductorCore27RuntimeCapabilityDiscovererV014verifiedPythonE0020_A4AF4730ED0B756A3E1M11A7ED75252BALL_18isolationAvailableAA0d10ExecutableE0V10Foundation3URLV_SbtFZSbAKcfu_ + 28
+6   ForgeConductorCore                  0x000000010fc8d058 $s18ForgeConductorCore27RuntimeCapabilityDiscovererV016verifiedOptionalE0020_A4AF4730ED0B756A3E1M11A7ED75252BALL_18isolationAvailable5probeAA0d10ExecutableE0V10Foundation3URLV_S2bALXEtFZ + 356
+7   ForgeConductorCore                  0x000000010fc8ca9c $s18ForgeConductorCore27RuntimeCapabilityDiscovererV014verifiedPythonE0020_A4AF4730ED0B756A3E1M11A7ED75252BALL_18isolationAvailableAA0d10ExecutableE0V10Foundation3URLV_SbtFZ + 60
+8   ForgeConductorCore                  0x000000010fc8c104 $s18ForgeConductorCore27RuntimeCapabilityDiscovererV06pythonE0020_A4AF4730ED0B756A3E1L11A7ED75252BALL10configured18isolationAvailableAA0d10ExecutableE0V10Foundation3URLVSg_SbtFZ + 1456
+9   ForgeConductorCore                  0x000000010fc8b660 $s18ForgeConductorCore27RuntimeCapabilityDiscovererV8discover6limitsAA0D12CapabilitiesVAA0D9JobLimitsV_tF + 536
+10  ForgeConductorCore                  0x000000010fc954b0 $s18ForgeConductorCore19ExecutionJobServiceC10repository16contextValidator12artifactRoot6limits20capabilityDiscoverer11environment14launchObserver23terminalPersistenceHookAcA07RuntimeE10RepositoryC_AA0uE17ContextValidating_p10Foundation3URLVAA0uE6LimitsVAA0u10CapabilityN0VSDyS2SGAA0uE15LaunchObserving_pAA0ue8TerminalsT0_ptKcfc + 2760
+11  ForgeConductorCore                  0x000000010fc949a0 $s18ForgeConductorCore19ExecutionJobServiceC10repository16contextValidator12artifactRoot6limits20capabilityDiscoverer11environment14launchObserver23terminalPersistenceHookAcA07RuntimeE10RepositoryC_AA0uE17ContextValidating_p10Foundation3URLVAA0uE6LimitsVAA0u10CapabilityN0VSDyS2SGAA0uE15LaunchObserving_pAA0ue8TerminalsT0_ptKcfC + 120
+12  ForgeConductorCore                  0x000000010fde8678 $s18ForgeConductorCore19RuntimeJobSubsystemV22controlPlaneRepository11databaseURL12artifactRoot6limits20capabilityDiscovererAcA014ProjectControlhI0C_10Foundation0K0VAmA0dE6LimitsVAA0d10CapabilityP0VtKcfC + 636
+13  ForgeConductorCore                  0x00000001102becd4 $s18ForgeConductorCore0A3AppC9bootstrap4home5clockAC10Foundation3URLVSg_AA5Clock_ptKFZ + 4556
+14  ForgeConductorTests                 0x000000010dc25bd4 $s19ForgeConductorTests021ProviderConfigurationC0C031testNonterminalDurableRunFencese15WithoutChangingI0yyYaKFTY0_ + 228
+15  libswift_Concurrency.dylib          0x0000000289351e18 _ZN5swift34runJobInEstablishedExecutorContextEPNS_3JobE + 472
+16  libswift_Concurrency.dylib          0x00000002893536ec _ZL17swift_job_runImplPN5swift3JobENS_17SerialExecutorRefE + 156
+17  libdispatch.dylib                   0x0000000183a95980 _dispatch_root_queue_drain + 360
+18  libdispatch.dylib                   0x0000000183a96120 _dispatch_worker_thread2 + 184
+19  libsystem_pthread.dylib             0x0000000183c3be84 _pthread_wqthread + 232
+20  libsystem_pthread.dylib             0x0000000183c3ac10 start_wqthread + 8
+Thread Performance Checker: Thread running at User-initiated quality-of-service class waiting on a lower QoS thread running at Default quality-of-service class. Investigate ways to avoid priority inversions
+PID: 76376, TID: 33185189
+Backtrace
+=================================================================
+0   ForgeConductorCore                  0x000000010fdb13fc $s18ForgeConductorCore21ProjectContextServiceC4wait33_DC86F667C11E1A0B56D175A572910931LL12cancellation19committedResultWins_xAA20ToolCallCancellationCSg_SbxAIYaYbKctKs8SendableRzlF + 2480
+1   ForgeConductorCore                  0x000000010fdb5778 $s18ForgeConductorCore21ProjectContextServiceC7project15atCanonicalRoot12cancellationAA0D13ControlRecordVSg10Foundation3URLV_AA20ToolCallCancellationCSgtKF + 332
+2   ForgeConductorCore                  0x000000010fdb4474 $s18ForgeConductorCore21ProjectContextServiceC29prepareControlledRegistration10identities6target09requestedD2ID11displayName12cancellationAA0dI19IdentityPreparationVAA0dQ8ResolverC_AA0dQ6TargetVSSSgApA20ToolCallCancellationCSgtKF + 1696
+3   ForgeConductorCore                  0x00000001104d8e68 $s18ForgeConductorCore11ManagerNodeC21registerProjectResult4path11displayName18repositoryIdentityAA0dg12RegistrationH0VSS_SSSgAJtKF + 1404
+4   ForgeConductorCore                  0x00000001104d8544 $s18ForgeConductorCore11ManagerNodeC15registerProject4path11displayName18repositoryIdentitySDySSypGSS_SSSgAItKF + 444
+5   ForgeConductorTests                 0x000000010dc260c0 $s19ForgeConductorTests021ProviderConfigurationC0C031testNonterminalDurableRunFencese15WithoutChangingI0yyYaKFTY0_ + 1488
+6   libswift_Concurrency.dylib          0x0000000289351e18 _ZN5swift34runJobInEstablishedExecutorContextEPNS_3JobE + 472
+7   libswift_Concurrency.dylib          0x00000002893536ec _ZL17swift_job_runImplPN5swift3JobENS_17SerialExecutorRefE + 156
+8   libdispatch.dylib                   0x0000000183a95980 _dispatch_root_queue_drain + 360
+9   libdispatch.dylib                   0x0000000183a96120 _dispatch_worker_thread2 + 184
+10  libsystem_pthread.dylib             0x0000000183c3be84 _pthread_wqthread + 232
+11  libsystem_pthread.dylib             0x0000000183c3ac10 start_wqthread + 8
+Thread Performance Checker: Thread running at User-initiated quality-of-service class waiting on a lower QoS thread running at Default quality-of-service class. Investigate ways to avoid priority inversions
+PID: 76376, TID: 33185189
+Backtrace
+=================================================================
+0   ForgeConductorCore                  0x000000010fdbd8bc $s18ForgeConductorCore21ProjectContextServiceC25acquireOperationAdmission33_DC86F667C11E1A0B56D175A572910931LL12cancellation26mapsInternalDeadlineToBusyyAA20ToolCallCancellationC_SbtKF + 444
+1   ForgeConductorCore                  0x000000010fdb1108 $s18ForgeConductorCore21ProjectContextServiceC4wait33_DC86F667C11E1A0B56D175A572910931LL12cancellation19committedResultWins_xAA20ToolCallCancellationCSg_SbxAIYaYbKctKs8SendableRzlF + 1724
+2   ForgeConductorCore                  0x000000010fdb5778 $s18ForgeConductorCore21ProjectContextServiceC7project15atCanonicalRoot12cancellationAA0D13ControlRecordVSg10Foundation3URLV_AA20ToolCallCancellationCSgtKF + 332
+3   ForgeConductorCore                  0x000000010fdb4474 $s18ForgeConductorCore21ProjectContextServiceC29prepareControlledRegistration10identities6target09requestedD2ID11displayName12cancellationAA0dI19IdentityPreparationVAA0dQ8ResolverC_AA0dQ6TargetVSSSgApA20ToolCallCancellationCSgtKF + 1696
+4   ForgeConductorCore                  0x00000001104d9fe8 $s18ForgeConductorCore11ManagerNodeC21registerProjectResult4path11displayName18repositoryIdentityAA0dg12RegistrationH0VSS_SSSgAJtKFAIyyKXEKXEfU1_ + 1692
+5   ForgeConductorCore                  0x000000011050282c $s18ForgeConductorCore11ManagerNodeC21registerProjectResult4path11displayName18repositoryIdentityAA0dg12RegistrationH0VSS_SSSgAJtKFAIyyKXEKXEfU1_TA + 92
+6   ForgeConductorCore                  0x000000010fc0d730 $s18ForgeConductorCore30SecureFilesystemRecoveryLedgerC26withRetainedAuthorityFence9projectID10generation_xAA07ProjectM0V_AA0O10GenerationVxyyKXEKXEtKlFxyKXEfU_ + 504
+7   ForgeConductorCore                  0x000000010fc0e54c $s18ForgeConductorCore30SecureFilesystemRecoveryLedgerC26withRetainedAuthorityFence9projectID10generation_xAA07ProjectM0V_AA0O10GenerationVxyyKXEKXEtKlFxyKXEfU_TA + 52
+8   ForgeConductorCore                  0x000000010fc09df4 $s18ForgeConductorCore30SecureFilesystemRecoveryLedgerC04withG4Lock33_AFC7BD58E3A8045DF6ACDF0FAB3F58DALLyxxyKXEKlF + 1396
+9   ForgeConductorCore                  0x000000010fc0d4ec $s18ForgeConductorCore30SecureFilesystemRecoveryLedgerC26withRetainedAuthorityFence9projectID10generation_xAA07ProjectM0V_AA0O10GenerationVxyyKXEKXEtKlF + 168
+10  ForgeConductorCore                  0x00000001104d90b4 $s18ForgeConductorCore11ManagerNodeC21registerProjectResult4path11displayName18repositoryIdentityAA0dg12RegistrationH0VSS_SSSgAJtKF + 1992
+11  ForgeConductorCore                  0x00000001104d8544 $s18ForgeConductorCore11ManagerNodeC15registerProject4path11displayName18repositoryIdentitySDySSypGSS_SSSgAItKF + 444
+12  ForgeConductorTests                 0x000000010dc260c0 $s19ForgeConductorTests021ProviderConfigurationC0C031testNonterminalDurableRunFencese15WithoutChangingI0yyYaKFTY0_ + 1488
+13  libswift_Concurrency.dylib          0x0000000289351e18 _ZN5swift34runJobInEstablishedExecutorContextEPNS_3JobE + 472
+14  libswift_Concurrency.dylib          0x00000002893536ec _ZL17swift_job_runImplPN5swift3JobENS_17SerialExecutorRefE + 156
+15  libdispatch.dylib                   0x0000000183a95980 _dispatch_root_queue_drain + 360
+16  libdispatch.dylib                   0x0000000183a96120 _dispatch_worker_thread2 + 184
+17  libsystem_pthread.dylib             0x0000000183c3be84 _pthread_wqthread + 232
+18  libsystem_pthread.dylib             0x0000000183c3ac10 start_wqthread + 8
+Thread Performance Checker: Thread running at User-initiated quality-of-service class waiting on a lower QoS thread running at Default quality-of-service class. Investigate ways to avoid priority inversions
+PID: 76376, TID: 33185189
+Backtrace
+=================================================================
+0   ForgeConductorCore                  0x000000010fdb13fc $s18ForgeConductorCore21ProjectContextServiceC4wait33_DC86F667C11E1A0B56D175A572910931LL12cancellation19committedResultWins_xAA20ToolCallCancellationCSg_SbxAIYaYbKctKs8SendableRzlF + 2480
+1   ForgeConductorCore                  0x000000010fdb5778 $s18ForgeConductorCore21ProjectContextServiceC7project15atCanonicalRoot12cancellationAA0D13ControlRecordVSg10Foundation3URLV_AA20ToolCallCancellationCSgtKF + 332
+2   ForgeConductorCore                  0x000000010fdb4474 $s18ForgeConductorCore21ProjectContextServiceC29prepareControlledRegistration10identities6target09requestedD2ID11displayName12cancellationAA0dI19IdentityPreparationVAA0dQ8ResolverC_AA0dQ6TargetVSSSgApA20ToolCallCancellationCSgtKF + 1696
+3   ForgeConductorCore                  0x00000001104d9fe8 $s18ForgeConductorCore11ManagerNodeC21registerProjectResult4path11displayName18repositoryIdentityAA0dg12RegistrationH0VSS_SSSgAJtKFAIyyKXEKXEfU1_ + 1692
+4   ForgeConductorCore                  0x000000011050282c $s18ForgeConductorCore11ManagerNodeC21registerProjectResult4path11displayName18repositoryIdentityAA0dg12RegistrationH0VSS_SSSgAJtKFAIyyKXEKXEfU1_TA + 92
+5   ForgeConductorCore                  0x000000010fc0d730 $s18ForgeConductorCore30SecureFilesystemRecoveryLedgerC26withRetainedAuthorityFence9projectID10generation_xAA07ProjectM0V_AA0O10GenerationVxyyKXEKXEtKlFxyKXEfU_ + 504
+6   ForgeConductorCore                  0x000000010fc0e54c $s18ForgeConductorCore30SecureFilesystemRecoveryLedgerC26withRetainedAuthorityFence9projectID10generation_xAA07ProjectM0V_AA0O10GenerationVxyyKXEKXEtKlFxyKXEfU_TA + 52
+7   ForgeConductorCore                  0x000000010fc09df4 $s18ForgeConductorCore30SecureFilesystemRecoveryLedgerC04withG4Lock33_AFC7BD58E3A8045DF6ACDF0FAB3F58DALLyxxyKXEKlF + 1396
+8   ForgeConductorCore                  0x000000010fc0d4ec $s18ForgeConductorCore30SecureFilesystemRecoveryLedgerC26withRetainedAuthorityFence9projectID10generation_xAA07ProjectM0V_AA0O10GenerationVxyyKXEKXEtKlF + 168
+9   ForgeConductorCore                  0x00000001104d90b4 $s18ForgeConductorCore11ManagerNodeC21registerProjectResult4path11displayName18repositoryIdentityAA0dg12RegistrationH0VSS_SSSgAJtKF + 1992
+10  ForgeConductorCore                  0x00000001104d8544 $s18ForgeConductorCore11ManagerNodeC15registerProject4path11displayName18repositoryIdentitySDySSypGSS_SSSgAItKF + 444
+11  ForgeConductorTests                 0x000000010dc260c0 $s19ForgeConductorTests021ProviderConfigurationC0C031testNonterminalDurableRunFencese15WithoutChangingI0yyYaKFTY0_ + 1488
+12  libswift_Concurrency.dylib          0x0000000289351e18 _ZN5swift34runJobInEstablishedExecutorContextEPNS_3JobE + 472
+13  libswift_Concurrency.dylib          0x00000002893536ec _ZL17swift_job_runImplPN5swift3JobENS_17SerialExecutorRefE + 156
+14  libdispatch.dylib                   0x0000000183a95980 _dispatch_root_queue_drain + 360
+15  libdispatch.dylib                   0x0000000183a96120 _dispatch_worker_thread2 + 184
+16  libsystem_pthread.dylib             0x0000000183c3be84 _pthread_wqthread + 232
+17  libsystem_pthread.dylib             0x0000000183c3ac10 start_wqthread + 8
+Thread Performance Checker: Thread running at User-initiated quality-of-service class waiting on a lower QoS thread running at Default quality-of-service class. Investigate ways to avoid priority inversions
+PID: 76376, TID: 33185189
+Backtrace
+=================================================================
+0   ForgeConductorCore                  0x000000010fdb13fc $s18ForgeConductorCore21ProjectContextServiceC4wait33_DC86F667C11E1A0B56D175A572910931LL12cancellation19committedResultWins_xAA20ToolCallCancellationCSg_SbxAIYaYbKctKs8SendableRzlF + 2480
+1   ForgeConductorCore                  0x000000010fdb7afc $s18ForgeConductorCore21ProjectContextServiceC7project_12cancellationAA0D13ControlRecordVSgAA0D2IDV_AA20ToolCallCancellationCSgtKF + 308
+2   ForgeConductorCore                  0x00000001104da170 $s18ForgeConductorCore11ManagerNodeC21registerProjectResult4path11displayName18repositoryIdentityAA0dg12RegistrationH0VSS_SSSgAJtKFAIyyKXEKXEfU1_ + 2084
+3   ForgeConductorCore                  0x000000011050282c $s18ForgeConductorCore11ManagerNodeC21registerProjectResult4path11displayName18repositoryIdentityAA0dg12RegistrationH0VSS_SSSgAJtKFAIyyKXEKXEfU1_TA + 92
+4   ForgeConductorCore                  0x000000010fc0d730 $s18ForgeConductorCore30SecureFilesystemRecoveryLedgerC26withRetainedAuthorityFence9projectID10generation_xAA07ProjectM0V_AA0O10GenerationVxyyKXEKXEtKlFxyKXEfU_ + 504
+5   ForgeConductorCore                  0x000000010fc0e54c $s18ForgeConductorCore30SecureFilesystemRecoveryLedgerC26withRetainedAuthorityFence9projectID10generation_xAA07ProjectM0V_AA0O10GenerationVxyyKXEKXEtKlFxyKXEfU_TA + 52
+6   ForgeConductorCore                  0x000000010fc09df4 $s18ForgeConductorCore30SecureFilesystemRecoveryLedgerC04withG4Lock33_AFC7BD58E3A8045DF6ACDF0FAB3F58DALLyxxyKXEKlF + 1396
+7   ForgeConductorCore                  0x000000010fc0d4ec $s18ForgeConductorCore30SecureFilesystemRecoveryLedgerC26withRetainedAuthorityFence9projectID10generation_xAA07ProjectM0V_AA0O10GenerationVxyyKXEKXEtKlF + 168
+8   ForgeConductorCore                  0x00000001104d90b4 $s18ForgeConductorCore11ManagerNodeC21registerProjectResult4path11displayName18repositoryIdentityAA0dg12RegistrationH0VSS_SSSgAJtKF + 1992
+9   ForgeConductorCore                  0x00000001104d8544 $s18ForgeConductorCore11ManagerNodeC15registerProject4path11displayName18repositoryIdentitySDySSypGSS_SSSgAItKF + 444
+10  ForgeConductorTests                 0x000000010dc260c0 $s19ForgeConductorTests021ProviderConfigurationC0C031testNonterminalDurableRunFencese15WithoutChangingI0yyYaKFTY0_ + 1488
+11  libswift_Concurrency.dylib          0x0000000289351e18 _ZN5swift34runJobInEstablishedExecutorContextEPNS_3JobE + 472
+12  libswift_Concurrency.dylib          0x00000002893536ec _ZL17swift_job_runImplPN5swift3JobENS_17SerialExecutorRefE + 156
+13  libdispatch.dylib                   0x0000000183a95980 _dispatch_root_queue_drain + 360
+14  libdispatch.dylib                   0x0000000183a96120 _dispatch_worker_thread2 + 184
+15  libsystem_pthread.dylib             0x0000000183c3be84 _pthread_wqthread + 232
+16  libsystem_pthread.dylib             0x0000000183c3ac10 start_wqthread + 8
+Thread Performance Checker: Thread running at User-initiated quality-of-service class waiting on a lower QoS thread running at Default quality-of-service class. Investigate ways to avoid priority inversions
+PID: 76376, TID: 33185189
+Backtrace
+=================================================================
+0   ForgeConductorCore                  0x000000010fdb13fc $s18ForgeConductorCore21ProjectContextServiceC4wait33_DC86F667C11E1A0B56D175A572910931LL12cancellation19committedResultWins_xAA20ToolCallCancellationCSg_SbxAIYaYbKctKs8SendableRzlF + 2480
+1   ForgeConductorCore                  0x000000010fdb5778 $s18ForgeConductorCore21ProjectContextServiceC7project15atCanonicalRoot12cancellationAA0D13ControlRecordVSg10Foundation3URLV_AA20ToolCallCancellationCSgtKF + 332
+2   ForgeConductorCore                  0x000000010fdb4474 $s18ForgeConductorCore21ProjectContextServiceC29prepareControlledRegistration10identities6target09requestedD2ID11displayName12cancellationAA0dI19IdentityPreparationVAA0dQ8ResolverC_AA0dQ6TargetVSSSgApA20ToolCallCancellationCSgtKF + 1696
+3   ForgeConductorCore                  0x000000010fdb5a74 $s18ForgeConductorCore21ProjectContextServiceC30validateControlledRegistration_10identities09requestedD2ID11displayName12cancellationyAA0dI19IdentityPreparationV_AA0dP8ResolverCSSSgAmA20ToolCallCancellationCSgtKF + 256
+4   ForgeConductorCore                  0x00000001104da690 $s18ForgeConductorCore11ManagerNodeC21registerProjectResult4path11displayName18repositoryIdentityAA0dg12RegistrationH0VSS_SSSgAJtKFAIyyKXEKXEfU1_ + 3396
+5   ForgeConductorCore                  0x000000011050282c $s18ForgeConductorCore11ManagerNodeC21registerProjectResult4path11displayName18repositoryIdentityAA0dg12RegistrationH0VSS_SSSgAJtKFAIyyKXEKXEfU1_TA + 92
+6   ForgeConductorCore                  0x000000010fc0d730 $s18ForgeConductorCore30SecureFilesystemRecoveryLedgerC26withRetainedAuthorityFence9projectID10generation_xAA07ProjectM0V_AA0O10GenerationVxyyKXEKXEtKlFxyKXEfU_ + 504
+7   ForgeConductorCore                  0x000000010fc0e54c $s18ForgeConductorCore30SecureFilesystemRecoveryLedgerC26withRetainedAuthorityFence9projectID10generation_xAA07ProjectM0V_AA0O10GenerationVxyyKXEKXEtKlFxyKXEfU_TA + 52
+8   ForgeConductorCore                  0x000000010fc09df4 $s18ForgeConductorCore30SecureFilesystemRecoveryLedgerC04withG4Lock33_AFC7BD58E3A8045DF6ACDF0FAB3F58DALLyxxyKXEKlF + 1396
+9   ForgeConductorCore                  0x000000010fc0d4ec $s18ForgeConductorCore30SecureFilesystemRecoveryLedgerC26withRetainedAuthorityFence9projectID10generation_xAA07ProjectM0V_AA0O10GenerationVxyyKXEKXEtKlF + 168
+10  ForgeConductorCore                  0x00000001104d90b4 $s18ForgeConductorCore11ManagerNodeC21registerProjectResult4path11displayName18repositoryIdentityAA0dg12RegistrationH0VSS_SSSgAJtKF + 1992
+11  ForgeConductorCore                  0x00000001104d8544 $s18ForgeConductorCore11ManagerNodeC15registerProject4path11displayName18repositoryIdentitySDySSypGSS_SSSgAItKF + 444
+12  ForgeConductorTests                 0x000000010dc260c0 $s19ForgeConductorTests021ProviderConfigurationC0C031testNonterminalDurableRunFencese15WithoutChangingI0yyYaKFTY0_ + 1488
+13  libswift_Concurrency.dylib          0x0000000289351e18 _ZN5swift34runJobInEstablishedExecutorContextEPNS_3JobE + 472
+14  libswift_Concurrency.dylib          0x00000002893536ec _ZL17swift_job_runImplPN5swift3JobENS_17SerialExecutorRefE + 156
+15  libdispatch.dylib                   0x0000000183a95980 _dispatch_root_queue_drain + 360
+16  libdispatch.dylib                   0x0000000183a96120 _dispatch_worker_thread2 + 184
+17  libsystem_pthread.dylib             0x0000000183c3be84 _pthread_wqthread + 232
+18  libsystem_pthread.dylib             0x0000000183c3ac10 start_wqthread + 8
+Thread Performance Checker: Thread running at User-initiated quality-of-service class waiting on a lower QoS thread running at Default quality-of-service class. Investigate ways to avoid priority inversions
+PID: 76376, TID: 33185189
+Backtrace
+=================================================================
+0   ForgeConductorCore                  0x000000010fdb13fc $s18ForgeConductorCore21ProjectContextServiceC4wait33_DC86F667C11E1A0B56D175A572910931LL12cancellation19committedResultWins_xAA20ToolCallCancellationCSg_SbxAIYaYbKctKs8SendableRzlF + 2480
+1   ForgeConductorCore                  0x000000010fdb5ebc $s18ForgeConductorCore21ProjectContextServiceC08registerD011preparation12cancellationAA0D13ControlRecordVAA0D31RegistrationIdentityPreparationV_AA20ToolCallCancellationCSgtKF + 852
+2   ForgeConductorCore                  0x00000001104da6f4 $s18ForgeConductorCore11ManagerNodeC21registerProjectResult4path11displayName18repositoryIdentityAA0dg12RegistrationH0VSS_SSSgAJtKFAIyyKXEKXEfU1_ + 3496
+3   ForgeConductorCore                  0x000000011050282c $s18ForgeConductorCore11ManagerNodeC21registerProjectResult4path11displayName18repositoryIdentityAA0dg12RegistrationH0VSS_SSSgAJtKFAIyyKXEKXEfU1_TA + 92
+4   ForgeConductorCore                  0x000000010fc0d730 $s18ForgeConductorCore30SecureFilesystemRecoveryLedgerC26withRetainedAuthorityFence9projectID10generation_xAA07ProjectM0V_AA0O10GenerationVxyyKXEKXEtKlFxyKXEfU_ + 504
+5   ForgeConductorCore                  0x000000010fc0e54c $s18ForgeConductorCore30SecureFilesystemRecoveryLedgerC26withRetainedAuthorityFence9projectID10generation_xAA07ProjectM0V_AA0O10GenerationVxyyKXEKXEtKlFxyKXEfU_TA + 52
+6   ForgeConductorCore                  0x000000010fc09df4 $s18ForgeConductorCore30SecureFilesystemRecoveryLedgerC04withG4Lock33_AFC7BD58E3A8045DF6ACDF0FAB3F58DALLyxxyKXEKlF + 1396
+7   ForgeConductorCore                  0x000000010fc0d4ec $s18ForgeConductorCore30SecureFilesystemRecoveryLedgerC26withRetainedAuthorityFence9projectID10generation_xAA07ProjectM0V_AA0O10GenerationVxyyKXEKXEtKlF + 168
+8   ForgeConductorCore                  0x00000001104d90b4 $s18ForgeConductorCore11ManagerNodeC21registerProjectResult4path11displayName18repositoryIdentityAA0dg12RegistrationH0VSS_SSSgAJtKF + 1992
+9   ForgeConductorCore                  0x00000001104d8544 $s18ForgeConductorCore11ManagerNodeC15registerProject4path11displayName18repositoryIdentitySDySSypGSS_SSSgAItKF + 444
+10  ForgeConductorTests                 0x000000010dc260c0 $s19ForgeConductorTests021ProviderConfigurationC0C031testNonterminalDurableRunFencese15WithoutChangingI0yyYaKFTY0_ + 1488
+11  libswift_Concurrency.dylib          0x0000000289351e18 _ZN5swift34runJobInEstablishedExecutorContextEPNS_3JobE + 472
+12  libswift_Concurrency.dylib          0x00000002893536ec _ZL17swift_job_runImplPN5swift3JobENS_17SerialExecutorRefE + 156
+13  libdispatch.dylib                   0x0000000183a95980 _dispatch_root_queue_drain + 360
+14  libdispatch.dylib                   0x0000000183a96120 _dispatch_worker_thread2 + 184
+15  libsystem_pthread.dylib             0x0000000183c3be84 _pthread_wqthread + 232
+16  libsystem_pthread.dylib             0x0000000183c3ac10 start_wqthread + 8
+Thread Performance Checker: Thread running at User-initiated quality-of-service class waiting on a lower QoS thread running at Default quality-of-service class. Investigate ways to avoid priority inversions
+PID: 76376, TID: 33185189
+Backtrace
+=================================================================
+0   ForgeConductorCore                  0x000000010fdb13fc $s18ForgeConductorCore21ProjectContextServiceC4wait33_DC86F667C11E1A0B56D175A572910931LL12cancellation19committedResultWins_xAA20ToolCallCancellationCSg_SbxAIYaYbKctKs8SendableRzlF + 2480
+1   ForgeConductorCore                  0x000000010fdb8174 $s18ForgeConductorCore21ProjectContextServiceC40validateRegistrationPublicationAuthority11preparation12cancellationyAA0dH19IdentityPreparationV_AA20ToolCallCancellationCSgtKF + 716
+2   ForgeConductorCore                  0x00000001104da818 $s18ForgeConductorCore11ManagerNodeC21registerProjectResult4path11displayName18repositoryIdentityAA0dg12RegistrationH0VSS_SSSgAJtKFAIyyKXEKXEfU1_ + 3788
+3   ForgeConductorCore                  0x000000011050282c $s18ForgeConductorCore11ManagerNodeC21registerProjectResult4path11displayName18repositoryIdentityAA0dg12RegistrationH0VSS_SSSgAJtKFAIyyKXEKXEfU1_TA + 92
+4   ForgeConductorCore                  0x000000010fc0d730 $s18ForgeConductorCore30SecureFilesystemRecoveryLedgerC26withRetainedAuthorityFence9projectID10generation_xAA07ProjectM0V_AA0O10GenerationVxyyKXEKXEtKlFxyKXEfU_ + 504
+5   ForgeConductorCore                  0x000000010fc0e54c $s18ForgeConductorCore30SecureFilesystemRecoveryLedgerC26withRetainedAuthorityFence9projectID10generation_xAA07ProjectM0V_AA0O10GenerationVxyyKXEKXEtKlFxyKXEfU_TA + 52
+6   ForgeConductorCore                  0x000000010fc09df4 $s18ForgeConductorCore30SecureFilesystemRecoveryLedgerC04withG4Lock33_AFC7BD58E3A8045DF6ACDF0FAB3F58DALLyxxyKXEKlF + 1396
+7   ForgeConductorCore                  0x000000010fc0d4ec $s18ForgeConductorCore30SecureFilesystemRecoveryLedgerC26withRetainedAuthorityFence9projectID10generation_xAA07ProjectM0V_AA0O10GenerationVxyyKXEKXEtKlF + 168
+8   ForgeConductorCore                  0x00000001104d90b4 $s18ForgeConductorCore11ManagerNodeC21registerProjectResult4path11displayName18repositoryIdentityAA0dg12RegistrationH0VSS_SSSgAJtKF + 1992
+9   ForgeConductorCore                  0x00000001104d8544 $s18ForgeConductorCore11ManagerNodeC15registerProject4path11displayName18repositoryIdentitySDySSypGSS_SSSgAItKF + 444
+10  ForgeConductorTests                 0x000000010dc260c0 $s19ForgeConductorTests021ProviderConfigurationC0C031testNonterminalDurableRunFencese15WithoutChangingI0yyYaKFTY0_ + 1488
+11  libswift_Concurrency.dylib          0x0000000289351e18 _ZN5swift34runJobInEstablishedExecutorContextEPNS_3JobE + 472
+12  libswift_Concurrency.dylib          0x00000002893536ec _ZL17swift_job_runImplPN5swift3JobENS_17SerialExecutorRefE + 156
+13  libdispatch.dylib                   0x0000000183a95980 _dispatch_root_queue_drain + 360
+14  libdispatch.dylib                   0x0000000183a96120 _dispatch_worker_thread2 + 184
+15  libsystem_pthread.dylib             0x0000000183c3be84 _pthread_wqthread + 232
+16  libsystem_pthread.dylib             0x0000000183c3ac10 start_wqthread + 8
+Thread Performance Checker: Thread running at User-initiated quality-of-service class waiting on a lower QoS thread running at Default quality-of-service class. Investigate ways to avoid priority inversions
+PID: 76376, TID: 33185189
+Backtrace
+=================================================================
+0   ForgeConductorCore                  0x000000010fdb13fc $s18ForgeConductorCore21ProjectContextServiceC4wait33_DC86F667C11E1A0B56D175A572910931LL12cancellation19committedResultWins_xAA20ToolCallCancellationCSg_SbxAIYaYbKctKs8SendableRzlF + 2480
+1   ForgeConductorCore                  0x000000010fdb7854 $s18ForgeConductorCore21ProjectContextServiceC20finalizeRegistration11preparation12cancellationAA0D13ControlRecordVAA0dH19IdentityPreparationV_AA20ToolCallCancellationCSgtKF + 2892
+2   ForgeConductorCore                  0x00000001104da950 $s18ForgeConductorCore11ManagerNodeC21registerProjectResult4path11displayName18repositoryIdentityAA0dg12RegistrationH0VSS_SSSgAJtKFAIyyKXEKXEfU1_ + 4100
+3   ForgeConductorCore                  0x000000011050282c $s18ForgeConductorCore11ManagerNodeC21registerProjectResult4path11displayName18repositoryIdentityAA0dg12RegistrationH0VSS_SSSgAJtKFAIyyKXEKXEfU1_TA + 92
+4   ForgeConductorCore                  0x000000010fc0d730 $s18ForgeConductorCore30SecureFilesystemRecoveryLedgerC26withRetainedAuthorityFence9projectID10generation_xAA07ProjectM0V_AA0O10GenerationVxyyKXEKXEtKlFxyKXEfU_ + 504
+5   ForgeConductorCore                  0x000000010fc0e54c $s18ForgeConductorCore30SecureFilesystemRecoveryLedgerC26withRetainedAuthorityFence9projectID10generation_xAA07ProjectM0V_AA0O10GenerationVxyyKXEKXEtKlFxyKXEfU_TA + 52
+6   ForgeConductorCore                  0x000000010fc09df4 $s18ForgeConductorCore30SecureFilesystemRecoveryLedgerC04withG4Lock33_AFC7BD58E3A8045DF6ACDF0FAB3F58DALLyxxyKXEKlF + 1396
+7   ForgeConductorCore                  0x000000010fc0d4ec $s18ForgeConductorCore30SecureFilesystemRecoveryLedgerC26withRetainedAuthorityFence9projectID10generation_xAA07ProjectM0V_AA0O10GenerationVxyyKXEKXEtKlF + 168
+8   ForgeConductorCore                  0x00000001104d90b4 $s18ForgeConductorCore11ManagerNodeC21registerProjectResult4path11displayName18repositoryIdentityAA0dg12RegistrationH0VSS_SSSgAJtKF + 1992
+9   ForgeConductorCore                  0x00000001104d8544 $s18ForgeConductorCore11ManagerNodeC15registerProject4path11displayName18repositoryIdentitySDySSypGSS_SSSgAItKF + 444
+10  ForgeConductorTests                 0x000000010dc260c0 $s19ForgeConductorTests021ProviderConfigurationC0C031testNonterminalDurableRunFencese15WithoutChangingI0yyYaKFTY0_ + 1488
+11  libswift_Concurrency.dylib          0x0000000289351e18 _ZN5swift34runJobInEstablishedExecutorContextEPNS_3JobE + 472
+12  libswift_Concurrency.dylib          0x00000002893536ec _ZL17swift_job_runImplPN5swift3JobENS_17SerialExecutorRefE + 156
+13  libdispatch.dylib                   0x0000000183a95980 _dispatch_root_queue_drain + 360
+14  libdispatch.dylib                   0x0000000183a96120 _dispatch_worker_thread2 + 184
+15  libsystem_pthread.dylib             0x0000000183c3be84 _pthread_wqthread + 232
+16  libsystem_pthread.dylib             0x0000000183c3ac10 start_wqthread + 8
+Thread Performance Checker: Thread running at User-initiated quality-of-service class waiting on a lower QoS thread running at Default quality-of-service class. Investigate ways to avoid priority inversions
+PID: 76376, TID: 33185189
+Backtrace
+=================================================================
+0   ForgeConductorCore                  0x00000001102c0124 $s18ForgeConductorCore0A3AppC8shutdownAA24RuntimeJobShutdownReportVyF + 800
+1   ForgeConductorTests                 0x000000010d7fbb8c $s19ForgeConductorTests024SecureFilesystemMutationC0C53testProductionPackDisablesMoveWithoutSameUserFallbackyyKF6$deferL_yyF + 36
+2   ForgeConductorTests                 0x000000010dc2756c $s19ForgeConductorTests021ProviderConfigurationC0C031testNonterminalDurableRunFencese15WithoutChangingI0yyYaKFTY6_ + 720
+3   libswift_Concurrency.dylib          0x0000000289351e18 _ZN5swift34runJobInEstablishedExecutorContextEPNS_3JobE + 472
+4   libswift_Concurrency.dylib          0x00000002893536ec _ZL17swift_job_runImplPN5swift3JobENS_17SerialExecutorRefE + 156
+5   libdispatch.dylib                   0x0000000183a95980 _dispatch_root_queue_drain + 360
+6   libdispatch.dylib                   0x0000000183a96120 _dispatch_worker_thread2 + 184
+7   libsystem_pthread.dylib             0x0000000183c3be84 _pthread_wqthread + 232
+8   libsystem_pthread.dylib             0x0000000183c3ac10 start_wqthread + 8
+Thread Performance Checker: Thread running at User-initiated quality-of-service class waiting on a lower QoS thread running at Default quality-of-service class. Investigate ways to avoid priority inversions
+PID: 76376, TID: 33185189
+Backtrace
+=================================================================
+0   ForgeConductorCore                  0x000000010fdb13fc $s18ForgeConductorCore21ProjectContextServiceC4wait33_DC86F667C11E1A0B56D175A572910931LL12cancellation19committedResultWins_xAA20ToolCallCancellationCSg_SbxAIYaYbKctKs8SendableRzlF + 2480
+1   ForgeConductorCore                  0x000000010fdbd570 $s18ForgeConductorCore21ProjectContextServiceC5closeyyF + 100
+2   ForgeConductorCore                  0x00000001102c0264 $s18ForgeConductorCore0A3AppC8shutdownAA24RuntimeJobShutdownReportVyF + 1120
+3   ForgeConductorTests                 0x000000010d7fbb8c $s19ForgeConductorTests024SecureFilesystemMutationC0C53testProductionPackDisablesMoveWithoutSameUserFallbackyyKF6$deferL_yyF + 36
+4   ForgeConductorTests                 0x000000010dc2756c $s19ForgeConductorTests021ProviderConfigurationC0C031testNonterminalDurableRunFencese15WithoutChangingI0yyYaKFTY6_ + 720
+5   libswift_Concurrency.dylib          0x0000000289351e18 _ZN5swift34runJobInEstablishedExecutorContextEPNS_3JobE + 472
+6   libswift_Concurrency.dylib          0x00000002893536ec _ZL17swift_job_runImplPN5swift3JobENS_17SerialExecutorRefE + 156
+7   libdispatch.dylib                   0x0000000183a95980 _dispatch_root_queue_drain + 360
+8   libdispatch.dylib                   0x0000000183a96120 _dispatch_worker_thread2 + 184
+9   libsystem_pthread.dylib             0x0000000183c3be84 _pthread_wqthread + 232
+10  libsystem_pthread.dylib             0x0000000183c3ac10 start_wqthread + 8
+Test Case '-[ForgeConductorTests.ProviderConfigurationTests testNonterminalDurableRunFencesConfigurationWithoutChangingRun]' passed (0.817 seconds).
+Test Suite 'ProviderConfigurationTests' passed at 2026-09-04 18:06:37.212.
+	 Executed 12 tests, with 0 failures (0 unexpected) in 0.858 (0.861) seconds
+Test Suite 'ForgeConductorTests.xctest' passed at 2026-09-04 18:06:37.212.
+	 Executed 54 tests, with 0 failures (0 unexpected) in 0.889 (0.902) seconds
+Test Suite 'Selected tests' passed at 2026-09-04 18:06:37.212.
+	 Executed 54 tests, with 0 failures (0 unexpected) in 0.889 (0.902) seconds
+
+Test session results, code coverage, and logs:
+	/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Provider-Core-Native-2.xcresult
+
+** TEST SUCCEEDED **
+
+Testing started

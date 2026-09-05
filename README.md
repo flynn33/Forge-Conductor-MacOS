@@ -69,6 +69,15 @@ forge-conductor manager start --open   # native dashboard / manager
 # LM Studio starts MCP via ~/.lmstudio/mcp.json → forge-conductor serve (Swift stdio)
 ```
 
+The build/run script stages a development smoke bundle. Its optional build
+override must equal the compiled canonical build; Developer ID distribution
+uses the Xcode archive/export path. Follow the deterministic
+[Xcode installation instructions](XCODE.md#install-the-exact-xcode-build) to
+install the complete matching app, CLI, runtime launcher and framework.
+Native CI covers source integrity, Debug/Release Swift tests, and native app/CLI
+compilation. Signed UI, service lifecycle and distribution evidence remain
+separate release requirements.
+
 ## What the UI shows
 
 | Surface | Meaning |
@@ -78,7 +87,7 @@ forge-conductor manager start --open   # native dashboard / manager
 | **Agents / Tools / Feed** | Playbooks and tool audit for local-model agent runs |
 | **Projects** | Durable project identity, generation, bindings, memory, and continuity state |
 | **Autonomy / Continuity** | Manager-owned runs, provider leases, budgets, handoffs, successor acknowledgment, and fencing state |
-| **Runtimes / Provider** | Effective shell policy, durable jobs, redacted provider configuration, and contract health |
+| **Runtimes / Provider** | Effective shell policy, durable jobs, editable provider settings, redacted credentials, and contract health |
 | **Events & Evidence / Diagnostics** | Bounded manager events, durable evidence references, logs, and doctor signals |
 | **Manager** | Start/Stop/Restart control, authorized folders, project-shell policy, protected-filesystem service controls, maintenance, and doctor |
 
@@ -122,14 +131,15 @@ work recorded under **Unreleased** in the changelog.
 | **Project memory** | Twelve `project_memory.*` tools provide bounded search, optimistic updates, links, batch writes, health, and checksummed import/export while legacy `memory_*` tools remain available. |
 | **Shell** | Project shell tools are enabled on clean installs, ambiguous legacy disabled state migrates to enabled, explicit opt-out persists, and `shell_exec` retains its registered name, authorized `/bin/bash -lc` behavior, 120-second ceiling, and established result contract. Clean-profile `bash.run` is additive. |
 | **Continuity** | Durable checkpoints, handoffs, successor state, fencing, and a native LM Studio provider adapter are implemented and covered by deterministic recovery tests. Real-provider threshold rollover and the full crash-state matrix remain open below. |
-| **Runtime and telemetry** | Resource policy, lifecycle ownership, diagnostics, bounded latest-value telemetry, shared Metal resources, and durable bounded jobs are implemented. |
+| **Runtime and telemetry** | Startup, settings and diagnostics export run outside the main actor with bounded operation ownership. Hidden windows and hidden ancestors stop Metal draw submission; showing the window redraws pending values. Telemetry, subprocess pipes and durable jobs remain bounded. |
 | **Filesystem mitigation** | Protocol-v5 capture, bounded protected quarantine, durable receipts, and additive `fs_delete_recovery` narrow and record regular-file/symlink deletion race impact. Move and recursive directory deletion remain unavailable in production. |
 
-The current-source SwiftPM Release regression executes 1,001 tests
-with 5 declared environment skips and 0 failures, with compiler warnings treated
-as errors. A dedicated Apple Development-signed Xcode app-hosted contract suite
-also executes 2 tests with 0 failures. This is broad regression evidence, not
-production-path qualification for every feature listed below.
+The [current shipping handoff](.forge-codex/state/release-handoff.md) records
+exact source manifests, Debug/Release regression counts, native tests, separate
+sanitizer runs and signed bundle checks. All four native production onboarding
+scenarios passed, covering folder authorization, provider save/discovery and
+manager restart, plus Settings shell disable/re-enable with fresh MCP processes.
+These results do not qualify every feature or close the remaining release gates.
 
 ### Open or deferred before shipment
 
@@ -151,15 +161,17 @@ production-path qualification for every feature listed below.
   installed LaunchAgent manager PID replacement with predecessor exit. The
   current-source Apple Development-signed Release layout also passes raw
   installed-CLI `version`, `status`, and `doctor` with its adjacent signed
-  runtime launcher. The run deliberately did not invoke System Events; native
-  Settings control and post-Settings re-enable remain blocked for the Xcode XCUI
-  lane. Developer ID Release signing and P10 exact-production qualification also
-  remain open.
-- **Managed provider setup:** the adapter can load a valid LM Studio provider
-  configuration, but a clean installation currently has no supported app, CLI,
-  or manager control that creates it. Test-only file provisioning is not a
-  working product setup path, so Provider and managed Autonomy configuration
-  remain release-blocking.
+  runtime launcher. That installed-app run deliberately did not invoke System
+  Events and remains partial. A separate Xcode run passed native Settings shell
+  disable/re-enable and execution from fresh MCP processes. The complete
+  installed/native matrix, Developer ID Release signing and P10 exact-production
+  qualification remain open.
+- **Managed provider setup:** Provider now saves endpoint, model and Keychain
+  credential changes through authenticated manager controls. Save supports an
+  offline server; Refresh Models and Test Connection separately verify the
+  saved configuration. The four native onboarding scenarios passed; complete
+  installed-stack and provider/autonomy qualification remain open. A successful
+  save or connection test alone does not qualify managed Autonomy.
 - **Provider continuity:** an unresolved provider-response crash is fenced for
   660 seconds. LM Studio exposes no request-ID receipt lookup; after the fence,
   each retry can create at most one duplicate model inference, and repeated

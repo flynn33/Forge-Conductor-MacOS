@@ -1,0 +1,26 @@
+[0/1] Planning build
+Building for debugging...
+[0/16] Write sources
+[2/16] Write swift-version--58304C5D6DBC2206.txt
+[4/9] Compiling ForgeConductorApp ManagerSettingsView.swift
+[5/9] Emitting module ForgeConductorApp
+[6/9] Compiling ForgeConductorApp AppModel.swift
+[7/20] Compiling ForgeConductorApp AppSidebarView.swift
+[8/20] Compiling ForgeConductorApp ContentView.swift
+[9/20] Compiling ForgeConductorApp DiagnosticsView.swift
+[10/20] Compiling ForgeConductorApp ForgeConductorApp.swift
+[11/20] Compiling ForgeConductorApp EvidenceOperatorView.swift
+[12/20] Compiling ForgeConductorApp AgentsView.swift
+[13/20] Compiling ForgeConductorApp TelemetryDashboardView.swift
+[14/20] Compiling ForgeConductorApp ToolsView.swift
+[15/20] Compiling ForgeConductorApp LiveFeedView.swift
+[16/20] Compiling ForgeConductorApp MCPServersView.swift
+[17/20] Compiling ForgeConductorApp RigDashboardView.swift
+[17/22] Write Objects.LinkFileList
+[18/22] Linking forge-conductor-app
+[19/22] Applying forge-conductor-app
+[21/24] Compiling ForgeConductorTests AppBootstrapAppTests.swift
+[22/24] Emitting module ForgeConductorTests
+[22/24] Write Objects.LinkFileList
+[23/24] Linking ForgeConductorPackageTests
+Build complete! (5.24s)

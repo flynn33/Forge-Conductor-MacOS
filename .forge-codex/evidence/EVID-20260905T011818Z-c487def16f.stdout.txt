@@ -1,0 +1,574 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -workspace ForgeConductor.xcworkspace -scheme ForgeConductorAppTests -configuration Debug -destination platform=macOS,arch=arm64 -derivedDataPath /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug -resultBundlePath /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Ownership-Candidate-AppHosted.xcresult -jobs 4 -parallel-testing-enabled NO "-only-testing:ForgeConductorAppTests" SWIFT_TREAT_WARNINGS_AS_ERRORS=YES GCC_TREAT_WARNINGS_AS_ERRORS=YES test
+
+Build settings from command line:
+    GCC_TREAT_WARNINGS_AS_ERRORS = YES
+    SWIFT_TREAT_WARNINGS_AS_ERRORS = YES
+
+Writing result bundle at path:
+	/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Ownership-Candidate-AppHosted.xcresult
+
+Build Preparation
+Build task concurrency set to 4 via user default IDEBuildOperationMaxNumberOfConcurrentCompileTasks
+
+ComputePackagePrebuildTargetDependencyGraph
+
+Prepare packages
+
+CreateBuildRequest
+
+SendProjectDescription
+
+CreateBuildOperation
+
+ComputeTargetDependencyGraph
+note: Building targets in dependency order
+note: Target dependency graph (7 targets)
+    Target 'ForgeConductorAppTests' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeConductor' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeConductorCore' in project 'ForgeConductor'
+    Target 'ForgeConductor' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeConductorCore' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeRuntimeLauncher' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeFilesystemDaemon' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'forge-conductor' in project 'ForgeConductor'
+    Target 'forge-conductor' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeConductorCore' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeRuntimeLauncher' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeFilesystemDaemon' in project 'ForgeConductor'
+    Target 'ForgeFilesystemDaemon' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeFilesystemProtocol' in project 'ForgeConductor'
+    Target 'ForgeRuntimeLauncher' in project 'ForgeConductor' (no dependencies)
+    Target 'ForgeConductorCore' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeFilesystemProtocol' in project 'ForgeConductor'
+    Target 'ForgeFilesystemProtocol' in project 'ForgeConductor' (no dependencies)
+
+GatherProvisioningInputs
+
+CreateBuildDescription
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc --version
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -v -E -dM -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -x c -c /dev/null
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/usr/bin/actool --version --output-format xml1
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld -version_details
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/libtool -V
+
+Build description signature: fea10df154f6e2f8c2c0c1e398b983ff
+Build description path: /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/XCBuildData/fea10df154f6e2f8c2c0c1e398b983ff.xcbuilddata
+ClangStatCache /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/SDKStatCaches.noindex/macosx26.5-25F70-688ef53f1462e2c8f657fdc38a81448fe082c4a02f00227109f4ed75e425c832.sdkstatcache
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -o /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/SDKStatCaches.noindex/macosx26.5-25F70-688ef53f1462e2c8f657fdc38a81448fe082c4a02f00227109f4ed75e425c832.sdkstatcache
+
+MkDir /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/PlugIns/ForgeConductorAppTests.xctest/Contents (in target 'ForgeConductorAppTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    /bin/mkdir -p /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/PlugIns/ForgeConductorAppTests.xctest/Contents
+
+MkDir /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/PlugIns/ForgeConductorAppTests.xctest/Contents/MacOS (in target 'ForgeConductorAppTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    /bin/mkdir -p /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/PlugIns/ForgeConductorAppTests.xctest/Contents/MacOS
+
+MkDir /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/PlugIns (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    /bin/mkdir -p /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/PlugIns
+
+ProcessInfoPlistFile /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorCore.framework/Versions/A/Resources/Info.plist /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/empty-ForgeConductorCore.plist (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-infoPlistUtility /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/empty-ForgeConductorCore.plist -producttype com.apple.product-type.framework -expandbuildsettings -platform macosx -o /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorCore.framework/Versions/A/Resources/Info.plist
+
+ProcessInfoPlistFile /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeRuntimeLauncher.build/Objects-normal/arm64/Processed-Info.plist /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeRuntimeLauncher.build/empty-forge-runtime-launcher.plist (in target 'ForgeRuntimeLauncher' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-infoPlistUtility /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeRuntimeLauncher.build/empty-forge-runtime-launcher.plist -producttype com.apple.product-type.tool -expandbuildsettings -platform macosx -o /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeRuntimeLauncher.build/Objects-normal/arm64/Processed-Info.plist
+
+ProcessInfoPlistFile /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeFilesystemDaemon.build/Objects-normal/arm64/Processed-Info.plist /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeFilesystemDaemon.build/empty-forge-filesystem-daemon.plist (in target 'ForgeFilesystemDaemon' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-infoPlistUtility /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeFilesystemDaemon.build/empty-forge-filesystem-daemon.plist -producttype com.apple.product-type.tool -expandbuildsettings -platform macosx -o /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeFilesystemDaemon.build/Objects-normal/arm64/Processed-Info.plist
+
+Copy /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/forge_conductor.swiftmodule/Project/arm64-apple-macos.swiftsourceinfo /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/forge-conductor.build/Objects-normal/arm64/forge_conductor.swiftsourceinfo (in target 'forge-conductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/forge-conductor.build/Objects-normal/arm64/forge_conductor.swiftsourceinfo /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/forge_conductor.swiftmodule/Project/arm64-apple-macos.swiftsourceinfo
+
+ProcessInfoPlistFile /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/forge-conductor.build/Objects-normal/arm64/Processed-Info.plist /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/forge-conductor.build/DerivedSources/ForgeConductorCLI-Info.plist (in target 'forge-conductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-infoPlistUtility /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/forge-conductor.build/DerivedSources/ForgeConductorCLI-Info.plist -producttype com.apple.product-type.tool -expandbuildsettings -platform macosx -o /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/forge-conductor.build/Objects-normal/arm64/Processed-Info.plist
+
+Copy /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/forge_conductor.swiftmodule/arm64-apple-macos.swiftmodule /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/forge-conductor.build/Objects-normal/arm64/forge_conductor.swiftmodule (in target 'forge-conductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/forge-conductor.build/Objects-normal/arm64/forge_conductor.swiftmodule /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/forge_conductor.swiftmodule/arm64-apple-macos.swiftmodule
+
+Copy /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/forge_conductor.swiftmodule/arm64-apple-macos.swiftdoc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/forge-conductor.build/Objects-normal/arm64/forge_conductor.swiftdoc (in target 'forge-conductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/forge-conductor.build/Objects-normal/arm64/forge_conductor.swiftdoc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/forge_conductor.swiftmodule/arm64-apple-macos.swiftdoc
+
+Copy /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/forge_conductor.swiftmodule/arm64-apple-macos.abi.json /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/forge-conductor.build/Objects-normal/arm64/forge_conductor.abi.json (in target 'forge-conductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/forge-conductor.build/Objects-normal/arm64/forge_conductor.abi.json /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/forge_conductor.swiftmodule/arm64-apple-macos.abi.json
+
+Copy /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/libXCTestSwiftSupport.dylib /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib/libXCTestSwiftSupport.dylib (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -exclude Headers -exclude PrivateHeaders -exclude Modules -exclude \*.tbd -resolve-src-symlinks /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib/libXCTestSwiftSupport.dylib /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks
+
+Copy /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/libXCTestBundleInject.dylib /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib/libXCTestBundleInject.dylib (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -exclude Headers -exclude PrivateHeaders -exclude Modules -exclude \*.tbd -resolve-src-symlinks /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib/libXCTestBundleInject.dylib /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks
+
+Copy /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/XCUnit.framework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks/XCUnit.framework (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -exclude Headers -exclude PrivateHeaders -exclude Modules -exclude \*.tbd -resolve-src-symlinks /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks/XCUnit.framework /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks
+
+Copy /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/XCUIAutomation.framework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks/XCUIAutomation.framework (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -exclude Headers -exclude PrivateHeaders -exclude Modules -exclude \*.tbd -resolve-src-symlinks /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks/XCUIAutomation.framework /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks
+
+Copy /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/XCTestSupport.framework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks/XCTestSupport.framework (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -exclude Headers -exclude PrivateHeaders -exclude Modules -exclude \*.tbd -resolve-src-symlinks /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks/XCTestSupport.framework /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks
+
+SwiftDriver ForgeConductorAppTests normal arm64 com.apple.xcode.tools.swift.compiler (in target 'ForgeConductorAppTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-SwiftDriver -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name ForgeConductorAppTests -Onone @/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/Objects-normal/arm64/ForgeConductorAppTests.SwiftFileList -DDEBUG -plugin-path /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing -enable-upcoming-feature StrictConcurrency -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-macos26.0 -g -module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -warnings-as-errors -index-store-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Index.noindex/DataStore -swift-version 5 -I /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug -I /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64 -Isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib -F /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug -F /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks -c -j14 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/SDKStatCaches.noindex/macosx26.5-25F70-688ef53f1462e2c8f657fdc38a81448fe082c4a02f00227109f4ed75e425c832.sdkstatcache -output-file-map /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/Objects-normal/arm64/ForgeConductorAppTests-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex -sdk-module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/Objects-normal/arm64/ForgeConductorAppTests.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/Objects-normal/arm64/ForgeConductorAppTests_const_extract_protocols.json -Xcc -iquote -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/ForgeConductorAppTests-generated-files.hmap -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/ForgeConductorAppTests-own-target-headers.hmap -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/ForgeConductorAppTests-all-non-framework-target-headers.hmap -Xcc -ivfsoverlay -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor-8665fe8aec29fae8d8063572068c0da1-VFS/all-product-headers.yaml -Xcc -iquote -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/ForgeConductorAppTests-project-headers.hmap -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/include -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/DerivedSources-normal/arm64 -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/DerivedSources/arm64 -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/Objects-normal/arm64/ForgeConductorAppTests-Swift.h -working-directory /Users/jimdaley/GitHub/Forge-Conductor-MacOS -experimental-emit-module-separately -disable-cmo
+
+Copy /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/XCTestCore.framework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks/XCTestCore.framework (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -exclude Headers -exclude PrivateHeaders -exclude Modules -exclude \*.tbd -resolve-src-symlinks /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks/XCTestCore.framework /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks
+
+Copy /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/XCTest.framework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks/XCTest.framework (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -exclude Headers -exclude PrivateHeaders -exclude Modules -exclude \*.tbd -resolve-src-symlinks /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks/XCTest.framework /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks
+
+Copy /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/XCTAutomationSupport.framework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks/XCTAutomationSupport.framework (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -exclude Headers -exclude PrivateHeaders -exclude Modules -exclude \*.tbd -resolve-src-symlinks /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks/XCTAutomationSupport.framework /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks
+
+Copy /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/Testing.framework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks/Testing.framework (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -exclude Headers -exclude PrivateHeaders -exclude Modules -exclude \*.tbd -resolve-src-symlinks /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks/Testing.framework /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks
+
+CodeSign /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/libXCTestSwiftSupport.dylib (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    
+    Signing Identity:     "Apple Development: James Daley (FW94K6ZY57)"
+    
+    /usr/bin/codesign --force --sign 3E6B7EA813299330FC3235BBA34BE9237F0F1644 -o runtime --timestamp\=none --preserve-metadata\=identifier,entitlements,flags --generate-entitlement-der /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/libXCTestSwiftSupport.dylib
+/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/libXCTestSwiftSupport.dylib: replacing existing signature
+
+CodeSign /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/libXCTestBundleInject.dylib (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    
+    Signing Identity:     "Apple Development: James Daley (FW94K6ZY57)"
+    
+    /usr/bin/codesign --force --sign 3E6B7EA813299330FC3235BBA34BE9237F0F1644 -o runtime --timestamp\=none --preserve-metadata\=identifier,entitlements,flags --generate-entitlement-der /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/libXCTestBundleInject.dylib
+/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/libXCTestBundleInject.dylib: replacing existing signature
+
+ProcessInfoPlistFile /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Info.plist /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/DerivedSources/ForgeConductorApp-Info.plist (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-infoPlistUtility /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/DerivedSources/ForgeConductorApp-Info.plist -producttype com.apple.product-type.application -genpkginfo /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/PkgInfo -expandbuildsettings -platform macosx -additionalcontentfile /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/assetcatalog_generated_info.plist -scanforprivacyfile /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/ForgeConductorCore.framework -o /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Info.plist
+
+CopySwiftLibs /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-swiftStdLibTool --copy --verbose --sign 3E6B7EA813299330FC3235BBA34BE9237F0F1644 --scan-executable /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/MacOS/Forge\ Conductor.debug.dylib --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/PlugIns --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Library/SystemExtensions --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Extensions --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorCore.framework --scan-folder /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk/System/Library/Frameworks/MetalKit.framework --scan-folder /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk/System/Library/Frameworks/SwiftUI.framework --platform macosx --toolchain /var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.CLHpB9/Metal.xctoolchain --toolchain /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --destination /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks --strip-bitcode --strip-bitcode-tool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/bitcode_strip --emit-dependency-info /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/SwiftStdLibToolInputDependencies.dep --filter-for-swift-os
+
+CodeSign /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/XCUnit.framework (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    
+    Signing Identity:     "Apple Development: James Daley (FW94K6ZY57)"
+    
+    /usr/bin/codesign --force --sign 3E6B7EA813299330FC3235BBA34BE9237F0F1644 -o runtime --timestamp\=none --preserve-metadata\=identifier,entitlements,flags --generate-entitlement-der /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/XCUnit.framework
+/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/XCUnit.framework: replacing existing signature
+
+CodeSign /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/XCUIAutomation.framework (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    
+    Signing Identity:     "Apple Development: James Daley (FW94K6ZY57)"
+    
+    /usr/bin/codesign --force --sign 3E6B7EA813299330FC3235BBA34BE9237F0F1644 -o runtime --timestamp\=none --preserve-metadata\=identifier,entitlements,flags --generate-entitlement-der /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/XCUIAutomation.framework
+/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/XCUIAutomation.framework: replacing existing signature
+
+CodeSign /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/XCTestSupport.framework (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    
+    Signing Identity:     "Apple Development: James Daley (FW94K6ZY57)"
+    
+    /usr/bin/codesign --force --sign 3E6B7EA813299330FC3235BBA34BE9237F0F1644 -o runtime --timestamp\=none --preserve-metadata\=identifier,entitlements,flags --generate-entitlement-der /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/XCTestSupport.framework
+/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/XCTestSupport.framework: replacing existing signature
+
+CodeSign /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/XCTestCore.framework (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    
+    Signing Identity:     "Apple Development: James Daley (FW94K6ZY57)"
+    
+    /usr/bin/codesign --force --sign 3E6B7EA813299330FC3235BBA34BE9237F0F1644 -o runtime --timestamp\=none --preserve-metadata\=identifier,entitlements,flags --generate-entitlement-der /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/XCTestCore.framework
+/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/XCTestCore.framework: replacing existing signature
+
+CodeSign /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/XCTest.framework (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    
+    Signing Identity:     "Apple Development: James Daley (FW94K6ZY57)"
+    
+    /usr/bin/codesign --force --sign 3E6B7EA813299330FC3235BBA34BE9237F0F1644 -o runtime --timestamp\=none --preserve-metadata\=identifier,entitlements,flags --generate-entitlement-der /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/XCTest.framework
+/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/XCTest.framework: replacing existing signature
+
+CodeSign /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/XCTAutomationSupport.framework (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    
+    Signing Identity:     "Apple Development: James Daley (FW94K6ZY57)"
+    
+    /usr/bin/codesign --force --sign 3E6B7EA813299330FC3235BBA34BE9237F0F1644 -o runtime --timestamp\=none --preserve-metadata\=identifier,entitlements,flags --generate-entitlement-der /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/XCTAutomationSupport.framework
+/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/XCTAutomationSupport.framework: replacing existing signature
+
+CodeSign /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/Testing.framework (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    
+    Signing Identity:     "Apple Development: James Daley (FW94K6ZY57)"
+    
+    /usr/bin/codesign --force --sign 3E6B7EA813299330FC3235BBA34BE9237F0F1644 -o runtime --timestamp\=none --preserve-metadata\=identifier,entitlements,flags --generate-entitlement-der /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/Testing.framework
+/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/Testing.framework: replacing existing signature
+
+ProcessInfoPlistFile /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/PlugIns/ForgeConductorAppTests.xctest/Contents/Info.plist /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/empty-ForgeConductorAppTests.plist (in target 'ForgeConductorAppTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-infoPlistUtility /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/empty-ForgeConductorAppTests.plist -producttype com.apple.product-type.bundle.unit-test -expandbuildsettings -platform macosx -o /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/PlugIns/ForgeConductorAppTests.xctest/Contents/Info.plist
+
+SwiftEmitModule normal arm64 Emitting\ module\ for\ ForgeConductorAppTests (in target 'ForgeConductorAppTests' from project 'ForgeConductor')
+
+EmitSwiftModule normal arm64 (in target 'ForgeConductorAppTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    
+
+SwiftCompile normal arm64 Compiling\ ProviderConfigurationAppTests.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/ProviderConfigurationAppTests.swift (in target 'ForgeConductorAppTests' from project 'ForgeConductor')
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/ProviderConfigurationAppTests.swift (in target 'ForgeConductorAppTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    
+
+SwiftCompile normal arm64 Compiling\ OperatorProjectContractTests.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/OperatorProjectContractTests.swift (in target 'ForgeConductorAppTests' from project 'ForgeConductor')
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/OperatorProjectContractTests.swift (in target 'ForgeConductorAppTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    
+
+SwiftCompile normal arm64 Compiling\ NativeGaugeLifecycleTests.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/NativeGaugeLifecycleTests.swift (in target 'ForgeConductorAppTests' from project 'ForgeConductor')
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/NativeGaugeLifecycleTests.swift (in target 'ForgeConductorAppTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    
+
+SwiftCompile normal arm64 Compiling\ AppBootstrapAppTests.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/AppBootstrapAppTests.swift (in target 'ForgeConductorAppTests' from project 'ForgeConductor')
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/AppBootstrapAppTests.swift (in target 'ForgeConductorAppTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    
+
+SwiftDriverJobDiscovery normal arm64 Emitting module for ForgeConductorAppTests (in target 'ForgeConductorAppTests' from project 'ForgeConductor')
+
+SwiftDriver\ Compilation\ Requirements ForgeConductorAppTests normal arm64 com.apple.xcode.tools.swift.compiler (in target 'ForgeConductorAppTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-Swift-Compilation-Requirements -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name ForgeConductorAppTests -Onone @/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/Objects-normal/arm64/ForgeConductorAppTests.SwiftFileList -DDEBUG -plugin-path /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing -enable-upcoming-feature StrictConcurrency -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-macos26.0 -g -module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -warnings-as-errors -index-store-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Index.noindex/DataStore -swift-version 5 -I /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug -I /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64 -Isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib -F /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug -F /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks -c -j14 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/SDKStatCaches.noindex/macosx26.5-25F70-688ef53f1462e2c8f657fdc38a81448fe082c4a02f00227109f4ed75e425c832.sdkstatcache -output-file-map /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/Objects-normal/arm64/ForgeConductorAppTests-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex -sdk-module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/Objects-normal/arm64/ForgeConductorAppTests.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/Objects-normal/arm64/ForgeConductorAppTests_const_extract_protocols.json -Xcc -iquote -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/ForgeConductorAppTests-generated-files.hmap -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/ForgeConductorAppTests-own-target-headers.hmap -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/ForgeConductorAppTests-all-non-framework-target-headers.hmap -Xcc -ivfsoverlay -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor-8665fe8aec29fae8d8063572068c0da1-VFS/all-product-headers.yaml -Xcc -iquote -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/ForgeConductorAppTests-project-headers.hmap -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/include -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/DerivedSources-normal/arm64 -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/DerivedSources/arm64 -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/Objects-normal/arm64/ForgeConductorAppTests-Swift.h -working-directory /Users/jimdaley/GitHub/Forge-Conductor-MacOS -experimental-emit-module-separately -disable-cmo
+
+SwiftDriverJobDiscovery normal arm64 Compiling ProviderConfigurationAppTests.swift (in target 'ForgeConductorAppTests' from project 'ForgeConductor')
+
+Copy /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorAppTests.swiftmodule/Project/arm64-apple-macos.swiftsourceinfo /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/Objects-normal/arm64/ForgeConductorAppTests.swiftsourceinfo (in target 'ForgeConductorAppTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/Objects-normal/arm64/ForgeConductorAppTests.swiftsourceinfo /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorAppTests.swiftmodule/Project/arm64-apple-macos.swiftsourceinfo
+
+Copy /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorAppTests.swiftmodule/arm64-apple-macos.swiftmodule /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/Objects-normal/arm64/ForgeConductorAppTests.swiftmodule (in target 'ForgeConductorAppTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/Objects-normal/arm64/ForgeConductorAppTests.swiftmodule /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorAppTests.swiftmodule/arm64-apple-macos.swiftmodule
+
+Copy /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorAppTests.swiftmodule/arm64-apple-macos.abi.json /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/Objects-normal/arm64/ForgeConductorAppTests.abi.json (in target 'ForgeConductorAppTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/Objects-normal/arm64/ForgeConductorAppTests.abi.json /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorAppTests.swiftmodule/arm64-apple-macos.abi.json
+
+SwiftDriverJobDiscovery normal arm64 Compiling OperatorProjectContractTests.swift (in target 'ForgeConductorAppTests' from project 'ForgeConductor')
+
+SwiftDriverJobDiscovery normal arm64 Compiling NativeGaugeLifecycleTests.swift (in target 'ForgeConductorAppTests' from project 'ForgeConductor')
+
+SwiftDriverJobDiscovery normal arm64 Compiling AppBootstrapAppTests.swift (in target 'ForgeConductorAppTests' from project 'ForgeConductor')
+
+SwiftDriver\ Compilation ForgeConductorAppTests normal arm64 com.apple.xcode.tools.swift.compiler (in target 'ForgeConductorAppTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-Swift-Compilation -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name ForgeConductorAppTests -Onone @/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/Objects-normal/arm64/ForgeConductorAppTests.SwiftFileList -DDEBUG -plugin-path /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing -enable-upcoming-feature StrictConcurrency -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-macos26.0 -g -module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -warnings-as-errors -index-store-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Index.noindex/DataStore -swift-version 5 -I /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug -I /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64 -Isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib -F /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug -F /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks -c -j14 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/SDKStatCaches.noindex/macosx26.5-25F70-688ef53f1462e2c8f657fdc38a81448fe082c4a02f00227109f4ed75e425c832.sdkstatcache -output-file-map /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/Objects-normal/arm64/ForgeConductorAppTests-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex -sdk-module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/Objects-normal/arm64/ForgeConductorAppTests.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/Objects-normal/arm64/ForgeConductorAppTests_const_extract_protocols.json -Xcc -iquote -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/ForgeConductorAppTests-generated-files.hmap -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/ForgeConductorAppTests-own-target-headers.hmap -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/ForgeConductorAppTests-all-non-framework-target-headers.hmap -Xcc -ivfsoverlay -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor-8665fe8aec29fae8d8063572068c0da1-VFS/all-product-headers.yaml -Xcc -iquote -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/ForgeConductorAppTests-project-headers.hmap -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/include -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/DerivedSources-normal/arm64 -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/DerivedSources/arm64 -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/Objects-normal/arm64/ForgeConductorAppTests-Swift.h -working-directory /Users/jimdaley/GitHub/Forge-Conductor-MacOS -experimental-emit-module-separately -disable-cmo
+
+Ld /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/PlugIns/ForgeConductorAppTests.xctest/Contents/MacOS/ForgeConductorAppTests normal (in target 'ForgeConductorAppTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -Xlinker -reproducible -target arm64-apple-macos26.0 -bundle -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -Os -L/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/EagerLinkingTBDs/Debug -L/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug -L/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib -F/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/EagerLinkingTBDs/Debug -F/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug -iframework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks -filelist /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/Objects-normal/arm64/ForgeConductorAppTests.LinkFileList -Xlinker -rpath -Xlinker @loader_path/../Frameworks -Xlinker -rpath -Xlinker @executable_path/../Frameworks -Xlinker -dead_strip -bundle_loader /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/MacOS/Forge\ Conductor -Xlinker -object_path_lto -Xlinker /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/Objects-normal/arm64/ForgeConductorAppTests_lto.o -rdynamic -Xlinker -dependency_info -Xlinker /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/Objects-normal/arm64/ForgeConductorAppTests_dependency_info.dat -fobjc-link-runtime -L/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx -L/usr/lib/swift -Xlinker -add_ast_path -Xlinker /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/Objects-normal/arm64/ForgeConductorAppTests.swiftmodule @/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/Objects-normal/arm64/ForgeConductorAppTests-linker-args.resp -Xlinker -needed_framework -Xlinker XCTest -framework XCTest -Xlinker -needed-lXCTestSwiftSupport -lXCTestSwiftSupport -framework ForgeConductorCore /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/MacOS/Forge\ Conductor.debug.dylib -Xlinker -no_adhoc_codesign -o /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/PlugIns/ForgeConductorAppTests.xctest/Contents/MacOS/ForgeConductorAppTests
+
+CopySwiftLibs /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/PlugIns/ForgeConductorAppTests.xctest (in target 'ForgeConductorAppTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-swiftStdLibTool --copy --verbose --sign 3E6B7EA813299330FC3235BBA34BE9237F0F1644 --scan-executable /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/PlugIns/ForgeConductorAppTests.xctest/Contents/MacOS/ForgeConductorAppTests --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/PlugIns/ForgeConductorAppTests.xctest/Contents/Frameworks --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/PlugIns/ForgeConductorAppTests.xctest/Contents/PlugIns --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/PlugIns/ForgeConductorAppTests.xctest/Contents/Library/SystemExtensions --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/PlugIns/ForgeConductorAppTests.xctest/Contents/Extensions --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorCore.framework --platform macosx --toolchain /var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.CLHpB9/Metal.xctoolchain --toolchain /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --destination /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/PlugIns/ForgeConductorAppTests.xctest/Contents/Frameworks --strip-bitcode --scan-executable /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib/libXCTestSwiftSupport.dylib --strip-bitcode-tool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/bitcode_strip --emit-dependency-info /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/SwiftStdLibToolInputDependencies.dep --filter-for-swift-os
+
+ExtractAppIntentsMetadata (in target 'ForgeConductorAppTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsmetadataprocessor --toolchain-dir /var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.CLHpB9/Metal.xctoolchain --module-name ForgeConductorAppTests --sdk-root /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk --xcode-version 17F113 --platform-family macOS --deployment-target 26.0 --bundle-identifier com.forge-conductor.app-tests --output /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/PlugIns/ForgeConductorAppTests.xctest/Contents/Resources --target-triple arm64-apple-macos26.0 --binary-file /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/PlugIns/ForgeConductorAppTests.xctest/Contents/MacOS/ForgeConductorAppTests --dependency-file /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/Objects-normal/arm64/ForgeConductorAppTests_dependency_info.dat --stringsdata-file /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/Objects-normal/arm64/ExtractedAppShortcutsMetadata.stringsdata --source-file-list /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/Objects-normal/arm64/ForgeConductorAppTests.SwiftFileList --metadata-file-list /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/ForgeConductorAppTests.DependencyMetadataFileList --static-metadata-file-list /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/ForgeConductorAppTests.DependencyStaticMetadataFileList --swift-const-vals-list /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorAppTests.build/Objects-normal/arm64/ForgeConductorAppTests.SwiftConstValuesFileList --compile-time-extraction --deployment-aware-processing --validate-assistant-intents --no-app-shortcuts-localization
+2026-09-04 20:18:22.436 appintentsmetadataprocessor[37998:33787047] Starting appintentsmetadataprocessor export
+2026-09-04 20:18:22.437 appintentsmetadataprocessor[37998:33787047] warning: Metadata extraction skipped. No AppIntents.framework dependency found.
+
+CodeSign /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/PlugIns/ForgeConductorAppTests.xctest (in target 'ForgeConductorAppTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    
+    Signing Identity:     "Apple Development: James Daley (FW94K6ZY57)"
+    
+    /usr/bin/codesign --force --sign 3E6B7EA813299330FC3235BBA34BE9237F0F1644 --timestamp\=none --generate-entitlement-der /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/PlugIns/ForgeConductorAppTests.xctest
+
+CodeSign /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/MacOS/Forge\ Conductor.debug.dylib (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    
+    Signing Identity:     "Apple Development: James Daley (FW94K6ZY57)"
+    
+    /usr/bin/codesign --force --sign 3E6B7EA813299330FC3235BBA34BE9237F0F1644 -o runtime --timestamp\=none --generate-entitlement-der /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/MacOS/Forge\ Conductor.debug.dylib
+/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/Forge Conductor.debug.dylib: replacing existing signature
+
+CodeSign /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/MacOS/__preview.dylib (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    
+    Signing Identity:     "Apple Development: James Daley (FW94K6ZY57)"
+    
+    /usr/bin/codesign --force --sign 3E6B7EA813299330FC3235BBA34BE9237F0F1644 -o runtime --timestamp\=none --generate-entitlement-der /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/MacOS/__preview.dylib
+/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/__preview.dylib: replacing existing signature
+
+CodeSign /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    
+    Signing Identity:     "Apple Development: James Daley (FW94K6ZY57)"
+    
+    /usr/bin/codesign --force --sign 3E6B7EA813299330FC3235BBA34BE9237F0F1644 -o runtime --entitlements /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Forge\ Conductor.app.xcent --timestamp\=none --generate-entitlement-der /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app
+/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge Conductor.app: replacing existing signature
+
+Validate /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-validationUtility /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app -no-validate-extension -infoplist-subpath Contents/Info.plist
+
+RegisterWithLaunchServices /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    /System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister -f -R -trusted /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app
+
+2026-09-04 20:18:23.292606-0500 Forge Conductor[38006:33787148] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/com.forge-conductor.app.savedState
+Test Suite 'All tests' started at 2026-09-04 20:18:23.763.
+Test Suite 'ForgeConductorAppTests.xctest' started at 2026-09-04 20:18:23.763.
+Test Suite 'AppBackgroundOperationAppTests' started at 2026-09-04 20:18:23.763.
+Test Case '-[ForgeConductorAppTests.AppBackgroundOperationAppTests testCommittedExportWinsCancellationAndDuplicateActionIsRejected]' started.
+Thread Performance Checker: Thread running at User-initiated quality-of-service class waiting on a lower QoS thread running at Utility quality-of-service class. Investigate ways to avoid priority inversions
+PID: 38006, TID: 33787193
+Backtrace
+=================================================================
+0   ForgeConductorCore                  0x0000000107a12c48 $s18ForgeConductorCore21BoundedAsyncWorkQueueC5flush7timeoutSbSd_tF + 628
+1   ForgeConductorCore                  0x0000000107a15e74 $s18ForgeConductorCore13DiagnosticLogC5flush7timeoutSbSd_tF + 64
+2   ForgeConductorCore                  0x0000000107a1692c $s18ForgeConductorCore13DiagnosticLogC13loadPersisted8maxLinesSayAA0D8EnvelopeVGSi_tKF + 624
+3   ForgeConductorCore                  0x0000000107a17b7c $s18ForgeConductorCore13DiagnosticLogC6export2to8basenameAC12ExportResultV10Foundation3URLVSg_SSSgtKF + 1488
+4   ForgeConductorAppTests              0x0000000108cb9c34 $s22ForgeConductorAppTests0c19BackgroundOperationcD0C63testCommittedExportWinsCancellationAndDuplicateActionIsRejectedyyYaKFSbyKXEfu_0aB4Core13DiagnosticLogC0I6ResultVyYaYbKcfU_TY0_ + 676
+5   libswift_Concurrency.dylib          0x0000000289351e18 _ZN5swift34runJobInEstablishedExecutorContextEPNS_3JobE + 472
+6   libswift_Concurrency.dylib          0x00000002893536ec _ZL17swift_job_runImplPN5swift3JobENS_17SerialExecutorRefE + 156
+7   libdispatch.dylib                   0x0000000183a95980 _dispatch_root_queue_drain + 360
+8   libdispatch.dylib                   0x0000000183a96120 _dispatch_worker_thread2 + 184
+9   libsystem_pthread.dylib             0x0000000183c3be84 _pthread_wqthread + 232
+10  libsystem_pthread.dylib             0x0000000183c3ac10 start_wqthread + 8
+Thread Performance Checker: Thread running at User-initiated quality-of-service class waiting on a lower QoS thread running at Utility quality-of-service class. Investigate ways to avoid priority inversions
+PID: 38006, TID: 33787193
+Backtrace
+=================================================================
+0   ForgeConductorCore                  0x0000000107a1304c $s18ForgeConductorCore21BoundedAsyncWorkQueueC8shutdown7timeoutSbSd_tF + 688
+1   ForgeConductorCore                  0x0000000107a14894 $s18ForgeConductorCore13DiagnosticLogCfd + 56
+2   ForgeConductorCore                  0x0000000107a148f8 $s18ForgeConductorCore13DiagnosticLogCfD + 28
+3   libswiftCore.dylib                  0x000000019739ae88 _swift_release_dealloc + 64
+4   libswiftCore.dylib                  0x00000001973fde40 _ZN5swift9RefCountsINS_13RefCountBitsTILNS_19RefCountInlinednessE1EEEE15doDecrementSlowILNS_13PerformDeinitE1EEEbS3_j + 168
+5   ForgeConductorAppTests              0x0000000108cb9c6c $s22ForgeConductorAppTests0c19BackgroundOperationcD0C63testCommittedExportWinsCancellationAndDuplicateActionIsRejectedyyYaKFSbyKXEfu_0aB4Core13DiagnosticLogC0I6ResultVyYaYbKcfU_TY0_ + 732
+6   libswift_Concurrency.dylib          0x0000000289351e18 _ZN5swift34runJobInEstablishedExecutorContextEPNS_3JobE + 472
+7   libswift_Concurrency.dylib          0x00000002893536ec _ZL17swift_job_runImplPN5swift3JobENS_17SerialExecutorRefE + 156
+8   libdispatch.dylib                   0x0000000183a95980 _dispatch_root_queue_drain + 360
+9   libdispatch.dylib                   0x0000000183a96120 _dispatch_worker_thread2 + 184
+10  libsystem_pthread.dylib             0x0000000183c3be84 _pthread_wqthread + 232
+11  libsystem_pthread.dylib             0x0000000183c3ac10 start_wqthread + 8
+Test Case '-[ForgeConductorAppTests.AppBackgroundOperationAppTests testCommittedExportWinsCancellationAndDuplicateActionIsRejected]' passed (0.417 seconds).
+Test Case '-[ForgeConductorAppTests.AppBackgroundOperationAppTests testCooperativeCancellationAndFailureEachAllowRetryAfterCompletion]' started.
+Test Case '-[ForgeConductorAppTests.AppBackgroundOperationAppTests testCooperativeCancellationAndFailureEachAllowRetryAfterCompletion]' passed (0.045 seconds).
+Test Case '-[ForgeConductorAppTests.AppBackgroundOperationAppTests testReleasedOwnerCancelsWorkAndDoesNotReceiveCompletion]' started.
+Test Case '-[ForgeConductorAppTests.AppBackgroundOperationAppTests testReleasedOwnerCancelsWorkAndDoesNotReceiveCompletion]' passed (0.013 seconds).
+Test Suite 'AppBackgroundOperationAppTests' passed at 2026-09-04 20:18:24.239.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.475 (0.476) seconds
+Test Suite 'AppBootstrapAppTests' started at 2026-09-04 20:18:24.239.
+Test Case '-[ForgeConductorAppTests.AppBootstrapAppTests testCancellationClosesUnpublishedGraphAndAllowsRetryAfterCompletion]' started.
+Thread Performance Checker: Thread running at User-initiated quality-of-service class waiting on a lower QoS thread running at Default quality-of-service class. Investigate ways to avoid priority inversions
+PID: 38006, TID: 33787207
+Backtrace
+=================================================================
+0   ForgeConductorCore                  0x00000001078afa8c $s18ForgeConductorCore0A3AppC8shutdownAA24RuntimeJobShutdownReportVyF + 800
+1   Forge Conductor.debug.dylib         0x00000001058dd6b8 $s15Forge_Conductor21AppBootstrapOperationC5start10completionSbys6ResultOyAA0cD8SnapshotVs5Error_pGScMYcc_tFAIyYaKcfU_TY0_ + 624
+2   libswift_Concurrency.dylib          0x0000000289351e18 _ZN5swift34runJobInEstablishedExecutorContextEPNS_3JobE + 472
+3   libswift_Concurrency.dylib          0x00000002893536ec _ZL17swift_job_runImplPN5swift3JobENS_17SerialExecutorRefE + 156
+4   libdispatch.dylib                   0x0000000183a95980 _dispatch_root_queue_drain + 360
+5   libdispatch.dylib                   0x0000000183a96120 _dispatch_worker_thread2 + 184
+6   libsystem_pthread.dylib             0x0000000183c3be84 _pthread_wqthread + 232
+7   libsystem_pthread.dylib             0x0000000183c3ac10 start_wqthread + 8
+Thread Performance Checker: Thread running at User-initiated quality-of-service class waiting on a lower QoS thread running at Default quality-of-service class. Investigate ways to avoid priority inversions
+PID: 38006, TID: 33787207
+Backtrace
+=================================================================
+0   ForgeConductorCore                  0x000000010739ffbc $s18ForgeConductorCore21ProjectContextServiceC4wait33_DC86F667C11E1A0B56D175A572910931LL12cancellation19committedResultWins_xAA20ToolCallCancellationCSg_SbxAIYaYbKctKs8SendableRzlF + 2480
+1   ForgeConductorCore                  0x00000001073ac130 $s18ForgeConductorCore21ProjectContextServiceC5closeyyF + 100
+2   ForgeConductorCore                  0x00000001078afbcc $s18ForgeConductorCore0A3AppC8shutdownAA24RuntimeJobShutdownReportVyF + 1120
+3   Forge Conductor.debug.dylib         0x00000001058dd6b8 $s15Forge_Conductor21AppBootstrapOperationC5start10completionSbys6ResultOyAA0cD8SnapshotVs5Error_pGScMYcc_tFAIyYaKcfU_TY0_ + 624
+4   libswift_Concurrency.dylib          0x0000000289351e18 _ZN5swift34runJobInEstablishedExecutorContextEPNS_3JobE + 472
+5   libswift_Concurrency.dylib          0x00000002893536ec _ZL17swift_job_runImplPN5swift3JobENS_17SerialExecutorRefE + 156
+6   libdispatch.dylib                   0x0000000183a95980 _dispatch_root_queue_drain + 360
+7   libdispatch.dylib                   0x0000000183a96120 _dispatch_worker_thread2 + 184
+8   libsystem_pthread.dylib             0x0000000183c3be84 _pthread_wqthread + 232
+9   libsystem_pthread.dylib             0x0000000183c3ac10 start_wqthread + 8
+Test Case '-[ForgeConductorAppTests.AppBootstrapAppTests testCancellationClosesUnpublishedGraphAndAllowsRetryAfterCompletion]' passed (0.199 seconds).
+Test Case '-[ForgeConductorAppTests.AppBootstrapAppTests testDelayedStartupLeavesMainActorResponsiveAndCoalescesDuplicateCalls]' started.
+Test Case '-[ForgeConductorAppTests.AppBootstrapAppTests testDelayedStartupLeavesMainActorResponsiveAndCoalescesDuplicateCalls]' passed (0.188 seconds).
+Test Case '-[ForgeConductorAppTests.AppBootstrapAppTests testNativeModelFailureAndRetryKeepPublishedStateOnMainActor]' started.
+Test Case '-[ForgeConductorAppTests.AppBootstrapAppTests testNativeModelFailureAndRetryKeepPublishedStateOnMainActor]' passed (0.013 seconds).
+Test Case '-[ForgeConductorAppTests.AppBootstrapAppTests testOwnerReleaseCancelsWorkerWithoutRetainingApplication]' started.
+Thread Performance Checker: Thread running at User-initiated quality-of-service class waiting on a lower QoS thread running at Default quality-of-service class. Investigate ways to avoid priority inversions
+PID: 38006, TID: 33787208
+Backtrace
+=================================================================
+0   ForgeConductorCore                  0x00000001078afa8c $s18ForgeConductorCore0A3AppC8shutdownAA24RuntimeJobShutdownReportVyF + 800
+1   Forge Conductor.debug.dylib         0x00000001058dd6b8 $s15Forge_Conductor21AppBootstrapOperationC5start10completionSbys6ResultOyAA0cD8SnapshotVs5Error_pGScMYcc_tFAIyYaKcfU_TY0_ + 624
+2   libswift_Concurrency.dylib          0x0000000289351e18 _ZN5swift34runJobInEstablishedExecutorContextEPNS_3JobE + 472
+3   libswift_Concurrency.dylib          0x00000002893536ec _ZL17swift_job_runImplPN5swift3JobENS_17SerialExecutorRefE + 156
+4   libdispatch.dylib                   0x0000000183a95980 _dispatch_root_queue_drain + 360
+5   libdispatch.dylib                   0x0000000183a96120 _dispatch_worker_thread2 + 184
+6   libsystem_pthread.dylib             0x0000000183c3be84 _pthread_wqthread + 232
+7   libsystem_pthread.dylib             0x0000000183c3ac10 start_wqthread + 8
+Thread Performance Checker: Thread running at User-initiated quality-of-service class waiting on a lower QoS thread running at Default quality-of-service class. Investigate ways to avoid priority inversions
+PID: 38006, TID: 33787208
+Backtrace
+=================================================================
+0   ForgeConductorCore                  0x000000010739ffbc $s18ForgeConductorCore21ProjectContextServiceC4wait33_DC86F667C11E1A0B56D175A572910931LL12cancellation19committedResultWins_xAA20ToolCallCancellationCSg_SbxAIYaYbKctKs8SendableRzlF + 2480
+1   ForgeConductorCore                  0x00000001073ac130 $s18ForgeConductorCore21ProjectContextServiceC5closeyyF + 100
+2   ForgeConductorCore                  0x00000001078afbcc $s18ForgeConductorCore0A3AppC8shutdownAA24RuntimeJobShutdownReportVyF + 1120
+3   Forge Conductor.debug.dylib         0x00000001058dd6b8 $s15Forge_Conductor21AppBootstrapOperationC5start10completionSbys6ResultOyAA0cD8SnapshotVs5Error_pGScMYcc_tFAIyYaKcfU_TY0_ + 624
+4   libswift_Concurrency.dylib          0x0000000289351e18 _ZN5swift34runJobInEstablishedExecutorContextEPNS_3JobE + 472
+5   libswift_Concurrency.dylib          0x00000002893536ec _ZL17swift_job_runImplPN5swift3JobENS_17SerialExecutorRefE + 156
+6   libdispatch.dylib                   0x0000000183a95980 _dispatch_root_queue_drain + 360
+7   libdispatch.dylib                   0x0000000183a96120 _dispatch_worker_thread2 + 184
+8   libsystem_pthread.dylib             0x0000000183c3be84 _pthread_wqthread + 232
+9   libsystem_pthread.dylib             0x0000000183c3ac10 start_wqthread + 8
+Test Case '-[ForgeConductorAppTests.AppBootstrapAppTests testOwnerReleaseCancelsWorkerWithoutRetainingApplication]' passed (0.189 seconds).
+Test Case '-[ForgeConductorAppTests.AppBootstrapAppTests testSettingsMutationsWaitForStartupAndFailureStillAllowsRetry]' started.
+Test Case '-[ForgeConductorAppTests.AppBootstrapAppTests testSettingsMutationsWaitForStartupAndFailureStillAllowsRetry]' passed (0.008 seconds).
+Test Suite 'AppBootstrapAppTests' passed at 2026-09-04 20:18:24.836.
+	 Executed 5 tests, with 0 failures (0 unexpected) in 0.596 (0.597) seconds
+Test Suite 'NativeGaugeLifecycleTests' started at 2026-09-04 20:18:24.836.
+Test Case '-[ForgeConductorAppTests.NativeGaugeLifecycleTests testHiddenAndOrderedOutProductionGaugesStopDrawingAndResumeWhenVisible]' started.
+Test Case '-[ForgeConductorAppTests.NativeGaugeLifecycleTests testHiddenAndOrderedOutProductionGaugesStopDrawingAndResumeWhenVisible]' passed (4.873 seconds).
+Test Case '-[ForgeConductorAppTests.NativeGaugeLifecycleTests testProductionGaugesDrawOnDemandAndReuseSharedResources]' started.
+2026-09-04 20:18:29.969933-0500 Forge Conductor[38006:33787148] [NSCGS] Ignoring request to entangle context after pre-commit
+2026-09-04 20:18:29.969970-0500 Forge Conductor[38006:33787148] [NSCGS] Ignoring request to entangle context after pre-commit
+2026-09-04 20:18:29.969978-0500 Forge Conductor[38006:33787148] [NSCGS] Ignoring request to entangle context after pre-commit
+2026-09-04 20:18:29.970005-0500 Forge Conductor[38006:33787148] [NSCGS] Entangling fence requested after pre-commit
+2026-09-04 20:18:29.971062-0500 Forge Conductor[38006:33787148] [API] cannot add handler to 2 from 2 - dropping
+2026-09-04 20:18:29.971074-0500 Forge Conductor[38006:33787148] [NSCGS] Warning: Invalid attempt to open a new transaction during CA commit. This is likely to break AppKit transactional behavior. Break on NSCGSTransactionCreatedDuringCommitError to debug.
+Test Case '-[ForgeConductorAppTests.NativeGaugeLifecycleTests testProductionGaugesDrawOnDemandAndReuseSharedResources]' passed (2.450 seconds).
+Test Case '-[ForgeConductorAppTests.NativeGaugeLifecycleTests testProductionVertexBufferReusesCapacityAndReleasesItsMetalObject]' started.
+2026-09-04 20:18:32.423750-0500 Forge Conductor[38006:33787148] [NSCGS] Ignoring request to entangle context after pre-commit
+2026-09-04 20:18:32.423778-0500 Forge Conductor[38006:33787148] [NSCGS] Ignoring request to entangle context after pre-commit
+2026-09-04 20:18:32.423785-0500 Forge Conductor[38006:33787148] [NSCGS] Ignoring request to entangle context after pre-commit
+2026-09-04 20:18:32.423809-0500 Forge Conductor[38006:33787148] [NSCGS] Entangling fence requested after pre-commit
+2026-09-04 20:18:32.424739-0500 Forge Conductor[38006:33787148] [API] cannot add handler to 2 from 2 - dropping
+2026-09-04 20:18:32.424752-0500 Forge Conductor[38006:33787148] [NSCGS] Warning: Invalid attempt to open a new transaction during CA commit. This is likely to break AppKit transactional behavior. Break on NSCGSTransactionCreatedDuringCommitError to debug.
+Test Case '-[ForgeConductorAppTests.NativeGaugeLifecycleTests testProductionVertexBufferReusesCapacityAndReleasesItsMetalObject]' passed (1.316 seconds).
+Test Case '-[ForgeConductorAppTests.NativeGaugeLifecycleTests testSwiftUIDismantleReleasesProductionSurfacesAndCoordinatorsAcrossCycles]' started.
+Test Case '-[ForgeConductorAppTests.NativeGaugeLifecycleTests testSwiftUIDismantleReleasesProductionSurfacesAndCoordinatorsAcrossCycles]' passed (4.216 seconds).
+Test Suite 'NativeGaugeLifecycleTests' passed at 2026-09-04 20:18:37.692.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 12.854 (12.855) seconds
+Test Suite 'OperatorProjectContractTests' started at 2026-09-04 20:18:37.692.
+Test Case '-[ForgeConductorAppTests.OperatorProjectContractTests testCommittedRegistrationFetchesFullProjectWithoutLosingReconciledFlag]' started.
+Test Case '-[ForgeConductorAppTests.OperatorProjectContractTests testCommittedRegistrationFetchesFullProjectWithoutLosingReconciledFlag]' passed (0.007 seconds).
+Test Case '-[ForgeConductorAppTests.OperatorProjectContractTests testProjectsViewModelPreservesFullRegistrationAndResetProjection]' started.
+Test Case '-[ForgeConductorAppTests.OperatorProjectContractTests testProjectsViewModelPreservesFullRegistrationAndResetProjection]' passed (0.055 seconds).
+Test Suite 'OperatorProjectContractTests' passed at 2026-09-04 20:18:37.755.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.062 (0.063) seconds
+Test Suite 'OperatorStartupContentAppTests' started at 2026-09-04 20:18:37.755.
+Test Case '-[ForgeConductorAppTests.OperatorStartupContentAppTests testOperatorScreenConstructionWaitsThroughStartupAndFailureUntilReady]' started.
+Test Case '-[ForgeConductorAppTests.OperatorStartupContentAppTests testOperatorScreenConstructionWaitsThroughStartupAndFailureUntilReady]' passed (0.001 seconds).
+Test Suite 'OperatorStartupContentAppTests' passed at 2026-09-04 20:18:37.756.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.001 (0.001) seconds
+Test Suite 'ProviderConfigurationAppTests' started at 2026-09-04 20:18:37.756.
+Test Case '-[ForgeConductorAppTests.ProviderConfigurationAppTests testBusyProviderRouteRejectsCredentialBodiesWithoutDispatchingMutations]' started.
+2026-09-04 20:18:37.963635-0500 Forge Conductor[38006:33787148] [NSCGS] Ignoring request to entangle context after pre-commit
+2026-09-04 20:18:37.963660-0500 Forge Conductor[38006:33787148] [NSCGS] Ignoring request to entangle context after pre-commit
+2026-09-04 20:18:37.963666-0500 Forge Conductor[38006:33787148] [NSCGS] Ignoring request to entangle context after pre-commit
+2026-09-04 20:18:37.963691-0500 Forge Conductor[38006:33787148] [NSCGS] Entangling fence requested after pre-commit
+2026-09-04 20:18:37.964642-0500 Forge Conductor[38006:33787148] [API] cannot add handler to 2 from 2 - dropping
+2026-09-04 20:18:37.964653-0500 Forge Conductor[38006:33787148] [NSCGS] Warning: Invalid attempt to open a new transaction during CA commit. This is likely to break AppKit transactional behavior. Break on NSCGSTransactionCreatedDuringCommitError to debug.
+2026-09-04 20:18:37.969745-0500 Forge Conductor[38006:33788039] [] nw_path_necp_check_for_updates Failed to copy updated result (22)
+2026-09-04 20:18:37.970796-0500 Forge Conductor[38006:33788034] [] nw_path_necp_check_for_updates Failed to copy updated result (22)
+2026-09-04 20:18:37.971798-0500 Forge Conductor[38006:33788039] [] nw_path_necp_check_for_updates Failed to copy updated result (22)
+2026-09-04 20:18:37.975017-0500 Forge Conductor[38006:33788034] [] nw_path_necp_check_for_updates Failed to copy updated result (22)
+Thread Performance Checker: Thread running at User-initiated quality-of-service class waiting on a lower QoS thread running at Default quality-of-service class. Investigate ways to avoid priority inversions
+PID: 38006, TID: 33787447
+Backtrace
+=================================================================
+0   ForgeConductorCore                  0x00000001078afa8c $s18ForgeConductorCore0A3AppC8shutdownAA24RuntimeJobShutdownReportVyF + 800
+1   ForgeConductorAppTests              0x0000000108c8fb20 $s22ForgeConductorAppTests021ProviderConfigurationcD0C04testeF53RoutesRequireAuthorizationAndClientPersistsCleanSetupyyYaKF6$deferL_yyF + 36
+2   ForgeConductorAppTests              0x0000000108c8edc4 $s22ForgeConductorAppTests021ProviderConfigurationcD0C08testBusyE55RouteRejectsCredentialBodiesWithoutDispatchingMutationsyyYaKFTY14_ + 124
+3   libswift_Concurrency.dylib          0x0000000289351e18 _ZN5swift34runJobInEstablishedExecutorContextEPNS_3JobE + 472
+4   libswift_Concurrency.dylib          0x00000002893536ec _ZL17swift_job_runImplPN5swift3JobENS_17SerialExecutorRefE + 156
+5   libdispatch.dylib                   0x0000000183a95980 _dispatch_root_queue_drain + 360
+6   libdispatch.dylib                   0x0000000183a96120 _dispatch_worker_thread2 + 184
+7   libsystem_pthread.dylib             0x0000000183c3be84 _pthread_wqthread + 232
+8   libsystem_pthread.dylib             0x0000000183c3ac10 start_wqthread + 8
+Thread Performance Checker: Thread running at User-initiated quality-of-service class waiting on a lower QoS thread running at Default quality-of-service class. Investigate ways to avoid priority inversions
+PID: 38006, TID: 33787447
+Backtrace
+=================================================================
+0   ForgeConductorCore                  0x000000010739ffbc $s18ForgeConductorCore21ProjectContextServiceC4wait33_DC86F667C11E1A0B56D175A572910931LL12cancellation19committedResultWins_xAA20ToolCallCancellationCSg_SbxAIYaYbKctKs8SendableRzlF + 2480
+1   ForgeConductorCore                  0x00000001073ac130 $s18ForgeConductorCore21ProjectContextServiceC5closeyyF + 100
+2   ForgeConductorCore                  0x00000001078afbcc $s18ForgeConductorCore0A3AppC8shutdownAA24RuntimeJobShutdownReportVyF + 1120
+3   ForgeConductorAppTests              0x0000000108c8fb20 $s22ForgeConductorAppTests021ProviderConfigurationcD0C04testeF53RoutesRequireAuthorizationAndClientPersistsCleanSetupyyYaKF6$deferL_yyF + 36
+4   ForgeConductorAppTests              0x0000000108c8edc4 $s22ForgeConductorAppTests021ProviderConfigurationcD0C08testBusyE55RouteRejectsCredentialBodiesWithoutDispatchingMutationsyyYaKFTY14_ + 124
+5   libswift_Concurrency.dylib          0x0000000289351e18 _ZN5swift34runJobInEstablishedExecutorContextEPNS_3JobE + 472
+6   libswift_Concurrency.dylib          0x00000002893536ec _ZL17swift_job_runImplPN5swift3JobENS_17SerialExecutorRefE + 156
+7   libdispatch.dylib                   0x0000000183a95980 _dispatch_root_queue_drain + 360
+8   libdispatch.dylib                   0x0000000183a96120 _dispatch_worker_thread2 + 184
+9   libsystem_pthread.dylib             0x0000000183c3be84 _pthread_wqthread + 232
+10  libsystem_pthread.dylib             0x0000000183c3ac10 start_wqthread + 8
+Test Case '-[ForgeConductorAppTests.ProviderConfigurationAppTests testBusyProviderRouteRejectsCredentialBodiesWithoutDispatchingMutations]' passed (1.218 seconds).
+Test Case '-[ForgeConductorAppTests.ProviderConfigurationAppTests testProviderConfigurationRoutesRequireAuthorizationAndClientPersistsCleanSetup]' started.
+2026-09-04 20:18:39.143036-0500 Forge Conductor[38006:33787196] [] nw_path_necp_check_for_updates Failed to copy updated result (22)
+2026-09-04 20:18:39.144294-0500 Forge Conductor[38006:33787204] [] nw_path_necp_check_for_updates Failed to copy updated result (22)
+2026-09-04 20:18:39.146027-0500 Forge Conductor[38006:33787196] [] nw_path_necp_check_for_updates Failed to copy updated result (22)
+2026-09-04 20:18:39.149103-0500 Forge Conductor[38006:33787200] [] nw_path_necp_check_for_updates Failed to copy updated result (22)
+2026-09-04 20:18:39.150695-0500 Forge Conductor[38006:33787196] [] nw_path_necp_check_for_updates Failed to copy updated result (22)
+Thread Performance Checker: Thread running at User-initiated quality-of-service class waiting on a lower QoS thread running at Default quality-of-service class. Investigate ways to avoid priority inversions
+PID: 38006, TID: 33788034
+Backtrace
+=================================================================
+0   ForgeConductorCore                  0x00000001078afa8c $s18ForgeConductorCore0A3AppC8shutdownAA24RuntimeJobShutdownReportVyF + 800
+1   ForgeConductorAppTests              0x0000000108c8fb20 $s22ForgeConductorAppTests021ProviderConfigurationcD0C04testeF53RoutesRequireAuthorizationAndClientPersistsCleanSetupyyYaKF6$deferL_yyF + 36
+2   ForgeConductorAppTests              0x0000000108c93630 $s22ForgeConductorAppTests021ProviderConfigurationcD0C04testeF53RoutesRequireAuthorizationAndClientPersistsCleanSetupyyYaKFTY16_ + 528
+3   libswift_Concurrency.dylib          0x0000000289351e18 _ZN5swift34runJobInEstablishedExecutorContextEPNS_3JobE + 472
+4   libswift_Concurrency.dylib          0x00000002893536ec _ZL17swift_job_runImplPN5swift3JobENS_17SerialExecutorRefE + 156
+5   libdispatch.dylib                   0x0000000183a95980 _dispatch_root_queue_drain + 360
+6   libdispatch.dylib                   0x0000000183a96120 _dispatch_worker_thread2 + 184
+7   libsystem_pthread.dylib             0x0000000183c3be84 _pthread_wqthread + 232
+8   libsystem_pthread.dylib             0x0000000183c3ac10 start_wqthread + 8
+Thread Performance Checker: Thread running at User-initiated quality-of-service class waiting on a lower QoS thread running at Default quality-of-service class. Investigate ways to avoid priority inversions
+PID: 38006, TID: 33788034
+Backtrace
+=================================================================
+0   ForgeConductorCore                  0x000000010739ffbc $s18ForgeConductorCore21ProjectContextServiceC4wait33_DC86F667C11E1A0B56D175A572910931LL12cancellation19committedResultWins_xAA20ToolCallCancellationCSg_SbxAIYaYbKctKs8SendableRzlF + 2480
+1   ForgeConductorCore                  0x00000001073ac130 $s18ForgeConductorCore21ProjectContextServiceC5closeyyF + 100
+2   ForgeConductorCore                  0x00000001078afbcc $s18ForgeConductorCore0A3AppC8shutdownAA24RuntimeJobShutdownReportVyF + 1120
+3   ForgeConductorAppTests              0x0000000108c8fb20 $s22ForgeConductorAppTests021ProviderConfigurationcD0C04testeF53RoutesRequireAuthorizationAndClientPersistsCleanSetupyyYaKF6$deferL_yyF + 36
+4   ForgeConductorAppTests              0x0000000108c93630 $s22ForgeConductorAppTests021ProviderConfigurationcD0C04testeF53RoutesRequireAuthorizationAndClientPersistsCleanSetupyyYaKFTY16_ + 528
+5   libswift_Concurrency.dylib          0x0000000289351e18 _ZN5swift34runJobInEstablishedExecutorContextEPNS_3JobE + 472
+6   libswift_Concurrency.dylib          0x00000002893536ec _ZL17swift_job_runImplPN5swift3JobENS_17SerialExecutorRefE + 156
+7   libdispatch.dylib                   0x0000000183a95980 _dispatch_root_queue_drain + 360
+8   libdispatch.dylib                   0x0000000183a96120 _dispatch_worker_thread2 + 184
+9   libsystem_pthread.dylib             0x0000000183c3be84 _pthread_wqthread + 232
+10  libsystem_pthread.dylib             0x0000000183c3ac10 start_wqthread + 8
+Test Case '-[ForgeConductorAppTests.ProviderConfigurationAppTests testProviderConfigurationRoutesRequireAuthorizationAndClientPersistsCleanSetup]' passed (0.184 seconds).
+Test Suite 'ProviderConfigurationAppTests' passed at 2026-09-04 20:18:39.158.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 1.402 (1.402) seconds
+Test Suite 'ForgeConductorAppTests.xctest' passed at 2026-09-04 20:18:39.159.
+	 Executed 17 tests, with 0 failures (0 unexpected) in 15.391 (15.396) seconds
+Test Suite 'All tests' passed at 2026-09-04 20:18:39.159.
+	 Executed 17 tests, with 0 failures (0 unexpected) in 15.391 (15.396) seconds
+
+Test session results, code coverage, and logs:
+	/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Ownership-Candidate-AppHosted.xcresult
+
+** TEST SUCCEEDED **
+
+Testing started

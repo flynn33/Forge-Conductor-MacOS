@@ -13,6 +13,8 @@ import json
 import pathlib
 import re
 import shlex
+import p10_native_cli_scenario as native_cli
+from p10_source_candidate import validate_source_candidate
 from typing import Any
 
 try:
@@ -84,7 +86,7 @@ EXPECTED_SCENARIO_KEYS = {"scenario_id", "assertions", "runner", "installation"}
 EXPECTED_SCENARIO_ASSERTION_KEYS = {
     "feature_id", "assertion_id", "selector", "evidence_kind", "expected",
 }
-EXPECTED_RUNNER_KINDS = ["repository_qualification"]
+EXPECTED_RUNNER_KINDS = ["repository_qualification", native_cli.RUNNER_KIND]
 EXPECTED_PROBE_LIMITS = {
     "maximum_matrix_seconds": 1500,
     "maximum_probe_stream_bytes": 65536,
@@ -283,10 +285,12 @@ def _validate_probe_registry(
         except (OSError, EvidenceSupportError, ValueError) as error:
             failures.append(f"{label} concrete runner is invalid: {error}")
             continue
-        if not installation_contract_valid(scenario.get("installation")):
+        native_scenario = native_cli.scenario_valid(scenario)
+        installation_contract = native_cli.bound_probe(pathlib.Path("/validated/Forge Conductor.app"))["installation"] if native_scenario else scenario.get("installation")
+        if not installation_contract_valid(installation_contract):
             failures.append(f"{label} has no exact installed-product contract")
             continue
-        if pathlib.PurePosixPath(scenario["installation"]["root"]).name != "Forge Conductor.app":
+        if pathlib.PurePosixPath(installation_contract["root"]).name != "Forge Conductor.app":
             failures.append(f"{label} installation root is not a canonical Forge Conductor app bundle")
             continue
         declared_artifacts = {
@@ -333,7 +337,7 @@ def _validate_probe_registry(
                 failures.append(f"{assertion_label} selector is invalid")
                 continue
             if evidence_kind not in {
-                "installed-cli-transcript", "codesign-identity", "lmstudio-nonce-transcript",
+                "installed-cli-transcript", "codesign-identity", "lmstudio-nonce-transcript", "native-cli-version-help",
             } or not isinstance(expected, dict) or not expected:
                 failures.append(f"{assertion_label} has no exact typed evidence contract")
                 continue
@@ -343,6 +347,10 @@ def _validate_probe_registry(
                     failures.append(
                         f"{assertion_label} has no trusted ordinary adapter for its non-CLI surface"
                     )
+                    continue
+                if native_scenario and binding == native_cli.SCENARIO["assertions"][0]:
+                    ordinary_selectors.append(selector)
+                    probes[assertion_id] = {"scenario": scenario, "binding": binding}
                     continue
                 if canonical_feature_registry:
                     failures.append(
@@ -740,6 +748,22 @@ def _validate_record_and_report(
         "--report",
         FEATURE_QUALIFICATION_REPORT_SOURCE_PATH,
     ]
+    selection = report.get("selection")
+    if selection is not None:
+        required_ids = {assertion for feature in registry_features.values() for assertion in feature.get("required_assertions", [])}
+        expected_selection = {
+            "feature_ids": [native_cli.FEATURE_ID], "scope": native_cli.SCOPE,
+            "distribution_qualified": False, "global_required_assertion_count": len(required_ids),
+            "global_missing_assertion_ids": sorted(required_ids - set(registry_features.get(native_cli.FEATURE_ID, {}).get("required_assertions", []))),
+            "build_evidence_id": selection.get("build_evidence_id") if isinstance(selection, dict) else None,
+            "installation_evidence_id": selection.get("installation_evidence_id") if isinstance(selection, dict) else None,
+        }
+        if selection != expected_selection or expected_features != {native_cli.FEATURE_ID}:
+            failures.append(f"{label} selected feature scope is not exact")
+        elif any(not isinstance(selection[key], str) or re.fullmatch(r"EVID-[A-Za-z0-9_-]{1,128}", selection[key]) is None for key in ("build_evidence_id", "installation_evidence_id")):
+            failures.append(f"{label} selected feature provenance IDs are malformed")
+        else:
+            expected_argv.extend(["--feature", native_cli.FEATURE_ID, "--build-evidence", selection["build_evidence_id"], "--installation-evidence", selection["installation_evidence_id"]])
     if argv != expected_argv or record.get("command") != shlex.join(expected_argv):
         failures.append(f"{label} did not execute the exact known qualifier command")
     if command.get("exit_code") != 0 or command.get("timed_out") is not False or command.get("stream_limit_exceeded") is not False:
@@ -766,8 +790,10 @@ def _validate_record_and_report(
     if not isinstance(repository_provenance, dict) or not isinstance(test_environment, dict):
         failures.append(f"{label} execution provenance is malformed")
     else:
-        if repository_provenance.get("head_sha") != current_git_head:
-            failures.append(f"{label} Git HEAD is stale")
+        try:
+            validate_source_candidate(repository, repository_provenance.get("head_sha"), current_git_head, record.get("source_manifest"), current_manifest)
+        except EvidenceSupportError as error:
+            failures.append(f"{label} source candidate is invalid: {error}")
         if repository_provenance.get("repository_path") != str(repository):
             failures.append(f"{label} repository path is stale")
         if not all(
@@ -810,7 +836,7 @@ def _validate_record_and_report(
     if record.get("environment") != expected_record_environment:
         failures.append(f"{label} recorder environment is malformed")
     if report.get("source_identity") != {
-        "git_head": current_git_head,
+        "git_head": repository_provenance.get("head_sha") if isinstance(repository_provenance, dict) else None,
         "source_manifest": current_manifest,
         "registry_sha256": registry_sha256,
         "probe_registry_sha256": probe_registry_sha256,
@@ -876,11 +902,6 @@ def _validate_record_and_report(
             if receipt is None or observation_entry is None:
                 failures.append(f"{label} feature {feature_id} has no recorder-owned allowlisted probe receipt")
                 continue
-            try:
-                expected_runner_argv, _ = runner_argv(repository, probe)
-            except (OSError, EvidenceSupportError, ValueError) as error:
-                failures.append(f"{label} feature {feature_id} probe runner is invalid: {error}")
-                continue
             (
                 observation_raw,
                 observation_document,
@@ -888,6 +909,21 @@ def _validate_record_and_report(
                 observed_signing,
                 observed_providers,
             ) = observation_entry
+            try:
+                if probe.get("runner", {}).get("kind") == native_cli.RUNNER_KIND:
+                    probe = native_cli.probe_from_observation(probe, observation_document)
+                    native_results = [item for item in observation_document["results"] if item.get("selector") == "cli.version-help"]
+                    transcript = native_results[0]["transcript"]
+                    native_started, native_ended = _timestamp(transcript.get("started_at")), _timestamp(transcript.get("ended_at"))
+                    outer_started, outer_ended = _timestamp(receipt.get("started_at")), _timestamp(receipt.get("ended_at"))
+                    if None in (native_started, native_ended, outer_started, outer_ended) or not (outer_started <= native_started <= native_ended <= outer_ended):
+                        failures.append(f"{label} native CLI transcript timing is outside its captured scenario")
+                    if not isinstance(selection, dict) or any(native_results[0]["provenance"].get(key) != selection.get(key) for key in ("build_evidence_id", "installation_evidence_id")):
+                        failures.append(f"{label} selected feature provenance is not bound to its transcript")
+                expected_runner_argv, _ = runner_argv(repository, probe)
+            except (OSError, EvidenceSupportError, ValueError, KeyError, TypeError, IndexError, AttributeError) as error:
+                failures.append(f"{label} feature {feature_id} probe runner is invalid: {error}")
+                continue
             try:
                 current_installation = derive_installation_facts(
                     probe,
@@ -902,6 +938,7 @@ def _validate_record_and_report(
                 evidence_id=evidence_id,
                 challenge_nonce=receipt.get("challenge_nonce"),
                 installation=current_installation,
+                repository=repository,
             )
             selected_result = result_by_selector.get(assertion_binding.get("selector"))
             expected_assertion_observations = 1 if isinstance(selected_result, dict) else 0

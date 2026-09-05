@@ -1,0 +1,2 @@
+58773e32c8c61315f69cb0b960446447a7c5a0afc608749d43d87dbd81ca8352  /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/live-manager-calibrated-observations.json
+7c6124aa0376a0fc1b33da4bd782fcb450e51647cbe39dc37cb94877b647e21e  /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/observe-current-rollover.py

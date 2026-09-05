@@ -255,6 +255,9 @@ public final class ManagerRoutes: @unchecked Sendable {
     /// Provider I/O is intentionally isolated from `DashboardServer`'s serial
     /// listener queue. The active-connection cap bounds submitted work, while
     /// `ManagerNode` rejects overlapping probes and owns the operation deadline.
+    // Claim admission before dispatch so connection churn cannot queue retained
+    // token-bearing request bodies behind blocked provider or Keychain work.
+    private static let providerOperationAdmission = DispatchSemaphore(value: 1)
     private static let providerProbeQueue = DispatchQueue(
         label: "forge.dashboard.provider-probe",
         qos: .userInitiated,
@@ -305,6 +308,10 @@ public final class ManagerRoutes: @unchecked Sendable {
             return
         }
         switch (method, target.path) {
+        case ("GET", "/api/manager/provider/configuration"),
+             ("PUT", "/api/manager/provider/configuration"),
+             ("GET", "/api/manager/provider/models"):
+            dispatchProviderConfiguration(method: method, path: target.path, body: body, connection: connection)
         case ("GET", "/api/manager/status"):
             http.respondJSON(connection, status: 200, object: manager.status())
         case ("GET", "/api/manager/settings"):
@@ -799,6 +806,63 @@ public final class ManagerRoutes: @unchecked Sendable {
         }
     }
 
+    private func dispatchProviderConfiguration(method: String, path: String, body: Data, connection: NWConnection) {
+        let manager = self.manager
+        let http = self.http
+        guard body.count <= 16 * 1024 else {
+            http.respondJSON(connection, status: 413, object: ["ok": false, "message": "Provider configuration request is oversized"])
+            return
+        }
+        guard Self.providerOperationAdmission.wait(timeout: .now()) == .success else {
+            http.respondJSON(connection, status: 409, object: [
+                "ok": false, "code": "provider_configuration_busy",
+                "message": "A provider operation is already in progress. Retry after it settles.",
+            ])
+            return
+        }
+        Self.providerProbeQueue.async {
+            defer { Self.providerOperationAdmission.signal() }
+            do {
+                let data: Data
+                if method == "PUT" {
+                    guard let object = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
+                          Set(object.keys).isSubset(of: ["expectedRevision", "endpoint", "modelKey", "credentialAction", "token"]),
+                          let update = try? JSONDecoder().decode(ProviderConfigurationUpdate.self, from: body) else {
+                        throw ProviderConfigurationError.invalidRequest
+                    }
+                    data = try JSONEncoder().encode(manager.updateProviderConfiguration(update))
+                } else if path.hasSuffix("/models") {
+                    data = try JSONEncoder().encode(manager.providerModels())
+                } else {
+                    data = try JSONEncoder().encode(manager.readProviderConfiguration())
+                }
+                let object = try JSONSupport.object(from: data)
+                http.respondJSON(connection, status: 200, object: object)
+            } catch let error as ProviderConfigurationError {
+                let status: Int
+                switch error {
+                case .invalidRequest: status = 400
+                case .busy, .revisionConflict: status = 409
+                case .credentialUnavailable: status = 422
+                case .unavailable: status = 503
+                case .persistenceFailed: status = 500
+                case .authenticationFailed, .offline, .timeout, .modelEndpointUnavailable, .connectionFailed: status = 502
+                }
+                http.respondJSON(connection, status: status, object: [
+                    "ok": false, "code": "provider_configuration_" + error.rawValue,
+                    "message": error.localizedDescription,
+                ])
+            } catch {
+                // Provider payloads and arbitrary localized errors are not an
+                // approved diagnostic channel for credential material.
+                http.respondJSON(connection, status: 502, object: [
+                    "ok": false, "code": "provider_configuration_connection_failed",
+                    "message": "Cannot retrieve provider models. Check the server, credential, and connection, then retry.",
+                ])
+            }
+        }
+    }
+
     private func dispatchProviderProbe(
         adapterID: String,
         mode: ManagerProviderProbeMode,
@@ -806,7 +870,15 @@ public final class ManagerRoutes: @unchecked Sendable {
     ) {
         let manager = self.manager
         let http = self.http
+        guard Self.providerOperationAdmission.wait(timeout: .now()) == .success else {
+            http.respondJSON(connection, status: 409, object: [
+                "ok": false, "code": "provider_probe_in_progress",
+                "message": "A provider operation is already in progress. Retry after it settles.",
+            ])
+            return
+        }
         Self.providerProbeQueue.async {
+            defer { Self.providerOperationAdmission.signal() }
             do {
                 http.respondJSON(
                     connection,

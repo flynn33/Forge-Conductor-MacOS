@@ -7,15 +7,18 @@ public actor PersistedManagedRunBudgetEvaluator: ManagedRunBudgetEvaluating {
 
     private let repository: ProjectControlPlaneRepository
     private let clock: any Clock
+    private let policyOverride: ContextBudgetPolicy?
     private var supervisors: [String: ContextBudgetSupervisor] = [:]
     private var cacheOrder: [String] = []
 
     public init(
         repository: ProjectControlPlaneRepository,
-        clock: any Clock = SystemClock()
+        clock: any Clock = SystemClock(),
+        policyOverride: ContextBudgetPolicy? = nil
     ) {
         self.repository = repository
         self.clock = clock
+        self.policyOverride = policyOverride
     }
 
     public func evaluateBeforeProviderTurn(
@@ -146,7 +149,7 @@ public actor PersistedManagedRunBudgetEvaluator: ManagedRunBudgetEvaluating {
         )
         let key = Self.key(identity)
         if let existing = supervisors[key] { return existing }
-        let configuration = try Self.configuration(capabilities: capabilities)
+        let configuration = try Self.configuration(capabilities: capabilities, policyOverride: policyOverride)
         let value: ContextBudgetSupervisor
         do {
             value = try await ContextBudgetSupervisor.open(
@@ -176,8 +179,9 @@ public actor PersistedManagedRunBudgetEvaluator: ManagedRunBudgetEvaluating {
         }
     }
 
-    private static func configuration(
-        capabilities: ProviderCapabilities
+    static func configuration(
+        capabilities: ProviderCapabilities,
+        policyOverride: ContextBudgetPolicy? = nil
     ) throws -> ContextBudgetConfiguration {
         let capacity = capabilities.contextLength
         let minimumUsable = min(1_024, max(128, capacity / 4))
@@ -199,7 +203,7 @@ public actor PersistedManagedRunBudgetEvaluator: ManagedRunBudgetEvaluating {
         return try ContextBudgetConfiguration(
             capacity: resolution,
             reserves: reserves,
-            policy: ContextBudgetPolicy(
+            policy: policyOverride ?? ContextBudgetPolicy(
                 initialProjectedNextTurnTokens: min(1_024, max(128, capacity / 64)),
                 minimumUsableTokens: minimumUsable
             )

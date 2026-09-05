@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import re
 import sys
 from pathlib import Path
@@ -25,6 +26,18 @@ POLICY_EXAMPLES = frozenset({
     ".github/agents/attribution-guard.agent.md",
     ".forge-continuity-design/scripts/validate_package.py",
 })
+# These reviewed regex examples are bound to the exact path, position and
+# UTF-8 line bytes (including the newline). A changed or additional line still
+# receives normal scanning; the workflow itself is never exempted.
+PINNED_POLICY_EXAMPLE_LINES = {
+    ".github/workflows/no-ai-attribution.yml": {
+        100: "51e6e5f032b42fb437c3053c22b11664cf8319206e55c0e55de7e4d0d672ae3f",
+        184: "08a1200e51df8e7e9560c82ef7e85c1384aefbb38a7f2a6b8b7b7fbb74d94558",
+        231: "08a1200e51df8e7e9560c82ef7e85c1384aefbb38a7f2a6b8b7b7fbb74d94558",
+        272: "ba04ba65269ace162486df40950af4e35f0a546fbaf0123cb153b65ca9f10e9c",
+        326: "edbad54512651f15036fabadd5c164a4174be7acf5f5e321265e4d9527484b2b",
+    },
+}
 BINARY_SUFFIXES = frozenset({
     ".zip", ".png", ".jpg", ".jpeg", ".gif", ".pdf", ".trace",
     ".memgraph", ".sqlite", ".sqlite3", ".xcassets", ".car",
@@ -118,7 +131,14 @@ def scan_repository(
             text = raw.decode("utf-8", errors="strict")
         except UnicodeDecodeError:
             continue
-        for line_number, line in enumerate(text.splitlines(), 1):
+        pinned_lines = PINNED_POLICY_EXAMPLE_LINES.get(relative.as_posix(), {})
+        for line_number, line in enumerate(text.splitlines(keepends=True), 1):
+            expected_hash = pinned_lines.get(line_number)
+            if (
+                expected_hash is not None
+                and hashlib.sha256(line.encode("utf-8")).hexdigest() == expected_hash
+            ):
+                continue
             for pattern in PATTERNS:
                 if not pattern.search(line):
                     continue

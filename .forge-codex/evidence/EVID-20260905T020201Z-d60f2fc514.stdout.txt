@@ -1,0 +1,837 @@
+{
+  "schema_version": 1,
+  "gate_id": "G00",
+  "operation_id": "51d171ca-5f5e-4638-a047-9f15e9dacf86",
+  "source_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c",
+  "source_manifest": {
+    "schema_version": 1,
+    "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14",
+    "file_count": 392,
+    "bytes": 13422208
+  },
+  "state_sequence_before": 1042,
+  "status": "passed",
+  "finalized": true,
+  "started_at": "2026-09-05T02:02:02.421618+00:00",
+  "ended_at": "2026-09-05T02:02:04.508223+00:00",
+  "commands": [
+    {
+      "command": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-handlers/G00.sh",
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "timed_out": false
+    }
+  ],
+  "environment": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "repository": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
+  },
+  "artifacts": [
+    {
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "stdout"
+    },
+    {
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "stderr"
+    },
+    {
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.criteria.json",
+      "sha256": "ca84f4a4c202de610090f3bcac37c2cf259ea133b5be858f3e732b27a9679a1b",
+      "kind": "criteria"
+    }
+  ],
+  "evaluator": {
+    "name": "forge-gate-handler",
+    "version": "1",
+    "criteria_results": [
+      {
+        "criterion": "environment doctor exits with recorded capability status",
+        "passed": true,
+        "evidence": [
+          {
+            "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.doctor.log",
+            "sha256": "e32dfa367c334f61f948dc0cc425ef3443ef502f67f03fe33befbc4daf33d5cc"
+          },
+          {
+            "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/environment.json",
+            "sha256": "42a86ee85cc4f905d92e947d0558e7f406e1f8ece9f3d09e53851c388f519cbd"
+          }
+        ]
+      },
+      {
+        "criterion": "repository shape and Git state recorded",
+        "passed": true,
+        "evidence": [
+          {
+            "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/run-state.json",
+            "sha256": "7e3b88fed35c22e444dd69d9180fb25b0af1e8ad57da9547b496fe100cda5726"
+          }
+        ]
+      },
+      {
+        "criterion": "package validation passes",
+        "passed": true,
+        "evidence": [
+          {
+            "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.package.log",
+            "sha256": "df518c6ba99e59e4893039e08ad5b9f03ff5dfe74abd32365a46a6c0768f18df"
+          },
+          {
+            "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.package-validation.json",
+            "sha256": "1c2aec5f96b199a122c0e451de8ea31fa5c16e1650bf583552ad1524220d5277"
+          }
+        ]
+      },
+      {
+        "criterion": "reproducible build entrypoint exists or tracked implementation task is active",
+        "passed": true,
+        "evidence": [
+          {
+            "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.build-script.log",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/script/build_and_run.sh",
+            "sha256": "661f66b862961631ec79860385de6da98e6b166b3a88a4fd835e93de81b5d75c"
+          }
+        ]
+      }
+    ]
+  },
+  "notes": ""
+}
+{
+  "schema_version": 1,
+  "gate_id": "G01",
+  "operation_id": "b7dc66f1-0d41-41b7-9d41-e3d637d1b2a3",
+  "source_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c",
+  "source_manifest": {
+    "schema_version": 1,
+    "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14",
+    "file_count": 392,
+    "bytes": 13422208
+  },
+  "state_sequence_before": 1043,
+  "status": "passed",
+  "finalized": true,
+  "started_at": "2026-09-05T02:02:04.855633+00:00",
+  "ended_at": "2026-09-05T02:02:20.941987+00:00",
+  "commands": [
+    {
+      "command": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-handlers/G01.sh",
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "timed_out": false
+    }
+  ],
+  "environment": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "repository": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
+  },
+  "artifacts": [
+    {
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G01.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "stdout"
+    },
+    {
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G01.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "stderr"
+    },
+    {
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G01.criteria.json",
+      "sha256": "4a6fa6783c79614b63f7ba01d2ecd46c4513ceef6486c6c5db4d333a7620222a",
+      "kind": "criteria"
+    }
+  ],
+  "evaluator": {
+    "name": "forge-gate-handler",
+    "version": "1",
+    "criteria_results": [
+      {
+        "criterion": "feature-baseline.json validates",
+        "passed": true,
+        "evidence": [
+          {
+            "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/feature-baseline.json",
+            "sha256": "77bef503e4f3b1f2efce0cea9b0803b8a6211d1167460bb2a46d12acc20a1fca"
+          }
+        ]
+      },
+      {
+        "criterion": "existing MCP surfaces captured",
+        "passed": true,
+        "evidence": [
+          {
+            "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/baseline/mcp-capabilities.json",
+            "sha256": "0e33ddd69eeb132495ec5e51261f137bd27d6ceab45f2b52d71cc9c7b0e3b1c8"
+          }
+        ]
+      },
+      {
+        "criterion": "persistence/settings/commands/scenes inventoried",
+        "passed": true,
+        "evidence": [
+          {
+            "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/baseline/persistence-inventory.json",
+            "sha256": "5594d83e67dc3c763cd5717ad37fc0d98638c56fe65de30daaa38a127b000e72"
+          }
+        ]
+      },
+      {
+        "criterion": "all behavior-changing targets have characterization coverage",
+        "passed": true,
+        "evidence": [
+          {
+            "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/baseline/characterization-tests.json",
+            "sha256": "3ef672d6e16cdef77acdaf87834171387bfa538f7dc33573c366bf74581eb313"
+          }
+        ]
+      }
+    ]
+  },
+  "notes": ""
+}
+{
+  "schema_version": 1,
+  "gate_id": "G02",
+  "operation_id": "707348cc-776b-47f8-99f1-5dad1d37c83b",
+  "source_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c",
+  "source_manifest": {
+    "schema_version": 1,
+    "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14",
+    "file_count": 392,
+    "bytes": 13422208
+  },
+  "state_sequence_before": 1046,
+  "status": "failed",
+  "finalized": true,
+  "started_at": "2026-09-05T02:02:21.251788+00:00",
+  "ended_at": "2026-09-05T02:02:21.520779+00:00",
+  "commands": [
+    {
+      "command": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-handlers/G02.sh",
+      "exit_code": 1,
+      "stdout_sha256": "7a0e635f4300311a6688dee1459a3d9d2655b2572af43f63ff18ab85490c51d4",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "timed_out": false
+    }
+  ],
+  "environment": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "repository": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
+  },
+  "artifacts": [
+    {
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G02.stdout.txt",
+      "sha256": "7a0e635f4300311a6688dee1459a3d9d2655b2572af43f63ff18ab85490c51d4",
+      "kind": "stdout"
+    },
+    {
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G02.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "stderr"
+    },
+    {
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G02.criteria.json",
+      "sha256": "c517437c71ebeeee8fefafaa2a9bc55aadf143043720228908f61ce8afd5c813",
+      "kind": "criteria"
+    }
+  ],
+  "evaluator": {
+    "name": "forge-gate-handler",
+    "version": "1",
+    "criteria_results": [
+      {
+        "criterion": "diagnostic counters and signposts build",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/RuntimeObservability.swift#b1477822a5ec4187c9a44128c2bd9225a485166130c981484c3ebbab80c1e917; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T190435Z-72024a943c.stdout.txt#3e6ac537d1a568f2f0fcb6259b641a377430ed5fc7fa520c046f51f7c39b4e81",
+        "passed": true
+      },
+      {
+        "criterion": "logs redact private content",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/DiagnosticLog.swift#ec7d3d5c8f0cccbd51aa8a70afb5245db595523ae3d628b7fbb90843c4d66be8; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T190435Z-72024a943c.stdout.txt#3e6ac537d1a568f2f0fcb6259b641a377430ed5fc7fa520c046f51f7c39b4e81",
+        "passed": false
+      },
+      {
+        "criterion": "baseline reproducer artifacts recorded",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P02-telemetry-baseline.json#497ba34b5c3eeeb4b821f664b1df505976a64fcf4104c99f655371051a3d426e; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T190504Z-695abfb997.stdout.txt#27a0939f7a0047ae94fb4c7c9e03dbcb0cab639a23930aa29b500a72317a6309",
+        "passed": true
+      },
+      {
+        "criterion": "before traces captured on capable macOS host",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T190527Z-3d3279fc30.stdout.txt#3dd24fc23a33fe3a7e0592e9b8becbe10fb446612fb3ea2e9a3bc87abadf2050",
+        "passed": false
+      }
+    ]
+  },
+  "notes": ""
+}
+{
+  "schema_version": 1,
+  "gate_id": "G03",
+  "operation_id": "b1d2efce-9f1e-4d53-a6b3-0d9b203b2c05",
+  "source_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c",
+  "source_manifest": {
+    "schema_version": 1,
+    "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14",
+    "file_count": 392,
+    "bytes": 13422208
+  },
+  "state_sequence_before": 1047,
+  "status": "failed",
+  "finalized": true,
+  "started_at": "2026-09-05T02:02:21.825451+00:00",
+  "ended_at": "2026-09-05T02:02:22.050134+00:00",
+  "commands": [
+    {
+      "command": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-handlers/G03.sh",
+      "exit_code": 1,
+      "stdout_sha256": "0eb9e32439669ed1e5b2a08e329f4e4b6e34b1608f545d6f3ebbf80446d56c8c",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "timed_out": false
+    }
+  ],
+  "environment": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "repository": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
+  },
+  "artifacts": [
+    {
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G03.stdout.txt",
+      "sha256": "0eb9e32439669ed1e5b2a08e329f4e4b6e34b1608f545d6f3ebbf80446d56c8c",
+      "kind": "stdout"
+    },
+    {
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G03.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "stderr"
+    },
+    {
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G03.criteria.json",
+      "sha256": "6fd39b93d0b6b9fc07f5481e5f4edfa96adedff731765683adcd7e3e3ddc4e6c",
+      "kind": "criteria"
+    }
+  ],
+  "evaluator": {
+    "name": "forge-gate-handler",
+    "version": "1",
+    "criteria_results": [
+      {
+        "criterion": "maximum pending presentation state <= 2 logical slots",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Telemetry/LatestValueMailbox.swift#93cbd7228b64a502432363046ba06160b485accd7fe36acca10f3ddb2a58d70a; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T191259Z-1cde4355df.stdout.txt#db98c76101a8a1fb8ce10485c445af21f246ab4fc505c65a4de73e362e9da12d; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P03-bounded-telemetry-before-after.json#fc9e48d224f27d224fa57d54d2366f12b8f562fe77ff934a0dc52287dc5ec45c",
+        "passed": true
+      },
+      {
+        "criterion": "no per-update unstructured main-actor task path",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorApp/AppTelemetryBinding.swift#557e19d3ef5135b0fdd4ef5121a25d21a35c4c19ed678776564473cb136fb8cb; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T193356Z-c8231b937d.stdout.txt#83c3308c29b3eec08df13d52811ffbe8b48108735261c0d514cccc6ec187356e",
+        "passed": true
+      },
+      {
+        "criterion": "latest value converges under producer pressure",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/LatestValueMailboxTests.swift#9d4007b7bff2d01d6d0a9b4870cb51c546a7c994b26f28735cb8b86c0bc7b737; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T191232Z-37ef639495.stdout.txt#6fc2325dfab870b9de902f4eb36f1c221e8059ca41af3f6247c280d377fcf369",
+        "passed": true
+      },
+      {
+        "criterion": "stale generation and post-stop delivery tests pass",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/LatestValueMailboxTests.swift#9d4007b7bff2d01d6d0a9b4870cb51c546a7c994b26f28735cb8b86c0bc7b737; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T191232Z-37ef639495.stdout.txt#6fc2325dfab870b9de902f4eb36f1c221e8059ca41af3f6247c280d377fcf369",
+        "passed": true
+      },
+      {
+        "criterion": "telemetry mapping/unit tests pass",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorApp/AppModel.swift#4f96b0e41aaf0367b478b34b01273d9ae681790e10b008755bd2c56665888f02; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T193356Z-c8231b937d.stdout.txt#83c3308c29b3eec08df13d52811ffbe8b48108735261c0d514cccc6ec187356e; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T193106Z-667173c96c.stdout.txt#33b97a5b76d0b7835f2e54e092c68a9415fc5272e387321a23984bc385eed12a",
+        "passed": false
+      }
+    ]
+  },
+  "notes": ""
+}
+{
+  "schema_version": 1,
+  "gate_id": "G04",
+  "operation_id": "f554351c-47d0-42b0-bc47-ee4ce816a59c",
+  "source_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c",
+  "source_manifest": {
+    "schema_version": 1,
+    "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14",
+    "file_count": 392,
+    "bytes": 13422208
+  },
+  "state_sequence_before": 1048,
+  "status": "failed",
+  "finalized": true,
+  "started_at": "2026-09-05T02:02:22.363062+00:00",
+  "ended_at": "2026-09-05T02:02:22.587297+00:00",
+  "commands": [
+    {
+      "command": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-handlers/G04.sh",
+      "exit_code": 1,
+      "stdout_sha256": "e33278d241d36988e1e3ed64c4608f62d43eca98078b1fb4061ff43de7741292",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "timed_out": false
+    }
+  ],
+  "environment": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "repository": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
+  },
+  "artifacts": [
+    {
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G04.stdout.txt",
+      "sha256": "e33278d241d36988e1e3ed64c4608f62d43eca98078b1fb4061ff43de7741292",
+      "kind": "stdout"
+    },
+    {
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G04.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "stderr"
+    },
+    {
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G04.criteria.json",
+      "sha256": "7b76d725d5ee4ee9e7d3da305c215c2311e7cc96b1f5d1990666bf75c84af684",
+      "kind": "criteria"
+    }
+  ],
+  "evaluator": {
+    "name": "forge-gate-handler",
+    "version": "1",
+    "criteria_results": [
+      {
+        "criterion": "Metal resource construction is shared or justified",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorApp/Metal/MetalGaugeResources.swift#9a98765732a25407a11ca65d879c3f7ad4a00d635685ca63361bf4aa79effd06; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T193100Z-a782c3890a.stdout.txt#d61d72bfc705b73ce988d0690f85cac6a7e5f8fde3d4ce84e3059d2361506868; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T192842Z-4e41ce2a84.stdout.txt#ee8d3228faee0138d395fa2f423a547b4e19e587cfd87b0f7ca49661d0e7c131",
+        "passed": false
+      },
+      {
+        "criterion": "hidden/static draw count reaches zero after quiescence",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorApp/Metal/MetalGaugeKit.swift#d0318df4c076ccf38ce8a08463ac402a9d5b3629f9749121a4b4e03a5637bcf9; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T192631Z-cfa3748c4d.stdout.txt#fe9fa09e4fcd8ad7002fde9ff498313abcac549db361cf85b5fb086c1192e386; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T192639Z-46267799f4.stdout.txt#ccd303c6b89989cf5eaa52ed832e5b863b7ecc71386692030b8761ceb9dd5519",
+        "passed": false
+      },
+      {
+        "criterion": "no high-frequency buffer allocation path",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorApp/Metal/MetalGaugeResources.swift#9a98765732a25407a11ca65d879c3f7ad4a00d635685ca63361bf4aa79effd06; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P04-metal-performance-report.json#4958c561b8ac484218edbbfb14dad86c2c4174e5d7da5cee7feecc67278c4de5",
+        "passed": false
+      },
+      {
+        "criterion": "open-close release test passes",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T192728Z-e788871dce.stdout.txt#42be1aba4c1c2cce365cc399d339afa299d3c0f46c0f5ad36b9b5f62a9ce0176; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T192746Z-399a98b738.stdout.txt#9e717e9ee222468433d7ce1cc6782555fcc2231168b03157d71f800ec25aaac0",
+        "passed": true
+      },
+      {
+        "criterion": "Release Metal/performance evidence meets budget",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T193106Z-667173c96c.stdout.txt#33b97a5b76d0b7835f2e54e092c68a9415fc5272e387321a23984bc385eed12a; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T192954Z-a1ccac7d61.stdout.txt#cf69ca0193cfc44225c659152ea329764a6fc62c0472adeb2835735607ec4a19; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P04-metal-performance-report.json#4958c561b8ac484218edbbfb14dad86c2c4174e5d7da5cee7feecc67278c4de5",
+        "passed": false
+      }
+    ]
+  },
+  "notes": ""
+}
+{
+  "schema_version": 1,
+  "gate_id": "G05",
+  "operation_id": "529fe267-1988-459a-9f07-d973242fb2b1",
+  "source_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c",
+  "source_manifest": {
+    "schema_version": 1,
+    "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14",
+    "file_count": 392,
+    "bytes": 13422208
+  },
+  "state_sequence_before": 1049,
+  "status": "failed",
+  "finalized": true,
+  "started_at": "2026-09-05T02:02:22.901004+00:00",
+  "ended_at": "2026-09-05T02:02:23.125840+00:00",
+  "commands": [
+    {
+      "command": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-handlers/G05.sh",
+      "exit_code": 1,
+      "stdout_sha256": "510c610fac002d1727e39919bd4b378d6d2e974e7563270f6f472633fa6ceb46",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "timed_out": false
+    }
+  ],
+  "environment": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "repository": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
+  },
+  "artifacts": [
+    {
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G05.stdout.txt",
+      "sha256": "510c610fac002d1727e39919bd4b378d6d2e974e7563270f6f472633fa6ceb46",
+      "kind": "stdout"
+    },
+    {
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G05.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "stderr"
+    },
+    {
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G05.criteria.json",
+      "sha256": "34a2831de08604f1eb0d255fd2b77b0c750b89a4013d1a13a8ab26a7e5b299d3",
+      "kind": "criteria"
+    }
+  ],
+  "evaluator": {
+    "name": "forge-gate-handler",
+    "version": "1",
+    "criteria_results": [
+      {
+        "criterion": "all audit E2 risks have ownership disposition",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P05-resource-owner-matrix.json#16a2f2d0b63d4c53ba46006afdf85254fa580de2b5426c7e4a662503e5d3eeda; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/findings-resolution.json#7b565d1532ce1dd6f0b4757e23dc7da34f04b9ec047579e62295ffa11157fe11",
+        "passed": false
+      },
+      {
+        "criterion": "confirmed retaining edges fixed with same-flow proof",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCLI/ForgeConductorMain.swift#8584bf66b43097efb2b3f656db9f0e6b0015f30e957d076f92e22ac800b85407; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Dashboard/DashboardServer.swift#652c67609b11f5b6c47129b1cf0f1ba58212cb78455064f71c3bfcf3b49964a6; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/DashboardPortGuard.swift#2b0237ff6b35518fa8c34dffa31ffeff7356d9bf6eafcd6d1d9436a2fd96c244; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Manager/ManagerRuntime.swift#51e81e6b6b9042de5d8bf793d013e5ec79b77b30f3f15b1daa0a85be94c3feaa; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T193826Z-661c01c5d5.stdout.txt#48ea5cf223eff9c4edcd0579afa59c9c36b83c5e768702d24ebf154a476e5b71",
+        "passed": false
+      },
+      {
+        "criterion": "process/pipe/task/timer/observer shutdown tests pass",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/LifecycleOwnershipTests.swift#d0a824f6b53cfc5286d1eb590b4529bda446aba6074f2ff71b8ab4337c007809; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T193826Z-661c01c5d5.stdout.txt#48ea5cf223eff9c4edcd0579afa59c9c36b83c5e768702d24ebf154a476e5b71; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P05-sanitizer-and-lifecycle-report.json#05eb6fb9771d6a10566af837ab27fec90b9c80485f0e5f4301bffd5e6752e63a",
+        "passed": true
+      },
+      {
+        "criterion": "ASan and TSan runs separately pass or have zero unresolved product findings",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P05-sanitizer-and-lifecycle-report.json#05eb6fb9771d6a10566af837ab27fec90b9c80485f0e5f4301bffd5e6752e63a; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T194148Z-4bc9b988c0.stderr.txt#343d66f8575dfd0c773094fcf09a2aae983cc15a26e108e733fc9b2c5169246e; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T194202Z-a41d508f0c.stderr.txt#c878345c2c2b6f9c210696529ff943adb936b8128c1e9dd51bd39ab39b749ab6; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T194308Z-9a5fdacf6f.stdout.txt#ac62c047f765668f088abe1b559bf82a448925472160b9e6d0396f70c5d4a180; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T194225Z-32827b0ff8.stdout.txt#c6bf199c5a3128cb16811ae598c954e70c8af806f17d3c484f85d96511abc14c; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T194253Z-44ca4b7694.stdout.txt#a6a19720b3c8f8860aa6d7aa418a9ece5156c63494d887f47173352b226dbf5b; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T194716Z-556705f0c7.stdout.txt#b06cf027ca8e7ffe3ae4ee6c76d88b3f8f7d27f57c7a0d4b7b25a6995818775b",
+        "passed": true
+      }
+    ]
+  },
+  "notes": ""
+}
+{
+  "schema_version": 1,
+  "gate_id": "G06",
+  "operation_id": "3a964a4f-6e36-4526-a817-7810cec09843",
+  "source_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c",
+  "source_manifest": {
+    "schema_version": 1,
+    "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14",
+    "file_count": 392,
+    "bytes": 13422208
+  },
+  "state_sequence_before": 1050,
+  "status": "failed",
+  "finalized": true,
+  "started_at": "2026-09-05T02:02:23.440565+00:00",
+  "ended_at": "2026-09-05T02:02:23.663384+00:00",
+  "commands": [
+    {
+      "command": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-handlers/G06.sh",
+      "exit_code": 1,
+      "stdout_sha256": "a1277de1a0f15a9f0472b5212f88448647ff367f124793fe46bd2a5caad59f8e",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "timed_out": false
+    }
+  ],
+  "environment": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "repository": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
+  },
+  "artifacts": [
+    {
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G06.stdout.txt",
+      "sha256": "a1277de1a0f15a9f0472b5212f88448647ff367f124793fe46bd2a5caad59f8e",
+      "kind": "stdout"
+    },
+    {
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G06.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "stderr"
+    },
+    {
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G06.criteria.json",
+      "sha256": "19857ad48ee590e67a4407827997d267c1cc14aa4e77f3bfd0c0206819eb65f2",
+      "kind": "criteria"
+    }
+  ],
+  "evaluator": {
+    "name": "forge-gate-handler",
+    "version": "1",
+    "criteria_results": [
+      {
+        "criterion": "all long-lived collections declare/enforce limits",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P06-resource-policy-inventory.json#e62cc92dbd5fb54145ed84db6a14ac476c69ef5ae3aa5d243a54a0bf0bd5e400; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/ResourcePolicy.swift#cc500f44120dd141f944d2a26a2c7f8624437fe01960e29b4a90f302e220dd84; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T195911Z-2c43d9837a.stdout.txt#49a317b61a5aa822cb9f4ffcb3f06ea3aa1e6973b6848e9fb077d76c65260a12",
+        "passed": false
+      },
+      {
+        "criterion": "memory-pressure behavior passes",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/ResourcePolicy.swift#cc500f44120dd141f944d2a26a2c7f8624437fe01960e29b4a90f302e220dd84; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Telemetry/TelemetryService.swift#87473a08ca767716bb04731fb0f0b693ce33383629460082593469d96c5eb4ef; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/ResourcePolicyTests.swift#52bc75de516bc6decddbd93be25b676e80bfdea3c671640043f8e838f82a5982; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T195742Z-533a0ffc8a.stdout.txt#f2c7ea913587a567ef0c6d2cb11ec08bc1951725ed4117439b52c6186c8b9753",
+        "passed": false
+      },
+      {
+        "criterion": "subprocess output/logs are bounded",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/ProcessRunner.swift#76b8acad2193439761df1af390a776c33ea170bc2b77971e396b9bb0a3ba6b7e; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/DiagnosticLog.swift#ec7d3d5c8f0cccbd51aa8a70afb5245db595523ae3d628b7fbb90843c4d66be8; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/ProcessRunnerTests.swift#cef46a3ba4c1d006b289dfeb7531da1f1e4434a02e31a26dd842eba1806e8747; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P06-bounded-state-report.json#b05db8ae7a98a3d3d556712b78cca923b279e61315317ebdad7016438c46255c",
+        "passed": false
+      },
+      {
+        "criterion": "main-actor blocking scan and tests pass",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorApp/AppModel.swift#4f96b0e41aaf0367b478b34b01273d9ae681790e10b008755bd2c56665888f02; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T195911Z-2c43d9837a.stdout.txt#49a317b61a5aa822cb9f4ffcb3f06ea3aa1e6973b6848e9fb077d76c65260a12; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T195808Z-9893a6484a.stdout.txt#55308297342628a613b88b2f4e53ed5169aa123109d37c84d82fe4474ff957e7",
+        "passed": false
+      },
+      {
+        "criterion": "project/session release reaches bounded steady state",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/ResourcePolicyTests.swift#52bc75de516bc6decddbd93be25b676e80bfdea3c671640043f8e838f82a5982; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P06-bounded-state-report.json#b05db8ae7a98a3d3d556712b78cca923b279e61315317ebdad7016438c46255c; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T195742Z-533a0ffc8a.stdout.txt#f2c7ea913587a567ef0c6d2cb11ec08bc1951725ed4117439b52c6186c8b9753",
+        "passed": false
+      }
+    ]
+  },
+  "notes": ""
+}
+{
+  "schema_version": 1,
+  "gate_id": "G07",
+  "operation_id": "87353fef-f876-4596-8109-d06087218939",
+  "source_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c",
+  "source_manifest": {
+    "schema_version": 1,
+    "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14",
+    "file_count": 392,
+    "bytes": 13422208
+  },
+  "state_sequence_before": 1051,
+  "status": "failed",
+  "finalized": true,
+  "started_at": "2026-09-05T02:02:23.981805+00:00",
+  "ended_at": "2026-09-05T02:02:24.208601+00:00",
+  "commands": [
+    {
+      "command": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-handlers/G07.sh",
+      "exit_code": 1,
+      "stdout_sha256": "1ae8757ce8191064f5ef0a0d18239479b38071ae46739639d81538e76a0fcab9",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "timed_out": false
+    }
+  ],
+  "environment": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "repository": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
+  },
+  "artifacts": [
+    {
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G07.stdout.txt",
+      "sha256": "1ae8757ce8191064f5ef0a0d18239479b38071ae46739639d81538e76a0fcab9",
+      "kind": "stdout"
+    },
+    {
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G07.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "stderr"
+    },
+    {
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G07.criteria.json",
+      "sha256": "7e32443c1cb2726f252ce9a7f98d36a1ef1538329b330e1a9fb311359772cfe6",
+      "kind": "criteria"
+    }
+  ],
+  "evaluator": {
+    "name": "forge-gate-handler",
+    "version": "1",
+    "criteria_results": [
+      {
+        "criterion": "existing MCP compatibility passes",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/MCP/MCPServer.swift#3373eb6d5f506b1fb07c490dae0d3800f3b0fcf6df4f5aa8f69092177990ada2; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P07-mcp-process-conformance.json#135ceac8822d2dad4d997d12fbc5adf9a8a97dc243fc7296cd06d1b5d13e52c4; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T201632Z-6920be9c15.stdout.txt#2110b17824fe46b80909e785fb482e6683c54ca76578220260c508d852d8440f",
+        "passed": false
+      },
+      {
+        "criterion": "memory MCP conformance passes",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Application/Tools/ProjectMemoryToolPack.swift#9cecbde51e825dac316fb46a3f22ef8e8492b4b8fa22b6d40b3d6e0e99d0c3d0; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P07-mcp-process-conformance.json#135ceac8822d2dad4d997d12fbc5adf9a8a97dc243fc7296cd06d1b5d13e52c4; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T202214Z-45beba1a02.stdout.txt#1f1195dda5b4e826f9ae201dd2e5cdb06f6fc62c2925668550845efeadaccff2",
+        "passed": false
+      },
+      {
+        "criterion": "project isolation and restart durability pass",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/ProjectMemoryRepository.swift#4b40e05505c96d28873a4016a12444fdc0c4aa546a11367f99eee0779aea523a; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P07-mcp-process-conformance.json#135ceac8822d2dad4d997d12fbc5adf9a8a97dc243fc7296cd06d1b5d13e52c4; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T201609Z-581a87dcb8.stdout.txt#efa16cd515cd149f4643773ec3d9f1f879703aff3d4a91bc3081bdcfe1d70bc3",
+        "passed": false
+      },
+      {
+        "criterion": "migration/integrity/recovery pass",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/ProjectMemoryTests.swift#56ba19987d84aa1dc4f19e34424b55dd5db49bb8b168a9f1d95ee49daf06db59; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P07-project-memory-report.json#88d76f9daf1d2dd536e0d7715c81ad0fcb2b1ce620179160ae3f9b14c7abc2f1; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T201609Z-581a87dcb8.stdout.txt#efa16cd515cd149f4643773ec3d9f1f879703aff3d4a91bc3081bdcfe1d70bc3",
+        "passed": false
+      },
+      {
+        "criterion": "search/page/payload/cache budgets pass",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Domain/ProjectMemoryModels.swift#c0c22b2f654530978795699a4cead0938315e0a475075e0ada161bdded7bbbf0; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/ProjectMemoryRepository.swift#4b40e05505c96d28873a4016a12444fdc0c4aa546a11367f99eee0779aea523a; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P07-resource-owner-matrix.json#4b7da4806d7c77f4653e5f6800fe1d218ffb6f2c088161c3d59cfffba0d9bdb5; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P07-mcp-process-conformance.json#135ceac8822d2dad4d997d12fbc5adf9a8a97dc243fc7296cd06d1b5d13e52c4",
+        "passed": false
+      },
+      {
+        "criterion": "redaction/security tests pass",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Application/ProjectMemoryService.swift#3735e7bebe806b90adfcd633fd8bcffdadaca3bcac06285b2ecaf3d2a44821b1; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T202205Z-6824db4d27.stdout.txt#06b033ec8356398fbf1e87d467a4c5149625707eb2e7e090c7b31cc7a7583658; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T202209Z-a14a40e46a.stdout.txt#be915aedab4cd32fd9c9ff048b75e0edfb06a66d2ff65476d5879d6490822256; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T201609Z-581a87dcb8.stdout.txt#efa16cd515cd149f4643773ec3d9f1f879703aff3d4a91bc3081bdcfe1d70bc3",
+        "passed": false
+      }
+    ]
+  },
+  "notes": ""
+}
+{
+  "schema_version": 1,
+  "gate_id": "G08",
+  "operation_id": "480ff36f-51f8-44b0-a857-14ee4230e319",
+  "source_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c",
+  "source_manifest": {
+    "schema_version": 1,
+    "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14",
+    "file_count": 392,
+    "bytes": 13422208
+  },
+  "state_sequence_before": 1052,
+  "status": "failed",
+  "finalized": true,
+  "started_at": "2026-09-05T02:02:24.525013+00:00",
+  "ended_at": "2026-09-05T02:02:24.742342+00:00",
+  "commands": [
+    {
+      "command": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-handlers/G08.sh",
+      "exit_code": 1,
+      "stdout_sha256": "62c65ca9e05feb0b66ebec2338606deae601607a54389d4bfa521ce398e43887",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "timed_out": false
+    }
+  ],
+  "environment": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "repository": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
+  },
+  "artifacts": [
+    {
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G08.stdout.txt",
+      "sha256": "62c65ca9e05feb0b66ebec2338606deae601607a54389d4bfa521ce398e43887",
+      "kind": "stdout"
+    },
+    {
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G08.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "stderr"
+    },
+    {
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G08.criteria.json",
+      "sha256": "0e95964be4d9afc7909660193fa9765aaefc3afe20afc81c2bd0f58d422eaa03",
+      "kind": "criteria"
+    }
+  ],
+  "evaluator": {
+    "name": "forge-gate-handler",
+    "version": "1",
+    "criteria_results": [
+      {
+        "criterion": "handoff schema and compactness pass",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P08-continuity-report.json#86b23e437872b191570bf864250f76bfc29523ea49520cb75e2ea3ec98644f4b; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T204207Z-fb406e171d.json#88076e6dbb4f16e617b0ba3c25655991494a8aecb4aaeb0bccc658a1ccfb791b",
+        "passed": true
+      },
+      {
+        "criterion": "all transition crash points recover",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P08-continuity-report.json#86b23e437872b191570bf864250f76bfc29523ea49520cb75e2ea3ec98644f4b; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T204207Z-fb406e171d.json#88076e6dbb4f16e617b0ba3c25655991494a8aecb4aaeb0bccc658a1ccfb791b",
+        "passed": true
+      },
+      {
+        "criterion": "idempotency and exact acknowledgment pass",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P08-mcp-process-conformance.json#e18ee8d25baf6b3d38169e72d64046b78fe04ec150bc10bc6aba042786b20015; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T203838Z-4f3fba0ee5.json#e9c3a5836f9e3117bd07d129d01b60e0c1a733373ee854a7a696a93918124b4f",
+        "passed": true
+      },
+      {
+        "criterion": "context budget fallback passes",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P08-continuity-report.json#86b23e437872b191570bf864250f76bfc29523ea49520cb75e2ea3ec98644f4b; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T204207Z-fb406e171d.json#88076e6dbb4f16e617b0ba3c25655991494a8aecb4aaeb0bccc658a1ccfb791b",
+        "passed": true
+      },
+      {
+        "criterion": "continuity MCP conformance passes",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P08-mcp-process-conformance.json#e18ee8d25baf6b3d38169e72d64046b78fe04ec150bc10bc6aba042786b20015; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T204247Z-4561e060f3.json#6b40dc22f5e9ba3787794353232a1ad664509ebb520dcb5cc007be0600c91844",
+        "passed": true
+      }
+    ]
+  },
+  "notes": ""
+}
+{
+  "schema_version": 1,
+  "gate_id": "G09",
+  "operation_id": "154106f1-3f30-4f0c-b59f-7115fb2ab2f9",
+  "source_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c",
+  "source_manifest": {
+    "schema_version": 1,
+    "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14",
+    "file_count": 392,
+    "bytes": 13422208
+  },
+  "state_sequence_before": 1053,
+  "status": "failed",
+  "finalized": true,
+  "started_at": "2026-09-05T02:02:25.052545+00:00",
+  "ended_at": "2026-09-05T02:02:25.277143+00:00",
+  "commands": [
+    {
+      "command": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-handlers/G09.sh",
+      "exit_code": 1,
+      "stdout_sha256": "20e65308e01280594b2b249ecb785981ce10794d2017820eb7b0bb8d88e581a3",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "timed_out": false
+    }
+  ],
+  "environment": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "repository": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
+  },
+  "artifacts": [
+    {
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G09.stdout.txt",
+      "sha256": "20e65308e01280594b2b249ecb785981ce10794d2017820eb7b0bb8d88e581a3",
+      "kind": "stdout"
+    },
+    {
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G09.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "stderr"
+    },
+    {
+      "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G09.criteria.json",
+      "sha256": "ad6a7800b8dbe6f426d12fc5e98e8111934bd1353df881e240485a08565a433b",
+      "kind": "criteria"
+    }
+  ],
+  "evaluator": {
+    "name": "forge-gate-handler",
+    "version": "1",
+    "criteria_results": [
+      {
+        "criterion": "host capability report exists",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P09-host-capability-report.json#b7c7ae9a1d8d9302448e31c8673142e66cbc4e1080ddf6152d8067ddb56b2d75; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260827T105148Z-30b18f1784.json#6958ac05ab6e699d3264526c965d739d8e6e2ee34d3ac0a4e816b92c33a4babe",
+        "passed": true
+      },
+      {
+        "criterion": "required plugin target builds and tests",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P09-resource-owner-matrix.json#be9f2d9b9d711e5852f7a17ea2d6ffd52b540cc3e85c1242df2363797e3a5104; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260827T103142Z-31aeee7a3f.json#562a6a3758ce30fbb580f0f26e480f76432526caea46fc744a73b834b6063325; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260827T103242Z-f2a67a3569.json#1768996bf110201389fa45d899ccbb06da6e210a8e7c8418d74a200c56353ecd; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260827T105148Z-30b18f1784.json#6958ac05ab6e699d3264526c965d739d8e6e2ee34d3ac0a4e816b92c33a4babe",
+        "passed": true
+      },
+      {
+        "criterion": "full no-operator rollover passes in a supported mode",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P09-host-capability-report.json#b7c7ae9a1d8d9302448e31c8673142e66cbc4e1080ddf6152d8067ddb56b2d75; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P09-feature-parity.json#3f9b9f26cd42c153b537e007ac0317c8bf7c3074b91f7e0bdf268a4b2696601f; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-autonomy-state/evidence/FC-E2E-001/live-lmstudio-managed-continuity.json#7861db2e43dff59892b85b6bb914540b891a630c07f7ae882c69954f5e01702b; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260827T105148Z-30b18f1784.json#6958ac05ab6e699d3264526c965d739d8e6e2ee34d3ac0a4e816b92c33a4babe",
+        "passed": true
+      },
+      {
+        "criterion": "external MCP-only compatibility passes",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P09-external-mcp-compatibility.json#e567663b11502ec6707a1737826a5ebc0a81f274586180d14db5a480106c9820; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260827T103306Z-a585799235.json#b42c9bf936923cbadb8babd701f8a45596e0df0700bab39a0b2ba98b2492575b; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260827T103315Z-ea299d27a2.json#fbc49951ecf34e6596b9942231e87cde1645cb19fd0f132d4b11910d74a8f28c; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260827T105148Z-30b18f1784.json#6958ac05ab6e699d3264526c965d739d8e6e2ee34d3ac0a4e816b92c33a4babe",
+        "passed": true
+      },
+      {
+        "criterion": "private UI automation scan passes",
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P09-host-capability-report.json#b7c7ae9a1d8d9302448e31c8673142e66cbc4e1080ddf6152d8067ddb56b2d75; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260827T103321Z-9af37ac353.json#c8aeeac1ea96688136851877e29ce23e6224d3fedb9a50e11e1e365e90446d09; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260827T105148Z-30b18f1784.json#6958ac05ab6e699d3264526c965d739d8e6e2ee34d3ac0a4e816b92c33a4babe",
+        "passed": true
+      }
+    ]
+  },
+  "notes": ""
+}

@@ -10,6 +10,144 @@ import AppKit
 import ForgeConductorCore
 import SwiftUI
 
+struct AppBootstrapSnapshot: Sendable {
+    let app: ForgeApp
+    let pluginStatus: LMStudioMCPPluginInstaller.PluginStatus?
+    let settings: ManagerSettings
+}
+
+/// One owner per user-action family. Admission is synchronous and bounded;
+/// cancellation is propagated to the worker, and a committed result still wins.
+@MainActor
+final class AppBackgroundOperation {
+    private var task: Task<Void, Never>?
+    deinit { task?.cancel() }
+    var isRunning: Bool { task != nil }
+
+    @discardableResult
+    func start<Value: Sendable>(
+        work: @escaping @Sendable () async throws -> Value,
+        completion: @escaping @MainActor (Result<Value, Error>) -> Void
+    ) -> Bool {
+        guard task == nil else { return false }
+        let worker = Task.detached(priority: .userInitiated) {
+            try Task.checkCancellation()
+            return try await work()
+        }
+        task = Task { [weak self] in
+            let result = await withTaskCancellationHandler {
+                await worker.result
+            } onCancel: {
+                worker.cancel()
+            }
+            guard let self else { return }
+            self.task = nil
+            completion(result)
+        }
+        return true
+    }
+
+    func cancel() { task?.cancel() }
+    func stop() async {
+        let pending = task
+        pending?.cancel()
+        await pending?.value
+    }
+}
+
+/// Owns one startup worker and its cancellation cleanup. The completion always
+/// runs on the main actor after the worker has finished constructing or closing
+/// the unpublished application graph.
+@MainActor
+final class AppBootstrapOperation {
+    typealias Factory = @Sendable () throws -> ForgeApp
+    typealias PluginStatus = @Sendable (ForgeApp) -> LMStudioMCPPluginInstaller.PluginStatus?
+    private let factory: Factory
+    private let pluginStatus: PluginStatus
+    private var task: Task<Void, Never>?
+
+    init(
+        factory: @escaping Factory = { try ForgeApp.bootstrap() },
+        pluginStatus: @escaping PluginStatus = { app in
+            app.lmStudioDeploy.status(
+                preferredBinary: app.lmStudioDeploy.resolveServeBinary(preferred: Bundle.main.executableURL)
+            )
+        }
+    ) {
+        self.factory = factory
+        self.pluginStatus = pluginStatus
+    }
+
+    deinit { task?.cancel() }
+
+    var isRunning: Bool { task != nil }
+
+    @discardableResult
+    func start(completion: @escaping @MainActor (Result<AppBootstrapSnapshot, Error>) -> Void) -> Bool {
+        guard task == nil else { return false }
+        let factory = self.factory
+        let pluginStatus = self.pluginStatus
+        let worker = Task.detached(priority: .userInitiated) {
+            try Task.checkCancellation()
+            let app = try factory()
+            do {
+                try Task.checkCancellation()
+                let status = pluginStatus(app)
+                let settings = Self.settingsSnapshot(app)
+                try Task.checkCancellation()
+                return AppBootstrapSnapshot(app: app, pluginStatus: status, settings: settings)
+            } catch {
+                _ = app.shutdown()
+                throw error
+            }
+        }
+        task = Task { [weak self] in
+            let result = await withTaskCancellationHandler {
+                await worker.result
+            } onCancel: {
+                worker.cancel()
+            }
+            if Task.isCancelled || self == nil {
+                if case .success(let snapshot) = result {
+                    _ = await Task.detached { snapshot.app.shutdown() }.value
+                }
+                self?.task = nil
+                if self != nil { completion(.failure(CancellationError())) }
+                return
+            }
+            self?.task = nil
+            completion(result)
+        }
+        return true
+    }
+
+    func cancel() { task?.cancel() }
+
+    func stop() async {
+        let pending = task
+        pending?.cancel()
+        await pending?.value
+    }
+
+    nonisolated static func settingsSnapshot(_ app: ForgeApp) -> ManagerSettings {
+        let config = app.config.model
+        let shell = app.config.shellPolicyStatus
+        return ManagerSettings(
+            dashboardHost: config.dashboard.host, dashboardPort: config.dashboard.port,
+            dashboardRefreshSec: config.dashboard.refreshIntervalSec,
+            autoRestart: config.manager.autoRestart, watchdogIntervalSec: config.manager.watchdogIntervalSec,
+            openBrowserOnStart: config.manager.openBrowserOnStart,
+            sessionIdleTTLSec: config.sessions.idleTTLSec,
+            shellEnabled: shell.enabled, shellUserDisabled: shell.userDisabled,
+            shellPolicyVersion: shell.policyVersion, shellPolicyOrigin: shell.policyOrigin,
+            shellMigrationState: shell.migration.state, shellMigrationReceiptValid: shell.migration.receiptValid,
+            shellRuntimeCapabilities: shell.runtimes, shellTimeoutSec: config.shell.defaultTimeoutSec,
+            logLevel: config.logLevel,
+            allowedRoots: ManagerSettingsNormalizer.canonicalAllowedRoots(config.allowedRoots)
+        )
+    }
+}
+
 /// Owns the macOS app's observable state and coordinates every user-facing module.
 ///
 /// Views read immutable projections from this model and send user intent back through
@@ -23,6 +161,8 @@ public final class AppModel: ObservableObject {
     @Published public private(set) var updated: Date?
     @Published public private(set) var lastError: String?
     @Published public private(set) var isLoading = false
+    @Published public private(set) var isBootstrapping = false
+    @Published public private(set) var hasLoadedInitialSettings = false
     @Published public private(set) var version: String = ForgeApp.version
     @Published public private(set) var homePath: String = ""
     @Published public private(set) var lastTyped: TelemetrySnapshot?
@@ -31,6 +171,8 @@ public final class AppModel: ObservableObject {
     @Published public private(set) var lmStudioPluginStatus: LMStudioMCPPluginInstaller.PluginStatus?
     @Published public private(set) var lmStudioPluginMessage: String?
     @Published public private(set) var isInstallingPlugin = false
+    @Published public private(set) var isExportingDiagnostics = false
+    @Published public private(set) var isUpdatingSettings = false
     @Published public private(set) var diagnosticPreview: [DiagnosticEnvelope] = []
     @Published public private(set) var lastExportMessage: String?
     @Published public private(set) var measuredTelemetryHz: Double = 0
@@ -54,7 +196,8 @@ public final class AppModel: ObservableObject {
     @Published public private(set) var shellPolicyOrigin: String = "default_enabled"
     @Published public private(set) var shellMigrationState: String = "not_required"
     @Published public private(set) var shellMigrationReceiptValid: Bool = false
-    @Published public private(set) var shellRuntimeCapabilities = ShellRuntimeCapabilities.detect()
+    @Published public private(set) var shellRuntimeCapabilities =
+        ShellRuntimeCapabilities(zsh: nil, bash: nil, python: nil, powershell: nil)
     @Published public private(set) var secureFilesystemServiceStatus: SecureFilesystemServiceStatus = .notFound
     @Published public private(set) var secureFilesystemOperationalHealth =
         SecureFilesystemOperationalHealth.initial
@@ -77,6 +220,13 @@ public final class AppModel: ObservableObject {
     private var telemetryBag: AnyCancellable?
     private var managerPollInFlight = false
     private var remoteManagerLastError: String?
+    private let bootstrapOperation: AppBootstrapOperation
+    private let settingsOperation = AppBackgroundOperation()
+    private let pluginStatusOperation = AppBackgroundOperation()
+    private var pluginStatusRefreshPending = false
+    private let deploymentOperation = AppBackgroundOperation()
+    private let diagnosticsExportOperation = AppBackgroundOperation()
+    private var preferredServeBinaryURL: URL?
     private let secureFilesystemService = SecureFilesystemServiceController()
     private var secureFilesystemOperationTask: Task<Void, Never>?
     private var secureFilesystemLifecycleObservationGate =
@@ -118,7 +268,12 @@ public final class AppModel: ObservableObject {
         }
     }
 
-    public init() {
+    public convenience init() {
+        self.init(bootstrapOperation: AppBootstrapOperation())
+    }
+
+    init(bootstrapOperation: AppBootstrapOperation) {
+        self.bootstrapOperation = bootstrapOperation
         secureFilesystemService.setLifecycleStateObserver { [weak self] observation in
             self?.applySecureFilesystemLifecycleObservation(observation)
         }
@@ -128,62 +283,99 @@ public final class AppModel: ObservableObject {
     }
 
     public func bootstrap() {
-        do {
-            let forgeApp = try ForgeApp.bootstrap()
-            self.app = forgeApp
-            self.homePath = forgeApp.paths.home.path
-            self.version = ForgeApp.version
-            self.deployController = AppDeployController(app: forgeApp)
-            telemetryBinding.attach(app: forgeApp)
-            if CommandLine.arguments.contains("--uitesting") {
-                let fixturePort = ProcessInfo.processInfo.environment["FORGE_OPERATOR_UI_TEST_PORT"]
-                    .flatMap(Int.init)
-                    .flatMap { (1...65_535).contains($0) ? $0 : nil }
-                if let fixturePort {
-                    let credentials = ManagerControlCredentialStore(paths: forgeApp.paths)
-                    remoteManager = ManagerDashboardClient(
+        guard app == nil, !bootstrapOperation.isRunning else { return }
+        isBootstrapping = true
+        isLoading = true
+        lastError = nil
+        bootstrapOperation.start { [weak self] result in
+            guard let self else { return }
+            self.isBootstrapping = false
+            switch result {
+            case .success(let snapshot):
+                self.applyBootstrap(snapshot)
+            case .failure(is CancellationError):
+                self.isLoading = false
+                self.lastError = "Startup cancelled. Retry to start Forge Conductor."
+            case .failure(let error):
+                self.isLoading = false
+                self.lastError = "Bootstrap failed: \(error)"
+            }
+        }
+    }
+
+    public func cancelBootstrap() {
+        bootstrapOperation.cancel()
+    }
+
+    public func cancelBackgroundOperations() {
+        bootstrapOperation.cancel()
+        settingsOperation.cancel()
+        pluginStatusRefreshPending = false
+        pluginStatusOperation.cancel()
+        deploymentOperation.cancel()
+        diagnosticsExportOperation.cancel()
+    }
+
+    func stopBootstrap() async {
+        await bootstrapOperation.stop()
+    }
+
+    private func applyBootstrap(_ snapshot: AppBootstrapSnapshot) {
+        let forgeApp = snapshot.app
+        self.app = forgeApp
+        self.homePath = forgeApp.paths.home.path
+        self.version = ForgeApp.version
+        self.deployController = AppDeployController(app: forgeApp)
+        telemetryBinding.autoRefresh = autoRefresh
+        telemetryBinding.attach(app: forgeApp)
+        if CommandLine.arguments.contains("--uitesting") {
+            let fixturePort = ProcessInfo.processInfo.environment["FORGE_OPERATOR_UI_TEST_PORT"]
+                .flatMap(Int.init)
+                .flatMap { (1...65_535).contains($0) ? $0 : nil }
+            if let fixturePort {
+                let credentials = ManagerControlCredentialStore(paths: forgeApp.paths)
+                remoteManager = ManagerDashboardClient(
+                    host: "127.0.0.1",
+                    port: fixturePort,
+                    credentials: credentials
+                )
+                operatorManagerClient.replace(
+                    with: OperatorManagerHTTPClient(
                         host: "127.0.0.1",
                         port: fixturePort,
                         credentials: credentials
                     )
-                    operatorManagerClient.replace(
-                        with: OperatorManagerHTTPClient(
-                            host: "127.0.0.1",
-                            port: fixturePort,
-                            credentials: credentials
-                        )
-                    )
-                    managerMessage = "Attached to operator UI test fixture"
-                } else {
-                    operatorManagerClient.replace(
-                        with: UnavailableOperatorManagerClient(
-                            reason: "Manager control is intentionally disabled during UI tests."
-                        )
-                    )
-                    managerMessage = "Manager disabled during UI tests"
-                }
+                )
+                managerMessage = "Attached to operator UI test fixture"
             } else {
                 operatorManagerClient.replace(
-                    with: OperatorManagerHTTPClient(
-                        host: forgeApp.config.model.dashboard.host,
-                        port: forgeApp.config.model.dashboard.port,
-                        credentials: ManagerControlCredentialStore(paths: forgeApp.paths)
+                    with: UnavailableOperatorManagerClient(
+                        reason: "Manager control is intentionally disabled during UI tests."
                     )
                 )
-                attachToOrStartManager(app: forgeApp)
+                managerMessage = "Manager disabled during UI tests"
             }
-            loadSettingsFromConfig()
-            bootstrapSecureFilesystemService(paths: forgeApp.paths)
-            refreshLMStudioPluginStatus()
-            refreshDiagnosticsPreview()
-            forgeApp.diagnostics.info("gui_bootstrap", [
-                "version": ForgeApp.version,
-                "home": forgeApp.paths.home.path,
-            ], category: .ui)
-            refresh(force: true)
-        } catch {
-            lastError = "Bootstrap failed: \(error)"
+        } else {
+            operatorManagerClient.replace(
+                with: OperatorManagerHTTPClient(
+                    host: forgeApp.config.model.dashboard.host,
+                    port: forgeApp.config.model.dashboard.port,
+                    credentials: ManagerControlCredentialStore(paths: forgeApp.paths)
+                )
+            )
+            attachToOrStartManager(app: forgeApp)
         }
+        apply(settings: snapshot.settings)
+        hasLoadedInitialSettings = true
+        bootstrapSecureFilesystemService(paths: forgeApp.paths)
+        lmStudioPluginStatus = snapshot.pluginStatus
+        preferredServeBinaryURL = snapshot.pluginStatus.map { URL(fileURLWithPath: $0.binaryPath) }
+        refreshDiagnosticsPreview()
+        forgeApp.diagnostics.info("gui_bootstrap", [
+            "version": ForgeApp.version,
+            "home": forgeApp.paths.home.path,
+        ], category: .ui)
+        refresh(force: true)
     }
 
     /// A GUI is a presentation client when the LaunchAgent manager already
@@ -273,46 +465,61 @@ public final class AppModel: ObservableObject {
         lastTyped = b.lastTyped
         measuredTelemetryHz = b.measuredHz
         runtimeDiagnosticSnapshot = app?.runtimeDiagnosticSnapshot()
-        isLoading = b.isLoading
+        isLoading = isBootstrapping || b.isLoading
         if let e = b.lastError { lastError = e }
     }
 
     public var preferredServeBinary: URL {
-        deployController?.preferredServeBinary
-            ?? app?.lmStudioDeploy.resolveServeBinary(preferred: Bundle.main.executableURL)
-            ?? URL(fileURLWithPath: "/usr/bin/false")
+        preferredServeBinaryURL ?? URL(fileURLWithPath: "/usr/bin/false")
     }
 
     public func refreshLMStudioPluginStatus() {
-        lmStudioPluginStatus = deployController?.status()
-            ?? app?.lmStudioDeploy.status(preferredBinary: preferredServeBinary)
+        guard let app else { return }
+        guard !pluginStatusOperation.isRunning else {
+            pluginStatusRefreshPending = true
+            return
+        }
+        pluginStatusOperation.start {
+            app.lmStudioDeploy.status(
+                preferredBinary: app.lmStudioDeploy.resolveServeBinary(preferred: Bundle.main.executableURL)
+            )
+        } completion: { [weak self] result in
+            guard let self else { return }
+            if self.pluginStatusRefreshPending {
+                self.pluginStatusRefreshPending = false
+                self.refreshLMStudioPluginStatus()
+                return
+            }
+            switch result {
+            case .success(let status):
+                self.lmStudioPluginStatus = status
+                self.preferredServeBinaryURL = URL(fileURLWithPath: status.binaryPath)
+            case .failure(is CancellationError): break
+            case .failure(let error):
+                self.lmStudioPluginMessage = "Status unavailable: \(error.localizedDescription)"
+            }
+        }
     }
 
     public func deployToLMStudio() {
         guard !isInstallingPlugin, let forgeApp = app else { return }
         isInstallingPlugin = true
         lmStudioPluginMessage = nil
-        let binary = preferredServeBinary
-        Task { [weak self] in
-            do {
-                let result = try await Task.detached {
-                    try forgeApp.lmStudioDeploy.deploy(preferredBinary: binary)
-                }.value
-                await MainActor.run {
-                    self?.lmStudioPluginMessage = result.message
-                    self?.refreshLMStudioPluginStatus()
-                    self?.isInstallingPlugin = false
-                    self?.refreshDiagnosticsPreview()
-                    self?.refresh(force: true)
-                }
-            } catch {
-                await MainActor.run {
-                    self?.lmStudioPluginMessage = "Deploy failed: \(error.localizedDescription)"
-                    self?.refreshLMStudioPluginStatus()
-                    self?.isInstallingPlugin = false
-                    self?.refreshDiagnosticsPreview()
-                }
+        deploymentOperation.start {
+            let binary = forgeApp.lmStudioDeploy.resolveServeBinary(preferred: Bundle.main.executableURL)
+            return try forgeApp.lmStudioDeploy.deploy(preferredBinary: binary)
+        } completion: { [weak self] result in
+            guard let self else { return }
+            self.isInstallingPlugin = false
+            switch result {
+            case .success(let installed):
+                self.lmStudioPluginMessage = installed.message
+                self.refresh(force: true)
+            case .failure(is CancellationError): self.lmStudioPluginMessage = "Deploy cancelled"
+            case .failure(let error): self.lmStudioPluginMessage = "Deploy failed: \(error.localizedDescription)"
             }
+            self.refreshLMStudioPluginStatus()
+            self.refreshDiagnosticsPreview()
         }
     }
 
@@ -377,46 +584,57 @@ public final class AppModel: ObservableObject {
     }
 
     public func exportDiagnostics() {
-        guard let diagnostics = app?.diagnostics else {
+        guard !isExportingDiagnostics else { return }
+        guard app != nil else {
             lastExportMessage = "App not bootstrapped"
             return
         }
-        do {
-            let panel = NSOpenPanel()
-            panel.canChooseFiles = false
-            panel.canChooseDirectories = true
-            panel.canCreateDirectories = true
-            panel.prompt = "Export Here"
-            panel.message = "Choose a folder for Forge Conductor diagnostics (.json + .md)"
-            if let home = app?.paths.exportsDir {
-                panel.directoryURL = home
-            }
-            guard panel.runModal() == .OK, let dir = panel.url else {
-                lastExportMessage = "Export cancelled"
-                return
-            }
-            let result = try diagnostics.export(to: dir, basename: nil)
-            lastExportMessage =
-                "Exported \(result.recordCount) records →\n\(result.jsonURL.path)\n\(result.markdownURL.path)"
-            refreshDiagnosticsPreview()
-        } catch {
-            lastExportMessage = "Export failed: \(error.localizedDescription)"
-            app?.diagnostics.error("diagnostics_export_failed", [
-                "error": error.localizedDescription,
-            ], category: .diagnostics)
+        isExportingDiagnostics = true
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.prompt = "Export Here"
+        panel.message = "Choose a folder for Forge Conductor diagnostics (.json + .md)"
+        panel.directoryURL = app?.paths.exportsDir
+        guard panel.runModal() == .OK, let directory = panel.url else {
+            isExportingDiagnostics = false
+            lastExportMessage = "Export cancelled"
+            return
         }
+        beginDiagnosticsExport(to: directory, reveal: false)
     }
 
     public func exportDiagnosticsToDefaultFolder() {
-        guard let diagnostics = app?.diagnostics, let paths = app?.paths else { return }
-        do {
-            let result = try diagnostics.export(to: paths.exportsDir, basename: nil)
-            lastExportMessage =
-                "Exported \(result.recordCount) records →\n\(result.jsonURL.path)\n\(result.markdownURL.path)"
-            NSWorkspace.shared.activateFileViewerSelecting([result.jsonURL, result.markdownURL])
-            refreshDiagnosticsPreview()
-        } catch {
-            lastExportMessage = "Export failed: \(error.localizedDescription)"
+        guard !isExportingDiagnostics, let directory = app?.paths.exportsDir else { return }
+        isExportingDiagnostics = true
+        beginDiagnosticsExport(to: directory, reveal: true)
+    }
+
+    private func beginDiagnosticsExport(to directory: URL, reveal: Bool) {
+        guard let diagnostics = app?.diagnostics else {
+            isExportingDiagnostics = false
+            return
+        }
+        lastExportMessage = "Exporting diagnostics…"
+        diagnosticsExportOperation.start {
+            try diagnostics.export(to: directory, basename: nil)
+        } completion: { [weak self] result in
+            guard let self else { return }
+            self.isExportingDiagnostics = false
+            switch result {
+            case .success(let exported):
+                self.lastExportMessage =
+                    "Exported \(exported.recordCount) records →\n\(exported.jsonURL.path)\n\(exported.markdownURL.path)"
+                if reveal {
+                    NSWorkspace.shared.activateFileViewerSelecting([exported.jsonURL, exported.markdownURL])
+                }
+                self.refreshDiagnosticsPreview()
+            case .failure(is CancellationError): self.lastExportMessage = "Export cancelled"
+            case .failure(let error):
+                self.lastExportMessage = "Export failed: \(error.localizedDescription)"
+                diagnostics.error("diagnostics_export_failed", ["error": error.localizedDescription], category: .diagnostics)
+            }
         }
     }
 
@@ -574,102 +792,94 @@ public final class AppModel: ObservableObject {
         }
     }
 
-    public func loadSettingsFromConfig() {
-        guard let app else { return }
-        if let m = manager {
-            let s = m.settingsModel()
-            apply(settings: s)
-            return
-        }
-        setHost = app.config.string("dashboard", "host", default: "127.0.0.1")
-        setPort = app.config.int("dashboard", "port", default: 7788)
-        setRefresh = app.config.int("dashboard", "refresh_interval_sec", default: 8)
-        setWatchdog = app.config.int("manager", "watchdog_interval_sec", default: 3)
-        setIdleTTL = app.config.int("sessions", "idle_ttl_sec", default: 14_400)
-        setShellEnabled = app.config.bool("shell", "enabled", default: true)
-        setShellTimeout = app.config.int("shell", "default_timeout_sec", default: 30)
-        setAutoRestart = app.config.bool("manager", "auto_restart", default: true)
-        setAllowedRoots = ManagerSettingsNormalizer.canonicalAllowedRoots(
-            app.config.model.allowedRoots
+    private var settingsDraft: ManagerSettingsPatch {
+        ManagerSettingsPatch(
+            dashboardHost: setHost, dashboardPort: setPort, dashboardRefreshSec: setRefresh,
+            autoRestart: setAutoRestart, watchdogIntervalSec: setWatchdog,
+            sessionIdleTTLSec: setIdleTTL, shellEnabled: setShellEnabled,
+            shellTimeoutSec: setShellTimeout, allowedRoots: setAllowedRoots
         )
-        let shell = app.config.shellPolicyStatus
-        shellPolicyOrigin = shell.policyOrigin
-        shellMigrationState = shell.migration.state
-        shellMigrationReceiptValid = shell.migration.receiptValid
-        shellRuntimeCapabilities = shell.runtimes
-        if let client = remoteManager {
-            Task { [weak self] in
-                do {
-                    let settings = try await client.settings()
-                    self?.apply(settings: settings)
-                } catch {
-                    self?.recordRemoteManagerFailure(action: "Load settings", error: error)
-                }
+    }
+
+    public func loadSettingsFromConfig() {
+        guard let app, !settingsOperation.isRunning else { return }
+        let client = remoteManager
+        let manager = self.manager
+        let draft = settingsDraft
+        isUpdatingSettings = true
+        settingsOperation.start {
+            if let client { return try await client.settings() }
+            if let manager { return manager.settingsModel() }
+            return AppBootstrapOperation.settingsSnapshot(app)
+        } completion: { [weak self] result in
+            guard let self else { return }
+            self.isUpdatingSettings = false
+            switch result {
+            case .success(let settings):
+                // A delayed read cannot overwrite edits made while it was running.
+                guard self.settingsDraft == draft else { return }
+                self.apply(settings: settings)
+            case .failure(is CancellationError): break
+            case .failure(let error): self.recordRemoteManagerFailure(action: "Load settings", error: error)
             }
         }
     }
 
     public func saveSettings() {
+        guard hasLoadedInitialSettings else {
+            managerMessage = "Settings are unavailable until startup completes."
+            return
+        }
+        guard !settingsOperation.isRunning else {
+            managerMessage = "A settings operation is in progress. Retry after it completes."
+            return
+        }
         guard let appPaths = app?.paths else {
             managerMessage = "Manager credentials are unavailable"
             return
         }
-        let patch = ManagerSettingsPatch(
-            dashboardHost: setHost,
-            dashboardPort: setPort,
-            dashboardRefreshSec: setRefresh,
-            autoRestart: setAutoRestart,
-            watchdogIntervalSec: setWatchdog,
-            sessionIdleTTLSec: setIdleTTL,
-            shellEnabled: setShellEnabled,
-            shellTimeoutSec: setShellTimeout,
-            allowedRoots: setAllowedRoots
-        )
-        if let client = remoteManager {
-            managerMessage = "Saving settings…"
-            Task { [weak self] in
-                do {
-                    let settings = try await client.updateSettings(patch, apply: true)
-                    guard let self else { return }
-                    self.apply(settings: settings)
-                    self.remoteManager = ManagerDashboardClient(
-                        host: settings.dashboardHost,
-                        port: settings.dashboardPort,
-                        credentials: ManagerControlCredentialStore(paths: appPaths)
-                    )
-                    self.operatorManagerClient.replace(
-                        with: OperatorManagerHTTPClient(
-                            host: settings.dashboardHost,
-                            port: settings.dashboardPort,
-                            credentials: ManagerControlCredentialStore(paths: appPaths)
-                        )
-                    )
-                    self.managerMessage = "Settings saved"
-                    self.refreshRemoteManagerStatus()
-                } catch {
-                    self?.recordRemoteManagerFailure(action: "Settings", error: error)
-                }
-            }
+        let client = remoteManager
+        let manager = self.manager
+        guard client != nil || manager != nil else {
+            managerMessage = "Manager is unavailable"
             return
         }
-        do {
-            guard let manager else {
-                managerMessage = "Manager is unavailable"
-                return
+        let patch = settingsDraft
+        isUpdatingSettings = true
+        managerMessage = "Saving settings…"
+        settingsOperation.start {
+            if let client {
+                let settings = try await client.updateSettings(patch, apply: true)
+                return (settings, Optional<ManagerStatus>.none)
             }
+            guard let manager else { throw CancellationError() }
             let settings = try manager.updateSettings(patch, apply: true)
-            apply(settings: settings)
-            operatorManagerClient.replace(
-                with: OperatorManagerHTTPClient(
-                    host: settings.dashboardHost,
-                    port: settings.dashboardPort,
-                    credentials: ManagerControlCredentialStore(paths: appPaths)
+            return (settings, Optional(manager.statusModel()))
+        } completion: { [weak self] result in
+            guard let self else { return }
+            self.isUpdatingSettings = false
+            switch result {
+            case .success(let (settings, status)):
+                let draftUnchanged = self.settingsDraft == patch
+                if draftUnchanged { self.apply(settings: settings) }
+                if client != nil {
+                    self.remoteManager = ManagerDashboardClient(
+                        host: settings.dashboardHost, port: settings.dashboardPort,
+                        credentials: ManagerControlCredentialStore(paths: appPaths)
+                    )
+                }
+                self.operatorManagerClient.replace(
+                    with: OperatorManagerHTTPClient(
+                        host: settings.dashboardHost, port: settings.dashboardPort,
+                        credentials: ManagerControlCredentialStore(paths: appPaths)
+                    )
                 )
-            )
-            managerStatus = manager.statusModel()
-            managerMessage = "Settings saved"
-        } catch {
-            managerMessage = "Settings failed: \(error.localizedDescription)"
+                if let status { self.managerStatus = status }
+                self.managerMessage = draftUnchanged ? "Settings saved" : "Settings saved. New edits have not been saved."
+                if client != nil { self.refreshRemoteManagerStatus() }
+            case .failure(is CancellationError): self.managerMessage = "Settings cancelled"
+            case .failure(let error): self.recordRemoteManagerFailure(action: "Settings", error: error)
+            }
         }
     }
 
@@ -1167,6 +1377,10 @@ public final class AppModel: ObservableObject {
     /// explicit path so the resulting controls can be exercised without automating a
     /// process-owned system panel.
     public func chooseAllowedRoot() {
+        guard hasLoadedInitialSettings else {
+            allowedRootsMessage = "Project folder changes are unavailable until startup completes."
+            return
+        }
         let environment = ProcessInfo.processInfo.environment
         if CommandLine.arguments.contains("--uitesting"),
            let path = environment["FORGE_ALLOWED_ROOT_UI_TEST_SELECTION"] {
@@ -1191,6 +1405,10 @@ public final class AppModel: ObservableObject {
     /// Stages one canonical project root for the next settings save.
     @discardableResult
     public func addAllowedRoot(_ url: URL) -> Bool {
+        guard hasLoadedInitialSettings else {
+            allowedRootsMessage = "Project folder changes are unavailable until startup completes."
+            return false
+        }
         guard url.isFileURL,
               let canonical = ManagerSettingsNormalizer.canonicalAllowedRoot(url.path) else {
             allowedRootsMessage = url.standardizedFileURL.path == "/"
@@ -1211,6 +1429,10 @@ public final class AppModel: ObservableObject {
 
     /// Stages removal of one project root for the next settings save.
     public func removeAllowedRoot(_ path: String) {
+        guard hasLoadedInitialSettings else {
+            allowedRootsMessage = "Project folder changes are unavailable until startup completes."
+            return
+        }
         let canonical = URL(fileURLWithPath: path, isDirectory: true)
             .resolvingSymlinksInPath()
             .standardizedFileURL
@@ -1232,7 +1454,8 @@ public final class AppModel: ObservableObject {
         shellMigrationState = settings.shellMigrationState
         shellMigrationReceiptValid = settings.shellMigrationReceiptValid
         shellRuntimeCapabilities = settings.shellRuntimeCapabilities
-        setAllowedRoots = ManagerSettingsNormalizer.canonicalAllowedRoots(settings.allowedRoots)
+        // The manager (or startup worker) already validated and canonicalized these roots.
+        setAllowedRoots = settings.allowedRoots
     }
 
     private func recordRemoteManagerFailure(action: String, error: Error) {

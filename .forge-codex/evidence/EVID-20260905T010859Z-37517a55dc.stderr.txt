@@ -1,0 +1,82 @@
+[0/1] Planning build
+Building for debugging...
+[0/18] Write sources
+[4/18] Write swift-version--58304C5D6DBC2206.txt
+[6/12] Emitting module ForgeConductorCore
+[7/12] Compiling ForgeConductorCore ManagedProjectRunStepExecutor.swift
+[8/13] Compiling ForgeConductorCore ManagedAutonomyRuntime.swift
+[9/16] Emitting module ForgeNativeSessionHostPlugin
+[10/16] Compiling ForgeNativeSessionHostPlugin ForgeNativeSessionHostPlugin.swift
+[10/16] Write Objects.LinkFileList
+[12/18] Compiling ForgeConductorApp ContentView.swift
+[13/18] Emitting module ForgeConductorApp
+[13/19] Linking forge-conductor
+[14/19] Applying forge-conductor
+[16/19] Compiling ForgeConductorApp ForgeConductorApp.swift
+[16/21] Write Objects.LinkFileList
+[17/21] Linking forge-conductor-app
+[18/21] Applying forge-conductor-app
+[20/67] Compiling ForgeConductorTests ForgeFilesystemProtocolTests.swift
+[21/67] Compiling ForgeConductorTests ForgeProcessEntryTests.swift
+[22/67] Compiling ForgeConductorTests G1G10AcceptanceTests.swift
+[23/67] Compiling ForgeConductorTests HTTPTestHelpers.swift
+[24/67] Compiling ForgeConductorTests LMStudioConnectorReliabilityTests.swift
+[25/67] Compiling ForgeConductorTests LMStudioContractFixtureServer.swift
+[26/67] Compiling ForgeConductorTests LMStudioContractFixtureTests.swift
+[27/67] Compiling ForgeConductorTests LatestValueMailboxTests.swift
+[28/67] Compiling ForgeConductorTests LegacyContinuityCancellationTests.swift
+[29/67] Compiling ForgeConductorTests LifecycleOwnershipTests.swift
+[30/67] Compiling ForgeConductorTests LiveCollectorEvidenceTests.swift
+[31/67] Compiling ForgeConductorTests LiveLMStudioManagedAutonomyTests.swift
+[32/67] Compiling ForgeConductorTests MCPProtocolAndDiagnosticsTests.swift
+[33/67] Compiling ForgeConductorTests MachHostMetricsTests.swift
+[34/67] Compiling ForgeConductorTests ManagedAutonomyRuntimeTests.swift
+[35/82] Compiling ForgeConductorTests AppBootstrapAppTests.swift
+[36/82] Compiling ForgeConductorTests AppConfigAndDoctorTests.swift
+[37/82] Compiling ForgeConductorTests AutonomousContinuityAcceptanceTests.swift
+[38/82] Compiling ForgeConductorTests AutonomySupervisorTests.swift
+[39/82] Compiling ForgeConductorTests CLIContractTests.swift
+[40/82] Compiling ForgeConductorTests CommittedResultRecoveryTests.swift
+[41/82] Compiling ForgeConductorTests ContextBudgetSupervisorTests.swift
+[42/82] Compiling ForgeConductorTests ContinuityCoordinatorTests.swift
+[43/82] Compiling ForgeConductorTests ContinuityTests.swift
+[44/82] Compiling ForgeConductorTests ContinuityV2Tests.swift
+[45/82] Compiling ForgeConductorTests CoreTests.swift
+[46/82] Compiling ForgeConductorTests DashboardSecurityTests.swift
+[47/82] Compiling ForgeConductorTests DashboardTests.swift
+[48/82] Compiling ForgeConductorTests DiagnosticBoundaryTests.swift
+[49/82] Compiling ForgeConductorTests FilesystemCancellationTests.swift
+[50/82] Emitting module ForgeConductorTests
+[51/82] Compiling ForgeConductorTests ManagedContinuityWorkerTests.swift
+[52/82] Compiling ForgeConductorTests ManagedModelProviderBridgeTests.swift
+[53/82] Compiling ForgeConductorTests ManagedProjectRunStepExecutorTests.swift
+[54/82] Compiling ForgeConductorTests ManagerTests.swift
+[55/82] Compiling ForgeConductorTests MemoryToolTests.swift
+[56/82] Compiling ForgeConductorTests NativeAppSmokeTests.swift
+[57/82] Compiling ForgeConductorTests NativeSessionHostPluginTests.swift
+[58/82] Compiling ForgeConductorTests NativeTelemetryTests.swift
+[59/82] Compiling ForgeConductorTests OperatorProjectContractTests.swift
+[60/82] Compiling ForgeConductorTests OwnerOnlyAtomicFileTests.swift
+[61/82] Compiling ForgeConductorTests ProcessRunnerTests.swift
+[62/82] Compiling ForgeConductorTests ProductPathReliabilityTests.swift
+[63/82] Compiling ForgeConductorTests ProjectContextIntegrationTests.swift
+[64/82] Compiling ForgeConductorTests ProjectControlPlaneRepositoryTests.swift
+[65/82] Compiling ForgeConductorTests ProjectMemoryTests.swift
+[66/82] Compiling ForgeConductorTests ProviderConfigurationAppTests.swift
+[67/82] Compiling ForgeConductorTests ProviderConfigurationTests.swift
+[68/82] Compiling ForgeConductorTests RealtimeStreamTests.swift
+[69/82] Compiling ForgeConductorTests ReleaseStressTests.swift
+[70/82] Compiling ForgeConductorTests ResourcePolicyTests.swift
+[71/82] Compiling ForgeConductorTests RigParityTests.swift
+[72/82] Compiling ForgeConductorTests RuntimeCancelQualificationTests.swift
+[73/82] Compiling ForgeConductorTests RuntimeExecutionJobTests.swift
+[74/82] Compiling ForgeConductorTests RuntimeObservabilityTests.swift
+[75/82] Compiling ForgeConductorTests SecureFilesystemMutationTests.swift
+[76/82] Compiling ForgeConductorTests SecureFilesystemQualificationHealthSessionTests.swift
+[77/82] Compiling ForgeConductorTests TelemetryContractTests.swift
+[78/82] Compiling ForgeConductorTests ToolDefinitionCatalogTests.swift
+[79/82] Compiling ForgeConductorTests ToolRouterDeadlineTests.swift
+[80/82] Compiling ForgeConductorTests resource_bundle_accessor.swift
+[80/82] Write Objects.LinkFileList
+[81/82] Linking ForgeConductorPackageTests
+Build complete! (20.77s)

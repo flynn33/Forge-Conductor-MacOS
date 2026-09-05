@@ -63,7 +63,6 @@ public final class MultiSeriesLoadRenderer: NSObject, MTKViewDelegate {
             Series(values: ram.map(Optional.some), color: SIMD4(1.0, 0.42, 0.12, 0.95)),
             Series(values: gpu, color: SIMD4(0.18, 1.0, 0.55, 0.95)),
         ]
-        rebuild()
         requestDraw()
     }
 
@@ -147,6 +146,11 @@ public final class MultiSeriesLoadRenderer: NSObject, MTKViewDelegate {
             RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedStatic)
             return
         }
+        guard MetalGaugeResources.canRender(view) else {
+            RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedHidden)
+            return
+        }
+        rebuild()
         guard let drawable = view.currentDrawable,
               let rpd = view.currentRenderPassDescriptor,
               let pipeline,
@@ -190,7 +194,7 @@ public final class MultiSeriesLoadRenderer: NSObject, MTKViewDelegate {
 
     private func requestDraw() {
         dirty = true
-        guard let view, !view.isHidden else {
+        guard let view, MetalGaugeResources.canRender(view) else {
             RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedHidden)
             return
         }
@@ -207,7 +211,7 @@ struct MultiSeriesLoadChart: NSViewRepresentable {
     func makeCoordinator() -> MultiSeriesLoadRenderer { MultiSeriesLoadRenderer() }
 
     func makeNSView(context: Context) -> MTKView {
-        let view = MTKView()
+        let view = GaugeMetalView()
         context.coordinator.attach(to: view)
         context.coordinator.update(cpu: cpu, ram: ram, gpu: gpu)
         return view

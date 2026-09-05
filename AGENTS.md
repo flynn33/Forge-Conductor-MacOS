@@ -1,13 +1,28 @@
-<!-- FORGE-QWEN-REMEDIATION:BEGIN -->
-# Shippable remediation contract
+<!-- FORGE-SHIPPING:BEGIN -->
+# Active shipping execution contract
 
-Read `.forge-qwen-remediation/AGENTS.md` and use its doctor, selector, deterministic gates, and do-not-ship boundary. Shell access and every current feature must remain available.
-<!-- FORGE-QWEN-REMEDIATION:END -->
+The September 4 shipping package supersedes earlier instruction packages.
+Read `.forge-codex/shipping/EXECUTION.md` and its current work order. Use the
+existing `.forge-codex` doctor, selector, evidence recorder, gates, and handoff;
+do not bootstrap historical packages or initialize a competing ledger.
+Preserve the substantive safety, compatibility, ownership, and evidence
+requirements below. Build and test the application; the owner ships manually.
+No attribution credits, trailers, or attributed artifact/branch names.
+<!-- FORGE-SHIPPING:END -->
 
 <!-- FORGE-AUTONOMOUS-CONTINUITY-DESIGN:BEGIN -->
 # Autonomous continuity implementation supplement
 
-Before autonomy, continuity, project context, provider, shell, or runtime work, read `.forge-continuity-design/AGENTS.md` and execute `.forge-continuity-design/schemas/work-packages.json`. This supplement requires shell enabled by default, exact project-generation binding, manager-owned context enforcement, a real LM Studio transport in the existing session-host plugin, automatic fresh-root rollover, predecessor fencing, crash recovery, and automatic continuation.
+The former continuity-design package is absent. For autonomy, continuity,
+project context, provider, shell, or runtime work, use the active shipping
+work orders B and D, `.forge-codex/architecture/CONTINUITY_AND_ROLLOVER.md`,
+`.forge-codex/architecture/HOST_ADAPTER_PLUGIN.md`, and
+`.forge-codex/specifications/CONTINUITY_STATE_MACHINE.md`. The retained
+requirements are shell enabled by default with explicit opt-outs preserved,
+exact project-generation binding, manager-owned context enforcement, a real
+LM Studio transport in the existing session-host plugin, automatic fresh-root
+rollover, predecessor fencing, crash recovery, and automatic continuation.
+Their presence in source is not proof of production qualification.
 <!-- FORGE-AUTONOMOUS-CONTINUITY-DESIGN:END -->
 
 <!-- FORGE-CONDUCTOR-AUTONOMOUS-CONTRACT:BEGIN -->

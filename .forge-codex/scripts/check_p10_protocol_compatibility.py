@@ -991,12 +991,19 @@ def exercise_legacy_tool_success_matrix(
         requests.append(request)
         process.send(request)
         response = process.receive(request_id, tool_name, response_timeout)
-        structured = validate_tool_call_envelope(
-            response,
-            expected_error=False,
-            expected_id=request_id,
-        )
         responses.append(response)
+        try:
+            structured = validate_tool_call_envelope(
+                response,
+                expected_error=False,
+                expected_id=request_id,
+            )
+        except CompatibilityError as error:
+            # Retain the failing fixture response before closing the subprocess.
+            # The bounded diagnostic identifies the product path without turning
+            # a required success into an accepted denial.
+            detail = json.dumps(response, sort_keys=True, separators=(",", ":"))[:4096]
+            raise CompatibilityError(f"{tool_name}: {error}; response={detail}") from error
         called_tools.append(tool_name)
         return structured
 

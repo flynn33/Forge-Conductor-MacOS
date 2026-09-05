@@ -23,6 +23,9 @@ protocol OperatorManagerClientProtocol: Sendable {
     func runStatus(runID: String) async throws -> OperatorRun
     func controlRun(runID: String, action: OperatorRunControlAction) async throws -> OperatorRun
     func cancelRuntimeJob(jobID: String) async throws -> OperatorRuntimeJob
+    func providerConfiguration() async throws -> ProviderConfigurationSnapshot
+    func updateProviderConfiguration(_ update: ProviderConfigurationUpdate) async throws -> ProviderConfigurationSnapshot
+    func providerModels() async throws -> ProviderModelInventory
     func probeProvider(
         adapterID: String,
         mode: OperatorProviderProbeMode
@@ -99,6 +102,18 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
             credentials: resolvedCredentials
         )
         encoder.outputFormatting = [.sortedKeys]
+    }
+
+    func providerConfiguration() async throws -> ProviderConfigurationSnapshot {
+        try await request(method: "GET", path: "/api/manager/provider/configuration", timeoutInterval: 25)
+    }
+
+    func updateProviderConfiguration(_ update: ProviderConfigurationUpdate) async throws -> ProviderConfigurationSnapshot {
+        try await request(method: "PUT", path: "/api/manager/provider/configuration", body: update, timeoutInterval: 25)
+    }
+
+    func providerModels() async throws -> ProviderModelInventory {
+        try await request(method: "GET", path: "/api/manager/provider/models", timeoutInterval: 25)
     }
 
     func snapshot(limit: Int = 100, cursor: String? = nil) async throws -> OperatorSnapshot {
@@ -476,6 +491,11 @@ final class UnavailableOperatorManagerClient: OperatorManagerClientProtocol, @un
     func runStatus(runID: String) async throws -> OperatorRun { throw error }
     func controlRun(runID: String, action: OperatorRunControlAction) async throws -> OperatorRun { throw error }
     func cancelRuntimeJob(jobID: String) async throws -> OperatorRuntimeJob { throw error }
+    func providerConfiguration() async throws -> ProviderConfigurationSnapshot { throw error }
+    func updateProviderConfiguration(_ update: ProviderConfigurationUpdate) async throws -> ProviderConfigurationSnapshot {
+        throw error
+    }
+    func providerModels() async throws -> ProviderModelInventory { throw error }
     func probeProvider(
         adapterID: String,
         mode: OperatorProviderProbeMode
@@ -557,6 +577,18 @@ final class OperatorManagerClientRouter: OperatorManagerClientProtocol, @uncheck
 
     func cancelRuntimeJob(jobID: String) async throws -> OperatorRuntimeJob {
         try await current.cancelRuntimeJob(jobID: jobID)
+    }
+
+    func providerConfiguration() async throws -> ProviderConfigurationSnapshot {
+        try await current.providerConfiguration()
+    }
+
+    func updateProviderConfiguration(_ update: ProviderConfigurationUpdate) async throws -> ProviderConfigurationSnapshot {
+        try await current.updateProviderConfiguration(update)
+    }
+
+    func providerModels() async throws -> ProviderModelInventory {
+        try await current.providerModels()
     }
 
     func probeProvider(

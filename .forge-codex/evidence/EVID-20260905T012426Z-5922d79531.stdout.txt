@@ -1,0 +1,75 @@
+Test Suite 'Selected tests' started at 2026-09-04 20:25:21.490.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-09-04 20:25:21.491.
+Test Suite 'ManagedContinuityWorkerTests' started at 2026-09-04 20:25:21.491.
+Test Case '-[ForgeConductorTests.ManagedContinuityWorkerTests testCreateBootstrapCrashRestartsWithOneSuccessorAndOneAutomaticDispatch]' started.
+Test Case '-[ForgeConductorTests.ManagedContinuityWorkerTests testCreateBootstrapCrashRestartsWithOneSuccessorAndOneAutomaticDispatch]' passed (0.163 seconds).
+Test Case '-[ForgeConductorTests.ManagedContinuityWorkerTests testEveryManagedCrashBoundaryRecoversOneSuccessorAndOneContinuation]' started.
+Test Case '-[ForgeConductorTests.ManagedContinuityWorkerTests testEveryManagedCrashBoundaryRecoversOneSuccessorAndOneContinuation]' passed (1.690 seconds).
+Test Case '-[ForgeConductorTests.ManagedContinuityWorkerTests testExecutorCancellationStopsActiveContinuityWithoutDiscardingDurableIntent]' started.
+Test Case '-[ForgeConductorTests.ManagedContinuityWorkerTests testExecutorCancellationStopsActiveContinuityWithoutDiscardingDurableIntent]' passed (0.072 seconds).
+Test Case '-[ForgeConductorTests.ManagedContinuityWorkerTests testMismatchedBootstrapNonceNeverAcceptsCandidate]' started.
+Test Case '-[ForgeConductorTests.ManagedContinuityWorkerTests testMismatchedBootstrapNonceNeverAcceptsCandidate]' passed (0.060 seconds).
+Test Suite 'ManagedContinuityWorkerTests' passed at 2026-09-04 20:25:23.477.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 1.985 (1.986) seconds
+Test Suite 'NativeSessionHostPluginTests' started at 2026-09-04 20:25:23.477.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testCancellationDeadlineMalformedAndStreamingBounds]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testCancellationDeadlineMalformedAndStreamingBounds]' passed (0.006 seconds).
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testCancelledCoalescedWaiterCannotCancelTransportOwner]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testCancelledCoalescedWaiterCannotCancelTransportOwner]' passed (0.077 seconds).
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testCancellingBootstrapOwnerStopsTransportAndPreservesRestartRecovery]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testCancellingBootstrapOwnerStopsTransportAndPreservesRestartRecovery]' passed (0.036 seconds).
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testCompletedBootstrapReceiptWinsOwnerCancellationAndSurvivesRestart]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testCompletedBootstrapReceiptWinsOwnerCancellationAndSurvivesRestart]' passed (0.018 seconds).
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testConfiguredProductionRegistrationCannotYieldSyntheticV1Session]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testConfiguredProductionRegistrationCannotYieldSyntheticV1Session]' passed (0.002 seconds).
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testExplicitBootstrapCancellationRemainsDurablyCancelled]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testExplicitBootstrapCancellationRemainsDurablyCancelled]' passed (0.019 seconds).
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testFullAutonomousRolloverPersistsOnlyCompactIdentifiers]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testFullAutonomousRolloverPersistsOnlyCompactIdentifiers]' passed (0.040 seconds).
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testLiveLMStudioFreshRootAcknowledgementAndAutomaticContinuation]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/NativeSessionHostPluginTests.swift:1400: -[ForgeConductorTests.NativeSessionHostPluginTests testLiveLMStudioFreshRootAcknowledgementAndAutomaticContinuation] : Test skipped - Set FORGE_LIVE_LMSTUDIO_MODEL to run the real-provider system test
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testLiveLMStudioFreshRootAcknowledgementAndAutomaticContinuation]' skipped (0.001 seconds).
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testLMStudioErrorsExposeProviderNeutralFailureDisposition]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testLMStudioErrorsExposeProviderNeutralFailureDisposition]' passed (0.000 seconds).
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testNativeLedgerChangedRestoreUsesBoundedImmutableLineages]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testNativeLedgerChangedRestoreUsesBoundedImmutableLineages]' passed (0.199 seconds).
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testProductionRegistrationFailsClosedWithoutProviderConfiguration]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testProductionRegistrationFailsClosedWithoutProviderConfiguration]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testProductionRegistrationLoadsBoundedProviderFile]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testProductionRegistrationLoadsBoundedProviderFile]' passed (0.002 seconds).
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testProductionRegistrationUsesKeychainAuthorizationForConfiguredReference]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testProductionRegistrationUsesKeychainAuthorizationForConfiguredReference]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testProviderConfigurationDefaultsAndBoundsOutputTokens]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testProviderConfigurationDefaultsAndBoundsOutputTokens]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testRateLimitRetryIdempotencyAndConcurrentProjects]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testRateLimitRetryIdempotencyAndConcurrentProjects]' passed (0.002 seconds).
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testV2AcceptsExactProbedLoadedInstanceAliasAndPersistsCanonicalModelKey]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testV2AcceptsExactProbedLoadedInstanceAliasAndPersistsCanonicalModelKey]' passed (0.005 seconds).
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testV2BlockedCredentialFailureAndLegacySyntheticQuarantinePersist]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testV2BlockedCredentialFailureAndLegacySyntheticQuarantinePersist]' passed (0.095 seconds).
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testV2CrashRetryReconcilesPersistedIntentByIdempotencyKey]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testV2CrashRetryReconcilesPersistedIntentByIdempotencyKey]' passed (0.007 seconds).
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testV2ExplicitCancellationWinsBothCoalescedCallersAfterCompactionAndRestart]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testV2ExplicitCancellationWinsBothCoalescedCallersAfterCompactionAndRestart]' passed (0.090 seconds).
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testV2FreshRootReceiptPersistsAndReplaysWithoutSyntheticIdentity]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testV2FreshRootReceiptPersistsAndReplaysWithoutSyntheticIdentity]' passed (0.017 seconds).
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testV2OwnerFirstSharedCancellationRemainsRetryableAfterCompactionAndRestart]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testV2OwnerFirstSharedCancellationRemainsRetryableAfterCompactionAndRestart]' passed (0.092 seconds).
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testV2QuarantinesAcknowledgementMismatchDuplicateAndSyntheticCandidate]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testV2QuarantinesAcknowledgementMismatchDuplicateAndSyntheticCandidate]' passed (0.031 seconds).
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testV2RejectsIdentityChecksumNonceAndSecretBeforeProvider]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testV2RejectsIdentityChecksumNonceAndSecretBeforeProvider]' passed (0.008 seconds).
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testV2TerminalLedgerCompactionRetainsIdempotentReconciliation]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testV2TerminalLedgerCompactionRetainsIdempotentReconciliation]' passed (0.039 seconds).
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testV2WaiterFirstSharedCancellationRemainsRetryableAfterCompactionAndRestart]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testV2WaiterFirstSharedCancellationRemainsRetryableAfterCompactionAndRestart]' passed (0.099 seconds).
+Test Suite 'NativeSessionHostPluginTests' passed at 2026-09-04 20:25:24.366.
+	 Executed 25 tests, with 1 test skipped and 0 failures (0 unexpected) in 0.886 (0.889) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-09-04 20:25:24.366.
+	 Executed 29 tests, with 1 test skipped and 0 failures (0 unexpected) in 2.871 (2.875) seconds
+Test Suite 'Selected tests' passed at 2026-09-04 20:25:24.366.
+	 Executed 29 tests, with 1 test skipped and 0 failures (0 unexpected) in 2.871 (2.876) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

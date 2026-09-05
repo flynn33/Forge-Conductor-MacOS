@@ -12,6 +12,76 @@ import ForgeNativeSessionHostPlugin
 final class LiveLMStudioManagedAutonomyTests: XCTestCase {
     private static let successorMarker = "SUCCESSOR_ONLY_TOOL_EFFECT"
     private static let missionPaddingScalarCount = 4_620
+    private static let providerTotalTimeoutSeconds: TimeInterval = 600
+
+    func testQuiescentFailureDiagnosticPreservesReasonWithoutPrivatePayloads() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("forge-failure-diagnostic-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let evidenceURL = root.appendingPathComponent("evidence/manager.json")
+        let ledgerURL = root.appendingPathComponent("disposable/native-session-ledger.json")
+        let key = "private-idempotency-fixture"
+        let privatePayload = String(repeating: "private-prompt-nonce-Bearer-credential ", count: 4_000)
+        var record: [String: Any] = [
+            "idempotency_key_sha256": JSONSupport.sha256Hex(key), "status": "quarantined",
+            "error_code": "acknowledgement_mismatch", "attempt": 2, "receipt": NSNull(),
+            "nonce": privatePayload, "prompt": privatePayload,
+        ]
+        let unrelated: [String: Any] = ["idempotency_key_sha256": JSONSupport.sha256Hex("other-operation"),
+            "status": "accepted", "receipt": ["private_payload": privatePayload]]
+        try OwnerOnlyAtomicFile.write(try JSONSerialization.data(withJSONObject:
+            ["records": [unrelated, record]]), to: ledgerURL)
+        let url = try Self.writeQuiescentFailureDiagnostic(evidenceURL: evidenceURL, ledgerURL: ledgerURL,
+            runState: .waitingProvider, runRevision: 9, errorCode: "run_step_failed", errorSummary: privatePayload,
+            operationState: .successorRequested, idempotencyKey: key)
+        XCTAssertEqual(url, root.appendingPathComponent("evidence/manager-failure-diagnostic.json"))
+        let data = try Data(contentsOf: url)
+        XCTAssertLessThanOrEqual(data.count, 8 * 1_024)
+        let text = String(decoding: data, as: UTF8.self)
+        XCTAssertFalse(text.contains("private-"))
+        XCTAssertFalse(text.contains("Bearer"))
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(object["run_error_code"] as? String, "run_step_failed")
+        XCTAssertEqual(object["run_error_summary_sha256"] as? String, JSONSupport.sha256Hex(privatePayload))
+        XCTAssertEqual(object["expected_injected_crash"] as? Bool, false)
+        XCTAssertEqual(object["operation_state"] as? String, ContinuityState.successorRequested.rawValue)
+        let ledger = try XCTUnwrap(object["provider_ledger"] as? [String: Any])
+        XCTAssertEqual(ledger["matching_record_count"] as? Int, 1)
+        XCTAssertEqual(ledger["status"] as? String, "quarantined")
+        XCTAssertEqual(ledger["error_code"] as? String, "acknowledgement_mismatch")
+        XCTAssertEqual(ledger["attempt"] as? Int, 2)
+        XCTAssertEqual(ledger["receipt_present"] as? Bool, false)
+        let mode = try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? NSNumber
+        XCTAssertEqual(mode?.intValue, 0o600)
+
+        record["error_code"] = privatePayload
+        try OwnerOnlyAtomicFile.write(try JSONSerialization.data(withJSONObject:
+            ["records": [unrelated, record]]), to: ledgerURL)
+        _ = try Self.writeQuiescentFailureDiagnostic(evidenceURL: evidenceURL, ledgerURL: ledgerURL,
+            runState: .waitingProvider, runRevision: 10, errorCode: "run_step_failed",
+            errorSummary: ManagedContinuityWorkerError.injectedCrash(.providerBootstrapResponse).localizedDescription,
+            operationState: .successorRequested, idempotencyKey: key)
+        let updated = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+        XCTAssertEqual(updated["expected_injected_crash"] as? Bool, true)
+        XCTAssertEqual((updated["provider_ledger"] as? [String: Any])?["error_code"] as? String, "unrecognized")
+        XCTAssertFalse(String(decoding: try Data(contentsOf: url), as: UTF8.self).contains("private-"))
+    }
+
+    func testQuiescentFailureDiagnosticSurvivesOversizedLedgerWithoutLeakingCodes() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("forge-failure-bound-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let ledgerURL = root.appendingPathComponent("native-session-ledger.json")
+        try OwnerOnlyAtomicFile.write(Data(repeating: 65,
+            count: LMStudioManagedSessionHostAdapterV2.maximumLedgerBytes + 1), to: ledgerURL)
+        let url = try Self.writeQuiescentFailureDiagnostic(evidenceURL: root.appendingPathComponent("manager.json"),
+            ledgerURL: ledgerURL, runState: .waitingProvider, runRevision: 1,
+            errorCode: "Bearer private-credential", errorSummary: nil, operationState: nil, idempotencyKey: nil)
+        let data = try Data(contentsOf: url)
+        XCTAssertLessThanOrEqual(data.count, 8 * 1_024)
+        XCTAssertFalse(String(decoding: data, as: UTF8.self).contains("private-credential"))
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(object["run_error_code"] as? String, "unrecognized")
+        XCTAssertEqual((object["provider_ledger"] as? [String: Any])?["read_status"] as? String, "read_failed")
+    }
 
     func testToolInvocationLookupByUUIDIsExactAndBounded() async throws {
         let home = FileManager.default.temporaryDirectory.appendingPathComponent(
@@ -118,6 +188,7 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
                 "Set FORGE_LIVE_LMSTUDIO_EXPECTED_CONTEXT_LENGTH to the exact loaded instance context"
             )
         }
+        let budgetPolicy = try Self.qualificationBudgetPolicy(environment: environment)
         let baseURL = try XCTUnwrap(URL(
             string: environment["FORGE_LIVE_LMSTUDIO_BASE_URL"]
                 ?? "http://127.0.0.1:1234"
@@ -146,18 +217,21 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
             registry: registry,
             runID: runID,
             mission: mission,
-            expectedContextLength: expectedContextLength
+            expectedContextLength: expectedContextLength,
+            budgetPolicy: budgetPolicy
         )
         let recovered = try await executeRecoveryPhase(
             home: home,
             port: ports[1],
             registry: registry,
+            budgetPolicy: budgetPolicy,
             interrupted: interrupted
         )
         let replayed = try await executeStableReplayPhase(
             home: home,
             port: ports[2],
             registry: registry,
+            budgetPolicy: budgetPolicy,
             interrupted: interrupted,
             recovered: recovered
         )
@@ -176,7 +250,8 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
             mission: mission,
             interrupted: interrupted,
             recovered: recovered,
-            replayed: replayed
+            replayed: replayed,
+            budgetPolicy: budgetPolicy
         )
         XCTAssertTrue(FileManager.default.fileExists(atPath: evidenceURL.path))
         print("FORGE_LIVE_MANAGER_EVIDENCE=\(evidenceURL.path)")
@@ -190,7 +265,8 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
         registry: HostAdapterRegistry,
         runID: RunID,
         mission: String,
-        expectedContextLength: Int
+        expectedContextLength: Int,
+        budgetPolicy: ContextBudgetPolicy?
     ) async throws -> InterruptedPhase {
         let guiPIDs = forgeGUIProcessIDs()
         XCTAssertTrue(guiPIDs.isEmpty, "Forge Conductor GUI must be closed")
@@ -209,6 +285,9 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
         try writeProviderConfiguration(baseURL: baseURL, modelKey: modelKey, paths: app.paths)
         let projectRoot = home.appendingPathComponent("project", isDirectory: true)
         try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+        // The production manager requires an explicit root grant even for this
+        // disposable continuity fixture; registration does not confer authority.
+        try app.config.update(["allowed_roots": [projectRoot.path]], save: true)
         try Data("\(Self.successorMarker)\n".utf8).write(
             to: projectRoot.appendingPathComponent("successor-only.txt"),
             options: .atomic
@@ -221,6 +300,7 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
                 registry: registry,
                 managerID: "live-threshold-manager-before-restart",
                 maximumConcurrentRuns: 1,
+                contextBudgetPolicy: budgetPolicy,
                 continuityFactory: { _ in
                     ManagedContinuityWorker(
                         repository: candidate.projectContexts.repository,
@@ -287,7 +367,10 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
             bearerToken: bearerToken,
             timeout: 30
         )
-        XCTAssertEqual(started.status, 202)
+        guard started.status == 202 else {
+            throw LiveQualificationError.managerRouteRejected(status: started.status,
+                code: started.object["code"] as? String ?? "unreported")
+        }
         XCTAssertEqual(started.object["run_id"] as? String, runID.description)
         let runtime = try XCTUnwrap(holder.load())
         let thresholdRun = try await driveUntilExactRollover(
@@ -364,11 +447,12 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
         }
         XCTAssertEqual(predecessorTurns.count, predecessorProviderTurnIntentCount)
         try await runtime.tick()
+        // Observe the provider deadline plus cleanup margin before cancelling the manager.
         let interruptedRun = try await waitForQuiescentRun(
             runtime: runtime,
             repository: app.projectContexts.repository,
             runID: runID,
-            timeout: .seconds(300)
+            timeout: .seconds(Self.providerTotalTimeoutSeconds + 30)
         ) { run in
             run.state == .waitingProvider
                 && run.specification.work.pendingIntent?.kind == .continuity
@@ -377,9 +461,34 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
 
         let operationID = pending.continuityOperationID
         let memoryRepository = try app.projectMemory.repositoryForProject(projectID.description)
-        let operation = try XCTUnwrap(memoryRepository.continuityOperationV2(
+        let operationValue = try memoryRepository.continuityOperationV2(
             id: operationID.uuidString.lowercased()
-        ))
+        )
+        let providerStorage = app.paths.managedProvidersDir.appendingPathComponent(
+            ForgeNativeSessionHostPlugin.identifier,
+            isDirectory: true
+        )
+        let environment = ProcessInfo.processInfo.environment
+        let evidenceURL = environment["FORGE_LIVE_MANAGER_EVIDENCE"].flatMap {
+            $0.isEmpty ? nil : URL(fileURLWithPath: $0)
+        } ?? FileManager.default.temporaryDirectory.appendingPathComponent(
+            "forge-live-manager-threshold-evidence-\(runID.description).json"
+        )
+        let diagnosticURL = try Self.writeQuiescentFailureDiagnostic(
+            evidenceURL: evidenceURL,
+            ledgerURL: providerStorage.appendingPathComponent("native-session-ledger.json"),
+            runState: interruptedRun.state,
+            runRevision: interruptedRun.revision,
+            errorCode: interruptedRun.lastErrorCode,
+            errorSummary: interruptedRun.lastErrorSummary,
+            operationState: operationValue?.state,
+            idempotencyKey: operationValue?.idempotencyKey
+        )
+        print("FORGE_LIVE_MANAGER_FAILURE_DIAGNOSTIC=\(diagnosticURL.path)")
+        XCTAssertTrue(Self.isExpectedBootstrapCrash(
+            code: interruptedRun.lastErrorCode, summary: interruptedRun.lastErrorSummary
+        ), "Quiescence must result from the intended bootstrap crash; inspect the sanitized diagnostic")
+        let operation = try XCTUnwrap(operationValue)
         XCTAssertEqual(operation.state, .successorRequested)
         XCTAssertEqual(operation.predecessorSessionID, predecessorSessionID)
         let engine = ContinuityStateEngine(memory: app.projectMemory)
@@ -387,10 +496,6 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
             projectID: projectID.description,
             handoffID: operation.handoffID
         ))
-        let providerStorage = app.paths.managedProvidersDir.appendingPathComponent(
-            ForgeNativeSessionHostPlugin.identifier,
-            isDirectory: true
-        )
         let receiptAdapter = try XCTUnwrap(
             try registry.adapter(
                 identifier: ForgeNativeSessionHostPlugin.identifier,
@@ -465,6 +570,7 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
         home: URL,
         port: Int,
         registry: HostAdapterRegistry,
+        budgetPolicy: ContextBudgetPolicy?,
         interrupted: InterruptedPhase
     ) async throws -> RecoveredPhase {
         let guiPIDs = forgeGUIProcessIDs()
@@ -477,7 +583,8 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
                 app: candidate,
                 registry: registry,
                 managerID: "live-threshold-manager-after-restart",
-                maximumConcurrentRuns: 1
+                maximumConcurrentRuns: 1,
+                contextBudgetPolicy: budgetPolicy
             )
             holder.store(runtime)
             return runtime
@@ -661,6 +768,7 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
         home: URL,
         port: Int,
         registry: HostAdapterRegistry,
+        budgetPolicy: ContextBudgetPolicy?,
         interrupted: InterruptedPhase,
         recovered: RecoveredPhase
     ) async throws -> ReplayedPhase {
@@ -674,7 +782,8 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
                 app: candidate,
                 registry: registry,
                 managerID: "live-threshold-manager-stable-replay",
-                maximumConcurrentRuns: 1
+                maximumConcurrentRuns: 1,
+                contextBudgetPolicy: budgetPolicy
             )
             holder.store(runtime)
             return runtime
@@ -897,6 +1006,78 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
         )
     }
 
+    private static func isExpectedBootstrapCrash(code: String?, summary: String?) -> Bool {
+        code == "run_step_failed" && summary == ManagedContinuityWorkerError
+            .injectedCrash(.providerBootstrapResponse).localizedDescription
+    }
+
+    /// Retains only bounded, allowlisted metadata outside the disposable run home.
+    /// It records the observed boundary even on success and is not a qualification receipt.
+    private static func writeQuiescentFailureDiagnostic(
+        evidenceURL: URL, ledgerURL: URL, runState: AutonomousRunState, runRevision: UInt64,
+        errorCode: String?, errorSummary: String?, operationState: ContinuityState?, idempotencyKey: String?
+    ) throws -> URL {
+        let providerCodes: Set<String> = [
+            "invalid_configuration", "provider_unavailable", "unauthorized", "forbidden", "endpoint_not_found",
+            "conflict", "rate_limited", "server_failure", "context_overflow", "response_truncated",
+            "deadline_exceeded", "cancelled", "malformed_response", "limit_exceeded", "receipt_storage",
+            "synthetic_provider_identifier",
+        ]
+        let allowedCodes = providerCodes.union(providerCodes.map { "lmstudio_" + $0 }).union([
+            "run_step_failed", "owner_interrupted", "provider_error", "invalid_request", "invalid_handoff",
+            "acknowledgement_mismatch", "idempotency_conflict", "candidate_quarantined", "ledger_integrity",
+            "storage_limit", "idempotency_identity_conflict", "provider_attempt_limit", "duplicate_operation_candidate",
+        ])
+        func safeCode(_ value: String?) -> Any {
+            guard let value else { return NSNull() }
+            return allowedCodes.contains(value) ? value : "unrecognized"
+        }
+        var ledger: [String: Any] = ["read_status": "unavailable", "matching_record_count": 0]
+        do {
+            let data = try OwnerOnlyAtomicFile.read(from: ledgerURL,
+                maximumBytes: LMStudioManagedSessionHostAdapterV2.maximumLedgerBytes)
+            ledger["bytes"] = data.count
+            ledger["sha256"] = JSONSupport.sha256Hex(data)
+            if let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                let records = (object["records"] as? [[String: Any]] ?? [])
+                    + (object["reconciliation_records"] as? [[String: Any]] ?? [])
+                let digest = idempotencyKey.map(JSONSupport.sha256Hex)
+                let matches = records.filter { digest != nil && $0["idempotency_key_sha256"] as? String == digest }
+                ledger["read_status"] = "read"
+                ledger["matching_record_count"] = matches.count
+                if matches.count == 1, let record = matches.first {
+                    let status = record["status"] as? String ?? "unrecognized"
+                    let statuses: Set<String> = ["intent", "provider_created", "accepted", "retryable_failure",
+                        "blocked_failure", "quarantined", "cancelled"]
+                    ledger["status"] = statuses.contains(status) ? status : "unrecognized"
+                    ledger["error_code"] = safeCode(record["error_code"] as? String)
+                    ledger["attempt"] = (record["attempt"] as? Int).flatMap {
+                        (0...LMStudioManagedSessionHostAdapterV2.maximumProviderAttempts).contains($0) ? $0 : nil
+                    }.map { $0 as Any } ?? NSNull()
+                    ledger["receipt_present"] = record["receipt"] is [String: Any]
+                }
+            } else { ledger["read_status"] = "invalid_json_object" }
+        } catch { ledger["read_status"] = "read_failed" }
+        let object: [String: Any] = [
+            "schema_version": 1,
+            "scope": "quiescent bootstrap boundary diagnostic; not a qualification result",
+            "run_state": runState.rawValue,
+            "run_revision": runRevision,
+            "run_error_code": safeCode(errorCode),
+            "run_error_summary_sha256": errorSummary.map { JSONSupport.sha256Hex($0) as Any } ?? NSNull(),
+            "expected_injected_crash": isExpectedBootstrapCrash(code: errorCode, summary: errorSummary),
+            "operation_state": operationState.map { $0.rawValue as Any } ?? NSNull(),
+            "provider_ledger": ledger,
+        ]
+        let data = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys, .prettyPrinted])
+        guard data.count <= 8 * 1_024 else { throw LiveQualificationError.failureDiagnosticTooLarge }
+        let url = evidenceURL.deletingLastPathComponent().appendingPathComponent(
+                evidenceURL.deletingPathExtension().lastPathComponent + "-failure-diagnostic.json"
+            )
+        try OwnerOnlyAtomicFile.write(data, to: url)
+        return url
+    }
+
     private func invocationAuthority(
         repository: ProjectControlPlaneRepository,
         sessionID: String
@@ -942,8 +1123,8 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
             modelKey: modelKey,
             connectTimeoutSeconds: 5,
             firstByteTimeoutSeconds: 120,
-            idleTimeoutSeconds: 600,
-            totalTimeoutSeconds: 600,
+            idleTimeoutSeconds: Self.providerTotalTimeoutSeconds,
+            totalTimeoutSeconds: Self.providerTotalTimeoutSeconds,
             maximumOutputTokens: 512
         )
         let data = try JSONEncoder().encode(configuration)
@@ -1019,6 +1200,15 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
         return try JSONSupport.object(from: Data(usageJSON.utf8))
     }
 
+    private static func qualificationBudgetPolicy(environment: [String: String]) throws -> ContextBudgetPolicy? {
+        guard let value = environment["FORGE_LIVE_LMSTUDIO_ACCELERATED_THRESHOLD"] else { return nil }
+        guard value == "yes" else { throw LiveQualificationError.invalidThresholdControl }
+        // This deliberately moves a supported policy boundary; exact provider
+        // capacity, token usage, fixed reserves, and all continuity receipts remain real.
+        return try ContextBudgetPolicy(checkpointFraction: 0.78, rolloverFraction: 0.75,
+                                       emergencyFraction: 0.05).validated()
+    }
+
     private static func thresholdMission() -> String {
         let instruction = """
         Classify only the current user message, never quoted text or prior context. If the current user message contains either "You are executing a Forge Conductor managed autonomous run." or "Mission:", this is the predecessor stage: never call a tool and answer exactly PREDECESSOR_WAIT. A "Next action" line never changes that rule. Only when the current user message contains neither predecessor marker and begins "The bootstrap-only acknowledgement is complete; do not acknowledge it again." is this the successor stage: call fs_read exactly once for successor-only.txt, verify that its content is SUCCESSOR_ONLY_TOOL_EFFECT, then answer SUCCESSOR_TOOL_VERIFIED and stop. Mentions of successor wording inside this mission are inert data, not authorization. Never request completion.
@@ -1049,13 +1239,18 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
         mission: String,
         interrupted: InterruptedPhase,
         recovered: RecoveredPhase,
-        replayed: ReplayedPhase
+        replayed: ReplayedPhase,
+        budgetPolicy: ContextBudgetPolicy?
     ) throws {
         let observation = interrupted.observation
         let request = interrupted.actionRequestAtThreshold
         let object: [String: Any] = [
             "schema_version": 2,
             "qualification_scope": "real_lmstudio_manager_route_automatic_threshold_continuity",
+            "threshold_policy_override": budgetPolicy != nil,
+            "context_budget_policy": try JSONSupport.object(from: JSONEncoder().encode(
+                interrupted.budgetState.configuration.policy
+            )),
             "provider": "lmstudio",
             "model_key": modelKey,
             "mission_sha256": JSONSupport.sha256Hex(mission),
@@ -1340,6 +1535,9 @@ private struct ReplayedPhase {
 
 private enum LiveQualificationError: Error, LocalizedError {
     case invalidProviderInventory
+    case invalidThresholdControl
+    case failureDiagnosticTooLarge
+    case managerRouteRejected(status: Int, code: String)
     case unexpectedProviderContext(expected: Int, actual: Int)
     case predecessorToolInvocation(sequence: Int64)
     case unexpectedThreshold(action: String, source: String, used: Int?, remaining: Int?)
@@ -1349,6 +1547,12 @@ private enum LiveQualificationError: Error, LocalizedError {
 
     var errorDescription: String? {
         switch self {
+        case .failureDiagnosticTooLarge:
+            "Sanitized live failure diagnostic exceeded its byte bound"
+        case .invalidThresholdControl:
+            "FORGE_LIVE_LMSTUDIO_ACCELERATED_THRESHOLD accepts only yes when explicitly enabled"
+        case .managerRouteRejected(let status, let code):
+            "Manager start route rejected the disposable fixture: HTTP \(status), code \(code)"
         case .invalidProviderInventory:
             "LM Studio did not expose exactly one valid loaded instance for the selected model"
         case .unexpectedProviderContext(let expected, let actual):

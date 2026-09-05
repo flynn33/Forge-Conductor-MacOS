@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/observe-live-manager-calibration.py", line 3, in <module>
+    c=sqlite3.connect(p.as_uri()+'?mode=ro',uri=True,timeout=2);c.row_factory=sqlite3.Row;c.execute('BEGIN')
+sqlite3.OperationalError: unable to open database file
