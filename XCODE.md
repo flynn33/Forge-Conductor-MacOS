@@ -220,6 +220,8 @@ checkpoint/rollover policy of 0.78/0.75 while keeping the emergency fraction at
 0.05. The test records this override, the full policy, real provider usage,
 capacity and reserves. Ordinary application construction keeps the default
 policy. This control never shortens the 660-second uncertainty fence.
+The bootstrap observation allows the configured 600-second provider request
+plus 30 seconds for state settlement, without changing the provider's deadline.
 
 Use separate DerivedData directories for ordinary installable builds and native
 test runs. Xcode can inject test-only entitlements into dependency executables

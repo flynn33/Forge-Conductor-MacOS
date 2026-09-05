@@ -54,6 +54,9 @@ installed-stack and complete production-feature acceptance remain separate gates
   responses preserve newer edits and update clients only after a committed save.
   Operator screens wait for startup readiness before loading manager data,
   keeping startup progress, failures and retry visible.
+- Continuity shutdown now cancels the execution's owned local provider request.
+  Interrupted operations remain retryable with the same handoff; accepted
+  receipts retain precedence and shared request waiters cannot cancel the owner.
 - Process execution owns nonblocking stdout/stderr drains directly, bounds each
   drain turn and final capture, and continues draining during termination. This
   removes the unbounded callback-shutdown wait while preserving output limits,
