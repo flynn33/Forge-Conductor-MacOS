@@ -3332,8 +3332,11 @@ public actor LMStudioManagedSessionHostAdapterV2: SessionHostAdapterV2 {
                 // A stopped manager releases its live request without declaring
                 // the durable continuity operation cancelled. Restart must still
                 // reconcile this exact operation and handoff through its receipt.
-                let ownerInterrupted = Task.isCancelled
-                    && (error is CancellationError || (error as? LMStudioProviderError) == .cancelled)
+                // Coalesced callers receive the owner's transport cancellation
+                // even when their own task is not cancelled. Only the explicit
+                // operation-cancel path above may make that outcome terminal.
+                let ownerInterrupted = error is CancellationError
+                    || (error as? LMStudioProviderError) == .cancelled
                 ledger.records[current].status = ownerInterrupted ? .retryableFailure : failureStatus(error)
                 ledger.records[current].errorCode = ownerInterrupted ? "owner_interrupted" : errorCode(error)
                 ledger.records[current].updatedAt = ISO8601.string(from: Date())

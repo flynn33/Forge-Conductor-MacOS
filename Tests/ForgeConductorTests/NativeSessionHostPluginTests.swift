@@ -73,6 +73,47 @@ private struct FixtureManagedAuthorization: LMStudioAuthorizationProviding {
 }
 
 #if SWIFT_PACKAGE
+/// Delays one caller's actual transport error so both V2 persistence orders are
+/// exercised. The fallback is finite and no response or error is fabricated.
+private actor OrderedCancellationTransport: LMStudioManagedTransporting {
+    private let underlying: LMStudioManagedSessionTransport
+    private let delayedCaller: Int
+    private var callerCount = 0
+    private var delivery: Task<Void, Never>?
+    private(set) var errorCount = 0
+
+    init(_ underlying: LMStudioManagedSessionTransport, ownerReceivesErrorFirst: Bool) {
+        self.underlying = underlying
+        self.delayedCaller = ownerReceivesErrorFirst ? 1 : 0
+    }
+    var holdsError: Bool { delivery != nil }
+    func releaseError() { delivery?.cancel() }
+    func probe() async throws -> LMStudioProviderCapabilities { try await underlying.probe() }
+    func createRoot(_ request: LMStudioRootRequest) async throws -> LMStudioResponseTurn {
+        let caller = callerCount
+        callerCount += 1
+        do {
+            return try await underlying.createRoot(request)
+        } catch {
+            errorCount += 1
+            if caller == delayedCaller {
+                let delivery = Task<Void, Never> { _ = try? await Task.sleep(for: .seconds(2)) }
+                self.delivery = delivery
+                defer { self.delivery = nil }
+                await delivery.value
+            }
+            throw error
+        }
+    }
+    func continueSession(_ request: LMStudioContinuationRequest) async throws -> LMStudioResponseTurn {
+        try await underlying.continueSession(request)
+    }
+    func receipt(forIdempotencyKey key: String) async -> LMStudioResponseTurn? {
+        await underlying.receipt(forIdempotencyKey: key)
+    }
+    func cancel(operationID: String) async { await underlying.cancel(operationID: operationID) }
+}
+
 /// Holds an actual parsed fixture response at the return boundary, with a finite
 /// fallback, to exercise cancellation after the provider has already completed.
 private actor CompletedResponseTransport: LMStudioManagedTransporting {
@@ -472,6 +513,116 @@ final class NativeSessionHostPluginTests: XCTestCase {
         XCTAssertEqual(shared, original)
         let retained = await transport.receipt(forIdempotencyKey: request.idempotencyKey)
         XCTAssertEqual(retained, original)
+    }
+
+    func testV2OwnerFirstSharedCancellationRemainsRetryableAfterCompactionAndRestart() async throws {
+        try await verifyV2SharedCancellation(explicitOperationCancellation: false, ownerReceivesErrorFirst: true)
+    }
+
+    func testV2WaiterFirstSharedCancellationRemainsRetryableAfterCompactionAndRestart() async throws {
+        try await verifyV2SharedCancellation(explicitOperationCancellation: false, ownerReceivesErrorFirst: false)
+    }
+
+    func testV2ExplicitCancellationWinsBothCoalescedCallersAfterCompactionAndRestart() async throws {
+        try await verifyV2SharedCancellation(explicitOperationCancellation: true, ownerReceivesErrorFirst: true)
+    }
+
+    private func verifyV2SharedCancellation(explicitOperationCancellation: Bool, ownerReceivesErrorFirst: Bool) async throws {
+        let root = temporaryRoot("v2-shared-cancel")
+        defer {
+            LMStudioContractFixtureServer.suspendBootstrapRequests(false)
+            try? FileManager.default.removeItem(at: root)
+        }
+        let transport = OrderedCancellationTransport(try makeV2Transport(), ownerReceivesErrorFirst: ownerReceivesErrorFirst)
+        let adapter = try LMStudioManagedSessionHostAdapterV2(storageDirectory: root, transport: transport)
+        let fixture = try makeV2Fixture(mission: "fixture-suspend-bootstrap",
+            idempotencyKey: "v2-shared-cancel")
+        func persistedRecord() throws -> [String: Any] {
+            let ledger = try XCTUnwrap(JSONSerialization.jsonObject(with:
+                Data(contentsOf: root.appendingPathComponent("native-session-ledger.json"))) as? [String: Any])
+            return try XCTUnwrap((ledger["records"] as? [[String: Any]])?.first)
+        }
+        LMStudioContractFixtureServer.suspendBootstrapRequests(true)
+        let owner = Task {
+            try await adapter.createAndBootstrap(request: fixture.request,
+                handoffJSON: fixture.handoffJSON, challenge: fixture.challenge)
+        }
+        defer { owner.cancel() }
+        for _ in 0..<200 {
+            if LMStudioContractFixtureServer.suspendedBootstrapCount == 1 { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        XCTAssertEqual(LMStudioContractFixtureServer.suspendedBootstrapCount, 1)
+        let waiter = Task {
+            try await adapter.createAndBootstrap(request: fixture.request,
+                handoffJSON: fixture.handoffJSON, challenge: fixture.challenge)
+        }
+        defer { waiter.cancel() }
+        for _ in 0..<200 {
+            if try persistedRecord()["attempt"] as? Int == 2 { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        XCTAssertEqual(try persistedRecord()["attempt"] as? Int, 2,
+            "Both V2 calls must reach their persisted intent before cancellation")
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertEqual(LMStudioContractFixtureServer.suspendedBootstrapCount, 1,
+            "Both calls must share one held provider request")
+        if explicitOperationCancellation {
+            await adapter.cancel(operationID: fixture.request.operationID)
+        } else {
+            owner.cancel()
+        }
+        for _ in 0..<200 {
+            let bothObserved = await transport.errorCount == 2
+            let holdsError = await transport.holdsError
+            let status = await adapter.candidateStatus(forIdempotencyKey: fixture.request.idempotencyKey)
+            if bothObserved, holdsError, status != "intent" { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        let errorCount = await transport.errorCount
+        let holdsError = await transport.holdsError
+        XCTAssertEqual(errorCount, 2, "Both callers must receive the real shared transport error")
+        XCTAssertTrue(holdsError, "One error must remain held until the first caller publishes its outcome")
+        let firstStatus = await adapter.candidateStatus(forIdempotencyKey: fixture.request.idempotencyKey)
+        XCTAssertNotEqual(firstStatus, "intent", "The first caller must persist its result before the second error is delivered")
+        await transport.releaseError()
+        do { _ = try await owner.value; XCTFail("Cancelled shared request returned a receipt") }
+        catch is CancellationError {}
+        catch LMStudioProviderError.cancelled {}
+        do { _ = try await waiter.value; XCTFail("Shared cancellation did not reach the second V2 caller") }
+        catch is CancellationError {}
+        catch LMStudioProviderError.cancelled {}
+        XCTAssertFalse(waiter.isCancelled, "The second caller must observe shared cancellation without being cancelled itself")
+        for _ in 0..<200 {
+            if LMStudioContractFixtureServer.suspendedBootstrapCount == 0 { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        XCTAssertEqual(LMStudioContractFixtureServer.suspendedBootstrapCount, 0)
+        let expectedStatus = explicitOperationCancellation ? "cancelled" : "retryable_failure"
+        XCTAssertEqual(try persistedRecord()["status"] as? String, expectedStatus)
+        XCTAssertNil(try persistedRecord()["receipt"])
+        let compacted = try await adapter.compactTerminalLedger(retainingRecentTerminalRecords: 0)
+        XCTAssertEqual(compacted, explicitOperationCancellation ? 1 : 0,
+            "Owner interruption must remain recoverable rather than becoming terminal reconciliation")
+        LMStudioContractFixtureServer.suspendBootstrapRequests(false)
+        let restarted = try LMStudioManagedSessionHostAdapterV2(storageDirectory: root, transport: try makeV2Transport())
+        let restoredStatus = await restarted.candidateStatus(forIdempotencyKey: fixture.request.idempotencyKey)
+        XCTAssertEqual(restoredStatus, expectedStatus)
+        if explicitOperationCancellation {
+            do {
+                _ = try await restarted.createAndBootstrap(request: fixture.request,
+                    handoffJSON: fixture.handoffJSON, challenge: fixture.challenge)
+                XCTFail("Compacted explicit cancellation must not be replayed")
+            } catch LMStudioProviderError.cancelled {}
+        } else {
+            let recovered = try await restarted.createAndBootstrap(request: fixture.request,
+                handoffJSON: fixture.handoffJSON, challenge: fixture.challenge)
+            XCTAssertEqual(recovered.acknowledgement.operationID, fixture.request.operationID)
+            XCTAssertEqual(recovered.acknowledgement.handoffSHA256, fixture.handoffSHA256)
+            let replayed = try await restarted.createAndBootstrap(request: fixture.request,
+                handoffJSON: fixture.handoffJSON, challenge: fixture.challenge)
+            XCTAssertEqual(replayed, recovered)
+        }
     }
 
     func testCompletedBootstrapReceiptWinsOwnerCancellationAndSurvivesRestart() async throws {
