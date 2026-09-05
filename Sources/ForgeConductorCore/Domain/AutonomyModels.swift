@@ -618,26 +618,96 @@ public struct ToolInvocationRecord: Codable, Sendable, Equatable {
     public let updatedAt: String
 }
 
+/// Identity of one manager-created validation invocation. The serialized value
+/// is auditable provenance; it is not a bearer token for completion authority.
+public struct CompletionGateInvocation: Codable, Sendable, Equatable {
+    public let jobID: UUID
+    public let nonce: UUID
+    public let gateVersion: UInt64
+    public let runID: RunID
+    public let projectID: ProjectID
+    public let projectGeneration: ProjectGeneration
+    public let expectedRevision: UInt64
+    public let specificationSHA256: String
+    public let startedAt: String
+    public let finishedAt: String
+
+    init(run: AutonomousRunRecord, gateVersion: UInt64, jobID: UUID, nonce: UUID, startedAt: String, finishedAt: String) throws {
+        self.jobID = jobID
+        self.nonce = nonce
+        self.gateVersion = gateVersion
+        runID = run.runID
+        projectID = run.projectID
+        projectGeneration = run.projectGeneration
+        expectedRevision = run.revision
+        specificationSHA256 = try Self.specificationDigest(run.specification)
+        self.startedAt = startedAt
+        self.finishedAt = finishedAt
+    }
+
+    func matches(_ run: AutonomousRunRecord) throws -> Bool {
+        let digest = try Self.specificationDigest(run.specification)
+        return runID == run.runID && projectID == run.projectID
+            && projectGeneration == run.projectGeneration && expectedRevision == run.revision
+            && specificationSHA256 == digest
+            && gateVersion > 0
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case jobID = "job_id"
+        case nonce
+        case gateVersion = "gate_version"
+        case runID = "run_id"
+        case projectID = "project_id"
+        case projectGeneration = "project_generation"
+        case expectedRevision = "expected_revision"
+        case specificationSHA256 = "specification_sha256"
+        case startedAt = "started_at"
+        case finishedAt = "finished_at"
+    }
+
+    private static func specificationDigest(_ specification: AutonomousRunSpecification) throws -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        return JSONSupport.sha256Hex(try encoder.encode(specification))
+    }
+}
+
+public enum CompletionGateBlocker: String, Codable, Sendable {
+    case unregisteredValidator = "unregistered_validator"
+    case unavailableEnvironment = "unavailable_environment"
+}
+
 public struct CompletionGateResult: Codable, Sendable, Equatable {
     public let gate: String
     public let passed: Bool
     public let summary: String
     public let evidenceReferences: [String]
+    public let invocation: CompletionGateInvocation?
+    public let nativeEvidence: NativeGateEvidence?
+    public let blocker: CompletionGateBlocker?
 
     public init(
         gate: String,
         passed: Bool,
         summary: String,
-        evidenceReferences: [String] = []
+        evidenceReferences: [String] = [],
+        nativeEvidence: NativeGateEvidence? = nil,
+        invocation: CompletionGateInvocation? = nil,
+        blocker: CompletionGateBlocker? = nil
     ) {
         self.gate = gate
         self.passed = passed
         self.summary = summary
         self.evidenceReferences = evidenceReferences
+        self.invocation = invocation
+        self.nativeEvidence = nativeEvidence
+        self.blocker = blocker
     }
 
     private enum CodingKeys: String, CodingKey {
-        case gate, passed, summary
+        case gate, passed, summary, invocation, blocker
+        case nativeEvidence = "native_evidence"
         case evidenceReferences = "evidence_references"
     }
 }

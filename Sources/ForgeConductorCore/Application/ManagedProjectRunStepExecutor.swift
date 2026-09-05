@@ -380,12 +380,8 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
                 }
                 if strongestAction == .checkpoint { return .checkpointRequired(work) }
                 if let request = Self.completionRequest(from: turn.messages) {
-                    let declaredGates = Set(run.specification.completionGates)
-                    for (gate, proof) in request.gateEvidence
-                    where declaredGates.contains(gate)
-                        && work.evidenceReferences.contains(proof) {
-                        work.metadata["completion_gate.\(gate).proof_sha256"] = proof
-                    }
+                    // Legacy gate_evidence fields remain wire-compatible but carry
+                    // no authority. Only installed manager validators decide gates.
                     return .completionRequestedWithWork(request.summary, work)
                 }
                 work.nextAction = "Continue the mission from provider response \(turn.responseID)"
@@ -713,15 +709,14 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
         lines.append("Completion gates: \(run.specification.completionGates.joined(separator: ", "))")
         lines.append(
             "When work is ready for deterministic validation, respond with exactly "
-                + "{\"forge_run_status\":\"completion_requested\",\"summary\":\"bounded summary\","
-                + "\"gate_evidence\":{\"gate name\":\"persisted tool-result sha256\"}}."
+                + "{\"forge_run_status\":\"completion_requested\",\"summary\":\"bounded summary\"}. "
+                + "The manager independently executes the registered completion gates."
         )
         return lines.joined(separator: "\n")
     }
 
     private struct CompletionRequest {
         let summary: String
-        let gateEvidence: [String: String]
     }
 
     private static func completionRequest(from messages: [String]) -> CompletionRequest? {
@@ -731,17 +726,8 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
                   object["forge_run_status"] as? String == "completion_requested",
                   let summary = object["summary"] as? String,
                   !summary.isEmpty else { continue }
-            let rawEvidence = object["gate_evidence"] as? [String: Any] ?? [:]
-            let evidence = rawEvidence.reduce(into: [String: String]()) { result, entry in
-                guard let value = entry.value as? String,
-                      value.count == 64,
-                      value.allSatisfy(\.isHexDigit),
-                      entry.key.utf8.count <= 256 else { return }
-                result[entry.key] = value.lowercased()
-            }
             return CompletionRequest(
-                summary: String(summary.prefix(2_048)),
-                gateEvidence: evidence
+                summary: String(summary.prefix(2_048))
             )
         }
         return nil

@@ -18,7 +18,12 @@ Version **0.9.0**, build **1**. This guide is for operators who run Forge Conduc
 Where implementation has only unit, synthetic-host, simulator, focused Debug,
 or build-only evidence, that boundary is stated plainly. This guide does not
 mark a package or release gate complete. The [qualification summary](docs/QUALIFICATION-STATUS.md)
-binds the local results and known GitHub CI failure to their tested revisions.
+binds local results and GitHub CI repairs to their tested revisions.
+Manager-owned completion requires [installed native validation policy](docs/NATIVE-COMPLETION.md).
+A missing policy appears as a configuration block; a summary or result hash
+cannot substitute for required checks. Existing shell enable/disable controls
+and completion-request fields remain available.
+
 Provider Save, model discovery, and credential controls are described in
 [Configure the managed provider](#configure-the-managed-provider).
 

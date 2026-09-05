@@ -196,11 +196,14 @@ both configurations. Unsigned CI builds are compilation evidence; signed
 app-hosted, UI, installed-service and distribution qualification run separately
 on an authorized Mac.
 
-For the September 5 shipping snapshot, GitHub native source integrity and Xcode
-Debug/Release compilation passed, but both SwiftPM lanes failed the Python
-interpreter containment test. The passing local suites and native onboarding
-results have separate retained source bindings. See the
-[qualification summary](docs/QUALIFICATION-STATUS.md) for counts and evidence.
+The initial September 5 shipping snapshot failed the Python interpreter
+containment test in CI. That repair and the later external-lock startup repair
+passed the follow-up CI runs. Local P01 completion-authority changes require
+fresh regression and native evidence at their own source binding. See the
+[qualification summary](docs/QUALIFICATION-STATUS.md) for the revision boundaries
+and [native completion policy](docs/NATIVE-COMPLETION.md) for trusted job setup.
+Native gate validation uses prebuilt, signed test products and semantic result
+records; unsigned app compilation does not provide that qualification.
 
 Use the canonical Release archive/export path for distribution, with matching
 Developer ID team policy and secure timestamps. The shipping

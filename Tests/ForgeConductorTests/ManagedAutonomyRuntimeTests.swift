@@ -89,6 +89,54 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
         }
     }
 
+    func testProductionCompletionHasNoHashFallbackWithMissingOrRejectingPolicy() async throws {
+        for installRejectingValidator in [false, true] {
+            let app = try ForgeApp.bootstrap(home: home.appendingPathComponent(UUID().uuidString))
+            let root = home.appendingPathComponent("project-\(UUID().uuidString)", isDirectory: true)
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            _ = try app.config.update(["allowed_roots": [root.path]], save: true)
+            let file = root.appendingPathComponent("fixture.txt")
+            try Data("unrelated successful read".utf8).write(to: file)
+            let provider = ManagedRuntimeFixtureProvider(fixturePath: file.path)
+            let validator: GateValidatorRegistry? = installRejectingValidator
+                ? try GateValidatorRegistry(validators: [CompletionGateValidator(gate: "fixture_read") { _ in
+                    CompletionGateResult(gate: "fixture_read", passed: false, summary: "Required assertion failed")
+                }]) : nil
+            let runtime = try ManagedAutonomyRuntime(
+                app: app, registry: managedRuntimeFixtureRegistry(provider: provider),
+                maximumConcurrentRuns: 1, completionValidator: validator
+            )
+            let project = try await app.projectContexts.repository.registerProjectUnchecked(
+                projectID: ProjectID(), displayName: "Completion policy fixture", canonicalRoot: root
+            )
+            _ = try await runtime.start()
+            let run = try await runtime.createRun(managedRuntimeRunRequest(
+                projectID: project.projectID, generation: project.generation, projectRoot: root
+            ))
+            let deadline = ContinuousClock.now + .seconds(5)
+            var rejected = false
+            while ContinuousClock.now < deadline {
+                let events = try await app.projectContexts.repository.autonomyEvents(runID: run.runID)
+                if events.contains(where: { $0.eventType == "autonomous_completion_rejected" }) {
+                    rejected = true
+                    break
+                }
+                try await Task.sleep(for: .milliseconds(25))
+            }
+            XCTAssertTrue(rejected, "Manager must execute the non-approving policy")
+            let current = try await runtime.run(run.runID)
+            XCTAssertNotEqual(current.state, .completed)
+            if !installRejectingValidator {
+                XCTAssertEqual(current.state, .blockedConfiguration, "Missing policy must stop repeated model requests")
+            }
+            XCTAssertNil(current.specification.work.metadata["completion_gate.fixture_read.proof_sha256"])
+            let snapshot = await provider.snapshot()
+            XCTAssertTrue(snapshot.receivedToolOutput, "A real stored read result must not satisfy the gate")
+            await runtime.shutdown()
+            app.shutdown()
+        }
+    }
+
     func testManagerRecoversDurableRunBeforeDashboardAndCompletesThroughProductionComposition() async throws {
         let app = try ForgeApp.bootstrap(home: home)
         let projectRoot = home.appendingPathComponent("project", isDirectory: true)
@@ -104,7 +152,8 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
                 app: app,
                 registry: registry,
                 managerID: "managed-runtime-recovery",
-                maximumConcurrentRuns: 1
+                maximumConcurrentRuns: 1,
+                completionValidator: try managedFixtureCompletionValidator(app: app, provider: provider)
             )
         }
         defer {
@@ -161,7 +210,8 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
                 app: app,
                 registry: registry,
                 managerID: "managed-runtime-dashboard-independent",
-                maximumConcurrentRuns: 1
+                maximumConcurrentRuns: 1,
+                completionValidator: try managedFixtureCompletionValidator(app: app, provider: provider)
             )
         }
         defer {
@@ -219,7 +269,8 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
             app: app,
             registry: managedRuntimeFixtureRegistry(provider: provider),
             managerID: "managed-runtime-controls",
-            maximumConcurrentRuns: 1
+            maximumConcurrentRuns: 1,
+            completionValidator: try managedFixtureCompletionValidator(app: app, provider: provider)
         )
         _ = try await runtime.start()
 
@@ -1014,17 +1065,15 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
                 eventSummary: "Validate the exact operator response receipt"
             )
         )
-        let receipt = try CompletionValidationReceipt.make(
-            runID: runID,
-            expectedRevision: current.revision,
-            results: [CompletionGateResult(
+        let receipt = try await GateValidatorRegistry(validators: [CompletionGateValidator(gate: "fixture_read") { _ in
+            CompletionGateResult(
                 gate: "fixture_read",
                 passed: true,
                 summary: "The production HTTP contract fixture passed",
                 evidenceReferences: ["fixture:operator-run-contract"]
-            )],
-            validatedAt: ISO8601.string(from: Date())
-        )
+            )
+        }]).validate(current)
+        try await repository.recordTrustedCompletionValidation(receipt, for: current, lease: lease)
         _ = try await repository.completeAutonomousRun(runID: runID, lease: lease, receipt: receipt)
 
         let completedStatus = try postJSON(statusURL, object: ["run_id": runID.description])
@@ -1489,6 +1538,33 @@ private func managedRuntimeFixtureRegistry(
         factory: { _ in ManagedRuntimeUnavailableAdapter() }
     )
     return registry
+}
+
+// This fixture gate is explicitly installed by its tests, never by production.
+// Verify the actual manager-owned invocation and provider consumption; a hash
+// supplied by the provider is intentionally insufficient.
+private func managedFixtureCompletionValidator(
+    app: ForgeApp,
+    provider: ManagedRuntimeFixtureProvider
+) throws -> GateValidatorRegistry {
+    try GateValidatorRegistry(validators: [CompletionGateValidator(gate: "fixture_read") { run in
+        let snapshot = await provider.snapshot()
+        let invocation = try await app.projectContexts.repository.toolInvocation(
+            sessionID: run.activeSessionID ?? "", providerCallID: "call-manager-read"
+        )
+        let passed = invocation?.runID == run.runID
+            && invocation?.projectID == run.projectID
+            && invocation?.projectGeneration == run.projectGeneration
+            && invocation?.toolName == "fs_read"
+            && invocation?.state == .completed
+            && snapshot.receivedToolOutput
+            && snapshot.previousResponseID == "resp-manager-root"
+        return CompletionGateResult(
+            gate: "fixture_read", passed: passed,
+            summary: "Assert project-bound file invocation and provider consumption",
+            evidenceReferences: invocation?.resultSHA256.map { [$0] } ?? []
+        )
+    }])
 }
 
 private actor ManagedRuntimeFixtureProvider: ManagedModelProvider {

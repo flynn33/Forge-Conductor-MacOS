@@ -158,6 +158,10 @@
 		A26B00000000000000000007 /* Application/PersistedManagedRunBudgetEvaluator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000007 /* Application/PersistedManagedRunBudgetEvaluator.swift */; };
 		A26B00000000000000000008 /* Application/ProjectContextService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000008 /* Application/ProjectContextService.swift */; };
 		A26B00000000000000000009 /* Application/ProjectRunCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000009 /* Application/ProjectRunCoordinator.swift */; };
+		B50B00000000000000000001 /* Application/XCTestResultAdjudicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50F00000000000000000001 /* Application/XCTestResultAdjudicator.swift */; };
+		B50B00000000000000000003 /* Infrastructure/QualificationInputSnapshotter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50F00000000000000000003 /* Infrastructure/QualificationInputSnapshotter.swift */; };
+		B50B00000000000000000002 /* Application/NativeXCTestGateHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50F00000000000000000002 /* Application/NativeXCTestGateHandler.swift */; };
+		B50B00000000000000000004 /* Application/InstalledNativeGateRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50F00000000000000000004 /* Application/InstalledNativeGateRegistry.swift */; };
 		A26B00000000000000000010 /* Application/RuntimeJobSubsystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000010 /* Application/RuntimeJobSubsystem.swift */; };
 		A26B00000000000000000011 /* Application/ToolDefinitionCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000011 /* Application/ToolDefinitionCatalog.swift */; };
 		A26B00000000000000000012 /* Application/ToolInvocationBroker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000012 /* Application/ToolInvocationBroker.swift */; };
@@ -629,6 +633,10 @@
 		A26F00000000000000000007 /* Application/PersistedManagedRunBudgetEvaluator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/PersistedManagedRunBudgetEvaluator.swift; sourceTree = "<group>"; };
 		A26F00000000000000000008 /* Application/ProjectContextService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/ProjectContextService.swift; sourceTree = "<group>"; };
 		A26F00000000000000000009 /* Application/ProjectRunCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/ProjectRunCoordinator.swift; sourceTree = "<group>"; };
+		B50F00000000000000000001 /* Application/XCTestResultAdjudicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/XCTestResultAdjudicator.swift; sourceTree = "<group>"; };
+		B50F00000000000000000003 /* Infrastructure/QualificationInputSnapshotter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Infrastructure/QualificationInputSnapshotter.swift; sourceTree = "<group>"; };
+		B50F00000000000000000002 /* Application/NativeXCTestGateHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/NativeXCTestGateHandler.swift; sourceTree = "<group>"; };
+		B50F00000000000000000004 /* Application/InstalledNativeGateRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/InstalledNativeGateRegistry.swift; sourceTree = "<group>"; };
 		A26F00000000000000000010 /* Application/RuntimeJobSubsystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/RuntimeJobSubsystem.swift; sourceTree = "<group>"; };
 		A26F00000000000000000011 /* Application/ToolDefinitionCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/ToolDefinitionCatalog.swift; sourceTree = "<group>"; };
 		A26F00000000000000000012 /* Application/ToolInvocationBroker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/ToolInvocationBroker.swift; sourceTree = "<group>"; };
@@ -1081,6 +1089,10 @@
 				A26F00000000000000000007 /* Application/PersistedManagedRunBudgetEvaluator.swift */,
 				A26F00000000000000000008 /* Application/ProjectContextService.swift */,
 				A26F00000000000000000009 /* Application/ProjectRunCoordinator.swift */,
+				B50F00000000000000000001 /* Application/XCTestResultAdjudicator.swift */,
+				B50F00000000000000000003 /* Infrastructure/QualificationInputSnapshotter.swift */,
+				B50F00000000000000000002 /* Application/NativeXCTestGateHandler.swift */,
+				B50F00000000000000000004 /* Application/InstalledNativeGateRegistry.swift */,
 				A26F00000000000000000010 /* Application/RuntimeJobSubsystem.swift */,
 				A26F00000000000000000011 /* Application/ToolDefinitionCatalog.swift */,
 				A26F00000000000000000012 /* Application/ToolInvocationBroker.swift */,
@@ -1721,6 +1733,10 @@
 				A26B00000000000000000007 /* Application/PersistedManagedRunBudgetEvaluator.swift in Sources */,
 				A26B00000000000000000008 /* Application/ProjectContextService.swift in Sources */,
 				A26B00000000000000000009 /* Application/ProjectRunCoordinator.swift in Sources */,
+				B50B00000000000000000001 /* Application/XCTestResultAdjudicator.swift in Sources */,
+				B50B00000000000000000003 /* Infrastructure/QualificationInputSnapshotter.swift in Sources */,
+				B50B00000000000000000002 /* Application/NativeXCTestGateHandler.swift in Sources */,
+				B50B00000000000000000004 /* Application/InstalledNativeGateRegistry.swift in Sources */,
 				A26B00000000000000000010 /* Application/RuntimeJobSubsystem.swift in Sources */,
 				A26B00000000000000000011 /* Application/ToolDefinitionCatalog.swift in Sources */,
 				A26B00000000000000000012 /* Application/ToolInvocationBroker.swift in Sources */,

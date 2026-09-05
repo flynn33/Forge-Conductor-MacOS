@@ -22,9 +22,14 @@ Forge Conductor is purpose-built for LM Studio and its local MCP runtime.
 > any package gate complete.
 
 The [qualification summary](docs/QUALIFICATION-STATUS.md) identifies the tested
-source revisions, passing local scenarios, and the known GitHub CI failure.
+source revisions, passing local scenarios, and subsequent GitHub CI repairs.
 The [wiki](https://github.com/flynn33/Forge-Conductor-MacOS/wiki) describes the
 same provider setup and installation workflow.
+
+Manager-owned runs now use [installed native completion policy](docs/NATIVE-COMPLETION.md).
+Missing policy blocks completion; model-supplied hashes cannot approve a gate.
+CLU correction implementation and its separate live API/desktop qualification
+remain in progress.
 
 ### How LM Studio connects
 

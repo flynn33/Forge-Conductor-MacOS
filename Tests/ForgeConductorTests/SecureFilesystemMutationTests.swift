@@ -1302,6 +1302,79 @@ final class SecureFilesystemMutationTests: XCTestCase {
         XCTAssertEqual(try ledger.retainedCount(), 1)
     }
 
+    func testAuthorizedTextWriteCannotFollowParentSwappedToValidationPolicy() throws {
+        let app = try ForgeApp.bootstrap(home: root.appendingPathComponent("write-race-manager"))
+        defer { app.shutdown() }
+        _ = try app.config.update(["allowed_roots": [root.path]], save: false)
+        let protected = app.paths.nativeValidationDir
+        let policy = protected.appendingPathComponent("policy.json")
+        try OwnerOnlyAtomicFile.write(Data("trusted".utf8), to: policy)
+        let workDirectory = root.appendingPathComponent("authorized-parent")
+        try FileManager.default.createDirectory(at: workDirectory, withIntermediateDirectories: true)
+        let context = makeContext(allowedTools: ["fs_write"])
+        let decision = ToolAuthorizationService(paths: app.paths, config: app.config).authorize(
+            tool: "fs_write", arguments: ["path": workDirectory.appendingPathComponent("policy.json").path, "content": "forged"],
+            context: context, clientID: context.clientID, binding: nil
+        )
+        guard case let .allowed(arguments) = decision else { return XCTFail("ordinary initial path must be authorized") }
+        try FileManager.default.removeItem(at: workDirectory)
+        try FileManager.default.createSymbolicLink(at: workDirectory, withDestinationURL: protected)
+        do {
+            let result = try FilesystemToolPack().handle(name: "fs_write", arguments: arguments, context: context,
+                                                        clientID: context.clientID, app: app, cancellation: nil)
+            XCTAssertFalse(result?.ok ?? false, "a swapped parent must not be followed after authorization")
+        } catch { /* Rejecting the changed path is the required outcome. */ }
+        XCTAssertEqual(try Data(contentsOf: policy), Data("trusted".utf8))
+    }
+
+    func testNativeValidationFilesRemainPrivateUnderBroaderProjectGrant() throws {
+        let app = try ForgeApp.bootstrap(home: root.appendingPathComponent("validation-manager"))
+        defer { app.shutdown() }
+        _ = try app.config.update(["allowed_roots": [root.path]], save: false)
+        let protected = app.paths.home.appendingPathComponent("native-validation")
+        try FileManager.default.createDirectory(at: protected, withIntermediateDirectories: true)
+        let policy = protected.appendingPathComponent("policy.json")
+        try Data("trusted policy".utf8).write(to: policy)
+        let alias = root.appendingPathComponent("policy-alias")
+        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: protected)
+        let authorization = ToolAuthorizationService(paths: app.paths, config: app.config)
+        let context = makeContext(allowedTools: ["*"])
+        let cases: [(String, [String: Any])] = [
+            ("fs_read", ["path": policy.path]),
+            ("fs_write", ["path": policy.path]),
+            ("fs_write", ["path": alias.appendingPathComponent("policy.json").path]),
+            ("fs_delete", ["path": app.paths.home.path]),
+            ("fs_move", ["path": app.paths.home.path, "dest": root.appendingPathComponent("moved").path]),
+        ]
+        for (tool, arguments) in cases {
+            let decision = authorization.authorize(tool: tool, arguments: arguments,
+                                                   context: context, clientID: context.clientID, binding: nil)
+            guard case let .denied(code, _) = decision else {
+                XCTFail("protected validation path was authorized for \(tool)")
+                continue
+            }
+            XCTAssertEqual(code, "manager_validation_path_protected")
+        }
+        let ordinary = root.appendingPathComponent("ordinary.txt")
+        try Data("ordinary searchable work".utf8).write(to: ordinary)
+        let listed = try XCTUnwrap(try FilesystemToolPack().handle(
+            name: "fs_glob", arguments: ["path": root.path, "pattern": "*.json"], context: context,
+            clientID: context.clientID, app: app, cancellation: nil
+        ))
+        XCTAssertFalse((listed.payload["matches"] as? [String] ?? []).contains { $0.hasSuffix("policy.json") })
+        let searched = try XCTUnwrap(try SearchToolPack().handle(
+            name: "search_text", arguments: ["path": root.path, "pattern": "policy\\|ordinary searchable work"], context: context,
+            clientID: context.clientID, app: app, cancellation: nil
+        ))
+        let matches = searched.payload["matches"] as? [String] ?? []
+        XCTAssertFalse(matches.contains { $0.contains("trusted policy") })
+        XCTAssertTrue(matches.contains { $0.contains("ordinary searchable work") }, String(describing: searched.payload))
+        guard case .allowed = authorization.authorize(tool: "fs_write", arguments: ["path": ordinary.path],
+                                                      context: context, clientID: context.clientID, binding: nil) else {
+            return XCTFail("ordinary work inside the broader project must remain writable")
+        }
+    }
+
     func testDeleteGrantAlsoAuthorizesAdditiveRecoveryTool() throws {
         let app = try ForgeApp.bootstrap(home: root.appendingPathComponent("authorization-app"))
         defer { app.shutdown() }

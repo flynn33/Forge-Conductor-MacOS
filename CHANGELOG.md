@@ -20,6 +20,22 @@ Provider settings now have native and manager save controls. Four native product
 onboarding scenarios passed; disposable Keychain tests also executed. Complete
 installed-stack and production-feature acceptance remain separate gates.
 
+### Completion authority and protected validation
+
+- Completion now runs installed native validators. Model-selected hashes and
+  decoded receipts cannot approve a run; missing policy blocks completion.
+  Prebuilt package gates bind the approved candidate source, test package,
+  generation, lease, policy, job identity, and actual XCTest semantics.
+- Native regressions execute failure, stale success, and fresh success through
+  the installed registry. Only a fresh qualified result permits completion.
+  These disposable work-product checks do not qualify live CLU or desktop use.
+- Validation storage and Xcode's complete toolchain are protected from project
+  writes. Text operations reject swapped parent links. Git/search/glob and
+  compatibility shell children use project sandboxing; Git recovery keeps its
+  existing effect checks with private scratch and native tool binaries.
+- [Native completion policy](docs/NATIVE-COMPLETION.md) documents ownership,
+  compatibility, limits, and evidence boundaries. Version remains 0.9.0 build 1.
+
 ### Verified current-source evidence
 
 - Native Xcode tests now include the provider bridge and continuity cases that

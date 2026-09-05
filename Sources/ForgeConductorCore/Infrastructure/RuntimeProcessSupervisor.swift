@@ -79,6 +79,7 @@ enum RuntimeProcessSandbox {
         "/private/etc/services",
         "/private/etc/zprofile",
         "/private/etc/zshrc",
+        "/private/var/select/sh",
         "/dev/null",
         "/dev/random",
         "/dev/urandom",
@@ -97,7 +98,9 @@ enum RuntimeProcessSandbox {
         canonicalWritableRoots: [URL],
         managerReadDirectory: URL,
         scratchDirectory: URL,
-        networkAllowed: Bool
+        networkAllowed: Bool,
+        protectedDirectories: [URL] = [],
+        readOnlyDirectories: [URL] = [AppPaths.nativeValidationToolchainDirectory]
     ) throws -> RuntimeProcessPlan {
         guard isAvailable else {
             throw RuntimeJobError.executableUnavailable("sandbox-exec")
@@ -180,6 +183,25 @@ enum RuntimeProcessSandbox {
         (allow sysctl-read)
         (deny syscall-unix (syscall-number 82 147 244))
         """
+        guard protectedDirectories.count <= maximumRoots, readOnlyDirectories.count <= maximumRoots else {
+            throw RuntimeJobError.invalidRequest("runtime protected directory count exceeds its bound")
+        }
+        if !protectedDirectories.isEmpty {
+            let protectedPaths = protectedDirectories.map(canonicalURL).map(\.path)
+            let protectedFilters = try filters(subpaths: protectedPaths, literals: [])
+            let protectedAncestors = try filters(subpaths: [], literals: ancestorDirectories(of: protectedPaths))
+            // Explicit denials retain precedence over broader project grants.
+            // Ancestor mutation could rename or replace the protected namespace.
+            profile += "\n(deny file-read* file-write* (require-any \(protectedFilters)))"
+            profile += "\n(deny file-write-unlink file-write-mode file-write-owner (require-any \(protectedAncestors)))"
+        }
+        if !readOnlyDirectories.isEmpty {
+            let paths = readOnlyDirectories.map(canonicalURL).map(\.path)
+            let directories = try filters(subpaths: paths, literals: [])
+            let ancestors = try filters(subpaths: [], literals: ancestorDirectories(of: paths))
+            profile += "\n(deny file-write* (require-any \(directories)))"
+            profile += "\n(deny file-write-unlink file-write-mode file-write-owner (require-any \(ancestors)))"
+        }
         if networkAllowed {
             profile += "\n(allow network-outbound (literal \"/private/var/run/mDNSResponder\") (remote tcp \"*:*\") (remote udp \"*:*\"))"
         }

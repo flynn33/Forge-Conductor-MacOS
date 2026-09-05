@@ -303,6 +303,18 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
                     message: "The workspace root itself cannot be deleted or moved: \(candidate.path)"
                 )
             }
+            let validationRoot = try canonicalURL(paths.nativeValidationDir, cancellation: cancellation)
+            if reservedContains(candidate, root: validationRoot)
+                || (access.protectRoot && reservedContains(validationRoot, root: candidate)) {
+                return .denied(
+                    code: "manager_validation_path_protected",
+                    message: "Native validation policy and evidence are owned by the manager"
+                )
+            }
+            let developerRoot = try canonicalURL(AppPaths.nativeValidationToolchainDirectory, cancellation: cancellation)
+            if access.requiresWrite && (reservedContains(candidate, root: developerRoot) || (access.protectRoot && reservedContains(developerRoot, root: candidate))) {
+                return .denied(code: "native_validation_toolchain_protected", message: "The installed native validation toolchain is read-only to project tools")
+            }
             normalized[access.key] = candidate.path
         }
 
@@ -562,6 +574,14 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
         }
         try cancellation?.checkCancellation()
         return resolved.standardizedFileURL
+    }
+
+    // Reserve spelling variants as well on case-insensitive APFS. This narrow
+    // namespace rule does not alter general project-root matching semantics.
+    private func reservedContains(_ candidate: URL, root: URL) -> Bool {
+        let value = candidate.standardizedFileURL.path.lowercased()
+        let prefix = root.standardizedFileURL.path.lowercased()
+        return value == prefix || prefix == "/" || value.hasPrefix(prefix + "/")
     }
 
     private func contains(_ candidate: URL, root: URL) -> Bool {

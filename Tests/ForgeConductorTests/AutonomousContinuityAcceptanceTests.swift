@@ -38,7 +38,30 @@ final class AutonomousContinuityAcceptanceTests: XCTestCase {
             app: app,
             registry: autonomousRolloverRegistry(provider: provider),
             managerID: "acceptance-rollover-manager",
-            maximumConcurrentRuns: 2
+            maximumConcurrentRuns: 2,
+            completionValidator: try GateValidatorRegistry(validators: [CompletionGateValidator(gate: "fixture_read") { run in
+                guard let operationID = run.specification.work.metadata["continuity_operation_id"],
+                      let operation = try app.projectMemory.repositoryForProject(run.projectID.description)
+                        .continuityOperationV2(id: operationID) else {
+                    return CompletionGateResult(gate: "fixture_read", passed: false, summary: "Rollover is not durable")
+                }
+                let invocation = try await app.projectContexts.repository.toolInvocation(
+                    sessionID: operation.predecessorSessionID,
+                    providerCallID: "threshold-read-\(String(run.projectID.description.prefix(12)))"
+                )
+                let snapshot = await provider.snapshot()
+                let passed = operation.state == .predecessorSealed && operation.continuationIssued
+                    && operation.acknowledgementSHA256 != nil && operation.runID == run.runID.description
+                    && operation.projectID == run.projectID.description
+                    && operation.projectGeneration == run.projectGeneration.rawValue
+                    && invocation?.runID == run.runID && invocation?.state == .completed
+                    && snapshot.continuationProjectIDs.contains(run.projectID.description)
+                return CompletionGateResult(
+                    gate: "fixture_read", passed: passed,
+                    summary: "Assert durable rollover, predecessor tool execution, and exact successor continuation",
+                    evidenceReferences: invocation?.resultSHA256.map { [$0] } ?? []
+                )
+            }])
         )
         _ = try await runtime.start()
 
@@ -113,7 +136,8 @@ final class AutonomousContinuityAcceptanceTests: XCTestCase {
             app: try XCTUnwrap(activeApp),
             registry: restartAcceptanceRegistry(provider: provider),
             managerID: "acceptance-outage-before-restart",
-            maximumConcurrentRuns: 1
+            maximumConcurrentRuns: 1,
+            completionValidator: try restartCompletionValidator(provider: provider, clock: clock)
         )
         _ = try await runtime?.start()
         let created = try await runtime?.createRun(runRequest(
@@ -143,7 +167,8 @@ final class AutonomousContinuityAcceptanceTests: XCTestCase {
             app: restartedApp,
             registry: restartAcceptanceRegistry(provider: provider),
             managerID: "acceptance-outage-after-restart",
-            maximumConcurrentRuns: 1
+            maximumConcurrentRuns: 1,
+            completionValidator: try restartCompletionValidator(provider: provider, clock: clock)
         )
         runtime = restartedRuntime
         let report = try await restartedRuntime.start()
@@ -155,7 +180,13 @@ final class AutonomousContinuityAcceptanceTests: XCTestCase {
             runID: runID,
             state: .completed
         )
-        XCTAssertEqual(completed.specification.work.metadata["completion_gate.fixture_read.proof_sha256"], proof)
+        XCTAssertNil(completed.specification.work.metadata["completion_gate.fixture_read.proof_sha256"])
+        XCTAssertTrue(completed.specification.work.evidenceReferences.contains(proof))
+        let completion = try JSONDecoder().decode(
+            CompletionValidationReceipt.self, from: Data(try XCTUnwrap(completed.completionRequestJSON).utf8)
+        )
+        XCTAssertTrue(completion.passed)
+        XCTAssertEqual(completion.results.first?.invocation?.runID, completed.runID)
         let snapshot = await provider.snapshot()
         XCTAssertEqual(snapshot.rootAttempts, 2)
         XCTAssertEqual(snapshot.completedRoots, 1)
@@ -322,7 +353,13 @@ final class AutonomousContinuityAcceptanceTests: XCTestCase {
     ) async throws {
         XCTAssertEqual(run.projectID, project.record.projectID)
         XCTAssertEqual(run.projectGeneration, project.record.generation)
-        XCTAssertEqual(run.specification.work.metadata["completion_gate.fixture_read.proof_sha256"], proof)
+        XCTAssertNil(run.specification.work.metadata["completion_gate.fixture_read.proof_sha256"])
+        let completion = try JSONDecoder().decode(
+            CompletionValidationReceipt.self, from: Data(try XCTUnwrap(run.completionRequestJSON).utf8)
+        )
+        XCTAssertTrue(completion.passed)
+        XCTAssertEqual(completion.results.first?.invocation?.projectID, project.record.projectID)
+        XCTAssertEqual(completion.results.first?.invocation?.projectGeneration, project.record.generation)
         XCTAssertTrue(run.specification.work.evidenceReferences.contains(proof))
         let operationString = try XCTUnwrap(
             run.specification.work.metadata["continuity_operation_id"]
@@ -343,6 +380,12 @@ final class AutonomousContinuityAcceptanceTests: XCTestCase {
             operation.predecessorSessionID
         )
         let predecessor = try XCTUnwrap(predecessorValue)
+        let invocation = try await repository.toolInvocation(
+            sessionID: predecessor.sessionID,
+            providerCallID: "threshold-read-\(String(run.projectID.description.prefix(12)))"
+        )
+        let invocationDigest = try XCTUnwrap(invocation?.resultSHA256)
+        XCTAssertEqual(completion.results.first?.evidenceReferences, [invocationDigest])
         let successor = try XCTUnwrap(candidates.first { $0.accepted })
         XCTAssertEqual(predecessor.status, .sealed)
         XCTAssertEqual(successor.status, .active)
@@ -364,6 +407,19 @@ final class AutonomousContinuityAcceptanceTests: XCTestCase {
         XCTAssertTrue(operation.continuationIssued)
         XCTAssertNotNil(operation.acknowledgementSHA256)
     }
+}
+
+private func restartCompletionValidator(provider: RestartAcceptanceProvider, clock: any Clock) throws -> GateValidatorRegistry {
+    try GateValidatorRegistry(validators: [CompletionGateValidator(gate: "fixture_read") { run in
+        let snapshot = await provider.snapshot()
+        return CompletionGateResult(
+            gate: "fixture_read",
+            passed: snapshot.rootAttempts == 2 && snapshot.completedRoots == 1
+                && Set(snapshot.idempotencyKeys).count == 1
+                && run.specification.work.metadata["provider_response_id"] == "restart-continuation-response",
+            summary: "Assert one recovered provider turn and the persisted continuation response"
+        )
+    }], clock: clock)
 }
 
 private struct AcceptanceProject {

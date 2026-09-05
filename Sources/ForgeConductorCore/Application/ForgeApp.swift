@@ -162,7 +162,8 @@ public final class ForgeApp: @unchecked Sendable {
         let runtimeJobs = try RuntimeJobSubsystem(
             controlPlaneRepository: projectContexts.repository,
             databaseURL: paths.controlPlaneSQLite,
-            artifactRoot: paths.runtimeArtifactsDir
+            artifactRoot: paths.runtimeArtifactsDir,
+            protectedDirectories: [paths.nativeValidationDir]
         )
 
         let deploy = LMStudioDeployService(paths: paths, diagnostics: diagnostics, store: store)

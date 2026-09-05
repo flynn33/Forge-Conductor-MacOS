@@ -39,7 +39,7 @@ public struct ShellToolPack: ToolPackHandling {
             )
         }
         let timeout = min(requestedTimeout, Self.maximumTimeoutSec)
-        let result = try runner.run(
+        let result = try runner.scopedForTool(context: context, workingDirectory: URL(fileURLWithPath: cwd ?? FileManager.default.currentDirectoryPath), paths: app.paths).run(
             executable: "/bin/bash",
             arguments: ["-lc", command],
             currentDirectory: cwd,

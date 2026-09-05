@@ -3838,6 +3838,44 @@ final class RuntimeExecutionJobTests: XCTestCase {
         XCTAssertFalse(denied.stdout.contains("private-data"))
     }
 
+    func testRuntimeSandboxProtectsNativeValidationInsideBroaderGrant() throws {
+        let root = RuntimeProcessSandbox.canonicalExistingURL(FileManager.default.temporaryDirectory).appendingPathComponent("validation-sandbox-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let project = root.appendingPathComponent("project")
+        let manager = project.appendingPathComponent("manager")
+        let protected = manager.appendingPathComponent("native-validation")
+        let artifacts = root.appendingPathComponent("artifacts")
+        let scratch = root.appendingPathComponent("scratch")
+        for directory in [protected, artifacts, scratch] {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+        let policy = protected.appendingPathComponent("policy.json")
+        try Data("trusted".utf8).write(to: policy)
+        let alias = project.appendingPathComponent("alias")
+        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: protected)
+        func execute(_ command: String, _ arguments: [String], protect: Bool = true) throws -> ProcessResult {
+            let plan = try RuntimeProcessSandbox.plan(
+                executable: URL(fileURLWithPath: command), arguments: arguments,
+                workingDirectory: project, environment: [:], canonicalReadRoots: [project],
+                canonicalWritableRoots: [project], managerReadDirectory: artifacts,
+                scratchDirectory: scratch, networkAllowed: false, protectedDirectories: protect ? [protected] : []
+            )
+            return try ProcessRunner().run(executable: plan.executable.path, arguments: plan.arguments, timeoutSec: 5)
+        }
+        let baseline = try execute("/bin/cat", [policy.path], protect: false)
+        XCTAssertEqual(baseline.stdout, "trusted", baseline.stderr)
+        for path in [policy.path, alias.appendingPathComponent("policy.json").path] {
+            let read = try execute("/bin/cat", [path])
+            XCTAssertNotEqual(read.exitCode, 0)
+            XCTAssertFalse(read.stdout.contains("trusted"))
+            XCTAssertNotEqual(try execute("/usr/bin/touch", [path]).exitCode, 0)
+        }
+        XCTAssertNotEqual(try execute("/bin/mv", [manager.path, project.appendingPathComponent("renamed").path]).exitCode, 0)
+        XCTAssertEqual(try Data(contentsOf: policy), Data("trusted".utf8))
+        let ordinary = try execute("/usr/bin/touch", [project.appendingPathComponent("ordinary").path])
+        XCTAssertEqual(ordinary.exitCode, 0, ordinary.stderr)
+    }
+
     func testRuntimeSandboxProfileIsDenyByDefaultAndExcludesMutableUSRPrefix() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("forge-runtime-profile-\(UUID().uuidString)", isDirectory: true)

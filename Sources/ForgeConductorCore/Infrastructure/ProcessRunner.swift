@@ -18,6 +18,7 @@ public struct ProcessResult: Sendable {
     public var timedOut: Bool
     public var stdoutTruncated: Bool
     public var stderrTruncated: Bool
+    public var terminationSignal: Int32? = nil
 }
 
 /// Failures that are specific to subprocess lifecycle management.
@@ -45,8 +46,12 @@ public final class ProcessRunner: @unchecked Sendable {
     private let terminationGraceSec: TimeInterval
     private let forcedTerminationGraceSec: TimeInterval
     private let maximumRetainedOutputBytes: Int
+    private let inheritEnvironment: Bool
+    private let toolSandbox: ToolSandbox?
 
-    public init() {
+    public init(inheritEnvironment: Bool = true) {
+        self.inheritEnvironment = inheritEnvironment
+        toolSandbox = nil
         terminationGraceSec = 0.5
         forcedTerminationGraceSec = 1.0
         maximumRetainedOutputBytes = ResourcePolicy.current.nominalLimits.processOutputBytesPerStream
@@ -58,9 +63,64 @@ public final class ProcessRunner: @unchecked Sendable {
         forcedTerminationGraceSec: TimeInterval,
         maximumRetainedOutputBytes: Int = ResourcePolicy.current.nominalLimits.processOutputBytesPerStream
     ) {
+        inheritEnvironment = true
+        toolSandbox = nil
         self.terminationGraceSec = max(0, terminationGraceSec)
         self.forcedTerminationGraceSec = max(0, forcedTerminationGraceSec)
         self.maximumRetainedOutputBytes = max(0, maximumRetainedOutputBytes)
+    }
+
+    private init(copying other: ProcessRunner, sandbox: ToolSandbox) {
+        terminationGraceSec = other.terminationGraceSec
+        forcedTerminationGraceSec = other.forcedTerminationGraceSec
+        maximumRetainedOutputBytes = other.maximumRetainedOutputBytes
+        inheritEnvironment = false
+        toolSandbox = sandbox
+    }
+
+    var toolScratchDirectory: URL? { toolSandbox?.directory.appendingPathComponent("scratch") }
+
+    /// Applies the same project sandbox used by durable shell jobs to tool-owned
+    /// subprocesses, including Git hooks and reconciliation probes.
+    func scopedForTool(context: ToolInvocationContext?, workingDirectory: URL, paths: AppPaths) throws -> ProcessRunner {
+        try ProcessRunner(copying: self, sandbox: ToolSandbox(context: context, workingDirectory: workingDirectory, paths: paths))
+    }
+
+    private final class ToolSandbox: @unchecked Sendable {
+        let directory: URL
+        let scope: ToolAuthorizationScope
+        let protectedDirectory: URL
+        let workingDirectory: URL
+
+        init(context: ToolInvocationContext?, workingDirectory: URL, paths: AppPaths) throws {
+            self.workingDirectory = RuntimeProcessSandbox.canonicalURL(workingDirectory)
+            scope = context?.authorizationScope ?? ToolAuthorizationScope(
+                canonicalRoots: [self.workingDirectory], writableRoots: [self.workingDirectory],
+                allowedTools: [], networkAllowed: false, maximumInlineOutputBytes: 1_048_576
+            )
+            protectedDirectory = paths.nativeValidationDir
+            directory = FileManager.default.temporaryDirectory.appendingPathComponent("forge-tool-\(UUID().uuidString.lowercased())")
+            try FileManager.default.createDirectory(at: directory.appendingPathComponent("readonly"), withIntermediateDirectories: true,
+                                                    attributes: [.posixPermissions: 0o700])
+            try FileManager.default.createDirectory(at: directory.appendingPathComponent("scratch"), withIntermediateDirectories: true,
+                                                    attributes: [.posixPermissions: 0o700])
+        }
+
+        deinit { try? FileManager.default.removeItem(at: directory) }
+
+        func plan(executable: URL, arguments: [String], currentDirectory: String?, environment: [String: String]?) throws -> RuntimeProcessPlan {
+            var toolEnvironment = environment ?? [:]
+            toolEnvironment["PATH"] = AppPaths.nativeValidationDeveloperDirectory.appendingPathComponent("usr/bin").path + ":/Library/Developer/CommandLineTools/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+            toolEnvironment["DEVELOPER_DIR"] = AppPaths.nativeValidationDeveloperDirectory.path
+            return try RuntimeProcessSandbox.plan(
+                executable: executable, arguments: arguments,
+                workingDirectory: currentDirectory.map { URL(fileURLWithPath: $0) } ?? workingDirectory,
+                environment: toolEnvironment, canonicalReadRoots: scope.canonicalRoots,
+                canonicalWritableRoots: scope.writableRoots,
+                managerReadDirectory: directory.appendingPathComponent("readonly"), scratchDirectory: directory.appendingPathComponent("scratch"),
+                networkAllowed: scope.networkAllowed, protectedDirectories: [protectedDirectory]
+            )
+        }
     }
 
     public func run(
@@ -73,7 +133,7 @@ public final class ProcessRunner: @unchecked Sendable {
         cancellation: ToolCallCancellation? = nil
     ) throws -> ProcessResult {
         try cancellation?.checkCancellation()
-        let exeURL: URL
+        var exeURL: URL
         if executable.hasPrefix("/") {
             exeURL = URL(fileURLWithPath: executable)
         } else if let path = ProcessRunner.which(executable) {
@@ -84,6 +144,18 @@ public final class ProcessRunner: @unchecked Sendable {
                 code: 1,
                 userInfo: [NSLocalizedDescriptionKey: "executable not found: \(executable)"]
             )
+        }
+
+        var effectiveArguments = arguments
+        var effectiveDirectory = currentDirectory
+        var effectiveEnvironment = environment
+        if let toolSandbox {
+            let plan = try toolSandbox.plan(executable: exeURL, arguments: arguments,
+                                            currentDirectory: currentDirectory, environment: environment)
+            exeURL = plan.executable
+            effectiveArguments = plan.arguments
+            effectiveDirectory = plan.workingDirectory.path
+            effectiveEnvironment = plan.environment
         }
 
         let outPipe = Pipe()
@@ -176,9 +248,10 @@ public final class ProcessRunner: @unchecked Sendable {
         do {
             processIdentifier = try Self.spawn(
                 executable: exeURL,
-                arguments: arguments,
-                currentDirectory: currentDirectory,
-                environment: environment,
+                arguments: effectiveArguments,
+                currentDirectory: effectiveDirectory,
+                environment: effectiveEnvironment,
+                inheritEnvironment: inheritEnvironment,
                 stdoutDescriptors: [outHandle.fileDescriptor, outWriteHandle.fileDescriptor],
                 stderrDescriptors: [errHandle.fileDescriptor, errWriteHandle.fileDescriptor]
             )
@@ -203,6 +276,7 @@ public final class ProcessRunner: @unchecked Sendable {
             RuntimeSignposts.processExit(processSignpost, operation: operation)
         }
 
+        var terminationSignal: Int32?
         func pollTerminalStatus() throws -> Int32? {
             var rawStatus: Int32 = 0
             var waited: pid_t
@@ -223,6 +297,7 @@ public final class ProcessRunner: @unchecked Sendable {
                 )
             }
             let signal = rawStatus & 0x7f
+            terminationSignal = signal == 0 ? nil : signal
             return signal == 0 ? (rawStatus >> 8) & 0xff : signal
         }
 
@@ -377,7 +452,8 @@ public final class ProcessRunner: @unchecked Sendable {
             stderr: String(decoding: captured.stderr.data, as: UTF8.self),
             timedOut: timedOut,
             stdoutTruncated: captured.stdout.truncated,
-            stderrTruncated: captured.stderr.truncated
+            stderrTruncated: captured.stderr.truncated,
+            terminationSignal: terminationSignal
         )
     }
 
@@ -386,6 +462,7 @@ public final class ProcessRunner: @unchecked Sendable {
         arguments: [String],
         currentDirectory: String?,
         environment suppliedEnvironment: [String: String]?,
+        inheritEnvironment: Bool,
         stdoutDescriptors: [Int32],
         stderrDescriptors: [Int32]
     ) throws -> Int32 {
@@ -450,7 +527,7 @@ public final class ProcessRunner: @unchecked Sendable {
         result = posix_spawnattr_setpgroup(&attributes, 0)
         guard result == 0 else { throw posixError(result, operation: "configure process group") }
 
-        var mergedEnvironment = ProcessInfo.processInfo.environment
+        var mergedEnvironment = inheritEnvironment ? ProcessInfo.processInfo.environment : [:]
         if let suppliedEnvironment {
             for (key, value) in suppliedEnvironment { mergedEnvironment[key] = value }
         }

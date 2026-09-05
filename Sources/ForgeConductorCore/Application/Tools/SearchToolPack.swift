@@ -28,14 +28,14 @@ public struct SearchToolPack: ToolPackHandling {
             return .failure(code: "missing_pattern", message: "pattern required")
         }
         let path = ToolArgHelpers.string(arguments, "path") ?? FileManager.default.currentDirectoryPath
-        let result = try runner.run(
+        let result = try runner.scopedForTool(context: context, workingDirectory: URL(fileURLWithPath: path), paths: app.paths).run(
             executable: "/usr/bin/grep",
             arguments: [
                 "-RIn",
                 "--exclude-dir=node_modules",
                 "--exclude-dir=.git",
-                pattern,
-                ToolArgHelpers.resolvePath(path).path,
+                "--", pattern,
+                RuntimeProcessSandbox.canonicalURL(ToolArgHelpers.resolvePath(path)).path,
             ],
             timeoutSec: 20,
             cancellation: cancellation

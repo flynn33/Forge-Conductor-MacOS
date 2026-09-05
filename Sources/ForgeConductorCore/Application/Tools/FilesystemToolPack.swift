@@ -169,7 +169,9 @@ public struct FilesystemToolPack: ToolPackHandling {
         case "fs_write": return try fsWrite(arguments, cancellation: cancellation)
         case "fs_edit": return try fsEdit(arguments, cancellation: cancellation)
         case "fs_list": return try fsList(arguments, cancellation: cancellation)
-        case "fs_glob": return try fsGlob(arguments, runner: ProcessRunner(), cancellation: cancellation)
+        case "fs_glob":
+            let directory = URL(fileURLWithPath: ToolArgHelpers.string(arguments, "path") ?? FileManager.default.currentDirectoryPath)
+            return try fsGlob(arguments, runner: ProcessRunner().scopedForTool(context: context, workingDirectory: directory, paths: app.paths), cancellation: cancellation)
         case "fs_mkdir": return try fsMkdir(arguments, cancellation: cancellation)
         case "fs_delete":
             if let secureMutationClient {
@@ -358,8 +360,7 @@ public struct FilesystemToolPack: ToolPackHandling {
             )
         }
         try cancellation?.checkCancellation()
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try data.write(to: url, options: .atomic)
+        try Self.writePinnedText(data, to: url, cancellation: cancellation)
         return .success(["path": url.path, "bytes_written": data.count])
     }
 
@@ -417,7 +418,7 @@ public struct FilesystemToolPack: ToolPackHandling {
         }
         text = text.replacingOccurrences(of: old, with: new)
         try cancellation?.checkCancellation()
-        try text.write(to: url, atomically: true, encoding: .utf8)
+        try Self.writePinnedText(Data(text.utf8), to: url, cancellation: cancellation)
         return .success(["path": url.path, "replacements": count])
     }
 
@@ -474,7 +475,7 @@ public struct FilesystemToolPack: ToolPackHandling {
         let rootURL = ToolArgHelpers.resolvePath(root)
         let result = try runner.run(
             executable: "/usr/bin/find",
-            arguments: [rootURL.path, "-name", pattern],
+            arguments: [RuntimeProcessSandbox.canonicalURL(rootURL).path, "-name", pattern],
             timeoutSec: 15,
             cancellation: cancellation
         )
@@ -491,7 +492,7 @@ public struct FilesystemToolPack: ToolPackHandling {
         }
         let url = ToolArgHelpers.resolvePath(path)
         try cancellation?.checkCancellation()
-        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        _ = try Self.pinnedTextParent(of: url.appendingPathComponent(".directory-check"), create: true, cancellation: cancellation)
         return .success(["path": url.path, "ok": true])
     }
 
@@ -3932,6 +3933,65 @@ public struct FilesystemToolPack: ToolPackHandling {
         return ToolResult(ok: false, payload: payload, isError: true)
     }
 
+    /// Authorization already resolves permitted aliases. At dispatch, follow no
+    /// user-controlled link again: a parent may have changed after authorization.
+    /// Expand only the fixed macOS system aliases before descriptor traversal.
+    private static func pinnedTextParent(of url: URL, create: Bool, cancellation: ToolCallCancellation?) throws -> (PinnedFileDescriptor, String) {
+        var path = url.standardizedFileURL.path
+        for alias in ["/var", "/tmp", "/etc"] where path == alias || path.hasPrefix(alias + "/") {
+            path = "/private" + path
+            break
+        }
+        let components = path.split(separator: "/").map(String.init)
+        guard path.hasPrefix("/"), path.utf8.count < Int(PATH_MAX), !components.isEmpty,
+              components.count <= 256, components.allSatisfy({ $0 != "." && $0 != ".." }) else {
+            throw posixError(EINVAL, path: path)
+        }
+        let root = Darwin.open("/", O_SEARCH | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW_ANY)
+        guard root >= 0 else { throw posixError(errno, path: "/") }
+        var parent = PinnedFileDescriptor(root)
+        for component in components.dropLast() {
+            try cancellation?.checkCancellation()
+            var next = Darwin.openat(parent.rawValue, component, O_SEARCH | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW_ANY | O_RESOLVE_BENEATH)
+            if next < 0, errno == ENOENT, create {
+                guard Darwin.mkdirat(parent.rawValue, component, 0o755) == 0 || errno == EEXIST else {
+                    throw posixError(errno, path: path)
+                }
+                next = Darwin.openat(parent.rawValue, component, O_SEARCH | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW_ANY | O_RESOLVE_BENEATH)
+            }
+            guard next >= 0 else { throw posixError(errno, path: path) }
+            parent = PinnedFileDescriptor(next)
+        }
+        return (parent, components.last!)
+    }
+
+    private static func writePinnedText(_ data: Data, to url: URL, cancellation: ToolCallCancellation?) throws {
+        let (parent, leaf) = try pinnedTextParent(of: url, create: true, cancellation: cancellation)
+        let temporary = ".forge-text-\(UUID().uuidString.lowercased())"
+        let descriptor = Darwin.openat(parent.rawValue, temporary, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW | O_RESOLVE_BENEATH, 0o644)
+        guard descriptor >= 0 else { throw posixError(errno, path: url.path) }
+        defer { Darwin.close(descriptor); Darwin.unlinkat(parent.rawValue, temporary, 0) }
+        var prior = stat()
+        if Darwin.fstatat(parent.rawValue, leaf, &prior, AT_SYMLINK_NOFOLLOW) == 0,
+           prior.st_mode & S_IFMT == S_IFREG {
+            guard Darwin.fchmod(descriptor, prior.st_mode & 0o777) == 0 else { throw posixError(errno, path: url.path) }
+        }
+        try data.withUnsafeBytes { bytes in
+            var offset = 0
+            while offset < bytes.count {
+                try cancellation?.checkCancellation()
+                let count = Darwin.write(descriptor, bytes.baseAddress!.advanced(by: offset), min(64 * 1_024, bytes.count - offset))
+                if count < 0, errno == EINTR { continue }
+                guard count > 0 else { throw posixError(errno, path: url.path) }
+                offset += count
+            }
+        }
+        try cancellation?.checkCancellation()
+        guard Darwin.fsync(descriptor) == 0,
+              Darwin.renameat(parent.rawValue, temporary, parent.rawValue, leaf) == 0,
+              Darwin.fsync(parent.rawValue) == 0 else { throw posixError(errno, path: url.path) }
+    }
+
     private enum BoundedTextReadError: Error {
         case tooLarge
         case unreadable
@@ -3945,9 +4005,8 @@ public struct FilesystemToolPack: ToolPackHandling {
         cancellation: ToolCallCancellation?
     ) throws -> (Data, String) {
         try cancellation?.checkCancellation()
-        let descriptor = url.path.withCString {
-            Darwin.open($0, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW)
-        }
+        let (parent, leaf) = try pinnedTextParent(of: url, create: false, cancellation: cancellation)
+        let descriptor = Darwin.openat(parent.rawValue, leaf, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW | O_RESOLVE_BENEATH)
         guard descriptor >= 0 else { throw BoundedTextReadError.unreadable }
         defer { _ = Darwin.close(descriptor) }
 
