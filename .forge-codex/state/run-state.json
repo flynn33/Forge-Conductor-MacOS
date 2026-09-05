@@ -1415,7 +1415,7 @@
       "updated_at": "2026-09-05T02:19:55.997987+00:00"
     }
   ],
-  "last_event_sequence": 1093,
+  "last_event_sequence": 1094,
   "phases": {
     "P00": {
       "attempts": 1,
@@ -1498,12 +1498,12 @@
   },
   "repository": {
     "branch": "rescue/clu-shippable-2026-09-05",
-    "commit": "786396991f8159da8919f1812355c19d9445ddbb",
+    "commit": "5523c1042ed765d73dd6f472c111b105e7a5abd6",
     "dirty": true,
     "root": "/Users/jimdaley/GitHub/Forge-Conductor-CLU-Rescue"
   },
   "run_id": "aba90ab1-be80-4cc5-aa0b-23dd54d4a24d",
   "schema_version": 1,
   "status": "blocked_environment",
-  "updated_at": "2026-09-05T15:23:42.890259+00:00"
+  "updated_at": "2026-09-05T17:04:01.010977+00:00"
 }

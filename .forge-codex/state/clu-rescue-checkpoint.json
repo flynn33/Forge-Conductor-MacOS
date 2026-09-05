@@ -9,7 +9,7 @@
   "rescue_phase_status": {
     "P00": "baseline inventory recorded",
     "P02": "CI repair implemented; local SwiftPM and unsigned Xcode builds passed; native test/installed qualification remains pending",
-    "P01": "next independent implementation; design and source trace recorded externally",
+    "P01": "in progress: trusted core and focused regressions implemented; native job producer and installed policy incomplete",
     "P03-P14": "not complete"
   },
   "qualification": {
@@ -44,8 +44,8 @@
   },
   "evidence_id": "EVID-20260905T152217Z-7a8b9ece87",
   "external_evidence_root": "/Users/jimdaley/Projects/Forge-Conductor/rescue-evidence/20260905T145048Z",
-  "native_ci_run": 33974398152,
-  "native_ci_status": "queued at last readback",
+  "native_ci_run": 33976703518,
+  "native_ci_status": "passed at 5523c10; local P01 changes are not covered",
   "installed_app": {
     "path": "/Applications/Forge Conductor.app",
     "version": "0.9.1",
@@ -61,6 +61,8 @@
   "native_qualified": false,
   "release_qualified": false,
   "integration_complete": false,
-  "next_action": "Read this checkpoint and external run record; inspect CI 33974398152, then implement P01 trusted completion registry using p01-design-notes.json. Do not resume historical P10 selector as rescue authority.",
-  "policy": "No attribution; no protected merge or public release. Original checkout and both state histories preserved."
+  "next_action": "Finish P01 current-source regression and bounded native job producer with installed policy; include CLU-CORRECTION-001 in effective qualification. P02 remains independently ready.",
+  "policy": "No attribution; no protected merge or public release. Original checkout and both state histories preserved.",
+  "checkpoint_head": "5523c1042ed765d73dd6f472c111b105e7a5abd6",
+  "amendment_record": "/Users/jimdaley/Projects/Forge-Conductor/rescue-evidence/20260905T145048Z/correction-001-adoption.json"
 }

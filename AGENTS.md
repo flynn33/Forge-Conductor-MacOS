@@ -13,6 +13,17 @@ Preserve the prior ledger, event chain, feature baseline and all substantive
 safety, compatibility, ownership and qualification requirements below.
 No attribution credits, trailers, or attributed artifact/branch names.
 Build and qualify the candidate; the owner controls protected merges and shipping.
+
+The owner supplied CLU-CORRECTION-001 on September 5, 2026. Read
+`docs/decisions/CLU-CORRECTION-001.md` and the separately retained amendment at
+`/Users/jimdaley/Projects/Forge-Conductor/Forge-Conductor-CLU-Correction-001-2026-09-05`.
+Its SHA256SUMS digest is
+`0aa7cb3529ed1c68a6ec0bc0becdc58f5e17ed876593d5346a3aa4e6af01d779`.
+It supersedes conflicting CLU ingress, restoration, deployment and acceptance
+requirements only. Keep P00-P14 and the original package unchanged. Require
+durable automatic submission from authorized existing conversations, exact
+successful context_get restoration, and the added acceptance cases. API
+qualification cannot waive the separately required visible desktop experience.
 <!-- FORGE-SHIPPING:END -->
 
 <!-- FORGE-AUTONOMOUS-CONTINUITY-DESIGN:BEGIN -->
