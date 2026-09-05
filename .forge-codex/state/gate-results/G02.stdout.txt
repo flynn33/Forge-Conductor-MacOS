@@ -7,8 +7,8 @@
     },
     {
       "criterion": "logs redact private content",
-      "passed": true,
-      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/DiagnosticLog.swift#b87c063ffca4a1d472a089b1d8ae838f9681232ab445f80206ae07949053cf48; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T190435Z-72024a943c.stdout.txt#3e6ac537d1a568f2f0fcb6259b641a377430ed5fc7fa520c046f51f7c39b4e81"
+      "passed": false,
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/DiagnosticLog.swift#ec7d3d5c8f0cccbd51aa8a70afb5245db595523ae3d628b7fbb90843c4d66be8; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T190435Z-72024a943c.stdout.txt#3e6ac537d1a568f2f0fcb6259b641a377430ed5fc7fa520c046f51f7c39b4e81"
     },
     {
       "criterion": "baseline reproducer artifacts recorded",
@@ -17,10 +17,15 @@
     },
     {
       "criterion": "before traces captured on capable macOS host",
-      "passed": true,
-      "evidence": "/Users/jimdaley/Documents/RavenForge/Forge-Conductor-MacOS/Forge-Conductor-Repair-Evidence/aba90ab1-be80-4cc5-aa0b-23dd54d4a24d/p02/P02-Time-Profiler-Attach.trace/instrument_data/193EC53B-8B26-4F00-9165-EB2F319E1578/run_data/1.run.zip#8742bb04c07f0e7543508e0c55ac6c19e22cf71980a741ec586f54ea30a0f7ab; /Users/jimdaley/Documents/RavenForge/Forge-Conductor-MacOS/Forge-Conductor-Repair-Evidence/aba90ab1-be80-4cc5-aa0b-23dd54d4a24d/p02/P02-Sample-Baseline.txt#1df75054bd14acd1ced3c1fed5279152dee9204768450ced11b8e34a490fe41b; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T190527Z-3d3279fc30.stdout.txt#3dd24fc23a33fe3a7e0592e9b8becbe10fb446612fb3ea2e9a3bc87abadf2050"
+      "passed": false,
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T190527Z-3d3279fc30.stdout.txt#3dd24fc23a33fe3a7e0592e9b8becbe10fb446612fb3ea2e9a3bc87abadf2050"
     }
   ],
-  "valid": true,
-  "errors": []
+  "valid": false,
+  "errors": [
+    "acceptance record is historical evidence for unknown, not current release authority",
+    "malformed evidence for: logs redact private content: hash mismatch: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/DiagnosticLog.swift",
+    "missing artifact: /Users/jimdaley/Documents/RavenForge/Forge-Conductor-MacOS/Forge-Conductor-Repair-Evidence/aba90ab1-be80-4cc5-aa0b-23dd54d4a24d/p02/P02-Time-Profiler-Attach.trace/instrument_data/193EC53B-8B26-4F00-9165-EB2F319E1578/run_data/1.run.zip",
+    "missing artifact: /Users/jimdaley/Documents/RavenForge/Forge-Conductor-MacOS/Forge-Conductor-Repair-Evidence/aba90ab1-be80-4cc5-aa0b-23dd54d4a24d/p02/P02-Sample-Baseline.txt"
+  ]
 }

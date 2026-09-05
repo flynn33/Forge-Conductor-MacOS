@@ -1,0 +1,101 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 39523,
+      "path": ".forge-codex/evidence/EVID-20260905T020339Z-bbd5f84078.artifact-000-P10-cli-installation.json",
+      "sha256": "77203be5fd6580d04661dacec3a7a4bca43fddabab11c1197728e9c08c380d58",
+      "source_path": ".forge-codex/evidence/P10-cli-installation.json",
+      "storage": "evidence-id-specific-copy"
+    },
+    {
+      "bytes": 39523,
+      "path": ".forge-codex/evidence/EVID-20260905T020339Z-bbd5f84078.stdout.txt",
+      "sha256": "77203be5fd6580d04661dacec3a7a4bca43fddabab11c1197728e9c08c380d58",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260905T020339Z-bbd5f84078.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "child_evidence_context": {
+    "binding_schema_version": 1,
+    "evidence_id": "EVID-20260905T020339Z-bbd5f84078",
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "ffcf6bf9a2ea0c76a54788041cfa00c0dc8c7db4",
+      "branch": "release/0.9.0-shipping",
+      "head_sha": "b1876cf5b05134292ce0ecc6fb14ee67535c156c",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
+    },
+    "schema_version": 1,
+    "source_manifest": {
+      "bytes": 13422208,
+      "file_count": 392,
+      "schema_version": 1,
+      "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "command": "python3 .forge-codex/scripts/qualify_signed_shell_manager.py --app '/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Handoff-Release/Build/Products/Release/Forge Conductor.app' --execute --qualification-home /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Handoff-Qualification-Home --output .forge-codex/evidence/P10-cli-installation.json",
+  "ended_at": "2026-09-05T02:04:03.984363+00:00",
+  "environment": {
+    "architecture": "arm64",
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine_identifier": "Mac16,7",
+    "macos_build": "25G83",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "execution_provenance": {
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "ffcf6bf9a2ea0c76a54788041cfa00c0dc8c7db4",
+      "branch": "release/0.9.0-shipping",
+      "head_sha": "b1876cf5b05134292ce0ecc6fb14ee67535c156c",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "exit_code": 4,
+  "id": "EVID-20260905T020339Z-bbd5f84078",
+  "kind": "p10-native-cli-installation",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 13422208,
+    "file_count": 392,
+    "schema_version": 1,
+    "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"
+  },
+  "source_manifest_after": {
+    "bytes": 13422208,
+    "file_count": 392,
+    "schema_version": 1,
+    "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-09-05T02:03:39.489014+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

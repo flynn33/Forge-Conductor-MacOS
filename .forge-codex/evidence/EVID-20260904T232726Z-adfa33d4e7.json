@@ -1,0 +1,115 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 125892,
+      "path": ".forge-codex/evidence/EVID-20260904T232726Z-adfa33d4e7.artifact-000-P10-feature-production-qualification-report.json",
+      "sha256": "90fbedd55b3b0a29292afa5f495b4f0430c479a48009edf1edc4cdd1dacc8bcd",
+      "source_path": ".forge-codex/evidence/P10-feature-production-qualification-report.json",
+      "storage": "evidence-id-specific-copy"
+    },
+    {
+      "bytes": 148,
+      "path": ".forge-codex/evidence/EVID-20260904T232726Z-adfa33d4e7.artifact-001-P10-feature-production-observations.json",
+      "sha256": "66f885d88cb420f1f1ced8c4fbc4e6f1892d697c9b2524d01c6fed2376d074f2",
+      "source_path": ".forge-codex/evidence/P10-feature-production-observations.json",
+      "storage": "evidence-id-specific-copy"
+    },
+    {
+      "bytes": 40138,
+      "path": ".forge-codex/evidence/EVID-20260904T232726Z-adfa33d4e7.artifact-002-P10-cli-version-help-observations.json",
+      "sha256": "3c4e6d71183caab12191e1ae2713e479dee686e5e7cfdceb2b243ddf2f3d1ea4",
+      "source_path": ".forge-codex/evidence/P10-cli-version-help-observations.json",
+      "storage": "evidence-id-specific-copy"
+    },
+    {
+      "bytes": 13286,
+      "path": ".forge-codex/evidence/EVID-20260904T232726Z-adfa33d4e7.stdout.txt",
+      "sha256": "c2a5aa9d9e46128c04b45db259a03f7d4b31cc7b79b779721dc45c88f56bdf51",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260904T232726Z-adfa33d4e7.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "child_evidence_context": {
+    "binding_schema_version": 1,
+    "evidence_id": "EVID-20260904T232726Z-adfa33d4e7",
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "ffcf6bf9a2ea0c76a54788041cfa00c0dc8c7db4",
+      "branch": "release/0.9.0-shipping",
+      "head_sha": "6fd2ea22b2e3c22e97fb51634d72f1aa8a6886a2",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
+    },
+    "schema_version": 1,
+    "source_manifest": {
+      "bytes": 13226860,
+      "file_count": 384,
+      "schema_version": 1,
+      "sha256": "4814c097534de0d4467242dfd80a0412e0d658eb0a33183492135cd683c800ef"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "command": "python3 .forge-codex/scripts/qualify_p10_features.py --report .forge-codex/evidence/P10-feature-production-qualification-report.json --cli-app '/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Product-DevelopmentRelease/Build/Products/Release/Forge Conductor.app'",
+  "ended_at": "2026-09-04T23:27:27.063079+00:00",
+  "environment": {
+    "architecture": "arm64",
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine_identifier": "Mac16,7",
+    "macos_build": "25G83",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "execution_provenance": {
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "ffcf6bf9a2ea0c76a54788041cfa00c0dc8c7db4",
+      "branch": "release/0.9.0-shipping",
+      "head_sha": "6fd2ea22b2e3c22e97fb51634d72f1aa8a6886a2",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "exit_code": 2,
+  "id": "EVID-20260904T232726Z-adfa33d4e7",
+  "kind": "shipping-cli-version-help-supporting",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 13226860,
+    "file_count": 384,
+    "schema_version": 1,
+    "sha256": "4814c097534de0d4467242dfd80a0412e0d658eb0a33183492135cd683c800ef"
+  },
+  "source_manifest_after": {
+    "bytes": 13226860,
+    "file_count": 384,
+    "schema_version": 1,
+    "sha256": "4814c097534de0d4467242dfd80a0412e0d658eb0a33183492135cd683c800ef"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-09-04T23:27:26.728131+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-09-04T22:35:11.865904+00:00",
+  "captured_at": "2026-09-05T02:02:03.207003+00:00",
   "environment_keys_present": [
     "CODEX_APP_TOOLS_PIPE_PATH",
     "CODEX_CI",
@@ -9,7 +9,21 @@
     "CODEX_SAGE_BACKFILL_TRACKER_TAB_REUSE",
     "CODEX_SESSION_ID",
     "CODEX_SHELL",
-    "CODEX_THREAD_ID"
+    "CODEX_THREAD_ID",
+    "FORGE_EVIDENCE_ARCHITECTURE",
+    "FORGE_EVIDENCE_BASE_BRANCH",
+    "FORGE_EVIDENCE_BASE_SHA",
+    "FORGE_EVIDENCE_BINDING_SCHEMA_VERSION",
+    "FORGE_EVIDENCE_CONTEXT_SCHEMA_VERSION",
+    "FORGE_EVIDENCE_ID",
+    "FORGE_EVIDENCE_MACHINE_IDENTIFIER",
+    "FORGE_EVIDENCE_MACOS_BUILD",
+    "FORGE_EVIDENCE_PLATFORM",
+    "FORGE_EVIDENCE_REPOSITORY_BRANCH",
+    "FORGE_EVIDENCE_REPOSITORY_HEAD_SHA",
+    "FORGE_EVIDENCE_REPOSITORY_PATH",
+    "FORGE_EVIDENCE_SOURCE_MANIFEST_JSON",
+    "FORGE_GATE_REPOSITORY_ROOT"
   ],
   "execution_state": {
     "available": true,
@@ -18,7 +32,7 @@
       "base_branch": "main",
       "base_sha": "ffcf6bf9a2ea0c76a54788041cfa00c0dc8c7db4",
       "github_readback_verified": false,
-      "head_sha": "ffcf6bf9a2ea0c76a54788041cfa00c0dc8c7db4",
+      "head_sha": "b1876cf5b05134292ce0ecc6fb14ee67535c156c",
       "identity_resolution": "open_pull_request_not_found",
       "main_branch": "main",
       "main_sha": "ffcf6bf9a2ea0c76a54788041cfa00c0dc8c7db4",
@@ -33,10 +47,10 @@
       {
         "evidence_class": "E0",
         "id": "FC-UI-QUALIFICATION-001",
-        "notes": "Apple Development signing with James Daley on team 9AQ2C2838M is available. The current working-tree Release regression executes 1,001 tests with 5 declared environment skips and 0 failures under warnings-as-errors. A dedicated Apple Development-signed app-hosted Xcode contract suite executes 2 tests with 0 failures from fresh DerivedData. These are supporting non-UI proofs only. The current-source full native navigation and action matrix, production Settings shell control and post-enable flow, production folder panel, real SMAppService approval/update/disable/restart, privileged service lifecycle, Developer ID Release identity, archive, notarization, staple, and Gatekeeper remain unproven. Native qualification remains deferred and release-blocking and cannot pass from build-only, unit, app-hosted, synthetic, failed-initialization, read-only, or partial UI evidence. Exact checkpoint EVID-20260901T111032Z-3e4b6e0d96 built the coherent Apple Development-signed Release product with FORGE_DEVELOPMENT_SIGNING, EVID-20260901T111225Z-c749bdbf18 passed the five-artifact bundle checker, and EVID-20260901T110721Z-924f41ac96 passed 2 of 2 app-hosted contracts. None is native UI interaction, Developer ID Release, archive, notarization, staple, Gatekeeper, or protected-service lifecycle evidence. This finding remains deferred and release-blocking.",
+        "notes": "Final source7d3fbb4 normal production onboarding EVID-20260905T012552Z-150ad6578a passed4cases0skips0fail: native folder authorization/cancel/invalid root, provider offline save/rejection/replacement, Settings/freshMCP, real provider discovery/connection. EVID-20260905T013112Z-d0687b0ed2 passed17nativeapphosted tests. Full native action/service/scene-lifetime and DeveloperIDrelease matrix remain open; do not treat older failed restarted UI runs as passed.",
         "severity": "High",
-        "status": "deferred",
-        "title": "Native signed UI qualification is deferred and release-blocking"
+        "status": "validating",
+        "title": "Native signed UI qualification remains incomplete"
       },
       {
         "evidence_class": "E2",
@@ -49,10 +63,10 @@
       {
         "evidence_class": "E0",
         "id": "FC-SHELL-COMPAT-QUALIFICATION-001",
-        "notes": "The current working-tree Release regression executes 1,001 tests with 5 declared environment skips and 0 failures under warnings-as-errors. Bounded Apple Development-signed installed-app evidence preserves clean-install default enablement, accidental legacy-disabled migration, explicit opt-out and denial, exactly one shell_exec in MCP tools/list, established synchronous login Bash behavior and result contract through app and installed raw CLI, app relaunch, manager PID replacement with predecessor exit, and opt-out survival. shell_exec remains unchanged and bash.run remains additive. Production Settings control and post-Settings re-enable have not executed in the required XCUI lane. Developer ID Release, exact P10 production binding, native UI, archive, notarization, staple, and Gatekeeper remain open. This issue remains validating and release-blocking. Exact checkpoint EVID-20260901T111318Z-c887522fd4 is an intentionally partial installed-product qualification. It passed clean-install default enablement, accidental legacy-disabled migration, explicit opt-out and denial, exactly one shell_exec in tools/list, established login Bash behavior and result fields through the app and installed raw CLI, app relaunch, installed-manager PID replacement with predecessor exit, opt-out persistence, and raw CLI version/status/doctor. Cleanup restored the original command link, LaunchAgent state, and disabled state. Native Settings mutation and post-Settings re-enable were not run, so all completion claims remain false. EVID-20260901T110805Z-a977abdfeb is a nonqualifying blocked attempt from an incoherent evidence build that omitted FORGE_DEVELOPMENT_SIGNING; the installer correctly rejected it and cleanup restored state. Corrected build EVID-20260901T111032Z-3e4b6e0d96 and bundle check EVID-20260901T111225Z-c749bdbf18 are the applicable support.",
+        "notes": "Final native XCTest EVID-20260905T012552Z-150ad6578a passed Settings shell disable/re-enable, restart and fresh MCP denial/success through normal bootstrap and real folder panel. Canonical installed-manager EVID-20260905T013713Z-d0a7ac34b0 passed install/rawCLI/default/migration/optout/app-manager restart substeps and restored shared state; overallpartial because its own SystemEventsSettings step is notrun. The distinct records are not combined into a fabricated complete signed production or DeveloperID matrix.",
         "severity": "High",
         "status": "validating",
-        "title": "Shell compatibility requires native Settings qualification"
+        "title": "Shell Settings path executed; full signed production binding remains open"
       },
       {
         "evidence_class": "E0",
@@ -69,14 +83,6 @@
         "severity": "High",
         "status": "deferred",
         "title": "Representative physical-hardware qualification is owner-deferred and release-blocking"
-      },
-      {
-        "evidence_class": "E0",
-        "id": "FC-PROJECT-ROOT-SETTINGS-001",
-        "notes": "Native Settings implements operator-visible add and remove folder controls backed by NSOpenPanel, canonical symlink-resolved display, stable sorting and deduplication, filesystem-root, relative, missing and file rejection, typed manager settings, persistence, live application, accessibility identifiers, and restart survival. Earlier exact-revision strict Debug EVID-20260831T035742Z-50132edfb8 and Release EVID-20260831T040038Z-09ae71112e each passed 776 tests with two declared host skips and zero failures. Earlier exact-revision signed Debug XCUI EVID-20260830T153118Z-752f058222 passed six bounded Settings and relaunch cases, including two root-control cases, but chooser cases used a deterministic test-only selection hook. Exact-revision XCUI attempts EVID-20260831T031230Z-106eaea0df and EVID-20260831T031815Z-60354310b5 failed during automation-mode initialization before any test method. The current working-tree Release regression executes 1,001 tests with 5 declared environment skips and 0 failures, and the dedicated signed app-hosted contract suite executes 2 tests with 0 failures; neither exercises the production NSOpenPanel. Production NSOpenPanel observation and the broader signed native gate remain required before resolution. Exact checkpoint EVID-20260901T105839Z-6eed3d3434 passed the 1,001-test Release regression and EVID-20260901T110721Z-924f41ac96 passed both app-hosted project projection contracts. Production NSOpenPanel interaction was not executed, so this issue remains validating and release-blocking.",
-        "severity": "High",
-        "status": "validating",
-        "title": "Clean-install project root authority lacks a native Settings control"
       },
       {
         "evidence_class": "E2",
@@ -97,26 +103,60 @@
       {
         "evidence_class": "E0",
         "id": "FC-FEATURE-OPERABILITY-001",
-        "notes": "Feature complete requires successful production-path behavior, not source presence or a green unit suite. The canonical P10 registry contains 104 features and 259 required assertions; its production-probe registry still has 0 implemented scenarios, so no complete P10 production qualification is claimed. The current working-tree Release regression executes 1,001 tests with 5 declared environment skips and 0 failures under warnings-as-errors, and the dedicated signed app-hosted Xcode contract suite executes 2 tests with 0 failures from fresh DerivedData. Production fs_move and recursive directory fs_delete remain unavailable. Clean-install provider create/update control remains missing. Current native UI, real-provider forced rollover, signed distinct-process filesystem E2, privileged service lifecycle, coherent installation and migration, exact production MCP behavior, and owner-deferred hardware qualification must execute successfully before this issue can resolve. P10, G10, G12, E2, native signing, shell UI, continuity, and hardware gates remain open. Exact source checkpoint 2cc41ee2d95255761582792ed6c70c00702ff2f6 is bound by EVID-20260901T105839Z-6eed3d3434: 1,001 Release tests, 5 declared environment skips, and 0 failures with an unchanged 373-file source manifest. EVID-20260901T110721Z-924f41ac96 executed both signed app-hosted operator contracts with 0 failures. These are supporting regression and app-hosted proofs only; the P10 production-probe registry still implements zero of 259 required assertions, so no feature is promoted to exact-current production-qualified and every listed release blocker remains open.",
+        "notes": "Current source7d3fbb4 has104features/259required assertions. Canonical CLI capture EVID-20260905T013842Z-4deee02cdf and reader EVID-20260905T013919Z-054b4ebd37 accept2 assertions in development-installed-release scope;257 have no implemented production scenario and0full features are promoted. Native production onboarding4/4 and app-hosted17/17 pass. This improves concrete setup/shell proof without closing fullP10, requiredfs_move/recursive_delete, privileged service, real continuity, resources, hardware or distribution gates.",
         "severity": "High",
         "status": "patching",
         "title": "Advertised features require current production-path operability evidence"
-      },
-      {
-        "evidence_class": "E1",
-        "id": "FC-PROVIDER-CONFIG-OPERABILITY-001",
-        "notes": "Production loads managed-providers/forge-native-session-host/lmstudio-provider.json only when it already exists; no supported app, CLI, or manager control creates or updates it on a clean install. Implement typed redacted configuration controls, atomic persistence and migration, health-aware UI gating, restart survival, and real manager/provider tests. Provider probes now run outside dashboard serialization with a bounded timeout and single-probe admission. On timeout, admission remains fail-closed until the exact task exits, so a cancellation-ignoring provider cannot accumulate work; a provider that never terminates blocks further probes for that ManagerNode lifetime and requires manager restart. This is bounded mitigation, not provider-operability completion.",
-        "severity": "High",
-        "status": "patching",
-        "title": "Clean install lacks a supported managed-provider configuration path"
       }
     ],
     "nonpassing_hard_gates": [
       {
+        "deferral": null,
+        "id": "G02",
+        "release_blocking": true,
+        "status": "failed"
+      },
+      {
+        "deferral": null,
+        "id": "G03",
+        "release_blocking": true,
+        "status": "failed"
+      },
+      {
+        "deferral": null,
+        "id": "G04",
+        "release_blocking": true,
+        "status": "failed"
+      },
+      {
+        "deferral": null,
+        "id": "G05",
+        "release_blocking": true,
+        "status": "failed"
+      },
+      {
+        "deferral": null,
+        "id": "G06",
+        "release_blocking": true,
+        "status": "failed"
+      },
+      {
+        "deferral": null,
+        "id": "G07",
+        "release_blocking": true,
+        "status": "failed"
+      },
+      {
+        "deferral": null,
+        "id": "G08",
+        "release_blocking": true,
+        "status": "failed"
+      },
+      {
         "deferral": "real_provider_manager_owned_rollover_evidence_required",
         "id": "G09",
         "release_blocking": true,
-        "status": "blocked_dependency"
+        "status": "failed"
       },
       {
         "deferral": "p10_e2_native_and_privileged_lifecycle_evidence_required",
@@ -141,10 +181,10 @@
       {
         "evidence_class": "E0",
         "id": "FC-UI-QUALIFICATION-001",
-        "notes": "Apple Development signing with James Daley on team 9AQ2C2838M is available. The current working-tree Release regression executes 1,001 tests with 5 declared environment skips and 0 failures under warnings-as-errors. A dedicated Apple Development-signed app-hosted Xcode contract suite executes 2 tests with 0 failures from fresh DerivedData. These are supporting non-UI proofs only. The current-source full native navigation and action matrix, production Settings shell control and post-enable flow, production folder panel, real SMAppService approval/update/disable/restart, privileged service lifecycle, Developer ID Release identity, archive, notarization, staple, and Gatekeeper remain unproven. Native qualification remains deferred and release-blocking and cannot pass from build-only, unit, app-hosted, synthetic, failed-initialization, read-only, or partial UI evidence. Exact checkpoint EVID-20260901T111032Z-3e4b6e0d96 built the coherent Apple Development-signed Release product with FORGE_DEVELOPMENT_SIGNING, EVID-20260901T111225Z-c749bdbf18 passed the five-artifact bundle checker, and EVID-20260901T110721Z-924f41ac96 passed 2 of 2 app-hosted contracts. None is native UI interaction, Developer ID Release, archive, notarization, staple, Gatekeeper, or protected-service lifecycle evidence. This finding remains deferred and release-blocking.",
+        "notes": "Final source7d3fbb4 normal production onboarding EVID-20260905T012552Z-150ad6578a passed4cases0skips0fail: native folder authorization/cancel/invalid root, provider offline save/rejection/replacement, Settings/freshMCP, real provider discovery/connection. EVID-20260905T013112Z-d0687b0ed2 passed17nativeapphosted tests. Full native action/service/scene-lifetime and DeveloperIDrelease matrix remain open; do not treat older failed restarted UI runs as passed.",
         "severity": "High",
-        "status": "deferred",
-        "title": "Native signed UI qualification is deferred and release-blocking"
+        "status": "validating",
+        "title": "Native signed UI qualification remains incomplete"
       },
       {
         "evidence_class": "E2",
@@ -157,10 +197,10 @@
       {
         "evidence_class": "E0",
         "id": "FC-SHELL-COMPAT-QUALIFICATION-001",
-        "notes": "The current working-tree Release regression executes 1,001 tests with 5 declared environment skips and 0 failures under warnings-as-errors. Bounded Apple Development-signed installed-app evidence preserves clean-install default enablement, accidental legacy-disabled migration, explicit opt-out and denial, exactly one shell_exec in MCP tools/list, established synchronous login Bash behavior and result contract through app and installed raw CLI, app relaunch, manager PID replacement with predecessor exit, and opt-out survival. shell_exec remains unchanged and bash.run remains additive. Production Settings control and post-Settings re-enable have not executed in the required XCUI lane. Developer ID Release, exact P10 production binding, native UI, archive, notarization, staple, and Gatekeeper remain open. This issue remains validating and release-blocking. Exact checkpoint EVID-20260901T111318Z-c887522fd4 is an intentionally partial installed-product qualification. It passed clean-install default enablement, accidental legacy-disabled migration, explicit opt-out and denial, exactly one shell_exec in tools/list, established login Bash behavior and result fields through the app and installed raw CLI, app relaunch, installed-manager PID replacement with predecessor exit, opt-out persistence, and raw CLI version/status/doctor. Cleanup restored the original command link, LaunchAgent state, and disabled state. Native Settings mutation and post-Settings re-enable were not run, so all completion claims remain false. EVID-20260901T110805Z-a977abdfeb is a nonqualifying blocked attempt from an incoherent evidence build that omitted FORGE_DEVELOPMENT_SIGNING; the installer correctly rejected it and cleanup restored state. Corrected build EVID-20260901T111032Z-3e4b6e0d96 and bundle check EVID-20260901T111225Z-c749bdbf18 are the applicable support.",
+        "notes": "Final native XCTest EVID-20260905T012552Z-150ad6578a passed Settings shell disable/re-enable, restart and fresh MCP denial/success through normal bootstrap and real folder panel. Canonical installed-manager EVID-20260905T013713Z-d0a7ac34b0 passed install/rawCLI/default/migration/optout/app-manager restart substeps and restored shared state; overallpartial because its own SystemEventsSettings step is notrun. The distinct records are not combined into a fabricated complete signed production or DeveloperID matrix.",
         "severity": "High",
         "status": "validating",
-        "title": "Shell compatibility requires native Settings qualification"
+        "title": "Shell Settings path executed; full signed production binding remains open"
       },
       {
         "evidence_class": "E0",
@@ -177,14 +217,6 @@
         "severity": "High",
         "status": "deferred",
         "title": "Representative physical-hardware qualification is owner-deferred and release-blocking"
-      },
-      {
-        "evidence_class": "E0",
-        "id": "FC-PROJECT-ROOT-SETTINGS-001",
-        "notes": "Native Settings implements operator-visible add and remove folder controls backed by NSOpenPanel, canonical symlink-resolved display, stable sorting and deduplication, filesystem-root, relative, missing and file rejection, typed manager settings, persistence, live application, accessibility identifiers, and restart survival. Earlier exact-revision strict Debug EVID-20260831T035742Z-50132edfb8 and Release EVID-20260831T040038Z-09ae71112e each passed 776 tests with two declared host skips and zero failures. Earlier exact-revision signed Debug XCUI EVID-20260830T153118Z-752f058222 passed six bounded Settings and relaunch cases, including two root-control cases, but chooser cases used a deterministic test-only selection hook. Exact-revision XCUI attempts EVID-20260831T031230Z-106eaea0df and EVID-20260831T031815Z-60354310b5 failed during automation-mode initialization before any test method. The current working-tree Release regression executes 1,001 tests with 5 declared environment skips and 0 failures, and the dedicated signed app-hosted contract suite executes 2 tests with 0 failures; neither exercises the production NSOpenPanel. Production NSOpenPanel observation and the broader signed native gate remain required before resolution. Exact checkpoint EVID-20260901T105839Z-6eed3d3434 passed the 1,001-test Release regression and EVID-20260901T110721Z-924f41ac96 passed both app-hosted project projection contracts. Production NSOpenPanel interaction was not executed, so this issue remains validating and release-blocking.",
-        "severity": "High",
-        "status": "validating",
-        "title": "Clean-install project root authority lacks a native Settings control"
       },
       {
         "evidence_class": "E2",
@@ -205,18 +237,26 @@
       {
         "evidence_class": "E0",
         "id": "FC-FEATURE-OPERABILITY-001",
-        "notes": "Feature complete requires successful production-path behavior, not source presence or a green unit suite. The canonical P10 registry contains 104 features and 259 required assertions; its production-probe registry still has 0 implemented scenarios, so no complete P10 production qualification is claimed. The current working-tree Release regression executes 1,001 tests with 5 declared environment skips and 0 failures under warnings-as-errors, and the dedicated signed app-hosted Xcode contract suite executes 2 tests with 0 failures from fresh DerivedData. Production fs_move and recursive directory fs_delete remain unavailable. Clean-install provider create/update control remains missing. Current native UI, real-provider forced rollover, signed distinct-process filesystem E2, privileged service lifecycle, coherent installation and migration, exact production MCP behavior, and owner-deferred hardware qualification must execute successfully before this issue can resolve. P10, G10, G12, E2, native signing, shell UI, continuity, and hardware gates remain open. Exact source checkpoint 2cc41ee2d95255761582792ed6c70c00702ff2f6 is bound by EVID-20260901T105839Z-6eed3d3434: 1,001 Release tests, 5 declared environment skips, and 0 failures with an unchanged 373-file source manifest. EVID-20260901T110721Z-924f41ac96 executed both signed app-hosted operator contracts with 0 failures. These are supporting regression and app-hosted proofs only; the P10 production-probe registry still implements zero of 259 required assertions, so no feature is promoted to exact-current production-qualified and every listed release blocker remains open.",
+        "notes": "Current source7d3fbb4 has104features/259required assertions. Canonical CLI capture EVID-20260905T013842Z-4deee02cdf and reader EVID-20260905T013919Z-054b4ebd37 accept2 assertions in development-installed-release scope;257 have no implemented production scenario and0full features are promoted. Native production onboarding4/4 and app-hosted17/17 pass. This improves concrete setup/shell proof without closing fullP10, requiredfs_move/recursive_delete, privileged service, real continuity, resources, hardware or distribution gates.",
         "severity": "High",
         "status": "patching",
         "title": "Advertised features require current production-path operability evidence"
       },
       {
-        "evidence_class": "E1",
-        "id": "FC-PROVIDER-CONFIG-OPERABILITY-001",
-        "notes": "Production loads managed-providers/forge-native-session-host/lmstudio-provider.json only when it already exists; no supported app, CLI, or manager control creates or updates it on a clean install. Implement typed redacted configuration controls, atomic persistence and migration, health-aware UI gating, restart survival, and real manager/provider tests. Provider probes now run outside dashboard serialization with a bounded timeout and single-probe admission. On timeout, admission remains fail-closed until the exact task exits, so a cancellation-ignoring provider cannot accumulate work; a provider that never terminates blocks further probes for that ManagerNode lifetime and requires manager restart. This is bounded mitigation, not provider-operability completion.",
+        "evidence_class": "E0",
+        "id": "SHIPPING-NATIVE-WINDOW-LIFETIME-001",
+        "notes": "Retained weak-reference failures show wrapper and hosting view release while closed fixture NSWindow survives. EVID-20260905T010148Z-5020ee1a67 binds native ownership traces showing XCTestCase invokeTestMethod autorelease-pool retaining edge. Constructor/close, presentation/layout and observation pool comparisons did not release the window; no repair committed. Production window multiplication is not established. Next action is whole-scene native profiling outside the retaining XCTest fixture, preserving component evidence and original memgraph outside the repository.",
+        "severity": "Medium",
+        "status": "open",
+        "title": "XCTest autorelease pool retains closed gauge fixture windows across cycles"
+      },
+      {
+        "evidence_class": "E0",
+        "id": "SHIPPING-LIVE-BOOTSTRAP-001",
+        "notes": "EVID-20260905T013918Z-faae358156 naturallyfailed1test1failure at418 missingBootstrapReceipt after504.049s; child1/recorder125missing successreport, unchangedsource. Two providerExact predecessors crossedthreshold correctly. WaitingProvider doesnotprove the expected injectedcrash; finalproviderreasonwaslost onfixturecleanup. Smaller real fresh-root/ack/automaticcontinuation EVID-20260905T015037Z-7125c5a46e passed1case169.805s, narrowing problem. Add bounded sanitized diagnostic before receiptchecks/cleanup, preserve all assertions/deadlines/fences, and run one diagnostic manager retry before any speculative productrepair.",
         "severity": "High",
         "status": "patching",
-        "title": "Clean install lacks a supported managed-provider configuration path"
+        "title": "Manager rollover lacks an accepted successor bootstrap receipt"
       }
     ],
     "partial_security_pr_policy": {
@@ -228,10 +268,10 @@
     },
     "release_authorized": false,
     "repository": {
-      "branch": "repair/swift6-test-targets",
-      "commit": "62604e1f0f8abba649998679f22e55b0ecb89014",
+      "branch": "release/0.9.0-shipping",
+      "commit": "b1876cf5b05134292ce0ecc6fb14ee67535c156c",
       "dirty": true,
-      "root": "/Users/jimdaley/GitHub/Forge-Conductor-E2-Next"
+      "root": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
     },
     "run_status": "active"
   },

@@ -1,0 +1,15 @@
+Test Suite 'Selected tests' started at 2026-09-04 20:50:40.014.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-09-04 20:50:40.015.
+Test Suite 'NativeSessionHostPluginTests' started at 2026-09-04 20:50:40.015.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testLiveLMStudioFreshRootAcknowledgementAndAutomaticContinuation]' started.
+Test Case '-[ForgeConductorTests.NativeSessionHostPluginTests testLiveLMStudioFreshRootAcknowledgementAndAutomaticContinuation]' passed (169.805 seconds).
+Test Suite 'NativeSessionHostPluginTests' passed at 2026-09-04 20:53:29.820.
+	 Executed 1 test, with 0 failures (0 unexpected) in 169.805 (169.805) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-09-04 20:53:29.820.
+	 Executed 1 test, with 0 failures (0 unexpected) in 169.805 (169.806) seconds
+Test Suite 'Selected tests' passed at 2026-09-04 20:53:29.820.
+	 Executed 1 test, with 0 failures (0 unexpected) in 169.805 (169.806) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

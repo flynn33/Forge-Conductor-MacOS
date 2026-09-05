@@ -22,10 +22,13 @@
     },
     {
       "criterion": "telemetry mapping/unit tests pass",
-      "passed": true,
-      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorApp/AppModel.swift#3c0249108c0a9bdd2b7d075dd5414bb3158f266840d10e10b7560e63e71e4e9a; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T193356Z-c8231b937d.stdout.txt#83c3308c29b3eec08df13d52811ffbe8b48108735261c0d514cccc6ec187356e; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T193106Z-667173c96c.stdout.txt#33b97a5b76d0b7835f2e54e092c68a9415fc5272e387321a23984bc385eed12a"
+      "passed": false,
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorApp/AppModel.swift#4f96b0e41aaf0367b478b34b01273d9ae681790e10b008755bd2c56665888f02; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T193356Z-c8231b937d.stdout.txt#83c3308c29b3eec08df13d52811ffbe8b48108735261c0d514cccc6ec187356e; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T193106Z-667173c96c.stdout.txt#33b97a5b76d0b7835f2e54e092c68a9415fc5272e387321a23984bc385eed12a"
     }
   ],
-  "valid": true,
-  "errors": []
+  "valid": false,
+  "errors": [
+    "acceptance record is historical evidence for unknown, not current release authority",
+    "malformed evidence for: telemetry mapping/unit tests pass: hash mismatch: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorApp/AppModel.swift"
+  ]
 }

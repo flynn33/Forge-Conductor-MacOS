@@ -2,13 +2,13 @@
   "criteria_results": [
     {
       "criterion": "all audit E2 risks have ownership disposition",
-      "passed": true,
-      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P05-resource-owner-matrix.json#16a2f2d0b63d4c53ba46006afdf85254fa580de2b5426c7e4a662503e5d3eeda; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/findings-resolution.json#117b4f7df12206bd8ff7a6c50963f4a372c715cfdc3adc50a0226271cb83b8cc"
+      "passed": false,
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P05-resource-owner-matrix.json#16a2f2d0b63d4c53ba46006afdf85254fa580de2b5426c7e4a662503e5d3eeda; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/findings-resolution.json#7b565d1532ce1dd6f0b4757e23dc7da34f04b9ec047579e62295ffa11157fe11"
     },
     {
       "criterion": "confirmed retaining edges fixed with same-flow proof",
-      "passed": true,
-      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCLI/ForgeConductorMain.swift#088f88f8b73f17591e68daaf8b1d6cf8770bf7a12debf4e22116df6c47a9ed8c; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Dashboard/DashboardServer.swift#055caca8d7535cca499badca7cdb6378ade81964824dd841d83a2e82bc15df0e; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/DashboardPortGuard.swift#2b0237ff6b35518fa8c34dffa31ffeff7356d9bf6eafcd6d1d9436a2fd96c244; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Manager/ManagerRuntime.swift#39a342889ba4a067bf837ec47fe8191a722e3df780023608ab0958fba047f941; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T193826Z-661c01c5d5.stdout.txt#48ea5cf223eff9c4edcd0579afa59c9c36b83c5e768702d24ebf154a476e5b71"
+      "passed": false,
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCLI/ForgeConductorMain.swift#8584bf66b43097efb2b3f656db9f0e6b0015f30e957d076f92e22ac800b85407; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Dashboard/DashboardServer.swift#652c67609b11f5b6c47129b1cf0f1ba58212cb78455064f71c3bfcf3b49964a6; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/DashboardPortGuard.swift#2b0237ff6b35518fa8c34dffa31ffeff7356d9bf6eafcd6d1d9436a2fd96c244; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Manager/ManagerRuntime.swift#51e81e6b6b9042de5d8bf793d013e5ec79b77b30f3f15b1daa0a85be94c3feaa; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T193826Z-661c01c5d5.stdout.txt#48ea5cf223eff9c4edcd0579afa59c9c36b83c5e768702d24ebf154a476e5b71"
     },
     {
       "criterion": "process/pipe/task/timer/observer shutdown tests pass",
@@ -21,6 +21,12 @@
       "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P05-sanitizer-and-lifecycle-report.json#05eb6fb9771d6a10566af837ab27fec90b9c80485f0e5f4301bffd5e6752e63a; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T194148Z-4bc9b988c0.stderr.txt#343d66f8575dfd0c773094fcf09a2aae983cc15a26e108e733fc9b2c5169246e; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T194202Z-a41d508f0c.stderr.txt#c878345c2c2b6f9c210696529ff943adb936b8128c1e9dd51bd39ab39b749ab6; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T194308Z-9a5fdacf6f.stdout.txt#ac62c047f765668f088abe1b559bf82a448925472160b9e6d0396f70c5d4a180; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T194225Z-32827b0ff8.stdout.txt#c6bf199c5a3128cb16811ae598c954e70c8af806f17d3c484f85d96511abc14c; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T194253Z-44ca4b7694.stdout.txt#a6a19720b3c8f8860aa6d7aa418a9ece5156c63494d887f47173352b226dbf5b; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T194716Z-556705f0c7.stdout.txt#b06cf027ca8e7ffe3ae4ee6c76d88b3f8f7d27f57c7a0d4b7b25a6995818775b"
     }
   ],
-  "valid": true,
-  "errors": []
+  "valid": false,
+  "errors": [
+    "acceptance record is historical evidence for unknown, not current release authority",
+    "malformed evidence for: all audit E2 risks have ownership disposition: hash mismatch: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/findings-resolution.json",
+    "malformed evidence for: confirmed retaining edges fixed with same-flow proof: hash mismatch: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCLI/ForgeConductorMain.swift",
+    "malformed evidence for: confirmed retaining edges fixed with same-flow proof: hash mismatch: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Dashboard/DashboardServer.swift",
+    "malformed evidence for: confirmed retaining edges fixed with same-flow proof: hash mismatch: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Manager/ManagerRuntime.swift"
+  ]
 }

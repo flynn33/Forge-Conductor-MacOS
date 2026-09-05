@@ -1,0 +1,124 @@
+Test Suite 'Selected tests' started at 2026-09-04 18:53:18.576.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-09-04 18:53:18.577.
+Test Suite 'AppBackgroundOperationAppTests' started at 2026-09-04 18:53:18.577.
+Test Case '-[ForgeConductorTests.AppBackgroundOperationAppTests testCommittedExportWinsCancellationAndDuplicateActionIsRejected]' started.
+Test Case '-[ForgeConductorTests.AppBackgroundOperationAppTests testCommittedExportWinsCancellationAndDuplicateActionIsRejected]' passed (0.009 seconds).
+Test Case '-[ForgeConductorTests.AppBackgroundOperationAppTests testCooperativeCancellationAndFailureEachAllowRetryAfterCompletion]' started.
+Test Case '-[ForgeConductorTests.AppBackgroundOperationAppTests testCooperativeCancellationAndFailureEachAllowRetryAfterCompletion]' passed (0.013 seconds).
+Test Case '-[ForgeConductorTests.AppBackgroundOperationAppTests testReleasedOwnerCancelsWorkAndDoesNotReceiveCompletion]' started.
+Test Case '-[ForgeConductorTests.AppBackgroundOperationAppTests testReleasedOwnerCancelsWorkAndDoesNotReceiveCompletion]' passed (0.013 seconds).
+Test Suite 'AppBackgroundOperationAppTests' passed at 2026-09-04 18:53:18.611.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.034 (0.035) seconds
+Test Suite 'AppBootstrapAppTests' started at 2026-09-04 18:53:18.612.
+Test Case '-[ForgeConductorTests.AppBootstrapAppTests testCancellationClosesUnpublishedGraphAndAllowsRetryAfterCompletion]' started.
+Test Case '-[ForgeConductorTests.AppBootstrapAppTests testCancellationClosesUnpublishedGraphAndAllowsRetryAfterCompletion]' passed (0.212 seconds).
+Test Case '-[ForgeConductorTests.AppBootstrapAppTests testDelayedStartupLeavesMainActorResponsiveAndCoalescesDuplicateCalls]' started.
+Test Case '-[ForgeConductorTests.AppBootstrapAppTests testDelayedStartupLeavesMainActorResponsiveAndCoalescesDuplicateCalls]' passed (0.156 seconds).
+Test Case '-[ForgeConductorTests.AppBootstrapAppTests testNativeModelFailureAndRetryKeepPublishedStateOnMainActor]' started.
+Test Case '-[ForgeConductorTests.AppBootstrapAppTests testNativeModelFailureAndRetryKeepPublishedStateOnMainActor]' passed (0.013 seconds).
+Test Case '-[ForgeConductorTests.AppBootstrapAppTests testOwnerReleaseCancelsWorkerWithoutRetainingApplication]' started.
+Test Case '-[ForgeConductorTests.AppBootstrapAppTests testOwnerReleaseCancelsWorkerWithoutRetainingApplication]' passed (0.163 seconds).
+Test Suite 'AppBootstrapAppTests' passed at 2026-09-04 18:53:19.156.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.544 (0.544) seconds
+Test Suite 'ProcessRunnerTests' started at 2026-09-04 18:53:19.156.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testCallerCannotRaiseTheOwnerOutputCeiling]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testCallerCannotRaiseTheOwnerOutputCeiling]' passed (0.003 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testCancellationTerminatesAndReapsEntireProcessGroup]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testCancellationTerminatesAndReapsEntireProcessGroup]' passed (0.113 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testContinuousOutputDoesNotStarveOtherStreamOrTimeout]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testContinuousOutputDoesNotStarveOtherStreamOrTimeout]' passed (0.131 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testDeadlineTerminatesProcessAndThrowsDeadlineError]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testDeadlineTerminatesProcessAndThrowsDeadlineError]' passed (0.076 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testDirectChildExitDoesNotWaitForDescendantPipeEOF]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testDirectChildExitDoesNotWaitForDescendantPipeEOF]' passed (0.062 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testLaunchFailureDoesNotPoisonTheNextRun]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testLaunchFailureDoesNotPoisonTheNextRun]' passed (0.005 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testMalformedAndCapSplitUTF8PreserveReadableOutput]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testMalformedAndCapSplitUTF8PreserveReadableOutput]' passed (0.005 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testNonfiniteTimeoutCannotCreateAnIndefiniteWait]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testNonfiniteTimeoutCannotCreateAnIndefiniteWait]' passed (0.092 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testNormalAndNonzeroExitStatuses]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testNormalAndNonzeroExitStatuses]' passed (0.005 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testObservedTerminalResultWinsConcurrentCancellation]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testObservedTerminalResultWinsConcurrentCancellation]' passed (0.357 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testOutputIsCapturedConcurrentlyAndTruncatedPerStream]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testOutputIsCapturedConcurrentlyAndTruncatedPerStream]' passed (0.011 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testParallelRunsRemainBoundedAndIndependent]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testParallelRunsRemainBoundedAndIndependent]' passed (0.053 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testRapidExitNotificationsAreNotLostUnderLoad]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testRapidExitNotificationsAreNotLostUnderLoad]' passed (0.047 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testSaturatedStreamsContinueDrainingAfterRetentionCapUntilFiniteChildCompletes]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testSaturatedStreamsContinueDrainingAfterRetentionCapUntilFiniteChildCompletes]' passed (0.010 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testTermIgnoringChildRequiresSIGKILL]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testTermIgnoringChildRequiresSIGKILL]' passed (0.335 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testTerminationGraceDrainsHandlerOutputBeyondPipeCapacity]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testTerminationGraceDrainsHandlerOutputBeyondPipeCapacity]' passed (0.190 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testTimeoutTerminatesAndReapsEntireDescendantGroup]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testTimeoutTerminatesAndReapsEntireDescendantGroup]' passed (0.289 seconds).
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testTimeoutTerminatesChildAndReturnsConfirmedStatus]' started.
+Test Case '-[ForgeConductorTests.ProcessRunnerTests testTimeoutTerminatesChildAndReturnsConfirmedStatus]' passed (0.050 seconds).
+Test Suite 'ProcessRunnerTests' passed at 2026-09-04 18:53:20.991.
+	 Executed 18 tests, with 0 failures (0 unexpected) in 1.832 (1.835) seconds
+Test Suite 'ProductPathReliabilityTests' started at 2026-09-04 18:53:20.991.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testDiagnosticsCaptureDeploySmokeFailurePath]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testDiagnosticsCaptureDeploySmokeFailurePath]' passed (0.011 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testFilesystemIdentitySealUsesSandboxWritableAtomicStaging]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testFilesystemIdentitySealUsesSandboxWritableAtomicStaging]' passed (0.013 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testForgeStatusToolCall]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testForgeStatusToolCall]' passed (0.173 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testInProcessMCPHandshakeToolsList]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testInProcessMCPHandshakeToolsList]' passed (0.154 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testNestedLifecycleFixtureUsesContinuouslyDrainedCappedPipes]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testNestedLifecycleFixtureUsesContinuouslyDrainedCappedPipes]' passed (0.016 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testPortGuardReportsFreeOnUnusedPort]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testPortGuardReportsFreeOnUnusedPort]' passed (0.067 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testPrivilegedDaemonBindsPersistedDigestAndLegacyRollbackIdentity]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testPrivilegedDaemonBindsPersistedDigestAndLegacyRollbackIdentity]' passed (0.015 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testPrivilegedDaemonUsesDistinctCaptureIdentityAndPhaseReceipts]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testPrivilegedDaemonUsesDistinctCaptureIdentityAndPhaseReceipts]' passed (0.004 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testPrivilegedFilesystemBundleCheckerRetainsExactOptionalCLISealContract]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testPrivilegedFilesystemBundleCheckerRetainsExactOptionalCLISealContract]' passed (0.005 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testProcessVerifierRejectsHandshakeEmittedOnlyAfterEOF]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testProcessVerifierRejectsHandshakeEmittedOnlyAfterEOF]' passed (0.232 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testProcessVerifierRejectsMissingContinuityTool]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testProcessVerifierRejectsMissingContinuityTool]' passed (0.232 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testProcessVerifierRejectsMissingMemoryTool]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testProcessVerifierRejectsMissingMemoryTool]' passed (0.238 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testProcessVerifierRejectsNonNDJSONPrefix]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testProcessVerifierRejectsNonNDJSONPrefix]' passed (0.229 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testProcessVerifierRejectsValidHandshakeWhenCleanupIntervenes]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testProcessVerifierRejectsValidHandshakeWhenCleanupIntervenes]' passed (1.246 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testProcessVerifierRejectsValidHandshakeWithNonzeroNaturalExit]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testProcessVerifierRejectsValidHandshakeWithNonzeroNaturalExit]' passed (0.232 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testProcessVerifierTimeoutIsBoundedForSilentChild]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testProcessVerifierTimeoutIsBoundedForSilentChild]' passed (1.244 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testProjectBuildEntrypointStagesRuntimeLauncherBeforeBundleSigning]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testProjectBuildEntrypointStagesRuntimeLauncherBeforeBundleSigning]' passed (0.007 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testProtectedServiceSettingsUseOneOperationGateForEveryConflictingControl]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testProtectedServiceSettingsUseOneOperationGateForEveryConflictingControl]' passed (0.037 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testProtectedServiceSettingsUseOperationalHealthWithoutChangingRawStatus]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testProtectedServiceSettingsUseOperationalHealthWithoutChangingRawStatus]' passed (0.029 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testRealtimeEngineMeasuredProgress]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testRealtimeEngineMeasuredProgress]' passed (0.404 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testRemoteSettingsCommitReplacesEveryAppModelManagerEndpointBeforeRefresh]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testRemoteSettingsCommitReplacesEveryAppModelManagerEndpointBeforeRefresh]' passed (0.001 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testXcodeAppContractTestsRemainHostedAndSeparatedFromCoreLogicTests]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testXcodeAppContractTestsRemainHostedAndSeparatedFromCoreLogicTests]' passed (0.045 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testXcodeFilesystemIdentityBuildGraphRetainsSigningBeforeSealingControls]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testXcodeFilesystemIdentityBuildGraphRetainsSigningBeforeSealingControls]' passed (0.049 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testXcodeRuntimeLauncherEmbedsDeclaredProductIdentity]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testXcodeRuntimeLauncherEmbedsDeclaredProductIdentity]' passed (0.006 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testXcodeShippedTargetsKeepDebugAndReleaseSigningClassesDistinct]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testXcodeShippedTargetsKeepDebugAndReleaseSigningClassesDistinct]' passed (0.029 seconds).
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testXcodeUnitTargetIncludesCurrentRuntimeQualificationSources]' started.
+Test Case '-[ForgeConductorTests.ProductPathReliabilityTests testXcodeUnitTargetIncludesCurrentRuntimeQualificationSources]' passed (0.015 seconds).
+Test Suite 'ProductPathReliabilityTests' passed at 2026-09-04 18:53:25.728.
+	 Executed 26 tests, with 0 failures (0 unexpected) in 4.734 (4.737) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-09-04 18:53:25.728.
+	 Executed 51 tests, with 0 failures (0 unexpected) in 7.144 (7.151) seconds
+Test Suite 'Selected tests' passed at 2026-09-04 18:53:25.728.
+	 Executed 51 tests, with 0 failures (0 unexpected) in 7.144 (7.152) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

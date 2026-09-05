@@ -1,0 +1,16 @@
+[0/1] Planning build
+Building for debugging...
+[0/16] Write sources
+[2/16] Write swift-version--58304C5D6DBC2206.txt
+[4/10] Compiling ForgeNativeSessionHostPlugin ForgeNativeSessionHostPlugin.swift
+[5/10] Emitting module ForgeNativeSessionHostPlugin
+[5/13] Write Objects.LinkFileList
+[7/13] Linking forge-conductor
+[8/13] Applying forge-conductor
+[9/13] Linking forge-conductor-app
+[10/13] Applying forge-conductor-app
+[12/15] Compiling ForgeConductorTests NativeSessionHostPluginTests.swift
+[13/15] Emitting module ForgeConductorTests
+[13/15] Write Objects.LinkFileList
+[14/15] Linking ForgeConductorPackageTests
+Build complete! (6.23s)

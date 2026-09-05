@@ -1,0 +1,94 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 294535,
+      "path": ".forge-codex/evidence/EVID-20260904T232158Z-a7ad20bfb2.stdout.txt",
+      "sha256": "430305e5098d6c76fbe58f89cca689fa3c283ef950a9829115cbf458d3da9231",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 25,
+      "path": ".forge-codex/evidence/EVID-20260904T232158Z-a7ad20bfb2.stderr.txt",
+      "sha256": "7ad485fb379925bb1d2d1fbe4da8452ff5369870aa7f9b7084e55b164fe50a69",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "child_evidence_context": {
+    "binding_schema_version": 1,
+    "evidence_id": "EVID-20260904T232158Z-a7ad20bfb2",
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "ffcf6bf9a2ea0c76a54788041cfa00c0dc8c7db4",
+      "branch": "release/0.9.0-shipping",
+      "head_sha": "6fd2ea22b2e3c22e97fb51634d72f1aa8a6886a2",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
+    },
+    "schema_version": 1,
+    "source_manifest": {
+      "bytes": 13187910,
+      "file_count": 382,
+      "schema_version": 1,
+      "sha256": "df193bb0b5e117a499789b948a482710542d7f70e9ee835cb7e4b481635366de"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "command": "xcodebuild -workspace ForgeConductor.xcworkspace -scheme ForgeConductor -configuration Release -destination platform=macOS,arch=arm64 -derivedDataPath /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Product-DevelopmentRelease -jobs 4 DEVELOPMENT_TEAM=9AQ2C2838M 'CODE_SIGN_IDENTITY=Apple Development' FORGE_DEVELOPMENT_SIGNING=YES SWIFT_TREAT_WARNINGS_AS_ERRORS=YES build",
+  "ended_at": "2026-09-04T23:22:15.558602+00:00",
+  "environment": {
+    "architecture": "arm64",
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine_identifier": "Mac16,7",
+    "macos_build": "25G83",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "execution_provenance": {
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "ffcf6bf9a2ea0c76a54788041cfa00c0dc8c7db4",
+      "branch": "release/0.9.0-shipping",
+      "head_sha": "6fd2ea22b2e3c22e97fb51634d72f1aa8a6886a2",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "exit_code": 75,
+  "id": "EVID-20260904T232158Z-a7ad20bfb2",
+  "kind": "shipping-product-development-release-build",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [],
+  "related_gates": [
+    "G11"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 13187910,
+    "file_count": 382,
+    "schema_version": 1,
+    "sha256": "df193bb0b5e117a499789b948a482710542d7f70e9ee835cb7e4b481635366de"
+  },
+  "source_manifest_after": {
+    "bytes": 13187910,
+    "file_count": 382,
+    "schema_version": 1,
+    "sha256": "df193bb0b5e117a499789b948a482710542d7f70e9ee835cb7e4b481635366de"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-09-04T23:21:58.196459+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

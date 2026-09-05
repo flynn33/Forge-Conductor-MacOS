@@ -1,0 +1,8 @@
+2026-09-04 18:04:59.986 xcodebuild[75749:33171307] [MT] IDETestOperationsObserverDebug: 11.831 elapsed -- Testing started completed.
+2026-09-04 18:04:59.986 xcodebuild[75749:33171307] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-09-04 18:04:59.986 xcodebuild[75749:33171307] [MT] IDETestOperationsObserverDebug: 11.831 sec, +11.831 sec -- end
+Failing tests:
+	ProviderConfigurationTests.testNonterminalDurableRunFencesConfigurationWithoutChangingRun()
+
+** TEST FAILED **
+

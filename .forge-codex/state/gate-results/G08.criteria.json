@@ -26,6 +26,8 @@
       "passed": true
     }
   ],
-  "errors": [],
-  "valid": true
+  "errors": [
+    "acceptance record is historical evidence for unknown, not current release authority"
+  ],
+  "valid": false
 }

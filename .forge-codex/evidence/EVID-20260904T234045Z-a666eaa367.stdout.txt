@@ -1,0 +1,24 @@
+Test Suite 'Selected tests' started at 2026-09-04 18:40:59.376.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-09-04 18:40:59.376.
+Test Suite 'OperatorProjectContractTests' started at 2026-09-04 18:40:59.376.
+Test Case '-[ForgeConductorTests.OperatorProjectContractTests testCommittedRegistrationFetchesFullProjectWithoutLosingReconciledFlag]' started.
+Test Case '-[ForgeConductorTests.OperatorProjectContractTests testCommittedRegistrationFetchesFullProjectWithoutLosingReconciledFlag]' passed (0.006 seconds).
+Test Case '-[ForgeConductorTests.OperatorProjectContractTests testProjectsViewModelPreservesFullRegistrationAndResetProjection]' started.
+Test Case '-[ForgeConductorTests.OperatorProjectContractTests testProjectsViewModelPreservesFullRegistrationAndResetProjection]' passed (0.026 seconds).
+Test Suite 'OperatorProjectContractTests' passed at 2026-09-04 18:40:59.408.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.032 (0.032) seconds
+Test Suite 'ProviderConfigurationAppTests' started at 2026-09-04 18:40:59.408.
+Test Case '-[ForgeConductorTests.ProviderConfigurationAppTests testBusyProviderRouteRejectsCredentialBodiesWithoutDispatchingMutations]' started.
+Test Case '-[ForgeConductorTests.ProviderConfigurationAppTests testBusyProviderRouteRejectsCredentialBodiesWithoutDispatchingMutations]' passed (1.271 seconds).
+Test Case '-[ForgeConductorTests.ProviderConfigurationAppTests testProviderConfigurationRoutesRequireAuthorizationAndClientPersistsCleanSetup]' started.
+Test Case '-[ForgeConductorTests.ProviderConfigurationAppTests testProviderConfigurationRoutesRequireAuthorizationAndClientPersistsCleanSetup]' passed (0.204 seconds).
+Test Suite 'ProviderConfigurationAppTests' passed at 2026-09-04 18:41:00.883.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 1.474 (1.475) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-09-04 18:41:00.883.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 1.506 (1.507) seconds
+Test Suite 'Selected tests' passed at 2026-09-04 18:41:00.883.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 1.506 (1.507) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

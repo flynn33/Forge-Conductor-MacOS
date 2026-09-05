@@ -1,0 +1,64 @@
+[0/1] Planning build
+Building for debugging...
+[0/18] Write sources
+[3/18] Write swift-version--58304C5D6DBC2206.txt
+[5/14] Compiling ForgeConductorCore ManagerRoutes.swift
+[6/14] Emitting module ForgeConductorCore
+[7/14] Compiling ForgeConductorCore ManagedAutonomyRuntime.swift
+[8/14] Compiling ForgeConductorCore PersistedManagedRunBudgetEvaluator.swift
+[9/18] Compiling ForgeConductorCore DashboardServer.swift
+[10/18] Compiling ForgeConductorCore ManagerNode.swift
+[11/18] Compiling ForgeConductorCore ForgeProcessEntry.swift
+[12/18] Compiling ForgeConductorCore ManagerDashboardClient.swift
+[13/19] Emitting module ForgeNativeSessionHostPlugin
+[14/27] Compiling ForgeConductorCLI ForgeConductorMain.swift
+[15/27] Emitting module ForgeConductorCLI
+[15/27] Write Objects.LinkFileList
+[17/27] Compiling ForgeConductorApp AppModel.swift
+[18/27] Compiling ForgeConductorApp ProviderViewModel.swift
+[19/27] Compiling ForgeConductorApp OperatorManagerClient.swift
+[20/27] Emitting module ForgeConductorApp
+[20/37] Linking forge-conductor
+[21/37] Applying forge-conductor
+[23/37] Compiling ForgeConductorApp ProviderOperatorView.swift
+[24/41] Compiling ForgeConductorApp ForgeConductorApp.swift
+[25/41] Compiling ForgeConductorApp AutonomyViewModel.swift
+[26/41] Compiling ForgeConductorApp ContinuityViewModel.swift
+[27/41] Compiling ForgeConductorApp EvidenceViewModel.swift
+[28/41] Compiling ForgeConductorApp ContentView.swift
+[29/41] Compiling ForgeConductorApp ProjectsViewModel.swift
+[30/41] Compiling ForgeConductorApp RuntimesViewModel.swift
+[31/41] Compiling ForgeConductorApp EvidenceOperatorView.swift
+[32/41] Compiling ForgeConductorApp AgentsView.swift
+[33/44] Compiling ForgeConductorApp DiagnosticsView.swift
+[34/44] Compiling ForgeConductorApp LiveFeedView.swift
+[35/44] Compiling ForgeConductorApp MCPServersView.swift
+[36/44] Compiling ForgeConductorApp ManagerSettingsView.swift
+[37/44] Compiling ForgeConductorApp RigDashboardView.swift
+[38/44] Compiling ForgeConductorApp TelemetryDashboardView.swift
+[39/44] Compiling ForgeConductorApp ToolsView.swift
+[39/44] Write Objects.LinkFileList
+[40/44] Linking forge-conductor-app
+[41/44] Applying forge-conductor-app
+[43/59] Compiling ForgeConductorTests OperatorProjectContractTests.swift
+[44/59] Compiling ForgeConductorTests ProjectContextIntegrationTests.swift
+[45/59] Compiling ForgeConductorTests ProjectMemoryTests.swift
+[46/59] Compiling ForgeConductorTests ProviderConfigurationAppTests.swift
+[47/63] Compiling ForgeConductorTests AutonomousContinuityAcceptanceTests.swift
+[48/63] Compiling ForgeConductorTests CoreTests.swift
+[49/63] Compiling ForgeConductorTests G1G10AcceptanceTests.swift
+[50/63] Compiling ForgeConductorTests LifecycleOwnershipTests.swift
+[51/63] Compiling ForgeConductorTests LiveLMStudioManagedAutonomyTests.swift
+[52/63] Compiling ForgeConductorTests ProviderConfigurationTests.swift
+[53/63] Compiling ForgeConductorTests RigParityTests.swift
+[54/63] Compiling ForgeConductorTests RuntimeCancelQualificationTests.swift
+[55/63] Compiling ForgeConductorTests SecureFilesystemMutationTests.swift
+[56/63] Emitting module ForgeConductorTests
+[57/63] Compiling ForgeConductorTests ManagedAutonomyRuntimeTests.swift
+[58/63] Compiling ForgeConductorTests ManagedProjectRunStepExecutorTests.swift
+[59/63] Compiling ForgeConductorTests ManagerTests.swift
+[60/63] Compiling ForgeConductorTests NativeAppSmokeTests.swift
+[61/63] Compiling ForgeConductorTests NativeGaugeLifecycleTests.swift
+[61/63] Write Objects.LinkFileList
+[62/63] Linking ForgeConductorPackageTests
+Build complete! (12.14s)

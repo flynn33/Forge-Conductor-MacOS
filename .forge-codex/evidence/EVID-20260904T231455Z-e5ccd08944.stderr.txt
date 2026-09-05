@@ -1,0 +1,11 @@
+2026-09-04 18:15:28.817 xcodebuild[78433:33228518] [MT] IDETestOperationsObserverDebug: 25.638 elapsed -- Testing started completed.
+2026-09-04 18:15:28.817 xcodebuild[78433:33228518] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-09-04 18:15:28.817 xcodebuild[78433:33228518] [MT] IDETestOperationsObserverDebug: 25.638 sec, +25.638 sec -- end
+Failing tests:
+	NativeGaugeLifecycleTests.testHiddenAndOrderedOutProductionGaugesStopDrawingAndResumeWhenVisible()
+	NativeGaugeLifecycleTests.testProductionGaugesDrawOnDemandAndReuseSharedResources()
+	NativeGaugeLifecycleTests.testProductionVertexBufferReusesCapacityAndReleasesItsMetalObject()
+	NativeGaugeLifecycleTests.testSwiftUIDismantleReleasesProductionSurfacesAndCoordinatorsAcrossCycles()
+
+** TEST FAILED **
+

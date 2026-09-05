@@ -1,0 +1,115 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 6297,
+      "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Final-Native-Settings-MCP-Attachments/manifest.json",
+      "portability": "origin-host-required",
+      "sha256": "4c10322ec1ffd1dee17514e12bb255364ccea197b8051323c2810502f6f057df",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 6705,
+      "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Final-Native-Settings-MCP-Attachments/58E407A9-0632-449D-84FE-5F5F5FBE373B.json",
+      "portability": "origin-host-required",
+      "sha256": "b7d19880671a542b134df333e1eb70fa80549a0d58840a10e14c53912e21ed76",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 6239,
+      "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Final-Native-Settings-MCP-Attachments/15E9EFF7-E092-4014-9FC4-16330D1A6109.json",
+      "portability": "origin-host-required",
+      "sha256": "95ccd4feb69f9dc9c441629e658b01a6f9ae493fa9e1a5ae540f0a8ab7165a05",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 638,
+      "path": ".forge-codex/evidence/EVID-20260905T003445Z-9c5b014352.stdout.txt",
+      "sha256": "de3b7381ecb4843d25ed8f54c0678b175ad80489750c7fd7cc759ccf7ec5b271",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260905T003445Z-9c5b014352.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "child_evidence_context": {
+    "binding_schema_version": 1,
+    "evidence_id": "EVID-20260905T003445Z-9c5b014352",
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "ffcf6bf9a2ea0c76a54788041cfa00c0dc8c7db4",
+      "branch": "release/0.9.0-shipping",
+      "head_sha": "b8109b10dd9b4329934b83503806ff6724fd8b09",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
+    },
+    "schema_version": 1,
+    "source_manifest": {
+      "bytes": 13375749,
+      "file_count": 392,
+      "schema_version": 1,
+      "sha256": "a2b04157b718bcfaa69d09490aa78d3b9f97c06d625fdee4012e36710fdb1fd7"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "command": "/usr/bin/shasum -a 256 /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Final-Native-Settings-MCP-Attachments/manifest.json /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Final-Native-Settings-MCP-Attachments/58E407A9-0632-449D-84FE-5F5F5FBE373B.json /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Final-Native-Settings-MCP-Attachments/15E9EFF7-E092-4014-9FC4-16330D1A6109.json",
+  "ended_at": "2026-09-05T00:34:45.896433+00:00",
+  "environment": {
+    "architecture": "arm64",
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine_identifier": "Mac16,7",
+    "macos_build": "25G83",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "execution_provenance": {
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "ffcf6bf9a2ea0c76a54788041cfa00c0dc8c7db4",
+      "branch": "release/0.9.0-shipping",
+      "head_sha": "b8109b10dd9b4329934b83503806ff6724fd8b09",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "exit_code": 0,
+  "id": "EVID-20260905T003445Z-9c5b014352",
+  "kind": "shipping-final-native-settings-artifacts",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 13375749,
+    "file_count": 392,
+    "schema_version": 1,
+    "sha256": "a2b04157b718bcfaa69d09490aa78d3b9f97c06d625fdee4012e36710fdb1fd7"
+  },
+  "source_manifest_after": {
+    "bytes": 13375749,
+    "file_count": 392,
+    "schema_version": 1,
+    "sha256": "a2b04157b718bcfaa69d09490aa78d3b9f97c06d625fdee4012e36710fdb1fd7"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-09-05T00:34:45.867703+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

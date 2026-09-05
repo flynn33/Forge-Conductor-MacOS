@@ -1,0 +1,8 @@
+31a7ae8c8fd241f92fc2fe1f0b47283dd23180ba3e170e2b3fb90dd7e90a7d2d  /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/continuity-cancellation/manifest.json
+ed0a0bc2bbc3ea9395c76ab72b01383a7d0ccca34ec1712beea89041995757c0  /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/continuity-cancellation/provider-v2-shared-cancel-after-head.txt
+3576d516c13b5cc37cf019d9ec99f15ccf52ef96bdaee039536b527be33794b9  /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/continuity-cancellation/provider-v2-shared-cancel-ordered-after.log
+2146737148a042a013d51bd7d6c7eb8f617f47165b7d666aa5563174c8bbe294  /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/continuity-cancellation/provider-v2-shared-cancel-ordered-before-head.txt
+53b45f66a493f591ccdb3af0f6ac00fe6a5d35308c942305327953e9eb1c2ef8  /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/continuity-cancellation/provider-v2-shared-cancel-ordered-before-tests.patch
+42828882559bb3125ee9ccf724c568c19ef301444749917796f56233f89e519e  /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/continuity-cancellation/provider-v2-shared-cancel-ordered-before.log
+39d7ddee6525232d5a6ed51841e688d8fe6794d4d497eb4658eb31c5ac04dd69  /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/continuity-cancellation/provider-v2-shared-cancel-regressions.log
+b8e976ecf7dbf8163ef7bf261a17fad040b6e0c8e4c5e209dfcb71617f60b9b7  /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/continuity-cancellation/provider-v2-shared-cancel-repair.patch

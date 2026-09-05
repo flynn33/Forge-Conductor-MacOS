@@ -1,0 +1,1 @@
+xcodebuild: error: Failed to build workspace ForgeConductor with scheme ForgeConductor.: Tests in the target “ForgeConductorAppTests” can’t be run because “ForgeConductorAppTests” isn’t a member of the specified test plan or scheme.

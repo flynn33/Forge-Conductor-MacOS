@@ -1,0 +1,28 @@
+Test Suite 'Selected tests' started at 2026-09-04 21:00:43.391.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-09-04 21:00:43.392.
+Test Suite 'LiveLMStudioManagedAutonomyTests' started at 2026-09-04 21:00:43.392.
+Test Case '-[ForgeConductorTests.LiveLMStudioManagedAutonomyTests testQuiescentFailureDiagnosticPreservesReasonWithoutPrivatePayloads]' started.
+Test Case '-[ForgeConductorTests.LiveLMStudioManagedAutonomyTests testQuiescentFailureDiagnosticPreservesReasonWithoutPrivatePayloads]' passed (0.010 seconds).
+Test Case '-[ForgeConductorTests.LiveLMStudioManagedAutonomyTests testQuiescentFailureDiagnosticSurvivesOversizedLedgerWithoutLeakingCodes]' started.
+Test Case '-[ForgeConductorTests.LiveLMStudioManagedAutonomyTests testQuiescentFailureDiagnosticSurvivesOversizedLedgerWithoutLeakingCodes]' passed (0.002 seconds).
+Test Suite 'LiveLMStudioManagedAutonomyTests' passed at 2026-09-04 21:00:43.404.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.012 (0.012) seconds
+Test Suite 'ManagedContinuityWorkerTests' started at 2026-09-04 21:00:43.404.
+Test Case '-[ForgeConductorTests.ManagedContinuityWorkerTests testCreateBootstrapCrashRestartsWithOneSuccessorAndOneAutomaticDispatch]' started.
+Test Case '-[ForgeConductorTests.ManagedContinuityWorkerTests testCreateBootstrapCrashRestartsWithOneSuccessorAndOneAutomaticDispatch]' passed (0.097 seconds).
+Test Case '-[ForgeConductorTests.ManagedContinuityWorkerTests testEveryManagedCrashBoundaryRecoversOneSuccessorAndOneContinuation]' started.
+Test Case '-[ForgeConductorTests.ManagedContinuityWorkerTests testEveryManagedCrashBoundaryRecoversOneSuccessorAndOneContinuation]' passed (1.008 seconds).
+Test Case '-[ForgeConductorTests.ManagedContinuityWorkerTests testExecutorCancellationStopsActiveContinuityWithoutDiscardingDurableIntent]' started.
+Test Case '-[ForgeConductorTests.ManagedContinuityWorkerTests testExecutorCancellationStopsActiveContinuityWithoutDiscardingDurableIntent]' passed (0.049 seconds).
+Test Case '-[ForgeConductorTests.ManagedContinuityWorkerTests testMismatchedBootstrapNonceNeverAcceptsCandidate]' started.
+Test Case '-[ForgeConductorTests.ManagedContinuityWorkerTests testMismatchedBootstrapNonceNeverAcceptsCandidate]' passed (0.033 seconds).
+Test Suite 'ManagedContinuityWorkerTests' passed at 2026-09-04 21:00:44.592.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 1.187 (1.188) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' passed at 2026-09-04 21:00:44.592.
+	 Executed 6 tests, with 0 failures (0 unexpected) in 1.199 (1.200) seconds
+Test Suite 'Selected tests' passed at 2026-09-04 21:00:44.592.
+	 Executed 6 tests, with 0 failures (0 unexpected) in 1.199 (1.201) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

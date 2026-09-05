@@ -1,0 +1,16 @@
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeNativeSessionHostPlugin/LMStudioConfigurationService.swift:5:8: error: file 'LMStudioConfigurationService.swift' is part of module 'ForgeConductorCore'; ignoring import
+import ForgeConductorCore
+       ^
+Testing failed:
+	File 'LMStudioConfigurationService.swift' is part of module 'ForgeConductorCore'; ignoring import
+import ForgeConductorCore
+       ^
+	Testing cancelled because the build failed.
+
+** TEST FAILED **
+
+
+The following build commands failed:
+	SwiftDriver ForgeConductorCore normal arm64 com.apple.xcode.tools.swift.compiler (in target 'ForgeConductorCore' from project 'ForgeConductor')
+	Testing workspace ForgeConductor with scheme ForgeConductorAppTests
+(2 failures)

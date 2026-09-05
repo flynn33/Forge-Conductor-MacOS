@@ -1,0 +1,16 @@
+2026-09-04 18:19:12.561 xcodebuild[80649:33247512] [MT] IDELaunchParametersSnapshot: The operation couldn’t be completed. (DebuggerLLDB.DebuggerVersionStore.StoreError error 0.)
+2026-09-04 18:19:12.561 xcodebuild[80649:33247512] [MT] IDELaunchParametersSnapshot: no debugger version
+2026-09-04 18:19:36.228 xcodebuild[80649:33247512] [MT] IDELaunchParametersSnapshot: The operation couldn’t be completed. (DebuggerLLDB.DebuggerVersionStore.StoreError error 0.)
+2026-09-04 18:19:36.228 xcodebuild[80649:33247512] [MT] IDELaunchParametersSnapshot: no debugger version
+2026-09-04 18:19:59.787 xcodebuild[80649:33247512] [MT] IDELaunchParametersSnapshot: The operation couldn’t be completed. (DebuggerLLDB.DebuggerVersionStore.StoreError error 0.)
+2026-09-04 18:19:59.787 xcodebuild[80649:33247512] [MT] IDELaunchParametersSnapshot: no debugger version
+2026-09-04 18:20:31.023 xcodebuild[80649:33247512] [MT] IDETestOperationsObserverDebug: 79.143 elapsed -- Testing started completed.
+2026-09-04 18:20:31.023 xcodebuild[80649:33247512] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-09-04 18:20:31.023 xcodebuild[80649:33247512] [MT] IDETestOperationsObserverDebug: 79.143 sec, +79.143 sec -- end
+Failing tests:
+	ProductionOnboardingUITests.testNativeFolderAuthorizationCancellationAndInvalidRootPreserveSavedSettings()
+	ProductionOnboardingUITests.testNativeProviderSaveOfflineFailureAndInvalidEndpointsSurviveManagerReplacement()
+	ProductionOnboardingUITests.testRealProviderModelDiscoveryAndConnectionFromSavedNativeConfiguration()
+
+** TEST FAILED **
+

@@ -3,7 +3,7 @@
     {
       "kind": "stdout",
       "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G06.stdout.txt",
-      "sha256": "b73cca38f82eb1e02a02cd37a504653a7561c5ed02bdcdfffe9f3891eacddc88"
+      "sha256": "a1277de1a0f15a9f0472b5212f88448647ff367f124793fe46bd2a5caad59f8e"
     },
     {
       "kind": "stderr",
@@ -13,19 +13,19 @@
     {
       "kind": "criteria",
       "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G06.criteria.json",
-      "sha256": "ded439d6b183d7f8074fa2a4bb9d28d6eca6b31d03160a650085360b877dca5a"
+      "sha256": "19857ad48ee590e67a4407827997d267c1cc14aa4e77f3bfd0c0206819eb65f2"
     }
   ],
   "commands": [
     {
       "command": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-handlers/G06.sh",
-      "exit_code": 0,
+      "exit_code": 1,
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdout_sha256": "b73cca38f82eb1e02a02cd37a504653a7561c5ed02bdcdfffe9f3891eacddc88",
+      "stdout_sha256": "a1277de1a0f15a9f0472b5212f88448647ff367f124793fe46bd2a5caad59f8e",
       "timed_out": false
     }
   ],
-  "ended_at": "2026-08-23T20:00:03.560498+00:00",
+  "ended_at": "2026-09-05T02:02:23.663384+00:00",
   "environment": {
     "machine": "arm64",
     "platform": "macOS-26.6.2-arm64-arm-64bit",
@@ -35,36 +35,46 @@
     "criteria_results": [
       {
         "criterion": "all long-lived collections declare/enforce limits",
-        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P06-resource-policy-inventory.json#e62cc92dbd5fb54145ed84db6a14ac476c69ef5ae3aa5d243a54a0bf0bd5e400; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/ResourcePolicy.swift#de54eb94b38a2741721426185ddd02d7f2418cf7ca6971e1a424078c666c013c; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T195911Z-2c43d9837a.stdout.txt#49a317b61a5aa822cb9f4ffcb3f06ea3aa1e6973b6848e9fb077d76c65260a12",
-        "passed": true
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P06-resource-policy-inventory.json#e62cc92dbd5fb54145ed84db6a14ac476c69ef5ae3aa5d243a54a0bf0bd5e400; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/ResourcePolicy.swift#cc500f44120dd141f944d2a26a2c7f8624437fe01960e29b4a90f302e220dd84; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T195911Z-2c43d9837a.stdout.txt#49a317b61a5aa822cb9f4ffcb3f06ea3aa1e6973b6848e9fb077d76c65260a12",
+        "passed": false
       },
       {
         "criterion": "memory-pressure behavior passes",
-        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/ResourcePolicy.swift#de54eb94b38a2741721426185ddd02d7f2418cf7ca6971e1a424078c666c013c; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Telemetry/TelemetryService.swift#87473a08ca767716bb04731fb0f0b693ce33383629460082593469d96c5eb4ef; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/ResourcePolicyTests.swift#65625e6160a4fbf2cc26d9b5b699a01b756b0969ca999d328d40dacb105307d9; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T195742Z-533a0ffc8a.stdout.txt#f2c7ea913587a567ef0c6d2cb11ec08bc1951725ed4117439b52c6186c8b9753",
-        "passed": true
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/ResourcePolicy.swift#cc500f44120dd141f944d2a26a2c7f8624437fe01960e29b4a90f302e220dd84; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Telemetry/TelemetryService.swift#87473a08ca767716bb04731fb0f0b693ce33383629460082593469d96c5eb4ef; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/ResourcePolicyTests.swift#52bc75de516bc6decddbd93be25b676e80bfdea3c671640043f8e838f82a5982; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T195742Z-533a0ffc8a.stdout.txt#f2c7ea913587a567ef0c6d2cb11ec08bc1951725ed4117439b52c6186c8b9753",
+        "passed": false
       },
       {
         "criterion": "subprocess output/logs are bounded",
-        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/ProcessRunner.swift#b61c03729e0ba2838dea6e2d2254fe9983a04839d799d3dae015fe501b2bb9dc; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/DiagnosticLog.swift#0c8d42e315cacd4734a7014671ed7e4a9c317fbeea019f68887adb37f29bc5d0; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/ProcessRunnerTests.swift#de91e6892a0f3a74ef56dec304163b82dd80b572ae66c0f7a496bbd834562fe4; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P06-bounded-state-report.json#b05db8ae7a98a3d3d556712b78cca923b279e61315317ebdad7016438c46255c",
-        "passed": true
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/ProcessRunner.swift#76b8acad2193439761df1af390a776c33ea170bc2b77971e396b9bb0a3ba6b7e; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/DiagnosticLog.swift#ec7d3d5c8f0cccbd51aa8a70afb5245db595523ae3d628b7fbb90843c4d66be8; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/ProcessRunnerTests.swift#cef46a3ba4c1d006b289dfeb7531da1f1e4434a02e31a26dd842eba1806e8747; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P06-bounded-state-report.json#b05db8ae7a98a3d3d556712b78cca923b279e61315317ebdad7016438c46255c",
+        "passed": false
       },
       {
         "criterion": "main-actor blocking scan and tests pass",
-        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorApp/AppModel.swift#643b86a1f414bf4108465143bb902da0210f819f315e7490c5a6746bf7fe6e3e; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T195911Z-2c43d9837a.stdout.txt#49a317b61a5aa822cb9f4ffcb3f06ea3aa1e6973b6848e9fb077d76c65260a12; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T195808Z-9893a6484a.stdout.txt#55308297342628a613b88b2f4e53ed5169aa123109d37c84d82fe4474ff957e7",
-        "passed": true
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorApp/AppModel.swift#4f96b0e41aaf0367b478b34b01273d9ae681790e10b008755bd2c56665888f02; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T195911Z-2c43d9837a.stdout.txt#49a317b61a5aa822cb9f4ffcb3f06ea3aa1e6973b6848e9fb077d76c65260a12; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T195808Z-9893a6484a.stdout.txt#55308297342628a613b88b2f4e53ed5169aa123109d37c84d82fe4474ff957e7",
+        "passed": false
       },
       {
         "criterion": "project/session release reaches bounded steady state",
-        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/ResourcePolicyTests.swift#65625e6160a4fbf2cc26d9b5b699a01b756b0969ca999d328d40dacb105307d9; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P06-bounded-state-report.json#b05db8ae7a98a3d3d556712b78cca923b279e61315317ebdad7016438c46255c; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T195742Z-533a0ffc8a.stdout.txt#f2c7ea913587a567ef0c6d2cb11ec08bc1951725ed4117439b52c6186c8b9753",
-        "passed": true
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/ResourcePolicyTests.swift#52bc75de516bc6decddbd93be25b676e80bfdea3c671640043f8e838f82a5982; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P06-bounded-state-report.json#b05db8ae7a98a3d3d556712b78cca923b279e61315317ebdad7016438c46255c; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T195742Z-533a0ffc8a.stdout.txt#f2c7ea913587a567ef0c6d2cb11ec08bc1951725ed4117439b52c6186c8b9753",
+        "passed": false
       }
     ],
     "name": "forge-gate-handler",
     "version": "1"
   },
+  "finalized": true,
   "gate_id": "G06",
   "notes": "",
+  "operation_id": "3a964a4f-6e36-4526-a817-7810cec09843",
   "schema_version": 1,
-  "started_at": "2026-08-23T20:00:03.205106+00:00",
-  "status": "passed"
+  "source_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c",
+  "source_manifest": {
+    "bytes": 13422208,
+    "file_count": 392,
+    "schema_version": 1,
+    "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"
+  },
+  "started_at": "2026-09-05T02:02:23.440565+00:00",
+  "state_sequence_before": 1050,
+  "status": "failed"
 }

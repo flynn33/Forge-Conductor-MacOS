@@ -2,30 +2,40 @@
   "criteria_results": [
     {
       "criterion": "all long-lived collections declare/enforce limits",
-      "passed": true,
-      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P06-resource-policy-inventory.json#e62cc92dbd5fb54145ed84db6a14ac476c69ef5ae3aa5d243a54a0bf0bd5e400; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/ResourcePolicy.swift#de54eb94b38a2741721426185ddd02d7f2418cf7ca6971e1a424078c666c013c; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T195911Z-2c43d9837a.stdout.txt#49a317b61a5aa822cb9f4ffcb3f06ea3aa1e6973b6848e9fb077d76c65260a12"
+      "passed": false,
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P06-resource-policy-inventory.json#e62cc92dbd5fb54145ed84db6a14ac476c69ef5ae3aa5d243a54a0bf0bd5e400; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/ResourcePolicy.swift#cc500f44120dd141f944d2a26a2c7f8624437fe01960e29b4a90f302e220dd84; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T195911Z-2c43d9837a.stdout.txt#49a317b61a5aa822cb9f4ffcb3f06ea3aa1e6973b6848e9fb077d76c65260a12"
     },
     {
       "criterion": "memory-pressure behavior passes",
-      "passed": true,
-      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/ResourcePolicy.swift#de54eb94b38a2741721426185ddd02d7f2418cf7ca6971e1a424078c666c013c; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Telemetry/TelemetryService.swift#87473a08ca767716bb04731fb0f0b693ce33383629460082593469d96c5eb4ef; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/ResourcePolicyTests.swift#65625e6160a4fbf2cc26d9b5b699a01b756b0969ca999d328d40dacb105307d9; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T195742Z-533a0ffc8a.stdout.txt#f2c7ea913587a567ef0c6d2cb11ec08bc1951725ed4117439b52c6186c8b9753"
+      "passed": false,
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/ResourcePolicy.swift#cc500f44120dd141f944d2a26a2c7f8624437fe01960e29b4a90f302e220dd84; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Telemetry/TelemetryService.swift#87473a08ca767716bb04731fb0f0b693ce33383629460082593469d96c5eb4ef; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/ResourcePolicyTests.swift#52bc75de516bc6decddbd93be25b676e80bfdea3c671640043f8e838f82a5982; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T195742Z-533a0ffc8a.stdout.txt#f2c7ea913587a567ef0c6d2cb11ec08bc1951725ed4117439b52c6186c8b9753"
     },
     {
       "criterion": "subprocess output/logs are bounded",
-      "passed": true,
-      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/ProcessRunner.swift#b61c03729e0ba2838dea6e2d2254fe9983a04839d799d3dae015fe501b2bb9dc; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/DiagnosticLog.swift#0c8d42e315cacd4734a7014671ed7e4a9c317fbeea019f68887adb37f29bc5d0; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/ProcessRunnerTests.swift#de91e6892a0f3a74ef56dec304163b82dd80b572ae66c0f7a496bbd834562fe4; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P06-bounded-state-report.json#b05db8ae7a98a3d3d556712b78cca923b279e61315317ebdad7016438c46255c"
+      "passed": false,
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/ProcessRunner.swift#76b8acad2193439761df1af390a776c33ea170bc2b77971e396b9bb0a3ba6b7e; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/DiagnosticLog.swift#ec7d3d5c8f0cccbd51aa8a70afb5245db595523ae3d628b7fbb90843c4d66be8; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/ProcessRunnerTests.swift#cef46a3ba4c1d006b289dfeb7531da1f1e4434a02e31a26dd842eba1806e8747; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P06-bounded-state-report.json#b05db8ae7a98a3d3d556712b78cca923b279e61315317ebdad7016438c46255c"
     },
     {
       "criterion": "main-actor blocking scan and tests pass",
-      "passed": true,
-      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorApp/AppModel.swift#643b86a1f414bf4108465143bb902da0210f819f315e7490c5a6746bf7fe6e3e; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T195911Z-2c43d9837a.stdout.txt#49a317b61a5aa822cb9f4ffcb3f06ea3aa1e6973b6848e9fb077d76c65260a12; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T195808Z-9893a6484a.stdout.txt#55308297342628a613b88b2f4e53ed5169aa123109d37c84d82fe4474ff957e7"
+      "passed": false,
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorApp/AppModel.swift#4f96b0e41aaf0367b478b34b01273d9ae681790e10b008755bd2c56665888f02; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T195911Z-2c43d9837a.stdout.txt#49a317b61a5aa822cb9f4ffcb3f06ea3aa1e6973b6848e9fb077d76c65260a12; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T195808Z-9893a6484a.stdout.txt#55308297342628a613b88b2f4e53ed5169aa123109d37c84d82fe4474ff957e7"
     },
     {
       "criterion": "project/session release reaches bounded steady state",
-      "passed": true,
-      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/ResourcePolicyTests.swift#65625e6160a4fbf2cc26d9b5b699a01b756b0969ca999d328d40dacb105307d9; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P06-bounded-state-report.json#b05db8ae7a98a3d3d556712b78cca923b279e61315317ebdad7016438c46255c; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T195742Z-533a0ffc8a.stdout.txt#f2c7ea913587a567ef0c6d2cb11ec08bc1951725ed4117439b52c6186c8b9753"
+      "passed": false,
+      "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/ResourcePolicyTests.swift#52bc75de516bc6decddbd93be25b676e80bfdea3c671640043f8e838f82a5982; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P06-bounded-state-report.json#b05db8ae7a98a3d3d556712b78cca923b279e61315317ebdad7016438c46255c; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T195742Z-533a0ffc8a.stdout.txt#f2c7ea913587a567ef0c6d2cb11ec08bc1951725ed4117439b52c6186c8b9753"
     }
   ],
-  "valid": true,
-  "errors": []
+  "valid": false,
+  "errors": [
+    "acceptance record is historical evidence for unknown, not current release authority",
+    "malformed evidence for: all long-lived collections declare/enforce limits: hash mismatch: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/ResourcePolicy.swift",
+    "malformed evidence for: memory-pressure behavior passes: hash mismatch: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/ResourcePolicy.swift",
+    "malformed evidence for: memory-pressure behavior passes: hash mismatch: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/ResourcePolicyTests.swift",
+    "malformed evidence for: subprocess output/logs are bounded: hash mismatch: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/ProcessRunner.swift",
+    "malformed evidence for: subprocess output/logs are bounded: hash mismatch: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/DiagnosticLog.swift",
+    "malformed evidence for: subprocess output/logs are bounded: hash mismatch: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/ProcessRunnerTests.swift",
+    "malformed evidence for: main-actor blocking scan and tests pass: hash mismatch: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorApp/AppModel.swift",
+    "malformed evidence for: project/session release reaches bounded steady state: hash mismatch: /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/ResourcePolicyTests.swift"
+  ]
 }

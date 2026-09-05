@@ -1,0 +1,26 @@
+[0/1] Planning build
+Building for debugging...
+[0/21] Write sources
+[4/21] Write swift-version--58304C5D6DBC2206.txt
+[6/17] Compiling ForgeConductorCore ManagerRoutes.swift
+[7/17] Compiling ForgeConductorCore ProviderConfigurationService.swift
+[8/17] Compiling ForgeConductorCore HostAdapterRegistry.swift
+[9/20] Compiling ForgeConductorCore ManagerDashboardClient.swift
+[10/20] Compiling ForgeConductorCore DashboardServer.swift
+[11/22] Emitting module ForgeConductorCore
+[12/22] Compiling ForgeConductorCore ForgeProcessEntry.swift
+[13/22] Compiling ForgeConductorCore ManagedAutonomyRuntime.swift
+[14/22] Compiling ForgeConductorCore ManagerNode.swift
+[15/25] Compiling ForgeNativeSessionHostPlugin ForgeNativeSessionHostPlugin.swift
+[16/25] Emitting module ForgeNativeSessionHostPlugin
+[17/25] Compiling ForgeNativeSessionHostPlugin LMStudioConfigurationService.swift
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeNativeSessionHostPlugin/LMStudioConfigurationService.swift:20:35: error: 'kSecUseAuthenticationUIFail' was deprecated in macOS 11.0: Instead of kSecUseAuthenticationUI, use kSecUseAuthenticationContext and set LAContext.interactionNotAllowed property [#DeprecatedDeclaration]
+ 18 |          kSecAttrService: LMStudioKeychainAuthorization.service,
+ 19 |          kSecAttrAccount: reference,
+ 20 |          kSecUseAuthenticationUI: kSecUseAuthenticationUIFail]
+    |                                   `- error: 'kSecUseAuthenticationUIFail' was deprecated in macOS 11.0: Instead of kSecUseAuthenticationUI, use kSecUseAuthenticationContext and set LAContext.interactionNotAllowed property [#DeprecatedDeclaration]
+ 21 |     }
+ 22 | 
+
+[#DeprecatedDeclaration]: <https://docs.swift.org/compiler/documentation/diagnostics/deprecated-declaration>
+error: fatalError

@@ -1,0 +1,11 @@
+0853c2c1970d5c8af42cb92bdf20b820414131378990b658fa842a6455a25571  /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/window-diagnostics/forge-gauge-window-observation-pool-comparison-20260904.patch
+06833020b6d9cc2404aad319dc482f91fac487189249a46d1ddf5b7aba57048c  /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/window-diagnostics/forge-gauge-window-ownership-20260904.log
+ff2620d82ff21d83a2068949b4f04781f11392e17eb023cf6044d67348769f7d  /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/window-diagnostics/forge-gauge-window-ownership-autorelease-pools-20260904.txt
+b02273dd996b92bf2d1e9be1f5313afdf6846f87ccb8c3b9844f215548c9a791  /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/window-diagnostics/forge-gauge-window-ownership-observation-pooled-20260904.log
+aad79cab330969be54f8f8624c6ec569da9d06fed2edc84bab5ad366993c7ea0  /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/window-diagnostics/forge-gauge-window-ownership-pooled-20260904.log
+dfc15ddd27d6eb1235333d73080ac82ea7bbd80011b6bab6030cc393b71570a4  /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/window-diagnostics/forge-gauge-window-ownership-presentation-pooled-20260904.log
+129e1a0cd6e6c69ee8b31d803d3bf13a9ba31f5140c0b2ff5ed48ce4aaf7a16b  /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/window-diagnostics/forge-gauge-window-ownership-reproducer-20260904.patch
+7b9da472eed047efc133689688a4c5ffdee469df56f5b25c483b37efe87e3cac  /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/window-diagnostics/forge-gauge-window-ownership-retaining-path-20260904.txt
+90fe0ed7b00d532b763f5d586638554a8454674ec96dd989078daa4db1a591be  /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/window-diagnostics/forge-gauge-window-ownership-trace-20260904.log
+d4ee7a0790c067337ebc9192e05ddeee8ec596004f3078dfacb2d9605ff6e7b1  /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/window-diagnostics/forge-gauge-window-repair-base-20260904.txt
+7b3161d416ee56cc328f3062c31994a4d7910f63830d9144b7b42e5377f34116  /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/window-diagnostics/manifest.json

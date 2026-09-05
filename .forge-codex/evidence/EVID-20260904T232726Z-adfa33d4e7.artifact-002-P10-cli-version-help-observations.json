@@ -1,0 +1,801 @@
+{
+  "accepted_p10_assertions": [],
+  "app_path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Product-DevelopmentRelease/Build/Products/Release/Forge Conductor.app",
+  "artifact_origin": "embedded-app",
+  "build_provenance_assessed": false,
+  "bundle_after": [
+    {
+      "kind": "directory",
+      "path": "Contents"
+    },
+    {
+      "kind": "directory",
+      "path": "Contents/Frameworks"
+    },
+    {
+      "kind": "directory",
+      "path": "Contents/Frameworks/ForgeConductorCore.framework"
+    },
+    {
+      "kind": "symlink",
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/ForgeConductorCore",
+      "target": "Versions/Current/ForgeConductorCore"
+    },
+    {
+      "kind": "symlink",
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Resources",
+      "target": "Versions/Current/Resources"
+    },
+    {
+      "kind": "directory",
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions"
+    },
+    {
+      "kind": "directory",
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A"
+    },
+    {
+      "bytes": 15313536,
+      "kind": "file",
+      "mode": 493,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/ForgeConductorCore",
+      "sha256": "d661693c3ea4390ff71be353687f9904ddb8275de32407d6292be5ad8a6f1d4a"
+    },
+    {
+      "kind": "directory",
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/Resources"
+    },
+    {
+      "bytes": 1303,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/Resources/Info.plist",
+      "sha256": "035ab8cf788e767e6038e277693d34a33bb93ed5a94e162f245c15078ba99522"
+    },
+    {
+      "bytes": 33418,
+      "kind": "file",
+      "mode": 493,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/Resources/app.js",
+      "sha256": "2c8d2a00098d54ca65bea6466190e85a9c89553e8d2e7edd6d1eeb1484a83d59"
+    },
+    {
+      "bytes": 1789,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/Resources/debug.md",
+      "sha256": "4013e3cfa6a4af1b51d69d4dc8445cc1e0590b0658fb5d250b4a431c70224bef"
+    },
+    {
+      "bytes": 4047,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/Resources/docs.md",
+      "sha256": "e1118265e19562bf5e470ad6de16cd0c4e009b01e55f263049b24f714649ee55"
+    },
+    {
+      "bytes": 2703,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/Resources/explore.md",
+      "sha256": "0cfd24d91a74e24a64a8716e7fb6f57bb4a5a6388f5f0d2d843bbc4775e09b92"
+    },
+    {
+      "bytes": 2130,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/Resources/implement.md",
+      "sha256": "1459a82d77ceebd099a6fce5ef2504bffac451f0bd9e41c96318c3ff85a70142"
+    },
+    {
+      "bytes": 7280,
+      "kind": "file",
+      "mode": 493,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/Resources/index.html",
+      "sha256": "5a53d1914bedaf55753b6d9764f1234c129b64cc25c81e7e6a074849fdd9d98e"
+    },
+    {
+      "bytes": 1670,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/Resources/plan.md",
+      "sha256": "89e9ad8543beaa7a681c48a153569b9b340bdf7fd4f34a9164354c5a6874aaff"
+    },
+    {
+      "bytes": 1383,
+      "kind": "file",
+      "mode": 493,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/Resources/precommit-audit.md",
+      "sha256": "9dc5693035148f124b1b990e8177aa799b5149fd818da7b9a1d447d537db8ea0"
+    },
+    {
+      "bytes": 1301,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/Resources/research.md",
+      "sha256": "e5b0141797297ae5a5f647d9487445cfbffb43956ce1093e2edfad18ce4cb7e5"
+    },
+    {
+      "bytes": 1523,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/Resources/review.md",
+      "sha256": "cfab52c5a3ecb384dba6bfa022db773729a0b48c2828e7716d970b873826a9cc"
+    },
+    {
+      "bytes": 1453,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/Resources/security.md",
+      "sha256": "b7a7bd4a6174499b75ce095f9208cbec26f6e158a0cd7cffd9d204d782340c99"
+    },
+    {
+      "bytes": 26920,
+      "kind": "file",
+      "mode": 493,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/Resources/style.css",
+      "sha256": "ac153c71e36b8655593c6bc539506145f49814375f6c00c8a40125889f4a1e58"
+    },
+    {
+      "bytes": 1381,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/Resources/test.md",
+      "sha256": "bc29c81555acd940eccfe692d4ded50717f43b87943a13644c62b11783d30cc0"
+    },
+    {
+      "bytes": 2877,
+      "kind": "file",
+      "mode": 493,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/Resources/tools-catalog.js",
+      "sha256": "923605efe5fd5895b768c240e9a8b6c0d8cf40359196eea54be95f374dbd1331"
+    },
+    {
+      "kind": "directory",
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/_CodeSignature"
+    },
+    {
+      "bytes": 5608,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/_CodeSignature/CodeResources",
+      "sha256": "9e718141a6abb0349d9ff810c4aa1d57a4de36e32d976dd575e0c7dd3ff96c20"
+    },
+    {
+      "kind": "symlink",
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/Current",
+      "target": "A"
+    },
+    {
+      "kind": "directory",
+      "path": "Contents/Helpers"
+    },
+    {
+      "bytes": 213920,
+      "kind": "file",
+      "mode": 493,
+      "path": "Contents/Helpers/forge-conductor",
+      "sha256": "4d2b683a715037ef281611f52b3fa35234737b627fbfee7bae99722d8e2c809f"
+    },
+    {
+      "bytes": 79056,
+      "kind": "file",
+      "mode": 493,
+      "path": "Contents/Helpers/forge-runtime-launcher",
+      "sha256": "6c8b47f226d5782058827024d7685cb6399f22d4c10e70b8da82c45afe31fe95"
+    },
+    {
+      "bytes": 1774,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/Info.plist",
+      "sha256": "b3cc3f40402f9129e1b91b41e2a756bf7a939e24136134902e59d4b2203a6aaa"
+    },
+    {
+      "kind": "directory",
+      "path": "Contents/Library"
+    },
+    {
+      "kind": "directory",
+      "path": "Contents/Library/LaunchDaemons"
+    },
+    {
+      "bytes": 533,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/Library/LaunchDaemons/com.forge-conductor.filesystem-daemon.plist",
+      "sha256": "350693657ecb90958010537e99da97eafac41a0f56f79d8c4e7fe285cd69a486"
+    },
+    {
+      "kind": "directory",
+      "path": "Contents/MacOS"
+    },
+    {
+      "bytes": 4942656,
+      "kind": "file",
+      "mode": 493,
+      "path": "Contents/MacOS/Forge Conductor",
+      "sha256": "0b3c87f4647554967bdf9ea445bfb777411b8577023a48c4f976ba709b1f024c"
+    },
+    {
+      "bytes": 694912,
+      "kind": "file",
+      "mode": 493,
+      "path": "Contents/MacOS/forge-filesystem-daemon",
+      "sha256": "f12ac00f8165f3f81c961950cea66cb3cdd387ae3650ace875c926a272436a45"
+    },
+    {
+      "bytes": 8,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/PkgInfo",
+      "sha256": "82502191c9484b04d685374f9879a0066069c49b8acae7a04b01d38d07e8eca0"
+    },
+    {
+      "kind": "directory",
+      "path": "Contents/Resources"
+    },
+    {
+      "bytes": 159890,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/Resources/AppIcon.icns",
+      "sha256": "31bcba2825b9c11f491415ebae056518eb4b78a8a95fd7d53fdf98963845f7c9"
+    },
+    {
+      "bytes": 2628504,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/Resources/Assets.car",
+      "sha256": "ff0827e043da5d3323cf72d6ad5f0d8640c795242357ca95408068d9a43db1a3"
+    },
+    {
+      "bytes": 1805264,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/Resources/Forge-Conductor.icns",
+      "sha256": "47b2c18dbe355fb94a5fcabfeebaf6f8433fc6fa4f3502574a27b55921fa3192"
+    },
+    {
+      "kind": "directory",
+      "path": "Contents/_CodeSignature"
+    },
+    {
+      "bytes": 4690,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/_CodeSignature/CodeResources",
+      "sha256": "9064842a6de97074263f75d0bd2b276ebcb51e72e356b2a4b8de28f01c7576aa"
+    }
+  ],
+  "bundle_before": [
+    {
+      "kind": "directory",
+      "path": "Contents"
+    },
+    {
+      "kind": "directory",
+      "path": "Contents/Frameworks"
+    },
+    {
+      "kind": "directory",
+      "path": "Contents/Frameworks/ForgeConductorCore.framework"
+    },
+    {
+      "kind": "symlink",
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/ForgeConductorCore",
+      "target": "Versions/Current/ForgeConductorCore"
+    },
+    {
+      "kind": "symlink",
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Resources",
+      "target": "Versions/Current/Resources"
+    },
+    {
+      "kind": "directory",
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions"
+    },
+    {
+      "kind": "directory",
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A"
+    },
+    {
+      "bytes": 15313536,
+      "kind": "file",
+      "mode": 493,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/ForgeConductorCore",
+      "sha256": "d661693c3ea4390ff71be353687f9904ddb8275de32407d6292be5ad8a6f1d4a"
+    },
+    {
+      "kind": "directory",
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/Resources"
+    },
+    {
+      "bytes": 1303,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/Resources/Info.plist",
+      "sha256": "035ab8cf788e767e6038e277693d34a33bb93ed5a94e162f245c15078ba99522"
+    },
+    {
+      "bytes": 33418,
+      "kind": "file",
+      "mode": 493,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/Resources/app.js",
+      "sha256": "2c8d2a00098d54ca65bea6466190e85a9c89553e8d2e7edd6d1eeb1484a83d59"
+    },
+    {
+      "bytes": 1789,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/Resources/debug.md",
+      "sha256": "4013e3cfa6a4af1b51d69d4dc8445cc1e0590b0658fb5d250b4a431c70224bef"
+    },
+    {
+      "bytes": 4047,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/Resources/docs.md",
+      "sha256": "e1118265e19562bf5e470ad6de16cd0c4e009b01e55f263049b24f714649ee55"
+    },
+    {
+      "bytes": 2703,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/Resources/explore.md",
+      "sha256": "0cfd24d91a74e24a64a8716e7fb6f57bb4a5a6388f5f0d2d843bbc4775e09b92"
+    },
+    {
+      "bytes": 2130,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/Resources/implement.md",
+      "sha256": "1459a82d77ceebd099a6fce5ef2504bffac451f0bd9e41c96318c3ff85a70142"
+    },
+    {
+      "bytes": 7280,
+      "kind": "file",
+      "mode": 493,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/Resources/index.html",
+      "sha256": "5a53d1914bedaf55753b6d9764f1234c129b64cc25c81e7e6a074849fdd9d98e"
+    },
+    {
+      "bytes": 1670,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/Resources/plan.md",
+      "sha256": "89e9ad8543beaa7a681c48a153569b9b340bdf7fd4f34a9164354c5a6874aaff"
+    },
+    {
+      "bytes": 1383,
+      "kind": "file",
+      "mode": 493,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/Resources/precommit-audit.md",
+      "sha256": "9dc5693035148f124b1b990e8177aa799b5149fd818da7b9a1d447d537db8ea0"
+    },
+    {
+      "bytes": 1301,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/Resources/research.md",
+      "sha256": "e5b0141797297ae5a5f647d9487445cfbffb43956ce1093e2edfad18ce4cb7e5"
+    },
+    {
+      "bytes": 1523,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/Resources/review.md",
+      "sha256": "cfab52c5a3ecb384dba6bfa022db773729a0b48c2828e7716d970b873826a9cc"
+    },
+    {
+      "bytes": 1453,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/Resources/security.md",
+      "sha256": "b7a7bd4a6174499b75ce095f9208cbec26f6e158a0cd7cffd9d204d782340c99"
+    },
+    {
+      "bytes": 26920,
+      "kind": "file",
+      "mode": 493,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/Resources/style.css",
+      "sha256": "ac153c71e36b8655593c6bc539506145f49814375f6c00c8a40125889f4a1e58"
+    },
+    {
+      "bytes": 1381,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/Resources/test.md",
+      "sha256": "bc29c81555acd940eccfe692d4ded50717f43b87943a13644c62b11783d30cc0"
+    },
+    {
+      "bytes": 2877,
+      "kind": "file",
+      "mode": 493,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/Resources/tools-catalog.js",
+      "sha256": "923605efe5fd5895b768c240e9a8b6c0d8cf40359196eea54be95f374dbd1331"
+    },
+    {
+      "kind": "directory",
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/_CodeSignature"
+    },
+    {
+      "bytes": 5608,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/A/_CodeSignature/CodeResources",
+      "sha256": "9e718141a6abb0349d9ff810c4aa1d57a4de36e32d976dd575e0c7dd3ff96c20"
+    },
+    {
+      "kind": "symlink",
+      "path": "Contents/Frameworks/ForgeConductorCore.framework/Versions/Current",
+      "target": "A"
+    },
+    {
+      "kind": "directory",
+      "path": "Contents/Helpers"
+    },
+    {
+      "bytes": 213920,
+      "kind": "file",
+      "mode": 493,
+      "path": "Contents/Helpers/forge-conductor",
+      "sha256": "4d2b683a715037ef281611f52b3fa35234737b627fbfee7bae99722d8e2c809f"
+    },
+    {
+      "bytes": 79056,
+      "kind": "file",
+      "mode": 493,
+      "path": "Contents/Helpers/forge-runtime-launcher",
+      "sha256": "6c8b47f226d5782058827024d7685cb6399f22d4c10e70b8da82c45afe31fe95"
+    },
+    {
+      "bytes": 1774,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/Info.plist",
+      "sha256": "b3cc3f40402f9129e1b91b41e2a756bf7a939e24136134902e59d4b2203a6aaa"
+    },
+    {
+      "kind": "directory",
+      "path": "Contents/Library"
+    },
+    {
+      "kind": "directory",
+      "path": "Contents/Library/LaunchDaemons"
+    },
+    {
+      "bytes": 533,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/Library/LaunchDaemons/com.forge-conductor.filesystem-daemon.plist",
+      "sha256": "350693657ecb90958010537e99da97eafac41a0f56f79d8c4e7fe285cd69a486"
+    },
+    {
+      "kind": "directory",
+      "path": "Contents/MacOS"
+    },
+    {
+      "bytes": 4942656,
+      "kind": "file",
+      "mode": 493,
+      "path": "Contents/MacOS/Forge Conductor",
+      "sha256": "0b3c87f4647554967bdf9ea445bfb777411b8577023a48c4f976ba709b1f024c"
+    },
+    {
+      "bytes": 694912,
+      "kind": "file",
+      "mode": 493,
+      "path": "Contents/MacOS/forge-filesystem-daemon",
+      "sha256": "f12ac00f8165f3f81c961950cea66cb3cdd387ae3650ace875c926a272436a45"
+    },
+    {
+      "bytes": 8,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/PkgInfo",
+      "sha256": "82502191c9484b04d685374f9879a0066069c49b8acae7a04b01d38d07e8eca0"
+    },
+    {
+      "kind": "directory",
+      "path": "Contents/Resources"
+    },
+    {
+      "bytes": 159890,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/Resources/AppIcon.icns",
+      "sha256": "31bcba2825b9c11f491415ebae056518eb4b78a8a95fd7d53fdf98963845f7c9"
+    },
+    {
+      "bytes": 2628504,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/Resources/Assets.car",
+      "sha256": "ff0827e043da5d3323cf72d6ad5f0d8640c795242357ca95408068d9a43db1a3"
+    },
+    {
+      "bytes": 1805264,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/Resources/Forge-Conductor.icns",
+      "sha256": "47b2c18dbe355fb94a5fcabfeebaf6f8433fc6fa4f3502574a27b55921fa3192"
+    },
+    {
+      "kind": "directory",
+      "path": "Contents/_CodeSignature"
+    },
+    {
+      "bytes": 4690,
+      "kind": "file",
+      "mode": 420,
+      "path": "Contents/_CodeSignature/CodeResources",
+      "sha256": "9064842a6de97074263f75d0bd2b276ebcb51e72e356b2a4b8de28f01c7576aa"
+    }
+  ],
+  "bundle_build": "1",
+  "bundle_version": "0.9.0",
+  "candidate_assertion_id": "CLI-VERSION-HELP.production-path",
+  "cases": [
+    {
+      "argv": [
+        "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Product-DevelopmentRelease/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-conductor"
+      ],
+      "cwd": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-cli-help-sz6ed4tu/home",
+      "ended_at": "2026-09-04T23:27:26.829795+00:00",
+      "environment": {
+        "FORGE_CONDUCTOR_HOME": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-cli-help-sz6ed4tu/home/.forge-conductor",
+        "HOME": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-cli-help-sz6ed4tu/home",
+        "LANG": "C",
+        "LC_ALL": "C",
+        "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+        "TMPDIR": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-cli-help-sz6ed4tu"
+      },
+      "exit_code": 0,
+      "id": "no_arguments_help",
+      "maximum_stream_bytes": 16384,
+      "pid": 85101,
+      "started_at": "2026-09-04T23:27:26.820993+00:00",
+      "stderr": {
+        "base64": "",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "base64": "Rm9yZ2UtQ29uZHVjdG9yIDAuOS4wIOKAlCBuYXRpdmUgU3dpZnQgTUNQIG9yY2hlc3RyYXRvcgoKVXNhZ2U6CiAgZm9yZ2UtY29uZHVjdG9yIDxjb21tYW5kPiBbb3B0aW9uc10KCkNvbW1hbmRzOgogIGluc3RhbGwgWy0tZnJvbSBQQVRIXSAgTGF5b3V0ICsgaW5zdGFsbCBTd2lmdCBiaW5hcnkgdG8gfi8uZm9yZ2UtY29uZHVjdG9yL2JpbgogIGluc3RhbGwtbG1zdHVkaW8tcGx1Z2luIFstLWJpbmFyeSBQQVRIXSAgRGVwbG95IHRvIExNIFN0dWRpbyAocHJpbWFyeStmYWlsb3ZlciBtY3BCcmlkZ2UgKyBtY3AuanNvbikKICBkb2N0b3IgICAgICAgICAgICAgICBWYWxpZGF0ZSBpbnN0YWxsLCBwb3J0IGNvbmZsaWN0cywgZW5kcG9pbnQgcHJvdGVjdGlvbgogIHN0YXR1cyAgICAgICAgICAgICAgIFByaW50IHJ1bnRpbWUgc3RhdHVzIEpTT04KICBzZXJ2ZSAgICAgICAgICAgICAgICBSdW4gTUNQIHNlcnZlciBvbiBzdGRpbyAoZm9yIExNIFN0dWRpbykKICBkYXNoYm9hcmQgWy0taG9zdCBIT1NUXSBbLS1wb3J0IFBPUlRdIFstLW9wZW5dCiAgICAgICAgICAgICAgICAgICAgICAgU3RhcnQgc3RhbmRhbG9uZSBjb250cm9sIHN1cmZhY2UgKG5vIHN1cGVydmlzb3IpCiAgbWFuYWdlciAgICAgICAgICAgICAgU3VwZXJ2aXNlZCBkYXNoYm9hcmQgbm9kZSAoa2VlcHMgVUkgdXApCiAgICBydW4gWy0tb3Blbl0gICAgICAgICBGb3JlZ3JvdW5kIG1hbmFnZXIKICAgIHN0YXJ0IFstLW9wZW5dICAgICAgIEJhY2tncm91bmQgbWFuYWdlcgogICAgc3RvcCAgICAgICAgICAgICAgICAgU3RvcCBtYW5hZ2VyCiAgICByZXN0YXJ0IFstLW9wZW5dICAgICBSZXN0YXJ0IG1hbmFnZXIKICAgIHN0YXR1cyAgICAgICAgICAgICAgIE1hbmFnZXIgc3RhdHVzCiAgICBpbnN0YWxsLWxvZ2luIFstLWtlZXAtc3RhbGVdIFstLW9wZW5dCiAgICAgICAgICAgICAgICAgICAgICAgICBBcHAgYnVuZGxlICsgTGF1bmNoQWdlbnQgKHNob3dzIGFzIEZvcmdlIENvbmR1Y3RvcikKICAgIHVuaW5zdGFsbC1sb2dpbiAgICAgIFJlbW92ZSBMYXVuY2hBZ2VudAogICAgY2xlYW51cC1zdGFsZSAgICAgICAgUmVtb3ZlIGxlZ2FjeSBjb20uZm9yZ2UuKiBhZ2VudHMgKGJhc2gvcHl0aG9uMyBpbiBMb2dpbiBJdGVtcykKICAgIGFsbG93bGlzdCAgICAgICAgICAgIFByaW50IEVQIC8gZmlyZXdhbGwgYWxsb3dsaXN0IGd1aWRhbmNlCiAgYWdlbnRzICAgICAgICAgICAgICAgTGlzdCBzcGVjaWFsaXN0IGFnZW50IGlkcwogIHZlcnNpb24gICAgICAgICAgICAgIFByaW50IHZlcnNpb24KICBoZWxwICAgICAgICAgICAgICAgICBTaG93IHRoaXMgaGVscAoKRW52aXJvbm1lbnQ6CiAgRk9SR0VfQ09ORFVDVE9SX0hPTUUgIE92ZXJyaWRlIGRhdGEgZGlyZWN0b3J5IChkZWZhdWx0IH4vLmZvcmdlLWNvbmR1Y3RvcikKCk1hbmFnZWQgTWFjIG5vdGU6CiAgRmFsY29uIC8gSmFtZiBQcm90ZWN0IC8gQ29ydGV4IG1heSBibG9jayBhZC1ob2MgYmluYXJpZXMgYW5kIGxvb3BiYWNrIEhUVFAuCiAgUnVuOiBmb3JnZS1jb25kdWN0b3IgbWFuYWdlciBhbGxvd2xpc3QKICBUaGVuOiBTeXN0ZW0gU2V0dGluZ3Mg4oaSIEdlbmVyYWwg4oaSIExvZ2luIEl0ZW1zICYgRXh0ZW5zaW9ucwoKRXhhbXBsZXM6CiAgZm9yZ2UtY29uZHVjdG9yIGluc3RhbGwKICBmb3JnZS1jb25kdWN0b3IgbWFuYWdlciBpbnN0YWxsLWxvZ2luCiAgZm9yZ2UtY29uZHVjdG9yIG1hbmFnZXIgc3RhdHVzCiAgb3BlbiAtYSAiR29vZ2xlIENocm9tZSIgaHR0cDovLzEyNy4wLjAuMTo3Nzg4Lwo=",
+        "bytes": 1769,
+        "sha256": "606a53e6c8c35e9342933226e277caf089cab97ac3758698b21322a32b4bf7d7"
+      },
+      "stream_limit_exceeded": false,
+      "timed_out": false,
+      "timeout_seconds": 10
+    },
+    {
+      "argv": [
+        "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Product-DevelopmentRelease/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-conductor",
+        "help"
+      ],
+      "cwd": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-cli-help-sz6ed4tu/home",
+      "ended_at": "2026-09-04T23:27:26.838072+00:00",
+      "environment": {
+        "FORGE_CONDUCTOR_HOME": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-cli-help-sz6ed4tu/home/.forge-conductor",
+        "HOME": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-cli-help-sz6ed4tu/home",
+        "LANG": "C",
+        "LC_ALL": "C",
+        "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+        "TMPDIR": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-cli-help-sz6ed4tu"
+      },
+      "exit_code": 0,
+      "id": "help",
+      "maximum_stream_bytes": 16384,
+      "pid": 85102,
+      "started_at": "2026-09-04T23:27:26.830005+00:00",
+      "stderr": {
+        "base64": "",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "base64": "Rm9yZ2UtQ29uZHVjdG9yIDAuOS4wIOKAlCBuYXRpdmUgU3dpZnQgTUNQIG9yY2hlc3RyYXRvcgoKVXNhZ2U6CiAgZm9yZ2UtY29uZHVjdG9yIDxjb21tYW5kPiBbb3B0aW9uc10KCkNvbW1hbmRzOgogIGluc3RhbGwgWy0tZnJvbSBQQVRIXSAgTGF5b3V0ICsgaW5zdGFsbCBTd2lmdCBiaW5hcnkgdG8gfi8uZm9yZ2UtY29uZHVjdG9yL2JpbgogIGluc3RhbGwtbG1zdHVkaW8tcGx1Z2luIFstLWJpbmFyeSBQQVRIXSAgRGVwbG95IHRvIExNIFN0dWRpbyAocHJpbWFyeStmYWlsb3ZlciBtY3BCcmlkZ2UgKyBtY3AuanNvbikKICBkb2N0b3IgICAgICAgICAgICAgICBWYWxpZGF0ZSBpbnN0YWxsLCBwb3J0IGNvbmZsaWN0cywgZW5kcG9pbnQgcHJvdGVjdGlvbgogIHN0YXR1cyAgICAgICAgICAgICAgIFByaW50IHJ1bnRpbWUgc3RhdHVzIEpTT04KICBzZXJ2ZSAgICAgICAgICAgICAgICBSdW4gTUNQIHNlcnZlciBvbiBzdGRpbyAoZm9yIExNIFN0dWRpbykKICBkYXNoYm9hcmQgWy0taG9zdCBIT1NUXSBbLS1wb3J0IFBPUlRdIFstLW9wZW5dCiAgICAgICAgICAgICAgICAgICAgICAgU3RhcnQgc3RhbmRhbG9uZSBjb250cm9sIHN1cmZhY2UgKG5vIHN1cGVydmlzb3IpCiAgbWFuYWdlciAgICAgICAgICAgICAgU3VwZXJ2aXNlZCBkYXNoYm9hcmQgbm9kZSAoa2VlcHMgVUkgdXApCiAgICBydW4gWy0tb3Blbl0gICAgICAgICBGb3JlZ3JvdW5kIG1hbmFnZXIKICAgIHN0YXJ0IFstLW9wZW5dICAgICAgIEJhY2tncm91bmQgbWFuYWdlcgogICAgc3RvcCAgICAgICAgICAgICAgICAgU3RvcCBtYW5hZ2VyCiAgICByZXN0YXJ0IFstLW9wZW5dICAgICBSZXN0YXJ0IG1hbmFnZXIKICAgIHN0YXR1cyAgICAgICAgICAgICAgIE1hbmFnZXIgc3RhdHVzCiAgICBpbnN0YWxsLWxvZ2luIFstLWtlZXAtc3RhbGVdIFstLW9wZW5dCiAgICAgICAgICAgICAgICAgICAgICAgICBBcHAgYnVuZGxlICsgTGF1bmNoQWdlbnQgKHNob3dzIGFzIEZvcmdlIENvbmR1Y3RvcikKICAgIHVuaW5zdGFsbC1sb2dpbiAgICAgIFJlbW92ZSBMYXVuY2hBZ2VudAogICAgY2xlYW51cC1zdGFsZSAgICAgICAgUmVtb3ZlIGxlZ2FjeSBjb20uZm9yZ2UuKiBhZ2VudHMgKGJhc2gvcHl0aG9uMyBpbiBMb2dpbiBJdGVtcykKICAgIGFsbG93bGlzdCAgICAgICAgICAgIFByaW50IEVQIC8gZmlyZXdhbGwgYWxsb3dsaXN0IGd1aWRhbmNlCiAgYWdlbnRzICAgICAgICAgICAgICAgTGlzdCBzcGVjaWFsaXN0IGFnZW50IGlkcwogIHZlcnNpb24gICAgICAgICAgICAgIFByaW50IHZlcnNpb24KICBoZWxwICAgICAgICAgICAgICAgICBTaG93IHRoaXMgaGVscAoKRW52aXJvbm1lbnQ6CiAgRk9SR0VfQ09ORFVDVE9SX0hPTUUgIE92ZXJyaWRlIGRhdGEgZGlyZWN0b3J5IChkZWZhdWx0IH4vLmZvcmdlLWNvbmR1Y3RvcikKCk1hbmFnZWQgTWFjIG5vdGU6CiAgRmFsY29uIC8gSmFtZiBQcm90ZWN0IC8gQ29ydGV4IG1heSBibG9jayBhZC1ob2MgYmluYXJpZXMgYW5kIGxvb3BiYWNrIEhUVFAuCiAgUnVuOiBmb3JnZS1jb25kdWN0b3IgbWFuYWdlciBhbGxvd2xpc3QKICBUaGVuOiBTeXN0ZW0gU2V0dGluZ3Mg4oaSIEdlbmVyYWwg4oaSIExvZ2luIEl0ZW1zICYgRXh0ZW5zaW9ucwoKRXhhbXBsZXM6CiAgZm9yZ2UtY29uZHVjdG9yIGluc3RhbGwKICBmb3JnZS1jb25kdWN0b3IgbWFuYWdlciBpbnN0YWxsLWxvZ2luCiAgZm9yZ2UtY29uZHVjdG9yIG1hbmFnZXIgc3RhdHVzCiAgb3BlbiAtYSAiR29vZ2xlIENocm9tZSIgaHR0cDovLzEyNy4wLjAuMTo3Nzg4Lwo=",
+        "bytes": 1769,
+        "sha256": "606a53e6c8c35e9342933226e277caf089cab97ac3758698b21322a32b4bf7d7"
+      },
+      "stream_limit_exceeded": false,
+      "timed_out": false,
+      "timeout_seconds": 10
+    },
+    {
+      "argv": [
+        "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Product-DevelopmentRelease/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-conductor",
+        "-h"
+      ],
+      "cwd": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-cli-help-sz6ed4tu/home",
+      "ended_at": "2026-09-04T23:27:26.846558+00:00",
+      "environment": {
+        "FORGE_CONDUCTOR_HOME": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-cli-help-sz6ed4tu/home/.forge-conductor",
+        "HOME": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-cli-help-sz6ed4tu/home",
+        "LANG": "C",
+        "LC_ALL": "C",
+        "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+        "TMPDIR": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-cli-help-sz6ed4tu"
+      },
+      "exit_code": 0,
+      "id": "short_help",
+      "maximum_stream_bytes": 16384,
+      "pid": 85103,
+      "started_at": "2026-09-04T23:27:26.838263+00:00",
+      "stderr": {
+        "base64": "",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "base64": "Rm9yZ2UtQ29uZHVjdG9yIDAuOS4wIOKAlCBuYXRpdmUgU3dpZnQgTUNQIG9yY2hlc3RyYXRvcgoKVXNhZ2U6CiAgZm9yZ2UtY29uZHVjdG9yIDxjb21tYW5kPiBbb3B0aW9uc10KCkNvbW1hbmRzOgogIGluc3RhbGwgWy0tZnJvbSBQQVRIXSAgTGF5b3V0ICsgaW5zdGFsbCBTd2lmdCBiaW5hcnkgdG8gfi8uZm9yZ2UtY29uZHVjdG9yL2JpbgogIGluc3RhbGwtbG1zdHVkaW8tcGx1Z2luIFstLWJpbmFyeSBQQVRIXSAgRGVwbG95IHRvIExNIFN0dWRpbyAocHJpbWFyeStmYWlsb3ZlciBtY3BCcmlkZ2UgKyBtY3AuanNvbikKICBkb2N0b3IgICAgICAgICAgICAgICBWYWxpZGF0ZSBpbnN0YWxsLCBwb3J0IGNvbmZsaWN0cywgZW5kcG9pbnQgcHJvdGVjdGlvbgogIHN0YXR1cyAgICAgICAgICAgICAgIFByaW50IHJ1bnRpbWUgc3RhdHVzIEpTT04KICBzZXJ2ZSAgICAgICAgICAgICAgICBSdW4gTUNQIHNlcnZlciBvbiBzdGRpbyAoZm9yIExNIFN0dWRpbykKICBkYXNoYm9hcmQgWy0taG9zdCBIT1NUXSBbLS1wb3J0IFBPUlRdIFstLW9wZW5dCiAgICAgICAgICAgICAgICAgICAgICAgU3RhcnQgc3RhbmRhbG9uZSBjb250cm9sIHN1cmZhY2UgKG5vIHN1cGVydmlzb3IpCiAgbWFuYWdlciAgICAgICAgICAgICAgU3VwZXJ2aXNlZCBkYXNoYm9hcmQgbm9kZSAoa2VlcHMgVUkgdXApCiAgICBydW4gWy0tb3Blbl0gICAgICAgICBGb3JlZ3JvdW5kIG1hbmFnZXIKICAgIHN0YXJ0IFstLW9wZW5dICAgICAgIEJhY2tncm91bmQgbWFuYWdlcgogICAgc3RvcCAgICAgICAgICAgICAgICAgU3RvcCBtYW5hZ2VyCiAgICByZXN0YXJ0IFstLW9wZW5dICAgICBSZXN0YXJ0IG1hbmFnZXIKICAgIHN0YXR1cyAgICAgICAgICAgICAgIE1hbmFnZXIgc3RhdHVzCiAgICBpbnN0YWxsLWxvZ2luIFstLWtlZXAtc3RhbGVdIFstLW9wZW5dCiAgICAgICAgICAgICAgICAgICAgICAgICBBcHAgYnVuZGxlICsgTGF1bmNoQWdlbnQgKHNob3dzIGFzIEZvcmdlIENvbmR1Y3RvcikKICAgIHVuaW5zdGFsbC1sb2dpbiAgICAgIFJlbW92ZSBMYXVuY2hBZ2VudAogICAgY2xlYW51cC1zdGFsZSAgICAgICAgUmVtb3ZlIGxlZ2FjeSBjb20uZm9yZ2UuKiBhZ2VudHMgKGJhc2gvcHl0aG9uMyBpbiBMb2dpbiBJdGVtcykKICAgIGFsbG93bGlzdCAgICAgICAgICAgIFByaW50IEVQIC8gZmlyZXdhbGwgYWxsb3dsaXN0IGd1aWRhbmNlCiAgYWdlbnRzICAgICAgICAgICAgICAgTGlzdCBzcGVjaWFsaXN0IGFnZW50IGlkcwogIHZlcnNpb24gICAgICAgICAgICAgIFByaW50IHZlcnNpb24KICBoZWxwICAgICAgICAgICAgICAgICBTaG93IHRoaXMgaGVscAoKRW52aXJvbm1lbnQ6CiAgRk9SR0VfQ09ORFVDVE9SX0hPTUUgIE92ZXJyaWRlIGRhdGEgZGlyZWN0b3J5IChkZWZhdWx0IH4vLmZvcmdlLWNvbmR1Y3RvcikKCk1hbmFnZWQgTWFjIG5vdGU6CiAgRmFsY29uIC8gSmFtZiBQcm90ZWN0IC8gQ29ydGV4IG1heSBibG9jayBhZC1ob2MgYmluYXJpZXMgYW5kIGxvb3BiYWNrIEhUVFAuCiAgUnVuOiBmb3JnZS1jb25kdWN0b3IgbWFuYWdlciBhbGxvd2xpc3QKICBUaGVuOiBTeXN0ZW0gU2V0dGluZ3Mg4oaSIEdlbmVyYWwg4oaSIExvZ2luIEl0ZW1zICYgRXh0ZW5zaW9ucwoKRXhhbXBsZXM6CiAgZm9yZ2UtY29uZHVjdG9yIGluc3RhbGwKICBmb3JnZS1jb25kdWN0b3IgbWFuYWdlciBpbnN0YWxsLWxvZ2luCiAgZm9yZ2UtY29uZHVjdG9yIG1hbmFnZXIgc3RhdHVzCiAgb3BlbiAtYSAiR29vZ2xlIENocm9tZSIgaHR0cDovLzEyNy4wLjAuMTo3Nzg4Lwo=",
+        "bytes": 1769,
+        "sha256": "606a53e6c8c35e9342933226e277caf089cab97ac3758698b21322a32b4bf7d7"
+      },
+      "stream_limit_exceeded": false,
+      "timed_out": false,
+      "timeout_seconds": 10
+    },
+    {
+      "argv": [
+        "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Product-DevelopmentRelease/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-conductor",
+        "--help"
+      ],
+      "cwd": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-cli-help-sz6ed4tu/home",
+      "ended_at": "2026-09-04T23:27:26.854975+00:00",
+      "environment": {
+        "FORGE_CONDUCTOR_HOME": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-cli-help-sz6ed4tu/home/.forge-conductor",
+        "HOME": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-cli-help-sz6ed4tu/home",
+        "LANG": "C",
+        "LC_ALL": "C",
+        "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+        "TMPDIR": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-cli-help-sz6ed4tu"
+      },
+      "exit_code": 0,
+      "id": "long_help",
+      "maximum_stream_bytes": 16384,
+      "pid": 85104,
+      "started_at": "2026-09-04T23:27:26.846748+00:00",
+      "stderr": {
+        "base64": "",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "base64": "Rm9yZ2UtQ29uZHVjdG9yIDAuOS4wIOKAlCBuYXRpdmUgU3dpZnQgTUNQIG9yY2hlc3RyYXRvcgoKVXNhZ2U6CiAgZm9yZ2UtY29uZHVjdG9yIDxjb21tYW5kPiBbb3B0aW9uc10KCkNvbW1hbmRzOgogIGluc3RhbGwgWy0tZnJvbSBQQVRIXSAgTGF5b3V0ICsgaW5zdGFsbCBTd2lmdCBiaW5hcnkgdG8gfi8uZm9yZ2UtY29uZHVjdG9yL2JpbgogIGluc3RhbGwtbG1zdHVkaW8tcGx1Z2luIFstLWJpbmFyeSBQQVRIXSAgRGVwbG95IHRvIExNIFN0dWRpbyAocHJpbWFyeStmYWlsb3ZlciBtY3BCcmlkZ2UgKyBtY3AuanNvbikKICBkb2N0b3IgICAgICAgICAgICAgICBWYWxpZGF0ZSBpbnN0YWxsLCBwb3J0IGNvbmZsaWN0cywgZW5kcG9pbnQgcHJvdGVjdGlvbgogIHN0YXR1cyAgICAgICAgICAgICAgIFByaW50IHJ1bnRpbWUgc3RhdHVzIEpTT04KICBzZXJ2ZSAgICAgICAgICAgICAgICBSdW4gTUNQIHNlcnZlciBvbiBzdGRpbyAoZm9yIExNIFN0dWRpbykKICBkYXNoYm9hcmQgWy0taG9zdCBIT1NUXSBbLS1wb3J0IFBPUlRdIFstLW9wZW5dCiAgICAgICAgICAgICAgICAgICAgICAgU3RhcnQgc3RhbmRhbG9uZSBjb250cm9sIHN1cmZhY2UgKG5vIHN1cGVydmlzb3IpCiAgbWFuYWdlciAgICAgICAgICAgICAgU3VwZXJ2aXNlZCBkYXNoYm9hcmQgbm9kZSAoa2VlcHMgVUkgdXApCiAgICBydW4gWy0tb3Blbl0gICAgICAgICBGb3JlZ3JvdW5kIG1hbmFnZXIKICAgIHN0YXJ0IFstLW9wZW5dICAgICAgIEJhY2tncm91bmQgbWFuYWdlcgogICAgc3RvcCAgICAgICAgICAgICAgICAgU3RvcCBtYW5hZ2VyCiAgICByZXN0YXJ0IFstLW9wZW5dICAgICBSZXN0YXJ0IG1hbmFnZXIKICAgIHN0YXR1cyAgICAgICAgICAgICAgIE1hbmFnZXIgc3RhdHVzCiAgICBpbnN0YWxsLWxvZ2luIFstLWtlZXAtc3RhbGVdIFstLW9wZW5dCiAgICAgICAgICAgICAgICAgICAgICAgICBBcHAgYnVuZGxlICsgTGF1bmNoQWdlbnQgKHNob3dzIGFzIEZvcmdlIENvbmR1Y3RvcikKICAgIHVuaW5zdGFsbC1sb2dpbiAgICAgIFJlbW92ZSBMYXVuY2hBZ2VudAogICAgY2xlYW51cC1zdGFsZSAgICAgICAgUmVtb3ZlIGxlZ2FjeSBjb20uZm9yZ2UuKiBhZ2VudHMgKGJhc2gvcHl0aG9uMyBpbiBMb2dpbiBJdGVtcykKICAgIGFsbG93bGlzdCAgICAgICAgICAgIFByaW50IEVQIC8gZmlyZXdhbGwgYWxsb3dsaXN0IGd1aWRhbmNlCiAgYWdlbnRzICAgICAgICAgICAgICAgTGlzdCBzcGVjaWFsaXN0IGFnZW50IGlkcwogIHZlcnNpb24gICAgICAgICAgICAgIFByaW50IHZlcnNpb24KICBoZWxwICAgICAgICAgICAgICAgICBTaG93IHRoaXMgaGVscAoKRW52aXJvbm1lbnQ6CiAgRk9SR0VfQ09ORFVDVE9SX0hPTUUgIE92ZXJyaWRlIGRhdGEgZGlyZWN0b3J5IChkZWZhdWx0IH4vLmZvcmdlLWNvbmR1Y3RvcikKCk1hbmFnZWQgTWFjIG5vdGU6CiAgRmFsY29uIC8gSmFtZiBQcm90ZWN0IC8gQ29ydGV4IG1heSBibG9jayBhZC1ob2MgYmluYXJpZXMgYW5kIGxvb3BiYWNrIEhUVFAuCiAgUnVuOiBmb3JnZS1jb25kdWN0b3IgbWFuYWdlciBhbGxvd2xpc3QKICBUaGVuOiBTeXN0ZW0gU2V0dGluZ3Mg4oaSIEdlbmVyYWwg4oaSIExvZ2luIEl0ZW1zICYgRXh0ZW5zaW9ucwoKRXhhbXBsZXM6CiAgZm9yZ2UtY29uZHVjdG9yIGluc3RhbGwKICBmb3JnZS1jb25kdWN0b3IgbWFuYWdlciBpbnN0YWxsLWxvZ2luCiAgZm9yZ2UtY29uZHVjdG9yIG1hbmFnZXIgc3RhdHVzCiAgb3BlbiAtYSAiR29vZ2xlIENocm9tZSIgaHR0cDovLzEyNy4wLjAuMTo3Nzg4Lwo=",
+        "bytes": 1769,
+        "sha256": "606a53e6c8c35e9342933226e277caf089cab97ac3758698b21322a32b4bf7d7"
+      },
+      "stream_limit_exceeded": false,
+      "timed_out": false,
+      "timeout_seconds": 10
+    },
+    {
+      "argv": [
+        "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Product-DevelopmentRelease/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-conductor",
+        "version"
+      ],
+      "cwd": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-cli-help-sz6ed4tu/home",
+      "ended_at": "2026-09-04T23:27:26.863314+00:00",
+      "environment": {
+        "FORGE_CONDUCTOR_HOME": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-cli-help-sz6ed4tu/home/.forge-conductor",
+        "HOME": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-cli-help-sz6ed4tu/home",
+        "LANG": "C",
+        "LC_ALL": "C",
+        "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+        "TMPDIR": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-cli-help-sz6ed4tu"
+      },
+      "exit_code": 0,
+      "id": "version",
+      "maximum_stream_bytes": 16384,
+      "pid": 85105,
+      "started_at": "2026-09-04T23:27:26.855174+00:00",
+      "stderr": {
+        "base64": "",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "base64": "MC45LjAK",
+        "bytes": 6,
+        "sha256": "9d8c94f1ad3ea96b1e2ac4914fda4cb93c76b4a3e0d8cc6dd8976d6c0b227d15"
+      },
+      "stream_limit_exceeded": false,
+      "timed_out": false,
+      "timeout_seconds": 10
+    },
+    {
+      "argv": [
+        "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Product-DevelopmentRelease/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-conductor",
+        "--version"
+      ],
+      "cwd": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-cli-help-sz6ed4tu/home",
+      "ended_at": "2026-09-04T23:27:26.871584+00:00",
+      "environment": {
+        "FORGE_CONDUCTOR_HOME": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-cli-help-sz6ed4tu/home/.forge-conductor",
+        "HOME": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-cli-help-sz6ed4tu/home",
+        "LANG": "C",
+        "LC_ALL": "C",
+        "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+        "TMPDIR": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-cli-help-sz6ed4tu"
+      },
+      "exit_code": 0,
+      "id": "long_version",
+      "maximum_stream_bytes": 16384,
+      "pid": 85106,
+      "started_at": "2026-09-04T23:27:26.863508+00:00",
+      "stderr": {
+        "base64": "",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "base64": "MC45LjAK",
+        "bytes": 6,
+        "sha256": "9d8c94f1ad3ea96b1e2ac4914fda4cb93c76b4a3e0d8cc6dd8976d6c0b227d15"
+      },
+      "stream_limit_exceeded": false,
+      "timed_out": false,
+      "timeout_seconds": 10
+    },
+    {
+      "argv": [
+        "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Product-DevelopmentRelease/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-conductor",
+        "__forge_unknown_command__"
+      ],
+      "cwd": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-cli-help-sz6ed4tu/home",
+      "ended_at": "2026-09-04T23:27:26.880227+00:00",
+      "environment": {
+        "FORGE_CONDUCTOR_HOME": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-cli-help-sz6ed4tu/home/.forge-conductor",
+        "HOME": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-cli-help-sz6ed4tu/home",
+        "LANG": "C",
+        "LC_ALL": "C",
+        "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+        "TMPDIR": "/private/var/folders/tz/42vs04ls56q51168sddqb5940000gn/T/forge-p10-cli-help-sz6ed4tu"
+      },
+      "exit_code": 2,
+      "id": "unknown_command",
+      "maximum_stream_bytes": 16384,
+      "pid": 85107,
+      "started_at": "2026-09-04T23:27:26.871778+00:00",
+      "stderr": {
+        "base64": "VW5rbm93biBjb21tYW5kOiBfX2ZvcmdlX3Vua25vd25fY29tbWFuZF9fCgo=",
+        "bytes": 44,
+        "sha256": "6b086654eafb7d8e233e00447749ace0edfbe7c0f05cdfb594e017e52f89bf4e"
+      },
+      "stdout": {
+        "base64": "Rm9yZ2UtQ29uZHVjdG9yIDAuOS4wIOKAlCBuYXRpdmUgU3dpZnQgTUNQIG9yY2hlc3RyYXRvcgoKVXNhZ2U6CiAgZm9yZ2UtY29uZHVjdG9yIDxjb21tYW5kPiBbb3B0aW9uc10KCkNvbW1hbmRzOgogIGluc3RhbGwgWy0tZnJvbSBQQVRIXSAgTGF5b3V0ICsgaW5zdGFsbCBTd2lmdCBiaW5hcnkgdG8gfi8uZm9yZ2UtY29uZHVjdG9yL2JpbgogIGluc3RhbGwtbG1zdHVkaW8tcGx1Z2luIFstLWJpbmFyeSBQQVRIXSAgRGVwbG95IHRvIExNIFN0dWRpbyAocHJpbWFyeStmYWlsb3ZlciBtY3BCcmlkZ2UgKyBtY3AuanNvbikKICBkb2N0b3IgICAgICAgICAgICAgICBWYWxpZGF0ZSBpbnN0YWxsLCBwb3J0IGNvbmZsaWN0cywgZW5kcG9pbnQgcHJvdGVjdGlvbgogIHN0YXR1cyAgICAgICAgICAgICAgIFByaW50IHJ1bnRpbWUgc3RhdHVzIEpTT04KICBzZXJ2ZSAgICAgICAgICAgICAgICBSdW4gTUNQIHNlcnZlciBvbiBzdGRpbyAoZm9yIExNIFN0dWRpbykKICBkYXNoYm9hcmQgWy0taG9zdCBIT1NUXSBbLS1wb3J0IFBPUlRdIFstLW9wZW5dCiAgICAgICAgICAgICAgICAgICAgICAgU3RhcnQgc3RhbmRhbG9uZSBjb250cm9sIHN1cmZhY2UgKG5vIHN1cGVydmlzb3IpCiAgbWFuYWdlciAgICAgICAgICAgICAgU3VwZXJ2aXNlZCBkYXNoYm9hcmQgbm9kZSAoa2VlcHMgVUkgdXApCiAgICBydW4gWy0tb3Blbl0gICAgICAgICBGb3JlZ3JvdW5kIG1hbmFnZXIKICAgIHN0YXJ0IFstLW9wZW5dICAgICAgIEJhY2tncm91bmQgbWFuYWdlcgogICAgc3RvcCAgICAgICAgICAgICAgICAgU3RvcCBtYW5hZ2VyCiAgICByZXN0YXJ0IFstLW9wZW5dICAgICBSZXN0YXJ0IG1hbmFnZXIKICAgIHN0YXR1cyAgICAgICAgICAgICAgIE1hbmFnZXIgc3RhdHVzCiAgICBpbnN0YWxsLWxvZ2luIFstLWtlZXAtc3RhbGVdIFstLW9wZW5dCiAgICAgICAgICAgICAgICAgICAgICAgICBBcHAgYnVuZGxlICsgTGF1bmNoQWdlbnQgKHNob3dzIGFzIEZvcmdlIENvbmR1Y3RvcikKICAgIHVuaW5zdGFsbC1sb2dpbiAgICAgIFJlbW92ZSBMYXVuY2hBZ2VudAogICAgY2xlYW51cC1zdGFsZSAgICAgICAgUmVtb3ZlIGxlZ2FjeSBjb20uZm9yZ2UuKiBhZ2VudHMgKGJhc2gvcHl0aG9uMyBpbiBMb2dpbiBJdGVtcykKICAgIGFsbG93bGlzdCAgICAgICAgICAgIFByaW50IEVQIC8gZmlyZXdhbGwgYWxsb3dsaXN0IGd1aWRhbmNlCiAgYWdlbnRzICAgICAgICAgICAgICAgTGlzdCBzcGVjaWFsaXN0IGFnZW50IGlkcwogIHZlcnNpb24gICAgICAgICAgICAgIFByaW50IHZlcnNpb24KICBoZWxwICAgICAgICAgICAgICAgICBTaG93IHRoaXMgaGVscAoKRW52aXJvbm1lbnQ6CiAgRk9SR0VfQ09ORFVDVE9SX0hPTUUgIE92ZXJyaWRlIGRhdGEgZGlyZWN0b3J5IChkZWZhdWx0IH4vLmZvcmdlLWNvbmR1Y3RvcikKCk1hbmFnZWQgTWFjIG5vdGU6CiAgRmFsY29uIC8gSmFtZiBQcm90ZWN0IC8gQ29ydGV4IG1heSBibG9jayBhZC1ob2MgYmluYXJpZXMgYW5kIGxvb3BiYWNrIEhUVFAuCiAgUnVuOiBmb3JnZS1jb25kdWN0b3IgbWFuYWdlciBhbGxvd2xpc3QKICBUaGVuOiBTeXN0ZW0gU2V0dGluZ3Mg4oaSIEdlbmVyYWwg4oaSIExvZ2luIEl0ZW1zICYgRXh0ZW5zaW9ucwoKRXhhbXBsZXM6CiAgZm9yZ2UtY29uZHVjdG9yIGluc3RhbGwKICBmb3JnZS1jb25kdWN0b3IgbWFuYWdlciBpbnN0YWxsLWxvZ2luCiAgZm9yZ2UtY29uZHVjdG9yIG1hbmFnZXIgc3RhdHVzCiAgb3BlbiAtYSAiR29vZ2xlIENocm9tZSIgaHR0cDovLzEyNy4wLjAuMTo3Nzg4Lwo=",
+        "bytes": 1769,
+        "sha256": "606a53e6c8c35e9342933226e277caf089cab97ac3758698b21322a32b4bf7d7"
+      },
+      "stream_limit_exceeded": false,
+      "timed_out": false,
+      "timeout_seconds": 10
+    }
+  ],
+  "challenge_nonce": "b736c3da0981184fa98b6aa4257f064f89fd1ff889f7ee0bc65853f817c3a639",
+  "cleanup": {
+    "temporary_home_removed": true
+  },
+  "configuration_assessed": false,
+  "ended_at": "2026-09-04T23:27:26.895351+00:00",
+  "evidence_id": "EVID-20260904T232726Z-adfa33d4e7",
+  "executed_case_count": 7,
+  "expected_version": "0.9.0",
+  "failures": [],
+  "installation_assessed": false,
+  "isolated_home_unchanged": true,
+  "kind": "p10-cli-version-help-supporting-observations",
+  "passed": true,
+  "schema_version": 1,
+  "signing_assessed": false,
+  "started_at": "2026-09-04T23:27:26.797965+00:00",
+  "version_source": {
+    "bytes": 48673,
+    "mode": 420,
+    "path": "Sources/ForgeFilesystemProtocol/ForgeFilesystemProtocol.swift",
+    "sha256": "3a06aa21c63c8bf2107bffd97b490d131d278f7054406e224c95c2e03021252f"
+  }
+}

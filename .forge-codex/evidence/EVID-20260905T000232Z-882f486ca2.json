@@ -1,0 +1,150 @@
+{
+  "artifact_capture_errors": [],
+  "artifacts": [
+    {
+      "bytes": 5096688,
+      "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-OrdinaryDevelopmentRelease/Build/Products/Release/Forge Conductor.app/Contents/MacOS/Forge Conductor",
+      "portability": "origin-host-required",
+      "sha256": "487d5cdd7d4767f526205715fcb793bd36c0df00f4e1f9f3a927f9b0d8e0a21e",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 213920,
+      "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-OrdinaryDevelopmentRelease/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-conductor",
+      "portability": "origin-host-required",
+      "sha256": "47159717219cc00a1830361a3b825147d699a0468b53cb54ec7526b4de147c74",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 79056,
+      "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-OrdinaryDevelopmentRelease/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher",
+      "portability": "origin-host-required",
+      "sha256": "adbd04e456ec53bc8c547ce20f8bb2adf5e3930ac0fa80be51eeabe6d9122ec6",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 694912,
+      "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-OrdinaryDevelopmentRelease/Build/Products/Release/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon",
+      "portability": "origin-host-required",
+      "sha256": "15656e48638363e20f125b397ec8287254d165c1db255bcb1268a1ff1e8eb244",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 15311696,
+      "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-OrdinaryDevelopmentRelease/Build/Products/Release/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework/Versions/A/ForgeConductorCore",
+      "portability": "origin-host-required",
+      "sha256": "c34087aa80d0eefaedd5116adc3f9dc3732943046c1a1290461719e144d0f3d2",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 1774,
+      "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-OrdinaryDevelopmentRelease/Build/Products/Release/Forge Conductor.app/Contents/Info.plist",
+      "portability": "origin-host-required",
+      "sha256": "244ff1b7b4994b280057f6d19fa5f400acc1edc5c8b7ac618a3d595868f03bb7",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 533,
+      "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-OrdinaryDevelopmentRelease/Build/Products/Release/Forge Conductor.app/Contents/Library/LaunchDaemons/com.forge-conductor.filesystem-daemon.plist",
+      "portability": "origin-host-required",
+      "sha256": "350693657ecb90958010537e99da97eafac41a0f56f79d8c4e7fe285cd69a486",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 83559,
+      "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/final-source-candidate-build-inputs.json",
+      "portability": "origin-host-required",
+      "sha256": "99b73f6801a8eed1ac610cdfb1b2cccbf42f8f310479ace85ed3238dc6eecdd9",
+      "storage": "external-hash-only"
+    },
+    {
+      "bytes": 445395,
+      "path": ".forge-codex/evidence/EVID-20260905T000232Z-882f486ca2.stdout.txt",
+      "sha256": "4cff7f25364b93fd2af464d1e32eb1c0b648d49329674052553be9850b9633d4",
+      "storage": "evidence-id-specific-stream"
+    },
+    {
+      "bytes": 0,
+      "path": ".forge-codex/evidence/EVID-20260905T000232Z-882f486ca2.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storage": "evidence-id-specific-stream"
+    }
+  ],
+  "child_evidence_context": {
+    "binding_schema_version": 1,
+    "evidence_id": "EVID-20260905T000232Z-882f486ca2",
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "ffcf6bf9a2ea0c76a54788041cfa00c0dc8c7db4",
+      "branch": "release/0.9.0-shipping",
+      "head_sha": "fc5f899499052453feb0993832ae7aa9f27611b5",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
+    },
+    "schema_version": 1,
+    "source_manifest": {
+      "bytes": 13364452,
+      "file_count": 390,
+      "schema_version": 1,
+      "sha256": "80b58d7e2ec1e099edfd0728160c605094fbfed027e67ea83fb89dca810da7dd"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "command": "xcodebuild -workspace ForgeConductor.xcworkspace -scheme ForgeConductor -configuration Release -destination platform=macOS,arch=arm64 -derivedDataPath /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-OrdinaryDevelopmentRelease -jobs 4 -enableAddressSanitizer NO -enableThreadSanitizer NO -enableUndefinedBehaviorSanitizer NO DEVELOPMENT_TEAM=9AQ2C2838M 'CODE_SIGN_IDENTITY=Apple Development' SWIFT_ACTIVE_COMPILATION_CONDITIONS=FORGE_DEVELOPMENT_SIGNING SWIFT_TREAT_WARNINGS_AS_ERRORS=YES GCC_TREAT_WARNINGS_AS_ERRORS=YES build",
+  "ended_at": "2026-09-05T00:04:16.249679+00:00",
+  "environment": {
+    "architecture": "arm64",
+    "cwd": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS",
+    "machine_identifier": "Mac16,7",
+    "macos_build": "25G83",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "execution_provenance": {
+    "repository": {
+      "base_branch": "main",
+      "base_sha": "ffcf6bf9a2ea0c76a54788041cfa00c0dc8c7db4",
+      "branch": "release/0.9.0-shipping",
+      "head_sha": "fc5f899499052453feb0993832ae7aa9f27611b5",
+      "repository_path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
+    },
+    "test_environment": {
+      "architecture": "arm64",
+      "machine_identifier": "Mac16,7",
+      "macos_build": "25G83",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    }
+  },
+  "exit_code": 0,
+  "id": "EVID-20260905T000232Z-882f486ca2",
+  "kind": "p10-native-cli-build",
+  "ledger_reference": {
+    "exit_code": 0,
+    "status": "recorded"
+  },
+  "maximum_stream_bytes": 67108864,
+  "related_findings": [],
+  "related_gates": [
+    "G10"
+  ],
+  "schema_version": 2,
+  "source_manifest": {
+    "bytes": 13364452,
+    "file_count": 390,
+    "schema_version": 1,
+    "sha256": "80b58d7e2ec1e099edfd0728160c605094fbfed027e67ea83fb89dca810da7dd"
+  },
+  "source_manifest_after": {
+    "bytes": 13364452,
+    "file_count": 390,
+    "schema_version": 1,
+    "sha256": "80b58d7e2ec1e099edfd0728160c605094fbfed027e67ea83fb89dca810da7dd"
+  },
+  "source_manifest_changed": false,
+  "started_at": "2026-09-05T00:02:32.642639+00:00",
+  "stream_limit_exceeded": false,
+  "timed_out": false
+}

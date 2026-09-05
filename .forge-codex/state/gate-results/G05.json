@@ -3,7 +3,7 @@
     {
       "kind": "stdout",
       "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G05.stdout.txt",
-      "sha256": "cceda1d1209095847a386a86f9048b1de62691c7e7d8ef6a1954b151b7ad759d"
+      "sha256": "510c610fac002d1727e39919bd4b378d6d2e974e7563270f6f472633fa6ceb46"
     },
     {
       "kind": "stderr",
@@ -13,19 +13,19 @@
     {
       "kind": "criteria",
       "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G05.criteria.json",
-      "sha256": "88711d133c06c28d1c6344846856bfac0c409fb3d2627616faa5a8da2d14af39"
+      "sha256": "34a2831de08604f1eb0d255fd2b77b0c750b89a4013d1a13a8ab26a7e5b299d3"
     }
   ],
   "commands": [
     {
       "command": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-handlers/G05.sh",
-      "exit_code": 0,
+      "exit_code": 1,
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdout_sha256": "cceda1d1209095847a386a86f9048b1de62691c7e7d8ef6a1954b151b7ad759d",
+      "stdout_sha256": "510c610fac002d1727e39919bd4b378d6d2e974e7563270f6f472633fa6ceb46",
       "timed_out": false
     }
   ],
-  "ended_at": "2026-08-23T19:48:53.345651+00:00",
+  "ended_at": "2026-09-05T02:02:23.125840+00:00",
   "environment": {
     "machine": "arm64",
     "platform": "macOS-26.6.2-arm64-arm-64bit",
@@ -35,13 +35,13 @@
     "criteria_results": [
       {
         "criterion": "all audit E2 risks have ownership disposition",
-        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P05-resource-owner-matrix.json#16a2f2d0b63d4c53ba46006afdf85254fa580de2b5426c7e4a662503e5d3eeda; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/findings-resolution.json#117b4f7df12206bd8ff7a6c50963f4a372c715cfdc3adc50a0226271cb83b8cc",
-        "passed": true
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P05-resource-owner-matrix.json#16a2f2d0b63d4c53ba46006afdf85254fa580de2b5426c7e4a662503e5d3eeda; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/findings-resolution.json#7b565d1532ce1dd6f0b4757e23dc7da34f04b9ec047579e62295ffa11157fe11",
+        "passed": false
       },
       {
         "criterion": "confirmed retaining edges fixed with same-flow proof",
-        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCLI/ForgeConductorMain.swift#088f88f8b73f17591e68daaf8b1d6cf8770bf7a12debf4e22116df6c47a9ed8c; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Dashboard/DashboardServer.swift#055caca8d7535cca499badca7cdb6378ade81964824dd841d83a2e82bc15df0e; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/DashboardPortGuard.swift#2b0237ff6b35518fa8c34dffa31ffeff7356d9bf6eafcd6d1d9436a2fd96c244; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Manager/ManagerRuntime.swift#39a342889ba4a067bf837ec47fe8191a722e3df780023608ab0958fba047f941; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T193826Z-661c01c5d5.stdout.txt#48ea5cf223eff9c4edcd0579afa59c9c36b83c5e768702d24ebf154a476e5b71",
-        "passed": true
+        "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCLI/ForgeConductorMain.swift#8584bf66b43097efb2b3f656db9f0e6b0015f30e957d076f92e22ac800b85407; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Dashboard/DashboardServer.swift#652c67609b11f5b6c47129b1cf0f1ba58212cb78455064f71c3bfcf3b49964a6; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Infrastructure/DashboardPortGuard.swift#2b0237ff6b35518fa8c34dffa31ffeff7356d9bf6eafcd6d1d9436a2fd96c244; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Manager/ManagerRuntime.swift#51e81e6b6b9042de5d8bf793d013e5ec79b77b30f3f15b1daa0a85be94c3feaa; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T193826Z-661c01c5d5.stdout.txt#48ea5cf223eff9c4edcd0579afa59c9c36b83c5e768702d24ebf154a476e5b71",
+        "passed": false
       },
       {
         "criterion": "process/pipe/task/timer/observer shutdown tests pass",
@@ -57,9 +57,19 @@
     "name": "forge-gate-handler",
     "version": "1"
   },
+  "finalized": true,
   "gate_id": "G05",
   "notes": "",
+  "operation_id": "529fe267-1988-459a-9f07-d973242fb2b1",
   "schema_version": 1,
-  "started_at": "2026-08-23T19:48:53.098571+00:00",
-  "status": "passed"
+  "source_head": "b1876cf5b05134292ce0ecc6fb14ee67535c156c",
+  "source_manifest": {
+    "bytes": 13422208,
+    "file_count": 392,
+    "schema_version": 1,
+    "sha256": "4908eb162f9f8c7164c328d263fb484195145346b927f9f4232b6cbaca05eb14"
+  },
+  "started_at": "2026-09-05T02:02:22.901004+00:00",
+  "state_sequence_before": 1049,
+  "status": "failed"
 }

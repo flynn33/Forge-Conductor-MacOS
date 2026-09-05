@@ -1,0 +1,1733 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -workspace ForgeConductor.xcworkspace -scheme ForgeConductor -configuration Debug -destination platform=macOS,arch=arm64 -derivedDataPath /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug -resultBundlePath /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Final-Candidate-Production-Onboarding.xcresult -jobs 4 -parallel-testing-enabled NO "-only-testing:ForgeConductorUITests/ProductionOnboardingUITests" SWIFT_TREAT_WARNINGS_AS_ERRORS=YES GCC_TREAT_WARNINGS_AS_ERRORS=YES test
+
+Build settings from command line:
+    GCC_TREAT_WARNINGS_AS_ERRORS = YES
+    SWIFT_TREAT_WARNINGS_AS_ERRORS = YES
+
+Writing result bundle at path:
+	/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Final-Candidate-Production-Onboarding.xcresult
+
+Build Preparation
+Build task concurrency set to 4 via user default IDEBuildOperationMaxNumberOfConcurrentCompileTasks
+
+ComputePackagePrebuildTargetDependencyGraph
+
+Prepare packages
+
+CreateBuildRequest
+
+SendProjectDescription
+
+CreateBuildOperation
+
+ComputeTargetDependencyGraph
+note: Building targets in dependency order
+note: Target dependency graph (8 targets)
+    Target 'ForgeConductorUITests' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeConductor' in project 'ForgeConductor'
+    Target 'ForgeConductorTests' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeConductorCore' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'forge-conductor' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeRuntimeLauncher' in project 'ForgeConductor'
+    Target 'ForgeConductor' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeConductorCore' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeRuntimeLauncher' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeFilesystemDaemon' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'forge-conductor' in project 'ForgeConductor'
+    Target 'forge-conductor' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeConductorCore' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeRuntimeLauncher' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeFilesystemDaemon' in project 'ForgeConductor'
+    Target 'ForgeFilesystemDaemon' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeFilesystemProtocol' in project 'ForgeConductor'
+    Target 'ForgeRuntimeLauncher' in project 'ForgeConductor' (no dependencies)
+    Target 'ForgeConductorCore' in project 'ForgeConductor'
+        ➜ Explicit dependency on target 'ForgeFilesystemProtocol' in project 'ForgeConductor'
+    Target 'ForgeFilesystemProtocol' in project 'ForgeConductor' (no dependencies)
+
+GatherProvisioningInputs
+
+CreateBuildDescription
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc --version
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -v -E -dM -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -x c -c /dev/null
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/usr/bin/actool --version --output-format xml1
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld -version_details
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/libtool -V
+
+Build description signature: e1097bfa9b671aecabd95987f6542aab
+Build description path: /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/XCBuildData/e1097bfa9b671aecabd95987f6542aab.xcbuilddata
+ClangStatCache /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/SDKStatCaches.noindex/macosx26.5-25F70-688ef53f1462e2c8f657fdc38a81448fe082c4a02f00227109f4ed75e425c832.sdkstatcache
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -o /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/SDKStatCaches.noindex/macosx26.5-25F70-688ef53f1462e2c8f657fdc38a81448fe082c4a02f00227109f4ed75e425c832.sdkstatcache
+
+ProcessInfoPlistFile /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorCore.framework/Versions/A/Resources/Info.plist /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/empty-ForgeConductorCore.plist (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-infoPlistUtility /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/empty-ForgeConductorCore.plist -producttype com.apple.product-type.framework -expandbuildsettings -platform macosx -o /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorCore.framework/Versions/A/Resources/Info.plist
+
+SwiftDriver ForgeConductorCore normal arm64 com.apple.xcode.tools.swift.compiler (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-SwiftDriver -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name ForgeConductorCore -Onone @/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore.SwiftFileList -DDEBUG -enable-upcoming-feature StrictConcurrency -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-macos26.0 -g -module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -warnings-as-errors -index-store-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Index.noindex/DataStore -swift-version 5 -I /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug -F /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug -c -j14 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/SDKStatCaches.noindex/macosx26.5-25F70-688ef53f1462e2c8f657fdc38a81448fe082c4a02f00227109f4ed75e425c832.sdkstatcache -output-file-map /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex -sdk-module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore_const_extract_protocols.json -Xcc -iquote -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/ForgeConductorCore-generated-files.hmap -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/ForgeConductorCore-own-target-headers.hmap -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/ForgeConductorCore-all-non-framework-target-headers.hmap -Xcc -ivfsoverlay -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor-8665fe8aec29fae8d8063572068c0da1-VFS/all-product-headers.yaml -Xcc -iquote -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/ForgeConductorCore-project-headers.hmap -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/include -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/DerivedSources-normal/arm64 -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/DerivedSources/arm64 -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore-Swift.h -working-directory /Users/jimdaley/GitHub/Forge-Conductor-MacOS -experimental-emit-module-separately -disable-cmo
+
+ProcessInfoPlistFile /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeFilesystemDaemon.build/Objects-normal/arm64/Processed-Info.plist /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeFilesystemDaemon.build/empty-forge-filesystem-daemon.plist (in target 'ForgeFilesystemDaemon' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-infoPlistUtility /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeFilesystemDaemon.build/empty-forge-filesystem-daemon.plist -producttype com.apple.product-type.tool -expandbuildsettings -platform macosx -o /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeFilesystemDaemon.build/Objects-normal/arm64/Processed-Info.plist
+
+ProcessInfoPlistFile /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeRuntimeLauncher.build/Objects-normal/arm64/Processed-Info.plist /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeRuntimeLauncher.build/empty-forge-runtime-launcher.plist (in target 'ForgeRuntimeLauncher' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-infoPlistUtility /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeRuntimeLauncher.build/empty-forge-runtime-launcher.plist -producttype com.apple.product-type.tool -expandbuildsettings -platform macosx -o /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeRuntimeLauncher.build/Objects-normal/arm64/Processed-Info.plist
+
+SwiftCompile normal arm64 Compiling\ ForgeNativeSessionHostPlugin.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeNativeSessionHostPlugin/ForgeNativeSessionHostPlugin.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeNativeSessionHostPlugin/ForgeNativeSessionHostPlugin.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    
+
+SwiftEmitModule normal arm64 Emitting\ module\ for\ ForgeConductorCore (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+EmitSwiftModule normal arm64 (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    
+
+SwiftDriverJobDiscovery normal arm64 Emitting module for ForgeConductorCore (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftDriver\ Compilation\ Requirements ForgeConductorCore normal arm64 com.apple.xcode.tools.swift.compiler (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-Swift-Compilation-Requirements -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name ForgeConductorCore -Onone @/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore.SwiftFileList -DDEBUG -enable-upcoming-feature StrictConcurrency -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-macos26.0 -g -module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -warnings-as-errors -index-store-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Index.noindex/DataStore -swift-version 5 -I /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug -F /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug -c -j14 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/SDKStatCaches.noindex/macosx26.5-25F70-688ef53f1462e2c8f657fdc38a81448fe082c4a02f00227109f4ed75e425c832.sdkstatcache -output-file-map /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex -sdk-module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore_const_extract_protocols.json -Xcc -iquote -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/ForgeConductorCore-generated-files.hmap -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/ForgeConductorCore-own-target-headers.hmap -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/ForgeConductorCore-all-non-framework-target-headers.hmap -Xcc -ivfsoverlay -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor-8665fe8aec29fae8d8063572068c0da1-VFS/all-product-headers.yaml -Xcc -iquote -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/ForgeConductorCore-project-headers.hmap -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/include -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/DerivedSources-normal/arm64 -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/DerivedSources/arm64 -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore-Swift.h -working-directory /Users/jimdaley/GitHub/Forge-Conductor-MacOS -experimental-emit-module-separately -disable-cmo
+
+Copy /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorCore.framework/Versions/A/Modules/ForgeConductorCore.swiftmodule/Project/arm64-apple-macos.swiftsourceinfo /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore.swiftsourceinfo (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore.swiftsourceinfo /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorCore.framework/Versions/A/Modules/ForgeConductorCore.swiftmodule/Project/arm64-apple-macos.swiftsourceinfo
+
+Copy /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorCore.framework/Versions/A/Modules/ForgeConductorCore.swiftmodule/arm64-apple-macos.abi.json /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore.abi.json (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore.abi.json /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorCore.framework/Versions/A/Modules/ForgeConductorCore.swiftmodule/arm64-apple-macos.abi.json
+
+SwiftDriverJobDiscovery normal arm64 Compiling ForgeNativeSessionHostPlugin.swift (in target 'ForgeConductorCore' from project 'ForgeConductor')
+
+SwiftDriver\ Compilation ForgeConductorCore normal arm64 com.apple.xcode.tools.swift.compiler (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-Swift-Compilation -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name ForgeConductorCore -Onone @/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore.SwiftFileList -DDEBUG -enable-upcoming-feature StrictConcurrency -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-macos26.0 -g -module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -warnings-as-errors -index-store-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Index.noindex/DataStore -swift-version 5 -I /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug -F /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug -c -j14 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/SDKStatCaches.noindex/macosx26.5-25F70-688ef53f1462e2c8f657fdc38a81448fe082c4a02f00227109f4ed75e425c832.sdkstatcache -output-file-map /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex -sdk-module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore_const_extract_protocols.json -Xcc -iquote -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/ForgeConductorCore-generated-files.hmap -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/ForgeConductorCore-own-target-headers.hmap -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/ForgeConductorCore-all-non-framework-target-headers.hmap -Xcc -ivfsoverlay -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor-8665fe8aec29fae8d8063572068c0da1-VFS/all-product-headers.yaml -Xcc -iquote -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/ForgeConductorCore-project-headers.hmap -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/include -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/DerivedSources-normal/arm64 -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/DerivedSources/arm64 -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore-Swift.h -working-directory /Users/jimdaley/GitHub/Forge-Conductor-MacOS -experimental-emit-module-separately -disable-cmo
+
+Ld /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorCore.framework/Versions/A/ForgeConductorCore normal (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -Xlinker -reproducible -target arm64-apple-macos26.0 -dynamiclib -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -Os -L/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/EagerLinkingTBDs/Debug -L/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug -F/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/EagerLinkingTBDs/Debug -F/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug -filelist /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore.LinkFileList -install_name @rpath/ForgeConductorCore.framework/Versions/A/ForgeConductorCore -Xlinker -dead_strip -Xlinker -object_path_lto -Xlinker /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore_lto.o -rdynamic -Xlinker -dependency_info -Xlinker /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore_dependency_info.dat -fobjc-link-runtime -L/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx -L/usr/lib/swift -Xlinker -add_ast_path -Xlinker /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore.swiftmodule @/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore-linker-args.resp -lForgeFilesystemProtocol -Xlinker -no_adhoc_codesign -o /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorCore.framework/Versions/A/ForgeConductorCore -Xlinker -add_ast_path -Xlinker /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeFilesystemProtocol.build/Objects-normal/arm64/ForgeFilesystemProtocol.swiftmodule @/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeFilesystemProtocol.build/Objects-normal/arm64/ForgeFilesystemProtocol-linker-args.resp
+
+ExtractAppIntentsMetadata (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsmetadataprocessor --toolchain-dir /var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.CLHpB9/Metal.xctoolchain --module-name ForgeConductorCore --sdk-root /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk --xcode-version 17F113 --platform-family macOS --deployment-target 26.0 --bundle-identifier com.forge-conductor.core --output /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorCore.framework/Versions/A/Resources --target-triple arm64-apple-macos26.0 --binary-file /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorCore.framework/Versions/A/ForgeConductorCore --dependency-file /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore_dependency_info.dat --stringsdata-file /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ExtractedAppShortcutsMetadata.stringsdata --source-file-list /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore.SwiftFileList --metadata-file-list /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/ForgeConductorCore.DependencyMetadataFileList --static-metadata-file-list /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/ForgeConductorCore.DependencyStaticMetadataFileList --swift-const-vals-list /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorCore.build/Objects-normal/arm64/ForgeConductorCore.SwiftConstValuesFileList --compile-time-extraction --deployment-aware-processing --validate-assistant-intents --no-app-shortcuts-localization
+2026-09-04 20:25:57.865 appintentsmetadataprocessor[41548:33814028] Starting appintentsmetadataprocessor export
+2026-09-04 20:25:57.866 appintentsmetadataprocessor[41548:33814028] warning: Metadata extraction skipped. No AppIntents.framework dependency found.
+
+GenerateTAPI /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/EagerLinkingTBDs/Debug/ForgeConductorCore.framework/Versions/A/ForgeConductorCore.tbd (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/tapi stubify -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -F/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug -L/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorCore.framework/Versions/A/ForgeConductorCore -o /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/EagerLinkingTBDs/Debug/ForgeConductorCore.framework/Versions/A/ForgeConductorCore.tbd
+
+CodeSign /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorCore.framework/Versions/A (in target 'ForgeConductorCore' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    
+    Signing Identity:     "Apple Development: James Daley (FW94K6ZY57)"
+    
+    /usr/bin/codesign --force --sign 3E6B7EA813299330FC3235BBA34BE9237F0F1644 -o runtime --timestamp\=none --generate-entitlement-der /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorCore.framework/Versions/A
+
+ProcessInfoPlistFile /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/forge-conductor.build/Objects-normal/arm64/Processed-Info.plist /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/forge-conductor.build/DerivedSources/ForgeConductorCLI-Info.plist (in target 'forge-conductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-infoPlistUtility /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/forge-conductor.build/DerivedSources/ForgeConductorCLI-Info.plist -producttype com.apple.product-type.tool -expandbuildsettings -platform macosx -o /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/forge-conductor.build/Objects-normal/arm64/Processed-Info.plist
+
+SwiftDriver ForgeConductorTests normal arm64 com.apple.xcode.tools.swift.compiler (in target 'ForgeConductorTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-SwiftDriver -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name ForgeConductorTests -Onone @/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/Objects-normal/arm64/ForgeConductorTests.SwiftFileList -DDEBUG -plugin-path /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing -enable-upcoming-feature StrictConcurrency -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-macos26.0 -g -module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -warnings-as-errors -index-store-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Index.noindex/DataStore -swift-version 5 -I /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug -Isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib -F /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug -F /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks -c -j14 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/SDKStatCaches.noindex/macosx26.5-25F70-688ef53f1462e2c8f657fdc38a81448fe082c4a02f00227109f4ed75e425c832.sdkstatcache -output-file-map /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/Objects-normal/arm64/ForgeConductorTests-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex -sdk-module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/Objects-normal/arm64/ForgeConductorTests.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/Objects-normal/arm64/ForgeConductorTests_const_extract_protocols.json -Xcc -iquote -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/ForgeConductorTests-generated-files.hmap -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/ForgeConductorTests-own-target-headers.hmap -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/ForgeConductorTests-all-non-framework-target-headers.hmap -Xcc -ivfsoverlay -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor-8665fe8aec29fae8d8063572068c0da1-VFS/all-product-headers.yaml -Xcc -iquote -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/ForgeConductorTests-project-headers.hmap -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/include -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/DerivedSources-normal/arm64 -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/DerivedSources/arm64 -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/Objects-normal/arm64/ForgeConductorTests-Swift.h -working-directory /Users/jimdaley/GitHub/Forge-Conductor-MacOS -experimental-emit-module-separately -disable-cmo
+
+ProcessInfoPlistFile /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest/Contents/Info.plist /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/empty-ForgeConductorTests.plist (in target 'ForgeConductorTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-infoPlistUtility /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/empty-ForgeConductorTests.plist -producttype com.apple.product-type.bundle.unit-test -expandbuildsettings -platform macosx -o /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest/Contents/Info.plist
+
+Copy /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge_Conductor.swiftmodule/Project/arm64-apple-macos.swiftsourceinfo /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge_Conductor.swiftsourceinfo (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge_Conductor.swiftsourceinfo /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge_Conductor.swiftmodule/Project/arm64-apple-macos.swiftsourceinfo
+
+Copy /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge_Conductor.swiftmodule/arm64-apple-macos.swiftdoc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge_Conductor.swiftdoc (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge_Conductor.swiftdoc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge_Conductor.swiftmodule/arm64-apple-macos.swiftdoc
+
+Copy /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge_Conductor.swiftmodule/arm64-apple-macos.swiftmodule /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge_Conductor.swiftmodule (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge_Conductor.swiftmodule /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge_Conductor.swiftmodule/arm64-apple-macos.swiftmodule
+
+Copy /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge_Conductor.swiftmodule/arm64-apple-macos.abi.json /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge_Conductor.abi.json (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Objects-normal/arm64/Forge_Conductor.abi.json /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge_Conductor.swiftmodule/arm64-apple-macos.abi.json
+
+Copy /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/ForgeConductorCore.framework /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorCore.framework (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -exclude Headers -exclude PrivateHeaders -exclude Modules -exclude \*.tbd -resolve-src-symlinks -remove-static-executable /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorCore.framework /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks
+
+CodeSign /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/ForgeConductorCore.framework/Versions/A (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    
+    Signing Identity:     "Apple Development: James Daley (FW94K6ZY57)"
+    
+    /usr/bin/codesign --force --sign 3E6B7EA813299330FC3235BBA34BE9237F0F1644 -o runtime --timestamp\=none --preserve-metadata\=identifier,entitlements,flags --generate-entitlement-der /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/ForgeConductorCore.framework/Versions/A
+/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework/Versions/A: replacing existing signature
+
+ProcessInfoPlistFile /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Info.plist /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/DerivedSources/ForgeConductorApp-Info.plist (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-infoPlistUtility /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/DerivedSources/ForgeConductorApp-Info.plist -producttype com.apple.product-type.application -genpkginfo /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/PkgInfo -expandbuildsettings -platform macosx -additionalcontentfile /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/assetcatalog_generated_info.plist -scanforprivacyfile /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks/ForgeConductorCore.framework -o /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Info.plist
+
+CopySwiftLibs /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-swiftStdLibTool --copy --verbose --sign 3E6B7EA813299330FC3235BBA34BE9237F0F1644 --scan-executable /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/MacOS/Forge\ Conductor.debug.dylib --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/PlugIns --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Library/SystemExtensions --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Extensions --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorCore.framework --scan-folder /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk/System/Library/Frameworks/MetalKit.framework --scan-folder /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk/System/Library/Frameworks/SwiftUI.framework --platform macosx --toolchain /var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.CLHpB9/Metal.xctoolchain --toolchain /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --destination /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/Frameworks --strip-bitcode --strip-bitcode-tool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/bitcode_strip --emit-dependency-info /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/SwiftStdLibToolInputDependencies.dep --filter-for-swift-os
+
+CodeSign /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/MacOS/Forge\ Conductor.debug.dylib (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    
+    Signing Identity:     "Apple Development: James Daley (FW94K6ZY57)"
+    
+    /usr/bin/codesign --force --sign 3E6B7EA813299330FC3235BBA34BE9237F0F1644 -o runtime --timestamp\=none --generate-entitlement-der /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/MacOS/Forge\ Conductor.debug.dylib
+/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/Forge Conductor.debug.dylib: replacing existing signature
+
+CodeSign /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/MacOS/__preview.dylib (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    
+    Signing Identity:     "Apple Development: James Daley (FW94K6ZY57)"
+    
+    /usr/bin/codesign --force --sign 3E6B7EA813299330FC3235BBA34BE9237F0F1644 -o runtime --timestamp\=none --generate-entitlement-der /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app/Contents/MacOS/__preview.dylib
+/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge Conductor.app/Contents/MacOS/__preview.dylib: replacing existing signature
+
+CodeSign /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    
+    Signing Identity:     "Apple Development: James Daley (FW94K6ZY57)"
+    
+    /usr/bin/codesign --force --sign 3E6B7EA813299330FC3235BBA34BE9237F0F1644 -o runtime --entitlements /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor.build/Forge\ Conductor.app.xcent --timestamp\=none --generate-entitlement-der /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app
+/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge Conductor.app: replacing existing signature
+
+Validate /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-validationUtility /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app -no-validate-extension -infoplist-subpath Contents/Info.plist
+
+RegisterWithLaunchServices /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app (in target 'ForgeConductor' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    /System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister -f -R -trusted /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge\ Conductor.app
+
+ProcessInfoPlistFile /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorUITests-Runner.app/Contents/PlugIns/ForgeConductorUITests.xctest/Contents/Info.plist /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorUITests.build/empty-ForgeConductorUITests.plist (in target 'ForgeConductorUITests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-infoPlistUtility /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorUITests.build/empty-ForgeConductorUITests.plist -producttype com.apple.product-type.bundle.ui-testing -expandbuildsettings -platform macosx -additionalcontentfile /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorUITests.build/ProductTypeInfoPlistAdditions.plist -o /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorUITests-Runner.app/Contents/PlugIns/ForgeConductorUITests.xctest/Contents/Info.plist
+
+CopySwiftLibs /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorUITests-Runner.app/Contents/PlugIns/ForgeConductorUITests.xctest (in target 'ForgeConductorUITests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-swiftStdLibTool --copy --verbose --sign 3E6B7EA813299330FC3235BBA34BE9237F0F1644 --scan-executable /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorUITests-Runner.app/Contents/PlugIns/ForgeConductorUITests.xctest/Contents/MacOS/ForgeConductorUITests --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorUITests-Runner.app/Contents/PlugIns/ForgeConductorUITests.xctest/Contents/Frameworks --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorUITests-Runner.app/Contents/PlugIns/ForgeConductorUITests.xctest/Contents/PlugIns --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorUITests-Runner.app/Contents/PlugIns/ForgeConductorUITests.xctest/Contents/Library/SystemExtensions --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorUITests-Runner.app/Contents/PlugIns/ForgeConductorUITests.xctest/Contents/Extensions --platform macosx --toolchain /var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.CLHpB9/Metal.xctoolchain --toolchain /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --destination /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorUITests-Runner.app/Contents/PlugIns/ForgeConductorUITests.xctest/Contents/Frameworks --strip-bitcode --scan-executable /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib/libXCTestSwiftSupport.dylib --strip-bitcode-tool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/bitcode_strip --emit-dependency-info /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorUITests.build/SwiftStdLibToolInputDependencies.dep --filter-for-swift-os
+
+SwiftEmitModule normal arm64 Emitting\ module\ for\ ForgeConductorTests (in target 'ForgeConductorTests' from project 'ForgeConductor')
+
+EmitSwiftModule normal arm64 (in target 'ForgeConductorTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    
+
+SwiftCompile normal arm64 Compiling\ NativeSessionHostPluginTests.swift /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/NativeSessionHostPluginTests.swift (in target 'ForgeConductorTests' from project 'ForgeConductor')
+
+SwiftCompile normal arm64 /Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/NativeSessionHostPluginTests.swift (in target 'ForgeConductorTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling NativeSessionHostPluginTests.swift (in target 'ForgeConductorTests' from project 'ForgeConductor')
+
+SwiftDriverJobDiscovery normal arm64 Emitting module for ForgeConductorTests (in target 'ForgeConductorTests' from project 'ForgeConductor')
+
+SwiftDriver\ Compilation\ Requirements ForgeConductorTests normal arm64 com.apple.xcode.tools.swift.compiler (in target 'ForgeConductorTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-Swift-Compilation-Requirements -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name ForgeConductorTests -Onone @/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/Objects-normal/arm64/ForgeConductorTests.SwiftFileList -DDEBUG -plugin-path /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing -enable-upcoming-feature StrictConcurrency -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-macos26.0 -g -module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -warnings-as-errors -index-store-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Index.noindex/DataStore -swift-version 5 -I /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug -Isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib -F /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug -F /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks -c -j14 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/SDKStatCaches.noindex/macosx26.5-25F70-688ef53f1462e2c8f657fdc38a81448fe082c4a02f00227109f4ed75e425c832.sdkstatcache -output-file-map /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/Objects-normal/arm64/ForgeConductorTests-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex -sdk-module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/Objects-normal/arm64/ForgeConductorTests.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/Objects-normal/arm64/ForgeConductorTests_const_extract_protocols.json -Xcc -iquote -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/ForgeConductorTests-generated-files.hmap -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/ForgeConductorTests-own-target-headers.hmap -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/ForgeConductorTests-all-non-framework-target-headers.hmap -Xcc -ivfsoverlay -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor-8665fe8aec29fae8d8063572068c0da1-VFS/all-product-headers.yaml -Xcc -iquote -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/ForgeConductorTests-project-headers.hmap -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/include -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/DerivedSources-normal/arm64 -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/DerivedSources/arm64 -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/Objects-normal/arm64/ForgeConductorTests-Swift.h -working-directory /Users/jimdaley/GitHub/Forge-Conductor-MacOS -experimental-emit-module-separately -disable-cmo
+
+SwiftDriver\ Compilation ForgeConductorTests normal arm64 com.apple.xcode.tools.swift.compiler (in target 'ForgeConductorTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-Swift-Compilation -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name ForgeConductorTests -Onone @/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/Objects-normal/arm64/ForgeConductorTests.SwiftFileList -DDEBUG -plugin-path /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing -enable-upcoming-feature StrictConcurrency -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-macos26.0 -g -module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -warnings-as-errors -index-store-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Index.noindex/DataStore -swift-version 5 -I /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug -Isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib -F /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug -F /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks -c -j14 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/SDKStatCaches.noindex/macosx26.5-25F70-688ef53f1462e2c8f657fdc38a81448fe082c4a02f00227109f4ed75e425c832.sdkstatcache -output-file-map /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/Objects-normal/arm64/ForgeConductorTests-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex -sdk-module-cache-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/Objects-normal/arm64/ForgeConductorTests.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/Objects-normal/arm64/ForgeConductorTests_const_extract_protocols.json -Xcc -iquote -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/ForgeConductorTests-generated-files.hmap -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/ForgeConductorTests-own-target-headers.hmap -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/ForgeConductorTests-all-non-framework-target-headers.hmap -Xcc -ivfsoverlay -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductor-8665fe8aec29fae8d8063572068c0da1-VFS/all-product-headers.yaml -Xcc -iquote -Xcc /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/ForgeConductorTests-project-headers.hmap -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/include -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/DerivedSources-normal/arm64 -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/DerivedSources/arm64 -Xcc -I/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/Objects-normal/arm64/ForgeConductorTests-Swift.h -working-directory /Users/jimdaley/GitHub/Forge-Conductor-MacOS -experimental-emit-module-separately -disable-cmo
+
+Copy /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.swiftmodule/Project/arm64-apple-macos.swiftsourceinfo /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/Objects-normal/arm64/ForgeConductorTests.swiftsourceinfo (in target 'ForgeConductorTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/Objects-normal/arm64/ForgeConductorTests.swiftsourceinfo /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.swiftmodule/Project/arm64-apple-macos.swiftsourceinfo
+
+Copy /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.swiftmodule/arm64-apple-macos.abi.json /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/Objects-normal/arm64/ForgeConductorTests.abi.json (in target 'ForgeConductorTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/Objects-normal/arm64/ForgeConductorTests.abi.json /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.swiftmodule/arm64-apple-macos.abi.json
+
+Ld /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest/Contents/MacOS/ForgeConductorTests normal (in target 'ForgeConductorTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -Xlinker -reproducible -target arm64-apple-macos26.0 -bundle -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -Os -L/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/EagerLinkingTBDs/Debug -L/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug -L/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib -F/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/EagerLinkingTBDs/Debug -F/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug -iframework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks -filelist /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/Objects-normal/arm64/ForgeConductorTests.LinkFileList -Xlinker -rpath -Xlinker @loader_path/../Frameworks -Xlinker -rpath -Xlinker @executable_path/../Frameworks -Xlinker -rpath -Xlinker @loader_path/Frameworks -Xlinker -dead_strip -Xlinker -object_path_lto -Xlinker /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/Objects-normal/arm64/ForgeConductorTests_lto.o -rdynamic -Xlinker -dependency_info -Xlinker /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/Objects-normal/arm64/ForgeConductorTests_dependency_info.dat -fobjc-link-runtime -L/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx -L/usr/lib/swift -Xlinker -add_ast_path -Xlinker /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/Objects-normal/arm64/ForgeConductorTests.swiftmodule @/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/Objects-normal/arm64/ForgeConductorTests-linker-args.resp -Xlinker -needed_framework -Xlinker XCTest -framework XCTest -Xlinker -needed-lXCTestSwiftSupport -lXCTestSwiftSupport -framework ForgeConductorCore -Xlinker -no_adhoc_codesign -o /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest/Contents/MacOS/ForgeConductorTests
+
+Copy /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest/Contents/Frameworks/ForgeConductorCore.framework /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorCore.framework (in target 'ForgeConductorTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -exclude Headers -exclude PrivateHeaders -exclude Modules -exclude \*.tbd -resolve-src-symlinks -remove-static-executable /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorCore.framework /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest/Contents/Frameworks
+
+CodeSign /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest/Contents/Frameworks/ForgeConductorCore.framework/Versions/A (in target 'ForgeConductorTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    
+    Signing Identity:     "Apple Development: James Daley (FW94K6ZY57)"
+    
+    /usr/bin/codesign --force --sign 3E6B7EA813299330FC3235BBA34BE9237F0F1644 --timestamp\=none --preserve-metadata\=identifier,entitlements,flags --generate-entitlement-der /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest/Contents/Frameworks/ForgeConductorCore.framework/Versions/A
+/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest/Contents/Frameworks/ForgeConductorCore.framework/Versions/A: replacing existing signature
+
+ExtractAppIntentsMetadata (in target 'ForgeConductorTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsmetadataprocessor --toolchain-dir /var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.CLHpB9/Metal.xctoolchain --module-name ForgeConductorTests --sdk-root /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk --xcode-version 17F113 --platform-family macOS --deployment-target 26.0 --bundle-identifier com.forge-conductor.tests --output /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest/Contents/Resources --target-triple arm64-apple-macos26.0 --binary-file /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest/Contents/MacOS/ForgeConductorTests --dependency-file /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/Objects-normal/arm64/ForgeConductorTests_dependency_info.dat --stringsdata-file /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/Objects-normal/arm64/ExtractedAppShortcutsMetadata.stringsdata --source-file-list /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/Objects-normal/arm64/ForgeConductorTests.SwiftFileList --metadata-file-list /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/ForgeConductorTests.DependencyMetadataFileList --static-metadata-file-list /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/ForgeConductorTests.DependencyStaticMetadataFileList --swift-const-vals-list /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/Objects-normal/arm64/ForgeConductorTests.SwiftConstValuesFileList --compile-time-extraction --deployment-aware-processing --validate-assistant-intents --no-app-shortcuts-localization
+2026-09-04 20:25:59.269 appintentsmetadataprocessor[41562:33814198] Starting appintentsmetadataprocessor export
+2026-09-04 20:25:59.270 appintentsmetadataprocessor[41562:33814198] warning: Metadata extraction skipped. No AppIntents.framework dependency found.
+
+CopySwiftLibs /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest (in target 'ForgeConductorTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    builtin-swiftStdLibTool --copy --verbose --sign 3E6B7EA813299330FC3235BBA34BE9237F0F1644 --scan-executable /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest/Contents/MacOS/ForgeConductorTests --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest/Contents/Frameworks --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest/Contents/PlugIns --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest/Contents/Library/SystemExtensions --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest/Contents/Extensions --scan-folder /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorCore.framework --platform macosx --toolchain /var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.CLHpB9/Metal.xctoolchain --toolchain /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --destination /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest/Contents/Frameworks --strip-bitcode --scan-executable /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib/libXCTestSwiftSupport.dylib --strip-bitcode-tool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/bitcode_strip --emit-dependency-info /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Intermediates.noindex/ForgeConductor.build/Debug/ForgeConductorTests.build/SwiftStdLibToolInputDependencies.dep --filter-for-swift-os
+
+CodeSign /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest (in target 'ForgeConductorTests' from project 'ForgeConductor')
+    cd /Users/jimdaley/GitHub/Forge-Conductor-MacOS
+    
+    Signing Identity:     "Apple Development: James Daley (FW94K6ZY57)"
+    
+    /usr/bin/codesign --force --sign 3E6B7EA813299330FC3235BBA34BE9237F0F1644 --timestamp\=none --generate-entitlement-der /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/ForgeConductorTests.xctest
+
+note: Removed stale file '/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/Testing.framework'
+
+note: Removed stale file '/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/XCTAutomationSupport.framework'
+
+note: Removed stale file '/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/XCTest.framework'
+
+note: Removed stale file '/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/XCTestCore.framework'
+
+note: Removed stale file '/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/XCTestSupport.framework'
+
+note: Removed stale file '/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/XCUIAutomation.framework'
+
+note: Removed stale file '/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/XCUnit.framework'
+
+note: Removed stale file '/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/libXCTestBundleInject.dylib'
+
+note: Removed stale file '/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge Conductor.app/Contents/Frameworks/libXCTestSwiftSupport.dylib'
+
+note: Removed stale file '/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-Debug/Build/Products/Debug/Forge Conductor.app/Contents/PlugIns'
+
+2026-09-04 20:25:59.738618-0500 ForgeConductorUITests-Runner[41564:33814214] [Default] Running tests...
+Test Suite 'Selected tests' started at 2026-09-04 20:25:59.793.
+Test Suite 'ForgeConductorUITests.xctest' started at 2026-09-04 20:25:59.793.
+Test Suite 'ProductionOnboardingUITests' started at 2026-09-04 20:25:59.793.
+Test Case '-[ForgeConductorUITests.ProductionOnboardingUITests testNativeFolderAuthorizationCancellationAndInvalidRootPreserveSavedSettings]' started.
+    t =     0.00s Start Test at 2026-09-04 20:25:59.794
+    t =     0.08s Set Up
+    t =     0.09s Open com.forge-conductor.app
+    t =     0.09s     Launch com.forge-conductor.app
+    t =     0.52s         Wait for accessibility to load
+    t =     0.95s         Setting up automation session
+    t =     0.96s         Wait for com.forge-conductor.app to idle
+    t =     0.98s Waiting 15.0s for "tab-manager" Button to exist
+    t =     2.07s     Checking `Expect predicate `existsNoRetry == 1` for object "tab-manager" Button`
+    t =     2.07s         Checking existence of `"tab-manager" Button`
+    t =     2.21s Added attachment named 'ordinary-bootstrap-before-status'
+    t =     2.22s Requesting snapshot of accessibility hierarchy for app with pid 41565
+    t =     2.32s Requesting snapshot of accessibility hierarchy for app with pid 41565
+    t =     2.41s Added attachment named 'ordinary-bootstrap-before-status-native-controls'
+    t =     2.42s Added attachment named 'ordinary-bootstrap-manager'
+    t =     2.42s Waiting 8.0s for "tab-manager" Button to exist
+    t =     3.44s     Checking `Expect predicate `existsNoRetry == 1` for object "tab-manager" Button`
+    t =     3.45s         Checking existence of `"tab-manager" Button`
+    t =     3.54s Find the "tab-manager" Button
+    t =     3.62s Find the "tab-manager" Button
+    t =     3.71s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'tab-manager'
+    t =     3.80s Find the "tab-manager" Button
+    t =     3.91s Find the "tab-manager" Button
+    t =     4.01s Click "tab-manager" Button
+    t =     4.01s     Wait for com.forge-conductor.app to idle
+    t =     4.01s     Find the "tab-manager" Button
+    t =     4.10s     Check for interrupting elements affecting "tab-manager" Button
+    t =     4.13s     Synthesize event
+    t =     4.67s     Wait for com.forge-conductor.app to idle
+    t =     4.69s Waiting 5.0s for "settings-allowed-roots-empty" Any to exist
+    t =     5.73s     Checking `Expect predicate `existsNoRetry == 1` for object "settings-allowed-roots-empty" Any`
+    t =     5.73s         Checking existence of `"settings-allowed-roots-empty" Any`
+    t =     6.04s Waiting 8.0s for "settings-allowed-root-add" Button to exist
+    t =     7.07s     Checking `Expect predicate `existsNoRetry == 1` for object "settings-allowed-root-add" Button`
+    t =     7.07s         Checking existence of `"settings-allowed-root-add" Button`
+    t =     7.14s Find the "settings-allowed-root-add" Button
+    t =     7.22s Find the "settings-allowed-root-add" Button
+    t =     7.29s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'settings-allowed-root-add'
+    t =     7.36s Find the "settings-allowed-root-add" Button
+    t =     7.50s Find the "settings-allowed-root-add" Button
+    t =     7.66s Click "settings-allowed-root-add" Button
+    t =     7.66s     Wait for com.forge-conductor.app to idle
+    t =     7.66s     Find the "settings-allowed-root-add" Button
+    t =     7.72s     Check for interrupting elements affecting "settings-allowed-root-add" Button
+    t =     7.90s     Synthesize event
+    t =     8.65s     Wait for com.forge-conductor.app to idle
+    t =     8.66s Waiting 10.0s for "open-panel" Dialog to exist
+    t =     9.69s     Checking `Expect predicate `existsNoRetry == 1` for object "open-panel" Dialog`
+    t =     9.69s         Checking existence of `"open-panel" Dialog`
+    t =     9.82s Checking existence of `"Authorize Folder" Button`
+    t =     9.94s Checking existence of `"Cancel" Button`
+    t =    10.06s Find the Target Application 'com.forge-conductor.app'
+    t =    10.21s Added attachment named 'production-open-panel'
+    t =    10.21s Type 'g' key with modifiers '⌘⇧' (0x12)
+    t =    10.21s     Wait for com.forge-conductor.app to idle
+    t =    10.21s     Find the Target Application 'com.forge-conductor.app'
+    t =    10.27s     Check for interrupting elements affecting "Forge Conductor" Application
+    t =    10.27s     Synthesize event
+    t =    10.35s     Wait for com.forge-conductor.app to idle
+    t =    10.36s Waiting 5.0s for "GoToWindow" Sheet to exist
+    t =    11.39s     Checking `Expect predicate `existsNoRetry == 1` for object "GoToWindow" Sheet`
+    t =    11.39s         Checking existence of `"GoToWindow" Sheet`
+    t =    11.53s Waiting 8.0s for "PathTextField" TextField to exist
+    t =    12.56s     Checking `Expect predicate `existsNoRetry == 1` for object "PathTextField" TextField`
+    t =    12.56s         Checking existence of `"PathTextField" TextField`
+    t =    12.69s Find the "PathTextField" TextField
+    t =    12.81s Find the "PathTextField" TextField
+    t =    12.93s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'PathTextField'
+    t =    13.12s Find the "PathTextField" TextField
+    t =    13.21s Find the "PathTextField" TextField
+    t =    13.29s Click "PathTextField" TextField
+    t =    13.29s     Wait for com.forge-conductor.app to idle
+    t =    13.30s     Find the "PathTextField" TextField
+    t =    13.41s     Check for interrupting elements affecting "PathTextField" TextField
+    t =    13.43s     Synthesize event
+    t =    13.83s     Wait for com.forge-conductor.app to idle
+    t =    13.83s Type 'a' key with modifiers '⌘' (0x10)
+    t =    13.83s     Wait for com.forge-conductor.app to idle
+    t =    13.83s     Find the "PathTextField" TextField
+    t =    13.98s     Check for interrupting elements affecting "PathTextField" TextField
+    t =    13.99s     Synthesize event
+    t =    14.04s     Wait for com.forge-conductor.app to idle
+    t =    14.04s Type '/var/folders/tz/42...' into "PathTextField" TextField
+    t =    14.04s     Wait for com.forge-conductor.app to idle
+    t =    14.04s     Find the "PathTextField" TextField
+    t =    14.17s     Check for interrupting elements affecting "PathTextField" TextField
+    t =    14.18s     Synthesize event
+    t =    16.96s     Wait for com.forge-conductor.app to idle
+    t =    16.96s Find the "PathTextField" TextField
+    t =    17.09s Type '↩' key (XCUIKeyboardKeyReturn) with no modifiers
+    t =    17.09s     Wait for com.forge-conductor.app to idle
+    t =    17.09s     Find the "PathTextField" TextField
+    t =    17.22s     Check for interrupting elements affecting "PathTextField" TextField
+    t =    17.23s     Synthesize event
+    t =    17.60s     Wait for com.forge-conductor.app to idle
+    t =    17.60s Checking existence of `"GoToWindow" Sheet`
+    t =    17.69s Checking existence of `"GoToWindow" Sheet`
+    t =    17.78s Waiting 8.0s for "Authorize Folder" Button to exist
+    t =    18.81s     Checking `Expect predicate `existsNoRetry == 1` for object "Authorize Folder" Button`
+    t =    18.81s         Checking existence of `"Authorize Folder" Button`
+    t =    18.92s Find the "Authorize Folder" Button
+    t =    19.02s Find the "OKButton" Button
+    t =    19.11s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'OKButton'
+    t =    19.24s Find the "OKButton" Button
+    t =    19.31s Find the "OKButton" Button
+    t =    19.40s Click "OKButton" Button
+    t =    19.40s     Wait for com.forge-conductor.app to idle
+    t =    19.40s     Find the "OKButton" Button
+    t =    19.51s     Check for interrupting elements affecting "OKButton" Button
+    t =    19.51s     Synthesize event
+    t =    19.88s     Wait for com.forge-conductor.app to idle
+    t =    19.97s Checking existence of `"open-panel" Dialog`
+    t =    20.44s Checking existence of `"settings-allowed-root-path-0" Any`
+    t =    20.54s Find the "settings-allowed-root-path-0" Any
+    t =    20.65s Find the "settings-allowed-root-path-0" StaticText
+    t =    20.74s Find the Target Application 'com.forge-conductor.app'
+    t =    20.87s Added attachment named 'native-folder-staged'
+    t =    20.87s Waiting 8.0s for "settings-save" Button to exist
+    t =    21.91s     Checking `Expect predicate `existsNoRetry == 1` for object "settings-save" Button`
+    t =    21.91s         Checking existence of `"settings-save" Button`
+    t =    21.99s Find the "settings-save" Button
+    t =    22.06s Find the "settings-save" Button
+    t =    22.15s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'settings-save'
+    t =    22.24s Find the "settings-save" Button
+    t =    24.05s Find the "settings-save" Button
+    t =    25.86s Find the "settings-save" Button
+    t =    25.94s Find the ScrollView (Element at index 0)
+    t =    26.03s Scroll "root-split" ScrollView by dx: 0.00, dy: -360.00
+    t =    26.03s     Wait for com.forge-conductor.app to idle
+    t =    26.04s     Find the "root-split" ScrollView
+    t =    26.11s     Check for interrupting elements affecting "root-split" ScrollView
+    t =    26.14s     Synthesize event
+    t =    26.44s     Wait for com.forge-conductor.app to idle
+    t =    26.46s Find the "settings-save" Button
+    t =    26.57s Find the "settings-save" Button
+    t =    26.66s Find the "settings-save" Button
+    t =    26.74s Find the "settings-save" Button
+    t =    26.83s Find the "settings-save" Button
+    t =    26.94s Find the "settings-save" Button
+    t =    27.04s Find the "settings-save" Button
+    t =    27.14s Find the "settings-save" Button
+    t =    27.24s Find the "settings-save" Button
+    t =    27.36s Find the "settings-save" Button
+    t =    27.46s Find the "settings-save" Button
+    t =    27.56s Find the "settings-save" Button
+    t =    27.66s Click "settings-save" Button
+    t =    27.66s     Wait for com.forge-conductor.app to idle
+    t =    27.67s     Find the "settings-save" Button
+    t =    27.75s     Check for interrupting elements affecting "settings-save" Button
+    t =    27.77s     Synthesize event
+    t =    28.15s     Wait for com.forge-conductor.app to idle
+    t =    28.19s Added attachment named 'authorized-folder-manager-readback'
+    t =    28.19s Waiting 8.0s for "settings-allowed-root-add" Button to exist
+    t =    29.23s     Checking `Expect predicate `existsNoRetry == 1` for object "settings-allowed-root-add" Button`
+    t =    29.23s         Checking existence of `"settings-allowed-root-add" Button`
+    t =    29.31s Find the "settings-allowed-root-add" Button
+    t =    29.40s Find the "settings-allowed-root-add" Button
+    t =    29.49s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'settings-allowed-root-add'
+    t =    29.58s Find the "settings-allowed-root-add" Button
+    t =    29.74s Find the "settings-allowed-root-add" Button
+    t =    30.14s Find the "settings-allowed-root-add" Button
+    t =    30.23s Find the ScrollView (Element at index 0)
+    t =    30.31s Scroll "root-split" ScrollView by dx: 0.00, dy: 360.00
+    t =    30.31s     Wait for com.forge-conductor.app to idle
+    t =    30.32s     Find the "root-split" ScrollView
+    t =    30.41s     Check for interrupting elements affecting "root-split" ScrollView
+    t =    30.44s     Synthesize event
+    t =    30.77s     Wait for com.forge-conductor.app to idle
+    t =    30.77s Find the "settings-allowed-root-add" Button
+    t =    30.89s Find the "settings-allowed-root-add" Button
+    t =    30.99s Find the "settings-allowed-root-add" Button
+    t =    31.10s Find the "settings-allowed-root-add" Button
+    t =    31.19s Find the "settings-allowed-root-add" Button
+    t =    31.29s Find the "settings-allowed-root-add" Button
+    t =    31.42s Find the "settings-allowed-root-add" Button
+    t =    31.53s Find the "settings-allowed-root-add" Button
+    t =    31.63s Find the "settings-allowed-root-add" Button
+    t =    31.72s Find the "settings-allowed-root-add" Button
+    t =    31.82s Find the "settings-allowed-root-add" Button
+    t =    31.92s Find the "settings-allowed-root-add" Button
+    t =    32.02s Click "settings-allowed-root-add" Button
+    t =    32.02s     Wait for com.forge-conductor.app to idle
+    t =    32.02s     Find the "settings-allowed-root-add" Button
+    t =    32.09s     Check for interrupting elements affecting "settings-allowed-root-add" Button
+    t =    32.11s     Synthesize event
+    t =    32.61s     Wait for com.forge-conductor.app to idle
+    t =    32.64s Waiting 10.0s for "open-panel" Dialog to exist
+    t =    33.67s     Checking `Expect predicate `existsNoRetry == 1` for object "open-panel" Dialog`
+    t =    33.67s         Checking existence of `"open-panel" Dialog`
+    t =    33.78s Checking existence of `"Authorize Folder" Button`
+    t =    33.88s Checking existence of `"Cancel" Button`
+    t =    33.98s Find the Target Application 'com.forge-conductor.app'
+    t =    34.11s Added attachment named 'production-open-panel'
+    t =    34.11s Waiting 8.0s for "Cancel" Button to exist
+    t =    35.13s     Checking `Expect predicate `existsNoRetry == 1` for object "Cancel" Button`
+    t =    35.13s         Checking existence of `"Cancel" Button`
+    t =    35.24s Find the "Cancel" Button
+    t =    35.34s Find the "CancelButton" Button
+    t =    35.44s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'CancelButton'
+    t =    35.57s Find the "CancelButton" Button
+    t =    35.64s Find the "CancelButton" Button
+    t =    35.73s Click "CancelButton" Button
+    t =    35.73s     Wait for com.forge-conductor.app to idle
+    t =    35.73s     Find the "CancelButton" Button
+    t =    35.82s     Check for interrupting elements affecting "CancelButton" Button
+    t =    35.83s     Synthesize event
+    t =    36.16s     Wait for com.forge-conductor.app to idle
+    t =    36.19s Checking existence of `"settings-allowed-roots-message" Any`
+    t =    36.84s Find the "settings-allowed-roots-message" Any
+    t =    36.94s Find the "settings-allowed-roots-message" StaticText
+    t =    37.04s Waiting 8.0s for "settings-allowed-root-add" Button to exist
+    t =    38.06s     Checking `Expect predicate `existsNoRetry == 1` for object "settings-allowed-root-add" Button`
+    t =    38.06s         Checking existence of `"settings-allowed-root-add" Button`
+    t =    38.15s Find the "settings-allowed-root-add" Button
+    t =    38.22s Find the "settings-allowed-root-add" Button
+    t =    38.29s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'settings-allowed-root-add'
+    t =    38.37s Find the "settings-allowed-root-add" Button
+    t =    38.49s Find the "settings-allowed-root-add" Button
+    t =    38.59s Click "settings-allowed-root-add" Button
+    t =    38.59s     Wait for com.forge-conductor.app to idle
+    t =    38.59s     Find the "settings-allowed-root-add" Button
+    t =    38.66s     Check for interrupting elements affecting "settings-allowed-root-add" Button
+    t =    38.69s     Synthesize event
+    t =    39.21s     Wait for com.forge-conductor.app to idle
+    t =    39.23s Waiting 10.0s for "open-panel" Dialog to exist
+    t =    40.26s     Checking `Expect predicate `existsNoRetry == 1` for object "open-panel" Dialog`
+    t =    40.26s         Checking existence of `"open-panel" Dialog`
+    t =    40.37s Checking existence of `"Authorize Folder" Button`
+    t =    40.46s Checking existence of `"Cancel" Button`
+    t =    40.56s Find the Target Application 'com.forge-conductor.app'
+    t =    40.70s Added attachment named 'production-open-panel'
+    t =    40.70s Type 'g' key with modifiers '⌘⇧' (0x12)
+    t =    40.70s     Wait for com.forge-conductor.app to idle
+    t =    40.70s     Find the Target Application 'com.forge-conductor.app'
+    t =    40.75s     Check for interrupting elements affecting "Forge Conductor" Application
+    t =    40.75s     Synthesize event
+    t =    40.85s     Wait for com.forge-conductor.app to idle
+    t =    41.11s Waiting 5.0s for "GoToWindow" Sheet to exist
+    t =    42.13s     Checking `Expect predicate `existsNoRetry == 1` for object "GoToWindow" Sheet`
+    t =    42.13s         Checking existence of `"GoToWindow" Sheet`
+    t =    42.25s Waiting 8.0s for "PathTextField" TextField to exist
+    t =    43.27s     Checking `Expect predicate `existsNoRetry == 1` for object "PathTextField" TextField`
+    t =    43.27s         Checking existence of `"PathTextField" TextField`
+    t =    43.39s Find the "PathTextField" TextField
+    t =    43.53s Find the "PathTextField" TextField
+    t =    43.84s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'PathTextField'
+    t =    44.42s Find the "PathTextField" TextField
+    t =    44.67s Find the "PathTextField" TextField
+    t =    44.89s Click "PathTextField" TextField
+    t =    44.89s     Wait for com.forge-conductor.app to idle
+    t =    44.90s     Find the "PathTextField" TextField
+    t =    45.08s     Check for interrupting elements affecting "PathTextField" TextField
+    t =    45.13s     Synthesize event
+    t =    45.55s     Wait for com.forge-conductor.app to idle
+    t =    45.55s Type 'a' key with modifiers '⌘' (0x10)
+    t =    45.55s     Wait for com.forge-conductor.app to idle
+    t =    45.55s     Find the "PathTextField" TextField
+    t =    45.99s     Check for interrupting elements affecting "PathTextField" TextField
+    t =    46.03s     Synthesize event
+    t =    46.19s     Wait for com.forge-conductor.app to idle
+    t =    46.19s Type '/' into "PathTextField" TextField
+    t =    46.19s     Wait for com.forge-conductor.app to idle
+    t =    46.19s     Find the "PathTextField" TextField
+    t =    46.34s     Check for interrupting elements affecting "PathTextField" TextField
+    t =    46.38s     Synthesize event
+    t =    46.67s     Wait for com.forge-conductor.app to idle
+    t =    46.68s Find the "PathTextField" TextField
+    t =    46.89s Type '↩' key (XCUIKeyboardKeyReturn) with no modifiers
+    t =    46.89s     Wait for com.forge-conductor.app to idle
+    t =    46.89s     Find the "PathTextField" TextField
+    t =    47.01s     Check for interrupting elements affecting "PathTextField" TextField
+    t =    47.03s     Synthesize event
+    t =    47.38s     Wait for com.forge-conductor.app to idle
+    t =    47.39s Checking existence of `"GoToWindow" Sheet`
+    t =    47.51s Checking existence of `"GoToWindow" Sheet`
+    t =    47.60s Waiting 8.0s for "Authorize Folder" Button to exist
+    t =    48.63s     Checking `Expect predicate `existsNoRetry == 1` for object "Authorize Folder" Button`
+    t =    48.63s         Checking existence of `"Authorize Folder" Button`
+    t =    48.75s Find the "Authorize Folder" Button
+    t =    48.86s Find the "OKButton" Button
+    t =    48.97s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'OKButton'
+    t =    49.13s Find the "OKButton" Button
+    t =    49.22s Find the "OKButton" Button
+    t =    49.30s Click "OKButton" Button
+    t =    49.30s     Wait for com.forge-conductor.app to idle
+    t =    49.31s     Find the "OKButton" Button
+    t =    49.40s     Check for interrupting elements affecting "OKButton" Button
+    t =    49.41s     Synthesize event
+    t =    49.74s     Wait for com.forge-conductor.app to idle
+    t =    49.81s Checking existence of `"open-panel" Dialog`
+    t =    50.31s Checking existence of `"settings-allowed-roots-message" Any`
+    t =    50.40s Find the "settings-allowed-roots-message" Any
+    t =    50.53s Find the "settings-allowed-roots-message" StaticText
+    t =    50.63s Checking existence of `"settings-allowed-root-path-0" Any`
+    t =    50.85s Find the "settings-allowed-root-path-0" Any
+    t =    50.98s Find the "settings-allowed-root-path-0" StaticText
+    t =    51.08s Checking existence of `"settings-allowed-root-path-1" Any`
+    t =    51.16s Waiting 8.0s for "settings-save" Button to exist
+    t =    52.18s     Checking `Expect predicate `existsNoRetry == 1` for object "settings-save" Button`
+    t =    52.18s         Checking existence of `"settings-save" Button`
+    t =    52.27s Find the "settings-save" Button
+    t =    52.37s Find the "settings-save" Button
+    t =    52.46s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'settings-save'
+    t =    52.55s Find the "settings-save" Button
+    t =    54.22s Find the "settings-save" Button
+    t =    55.96s Find the "settings-save" Button
+    t =    56.04s Find the ScrollView (Element at index 0)
+    t =    56.13s Scroll "root-split" ScrollView by dx: 0.00, dy: -360.00
+    t =    56.13s     Wait for com.forge-conductor.app to idle
+    t =    56.13s     Find the "root-split" ScrollView
+    t =    56.23s     Check for interrupting elements affecting "root-split" ScrollView
+    t =    56.24s     Synthesize event
+    t =    56.55s     Wait for com.forge-conductor.app to idle
+    t =    56.57s Find the "settings-save" Button
+    t =    58.00s Find the "settings-save" Button
+    t =    59.42s Find the "settings-save" Button
+    t =    61.02s Find the "settings-save" Button
+    t =    62.38s Find the "settings-save" Button
+    t =    63.93s Find the "settings-save" Button
+    t =    65.34s Find the "settings-save" Button
+    t =    66.74s Find the "settings-save" Button
+    t =    68.09s Find the "settings-save" Button
+    t =    69.50s Find the "settings-save" Button
+    t =    70.98s Find the "settings-save" Button
+    t =    72.33s Find the "settings-save" Button
+    t =    73.78s Click "settings-save" Button
+    t =    73.78s     Wait for com.forge-conductor.app to idle
+    t =    73.79s     Find the "settings-save" Button
+    t =    73.87s     Check for interrupting elements affecting "settings-save" Button
+    t =    73.90s     Synthesize event
+    t =    75.58s     Wait for com.forge-conductor.app to idle
+    t =    75.63s Find the Target Application 'com.forge-conductor.app'
+    t =    75.74s Added attachment named 'native-filesystem-root-rejected'
+    t =    75.74s Terminate com.forge-conductor.app:41565
+    t =    76.79s Open com.forge-conductor.app
+    t =    76.79s     Launch com.forge-conductor.app
+    t =    77.00s         Wait for accessibility to load
+    t =    77.47s         Setting up automation session
+    t =    77.47s         Wait for com.forge-conductor.app to idle
+    t =    77.49s Waiting 15.0s for "tab-manager" Button to exist
+    t =    78.51s     Checking `Expect predicate `existsNoRetry == 1` for object "tab-manager" Button`
+    t =    78.51s         Checking existence of `"tab-manager" Button`
+    t =    78.64s Added attachment named 'ordinary-bootstrap-before-status'
+    t =    78.64s Requesting snapshot of accessibility hierarchy for app with pid 42185
+    t =    78.74s Requesting snapshot of accessibility hierarchy for app with pid 42185
+    t =    78.84s Added attachment named 'ordinary-bootstrap-before-status-native-controls'
+    t =    78.84s Added attachment named 'ordinary-bootstrap-manager'
+    t =    78.84s Waiting 8.0s for "tab-manager" Button to exist
+    t =    79.84s     Checking `Expect predicate `existsNoRetry == 1` for object "tab-manager" Button`
+    t =    79.85s         Checking existence of `"tab-manager" Button`
+    t =    79.94s Find the "tab-manager" Button
+    t =    80.03s Find the "tab-manager" Button
+    t =    80.12s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'tab-manager'
+    t =    80.22s Find the "tab-manager" Button
+    t =    80.35s Find the "tab-manager" Button
+    t =    80.46s Click "tab-manager" Button
+    t =    80.46s     Wait for com.forge-conductor.app to idle
+    t =    80.46s     Find the "tab-manager" Button
+    t =    80.55s     Check for interrupting elements affecting "tab-manager" Button
+    t =    80.58s     Synthesize event
+    t =    81.18s     Wait for com.forge-conductor.app to idle
+    t =    81.20s Checking existence of `"settings-allowed-root-path-0" Any`
+    t =    81.37s Find the "settings-allowed-root-path-0" Any
+    t =    81.45s Find the "settings-allowed-root-path-0" StaticText
+    t =    81.55s Added attachment named 'authorized-folder-after-relaunch'
+    t =    81.55s Tear Down
+    t =    81.55s     Added attachment named 'onboarding-final-diagnostics'
+    t =    81.56s     Requesting snapshot of accessibility hierarchy for app with pid 42185
+    t =    81.65s     Requesting snapshot of accessibility hierarchy for app with pid 42185
+    t =    81.74s     Added attachment named 'onboarding-final-diagnostics-native-controls'
+    t =    81.74s     Find the Target Application 'com.forge-conductor.app'
+    t =    81.91s     Added attachment named 'onboarding-final-state'
+    t =    81.91s     Terminate com.forge-conductor.app:42185
+Test Case '-[ForgeConductorUITests.ProductionOnboardingUITests testNativeFolderAuthorizationCancellationAndInvalidRootPreserveSavedSettings]' passed (83.204 seconds).
+Test Case '-[ForgeConductorUITests.ProductionOnboardingUITests testNativeProviderSaveOfflineFailureAndInvalidEndpointsSurviveManagerReplacement]' started.
+    t =     0.00s Start Test at 2026-09-04 20:27:22.999
+    t =     0.08s Set Up
+    t =     0.08s Open com.forge-conductor.app
+    t =     0.08s     Launch com.forge-conductor.app
+    t =     0.30s         Wait for accessibility to load
+    t =     0.72s         Setting up automation session
+    t =     0.73s         Wait for com.forge-conductor.app to idle
+    t =     0.76s Waiting 15.0s for "tab-manager" Button to exist
+    t =     1.77s     Checking `Expect predicate `existsNoRetry == 1` for object "tab-manager" Button`
+    t =     1.77s         Checking existence of `"tab-manager" Button`
+    t =     1.89s Added attachment named 'ordinary-bootstrap-before-status'
+    t =     1.90s Requesting snapshot of accessibility hierarchy for app with pid 42251
+    t =     2.01s Requesting snapshot of accessibility hierarchy for app with pid 42251
+    t =     2.10s Added attachment named 'ordinary-bootstrap-before-status-native-controls'
+    t =     2.11s Added attachment named 'ordinary-bootstrap-manager'
+    t =     2.11s Waiting 8.0s for "tab-provider" Button to exist
+    t =     3.11s     Checking `Expect predicate `existsNoRetry == 1` for object "tab-provider" Button`
+    t =     3.11s         Checking existence of `"tab-provider" Button`
+    t =     3.21s Find the "tab-provider" Button
+    t =     3.30s Find the "tab-provider" Button
+    t =     3.38s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'tab-provider'
+    t =     3.46s Find the "tab-provider" Button
+    t =     3.58s Find the "tab-provider" Button
+    t =     3.68s Click "tab-provider" Button
+    t =     3.68s     Wait for com.forge-conductor.app to idle
+    t =     3.70s     Find the "tab-provider" Button
+    t =     3.77s     Check for interrupting elements affecting "tab-provider" Button
+    t =     3.79s     Synthesize event
+    t =     4.26s     Wait for com.forge-conductor.app to idle
+    t =     4.27s Waiting 10.0s for "provider-endpoint" TextField to exist
+    t =     5.31s     Checking `Expect predicate `existsNoRetry == 1` for object "provider-endpoint" TextField`
+    t =     5.31s         Checking existence of `"provider-endpoint" TextField`
+    t =     5.36s Find the "provider-save" Button
+    t =     5.41s Waiting 8.0s for "provider-endpoint" TextField to exist
+    t =     6.41s     Checking `Expect predicate `existsNoRetry == 1` for object "provider-endpoint" TextField`
+    t =     6.41s         Checking existence of `"provider-endpoint" TextField`
+    t =     6.46s Find the "provider-endpoint" TextField
+    t =     6.51s Find the "provider-endpoint" TextField
+    t =     6.55s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'provider-endpoint'
+    t =     6.59s Find the "provider-endpoint" TextField
+    t =     6.64s Find the "provider-endpoint" TextField
+    t =     6.69s Click "provider-endpoint" TextField
+    t =     6.69s     Wait for com.forge-conductor.app to idle
+    t =     6.69s     Find the "provider-endpoint" TextField
+    t =     6.73s     Check for interrupting elements affecting "provider-endpoint" TextField
+    t =     6.74s     Synthesize event
+    t =     7.13s     Wait for com.forge-conductor.app to idle
+    t =     7.14s Type 'a' key with modifiers '⌘' (0x10)
+    t =     7.14s     Wait for com.forge-conductor.app to idle
+    t =     7.15s     Find the "provider-endpoint" TextField
+    t =     7.21s     Check for interrupting elements affecting "provider-endpoint" TextField
+    t =     7.22s     Synthesize event
+    t =     7.29s     Wait for com.forge-conductor.app to idle
+    t =     7.30s Type 'http://127.0.0.1:5...' into "provider-endpoint" TextField
+    t =     7.30s     Wait for com.forge-conductor.app to idle
+    t =     7.31s     Find the "provider-endpoint" TextField
+    t =     7.37s     Check for interrupting elements affecting "provider-endpoint" TextField
+    t =     7.39s     Synthesize event
+    t =     8.13s     Wait for com.forge-conductor.app to idle
+    t =     8.13s Find the "provider-endpoint" TextField
+    t =     8.18s Waiting 8.0s for "provider-model-key" TextField to exist
+    t =     9.18s     Checking `Expect predicate `existsNoRetry == 1` for object "provider-model-key" TextField`
+    t =     9.18s         Checking existence of `"provider-model-key" TextField`
+    t =     9.23s Find the "provider-model-key" TextField
+    t =     9.27s Find the "provider-model-key" TextField
+    t =     9.31s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'provider-model-key'
+    t =     9.36s Find the "provider-model-key" TextField
+    t =     9.42s Find the "provider-model-key" TextField
+    t =     9.47s Click "provider-model-key" TextField
+    t =     9.47s     Wait for com.forge-conductor.app to idle
+    t =     9.47s     Find the "provider-model-key" TextField
+    t =     9.51s     Check for interrupting elements affecting "provider-model-key" TextField
+    t =     9.53s     Synthesize event
+    t =     9.89s     Wait for com.forge-conductor.app to idle
+    t =     9.90s Type 'a' key with modifiers '⌘' (0x10)
+    t =     9.90s     Wait for com.forge-conductor.app to idle
+    t =     9.90s     Find the "provider-model-key" TextField
+    t =     9.94s     Check for interrupting elements affecting "provider-model-key" TextField
+    t =     9.96s     Synthesize event
+    t =    10.01s     Wait for com.forge-conductor.app to idle
+    t =    10.01s Type 'onboarding-offline...' into "provider-model-key" TextField
+    t =    10.01s     Wait for com.forge-conductor.app to idle
+    t =    10.02s     Find the "provider-model-key" TextField
+    t =    10.06s     Check for interrupting elements affecting "provider-model-key" TextField
+    t =    10.09s     Synthesize event
+    t =    10.82s     Wait for com.forge-conductor.app to idle
+    t =    10.82s Find the "provider-model-key" TextField
+    t =    10.86s Waiting 8.0s for "provider-save" Button to exist
+    t =    11.86s     Checking `Expect predicate `existsNoRetry == 1` for object "provider-save" Button`
+    t =    11.86s         Checking existence of `"provider-save" Button`
+    t =    11.92s Find the "provider-save" Button
+    t =    11.96s Find the "provider-save" Button
+    t =    12.00s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'provider-save'
+    t =    12.06s Find the "provider-save" Button
+    t =    12.11s Find the "provider-save" Button
+    t =    12.17s Click "provider-save" Button
+    t =    12.17s     Wait for com.forge-conductor.app to idle
+    t =    12.18s     Find the "provider-save" Button
+    t =    12.22s     Check for interrupting elements affecting "provider-save" Button
+    t =    12.24s     Synthesize event
+    t =    12.61s     Wait for com.forge-conductor.app to idle
+    t =    12.62s Checking existence of `"provider-probe-notice" Any`
+    t =    12.73s Checking existence of `"provider-probe-notice" Any`
+    t =    12.77s Find the "provider-probe-notice" Any
+    t =    12.91s Find the "provider-probe-notice" StaticText
+    t =    13.09s Added attachment named 'provider-native-save-readback'
+    t =    13.09s Checking existence of `"provider-probe-notice" Any`
+    t =    13.13s Find the "provider-probe-notice" Any
+    t =    13.16s Find the "provider-probe-notice" StaticText
+    t =    13.21s Waiting 8.0s for "provider-test-connection" Button to exist
+    t =    14.21s     Checking `Expect predicate `existsNoRetry == 1` for object "provider-test-connection" Button`
+    t =    14.21s         Checking existence of `"provider-test-connection" Button`
+    t =    14.25s Find the "provider-test-connection" Button
+    t =    14.29s Find the "provider-test-connection" Button
+    t =    14.33s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'provider-test-connection'
+    t =    14.37s Find the "provider-test-connection" Button
+    t =    14.42s Find the "provider-test-connection" Button
+    t =    14.47s Click "provider-test-connection" Button
+    t =    14.47s     Wait for com.forge-conductor.app to idle
+    t =    14.47s     Find the "provider-test-connection" Button
+    t =    14.60s     Check for interrupting elements affecting "provider-test-connection" Button
+    t =    14.62s     Synthesize event
+    t =    14.99s     Wait for com.forge-conductor.app to idle
+    t =    14.99s Waiting 40.0s for "operator-unavailable" Any to exist
+    t =    15.99s     Checking `Expect predicate `existsNoRetry == 1` for object "operator-unavailable" Any`
+    t =    15.99s         Checking existence of `"operator-unavailable" Any`
+    t =    16.05s         Capturing element debug description
+    t =    17.05s     Checking `Expect predicate `existsNoRetry == 1` for object "operator-unavailable" Any`
+    t =    17.05s         Checking existence of `"operator-unavailable" Any`
+    t =    17.09s         Capturing element debug description
+    t =    18.00s     Checking `Expect predicate `existsNoRetry == 1` for object "operator-unavailable" Any`
+    t =    18.00s         Checking existence of `"operator-unavailable" Any`
+    t =    18.05s         Capturing element debug description
+    t =    19.05s     Checking `Expect predicate `existsNoRetry == 1` for object "operator-unavailable" Any`
+    t =    19.05s         Checking existence of `"operator-unavailable" Any`
+    t =    19.09s         Capturing element debug description
+    t =    19.99s     Checking `Expect predicate `existsNoRetry == 1` for object "operator-unavailable" Any`
+    t =    19.99s         Checking existence of `"operator-unavailable" Any`
+    t =    20.18s Checking existence of `"provider-probe-notice" Any`
+    t =    20.24s Checking existence of `"provider-last-probe-error" Any`
+    t =    20.31s Find the "provider-health" Any
+    t =    20.37s Find the Target Application 'com.forge-conductor.app'
+    t =    20.49s Added attachment named 'native-provider-offline-error'
+    t =    20.49s Waiting 8.0s for "provider-endpoint" TextField to exist
+    t =    21.49s     Checking `Expect predicate `existsNoRetry == 1` for object "provider-endpoint" TextField`
+    t =    21.49s         Checking existence of `"provider-endpoint" TextField`
+    t =    21.54s Find the "provider-endpoint" TextField
+    t =    21.59s Find the "provider-endpoint" TextField
+    t =    21.64s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'provider-endpoint'
+    t =    21.79s Find the "provider-endpoint" TextField
+    t =    21.85s Find the "provider-endpoint" TextField
+    t =    21.90s Click "provider-endpoint" TextField
+    t =    21.90s     Wait for com.forge-conductor.app to idle
+    t =    21.91s     Find the "provider-endpoint" TextField
+    t =    21.95s     Check for interrupting elements affecting "provider-endpoint" TextField
+    t =    21.97s     Synthesize event
+    t =    22.30s     Wait for com.forge-conductor.app to idle
+    t =    22.30s Type 'a' key with modifiers '⌘' (0x10)
+    t =    22.30s     Wait for com.forge-conductor.app to idle
+    t =    22.31s     Find the "provider-endpoint" TextField
+    t =    22.35s     Check for interrupting elements affecting "provider-endpoint" TextField
+    t =    22.37s     Synthesize event
+    t =    22.42s     Wait for com.forge-conductor.app to idle
+    t =    22.42s Type 'not-an-endpoint' into "provider-endpoint" TextField
+    t =    22.42s     Wait for com.forge-conductor.app to idle
+    t =    22.43s     Find the "provider-endpoint" TextField
+    t =    22.48s     Check for interrupting elements affecting "provider-endpoint" TextField
+    t =    22.50s     Synthesize event
+    t =    22.95s     Wait for com.forge-conductor.app to idle
+    t =    22.95s Find the "provider-endpoint" TextField
+    t =    23.00s Waiting 8.0s for "provider-save" Button to exist
+    t =    24.02s     Checking `Expect predicate `existsNoRetry == 1` for object "provider-save" Button`
+    t =    24.02s         Checking existence of `"provider-save" Button`
+    t =    24.08s Find the "provider-save" Button
+    t =    24.13s Find the "provider-save" Button
+    t =    24.18s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'provider-save'
+    t =    24.24s Find the "provider-save" Button
+    t =    24.29s Find the "provider-save" Button
+    t =    24.35s Click "provider-save" Button
+    t =    24.35s     Wait for com.forge-conductor.app to idle
+    t =    24.36s     Find the "provider-save" Button
+    t =    24.41s     Check for interrupting elements affecting "provider-save" Button
+    t =    24.42s     Synthesize event
+    t =    24.79s     Wait for com.forge-conductor.app to idle
+    t =    24.79s Waiting 10.0s for "operator-unavailable" Any to exist
+    t =    25.81s     Checking `Expect predicate `existsNoRetry == 1` for object "operator-unavailable" Any`
+    t =    25.81s         Checking existence of `"operator-unavailable" Any`
+    t =    25.88s Find the "provider-save" Button
+    t =    25.94s Waiting 8.0s for "provider-endpoint" TextField to exist
+    t =    26.94s     Checking `Expect predicate `existsNoRetry == 1` for object "provider-endpoint" TextField`
+    t =    26.94s         Checking existence of `"provider-endpoint" TextField`
+    t =    27.00s Find the "provider-endpoint" TextField
+    t =    27.04s Find the "provider-endpoint" TextField
+    t =    27.08s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'provider-endpoint'
+    t =    27.13s Find the "provider-endpoint" TextField
+    t =    27.19s Find the "provider-endpoint" TextField
+    t =    27.25s Click "provider-endpoint" TextField
+    t =    27.25s     Wait for com.forge-conductor.app to idle
+    t =    27.25s     Find the "provider-endpoint" TextField
+    t =    27.30s     Check for interrupting elements affecting "provider-endpoint" TextField
+    t =    27.32s     Synthesize event
+    t =    27.68s     Wait for com.forge-conductor.app to idle
+    t =    27.68s Type 'a' key with modifiers '⌘' (0x10)
+    t =    27.68s     Wait for com.forge-conductor.app to idle
+    t =    27.69s     Find the "provider-endpoint" TextField
+    t =    27.73s     Check for interrupting elements affecting "provider-endpoint" TextField
+    t =    27.75s     Synthesize event
+    t =    27.79s     Wait for com.forge-conductor.app to idle
+    t =    27.79s Type 'http://provider.ex...' into "provider-endpoint" TextField
+    t =    27.79s     Wait for com.forge-conductor.app to idle
+    t =    27.80s     Find the "provider-endpoint" TextField
+    t =    27.84s     Check for interrupting elements affecting "provider-endpoint" TextField
+    t =    27.86s     Synthesize event
+    t =    28.82s     Wait for com.forge-conductor.app to idle
+    t =    28.82s Find the "provider-endpoint" TextField
+    t =    28.87s Waiting 8.0s for "provider-save" Button to exist
+    t =    29.88s     Checking `Expect predicate `existsNoRetry == 1` for object "provider-save" Button`
+    t =    29.88s         Checking existence of `"provider-save" Button`
+    t =    29.94s Find the "provider-save" Button
+    t =    29.99s Find the "provider-save" Button
+    t =    30.03s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'provider-save'
+    t =    30.09s Find the "provider-save" Button
+    t =    30.15s Find the "provider-save" Button
+    t =    30.21s Click "provider-save" Button
+    t =    30.21s     Wait for com.forge-conductor.app to idle
+    t =    30.21s     Find the "provider-save" Button
+    t =    30.26s     Check for interrupting elements affecting "provider-save" Button
+    t =    30.27s     Synthesize event
+    t =    30.68s     Wait for com.forge-conductor.app to idle
+    t =    30.71s Waiting 10.0s for "operator-unavailable" Any to exist
+    t =    31.71s     Checking `Expect predicate `existsNoRetry == 1` for object "operator-unavailable" Any`
+    t =    31.71s         Checking existence of `"operator-unavailable" Any`
+    t =    31.78s Find the "provider-save" Button
+    t =    31.94s Waiting 8.0s for "provider-endpoint" TextField to exist
+    t =    32.94s     Checking `Expect predicate `existsNoRetry == 1` for object "provider-endpoint" TextField`
+    t =    32.94s         Checking existence of `"provider-endpoint" TextField`
+    t =    32.98s Find the "provider-endpoint" TextField
+    t =    33.02s Find the "provider-endpoint" TextField
+    t =    33.06s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'provider-endpoint'
+    t =    33.11s Find the "provider-endpoint" TextField
+    t =    33.15s Find the "provider-endpoint" TextField
+    t =    33.20s Click "provider-endpoint" TextField
+    t =    33.20s     Wait for com.forge-conductor.app to idle
+    t =    33.21s     Find the "provider-endpoint" TextField
+    t =    33.24s     Check for interrupting elements affecting "provider-endpoint" TextField
+    t =    33.26s     Synthesize event
+    t =    33.60s     Wait for com.forge-conductor.app to idle
+    t =    33.61s Type 'a' key with modifiers '⌘' (0x10)
+    t =    33.61s     Wait for com.forge-conductor.app to idle
+    t =    33.61s     Find the "provider-endpoint" TextField
+    t =    33.65s     Check for interrupting elements affecting "provider-endpoint" TextField
+    t =    33.67s     Synthesize event
+    t =    33.72s     Wait for com.forge-conductor.app to idle
+    t =    33.73s Type 'http://127.0.0.1:1...' into "provider-endpoint" TextField
+    t =    33.73s     Wait for com.forge-conductor.app to idle
+    t =    33.73s     Find the "provider-endpoint" TextField
+    t =    33.78s     Check for interrupting elements affecting "provider-endpoint" TextField
+    t =    33.79s     Synthesize event
+    t =    34.91s     Wait for com.forge-conductor.app to idle
+    t =    34.91s Find the "provider-endpoint" TextField
+    t =    34.96s Waiting 8.0s for "provider-save" Button to exist
+    t =    35.96s     Checking `Expect predicate `existsNoRetry == 1` for object "provider-save" Button`
+    t =    35.96s         Checking existence of `"provider-save" Button`
+    t =    36.02s Find the "provider-save" Button
+    t =    36.07s Find the "provider-save" Button
+    t =    36.12s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'provider-save'
+    t =    36.17s Find the "provider-save" Button
+    t =    36.23s Find the "provider-save" Button
+    t =    36.29s Click "provider-save" Button
+    t =    36.29s     Wait for com.forge-conductor.app to idle
+    t =    36.30s     Find the "provider-save" Button
+    t =    36.34s     Check for interrupting elements affecting "provider-save" Button
+    t =    36.36s     Synthesize event
+    t =    36.74s     Wait for com.forge-conductor.app to idle
+    t =    36.75s Waiting 10.0s for "operator-unavailable" Any to exist
+    t =    37.75s     Checking `Expect predicate `existsNoRetry == 1` for object "operator-unavailable" Any`
+    t =    37.75s         Checking existence of `"operator-unavailable" Any`
+    t =    37.82s Find the "provider-save" Button
+    t =    37.88s Find the Target Application 'com.forge-conductor.app'
+    t =    37.99s Added attachment named 'native-provider-invalid-endpoint'
+    t =    38.00s Terminate com.forge-conductor.app:42251
+    t =    39.03s Open com.forge-conductor.app
+    t =    39.04s     Launch com.forge-conductor.app
+    t =    39.26s         Wait for accessibility to load
+    t =    39.65s         Setting up automation session
+    t =    39.65s         Wait for com.forge-conductor.app to idle
+    t =    39.66s Waiting 15.0s for "tab-manager" Button to exist
+    t =    40.67s     Checking `Expect predicate `existsNoRetry == 1` for object "tab-manager" Button`
+    t =    40.67s         Checking existence of `"tab-manager" Button`
+    t =    40.81s Added attachment named 'ordinary-bootstrap-before-status'
+    t =    40.81s Requesting snapshot of accessibility hierarchy for app with pid 42634
+    t =    40.91s Requesting snapshot of accessibility hierarchy for app with pid 42634
+    t =    41.00s Added attachment named 'ordinary-bootstrap-before-status-native-controls'
+    t =    41.00s Added attachment named 'ordinary-bootstrap-manager'
+    t =    41.01s Waiting 8.0s for "tab-provider" Button to exist
+    t =    42.01s     Checking `Expect predicate `existsNoRetry == 1` for object "tab-provider" Button`
+    t =    42.01s         Checking existence of `"tab-provider" Button`
+    t =    42.09s Find the "tab-provider" Button
+    t =    42.19s Find the "tab-provider" Button
+    t =    42.28s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'tab-provider'
+    t =    42.37s Find the "tab-provider" Button
+    t =    42.48s Find the "tab-provider" Button
+    t =    42.59s Click "tab-provider" Button
+    t =    42.59s     Wait for com.forge-conductor.app to idle
+    t =    42.60s     Find the "tab-provider" Button
+    t =    42.67s     Check for interrupting elements affecting "tab-provider" Button
+    t =    42.70s     Synthesize event
+    t =    43.12s     Wait for com.forge-conductor.app to idle
+    t =    43.13s Waiting 10.0s for "provider-endpoint" TextField to exist
+    t =    44.13s     Checking `Expect predicate `existsNoRetry == 1` for object "provider-endpoint" TextField`
+    t =    44.13s         Checking existence of `"provider-endpoint" TextField`
+    t =    44.18s Find the "provider-save" Button
+    t =    44.23s Find the "provider-endpoint" TextField
+    t =    44.27s Find the "provider-model-key" TextField
+    t =    44.32s Waiting 8.0s for "provider-test-connection" Button to exist
+    t =    45.32s     Checking `Expect predicate `existsNoRetry == 1` for object "provider-test-connection" Button`
+    t =    45.32s         Checking existence of `"provider-test-connection" Button`
+    t =    45.37s Find the "provider-test-connection" Button
+    t =    45.42s Find the "provider-test-connection" Button
+    t =    45.46s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'provider-test-connection'
+    t =    45.51s Find the "provider-test-connection" Button
+    t =    45.57s Find the "provider-test-connection" Button
+    t =    45.63s Click "provider-test-connection" Button
+    t =    45.63s     Wait for com.forge-conductor.app to idle
+    t =    45.64s     Find the "provider-test-connection" Button
+    t =    45.79s     Check for interrupting elements affecting "provider-test-connection" Button
+    t =    45.80s     Synthesize event
+    t =    46.15s     Wait for com.forge-conductor.app to idle
+    t =    46.16s Waiting 40.0s for "operator-unavailable" Any to exist
+    t =    47.16s     Checking `Expect predicate `existsNoRetry == 1` for object "operator-unavailable" Any`
+    t =    47.16s         Checking existence of `"operator-unavailable" Any`
+    t =    47.22s         Capturing element debug description
+    t =    48.22s     Checking `Expect predicate `existsNoRetry == 1` for object "operator-unavailable" Any`
+    t =    48.22s         Checking existence of `"operator-unavailable" Any`
+    t =    48.28s         Capturing element debug description
+    t =    49.18s     Checking `Expect predicate `existsNoRetry == 1` for object "operator-unavailable" Any`
+    t =    49.18s         Checking existence of `"operator-unavailable" Any`
+    t =    49.24s         Capturing element debug description
+    t =    50.24s     Checking `Expect predicate `existsNoRetry == 1` for object "operator-unavailable" Any`
+    t =    50.24s         Checking existence of `"operator-unavailable" Any`
+    t =    50.30s         Capturing element debug description
+    t =    51.20s     Checking `Expect predicate `existsNoRetry == 1` for object "operator-unavailable" Any`
+    t =    51.20s         Checking existence of `"operator-unavailable" Any`
+    t =    51.27s Added attachment named 'provider-configuration-after-manager-replacement'
+    t =    51.27s Added attachment named 'replacement-manager'
+    t =    51.27s Tear Down
+    t =    51.28s     Added attachment named 'onboarding-final-diagnostics'
+    t =    51.28s     Requesting snapshot of accessibility hierarchy for app with pid 42634
+    t =    51.35s     Requesting snapshot of accessibility hierarchy for app with pid 42634
+    t =    51.42s     Added attachment named 'onboarding-final-diagnostics-native-controls'
+    t =    51.42s     Find the Target Application 'com.forge-conductor.app'
+    t =    51.53s     Added attachment named 'onboarding-final-state'
+    t =    51.53s     Terminate com.forge-conductor.app:42634
+Test Case '-[ForgeConductorUITests.ProductionOnboardingUITests testNativeProviderSaveOfflineFailureAndInvalidEndpointsSurviveManagerReplacement]' passed (52.724 seconds).
+Test Case '-[ForgeConductorUITests.ProductionOnboardingUITests testNativeSettingsShellOptOutAndReenablePersistIntoFreshMCPProcesses]' started.
+    t =     0.00s Start Test at 2026-09-04 20:28:15.724
+    t =     0.08s Set Up
+    t =     0.08s Open com.forge-conductor.app
+    t =     0.08s     Launch com.forge-conductor.app
+    t =     0.30s         Wait for accessibility to load
+    t =     0.60s         Setting up automation session
+    t =     0.61s         Wait for com.forge-conductor.app to idle
+    t =     0.61s Waiting 15.0s for "tab-manager" Button to exist
+    t =     1.62s     Checking `Expect predicate `existsNoRetry == 1` for object "tab-manager" Button`
+    t =     1.62s         Checking existence of `"tab-manager" Button`
+    t =     1.75s Added attachment named 'ordinary-bootstrap-before-status'
+    t =     1.75s Requesting snapshot of accessibility hierarchy for app with pid 42696
+    t =     1.86s Requesting snapshot of accessibility hierarchy for app with pid 42696
+    t =     1.95s Added attachment named 'ordinary-bootstrap-before-status-native-controls'
+    t =     1.96s Added attachment named 'ordinary-bootstrap-manager'
+    t =     1.96s Waiting 8.0s for "tab-manager" Button to exist
+    t =     2.96s     Checking `Expect predicate `existsNoRetry == 1` for object "tab-manager" Button`
+    t =     2.96s         Checking existence of `"tab-manager" Button`
+    t =     3.04s Find the "tab-manager" Button
+    t =     3.11s Find the "tab-manager" Button
+    t =     3.19s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'tab-manager'
+    t =     3.29s Find the "tab-manager" Button
+    t =     3.39s Find the "tab-manager" Button
+    t =     3.49s Click "tab-manager" Button
+    t =     3.49s     Wait for com.forge-conductor.app to idle
+    t =     3.50s     Find the "tab-manager" Button
+    t =     3.58s     Check for interrupting elements affecting "tab-manager" Button
+    t =     3.62s     Synthesize event
+    t =     4.16s     Wait for com.forge-conductor.app to idle
+    t =     4.18s Waiting 8.0s for "settings-allowed-root-add" Button to exist
+    t =     5.18s     Checking `Expect predicate `existsNoRetry == 1` for object "settings-allowed-root-add" Button`
+    t =     5.18s         Checking existence of `"settings-allowed-root-add" Button`
+    t =     5.25s Find the "settings-allowed-root-add" Button
+    t =     5.31s Find the "settings-allowed-root-add" Button
+    t =     5.37s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'settings-allowed-root-add'
+    t =     5.44s Find the "settings-allowed-root-add" Button
+    t =     5.53s Find the "settings-allowed-root-add" Button
+    t =     5.63s Click "settings-allowed-root-add" Button
+    t =     5.63s     Wait for com.forge-conductor.app to idle
+    t =     5.64s     Find the "settings-allowed-root-add" Button
+    t =     5.70s     Check for interrupting elements affecting "settings-allowed-root-add" Button
+    t =     5.72s     Synthesize event
+    t =     6.51s     Wait for com.forge-conductor.app to idle
+    t =     6.52s Waiting 10.0s for "open-panel" Dialog to exist
+    t =     7.55s     Checking `Expect predicate `existsNoRetry == 1` for object "open-panel" Dialog`
+    t =     7.55s         Checking existence of `"open-panel" Dialog`
+    t =     7.68s Checking existence of `"Authorize Folder" Button`
+    t =     7.79s Checking existence of `"Cancel" Button`
+    t =     7.89s Find the Target Application 'com.forge-conductor.app'
+    t =     8.04s Added attachment named 'production-open-panel'
+    t =     8.04s Type 'g' key with modifiers '⌘⇧' (0x12)
+    t =     8.04s     Wait for com.forge-conductor.app to idle
+    t =     8.05s     Find the Target Application 'com.forge-conductor.app'
+    t =     8.10s     Check for interrupting elements affecting "Forge Conductor" Application
+    t =     8.10s     Synthesize event
+    t =     8.21s     Wait for com.forge-conductor.app to idle
+    t =     8.48s Waiting 5.0s for "GoToWindow" Sheet to exist
+    t =     9.50s     Checking `Expect predicate `existsNoRetry == 1` for object "GoToWindow" Sheet`
+    t =     9.50s         Checking existence of `"GoToWindow" Sheet`
+    t =     9.63s Waiting 8.0s for "PathTextField" TextField to exist
+    t =    10.65s     Checking `Expect predicate `existsNoRetry == 1` for object "PathTextField" TextField`
+    t =    10.65s         Checking existence of `"PathTextField" TextField`
+    t =    10.78s Find the "PathTextField" TextField
+    t =    10.89s Find the "PathTextField" TextField
+    t =    11.00s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'PathTextField'
+    t =    11.17s Find the "PathTextField" TextField
+    t =    11.26s Find the "PathTextField" TextField
+    t =    11.35s Click "PathTextField" TextField
+    t =    11.35s     Wait for com.forge-conductor.app to idle
+    t =    11.35s     Find the "PathTextField" TextField
+    t =    11.46s     Check for interrupting elements affecting "PathTextField" TextField
+    t =    11.46s     Synthesize event
+    t =    11.79s     Wait for com.forge-conductor.app to idle
+    t =    11.80s Type 'a' key with modifiers '⌘' (0x10)
+    t =    11.80s     Wait for com.forge-conductor.app to idle
+    t =    11.80s     Find the "PathTextField" TextField
+    t =    11.93s     Check for interrupting elements affecting "PathTextField" TextField
+    t =    11.94s     Synthesize event
+    t =    11.98s     Wait for com.forge-conductor.app to idle
+    t =    11.98s Type '/var/folders/tz/42...' into "PathTextField" TextField
+    t =    11.98s     Wait for com.forge-conductor.app to idle
+    t =    11.98s     Find the "PathTextField" TextField
+    t =    12.10s     Check for interrupting elements affecting "PathTextField" TextField
+    t =    12.12s     Synthesize event
+    t =    15.14s     Wait for com.forge-conductor.app to idle
+    t =    15.15s Find the "PathTextField" TextField
+    t =    15.29s Type '↩' key (XCUIKeyboardKeyReturn) with no modifiers
+    t =    15.29s     Wait for com.forge-conductor.app to idle
+    t =    15.29s     Find the "PathTextField" TextField
+    t =    15.41s     Check for interrupting elements affecting "PathTextField" TextField
+    t =    15.42s     Synthesize event
+    t =    15.80s     Wait for com.forge-conductor.app to idle
+    t =    15.80s Checking existence of `"GoToWindow" Sheet`
+    t =    15.88s Checking existence of `"GoToWindow" Sheet`
+    t =    15.96s Waiting 8.0s for "Authorize Folder" Button to exist
+    t =    16.97s     Checking `Expect predicate `existsNoRetry == 1` for object "Authorize Folder" Button`
+    t =    16.98s         Checking existence of `"Authorize Folder" Button`
+    t =    17.08s Find the "Authorize Folder" Button
+    t =    17.18s Find the "OKButton" Button
+    t =    17.26s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'OKButton'
+    t =    17.38s Find the "OKButton" Button
+    t =    17.46s Find the "OKButton" Button
+    t =    17.54s Click "OKButton" Button
+    t =    17.54s     Wait for com.forge-conductor.app to idle
+    t =    17.54s     Find the "OKButton" Button
+    t =    17.63s     Check for interrupting elements affecting "OKButton" Button
+    t =    17.64s     Synthesize event
+    t =    18.00s     Wait for com.forge-conductor.app to idle
+    t =    18.09s Checking existence of `"open-panel" Dialog`
+    t =    18.56s Waiting 8.0s for "settings-save" Button to exist
+    t =    19.57s     Checking `Expect predicate `existsNoRetry == 1` for object "settings-save" Button`
+    t =    19.57s         Checking existence of `"settings-save" Button`
+    t =    19.66s Find the "settings-save" Button
+    t =    19.74s Find the "settings-save" Button
+    t =    19.82s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'settings-save'
+    t =    19.90s Find the "settings-save" Button
+    t =    21.46s Find the "settings-save" Button
+    t =    23.21s Find the "settings-save" Button
+    t =    23.29s Find the ScrollView (Element at index 0)
+    t =    23.38s Scroll "root-split" ScrollView by dx: 0.00, dy: -360.00
+    t =    23.39s     Wait for com.forge-conductor.app to idle
+    t =    23.39s     Find the "root-split" ScrollView
+    t =    23.47s     Check for interrupting elements affecting "root-split" ScrollView
+    t =    23.49s     Synthesize event
+    t =    23.81s     Wait for com.forge-conductor.app to idle
+    t =    23.82s Find the "settings-save" Button
+    t =    23.91s Find the "settings-save" Button
+    t =    24.01s Find the "settings-save" Button
+    t =    24.11s Find the "settings-save" Button
+    t =    24.22s Find the "settings-save" Button
+    t =    24.31s Find the "settings-save" Button
+    t =    24.39s Find the "settings-save" Button
+    t =    24.48s Find the "settings-save" Button
+    t =    24.57s Find the "settings-save" Button
+    t =    24.68s Find the "settings-save" Button
+    t =    24.78s Find the "settings-save" Button
+    t =    24.87s Find the "settings-save" Button
+    t =    24.97s Click "settings-save" Button
+    t =    24.97s     Wait for com.forge-conductor.app to idle
+    t =    24.97s     Find the "settings-save" Button
+    t =    25.05s     Check for interrupting elements affecting "settings-save" Button
+    t =    25.11s     Synthesize event
+    t =    25.48s     Wait for com.forge-conductor.app to idle
+    t =    25.50s Waiting 8.0s for "tab-rig" Button to exist
+    t =    26.53s     Checking `Expect predicate `existsNoRetry == 1` for object "tab-rig" Button`
+    t =    26.53s         Checking existence of `"tab-rig" Button`
+    t =    26.60s Find the "tab-rig" Button
+    t =    26.69s Find the "tab-rig" Button
+    t =    26.76s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'tab-rig'
+    t =    26.83s Find the "tab-rig" Button
+    t =    26.92s Find the "tab-rig" Button
+    t =    27.02s Click "tab-rig" Button
+    t =    27.02s     Wait for com.forge-conductor.app to idle
+    t =    27.03s     Find the "tab-rig" Button
+    t =    27.12s     Check for interrupting elements affecting "tab-rig" Button
+    t =    27.15s     Synthesize event
+    t =    27.66s     Wait for com.forge-conductor.app to idle
+    t =    27.68s Type ',' key with modifiers '⌘' (0x10)
+    t =    27.68s     Wait for com.forge-conductor.app to idle
+    t =    27.68s     Find the Target Application 'com.forge-conductor.app'
+    t =    27.77s     Check for interrupting elements affecting "Forge Conductor" Application
+    t =    27.77s     Synthesize event
+    t =    28.02s     Wait for com.forge-conductor.app to idle
+    t =    28.04s Waiting 8.0s for "settings-shell-enabled" Any to exist
+    t =    29.07s     Checking `Expect predicate `existsNoRetry == 1` for object "settings-shell-enabled" Any`
+    t =    29.07s         Checking existence of `"settings-shell-enabled" Any`
+    t =    29.35s Find the "settings-shell-enabled" Any
+    t =    29.65s Find the "settings-shell-enabled" Switch
+    t =    29.85s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'settings-shell-enabled'
+    t =    30.01s Find the "settings-shell-enabled" Switch
+    t =    30.56s Find the "settings-shell-enabled" Switch
+    t =    31.11s Find the "settings-shell-enabled" Switch
+    t =    31.38s Find the ScrollView (Element at index 0)
+    t =    31.58s Scroll ScrollView at {{1496.0, 543.0}, {448.0, 328.0}} by dx: 0.00, dy: -360.00
+    t =    31.58s     Wait for com.forge-conductor.app to idle
+    t =    31.59s     Find the ScrollView at {{1496.0, 543.0}, {448.0, 328.0}}
+    t =    31.75s     Check for interrupting elements affecting ScrollView
+    t =    31.82s     Synthesize event
+    t =    32.12s     Wait for com.forge-conductor.app to idle
+    t =    32.15s Find the "settings-shell-enabled" Switch
+    t =    32.50s Find the "settings-shell-enabled" Switch
+    t =    32.74s Find the ScrollView at {{1496.0, 543.0}, {448.0, 328.0}}
+    t =    32.91s Scroll ScrollView at {{1496.0, 543.0}, {448.0, 328.0}} by dx: 0.00, dy: -360.00
+    t =    32.91s     Wait for com.forge-conductor.app to idle
+    t =    32.92s     Find the ScrollView at {{1496.0, 543.0}, {448.0, 328.0}}
+    t =    33.08s     Check for interrupting elements affecting ScrollView
+    t =    33.15s     Synthesize event
+    t =    33.54s     Wait for com.forge-conductor.app to idle
+    t =    33.57s Find the "settings-shell-enabled" Switch
+    t =    34.16s Find the "settings-shell-enabled" Switch
+    t =    34.45s Find the ScrollView at {{1496.0, 543.0}, {448.0, 328.0}}
+    t =    34.62s Scroll ScrollView at {{1496.0, 543.0}, {448.0, 328.0}} by dx: 0.00, dy: -336.00
+    t =    34.62s     Wait for com.forge-conductor.app to idle
+    t =    34.64s     Find the ScrollView at {{1496.0, 543.0}, {448.0, 328.0}}
+    t =    34.80s     Check for interrupting elements affecting ScrollView
+    t =    34.92s     Synthesize event
+    t =    35.25s     Wait for com.forge-conductor.app to idle
+    t =    35.28s Find the "settings-shell-enabled" Switch
+    t =    35.64s Find the "settings-shell-enabled" Switch
+    t =    35.97s Find the "settings-shell-enabled" Switch
+    t =    36.30s Find the "settings-shell-enabled" Switch
+    t =    36.58s Find the "settings-shell-enabled" Switch
+    t =    36.78s Find the "settings-shell-enabled" Switch
+    t =    37.06s Find the "settings-shell-enabled" Switch
+    t =    37.36s Find the "settings-shell-enabled" Switch
+    t =    37.71s Find the "settings-shell-enabled" Switch
+    t =    38.02s Find the "settings-shell-enabled" Switch
+    t =    38.37s Find the "settings-shell-enabled" Switch
+    t =    38.62s Waiting 8.0s for "settings-shell-enabled" Switch to exist
+    t =    39.64s     Checking `Expect predicate `existsNoRetry == 1` for object "settings-shell-enabled" Switch`
+    t =    39.65s         Checking existence of `"settings-shell-enabled" Switch`
+    t =    39.93s Find the "settings-shell-enabled" Switch
+    t =    40.20s Find the "settings-shell-enabled" Switch
+    t =    40.41s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'settings-shell-enabled'
+    t =    40.57s Find the "settings-shell-enabled" Switch
+    t =    40.92s Find the "settings-shell-enabled" Switch
+    t =    41.25s Click "settings-shell-enabled" Switch
+    t =    41.25s     Wait for com.forge-conductor.app to idle
+    t =    41.25s     Find the "settings-shell-enabled" Switch
+    t =    41.54s     Check for interrupting elements affecting "settings-shell-enabled" Switch
+    t =    41.64s     Synthesize event
+    t =    42.01s     Wait for com.forge-conductor.app to idle
+    t =    42.04s Waiting 8.0s for "settings-save" Button to exist
+    t =    43.06s     Checking `Expect predicate `existsNoRetry == 1` for object "settings-save" Button`
+    t =    43.06s         Checking existence of `"settings-save" Button`
+    t =    43.23s Find the "settings-save" Button
+    t =    43.40s Find the "settings-save" Button
+    t =    43.57s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'settings-save'
+    t =    43.74s Find the "settings-save" Button
+    t =    43.95s Find the "settings-save" Button
+    t =    44.23s Click "settings-save" Button
+    t =    44.23s     Wait for com.forge-conductor.app to idle
+    t =    44.25s     Find the "settings-save" Button
+    t =    44.42s     Check for interrupting elements affecting "settings-save" Button
+    t =    44.51s     Synthesize event
+    t =    44.88s     Wait for com.forge-conductor.app to idle
+    t =    44.91s Added attachment named 'native-settings-shell-disabled'
+    t =    44.91s Terminate com.forge-conductor.app:42696
+    t =    46.24s Added attachment named 'fresh-mcp-shell-disabled'
+    t =    46.24s Added attachment named 'fresh-mcp-shell-disabled-wire-transcript'
+    t =    46.24s Open com.forge-conductor.app
+    t =    46.24s     Launch com.forge-conductor.app
+    t =    46.46s         Wait for accessibility to load
+    t =    46.85s         Setting up automation session
+    t =    46.86s         Wait for com.forge-conductor.app to idle
+    t =    46.88s Waiting 15.0s for "tab-manager" Button to exist
+    t =    47.89s     Checking `Expect predicate `existsNoRetry == 1` for object "tab-manager" Button`
+    t =    47.89s         Checking existence of `"tab-manager" Button`
+    t =    48.00s Added attachment named 'ordinary-bootstrap-before-status'
+    t =    48.01s Requesting snapshot of accessibility hierarchy for app with pid 43166
+    t =    48.13s Requesting snapshot of accessibility hierarchy for app with pid 43166
+    t =    48.23s Added attachment named 'ordinary-bootstrap-before-status-native-controls'
+    t =    48.23s Added attachment named 'ordinary-bootstrap-manager'
+    t =    48.23s Type ',' key with modifiers '⌘' (0x10)
+    t =    48.23s     Wait for com.forge-conductor.app to idle
+    t =    48.29s     Find the Target Application 'com.forge-conductor.app'
+    t =    48.36s     Check for interrupting elements affecting "Forge Conductor" Application
+    t =    48.36s     Synthesize event
+    t =    48.63s     Wait for com.forge-conductor.app to idle
+    t =    48.66s Waiting 8.0s for "settings-shell-enabled" Any to exist
+    t =    49.67s     Checking `Expect predicate `existsNoRetry == 1` for object "settings-shell-enabled" Any`
+    t =    49.67s         Checking existence of `"settings-shell-enabled" Any`
+    t =    50.03s Find the "settings-shell-enabled" Any
+    t =    50.29s Find the "settings-shell-enabled" Switch
+    t =    50.57s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'settings-shell-enabled'
+    t =    50.73s Find the "settings-shell-enabled" Switch
+    t =    51.35s Find the "settings-shell-enabled" Switch
+    t =    51.87s Find the "settings-shell-enabled" Switch
+    t =    52.17s Find the ScrollView (Element at index 0)
+    t =    52.35s Scroll ScrollView at {{1496.0, 543.0}, {448.0, 328.0}} by dx: 0.00, dy: -360.00
+    t =    52.35s     Wait for com.forge-conductor.app to idle
+    t =    52.36s     Find the ScrollView at {{1496.0, 543.0}, {448.0, 328.0}}
+    t =    52.53s     Check for interrupting elements affecting ScrollView
+    t =    52.60s     Synthesize event
+    t =    52.98s     Wait for com.forge-conductor.app to idle
+    t =    52.99s Find the "settings-shell-enabled" Switch
+    t =    53.83s Find the "settings-shell-enabled" Switch
+    t =    54.10s Find the ScrollView at {{1496.0, 543.0}, {448.0, 328.0}}
+    t =    54.27s Scroll ScrollView at {{1496.0, 543.0}, {448.0, 328.0}} by dx: 0.00, dy: -360.00
+    t =    54.27s     Wait for com.forge-conductor.app to idle
+    t =    54.50s     Find the ScrollView at {{1496.0, 543.0}, {448.0, 328.0}}
+    t =    54.66s     Check for interrupting elements affecting ScrollView
+    t =    54.85s     Synthesize event
+    t =    55.19s     Wait for com.forge-conductor.app to idle
+    t =    55.19s Find the "settings-shell-enabled" Switch
+    t =    57.14s Find the "settings-shell-enabled" Switch
+    t =    57.47s Find the ScrollView at {{1496.0, 543.0}, {448.0, 328.0}}
+    t =    57.65s Scroll ScrollView at {{1496.0, 543.0}, {448.0, 328.0}} by dx: 0.00, dy: -262.00
+    t =    57.65s     Wait for com.forge-conductor.app to idle
+    t =    57.68s     Find the ScrollView at {{1496.0, 543.0}, {448.0, 328.0}}
+    t =    57.84s     Check for interrupting elements affecting ScrollView
+    t =    57.89s     Synthesize event
+    t =    58.17s     Wait for com.forge-conductor.app to idle
+    t =    58.19s Find the "settings-shell-enabled" Switch
+    t =    58.49s Find the "settings-shell-enabled" Switch
+    t =    58.86s Find the "settings-shell-enabled" Switch
+    t =    59.12s Find the "settings-shell-enabled" Switch
+    t =    59.45s Find the "settings-shell-enabled" Switch
+    t =    59.71s Find the "settings-shell-enabled" Switch
+    t =    60.01s Find the "settings-shell-enabled" Switch
+    t =    60.38s Find the "settings-shell-enabled" Switch
+    t =    60.67s Find the "settings-shell-enabled" Switch
+    t =    60.96s Find the "settings-shell-enabled" Switch
+    t =    61.28s Find the "settings-shell-enabled" Switch
+    t =    61.65s Waiting 8.0s for "settings-shell-enabled" Switch to exist
+    t =    62.66s     Checking `Expect predicate `existsNoRetry == 1` for object "settings-shell-enabled" Switch`
+    t =    62.66s         Checking existence of `"settings-shell-enabled" Switch`
+    t =    62.95s Find the "settings-shell-enabled" Switch
+    t =    63.31s Find the "settings-shell-enabled" Switch
+    t =    63.52s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'settings-shell-enabled'
+    t =    63.68s Find the "settings-shell-enabled" Switch
+    t =    63.94s Find the "settings-shell-enabled" Switch
+    t =    64.15s Click "settings-shell-enabled" Switch
+    t =    64.16s     Wait for com.forge-conductor.app to idle
+    t =    64.16s     Find the "settings-shell-enabled" Switch
+    t =    64.45s     Check for interrupting elements affecting "settings-shell-enabled" Switch
+    t =    64.47s     Synthesize event
+    t =    64.83s     Wait for com.forge-conductor.app to idle
+    t =    64.85s Waiting 8.0s for "settings-save" Button to exist
+    t =    65.86s     Checking `Expect predicate `existsNoRetry == 1` for object "settings-save" Button`
+    t =    65.86s         Checking existence of `"settings-save" Button`
+    t =    66.02s Find the "settings-save" Button
+    t =    66.20s Find the "settings-save" Button
+    t =    66.38s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'settings-save'
+    t =    66.55s Find the "settings-save" Button
+    t =    66.80s Find the "settings-save" Button
+    t =    67.01s Click "settings-save" Button
+    t =    67.01s     Wait for com.forge-conductor.app to idle
+    t =    67.03s     Find the "settings-save" Button
+    t =    67.20s     Check for interrupting elements affecting "settings-save" Button
+    t =    67.40s     Synthesize event
+    t =    67.77s     Wait for com.forge-conductor.app to idle
+    t =    67.82s Added attachment named 'native-settings-shell-reenabled'
+    t =    67.82s Terminate com.forge-conductor.app:43166
+    t =    69.56s Added attachment named 'fresh-mcp-shell-reenabled'
+    t =    69.56s Added attachment named 'fresh-mcp-shell-reenabled-wire-transcript'
+    t =    69.56s Tear Down
+    t =    69.56s     Added attachment named 'onboarding-final-diagnostics'
+Test Case '-[ForgeConductorUITests.ProductionOnboardingUITests testNativeSettingsShellOptOutAndReenablePersistIntoFreshMCPProcesses]' passed (70.041 seconds).
+Test Case '-[ForgeConductorUITests.ProductionOnboardingUITests testRealProviderModelDiscoveryAndConnectionFromSavedNativeConfiguration]' started.
+    t =     0.00s Start Test at 2026-09-04 20:29:25.766
+    t =     0.12s Set Up
+    t =     0.12s Open com.forge-conductor.app
+    t =     0.12s     Launch com.forge-conductor.app
+    t =     0.33s         Wait for accessibility to load
+    t =     0.79s         Setting up automation session
+    t =     0.79s         Wait for com.forge-conductor.app to idle
+    t =     0.81s Waiting 15.0s for "tab-manager" Button to exist
+    t =     1.83s     Checking `Expect predicate `existsNoRetry == 1` for object "tab-manager" Button`
+    t =     1.83s         Checking existence of `"tab-manager" Button`
+    t =     1.95s Added attachment named 'ordinary-bootstrap-before-status'
+    t =     1.95s Requesting snapshot of accessibility hierarchy for app with pid 43558
+    t =     2.04s Requesting snapshot of accessibility hierarchy for app with pid 43558
+    t =     2.13s Added attachment named 'ordinary-bootstrap-before-status-native-controls'
+    t =     2.13s Added attachment named 'ordinary-bootstrap-manager'
+    t =     2.13s Waiting 8.0s for "tab-provider" Button to exist
+    t =     3.15s     Checking `Expect predicate `existsNoRetry == 1` for object "tab-provider" Button`
+    t =     3.15s         Checking existence of `"tab-provider" Button`
+    t =     3.24s Find the "tab-provider" Button
+    t =     3.33s Find the "tab-provider" Button
+    t =     3.41s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'tab-provider'
+    t =     3.48s Find the "tab-provider" Button
+    t =     3.58s Find the "tab-provider" Button
+    t =     3.70s Click "tab-provider" Button
+    t =     3.70s     Wait for com.forge-conductor.app to idle
+    t =     3.71s     Find the "tab-provider" Button
+    t =     3.77s     Check for interrupting elements affecting "tab-provider" Button
+    t =     3.81s     Synthesize event
+    t =     4.24s     Wait for com.forge-conductor.app to idle
+    t =     4.25s Waiting 10.0s for "provider-endpoint" TextField to exist
+    t =     5.26s     Checking `Expect predicate `existsNoRetry == 1` for object "provider-endpoint" TextField`
+    t =     5.26s         Checking existence of `"provider-endpoint" TextField`
+    t =     5.31s Find the "provider-save" Button
+    t =     5.37s Waiting 8.0s for "provider-endpoint" TextField to exist
+    t =     6.38s     Checking `Expect predicate `existsNoRetry == 1` for object "provider-endpoint" TextField`
+    t =     6.38s         Checking existence of `"provider-endpoint" TextField`
+    t =     6.42s Find the "provider-endpoint" TextField
+    t =     6.46s Find the "provider-endpoint" TextField
+    t =     6.50s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'provider-endpoint'
+    t =     6.65s Find the "provider-endpoint" TextField
+    t =     6.70s Find the "provider-endpoint" TextField
+    t =     6.75s Click "provider-endpoint" TextField
+    t =     6.75s     Wait for com.forge-conductor.app to idle
+    t =     6.76s     Find the "provider-endpoint" TextField
+    t =     6.80s     Check for interrupting elements affecting "provider-endpoint" TextField
+    t =     6.81s     Synthesize event
+    t =     7.21s     Wait for com.forge-conductor.app to idle
+    t =     7.22s Type 'a' key with modifiers '⌘' (0x10)
+    t =     7.22s     Wait for com.forge-conductor.app to idle
+    t =     7.22s     Find the "provider-endpoint" TextField
+    t =     7.26s     Check for interrupting elements affecting "provider-endpoint" TextField
+    t =     7.29s     Synthesize event
+    t =     7.35s     Wait for com.forge-conductor.app to idle
+    t =     7.36s Type 'http://127.0.0.1:1...' into "provider-endpoint" TextField
+    t =     7.36s     Wait for com.forge-conductor.app to idle
+    t =     7.36s     Find the "provider-endpoint" TextField
+    t =     7.43s     Check for interrupting elements affecting "provider-endpoint" TextField
+    t =     7.45s     Synthesize event
+    t =     8.14s     Wait for com.forge-conductor.app to idle
+    t =     8.15s Find the "provider-endpoint" TextField
+    t =     8.19s Waiting 8.0s for "provider-model-key" TextField to exist
+    t =     9.21s     Checking `Expect predicate `existsNoRetry == 1` for object "provider-model-key" TextField`
+    t =     9.21s         Checking existence of `"provider-model-key" TextField`
+    t =     9.26s Find the "provider-model-key" TextField
+    t =     9.30s Find the "provider-model-key" TextField
+    t =     9.34s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'provider-model-key'
+    t =     9.40s Find the "provider-model-key" TextField
+    t =     9.45s Find the "provider-model-key" TextField
+    t =     9.51s Click "provider-model-key" TextField
+    t =     9.51s     Wait for com.forge-conductor.app to idle
+    t =     9.51s     Find the "provider-model-key" TextField
+    t =     9.55s     Check for interrupting elements affecting "provider-model-key" TextField
+    t =     9.57s     Synthesize event
+    t =     9.92s     Wait for com.forge-conductor.app to idle
+    t =     9.93s Type 'a' key with modifiers '⌘' (0x10)
+    t =     9.93s     Wait for com.forge-conductor.app to idle
+    t =     9.94s     Find the "provider-model-key" TextField
+    t =     9.98s     Check for interrupting elements affecting "provider-model-key" TextField
+    t =    10.01s     Synthesize event
+    t =    10.06s     Wait for com.forge-conductor.app to idle
+    t =    10.07s Type 'qwen/qwen3.8-27b' into "provider-model-key" TextField
+    t =    10.07s     Wait for com.forge-conductor.app to idle
+    t =    10.07s     Find the "provider-model-key" TextField
+    t =    10.12s     Check for interrupting elements affecting "provider-model-key" TextField
+    t =    10.13s     Synthesize event
+    t =    10.63s     Wait for com.forge-conductor.app to idle
+    t =    10.64s Find the "provider-model-key" TextField
+    t =    10.68s Waiting 8.0s for "provider-save" Button to exist
+    t =    11.68s     Checking `Expect predicate `existsNoRetry == 1` for object "provider-save" Button`
+    t =    11.68s         Checking existence of `"provider-save" Button`
+    t =    11.73s Find the "provider-save" Button
+    t =    11.79s Find the "provider-save" Button
+    t =    11.83s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'provider-save'
+    t =    11.89s Find the "provider-save" Button
+    t =    11.94s Find the "provider-save" Button
+    t =    12.00s Click "provider-save" Button
+    t =    12.00s     Wait for com.forge-conductor.app to idle
+    t =    12.01s     Find the "provider-save" Button
+    t =    12.05s     Check for interrupting elements affecting "provider-save" Button
+    t =    12.06s     Synthesize event
+    t =    12.44s     Wait for com.forge-conductor.app to idle
+    t =    12.44s Checking existence of `"provider-probe-notice" Any`
+    t =    12.50s Find the "provider-probe-notice" Any
+    t =    12.55s Find the "provider-probe-notice" StaticText
+    t =    12.61s Added attachment named 'provider-native-save-readback'
+    t =    12.61s Waiting 8.0s for "provider-refresh-models" Button to exist
+    t =    13.61s     Checking `Expect predicate `existsNoRetry == 1` for object "provider-refresh-models" Button`
+    t =    13.61s         Checking existence of `"provider-refresh-models" Button`
+    t =    13.65s Find the "provider-refresh-models" Button
+    t =    13.69s Find the "provider-refresh-models" Button
+    t =    13.73s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'provider-refresh-models'
+    t =    13.87s Find the "provider-refresh-models" Button
+    t =    13.92s Find the "provider-refresh-models" Button
+    t =    13.96s Click "provider-refresh-models" Button
+    t =    13.97s     Wait for com.forge-conductor.app to idle
+    t =    13.97s     Find the "provider-refresh-models" Button
+    t =    14.00s     Check for interrupting elements affecting "provider-refresh-models" Button
+    t =    14.02s     Synthesize event
+    t =    14.37s     Wait for com.forge-conductor.app to idle
+    t =    14.37s Find the "provider-refresh-models" Button
+    t =    14.43s Checking existence of `"operator-unavailable" Any`
+    t =    14.47s Checking existence of `"provider-model-selection" Any`
+    t =    14.52s Added attachment named 'real-provider-model-discovery'
+    t =    14.52s Waiting 8.0s for "provider-test-connection" Button to exist
+    t =    15.53s     Checking `Expect predicate `existsNoRetry == 1` for object "provider-test-connection" Button`
+    t =    15.53s         Checking existence of `"provider-test-connection" Button`
+    t =    15.57s Find the "provider-test-connection" Button
+    t =    15.61s Find the "provider-test-connection" Button
+    t =    15.65s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'provider-test-connection'
+    t =    15.69s Find the "provider-test-connection" Button
+    t =    15.74s Find the "provider-test-connection" Button
+    t =    15.89s Click "provider-test-connection" Button
+    t =    15.89s     Wait for com.forge-conductor.app to idle
+    t =    15.90s     Find the "provider-test-connection" Button
+    t =    15.93s     Check for interrupting elements affecting "provider-test-connection" Button
+    t =    15.95s     Synthesize event
+    t =    16.30s     Wait for com.forge-conductor.app to idle
+    t =    16.31s Checking existence of `"provider-probe-notice" Any`
+    t =    16.40s Checking existence of `"provider-probe-notice" Any`
+    t =    16.60s Checking existence of `"provider-probe-notice" Any`
+    t =    16.90s Checking existence of `"provider-probe-notice" Any`
+    t =    17.00s Checking existence of `"provider-probe-notice" Any`
+    t =    17.09s Checking existence of `"provider-probe-notice" Any`
+    t =    17.19s Checking existence of `"provider-probe-notice" Any`
+    t =    17.28s Checking existence of `"provider-probe-notice" Any`
+    t =    17.37s Checking existence of `"provider-probe-notice" Any`
+    t =    17.47s Checking existence of `"provider-probe-notice" Any`
+    t =    17.56s Checking existence of `"provider-probe-notice" Any`
+    t =    17.66s Checking existence of `"provider-probe-notice" Any`
+    t =    17.76s Checking existence of `"provider-probe-notice" Any`
+    t =    17.86s Checking existence of `"provider-probe-notice" Any`
+    t =    17.97s Checking existence of `"provider-probe-notice" Any`
+    t =    18.06s Checking existence of `"provider-probe-notice" Any`
+    t =    18.17s Checking existence of `"provider-probe-notice" Any`
+    t =    18.27s Checking existence of `"provider-probe-notice" Any`
+    t =    18.37s Checking existence of `"provider-probe-notice" Any`
+    t =    18.46s Checking existence of `"provider-probe-notice" Any`
+    t =    18.56s Checking existence of `"provider-probe-notice" Any`
+    t =    18.66s Checking existence of `"provider-probe-notice" Any`
+    t =    18.77s Checking existence of `"provider-probe-notice" Any`
+    t =    18.86s Checking existence of `"provider-probe-notice" Any`
+    t =    18.96s Checking existence of `"provider-probe-notice" Any`
+    t =    19.06s Checking existence of `"provider-probe-notice" Any`
+    t =    19.16s Checking existence of `"provider-probe-notice" Any`
+    t =    19.26s Checking existence of `"provider-probe-notice" Any`
+    t =    19.35s Checking existence of `"provider-probe-notice" Any`
+    t =    19.45s Checking existence of `"provider-probe-notice" Any`
+    t =    19.55s Checking existence of `"provider-probe-notice" Any`
+    t =    19.65s Checking existence of `"provider-probe-notice" Any`
+    t =    19.75s Checking existence of `"provider-probe-notice" Any`
+    t =    19.96s Checking existence of `"provider-probe-notice" Any`
+    t =    20.05s Checking existence of `"provider-probe-notice" Any`
+    t =    20.15s Checking existence of `"provider-probe-notice" Any`
+    t =    20.25s Checking existence of `"provider-probe-notice" Any`
+    t =    20.34s Checking existence of `"provider-probe-notice" Any`
+    t =    20.44s Checking existence of `"provider-probe-notice" Any`
+    t =    20.54s Checking existence of `"provider-probe-notice" Any`
+    t =    20.65s Checking existence of `"provider-probe-notice" Any`
+    t =    20.75s Checking existence of `"provider-probe-notice" Any`
+    t =    20.84s Checking existence of `"provider-probe-notice" Any`
+    t =    20.94s Checking existence of `"provider-probe-notice" Any`
+    t =    21.03s Checking existence of `"provider-probe-notice" Any`
+    t =    21.13s Checking existence of `"provider-probe-notice" Any`
+    t =    21.24s Checking existence of `"provider-probe-notice" Any`
+    t =    21.34s Checking existence of `"provider-probe-notice" Any`
+    t =    21.43s Checking existence of `"provider-probe-notice" Any`
+    t =    21.53s Checking existence of `"provider-probe-notice" Any`
+    t =    21.63s Checking existence of `"provider-probe-notice" Any`
+    t =    21.83s Checking existence of `"provider-probe-notice" Any`
+    t =    21.93s Checking existence of `"provider-probe-notice" Any`
+    t =    22.03s Checking existence of `"provider-probe-notice" Any`
+    t =    22.13s Checking existence of `"provider-probe-notice" Any`
+    t =    22.23s Checking existence of `"provider-probe-notice" Any`
+    t =    22.33s Checking existence of `"provider-probe-notice" Any`
+    t =    22.42s Checking existence of `"provider-probe-notice" Any`
+    t =    22.52s Checking existence of `"provider-probe-notice" Any`
+    t =    22.63s Checking existence of `"provider-probe-notice" Any`
+    t =    22.72s Checking existence of `"provider-probe-notice" Any`
+    t =    22.82s Checking existence of `"provider-probe-notice" Any`
+    t =    22.92s Checking existence of `"provider-probe-notice" Any`
+    t =    23.04s Checking existence of `"provider-probe-notice" Any`
+    t =    23.21s Find the "provider-probe-notice" Any
+    t =    23.27s Find the "provider-probe-notice" StaticText
+    t =    23.33s Checking existence of `"operator-unavailable" Any`
+    t =    23.38s Added attachment named 'real-provider-manager-probe-readback'
+    t =    23.38s Find the Target Application 'com.forge-conductor.app'
+    t =    23.50s Added attachment named 'real-provider-native-connection'
+    t =    23.50s Terminate com.forge-conductor.app:43558
+    t =    24.54s Open com.forge-conductor.app
+    t =    24.54s     Launch com.forge-conductor.app
+    t =    24.76s         Wait for accessibility to load
+    t =    25.12s         Setting up automation session
+    t =    25.13s         Wait for com.forge-conductor.app to idle
+    t =    25.16s Waiting 15.0s for "tab-manager" Button to exist
+    t =    26.16s     Checking `Expect predicate `existsNoRetry == 1` for object "tab-manager" Button`
+    t =    26.16s         Checking existence of `"tab-manager" Button`
+    t =    26.28s Added attachment named 'ordinary-bootstrap-before-status'
+    t =    26.28s Requesting snapshot of accessibility hierarchy for app with pid 43975
+    t =    26.41s Requesting snapshot of accessibility hierarchy for app with pid 43975
+    t =    26.51s Added attachment named 'ordinary-bootstrap-before-status-native-controls'
+    t =    26.51s Added attachment named 'ordinary-bootstrap-manager'
+    t =    26.52s Waiting 8.0s for "tab-provider" Button to exist
+    t =    27.52s     Checking `Expect predicate `existsNoRetry == 1` for object "tab-provider" Button`
+    t =    27.52s         Checking existence of `"tab-provider" Button`
+    t =    27.62s Find the "tab-provider" Button
+    t =    27.72s Find the "tab-provider" Button
+    t =    27.81s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'tab-provider'
+    t =    27.90s Find the "tab-provider" Button
+    t =    28.02s Find the "tab-provider" Button
+    t =    28.13s Click "tab-provider" Button
+    t =    28.13s     Wait for com.forge-conductor.app to idle
+    t =    28.14s     Find the "tab-provider" Button
+    t =    28.22s     Check for interrupting elements affecting "tab-provider" Button
+    t =    28.23s     Synthesize event
+    t =    28.69s     Wait for com.forge-conductor.app to idle
+    t =    28.70s Waiting 10.0s for "provider-endpoint" TextField to exist
+    t =    29.71s     Checking `Expect predicate `existsNoRetry == 1` for object "provider-endpoint" TextField`
+    t =    29.71s         Checking existence of `"provider-endpoint" TextField`
+    t =    29.76s Find the "provider-save" Button
+    t =    29.81s Find the "provider-model-key" TextField
+    t =    29.86s Waiting 8.0s for "provider-test-connection" Button to exist
+    t =    30.87s     Checking `Expect predicate `existsNoRetry == 1` for object "provider-test-connection" Button`
+    t =    30.87s         Checking existence of `"provider-test-connection" Button`
+    t =    30.92s Find the "provider-test-connection" Button
+    t =    31.07s Find the "provider-test-connection" Button
+    t =    31.12s Get all elements bound by index for: Elements containing elements matching type Any with identifier 'provider-test-connection'
+    t =    31.17s Find the "provider-test-connection" Button
+    t =    31.23s Find the "provider-test-connection" Button
+    t =    31.29s Click "provider-test-connection" Button
+    t =    31.29s     Wait for com.forge-conductor.app to idle
+    t =    31.29s     Find the "provider-test-connection" Button
+    t =    31.34s     Check for interrupting elements affecting "provider-test-connection" Button
+    t =    31.35s     Synthesize event
+    t =    31.73s     Wait for com.forge-conductor.app to idle
+    t =    31.74s Checking existence of `"provider-probe-notice" Any`
+    t =    31.85s Checking existence of `"provider-probe-notice" Any`
+    t =    31.95s Checking existence of `"provider-probe-notice" Any`
+    t =    32.06s Checking existence of `"provider-probe-notice" Any`
+    t =    32.17s Checking existence of `"provider-probe-notice" Any`
+    t =    32.27s Checking existence of `"provider-probe-notice" Any`
+    t =    32.38s Checking existence of `"provider-probe-notice" Any`
+    t =    32.49s Checking existence of `"provider-probe-notice" Any`
+    t =    32.59s Checking existence of `"provider-probe-notice" Any`
+    t =    32.69s Checking existence of `"provider-probe-notice" Any`
+    t =    32.90s Checking existence of `"provider-probe-notice" Any`
+    t =    33.01s Checking existence of `"provider-probe-notice" Any`
+    t =    33.12s Checking existence of `"provider-probe-notice" Any`
+    t =    33.23s Checking existence of `"provider-probe-notice" Any`
+    t =    33.35s Checking existence of `"provider-probe-notice" Any`
+    t =    33.46s Checking existence of `"provider-probe-notice" Any`
+    t =    33.57s Checking existence of `"provider-probe-notice" Any`
+    t =    33.68s Checking existence of `"provider-probe-notice" Any`
+    t =    33.80s Checking existence of `"provider-probe-notice" Any`
+    t =    34.02s Checking existence of `"provider-probe-notice" Any`
+    t =    34.14s Checking existence of `"provider-probe-notice" Any`
+    t =    34.25s Checking existence of `"provider-probe-notice" Any`
+    t =    34.35s Checking existence of `"provider-probe-notice" Any`
+    t =    34.46s Checking existence of `"provider-probe-notice" Any`
+    t =    34.56s Checking existence of `"provider-probe-notice" Any`
+    t =    34.66s Checking existence of `"provider-probe-notice" Any`
+    t =    34.77s Checking existence of `"provider-probe-notice" Any`
+    t =    34.88s Checking existence of `"provider-probe-notice" Any`
+    t =    35.00s Checking existence of `"provider-probe-notice" Any`
+    t =    35.11s Checking existence of `"provider-probe-notice" Any`
+    t =    35.23s Checking existence of `"provider-probe-notice" Any`
+    t =    35.34s Checking existence of `"provider-probe-notice" Any`
+    t =    35.46s Checking existence of `"provider-probe-notice" Any`
+    t =    35.57s Checking existence of `"provider-probe-notice" Any`
+    t =    35.67s Checking existence of `"provider-probe-notice" Any`
+    t =    35.79s Checking existence of `"provider-probe-notice" Any`
+    t =    35.90s Checking existence of `"provider-probe-notice" Any`
+    t =    36.02s Checking existence of `"provider-probe-notice" Any`
+    t =    36.11s Checking existence of `"provider-probe-notice" Any`
+    t =    36.23s Checking existence of `"provider-probe-notice" Any`
+    t =    36.33s Checking existence of `"provider-probe-notice" Any`
+    t =    36.44s Checking existence of `"provider-probe-notice" Any`
+    t =    36.54s Checking existence of `"provider-probe-notice" Any`
+    t =    36.66s Checking existence of `"provider-probe-notice" Any`
+    t =    36.88s Checking existence of `"provider-probe-notice" Any`
+    t =    36.98s Checking existence of `"provider-probe-notice" Any`
+    t =    37.10s Checking existence of `"provider-probe-notice" Any`
+    t =    37.21s Checking existence of `"provider-probe-notice" Any`
+    t =    37.32s Checking existence of `"provider-probe-notice" Any`
+    t =    37.43s Checking existence of `"provider-probe-notice" Any`
+    t =    37.53s Checking existence of `"provider-probe-notice" Any`
+    t =    37.63s Checking existence of `"provider-probe-notice" Any`
+    t =    37.73s Checking existence of `"provider-probe-notice" Any`
+    t =    37.84s Checking existence of `"provider-probe-notice" Any`
+    t =    38.06s Checking existence of `"provider-probe-notice" Any`
+    t =    38.17s Checking existence of `"provider-probe-notice" Any`
+    t =    38.28s Checking existence of `"provider-probe-notice" Any`
+    t =    38.39s Checking existence of `"provider-probe-notice" Any`
+    t =    38.51s Checking existence of `"provider-probe-notice" Any`
+    t =    38.62s Checking existence of `"provider-probe-notice" Any`
+    t =    38.74s Checking existence of `"provider-probe-notice" Any`
+    t =    38.85s Checking existence of `"provider-probe-notice" Any`
+    t =    38.96s Checking existence of `"provider-probe-notice" Any`
+    t =    39.06s Checking existence of `"provider-probe-notice" Any`
+    t =    39.16s Checking existence of `"provider-probe-notice" Any`
+    t =    39.26s Checking existence of `"provider-probe-notice" Any`
+    t =    39.36s Checking existence of `"provider-probe-notice" Any`
+    t =    39.41s Find the "provider-probe-notice" Any
+    t =    39.46s Find the "provider-probe-notice" StaticText
+    t =    39.51s Checking existence of `"operator-unavailable" Any`
+    t =    39.56s Added attachment named 'real-provider-manager-probe-readback'
+    t =    39.57s Added attachment named 'real-provider-configuration-after-relaunch'
+    t =    39.57s Tear Down
+    t =    39.57s     Added attachment named 'onboarding-final-diagnostics'
+    t =    39.57s     Requesting snapshot of accessibility hierarchy for app with pid 43975
+    t =    39.63s     Requesting snapshot of accessibility hierarchy for app with pid 43975
+    t =    39.70s     Added attachment named 'onboarding-final-diagnostics-native-controls'
+    t =    39.70s     Find the Target Application 'com.forge-conductor.app'
+    t =    39.81s     Added attachment named 'onboarding-final-state'
+    t =    39.81s     Terminate com.forge-conductor.app:43975
+Test Case '-[ForgeConductorUITests.ProductionOnboardingUITests testRealProviderModelDiscoveryAndConnectionFromSavedNativeConfiguration]' passed (41.416 seconds).
+Test Suite 'ProductionOnboardingUITests' passed at 2026-09-04 20:30:07.182.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 247.385 (247.388) seconds
+Test Suite 'ForgeConductorUITests.xctest' passed at 2026-09-04 20:30:07.182.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 247.385 (247.389) seconds
+Test Suite 'Selected tests' passed at 2026-09-04 20:30:07.183.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 247.385 (247.390) seconds
+
+Test session results, code coverage, and logs:
+	/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Final-Candidate-Production-Onboarding.xcresult
+
+** TEST SUCCEEDED **
+
+Testing started

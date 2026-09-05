@@ -26,6 +26,8 @@
       "evidence": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/P08-mcp-process-conformance.json#e18ee8d25baf6b3d38169e72d64046b78fe04ec150bc10bc6aba042786b20015; /Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/evidence/EVID-20260823T204247Z-4561e060f3.json#6b40dc22f5e9ba3787794353232a1ad664509ebb520dcb5cc007be0600c91844"
     }
   ],
-  "valid": true,
-  "errors": []
+  "valid": false,
+  "errors": [
+    "acceptance record is historical evidence for unknown, not current release authority"
+  ]
 }

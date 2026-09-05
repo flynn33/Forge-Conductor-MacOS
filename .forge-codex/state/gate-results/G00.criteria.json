@@ -6,11 +6,11 @@
       "evidence": [
         {
           "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.doctor.log",
-          "sha256": "17ab5d981c69d3eca540aa2fdd741cf1cb97f28fa359f716ee258afe33cad9cf"
+          "sha256": "e32dfa367c334f61f948dc0cc425ef3443ef502f67f03fe33befbc4daf33d5cc"
         },
         {
           "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/environment.json",
-          "sha256": "9d64ff74926765bfa29122f227badd953a4f67f34d174d0f72e28010f1d551e0"
+          "sha256": "42a86ee85cc4f905d92e947d0558e7f406e1f8ece9f3d09e53851c388f519cbd"
         }
       ]
     },
@@ -20,7 +20,7 @@
       "evidence": [
         {
           "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/run-state.json",
-          "sha256": "73003a76bddd47b2d399ac46f1f3a91433de2cbeaa18c07ffde1ced87006c079"
+          "sha256": "7e3b88fed35c22e444dd69d9180fb25b0af1e8ad57da9547b496fe100cda5726"
         }
       ]
     },
@@ -30,11 +30,11 @@
       "evidence": [
         {
           "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.package.log",
-          "sha256": "2ec3a0ee8a09c6f1ad67edd95cf5daa0e6ec1b21f4abc026fb3cd157d013dbbb"
+          "sha256": "df518c6ba99e59e4893039e08ad5b9f03ff5dfe74abd32365a46a6c0768f18df"
         },
         {
-          "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/PACKAGE_VALIDATION.json",
-          "sha256": "0e63c75d0907b81a1d01c3da0d2bff010a880548f0d75412ef4d0f4ef214b951"
+          "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/.forge-codex/state/gate-results/G00.package-validation.json",
+          "sha256": "1c2aec5f96b199a122c0e451de8ea31fa5c16e1650bf583552ad1524220d5277"
         }
       ]
     },
@@ -48,7 +48,7 @@
         },
         {
           "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS/script/build_and_run.sh",
-          "sha256": "1a79e6b9c67fa1be03d6f0c4a070eea7bc6d8ebb0b0c13f15fa1a20394485498"
+          "sha256": "661f66b862961631ec79860385de6da98e6b166b3a88a4fd835e93de81b5d75c"
         }
       ]
     }

@@ -1,0 +1,723 @@
+{
+  "blocking_reasons": [
+    "Settings UI mutation was not attempted because System Events access was not explicitly authorized; use the Xcode XCUI production-app test lane"
+  ],
+  "claims": {
+    "autonomous_continuity_complete": false,
+    "filesystem_e2_complete": false,
+    "g10_complete": false,
+    "native_ui_signing_complete": false,
+    "p10_complete": false
+  },
+  "cleanup": {
+    "command_link": {
+      "action": "recreated_original",
+      "status": "restored",
+      "target": "/Users/jimdaley/.forge-conductor/bin/forge-conductor"
+    },
+    "final_canonical_job": "absent",
+    "final_canonical_plist": "absent",
+    "launchd_disabled": {
+      "after": false,
+      "before": false,
+      "exact_relevant_entry_restored": true
+    },
+    "notes": [
+      "macOS Background Task Management may retain display history until logout even after scoped bootout and plist removal"
+    ],
+    "qualification_home_retained": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home",
+    "residuals": [],
+    "status": "restored",
+    "steps": [
+      "booted_out_qualification_manager",
+      "removed_qualification_launchagent_plist"
+    ]
+  },
+  "generated_at": "2026-09-05T01:32:39.201492Z",
+  "kind": "signed-shell-installed-manager-qualification",
+  "mode": "execute",
+  "open_release_gates": [
+    "P10/G10 product qualification",
+    "filesystem E2 residual race",
+    "native UI and signing qualification",
+    "real-provider autonomous continuity",
+    "whole-product rollback freshness"
+  ],
+  "overall_status": "partial",
+  "repository": {
+    "branch": "release/0.9.0-shipping",
+    "head": "7d3fbb4c4def3ca4b0799e9a611a70ea816f881f",
+    "path": "/Users/jimdaley/GitHub/Forge-Conductor-MacOS"
+  },
+  "scenario": {
+    "app_process_restart": {
+      "after_manager_restart": {
+        "close_signal": "SIGTERM",
+        "executable": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/Forge Conductor.app/Contents/MacOS/Forge Conductor",
+        "pid": 45949,
+        "return_code": -15,
+        "status": "passed",
+        "stderr_log": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/qualification-logs/gui-after-manager-restart.stderr.log",
+        "stderr_tail": "",
+        "stdout_log": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/qualification-logs/gui-after-manager-restart.stdout.log"
+      },
+      "first": {
+        "close_signal": "SIGTERM",
+        "executable": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/Forge Conductor.app/Contents/MacOS/Forge Conductor",
+        "pid": 45801,
+        "return_code": -15,
+        "status": "passed",
+        "stderr_log": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/qualification-logs/gui-first.stderr.log",
+        "stderr_tail": "",
+        "stdout_log": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/qualification-logs/gui-first.stdout.log"
+      },
+      "reopened": {
+        "close_signal": "SIGTERM",
+        "executable": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/Forge Conductor.app/Contents/MacOS/Forge Conductor",
+        "pid": 45813,
+        "return_code": -15,
+        "status": "passed",
+        "stderr_log": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/qualification-logs/gui-reopened.stderr.log",
+        "stderr_tail": "",
+        "stdout_log": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/qualification-logs/gui-reopened.stdout.log"
+      },
+      "status": "passed"
+    },
+    "clean_install_default": {
+      "enabled": true,
+      "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/config.json",
+      "policy_origin": "default_enabled",
+      "policy_version": 2,
+      "sha256": "8538db1bb71eba1e06a1220d861657eaf39d302b4c9e7f1ac4856abd67aafbcd",
+      "user_disabled": false
+    },
+    "home_isolation": {
+      "default_forge_home": "/Users/jimdaley/.forge-conductor",
+      "default_forge_home_excluded": true,
+      "qualification_home": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home"
+    },
+    "install": {
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-p",
+        "(version 1) (allow default) (allow job-creation) (deny process-exec (literal \"/usr/libexec/ApplicationFirewall/socketfilterfw\"))",
+        "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-ShippingCandidate-Release/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-conductor",
+        "manager",
+        "install-login",
+        "--keep-stale",
+        "--home",
+        "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home"
+      ],
+      "exit_code": 0,
+      "firewall_exec_denied_by_profile": true,
+      "stale_launchagent_cleanup_skipped": true,
+      "status": "passed",
+      "stderr_tail": "",
+      "stdout_tail": "\nForge Conductor login item installed\n  display name: Forge Conductor\n  app bundle:   /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/Forge Conductor.app\n  label:        com.forge-conductor.manager\n  plist:        /Users/jimdaley/Library/LaunchAgents/com.forge-conductor.manager.plist\n  binary:       /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/bin/forge-conductor\n  dashboard:    http://127.0.0.1:7788/\n\nWhere to look in System Settings:\n  General \u2192 Login Items & Extensions \u2192 Allow in the Background\n  \u2192 \"Forge Conductor\"  (NOT bash / python3)\n\nIf it still does not appear:\n  1. Log out and back in (BTM refresh)\n  2. Or reboot once\n  3. Check: launchctl print gui/$(id -u)/com.forge-conductor.manager\n{\"dashboard\":{\"host\":\"127.0.0.1\",\"port\":7788},\"home\":\"\\/Users\\/jimdaley\\/Projects\\/Forge-Conductor\\/shipping-evidence\\/20260904T223306Z\\/Installed-Shipping-Qualification-Home\",\"live\":{\"auto_restart\":true,\"dashboard\":{\"host\":\"127.0.0.1\",\"port\":7788,\"refresh_interval_sec\":8,\"url\":\"http:\\/\\/127.0.0.1:7788\\/\"},\"desired_running\":true,\"home\":\"\\/Users\\/jimdaley\\/Projects\\/Forge-Conductor\\/shipping-evidence\\/20260904T223306Z\\/Installed-Shipping-Qualification-Home\",\"http_listening\":true,\"last_error\":null,\"manager\":true,\"ok\":true,\"open_browser_on_start\":false,\"pid\":45737,\"restart_count\":0,\"service_active\":true,\"started_at\":\"2026-09-05T01:32:50Z\",\"state\":\"running\",\"uptime_sec\":0,\"version\":\"0.9.0\",\"watchdog_interval_sec\":3},\"manager_running\":true,\"ok\":true,\"pid\":45737,\"state\":{\"auto_restart\":true,\"dashboard\":{\"host\":\"127.0.0.1\",\"port\":7788,\"refresh_interval_sec\":8,\"url\":\"http:\\/\\/127.0.0.1:7788\\/\"},\"desired_running\":true,\"home\":\"\\/Users\\/jimdaley\\/Projects\\/Forge-Conductor\\/shipping-evidence\\/20260904T223306Z\\/Installed-Shipping-Qualification-Home\",\"http_listening\":true,\"last_error\":null,\"manager\":true,\"ok\":true,\"open_browser_on_start\":false,\"pid\":45737,\"restart_count\":0,\"service_active\":true,\"started_at\":\"2026-09-05T01:32:50Z\",\"state\":\"running\",\"uptime_sec\":0,\"version\":\"0.9.0\",\"watchdog_interval_sec\":3}}\n"
+    },
+    "installed_raw_cli_commands": {
+      "doctor_binary_installed": true,
+      "doctor_ok": true,
+      "executable": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/bin/forge-conductor",
+      "shell_enabled": true,
+      "status": "passed",
+      "status_ok": true,
+      "version": "0.9.0"
+    },
+    "launchagent_plist": {
+      "label": "com.forge-conductor.manager",
+      "path": "/Users/jimdaley/Library/LaunchAgents/com.forge-conductor.manager.plist",
+      "program_arguments": [
+        "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/Forge Conductor.app/Contents/MacOS/Forge Conductor",
+        "manager",
+        "run",
+        "--home",
+        "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home"
+      ],
+      "sha256": "efeec241d303759a57639f3e4c38c4daba780c60950e301d78e1277e9cad87ee",
+      "working_directory": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home"
+    },
+    "legacy_disabled_migration": {
+      "config": {
+        "default_timeout_sec": 41,
+        "enabled": true,
+        "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/legacy-disabled-migration/config.json",
+        "policy_origin": "legacy_disabled_default_migrated",
+        "sha256": "1480a61a35c38f9f8f909002f9dffa9684346d9bcb7a663f3edebe9a224ea767",
+        "user_disabled": false
+      },
+      "fixture": {
+        "enabled": false,
+        "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/legacy-disabled-migration/config.json",
+        "schema_version": "absent",
+        "sha256": "249671a1f1a2ab3149c5cea21f3fe07fe4f0592aa76250059d30c738fcc603a0"
+      },
+      "home": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/legacy-disabled-migration",
+      "receipt": {
+        "backup_path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/legacy-disabled-migration/config-migrations/config.pre-v2.2026-09-05T01-32-53Z.249671a1f1a2.json",
+        "backup_sha256": "249671a1f1a2ab3149c5cea21f3fe07fe4f0592aa76250059d30c738fcc603a0",
+        "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/legacy-disabled-migration/config-migrations/shell-policy-v2.json",
+        "sha256": "6abef83e30142d36beb0d7830f46434bf8c25d46d8b18d61557cfa0aac3db0fd",
+        "status": "completed",
+        "target_path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/legacy-disabled-migration/config-migrations/config.schema-v2.1d61ba04-313b-475c-a012-efb3c80b5fdc.json",
+        "target_sha256": "1480a61a35c38f9f8f909002f9dffa9684346d9bcb7a663f3edebe9a224ea767"
+      },
+      "status": "passed"
+    },
+    "manager_control_credential": {
+      "created_by_manager": true,
+      "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/manager-control.secret",
+      "status": "passed",
+      "unauthorized_probe_code": "manager_mutation_unauthorized",
+      "unauthorized_probe_status": 401
+    },
+    "manager_process_restart": {
+      "opt_out_survived": true,
+      "predecessor": {
+        "arguments": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/Forge Conductor.app/Contents/MacOS/Forge Conductor manager run --home /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home",
+        "executable": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/Forge Conductor.app/Contents/MacOS/Forge Conductor",
+        "launchctl_output_sha256": "2feb2996a8b448ac53a7353a82328f8ef0d1828a3fe4fb1244171f02dd10c14c",
+        "launchctl_program": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/Forge Conductor.app/Contents/MacOS/Forge Conductor",
+        "launchctl_state": "active",
+        "pid": 45737
+      },
+      "predecessor_gone": true,
+      "status": "passed",
+      "successor": {
+        "arguments": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/Forge Conductor.app/Contents/MacOS/Forge Conductor manager run --home /Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home",
+        "executable": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/Forge Conductor.app/Contents/MacOS/Forge Conductor",
+        "launchctl_output_sha256": "c6aa66ee91cd4296d763c7cd7374fff89419bc3cdc29d0ac8c626804f33e5cb5",
+        "launchctl_program": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/Forge Conductor.app/Contents/MacOS/Forge Conductor",
+        "launchctl_state": "active",
+        "pid": 45930
+      },
+      "successor_pid_changed": true
+    },
+    "manager_status": {
+      "auto_restart": true,
+      "dashboard": {
+        "host": "127.0.0.1",
+        "port": 7788,
+        "refresh_interval_sec": 8,
+        "url": "http://127.0.0.1:7788/"
+      },
+      "desired_running": true,
+      "home": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home",
+      "http_listening": true,
+      "last_error": null,
+      "manager": true,
+      "ok": true,
+      "open_browser_on_start": false,
+      "pid": 45737,
+      "restart_count": 0,
+      "service_active": true,
+      "started_at": "2026-09-05T01:32:50Z",
+      "state": "running",
+      "uptime_sec": 0,
+      "version": "0.9.0",
+      "watchdog_interval_sec": 3
+    },
+    "post_settings_shell_probe": {
+      "reason": "Settings UI did not persist the required shell re-enable",
+      "status": "not_run"
+    },
+    "qualification_home": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home",
+    "reason": "Settings UI mutation was not attempted because System Events access was not explicitly authorized; use the Xcode XCUI production-app test lane",
+    "settings_control_plane": {
+      "allowed_project_root": {
+        "persisted_readback": {
+          "configured": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/project",
+          "normalized": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/project",
+          "resolved": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/project"
+        },
+        "update_response": {
+          "configured": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/project",
+          "normalized": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/project",
+          "resolved": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/project"
+        }
+      },
+      "clean_default_enabled": true,
+      "explicit_opt_out": true,
+      "opt_out_survived_app_restart": true,
+      "opt_out_survived_manager_restart": true,
+      "reenabled": false,
+      "status": "in_progress"
+    },
+    "settings_ui": {
+      "automation_route": "xcode_xcui_required",
+      "reason": "Settings UI mutation was not attempted because System Events access was not explicitly authorized; use the Xcode XCUI production-app test lane",
+      "status": "blocked",
+      "used_system_events": false,
+      "used_test_fixture": false,
+      "used_uitesting_argument": false
+    },
+    "shell_probes": {
+      "clean_default_success": {
+        "executable": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/Forge Conductor.app/Contents/MacOS/Forge Conductor",
+        "pid": 45782,
+        "request_methods": [
+          "initialize",
+          "notifications/initialized",
+          "tools/list",
+          "tools/call",
+          "tools/call",
+          "tools/call"
+        ],
+        "response_ids": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "shell": {
+          "command": "shopt -q login_shell || exit 97; [ \"$0\" = /bin/bash ] || exit 98; printf '%s' 'native-restart-ok'",
+          "contract_keys": [
+            "command",
+            "cwd",
+            "exit_code",
+            "ok",
+            "stderr",
+            "stderr_truncated",
+            "stdout",
+            "stdout_truncated",
+            "timed_out"
+          ],
+          "cwd": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/project",
+          "exit_code": 0,
+          "login_bash_proof": "shopt login_shell and $0=/bin/bash checks exited zero",
+          "requested_timeout_sec": 999,
+          "stdout": "native-restart-ok",
+          "timed_out": false
+        },
+        "status": "passed",
+        "stderr": "",
+        "tools_list": {
+          "shell_exec_count": 1,
+          "tool_count": 64
+        }
+      },
+      "explicit_opt_out_denial": {
+        "executable": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/Forge Conductor.app/Contents/MacOS/Forge Conductor",
+        "pid": 45799,
+        "request_methods": [
+          "initialize",
+          "notifications/initialized",
+          "tools/list",
+          "tools/call",
+          "tools/call",
+          "tools/call"
+        ],
+        "response_ids": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "shell": {
+          "code": "shell_disabled_by_user",
+          "ok": false,
+          "retryable": false
+        },
+        "status": "passed",
+        "stderr": "",
+        "tools_list": {
+          "shell_exec_count": 1,
+          "tool_count": 64
+        }
+      },
+      "installed_raw_cli_success": {
+        "executable": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/bin/forge-conductor",
+        "pid": 45789,
+        "request_methods": [
+          "initialize",
+          "notifications/initialized",
+          "tools/list",
+          "tools/call",
+          "tools/call",
+          "tools/call"
+        ],
+        "response_ids": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "shell": {
+          "command": "shopt -q login_shell || exit 97; [ \"$0\" = /bin/bash ] || exit 98; printf '%s' 'native-restart-ok'",
+          "contract_keys": [
+            "command",
+            "cwd",
+            "exit_code",
+            "ok",
+            "stderr",
+            "stderr_truncated",
+            "stdout",
+            "stdout_truncated",
+            "timed_out"
+          ],
+          "cwd": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/project",
+          "exit_code": 0,
+          "login_bash_proof": "shopt login_shell and $0=/bin/bash checks exited zero",
+          "requested_timeout_sec": 999,
+          "stdout": "native-restart-ok",
+          "timed_out": false
+        },
+        "status": "passed",
+        "stderr": "",
+        "tools_list": {
+          "shell_exec_count": 1,
+          "tool_count": 64
+        }
+      },
+      "legacy_disabled_migrated_success": {
+        "executable": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/Forge Conductor.app/Contents/MacOS/Forge Conductor",
+        "pid": 45794,
+        "request_methods": [
+          "initialize",
+          "notifications/initialized",
+          "tools/list",
+          "tools/call",
+          "tools/call",
+          "tools/call"
+        ],
+        "response_ids": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "shell": {
+          "command": "shopt -q login_shell || exit 97; [ \"$0\" = /bin/bash ] || exit 98; printf '%s' 'native-restart-ok'",
+          "contract_keys": [
+            "command",
+            "cwd",
+            "exit_code",
+            "ok",
+            "stderr",
+            "stderr_truncated",
+            "stdout",
+            "stdout_truncated",
+            "timed_out"
+          ],
+          "cwd": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/project",
+          "exit_code": 0,
+          "login_bash_proof": "shopt login_shell and $0=/bin/bash checks exited zero",
+          "requested_timeout_sec": 999,
+          "stdout": "native-restart-ok",
+          "timed_out": false
+        },
+        "status": "passed",
+        "stderr": "",
+        "tools_list": {
+          "shell_exec_count": 1,
+          "tool_count": 64
+        }
+      },
+      "post_manager_restart_opt_out_denial": {
+        "executable": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/Forge Conductor.app/Contents/MacOS/Forge Conductor",
+        "pid": 45940,
+        "request_methods": [
+          "initialize",
+          "notifications/initialized",
+          "tools/list",
+          "tools/call",
+          "tools/call",
+          "tools/call"
+        ],
+        "response_ids": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "shell": {
+          "code": "shell_disabled_by_user",
+          "ok": false,
+          "retryable": false
+        },
+        "status": "passed",
+        "stderr": "",
+        "tools_list": {
+          "shell_exec_count": 1,
+          "tool_count": 64
+        }
+      }
+    },
+    "staged_artifacts": {
+      "application": {
+        "build": "1",
+        "embedded_cli_rpaths": [
+          "@executable_path/../Frameworks",
+          "@executable_path",
+          "@loader_path"
+        ],
+        "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/Forge Conductor.app",
+        "paths": {
+          "embedded_cli": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/Forge Conductor.app/Contents/Helpers/forge-conductor",
+          "filesystem_daemon": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon",
+          "framework": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework",
+          "launchdaemon_plist": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/Forge Conductor.app/Contents/Library/LaunchDaemons/com.forge-conductor.filesystem-daemon.plist",
+          "main": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/Forge Conductor.app/Contents/MacOS/Forge Conductor",
+          "runtime_launcher": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher"
+        },
+        "sealed_daemon_hashes": {
+          "ForgeFilesystemDaemonCDHashArm64": "407f19a39faac6c3e7b2527342548c4ee5e3f6ae"
+        },
+        "signatures": {
+          "application": {
+            "authorities": [
+              "Apple Development: James Daley (FW94K6ZY57)",
+              "Apple Worldwide Developer Relations Certification Authority",
+              "Apple Root CA"
+            ],
+            "cdhash": "ee9cae23d2fbc30f063c91ab72b7acc614e2cde7",
+            "identifier": "com.forge-conductor.app",
+            "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/Forge Conductor.app",
+            "runtime_version": "26.5.0",
+            "sha256": null,
+            "signing_requirement": "anchor apple generic and identifier \"com.forge-conductor.app\" and certificate leaf[subject.OU] = \"9AQ2C2838M\" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists",
+            "team_identifier": "9AQ2C2838M"
+          },
+          "embedded_cli": {
+            "authorities": [
+              "Apple Development: James Daley (FW94K6ZY57)",
+              "Apple Worldwide Developer Relations Certification Authority",
+              "Apple Root CA"
+            ],
+            "cdhash": "565a6345fbf811b23058ba3f14b7044bb2204a09",
+            "identifier": "com.forge-conductor.cli",
+            "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/Forge Conductor.app/Contents/Helpers/forge-conductor",
+            "runtime_version": "26.5.0",
+            "sha256": "86b283e6d85cdbbde6fc07669da4997dbc5d8c343879adf483c674709f0ce0c6",
+            "signing_requirement": "anchor apple generic and identifier \"com.forge-conductor.cli\" and certificate leaf[subject.OU] = \"9AQ2C2838M\" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists",
+            "team_identifier": "9AQ2C2838M"
+          },
+          "filesystem_daemon": {
+            "authorities": [
+              "Apple Development: James Daley (FW94K6ZY57)",
+              "Apple Worldwide Developer Relations Certification Authority",
+              "Apple Root CA"
+            ],
+            "cdhash": "407f19a39faac6c3e7b2527342548c4ee5e3f6ae",
+            "identifier": "com.forge-conductor.filesystem-daemon",
+            "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon",
+            "runtime_version": "26.5.0",
+            "sha256": "3bb67f4f509b9c023c9fc1e11b27783cf39d4b8d5d0941ae9d6ec13de3e9e398",
+            "signing_requirement": "anchor apple generic and identifier \"com.forge-conductor.filesystem-daemon\" and certificate leaf[subject.OU] = \"9AQ2C2838M\" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists",
+            "team_identifier": "9AQ2C2838M"
+          },
+          "framework": {
+            "authorities": [
+              "Apple Development: James Daley (FW94K6ZY57)",
+              "Apple Worldwide Developer Relations Certification Authority",
+              "Apple Root CA"
+            ],
+            "cdhash": "9b42bbaee9fc7a3c13a27ab66c8eacc67c16ba57",
+            "identifier": "com.forge-conductor.core",
+            "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework",
+            "runtime_version": "26.5.0",
+            "sha256": null,
+            "signing_requirement": "anchor apple generic and identifier \"com.forge-conductor.core\" and certificate leaf[subject.OU] = \"9AQ2C2838M\" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists",
+            "team_identifier": "9AQ2C2838M"
+          },
+          "runtime_launcher": {
+            "authorities": [
+              "Apple Development: James Daley (FW94K6ZY57)",
+              "Apple Worldwide Developer Relations Certification Authority",
+              "Apple Root CA"
+            ],
+            "cdhash": "f16827cd5c5fd2ed93dae8abff056a517e68dbb9",
+            "identifier": "com.forge-conductor.runtime-launcher",
+            "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher",
+            "runtime_version": "26.5.0",
+            "sha256": "476f30ad1a19ecdaf4d24ea454a1fc8d496544df4ed5dc05076c2e8dc3d284b9",
+            "signing_requirement": "anchor apple generic and identifier \"com.forge-conductor.runtime-launcher\" and certificate leaf[subject.OU] = \"9AQ2C2838M\" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists",
+            "team_identifier": "9AQ2C2838M"
+          }
+        },
+        "signing_authority": "Apple Development: James Daley (FW94K6ZY57)",
+        "team_identifier": "9AQ2C2838M",
+        "version": "0.9.0"
+      },
+      "raw_cli": {
+        "authorities": [
+          "Apple Development: James Daley (FW94K6ZY57)",
+          "Apple Worldwide Developer Relations Certification Authority",
+          "Apple Root CA"
+        ],
+        "cdhash": "565a6345fbf811b23058ba3f14b7044bb2204a09",
+        "identifier": "com.forge-conductor.cli",
+        "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/bin/forge-conductor",
+        "runtime_version": "26.5.0",
+        "sha256": "86b283e6d85cdbbde6fc07669da4997dbc5d8c343879adf483c674709f0ce0c6",
+        "signing_requirement": "anchor apple generic and identifier \"com.forge-conductor.cli\" and certificate leaf[subject.OU] = \"9AQ2C2838M\" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists",
+        "team_identifier": "9AQ2C2838M"
+      },
+      "raw_cli_sibling_framework": {
+        "authorities": [
+          "Apple Development: James Daley (FW94K6ZY57)",
+          "Apple Worldwide Developer Relations Certification Authority",
+          "Apple Root CA"
+        ],
+        "cdhash": "9b42bbaee9fc7a3c13a27ab66c8eacc67c16ba57",
+        "identifier": "com.forge-conductor.core",
+        "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/bin/ForgeConductorCore.framework",
+        "runtime_version": "26.5.0",
+        "sha256": null,
+        "signing_requirement": "anchor apple generic and identifier \"com.forge-conductor.core\" and certificate leaf[subject.OU] = \"9AQ2C2838M\" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists",
+        "team_identifier": "9AQ2C2838M"
+      },
+      "standalone_raw_cli_runtime": {
+        "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/bin/forge-runtime-launcher",
+        "reason": "runtime launcher identity is verified here; raw-CLI commands and shell execution are exercised by the enclosing scenario",
+        "signature": {
+          "authorities": [
+            "Apple Development: James Daley (FW94K6ZY57)",
+            "Apple Worldwide Developer Relations Certification Authority",
+            "Apple Root CA"
+          ],
+          "cdhash": "f16827cd5c5fd2ed93dae8abff056a517e68dbb9",
+          "identifier": "com.forge-conductor.runtime-launcher",
+          "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/Installed-Shipping-Qualification-Home/bin/forge-runtime-launcher",
+          "runtime_version": "26.5.0",
+          "sha256": "476f30ad1a19ecdaf4d24ea454a1fc8d496544df4ed5dc05076c2e8dc3d284b9",
+          "signing_requirement": "anchor apple generic and identifier \"com.forge-conductor.runtime-launcher\" and certificate leaf[subject.OU] = \"9AQ2C2838M\" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists",
+          "team_identifier": "9AQ2C2838M"
+        },
+        "status": "signature_verified"
+      }
+    },
+    "status": "blocked"
+  },
+  "schema_version": 1,
+  "shared_state_preflight": {
+    "canonical_job": {
+      "state": "absent",
+      "target": "gui/501/com.forge-conductor.manager"
+    },
+    "canonical_plist": {
+      "path": "/Users/jimdaley/Library/LaunchAgents/com.forge-conductor.manager.plist",
+      "state": "absent"
+    },
+    "command_link": {
+      "path": "/Users/jimdaley/.local/bin/forge-conductor-swift",
+      "state": "symlink",
+      "target": "/Users/jimdaley/.forge-conductor/bin/forge-conductor"
+    },
+    "dashboard_port_7788": "free",
+    "launchd_disabled": {
+      "output_sha256": "c5d52d28cc544865dc4c136de403bbfd7d50289b440288b7be14e4bf86efa3ab",
+      "value": false
+    },
+    "product_processes": []
+  },
+  "signing_identity_constraint": {
+    "expected_signing_authority": null,
+    "expected_team_identifier": null,
+    "matched": true,
+    "mode": "derived",
+    "observed_signing_authority": "Apple Development: James Daley (FW94K6ZY57)",
+    "observed_team_identifier": "9AQ2C2838M"
+  },
+  "source_application": {
+    "build": "1",
+    "embedded_cli_rpaths": [
+      "@executable_path/../Frameworks",
+      "@executable_path",
+      "@loader_path"
+    ],
+    "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-ShippingCandidate-Release/Build/Products/Release/Forge Conductor.app",
+    "paths": {
+      "embedded_cli": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-ShippingCandidate-Release/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-conductor",
+      "filesystem_daemon": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-ShippingCandidate-Release/Build/Products/Release/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon",
+      "framework": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-ShippingCandidate-Release/Build/Products/Release/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework",
+      "launchdaemon_plist": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-ShippingCandidate-Release/Build/Products/Release/Forge Conductor.app/Contents/Library/LaunchDaemons/com.forge-conductor.filesystem-daemon.plist",
+      "main": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-ShippingCandidate-Release/Build/Products/Release/Forge Conductor.app/Contents/MacOS/Forge Conductor",
+      "runtime_launcher": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-ShippingCandidate-Release/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher"
+    },
+    "sealed_daemon_hashes": {
+      "ForgeFilesystemDaemonCDHashArm64": "407f19a39faac6c3e7b2527342548c4ee5e3f6ae"
+    },
+    "signatures": {
+      "application": {
+        "authorities": [
+          "Apple Development: James Daley (FW94K6ZY57)",
+          "Apple Worldwide Developer Relations Certification Authority",
+          "Apple Root CA"
+        ],
+        "cdhash": "ee9cae23d2fbc30f063c91ab72b7acc614e2cde7",
+        "identifier": "com.forge-conductor.app",
+        "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-ShippingCandidate-Release/Build/Products/Release/Forge Conductor.app",
+        "runtime_version": "26.5.0",
+        "sha256": null,
+        "signing_requirement": "anchor apple generic and identifier \"com.forge-conductor.app\" and certificate leaf[subject.OU] = \"9AQ2C2838M\" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists",
+        "team_identifier": "9AQ2C2838M"
+      },
+      "embedded_cli": {
+        "authorities": [
+          "Apple Development: James Daley (FW94K6ZY57)",
+          "Apple Worldwide Developer Relations Certification Authority",
+          "Apple Root CA"
+        ],
+        "cdhash": "565a6345fbf811b23058ba3f14b7044bb2204a09",
+        "identifier": "com.forge-conductor.cli",
+        "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-ShippingCandidate-Release/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-conductor",
+        "runtime_version": "26.5.0",
+        "sha256": "86b283e6d85cdbbde6fc07669da4997dbc5d8c343879adf483c674709f0ce0c6",
+        "signing_requirement": "anchor apple generic and identifier \"com.forge-conductor.cli\" and certificate leaf[subject.OU] = \"9AQ2C2838M\" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists",
+        "team_identifier": "9AQ2C2838M"
+      },
+      "filesystem_daemon": {
+        "authorities": [
+          "Apple Development: James Daley (FW94K6ZY57)",
+          "Apple Worldwide Developer Relations Certification Authority",
+          "Apple Root CA"
+        ],
+        "cdhash": "407f19a39faac6c3e7b2527342548c4ee5e3f6ae",
+        "identifier": "com.forge-conductor.filesystem-daemon",
+        "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-ShippingCandidate-Release/Build/Products/Release/Forge Conductor.app/Contents/MacOS/forge-filesystem-daemon",
+        "runtime_version": "26.5.0",
+        "sha256": "3bb67f4f509b9c023c9fc1e11b27783cf39d4b8d5d0941ae9d6ec13de3e9e398",
+        "signing_requirement": "anchor apple generic and identifier \"com.forge-conductor.filesystem-daemon\" and certificate leaf[subject.OU] = \"9AQ2C2838M\" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists",
+        "team_identifier": "9AQ2C2838M"
+      },
+      "framework": {
+        "authorities": [
+          "Apple Development: James Daley (FW94K6ZY57)",
+          "Apple Worldwide Developer Relations Certification Authority",
+          "Apple Root CA"
+        ],
+        "cdhash": "9b42bbaee9fc7a3c13a27ab66c8eacc67c16ba57",
+        "identifier": "com.forge-conductor.core",
+        "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-ShippingCandidate-Release/Build/Products/Release/Forge Conductor.app/Contents/Frameworks/ForgeConductorCore.framework",
+        "runtime_version": "26.5.0",
+        "sha256": null,
+        "signing_requirement": "anchor apple generic and identifier \"com.forge-conductor.core\" and certificate leaf[subject.OU] = \"9AQ2C2838M\" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists",
+        "team_identifier": "9AQ2C2838M"
+      },
+      "runtime_launcher": {
+        "authorities": [
+          "Apple Development: James Daley (FW94K6ZY57)",
+          "Apple Worldwide Developer Relations Certification Authority",
+          "Apple Root CA"
+        ],
+        "cdhash": "f16827cd5c5fd2ed93dae8abff056a517e68dbb9",
+        "identifier": "com.forge-conductor.runtime-launcher",
+        "path": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-ShippingCandidate-Release/Build/Products/Release/Forge Conductor.app/Contents/Helpers/forge-runtime-launcher",
+        "runtime_version": "26.5.0",
+        "sha256": "476f30ad1a19ecdaf4d24ea454a1fc8d496544df4ed5dc05076c2e8dc3d284b9",
+        "signing_requirement": "anchor apple generic and identifier \"com.forge-conductor.runtime-launcher\" and certificate leaf[subject.OU] = \"9AQ2C2838M\" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists",
+        "team_identifier": "9AQ2C2838M"
+      }
+    },
+    "signing_authority": "Apple Development: James Daley (FW94K6ZY57)",
+    "team_identifier": "9AQ2C2838M",
+    "version": "0.9.0"
+  },
+  "source_application_argument": "/Users/jimdaley/Projects/Forge-Conductor/shipping-evidence/20260904T223306Z/DerivedData-ShippingCandidate-Release/Build/Products/Release/Forge Conductor.app"
+}

@@ -1,0 +1,25 @@
+[0/1] Planning build
+Building for production...
+[0/17] Write sources
+[6/17] Write swift-version--58304C5D6DBC2206.txt
+[8/17] Compiling ForgeFilesystemProtocol ForgeFilesystemProtocol.swift
+[9/21] Compiling ForgeFilesystemQualificationSupport QualificationReadiness.swift
+[9/22] Write Objects.LinkFileList
+[11/22] Linking ForgeFilesystemAdversary
+[11/22] Linking ForgeFilesystemQualificationHarness
+[14/22] Compiling ForgeFilesystemDaemon PrivilegedLeafDeleteEngine.swift
+[14/23] Write Objects.LinkFileList
+[15/23] Linking forge-filesystem-daemon
+[17/23] Compiling ForgeConductorCore AgentCatalog.swift
+[18/24] Compiling ForgeNativeSessionHostPlugin ForgeNativeSessionHostPlugin.swift
+[19/26] Compiling ForgeConductorCLI ForgeConductorMain.swift
+[19/26] Write Objects.LinkFileList
+[20/26] Linking forge-conductor
+[22/26] Compiling ForgeConductorApp AppDeployController.swift
+[22/26] Write Objects.LinkFileList
+[23/26] Linking forge-conductor-app
+[25/27] Compiling ForgeConductorTests AppConfigAndDoctorTests.swift
+[26/28] Compiling ForgeConductorPackageTests runner.swift
+[26/28] Write Objects.LinkFileList
+[27/28] Linking ForgeConductorPackageTests
+Build complete! (138.54s)

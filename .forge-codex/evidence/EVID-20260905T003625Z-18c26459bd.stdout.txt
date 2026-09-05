@@ -1,0 +1,17 @@
+Test Suite 'Selected tests' started at 2026-09-04 19:36:26.705.
+Test Suite 'ForgeConductorPackageTests.xctest' started at 2026-09-04 19:36:26.706.
+Test Suite 'LiveLMStudioManagedAutonomyTests' started at 2026-09-04 19:36:26.706.
+Test Case '-[ForgeConductorTests.LiveLMStudioManagedAutonomyTests testRealProviderAutomaticThresholdRolloverRecoversAfterBootstrapCrashAndContinuesViaManagerRoute]' started.
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Tests/ForgeConductorTests/LiveLMStudioManagedAutonomyTests.swift:361: error: -[ForgeConductorTests.LiveLMStudioManagedAutonomyTests testRealProviderAutomaticThresholdRolloverRecoversAfterBootstrapCrashAndContinuesViaManagerRoute] : XCTAssertGreaterThan failed: ("1") is not greater than ("1")
+/Users/jimdaley/GitHub/Forge-Conductor-MacOS/Sources/ForgeConductorCore/Application/ProjectRunCoordinator.swift:626: error: -[ForgeConductorTests.LiveLMStudioManagedAutonomyTests testRealProviderAutomaticThresholdRolloverRecoversAfterBootstrapCrashAndContinuesViaManagerRoute] : failed: caught error: "CancellationError()"
+Test Case '-[ForgeConductorTests.LiveLMStudioManagedAutonomyTests testRealProviderAutomaticThresholdRolloverRecoversAfterBootstrapCrashAndContinuesViaManagerRoute]' failed (486.098 seconds).
+Test Suite 'LiveLMStudioManagedAutonomyTests' failed at 2026-09-04 19:44:32.804.
+	 Executed 1 test, with 2 failures (1 unexpected) in 486.098 (486.098) seconds
+Test Suite 'ForgeConductorPackageTests.xctest' failed at 2026-09-04 19:44:32.804.
+	 Executed 1 test, with 2 failures (1 unexpected) in 486.098 (486.098) seconds
+Test Suite 'Selected tests' failed at 2026-09-04 19:44:32.804.
+	 Executed 1 test, with 2 failures (1 unexpected) in 486.098 (486.099) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

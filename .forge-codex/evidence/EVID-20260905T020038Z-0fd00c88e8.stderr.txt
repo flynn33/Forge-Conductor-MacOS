@@ -1,0 +1,9 @@
+[0/1] Planning build
+Building for debugging...
+[0/15] Write sources
+[1/15] Write swift-version--58304C5D6DBC2206.txt
+[3/5] Compiling ForgeConductorTests LiveLMStudioManagedAutonomyTests.swift
+[4/5] Emitting module ForgeConductorTests
+[4/6] Write Objects.LinkFileList
+[5/6] Linking ForgeConductorPackageTests
+Build complete! (3.21s)

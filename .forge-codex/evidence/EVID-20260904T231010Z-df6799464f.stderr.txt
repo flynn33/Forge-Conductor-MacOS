@@ -1,0 +1,3 @@
+2026-09-04 18:10:21.602 xcodebuild[77363:33210107] [MT] IDETestOperationsObserverDebug: 8.334 elapsed -- Testing started completed.
+2026-09-04 18:10:21.602 xcodebuild[77363:33210107] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-09-04 18:10:21.602 xcodebuild[77363:33210107] [MT] IDETestOperationsObserverDebug: 8.334 sec, +8.334 sec -- end
