@@ -34,6 +34,11 @@ installed-stack and production-feature acceptance remain separate gates.
   metadata and exact logical-input retention without rewriting older requests.
 - Source tool quotas include reads admitted before conversation enrollment once,
   including ready handoffs after current limits tighten.
+- Retained pressure decisions now fence ordinary source work and issue bounded,
+  recoverable checkpoint-storage claims. The control plane recomputes each decision
+  from retained provider facts; cancellation and expired ownership roll back writes.
+- Exact source-commit reconciliation reads immutable receipts without creating a
+  revision, delivery row or write reservation, including retained invalidated data.
 - Added typed pressure evaluation and a deterministic recovery-packet builder.
   Packets preserve full critical work and remaining budgets, bind compact pressure
   facts to the complete decision digest, and enforce inherited retrieval limits.

@@ -188,6 +188,19 @@ public final class ContextContinuityService: @unchecked Sendable {
         )
     }
 
+    /// Historical receipt readback only. The enclosing control-plane transaction
+    /// must validate its opaque pressure receipt-only claim and supply both exact
+    /// retained arguments. This does not grant live task or successor authority.
+    func readPreparedSourceCommitForReconciliation(
+        _ prepared: PreparedContinuitySourceCommit,
+        authorization: ContinuityIngressAuthorization,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuityHandoffCommit? {
+        try store.readPreparedSourceCommitForReconciliation(
+            prepared, authorization: authorization, cancellation: cancellation
+        )
+    }
+
     /// Called after the control plane authenticates exact native task ownership.
     /// This does not repair receipts, acquire a lease, or advance source state.
     func authorizedOperationProgress(acceptance: ContinuityIngressAcceptanceReceipt,

@@ -337,8 +337,28 @@ The projection is capped at 4 KiB. The complete exact `context_get` result must
 fit the 64 KiB and original inline bounds, tighter original/effective result-byte
 ceilings, and retained-result token policy. The ordinary 4,096-token limit is
 unchanged. Oversized critical work produces a typed construction failure;
-optional previews alone may be clipped. The pressure owner, durable disposition
-writer and automatic pressure-handoff path are not enabled by these components.
+optional previews alone may be clipped.
+
+The control plane can durably record pressure before a provider POST or after an
+accepted response. It recomputes the decision from the retained request,
+capability probe, response and ordered journal facts before atomically stopping
+ordinary source work. Opaque storage claims retain one five-minute deadline;
+recovery changes the lease epoch without extending that deadline. Expired owners,
+competing owners and cancellation cannot commit a fence or resume inference.
+An ordinary inference lease cannot release pending pressure-storage ownership.
+Quota blockers receive no storage claim. Cancellation preserves the exact
+provider state and decision for reconciliation.
+
+The source store also provides an internal exact prepared-commit receipt read.
+It checks metadata ownership before decoding and uses a read snapshot without
+creating a revision, outbox row or write reservation. It can read an existing
+invalidated receipt for reconciliation; live ingress remains fenced. This helper
+still requires the control-plane recovery claim to be connected at its caller.
+
+The tool-output pressure boundary, durable pressure handoff writer and owner
+integration remain incomplete. These components do not enable automatic pressure
+handoff or qualify G04. Product identity remains 0.9.0 build 1; no user-visible
+control or deployment behavior changes in this component checkpoint.
 
 At the September 8 component checkpoint, signed native and selected Release
 suites each passed 293 tests, and the separate packet suite passed 13 tests,

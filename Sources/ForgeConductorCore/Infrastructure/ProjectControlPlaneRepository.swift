@@ -40,6 +40,27 @@ struct NativeSourceCapabilityCheckClaim: Sendable {
     fileprivate let epoch: Int64
 }
 
+/// Storage-only authority over the existing conversation lease. This cannot be
+/// passed to provider or tool APIs, and every use rechecks the retained fence.
+struct NativeSourcePressureClaim: Sendable {
+    let conversationID: UUID, taskID: UUID, capabilityID: UUID, stageID: UUID
+    let capabilityEpoch: Int64, leaseEpoch: Int64, fenceRevision: Int64
+    let managerInstanceID: UUID
+    let expiresAt: String, storageDeadline: String, dispositionSHA256: String
+    fileprivate init(conversationID: UUID, taskID: UUID, capabilityID: UUID, stageID: UUID,
+        capabilityEpoch: Int64, leaseEpoch: Int64, fenceRevision: Int64, managerInstanceID: UUID,
+        expiresAt: String, storageDeadline: String, dispositionSHA256: String) {
+        self.conversationID = conversationID; self.taskID = taskID; self.capabilityID = capabilityID
+        self.stageID = stageID; self.capabilityEpoch = capabilityEpoch; self.leaseEpoch = leaseEpoch
+        self.fenceRevision = fenceRevision; self.managerInstanceID = managerInstanceID
+        self.expiresAt = expiresAt; self.storageDeadline = storageDeadline; self.dispositionSHA256 = dispositionSHA256
+    }
+}
+enum NativeSourceBudgetDispositionResult: Sendable {
+    case pressure(NativeSourcePressureClaim)
+    case blocked(NativeSourceStoredBudgetDisposition)
+}
+
 enum ProjectRegistrationControlExpectation: Sendable, Equatable {
     case unchecked
     case absent
@@ -1664,6 +1685,13 @@ public actor ProjectControlPlaneRepository {
         guard !row.cancelled else { throw NativeSourceConversationError.cancelled }
         if !allowFenced {
             guard row.state != .sourceFenced else { throw NativeSourceConversationError.sourceFenced }
+            if row.state == .stopped, let active = row.active,
+               let disposition = try nativeStageUnlocked(active, conversation: row, connection: connection).budgetDisposition {
+                switch disposition.metadata {
+                case .pressure: throw NativeSourceConversationError.sourceFenced
+                case .blocked: throw NativeSourceConversationError.conflict
+                }
+            }
         }
         return (attachment, row)
     }
@@ -1773,6 +1801,10 @@ public actor ProjectControlPlaneRepository {
             let a = try authenticateNativeTaskCapabilityUnlocked(credential, connection: connection)
             let row = try nativeConversationUnlocked(conversationID, attachment: a, connection: connection)
             guard !row.cancelled else { throw NativeSourceConversationError.cancelled }
+            if row.state == .stopped, let active = row.active,
+               try nativeStageUnlocked(active, conversation: row, connection: connection).budgetDisposition != nil {
+                throw NativeSourceConversationError.sourceFenced
+            }
             let now = ISO8601.string(from: clock.now())
             guard row.owner == nil || (row.leaseExpires ?? "") <= now else { throw NativeSourceConversationError.leaseUnavailable }
             guard row.leaseEpoch < Int64.max else { throw NativeSourceConversationError.capacityExceeded }
@@ -1811,6 +1843,9 @@ public actor ProjectControlPlaneRepository {
             try connection.execute("""
                 UPDATE native_source_conversations SET lease_owner=NULL,lease_capability_epoch=NULL,lease_expires_at=NULL
                 WHERE conversation_id=? AND task_id=? AND lease_owner=? AND lease_epoch=?
+                  AND NOT EXISTS (SELECT 1 FROM native_source_provider_turns t
+                    WHERE t.stage_id=native_source_conversations.active_stage_id
+                      AND t.pressure_decision_json IS NOT NULL AND t.blocked_code='pressure_pending')
                 """, bindings: [.text(lease.conversationID.uuidString.lowercased()), .text(lease.taskID.uuidString.lowercased()),
                     .text(lease.managerInstanceID.uuidString.lowercased()), .int64(lease.leaseEpoch)])
         }
@@ -1984,6 +2019,243 @@ public actor ProjectControlPlaneRepository {
             sourceReadCallsBeforeEnrollment: c.body.priorSourceReadCallsAtEnrollment,
             admittedProviderCallsBeforeStage: priorCalls, admittedCallsInStage: stageCalls,
             sourceMaximumCalls: c.body.sourceLimits.maximumCalls).validated()
+    }
+
+    private func nativeBudgetMetadata<Admission: Sendable>(
+        _ decision: NativeSourceBudgetDecision<Admission>
+    ) throws -> NativeSourceBudgetMetadata {
+        switch decision {
+        case .admitted: throw NativeSourceConversationError.conflict
+        case .pressure(let pressure): return .pressure(pressure)
+        case .blocked(let failure): return .blocked(failure)
+        }
+    }
+
+    /// The full numerical decision is recomputed from CP-retained observations.
+    /// This transaction fences inference but never submits a provider request or
+    /// creates a ready source packet. Storage receives its own once-fixed deadline.
+    func recordNativeSourceBudgetDisposition(metadata: NativeSourceBudgetMetadata,
+        credential: NativeTaskCapabilityCredential, lease: NativeSourceConversationLease,
+        policySelection: BudgetPolicySelection, cancellation: ToolCallCancellation? = nil
+    ) throws -> NativeSourceBudgetDispositionResult {
+        let binding: NativeSourceBudgetBinding
+        switch metadata {
+        case .pressure(let value): binding = value.observation.binding
+        case .blocked(let value): binding = value.binding
+        }
+        return try controlledTransaction(cancellation: cancellation, fullDurability: true, beforeCommitValidation: {
+            let connection = try self.requiredConnection()
+            let (a, c) = try self.nativeLeaseUnlocked(lease, credential: credential, allowFenced: true, connection: connection)
+            try self.requireSourceMutationAdmissionUnlocked(a.setup.record.authorization, connection: connection)
+            let stage = try self.nativeStageUnlocked(binding.stageID, conversation: c, connection: connection)
+            if binding.boundary == .beforeProviderPost {
+                guard stage.body.deadline > ISO8601.string(from: self.clock.now()) else {
+                    throw NativeSourceConversationError.deadlineExceeded
+                }
+            }
+        }) { connection in
+            let (attachment, conversation) = try nativeLeaseUnlocked(lease, credential: credential,
+                allowFenced: true, connection: connection)
+            try requireSourceMutationAdmissionUnlocked(attachment.setup.record.authorization, connection: connection)
+            try ContinuityIngressAcceptanceReceipt.validatePolicy(policySelection, authorization: attachment.setup.record.authorization)
+            let stage = try nativeStageUnlocked(binding.stageID, conversation: conversation, connection: connection)
+            guard binding.conversationID == conversation.body.conversationID,
+                  binding.taskID == attachment.descriptor.taskID,
+                  binding.capabilityID == credential.capabilityID, binding.capabilityEpoch == credential.epoch else {
+                throw NativeSourceConversationError.conflict
+            }
+            let supplied = try metadata.canonicalJSON()
+            if let retained = stage.budgetDisposition {
+                guard try retained.metadata.canonicalJSON() == supplied else { throw NativeSourceConversationError.conflict }
+                switch retained.metadata {
+                case .blocked: return .blocked(retained)
+                case .pressure: return .pressure(try nativePressureClaimUnlocked(conversation: conversation,
+                    stage: stage, attachment: attachment))
+                }
+            }
+            let actualBinding = try nativeBudgetBindingUnlocked(stage: stage, conversation: conversation,
+                boundary: binding.boundary, pendingCallOrdinal: binding.pendingCall?.ordinal, connection: connection)
+            guard actualBinding == binding,
+                  try connection.scalarInt("SELECT COUNT(*) FROM native_source_capability_checks WHERE conversation_id=? AND state='attempted'",
+                    bindings: [.text(binding.conversationID.uuidString.lowercased())]) == 0,
+                  try connection.scalarInt("SELECT COUNT(*) FROM native_source_provider_turns WHERE conversation_id=? AND state IN('submitted','outcome_unknown')",
+                    bindings: [.text(binding.conversationID.uuidString.lowercased())]) == 0 else {
+                throw NativeSourceConversationError.conflict
+            }
+            let recomputed: NativeSourceBudgetMetadata
+            switch binding.boundary {
+            case .beforeProviderPost:
+                guard stage.body.deadline > ISO8601.string(from: clock.now()) else { throw NativeSourceConversationError.deadlineExceeded }
+                let prepared = try nativePrepared(stage, conversation: conversation, connection: connection)
+                guard let preflight = prepared.retainedPreflight, let capabilities = prepared.retainedCapabilities else {
+                    throw NativeSourceConversationError.unsupportedProvider
+                }
+                try nativeVerifyPreflight(preflight, stage: stage, conversation: conversation)
+                recomputed = try nativeBudgetMetadata(NativeSourceBudgetEvaluator.providerDecision(prepared: prepared,
+                    preflight: preflight, capabilities: capabilities, policySelection: policySelection, binding: actualBinding))
+            case .acceptedProviderResponse:
+                let accepted = try nativeAcceptedUnlocked(stage, conversation: conversation, connection: connection)
+                guard let post = stage.post else { throw NativeSourceConversationError.integrityFailure }
+                let bytes = try Self.nativeSourceCheckedAdd(accepted.prepared.priorContextSerializedBytes,
+                    Self.nativeSourceCheckedAdd(post.preflight.bytes, Self.nativeRetainedProviderResponseBytes(accepted.turn)))
+                recomputed = try nativeBudgetMetadata(NativeSourceBudgetEvaluator.acceptedDecision(
+                    context: .init(binding: actualBinding, accepted: accepted, retainedContextSerializedBytes: bytes),
+                    policySelection: policySelection))
+            case .beforeToolOutput:
+                // Output admission needs the exact continuation-envelope proof;
+                // no caller-supplied projection may substitute for that future seam.
+                throw NativeSourceConversationError.invalidRequest("pressure_output_boundary_not_connected")
+            }
+            guard try recomputed.canonicalJSON() == supplied else { throw NativeSourceConversationError.conflict }
+            let timestamp = ISO8601.string(from: clock.now())
+            let storageDeadline: String?
+            let pressureObservation: NativeSourceBudgetObservation?
+            switch recomputed {
+            case .pressure(let value):
+                storageDeadline = min(attachment.descriptor.expiresAt, ISO8601.string(from: clock.now().addingTimeInterval(300)))
+                pressureObservation = value.observation
+            case .blocked: storageDeadline = nil; pressureObservation = nil
+            }
+            let nextRevision = conversation.revision.addingReportingOverflow(1)
+            guard !nextRevision.overflow else { throw NativeSourceConversationError.capacityExceeded }
+            let stored = try NativeSourceStoredBudgetDisposition(version: 1, metadata: recomputed,
+                fenceRevision: nextRevision.partialValue, recordedAt: timestamp, storageDeadline: storageDeadline).validated()
+            let bytes = try NativeSourceJournalCoding.encode(stored, maximum: NativeSourceBudgetMetadata.maximumStoredBytes)
+            let frozen = try pressureObservation.map { try NativeSourceJournalCoding.encode($0.fields.effectiveCeilings, maximum: 8_192) }
+            guard try connection.execute("""
+                UPDATE native_source_conversations SET state='stopped',active_stage_id=?,revision=revision+1,updated_at=?,
+                    configuration_sha256=COALESCE(configuration_sha256,?),ceilings_json=COALESCE(ceilings_json,?),
+                    ceilings_sha256=COALESCE(ceilings_sha256,?) WHERE conversation_id=? AND revision=? AND cancelled=0
+                """, bindings: [.text(binding.stageID.uuidString.lowercased()),.text(timestamp),
+                    .optionalText(pressureObservation?.fields.preflight.configurationSHA),
+                    .optionalText(frozen.map { String(decoding: $0, as: UTF8.self) }),.optionalText(frozen.map(JSONSupport.sha256Hex)),
+                    .text(binding.conversationID.uuidString.lowercased()),.int64(binding.conversationRevision)]) == 1 else {
+                throw NativeSourceConversationError.conflict
+            }
+            guard try connection.execute("""
+                UPDATE native_source_provider_turns SET pressure_decision_json=?,pressure_decision_sha256=?,blocked_code=?,updated_at=?
+                WHERE stage_id=? AND pressure_decision_json IS NULL AND blocked_code IS NULL
+                """, bindings: [.text(String(decoding: bytes, as: UTF8.self)),.text(JSONSupport.sha256Hex(bytes)),
+                    .text(storageDeadline == nil ? "budget_blocked" : "pressure_pending"),.text(timestamp),
+                    .text(binding.stageID.uuidString.lowercased())]) == 1 else { throw NativeSourceConversationError.conflict }
+            switch recomputed {
+            case .blocked: return .blocked(stored)
+            case .pressure:
+                let fenced = try nativeConversationUnlocked(binding.conversationID, attachment: attachment, connection: connection)
+                return .pressure(try nativePressureClaimUnlocked(conversation: fenced,
+                    stage: nativeStageUnlocked(binding.stageID, conversation: fenced, connection: connection), attachment: attachment))
+            }
+        }
+    }
+
+    private func nativePressureClaimUnlocked(conversation: NativeSourceConversationRow,
+        stage: NativeSourceStageRow, attachment: AuthenticatedContinuityTaskAttachment
+    ) throws -> NativeSourcePressureClaim {
+        let now = ISO8601.string(from: clock.now())
+        guard !conversation.cancelled else { throw NativeSourceConversationError.cancelled }
+        guard conversation.state == .stopped, conversation.active == stage.body.stageID,
+              stage.blocked == "pressure_pending", let stored = stage.budgetDisposition,
+              case .pressure = stored.metadata, stored.binding.stageState == stage.state,
+              stored.fenceRevision == conversation.revision, let deadline = stored.storageDeadline else {
+            throw NativeSourceConversationError.conflict
+        }
+        guard deadline > now else { throw NativeSourceConversationError.deadlineExceeded }
+        guard let owner = conversation.owner, let expiry = conversation.leaseExpires,
+              expiry > now, conversation.capabilityEpoch == attachment.descriptor.epoch else {
+            throw NativeSourceConversationError.leaseUnavailable
+        }
+        return .init(conversationID: conversation.body.conversationID, taskID: conversation.body.taskID,
+            capabilityID: conversation.body.capabilityID, stageID: stage.body.stageID,
+            capabilityEpoch: attachment.descriptor.epoch, leaseEpoch: conversation.leaseEpoch,
+            fenceRevision: stored.fenceRevision, managerInstanceID: owner, expiresAt: min(expiry, deadline),
+            storageDeadline: deadline, dispositionSHA256: JSONSupport.sha256Hex(
+                try NativeSourceJournalCoding.encode(stored, maximum: NativeSourceBudgetMetadata.maximumStoredBytes)))
+    }
+
+    private func nativePressureStateUnlocked(claim: NativeSourcePressureClaim,
+        credential: NativeTaskCapabilityCredential, connection: ControlPlaneSQLiteConnection
+    ) throws -> (AuthenticatedContinuityTaskAttachment, NativeSourceConversationRow, NativeSourceStageRow) {
+        let attachment = try authenticateNativeTaskCapabilityUnlocked(credential, connection: connection)
+        guard attachment.descriptor.taskID == claim.taskID, credential.capabilityID == claim.capabilityID,
+              credential.epoch == claim.capabilityEpoch else { throw NativeSourceConversationError.notFound }
+        let conversation = try nativeConversationUnlocked(claim.conversationID, attachment: attachment, connection: connection)
+        let stage = try nativeStageUnlocked(claim.stageID, conversation: conversation, connection: connection)
+        let current = try nativePressureClaimUnlocked(conversation: conversation, stage: stage, attachment: attachment)
+        guard current.managerInstanceID == claim.managerInstanceID, current.leaseEpoch == claim.leaseEpoch,
+              current.fenceRevision == claim.fenceRevision, current.dispositionSHA256 == claim.dispositionSHA256,
+              current.storageDeadline == claim.storageDeadline, current.expiresAt >= claim.expiresAt,
+              claim.expiresAt > ISO8601.string(from: clock.now()) else { throw NativeSourceConversationError.leaseUnavailable }
+        try requireSourceMutationAdmissionUnlocked(attachment.setup.record.authorization, connection: connection)
+        return (attachment, conversation, stage)
+    }
+
+    func nativeSourcePressureDisposition(claim: NativeSourcePressureClaim, credential: NativeTaskCapabilityCredential,
+        cancellation: ToolCallCancellation? = nil) throws -> NativeSourceStoredBudgetDisposition {
+        try controlledTransaction(cancellation: cancellation) { connection in
+            let (_, _, stage) = try nativePressureStateUnlocked(claim: claim, credential: credential, connection: connection)
+            guard let disposition = stage.budgetDisposition else { throw NativeSourceConversationError.integrityFailure }
+            return disposition
+        }
+    }
+
+    func acquireNativeSourcePressureClaim(conversationID: UUID, stageID: UUID,
+        credential: NativeTaskCapabilityCredential, managerInstanceID: UUID,
+        cancellation: ToolCallCancellation? = nil) throws -> NativeSourcePressureClaim {
+        try controlledTransaction(cancellation: cancellation, fullDurability: true, beforeCommitValidation: {
+            let connection = try self.requiredConnection()
+            let a = try self.authenticateNativeTaskCapabilityUnlocked(credential, connection: connection)
+            let c = try self.nativeConversationUnlocked(conversationID, attachment: a, connection: connection)
+            let stage = try self.nativeStageUnlocked(stageID, conversation: c, connection: connection)
+            let claim = try self.nativePressureClaimUnlocked(conversation: c, stage: stage, attachment: a)
+            guard claim.managerInstanceID == managerInstanceID else { throw NativeSourceConversationError.leaseUnavailable }
+            try self.requireSourceMutationAdmissionUnlocked(a.setup.record.authorization, connection: connection)
+        }) { connection in
+            let a = try authenticateNativeTaskCapabilityUnlocked(credential, connection: connection)
+            let c = try nativeConversationUnlocked(conversationID, attachment: a, connection: connection)
+            let stage = try nativeStageUnlocked(stageID, conversation: c, connection: connection)
+            try requireSourceMutationAdmissionUnlocked(a.setup.record.authorization, connection: connection)
+            let now = ISO8601.string(from: clock.now())
+            guard !c.cancelled else { throw NativeSourceConversationError.cancelled }
+            guard c.state == .stopped, c.active == stageID, stage.blocked == "pressure_pending",
+                  let stored = stage.budgetDisposition, case .pressure = stored.metadata,
+                  let deadline = stored.storageDeadline else { throw NativeSourceConversationError.conflict }
+            guard deadline > now else { throw NativeSourceConversationError.deadlineExceeded }
+            guard c.owner == nil || (c.leaseExpires ?? "") <= now else { throw NativeSourceConversationError.leaseUnavailable }
+            guard c.leaseEpoch < Int64.max else { throw NativeSourceConversationError.capacityExceeded }
+            let expiry = min(deadline, a.descriptor.expiresAt, ISO8601.string(from: clock.now().addingTimeInterval(30)))
+            try connection.execute("""
+                UPDATE native_source_conversations SET lease_owner=?,lease_epoch=lease_epoch+1,lease_capability_epoch=?,lease_expires_at=?
+                WHERE conversation_id=?
+                """, bindings: [.text(managerInstanceID.uuidString.lowercased()),.int64(credential.epoch),.text(expiry),
+                    .text(conversationID.uuidString.lowercased())])
+            return try nativePressureClaimUnlocked(conversation: nativeConversationUnlocked(conversationID,
+                attachment: a, connection: connection), stage: stage, attachment: a)
+        }
+    }
+
+    func renewNativeSourcePressureClaim(claim: NativeSourcePressureClaim, credential: NativeTaskCapabilityCredential,
+        cancellation: ToolCallCancellation? = nil) throws -> NativeSourcePressureClaim {
+        try controlledTransaction(cancellation: cancellation, fullDurability: true, beforeCommitValidation: {
+            _ = try self.nativePressureStateUnlocked(claim: claim, credential: credential, connection: self.requiredConnection())
+        }) { connection in
+            let (a, c, stage) = try nativePressureStateUnlocked(claim: claim, credential: credential, connection: connection)
+            let expiry = min(claim.storageDeadline, a.descriptor.expiresAt, ISO8601.string(from: clock.now().addingTimeInterval(30)))
+            try connection.execute("UPDATE native_source_conversations SET lease_expires_at=? WHERE conversation_id=?",
+                bindings: [.text(expiry),.text(c.body.conversationID.uuidString.lowercased())])
+            return try nativePressureClaimUnlocked(conversation: nativeConversationUnlocked(c.body.conversationID,
+                attachment: a, connection: connection), stage: stage, attachment: a)
+        }
+    }
+
+    func releaseNativeSourcePressureClaim(_ claim: NativeSourcePressureClaim) throws -> Bool {
+        try controlledTransaction(cancellation: nil, fullDurability: true) { connection in
+            try connection.execute("""
+                UPDATE native_source_conversations SET lease_owner=NULL,lease_capability_epoch=NULL,lease_expires_at=NULL
+                WHERE conversation_id=? AND task_id=? AND capability_id=? AND lease_owner=? AND lease_epoch=? AND lease_capability_epoch=?
+                """, bindings: [.text(claim.conversationID.uuidString.lowercased()),.text(claim.taskID.uuidString.lowercased()),
+                    .text(claim.capabilityID.uuidString.lowercased()),.text(claim.managerInstanceID.uuidString.lowercased()),
+                    .int64(claim.leaseEpoch),.int64(claim.capabilityEpoch)]) == 1
+        }
     }
 
     func nativeSourceBudgetBinding(stageID: UUID, boundary: NativeSourceBudgetBoundary,
@@ -2710,7 +2982,8 @@ public actor ProjectControlPlaneRepository {
             let firstID = try prior?.0.map { try NativeTaskValue.uuid($0) }
             if firstID == cancelRequestID, prior?.1 != reasonSHA { throw NativeSourceConversationError.conflict }
             let timestamp = try prior?.2.map { try NativeTaskValue.date($0) } ?? ISO8601.string(from: clock.now())
-            let activeExact = c.active == id && c.state != .sourceFenced && c.state != .stopped
+            let pressureExact = c.active == id && c.state == .stopped && stage.budgetDisposition != nil
+            let activeExact = (c.active == id && c.state != .sourceFenced && c.state != .stopped) || pressureExact
             if firstID == nil {
                 try connection.execute("UPDATE native_source_provider_turns SET cancel_request_id=?,cancel_reason_sha256=?,cancelled_at=? WHERE stage_id=? AND cancel_request_id IS NULL",
                     bindings: [.text(cancelRequestID.uuidString.lowercased()),.text(reasonSHA),.text(timestamp),.text(id.uuidString.lowercased())])
@@ -2720,8 +2993,13 @@ public actor ProjectControlPlaneRepository {
                         WHERE conversation_id=? AND active_stage_id=?
                         """, bindings: [.text(cancelRequestID.uuidString.lowercased()),.text(requestID.uuidString.lowercased()),.text(reasonSHA),
                             .text(timestamp),.text(timestamp),.text(conversationID.uuidString.lowercased()),.text(id.uuidString.lowercased())])
-                    try connection.execute("UPDATE native_source_provider_turns SET state='cancelled_before_dispatch',reserved_bytes=0,blocked_code='cancelled',updated_at=? WHERE stage_id=? AND state='prepared'",
-                        bindings: [.text(timestamp),.text(id.uuidString.lowercased())])
+                    if pressureExact {
+                        try connection.execute("UPDATE native_source_provider_turns SET blocked_code='pressure_cancelled',updated_at=? WHERE stage_id=?",
+                            bindings: [.text(timestamp),.text(id.uuidString.lowercased())])
+                    } else {
+                        try connection.execute("UPDATE native_source_provider_turns SET state='cancelled_before_dispatch',reserved_bytes=0,blocked_code='cancelled',updated_at=? WHERE stage_id=? AND state='prepared'",
+                            bindings: [.text(timestamp),.text(id.uuidString.lowercased())])
+                    }
                 }
             }
             return .init(conversationID: conversationID, taskID: c.body.taskID, requestID: requestID,
