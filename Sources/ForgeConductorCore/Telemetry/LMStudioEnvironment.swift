@@ -14,6 +14,7 @@ import Foundation
 public enum LMStudioEnvironment {
     public static let primaryServerID = "forge-conductor"
     public static let fallbackServerID = "forge-conductor-fallback"
+    public static let continuityServerID = "forge-conductor-clu"
 
     /// Shell wrappers that used to front the old Python stack. Deleted by install.
     public static let legacyLauncherNames = [
@@ -286,8 +287,8 @@ public enum LMStudioEnvironment {
         ]
     }
 
-    /// The revision is valid only when both role registrations point at the
-    /// expected executable and carry the same nonempty deployment identifier.
+    /// Legacy pair registrations remain readable. When CLU is registered, every
+    /// role must point at the same executable and deployment revision.
     public static func registeredDeploymentID(expectedBinary: URL) -> String? {
         let servers = configuredMCPServers()
         guard let primary = servers.first(where: { $0.id == primaryServerID }),
@@ -299,6 +300,10 @@ public enum LMStudioEnvironment {
               fallback.environment["FORGE_DEPLOYMENT_ID"] == primaryID
         else {
             return nil
+        }
+        if let continuity = servers.first(where: { $0.id == continuityServerID }) {
+            guard isSwiftServeRegistration(continuity, expectedBinary: expectedBinary, expectedRole: .clu),
+                  continuity.environment["FORGE_DEPLOYMENT_ID"] == primaryID else { return nil }
         }
         return primaryID
     }
@@ -331,9 +336,10 @@ public enum LMStudioEnvironment {
 
         if primaryOK && fallbackOK {
             guard let deploymentID = registeredDeploymentID(expectedBinary: expectedBinary) else {
-                return (false, "primary+fallback lack one matching deployment revision — redeploy Forge Conductor")
+                return (false, "registered roles lack one matching deployment revision — redeploy Forge Conductor")
             }
-            return (true, "primary+fallback → \(expectedBinary.path) serve [\(deploymentID)]")
+            let roles = servers.contains(where: { $0.id == continuityServerID }) ? "primary+fallback+clu" : "primary+fallback (legacy pair)"
+            return (true, "\(roles) → \(expectedBinary.path) serve [\(deploymentID)]")
         }
         if primaryOK && !fallbackOK {
             return (false, "primary OK; missing Swift fallback — run forge-conductor install")

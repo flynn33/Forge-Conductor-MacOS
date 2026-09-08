@@ -6,13 +6,15 @@
 
 import SwiftUI
 import MetalKit
+import ForgeConductorCore
 
 /// SwiftUI wrapper around an MTKView that draws the load history with Metal.
 struct MetalLoadChart: NSViewRepresentable {
     var samples: [Float]
+    var surfaceDiagnostics: RuntimeDiagnostics? = nil
 
     func makeCoordinator() -> LoadTraceRenderer {
-        LoadTraceRenderer()
+        LoadTraceRenderer(surfaceDiagnostics: surfaceDiagnostics)
     }
 
     func makeNSView(context: Context) -> MTKView {

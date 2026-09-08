@@ -112,6 +112,19 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     private var providerConfigurationService: (any ProviderConfigurationServicing)?
     private var activeProviderProbeID: UUID?
     private var managedAutonomy: ManagedAutonomyRuntime?
+    private var continuityIngress: ContinuityIngressDeliveryService?
+    private var nativeSourceConversation: NativeSourceConversationService?
+    private let nativeSourceManagerInstanceID = UUID()
+    private var nativeSourceRecoveryFirst = false
+    private var managedAutonomyStarting = false
+    private var managedAutonomyClosing = false
+    private var managedAutonomyShutdownID: UUID?
+    private let taskHTTPService: MCPTaskHTTPService
+    private let nativeTaskOperatorAdmission = MCPRequestAdmission(maximumActiveRequests: 8)
+    private let nativeTaskOperatorNamespace = UUID()
+    private var nativeSourceRecoveryCursor: Int64?
+    private var nativeSourceRecoveryCancellation: ToolCallCancellation?
+    private var nativeTaskAttachmentClosing = false
 
     public convenience init(
         app: ForgeApp,
@@ -143,6 +156,13 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             projectRelinkCheckpoint: { _ in },
             projectRegistrationCheckpoint: { _ in }
         )
+    }
+
+    convenience init(app: ForgeApp, managedAutonomyFactory: @escaping ManagedAutonomyFactory,
+                     hostAdapterRegistry: HostAdapterRegistry) {
+        self.init(app: app, managedAutonomyFactory: managedAutonomyFactory,
+            hostAdapterRegistry: hostAdapterRegistry, generationResetCheckpoint: { _, _ in },
+            projectRelinkCheckpoint: { _ in }, projectRegistrationCheckpoint: { _ in })
     }
 
     convenience init(
@@ -229,6 +249,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         ) throws -> Void
     ) {
         self.app = app
+        self.taskHTTPService = MCPTaskHTTPService(app: app)
         self.managedAutonomyFactory = managedAutonomyFactory
         self.hostAdapterRegistry = hostAdapterRegistry
         self.providerProbeTimeoutSeconds = min(
@@ -241,6 +262,10 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     }
 
     deinit {
+        nativeTaskOperatorAdmission.setOpen(false)
+        taskHTTPService.closeAdmission()
+        nativeSourceConversation?.setOperational(false)
+        nativeSourceRecoveryCancellation?.cancel()
         stopWatchdog()
         stopSignalHandlers()
         tearDownDashboard()
@@ -516,6 +541,9 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
 
     private func stopServiceSerialized() -> ManagerStatus {
         lock.lock()
+        taskHTTPService.setOperational(false)
+        nativeSourceConversation?.setOperational(false)
+        nativeSourceRecoveryCancellation?.cancel()
         runtime.desiredRunning = false
         runtime.state = .stopping
         runtime.markStopped()
@@ -1489,7 +1517,10 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             // This query includes paused/recoverable runs. Changing an endpoint under
             // any durable session would invalidate its receipt reconciliation domain.
             let runs = try await self.app.projectContexts.repository.nonterminalAutonomousRuns(limit: 1)
-            guard runs.isEmpty else { throw ProviderConfigurationError.busy }
+            guard runs.isEmpty,
+                  !(try await self.app.projectContexts.repository.hasNativeSourceProviderConfigurationBinding()) else {
+                throw ProviderConfigurationError.busy
+            }
             if let autonomy = self.providerAutonomyRuntime(),
                !(await autonomy.snapshot()).supervisor.activeRunIDs.isEmpty {
                 throw ProviderConfigurationError.busy
@@ -1508,7 +1539,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         _ operation: @escaping @Sendable (any ProviderConfigurationServicing) async throws -> Value
     ) throws -> Value {
         lock.lock()
-        guard !providerConfigurationInProgress, !runtime.providerProbeInProgress,
+        guard !managedAutonomyClosing, !providerConfigurationInProgress, !runtime.providerProbeInProgress,
               providerRunOperations == 0 else {
             lock.unlock()
             throw ProviderConfigurationError.busy
@@ -1551,7 +1582,9 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
 
     private func beginProviderRunOperation() throws {
         lock.lock(); defer { lock.unlock() }
-        guard !providerConfigurationInProgress else { throw ProviderConfigurationError.busy }
+        guard !managedAutonomyClosing, !providerConfigurationInProgress, !runtime.providerProbeInProgress else {
+            throw ProviderConfigurationError.busy
+        }
         providerRunOperations += 1
     }
 
@@ -1577,7 +1610,8 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         let startedAt = ISO8601.string(from: app.clock.now())
         let probeID = UUID()
         lock.lock()
-        guard !runtime.providerProbeInProgress, !providerConfigurationInProgress else {
+        guard !managedAutonomyClosing, !runtime.providerProbeInProgress, !providerConfigurationInProgress,
+              providerRunOperations == 0 else {
             lock.unlock()
             throw ManagerProviderProbeError.probeInProgress
         }
@@ -1768,8 +1802,10 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         let authorizedRoot = try authorizedProjectRoot(project.canonicalRoot)
         do {
             let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
-            _ = try catalog.definitions(allowedToolNames: allowedTools)
+            _ = try catalog.providerToolDefinitions(allowedToolNames: allowedTools)
         } catch ToolDefinitionCatalogError.unregisteredAllowedTools(let tools) {
+            throw AutonomyError.invalidToolConfiguration(tools)
+        } catch ToolDefinitionCatalogError.controlPlaneOnlyTools(let tools) {
             throw AutonomyError.invalidToolConfiguration(tools)
         }
         let request = AutonomousRunRequest(
@@ -1798,6 +1834,197 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             return try await autonomy.createRun(request)
         }
         return try autonomousRunDictionary(run)
+    }
+
+    /// Operator admission is claimed before retaining a body in an async worker.
+    /// The same owner keeps cancellation and shutdown accounting until it exits.
+    @discardableResult
+    func dispatchNativeTaskCommand(action: String, body: Data,
+        completion: @escaping @Sendable (Result<NativeTaskCapabilityCommandResult, Error>) -> Void
+    ) -> Bool {
+        guard body.count <= NativeContinuityTaskPreparationRequest.maximumBodyBytes else { return false }
+        let key = MCPRequestAdmission.Key(sessionID: nativeTaskOperatorNamespace,
+            id: .string(UUID().uuidString.lowercased()))
+        let cancellation = ToolCallCancellation(timeoutSeconds: 15)
+        guard case .accepted = nativeTaskOperatorAdmission.reserve(key, cancellation: cancellation) else { return false }
+        let task = Task.detached(priority: .userInitiated) {
+            defer { self.nativeTaskOperatorAdmission.finish(key, cancellation: cancellation) }
+            do {
+                try cancellation.checkCancellation()
+                let result: NativeTaskCapabilityCommandResult
+                switch action {
+                case "prepare":
+                    result = try await self.prepareNativeContinuityTask(
+                        NativeContinuityTaskPreparationRequest(data: body), cancellation: cancellation)
+                case "rotate":
+                    result = try await self.app.projectContexts.repository.rotateNativeContinuityTask(
+                        request: NativeContinuityTaskRotationRequest(data: body), cancellation: cancellation)
+                case "revoke":
+                    result = try await self.app.projectContexts.repository.revokeNativeContinuityTask(
+                        request: NativeContinuityTaskRevocationRequest(data: body), cancellation: cancellation)
+                default: throw NativeTaskOperatorError.invalidRequest("action")
+                }
+                completion(.success(result))
+            } catch {
+                completion(.failure(error))
+            }
+        }
+        nativeTaskOperatorAdmission.bindTask(key, cancellation: cancellation) { task.cancel() }
+        return true
+    }
+
+    @discardableResult
+    func dispatchNativeSourceCommand(action: String, body: Data,
+        completion: @escaping @Sendable (Result<NativeSourceOperatorResponse, Error>) -> Void
+    ) -> Bool {
+        guard body.count <= NativeSourceSendRequest.maximumBodyBytes else { return false }
+        let key = MCPRequestAdmission.Key(sessionID: nativeTaskOperatorNamespace,
+            id: .string(UUID().uuidString.lowercased()))
+        let cancellation = ToolCallCancellation(timeoutSeconds: 15)
+        guard case .accepted = nativeTaskOperatorAdmission.reserve(key, cancellation: cancellation) else { return false }
+        let task = Task.detached(priority: .userInitiated) {
+            defer { self.nativeTaskOperatorAdmission.finish(key, cancellation: cancellation) }
+            do {
+                try cancellation.checkCancellation()
+                let source = try self.requiredNativeSourceConversation()
+                let response: NativeSourceOperatorResponse
+                switch action {
+                case "send": response = try await source.send(NativeSourceSendRequest(data: body), cancellation: cancellation)
+                case "status": response = try await source.status(NativeSourceStatusRequest(data: body), cancellation: cancellation)
+                case "cancel": response = try await source.cancel(NativeSourceCancelRequest(data: body), cancellation: cancellation)
+                default: throw NativeSourceOperatorError.invalidRequest("action")
+                }
+                completion(.success(response))
+            } catch { completion(.failure(error)) }
+        }
+        nativeTaskOperatorAdmission.bindTask(key, cancellation: cancellation) { task.cancel() }
+        return true
+    }
+
+    private func requiredNativeSourceConversation() throws -> NativeSourceConversationService {
+        lock.lock(); defer { lock.unlock() }
+        guard !managedAutonomyClosing, !nativeTaskAttachmentClosing, !runtime.shutdownRequested,
+              let nativeSourceConversation else { throw NativeSourceOperatorError.unavailable }
+        return nativeSourceConversation
+    }
+
+    private func makeNativeSourceConversation(runtime: ManagedAutonomyRuntime) -> NativeSourceConversationService {
+        NativeSourceConversationService(repository: app.projectContexts.repository,
+            providerWorkAdmission: runtime.providerWorkAdmission, managerInstanceID: nativeSourceManagerInstanceID,
+            clock: app.clock, attachmentResolver: { [weak self] taskID in
+                guard let self else { throw NativeSourceOperatorError.unavailable }
+                let dashboard = self.app.config.model.dashboard
+                var endpoint = URLComponents()
+                endpoint.scheme = "http"; endpoint.host = dashboard.host; endpoint.port = dashboard.port
+                endpoint.path = MCPTaskHTTPService.path
+                guard let url = endpoint.url else { throw NativeSourceOperatorError.unavailable }
+                try NativeTaskOperatorEndpoint.validate(url)
+                return try NativeTaskCredentialFileStore(paths: self.app.paths).attachment(taskID: taskID,
+                    managerEndpoint: url, now: self.app.clock.now())
+            }, providerResolver: { [weak self] assignment in
+                guard let self, assignment.adapterID == Self.nativeSessionHostAdapterID,
+                      let provider = try self.hostAdapterRegistry.managedProvider(identifier: assignment.adapterID,
+                        storageDirectory: self.providerStorageDirectory(adapterID: assignment.adapterID))
+                        as? any ManagedModelProviderObservedDispatching,
+                      provider.providerID == assignment.providerID else { throw NativeSourceConversationError.unsupportedProvider }
+                return provider
+            }, configurationResolver: { [weak self] in
+                guard let self else { throw NativeSourceOperatorError.unavailable }
+                return try await self.nativeSourceConfigurationService().read()
+            }, policyResolver: { [weak self] projectID, generation in
+                guard let self, let value = Int(exactly: generation.rawValue) else { throw NativeSourceOperatorError.unavailable }
+                return try self.app.config.budgetPolicySelection(scope: .init(kind: .projectOverride,
+                    projectID: projectID.description, projectGeneration: value))
+            }, tools: { [weak self] credential, lease, cancellation in
+                guard let self else { throw NativeSourceOperatorError.unavailable }
+                return try await self.taskHTTPService.nativeProviderTools(credential: credential, lease: lease, cancellation: cancellation)
+            }, call: { [weak self] credential, reference, lease, budget, cancellation in
+                guard let self else { throw NativeSourceOperatorError.unavailable }
+                return try await self.taskHTTPService.submitNativeCall(credential: credential, reference: reference,
+                    lease: lease, outputBudget: budget, cancellation: cancellation)
+            }, budgetEvaluator: { prepared, preflight, capabilities, selection in
+                try NativeSourceBudgetEvaluator.providerApproval(prepared: prepared, preflight: preflight,
+                    capabilities: capabilities, policySelection: selection)
+            }, outputBudgetEvaluator: { call, outputs, preflight, capabilities, selection in
+                try NativeSourceBudgetEvaluator.outputBudget(call: call, priorOutputs: outputs,
+                    emptyOutputPreflight: preflight, capabilities: capabilities, policySelection: selection)
+            }, beginProviderOperation: { [weak self] in
+                guard let self else { throw NativeSourceOperatorError.unavailable }
+                try self.beginProviderRunOperation()
+                return NativeSourceProviderOperationLease { self.finishProviderRunOperation() }
+            })
+    }
+
+    /// Source workers already own the configuration exclusion for their entire exchange.
+    /// Reading through the public settings operation would conflict with that same owner.
+    private func nativeSourceConfigurationService() throws -> any ProviderConfigurationServicing {
+        lock.lock()
+        guard !managedAutonomyClosing, providerRunOperations > 0, !providerConfigurationInProgress,
+              !runtime.providerProbeInProgress else { lock.unlock(); throw ProviderConfigurationError.busy }
+        let existing = providerConfigurationService
+        lock.unlock()
+        if let existing { return existing }
+        let created = try hostAdapterRegistry.configurationService(identifier: Self.nativeSessionHostAdapterID,
+            storageDirectory: providerStorageDirectory(adapterID: Self.nativeSessionHostAdapterID))
+        lock.lock(); defer { lock.unlock() }
+        if let existing = providerConfigurationService { return existing }
+        providerConfigurationService = created
+        return created
+    }
+
+    func prepareNativeContinuityTask(_ request: NativeContinuityTaskPreparationRequest,
+        cancellation: ToolCallCancellation? = nil
+    ) async throws -> NativeTaskCapabilityCommandResult {
+        try cancellation?.checkCancellation()
+        guard let project = try await app.projectContexts.repository.project(request.projectID,
+            cancellation: cancellation) else { throw ProjectContextError.projectNotFound(request.projectID) }
+        guard project.generation == request.projectGeneration else {
+            throw ProjectContextError.staleProjectGeneration(expected: request.projectGeneration, actual: project.generation)
+        }
+        guard project.lifecycleState == .active else { throw ProjectContextError.projectNotActive(project.lifecycleState) }
+        let root = try authorizedProjectRoot(project.canonicalRoot)
+        let approval = request.approval
+        guard approval.filesystemAccess == "read_only", !approval.networkAllowed,
+              Set(approval.allowedTools) == ["fs_read"] else { throw NativeTaskCapabilityError.unsupportedProfile }
+        let assignment = try ContinuityTaskAssignment(
+            assignmentID: approval.assignmentID, assignmentBytes: approval.assignmentBytes,
+            mission: approval.mission, providerID: approval.providerID, adapterID: approval.adapterID,
+            modelKey: approval.modelKey,
+            specification: AutonomousRunSpecification(allowedTools: approval.allowedTools,
+                completionGates: approval.completionGates, resourceProfile: approval.resourceProfile),
+            authorizationScope: ToolAuthorizationScope(canonicalRoots: [root], writableRoots: [],
+                allowedTools: Set(approval.allowedTools), networkAllowed: false,
+                maximumInlineOutputBytes: approval.maximumInlineOutputBytes))
+        return try await app.projectContexts.repository.prepareNativeContinuityTask(request: request,
+            approvedAssignment: assignment, cancellation: cancellation)
+    }
+
+    /// Must settle before the application closes either durable store. A false
+    /// result retains an explicit incomplete-shutdown outcome at the caller.
+    @discardableResult
+    func shutdownNativeTaskAttachment() -> Bool {
+        lock.lock()
+        nativeTaskAttachmentClosing = true
+        let sourceConversation = nativeSourceConversation
+        sourceConversation?.setOperational(false)
+        nativeSourceRecoveryCancellation?.cancel()
+        lock.unlock()
+        nativeTaskOperatorAdmission.setOpen(false)
+        taskHTTPService.closeAdmission()
+        do {
+            return try Self.waitForAsync(timeoutSeconds: 20) {
+                async let transportDrained = self.taskHTTPService.shutdown()
+                async let sourceReport = sourceConversation?.shutdown(deadline: self.app.clock.now().addingTimeInterval(15))
+                let deadline = DispatchTime.now().uptimeNanoseconds + 15_000_000_000
+                while (self.nativeTaskOperatorAdmission.activeCount > 0 || !self.nativeSourceRecoveryIsSettled),
+                      DispatchTime.now().uptimeNanoseconds < deadline {
+                    try await Task.sleep(for: .milliseconds(10))
+                }
+                let drained = await transportDrained
+                let sourceDrained = await sourceReport?.completed ?? true
+                return drained && sourceDrained && self.nativeTaskOperatorAdmission.activeCount == 0 && self.nativeSourceRecoveryIsSettled
+            }
+        } catch { return false }
     }
 
     private func authorizedProjectRoot(_ projectRoot: URL) throws -> URL {
@@ -2539,6 +2766,10 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     public func requestShutdown(delayMs: Int = 300) {
         lock.lock()
         runtime.requestShutdown()
+        taskHTTPService.closeAdmission()
+        nativeSourceConversation?.setOperational(false)
+        nativeTaskOperatorAdmission.setOpen(false)
+        nativeSourceRecoveryCancellation?.cancel()
         lock.unlock()
         app.diagnostics.info("manager_shutdown_requested", [:])
         runtime.queue.asyncAfter(deadline: .now() + .milliseconds(delayMs)) { [weak self] in
@@ -2594,7 +2825,28 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         stopWatchdog()
         stopSignalHandlers()
         tearDownDashboard()
-        shutdownManagedAutonomy()
+        guard shutdownNativeTaskAttachment() else {
+            let error = RuntimeJobError.storageFailure("manager shutdown retained native task request ownership")
+            lock.lock()
+            runtime.markFailed(error)
+            lock.unlock()
+            persistState()
+            ManagerPIDFile.remove(paths: app.paths)
+            runtime.runLock.signal()
+            fputs("forge-conductor manager shutdown incomplete: native task requests remain active\n", stderr)
+            exit(1)
+        }
+        guard shutdownManagedAutonomy() else {
+            let error = RuntimeJobError.storageFailure("manager shutdown retained provider work ownership")
+            lock.lock()
+            runtime.markFailed(error)
+            lock.unlock()
+            persistState()
+            ManagerPIDFile.remove(paths: app.paths)
+            runtime.runLock.signal()
+            fputs("forge-conductor manager shutdown incomplete: provider work remains active\n", stderr)
+            exit(1)
+        }
         let shutdownReport = app.shutdown()
         guard shutdownReport.completed else {
             let unresolved = shutdownReport.unresolvedJobIDs
@@ -2662,6 +2914,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
 
         let server = DashboardServer(app: app, host: host, port: port)
         server.manager = self
+        server.taskHTTPService = taskHTTPService
         try server.start()
 
         lock.lock()
@@ -2671,6 +2924,9 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
 
     private func tearDownDashboard(allowingCompletedResponses: Bool = false) {
         lock.lock()
+        taskHTTPService.setOperational(false)
+        nativeSourceConversation?.setOperational(false)
+        nativeSourceRecoveryCancellation?.cancel()
         let server = runtime.dashboard
         runtime.dashboard = nil
         lock.unlock()
@@ -2905,19 +3161,42 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     @discardableResult
     public func recoverManagedAutonomy() throws -> AutonomyStartupReport? {
         lock.lock()
+        guard !managedAutonomyClosing, !managedAutonomyStarting else {
+            lock.unlock()
+            throw AutonomyError.shutdown
+        }
         if managedAutonomy != nil {
             lock.unlock()
             return nil
         }
+        managedAutonomyStarting = true
         lock.unlock()
+        var asyncStartupOwnsCompletion = false
+        defer { if !asyncStartupOwnsCompletion { finishManagedAutonomyStartup() } }
 
+        let ingress = try ContinuityIngressDeliveryService(
+            source: app.store, repository: app.projectContexts.repository, config: app.config
+        )
         let value = try managedAutonomyFactory(app)
-        let report = try Self.waitForAsync(timeoutSeconds: 30) {
-            try await value.start()
-        }
+        let sourceConversation = makeNativeSourceConversation(runtime: value)
+        // Publish ownership before awaiting startup. A timeout must not make a
+        // still-running provider owner invisible to manager shutdown.
         lock.lock()
         managedAutonomy = value
+        continuityIngress = ingress
+        nativeSourceConversation = sourceConversation
+        let closing = managedAutonomyClosing
         lock.unlock()
+        guard !closing else { throw AutonomyError.shutdown }
+        asyncStartupOwnsCompletion = true
+        let report = try Self.waitForAsync(timeoutSeconds: 30) {
+            defer { self.finishManagedAutonomyStartup() }
+            return try await value.start()
+        }
+        lock.lock()
+        let shutdownBegan = managedAutonomyClosing
+        lock.unlock()
+        guard !shutdownBegan else { throw AutonomyError.shutdown }
         app.diagnostics.info(
             "manager_autonomy_recovered",
             [
@@ -2931,18 +3210,61 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         return report
     }
 
+    private func finishManagedAutonomyStartup() {
+        lock.lock(); managedAutonomyStarting = false; lock.unlock()
+    }
+
     private func scheduleAutonomyTick() {
         lock.lock()
         guard let autonomy = managedAutonomy,
+              let ingress = continuityIngress,
+              let sourceConversation = nativeSourceConversation,
+              !managedAutonomyClosing,
               !runtime.autonomyTickPending,
               !runtime.shutdownRequested else {
             lock.unlock()
             return
         }
         runtime.autonomyTickPending = true
-        lock.unlock()
-
-        Task { [weak self, autonomy] in
+        nativeSourceRecoveryFirst.toggle()
+        let sourceFirst = nativeSourceRecoveryFirst
+        let tickID = UUID()
+        runtime.autonomyTickID = tickID
+        runtime.autonomyTickTask = Task { [weak self, autonomy, ingress, sourceConversation] in
+            defer { self?.markAutonomyTickComplete(tickID) }
+            do {
+                try await self?.reconcileNativeSourceCommitsOnce()
+            } catch {
+                if !Task.isCancelled {
+                    self?.app.diagnostics.warn("manager_native_source_recovery_failed",
+                        ["error_code": "bounded_source_recovery_failed"], category: .manager)
+                }
+            }
+            guard !Task.isCancelled else { return }
+            let recoverSource: @Sendable () async -> Void = { [weak self, sourceConversation] in
+                do {
+                    let token = ToolCallCancellation(timeoutSeconds: 15)
+                    _ = try await withTaskCancellationHandler {
+                        try await sourceConversation.recoverOnce(cancellation: token)
+                    } onCancel: { token.cancel() }
+                } catch {
+                    if !Task.isCancelled {
+                        self?.app.diagnostics.warn("manager_native_conversation_recovery_failed",
+                            ["error_code": "bounded_conversation_recovery_failed"], category: .manager)
+                    }
+                }
+            }
+            if sourceFirst { await recoverSource() }
+            guard !Task.isCancelled else { return }
+            do {
+                _ = try await ingress.drainOnce()
+            } catch {
+                if !Task.isCancelled {
+                    self?.app.diagnostics.warn("manager_continuity_delivery_failed",
+                        ["error_code": "bounded_ingress_drain_failed"], category: .manager)
+                }
+            }
+            guard !Task.isCancelled else { return }
             do {
                 try await autonomy.tick()
             } catch {
@@ -2952,28 +3274,118 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                     category: .manager
                 )
             }
-            guard let self else { return }
-            self.markAutonomyTickComplete()
+            if !sourceFirst, !Task.isCancelled { await recoverSource() }
+        }
+        lock.unlock()
+    }
+
+    private func markAutonomyTickComplete(_ tickID: UUID) {
+        lock.lock()
+        if runtime.autonomyTickID == tickID {
+            runtime.autonomyTickPending = false
+            runtime.autonomyTickID = nil
+            runtime.autonomyTickTask = nil
+        }
+        lock.unlock()
+    }
+
+    private func beginNativeSourceRecovery() -> (ToolCallCancellation, Int64?)? {
+        lock.lock(); defer { lock.unlock() }
+        guard runtime.state == .running, runtime.isHTTPUp, !runtime.shutdownRequested, !nativeTaskAttachmentClosing,
+              nativeSourceRecoveryCancellation == nil else { return nil }
+        let token = ToolCallCancellation(timeoutSeconds: 15)
+        nativeSourceRecoveryCancellation = token
+        return (token, nativeSourceRecoveryCursor)
+    }
+
+    private var nativeSourceRecoveryIsSettled: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return nativeSourceRecoveryCancellation == nil
+    }
+
+    private func finishNativeSourceRecovery(_ token: ToolCallCancellation, cursor: Int64?) {
+        lock.lock(); defer { lock.unlock() }
+        if nativeSourceRecoveryCancellation === token {
+            nativeSourceRecoveryCancellation = nil
+            nativeSourceRecoveryCursor = cursor
         }
     }
 
-    private func markAutonomyTickComplete() {
-        lock.lock()
-        runtime.autonomyTickPending = false
-        lock.unlock()
+    /// Uses the existing watchdog's single owned tick. A retained FULL intent is
+    /// reconciled with its exact packet and authority; no new source request is issued.
+    func reconcileNativeSourceCommitsOnce() async throws {
+        guard let (cancellation, initialCursor) = beginNativeSourceRecovery() else { return }
+        var cursor = initialCursor
+        defer { finishNativeSourceRecovery(cancellation, cursor: cursor) }
+        let repository = app.projectContexts.repository
+        let source = app.continuity
+        try await withTaskCancellationHandler {
+            let pending = try await repository.pendingNativeSourceCommits(afterRowID: cursor,
+                limit: 4, cancellation: cancellation)
+            if pending.isEmpty { cursor = nil; return }
+            for reference in pending {
+                try cancellation.checkCancellation()
+                cursor = reference.rowID
+                do {
+                    _ = try await repository.reconcileNativeSourceCommit(reference: reference,
+                        commit: { prepared, authorization, automatic in
+                            try source.commitPreparedAuthorizedSourceCommit(prepared,
+                                authorization: authorization, automaticHandoffEnabled: automatic,
+                                cancellation: cancellation)
+                        }, cancellation: cancellation)
+                } catch {
+                    try cancellation.checkCancellation()
+                    try await repository.deferNativeSourceCommit(reference: reference, cancellation: cancellation)
+                }
+            }
+        } onCancel: { cancellation.cancel() }
     }
 
-    public func shutdownManagedAutonomy() {
+    /// Runs the same bounded delivery pass used by the manager watchdog. A GUI
+    /// or MCP-only ManagerNode has no admission owner and cannot drive this path.
+    func drainContinuityIngressOnce() async throws -> ContinuityIngressDrainReport {
+        try await requiredContinuityIngress().drainOnce()
+    }
+
+    private func requiredContinuityIngress() throws -> ContinuityIngressDeliveryService {
         lock.lock()
+        defer { lock.unlock() }
+        guard managedAutonomy != nil, !managedAutonomyClosing, !runtime.shutdownRequested, let continuityIngress else {
+            throw AutonomyError.shutdown
+        }
+        return continuityIngress
+    }
+
+    /// A deadline stops waiting; it never releases the provider owners or their stores.
+    @discardableResult
+    public func shutdownManagedAutonomy() -> Bool {
+        lock.lock()
+        managedAutonomyClosing = true
+        nativeSourceConversation?.setOperational(false)
+        managedAutonomy?.providerWorkAdmission.close()
+        guard !managedAutonomyStarting, managedAutonomyShutdownID == nil,
+              providerRunOperations == 0, !providerConfigurationInProgress,
+              !runtime.providerProbeInProgress, activeProviderProbeID == nil else {
+            lock.unlock()
+            return false
+        }
         let autonomy = managedAutonomy
-        managedAutonomy = nil
-        runtime.autonomyTickPending = false
+        let ingress = continuityIngress
+        let sourceConversation = nativeSourceConversation
+        let tick = runtime.autonomyTickTask
+        let shutdownID = UUID()
+        managedAutonomyShutdownID = shutdownID
+        tick?.cancel()
         lock.unlock()
-        guard let autonomy else { return }
         do {
-            _ = try Self.waitForAsync(timeoutSeconds: 20) {
-                await autonomy.shutdown()
-                return true
+            return try Self.waitForAsync(timeoutSeconds: 20) {
+                await ingress?.shutdown()
+                await tick?.value
+                let sourceReport = await sourceConversation?.shutdown(deadline: self.app.clock.now().addingTimeInterval(15))
+                await autonomy?.shutdown()
+                let retainedAutonomy = await autonomy?.hasRetainedWork() ?? false
+                let drained = (sourceReport?.completed ?? true) && !retainedAutonomy
+                return self.finishManagedAutonomyShutdown(shutdownID, drained: drained)
             }
         } catch {
             app.diagnostics.error(
@@ -2981,7 +3393,24 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 ["error": error.localizedDescription],
                 category: .manager
             )
+            return false
         }
+    }
+
+    private func finishManagedAutonomyShutdown(_ shutdownID: UUID, drained: Bool) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard managedAutonomyShutdownID == shutdownID else { return false }
+        managedAutonomyShutdownID = nil
+        guard drained, !managedAutonomyStarting, providerRunOperations == 0,
+              !providerConfigurationInProgress, !runtime.providerProbeInProgress,
+              activeProviderProbeID == nil else { return false }
+        managedAutonomy = nil
+        continuityIngress = nil
+        nativeSourceConversation = nil
+        runtime.autonomyTickPending = false
+        runtime.autonomyTickID = nil
+        runtime.autonomyTickTask = nil
+        return true
     }
 
     private static func waitForAsync<Value: Sendable>(
@@ -3060,6 +3489,11 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     }
 
     private func persistState() {
+        lock.lock()
+        let operational = runtime.state == .running && runtime.isHTTPUp && !runtime.shutdownRequested
+        taskHTTPService.setOperational(operational)
+        nativeSourceConversation?.setOperational(operational && !managedAutonomyClosing && !nativeTaskAttachmentClosing)
+        lock.unlock()
         let snap = status()
         if let data = try? JSONSupport.data(from: snap) {
             try? data.write(to: app.paths.managerState, options: .atomic)

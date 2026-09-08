@@ -215,6 +215,15 @@ continuity as qualified.
 Unit and synthetic-host tests do not close this gate. The authority run must use
 the real provider with the GUI closed and recover from every durable crash state.
 
+For a native client with an explicit read-only task approval, use
+`forge-conductor manager task prepare --request /absolute/approval.json`.
+Preparation does not start a provider or a run. The CLI keeps the task credential
+in protected storage and prints a safe receipt. If it reports
+`reconciliation_required`, use `manager task reconcile --task UUID` with the
+reported task ID. Add `--home /absolute/path` to each command when using a custom
+installation. See [native source attachment](docs/CONTINUITY-INGRESS.md#authenticated-native-source-attachment)
+for scope limits, rotation, revocation, and the native connection contract.
+
 ### Configure the managed provider
 
 Open **Provider** and enter the LM Studio endpoint (normally

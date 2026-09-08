@@ -3,6 +3,75 @@ import XCTest
 @testable import ForgeConductorCore
 
 final class ManagedProjectRunStepExecutorTests: XCTestCase {
+    func testDurableBootstrapHoldRejectsDirectCoordinatorAndStaleExecutorSnapshot() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("managed-bootstrap-hold-\(UUID().uuidString)")
+        let repository = try ProjectControlPlaneRepository(databaseURL: root.appendingPathComponent("control.sqlite3"))
+        do {
+            let fixture = try await makeBootstrapHeldApplicationRun(repository: repository, root: root)
+            let toolExecutor = ManagedStepToolExecutor()
+            let broker = ToolInvocationBroker(repository: repository, executor: toolExecutor,
+                classifier: StaticToolReplayClassifier(classifications: ["fixture.read": .readOnly]))
+            let stepper = try ManagedProjectRunStepExecutor(repository: repository,
+                providerResolver: { _ in
+                    XCTFail("Held ingress resolved an ordinary provider")
+                    throw AutonomyError.invalidRequest("unexpected provider resolution")
+                }, toolDefinitionResolver: { _ in
+                    XCTFail("Held ingress prepared ordinary provider tools")
+                    return []
+                }, broker: broker)
+            let coordinator = try ProjectRunCoordinator(runID: fixture.run.runID, repository: repository,
+                managerID: "held-coordinator", stepExecutor: stepper,
+                completionValidator: EvidenceBoundCompletionValidator())
+            do {
+                _ = try await coordinator.runActivation()
+                XCTFail("Direct coordinator bypassed the persisted bootstrap hold")
+            } catch {
+                XCTAssertEqual(error as? AutonomyError, .bootstrapRequired(fixture.run.runID))
+            }
+
+            let held = fixture.run
+            let stale = AutonomousRunRecord(runID: held.runID, projectID: held.projectID,
+                projectGeneration: held.projectGeneration, assignmentID: held.assignmentID, mission: held.mission,
+                state: .running, continuityMode: held.continuityMode, providerID: held.providerID, modelKey: held.modelKey,
+                activeSessionID: nil, activeOperationID: held.activeOperationID, specification: held.specification,
+                completionRequestJSON: nil, lastErrorCode: nil, lastErrorSummary: nil, retryAt: nil,
+                continuationPending: false, revision: held.revision, createdAt: held.createdAt, updatedAt: held.updatedAt)
+            let lease = try await repository.acquireRunLease(runID: held.runID, ownerID: "held-direct-executor")
+            let context = ToolInvocationContext(projectID: held.projectID, projectGeneration: held.projectGeneration,
+                clientID: ClientID("held-direct-executor"), runID: held.runID,
+                authorizationScope: .init(canonicalRoots: [fixture.projectRoot], writableRoots: [],
+                    allowedTools: ["context_get", "fs_read"], networkAllowed: false, maximumInlineOutputBytes: 65_536))
+            do {
+                _ = try await stepper.prepareNextStep(for: stale)
+                XCTFail("Stale running snapshot bypassed durable admission during preparation")
+            } catch {
+                XCTAssertEqual(error as? AutonomyError, .bootstrapRequired(held.runID))
+            }
+            for kind in [RunSideEffectKind.providerTurn, .continuity] {
+                do {
+                    _ = try await stepper.execute(RunSideEffectIntent(kind: kind,
+                        idempotencyKey: "held-\(kind.rawValue)", payloadSHA256: String(repeating: "a", count: 64),
+                        summary: "Stale ordinary execution attempt"), run: stale, context: context, lease: lease)
+                    XCTFail("Stale running snapshot dispatched \(kind.rawValue)")
+                } catch {
+                    XCTAssertEqual(error as? AutonomyError, .bootstrapRequired(held.runID))
+                }
+            }
+            _ = try await repository.releaseRunLease(lease)
+            XCTAssertEqual(toolExecutor.callCount, 0)
+            let retained = try await repository.autonomousRun(held.runID)
+            XCTAssertEqual(retained?.state, .awaitingBootstrap)
+            XCTAssertNil(retained?.activeSessionID)
+            XCTAssertNil(retained?.specification.work.pendingIntent)
+        } catch {
+            await repository.close()
+            try? FileManager.default.removeItem(at: root)
+            throw error
+        }
+        await repository.close()
+        try? FileManager.default.removeItem(at: root)
+    }
+
     func testManagedProviderRootToolContinuationAndDeterministicCompletion() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("forge-managed-step-\(UUID().uuidString)", isDirectory: true)

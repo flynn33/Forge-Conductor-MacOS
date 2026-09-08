@@ -110,7 +110,7 @@ enum SQLiteStoreMutationKind: String, Sendable {
 
 /// SQLite3-backed store using the system library.
 public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unchecked Sendable {
-    static let schemaVersion = 6
+    static let schemaVersion = 8
     private static let maximumHandoffQueryRows = 10_000
     private static let maximumPresenceQueryRows = 10_000
     private static let maximumSessionQueryRows = 10_000
@@ -462,7 +462,60 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
         );
         CREATE INDEX IF NOT EXISTS idx_context_handoffs_updated
             ON context_handoffs(updated_at DESC);
+        CREATE TABLE IF NOT EXISTS continuity_ingress_revisions (
+            continuity_id TEXT NOT NULL,
+            revision INTEGER NOT NULL CHECK(revision > 0),
+            project_id TEXT NOT NULL,
+            project_generation INTEGER NOT NULL CHECK(project_generation > 0),
+            task_id TEXT NOT NULL,
+            authorization_json BLOB NOT NULL,
+            authorization_sha256 TEXT NOT NULL,
+            packet_json BLOB NOT NULL,
+            packet_sha256 TEXT NOT NULL,
+            resume_ready INTEGER NOT NULL CHECK(resume_ready IN (0,1)),
+            committed_at TEXT NOT NULL,
+            invalidated INTEGER NOT NULL DEFAULT 0 CHECK(invalidated IN (0,1)),
+            PRIMARY KEY(continuity_id,revision),
+            UNIQUE(continuity_id,packet_sha256)
+        );
+        CREATE INDEX IF NOT EXISTS idx_continuity_ingress_scope
+            ON continuity_ingress_revisions(project_id,project_generation,task_id);
+        CREATE TABLE IF NOT EXISTS continuity_ingress_outbox (
+            operation_id TEXT PRIMARY KEY,
+            continuity_id TEXT NOT NULL,
+            revision INTEGER NOT NULL,
+            packet_sha256 TEXT NOT NULL,
+            operation_key_sha256 TEXT NOT NULL UNIQUE,
+            explicitly_requested INTEGER NOT NULL DEFAULT 0 CHECK(explicitly_requested IN (0,1)),
+            state TEXT NOT NULL CHECK(state IN ('pending','claimed','acknowledged','blocked','invalidated')),
+            attempts INTEGER NOT NULL DEFAULT 0 CHECK(attempts BETWEEN 0 AND 8),
+            next_attempt_at TEXT NOT NULL,
+            lease_owner TEXT,
+            lease_token TEXT,
+            lease_expires_at TEXT,
+            last_error_code TEXT,
+            acceptance_receipt_sha256 TEXT,
+            acknowledged_at TEXT,
+            FOREIGN KEY(continuity_id,revision)
+                REFERENCES continuity_ingress_revisions(continuity_id,revision),
+            UNIQUE(continuity_id,revision)
+        );
+        CREATE INDEX IF NOT EXISTS idx_continuity_ingress_delivery
+            ON continuity_ingress_outbox(state,next_attempt_at);
+        CREATE TABLE IF NOT EXISTS continuity_ingress_invalidations (
+            project_id TEXT NOT NULL,
+            task_id TEXT NOT NULL,
+            through_generation INTEGER NOT NULL CHECK(through_generation > 0),
+            invalidated_at TEXT NOT NULL,
+            PRIMARY KEY(project_id,task_id)
+        );
         """)
+        if try !tableHasColumnUnlocked(table: "continuity_ingress_outbox", column: "explicitly_requested") {
+            try execUnlocked("""
+                ALTER TABLE continuity_ingress_outbox ADD COLUMN explicitly_requested
+                    INTEGER NOT NULL DEFAULT 0 CHECK(explicitly_requested IN (0,1));
+                """)
+        }
         if try !tableHasColumnUnlocked(table: "context_handoffs", column: "write_sequence") {
             try execUnlocked(
                 "ALTER TABLE context_handoffs ADD COLUMN write_sequence INTEGER NOT NULL DEFAULT 0;"
@@ -639,48 +692,784 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
         let noteTimestamp = ISO8601.string(from: clock.now())
         try withLockedSQLiteOperation(cancellation: cancellation) {
             try transactionUnlocked(cancellation: cancellation, mutationKind: .handoff) {
+                try handoffUpsertUnlocked(
+                    packet, json: json, timestamp: noteTimestamp, cancellation: cancellation
+                )
+            }
+        }
+    }
+
+    private func handoffUpsertUnlocked(
+        _ packet: HandoffPacket,
+        json: String,
+        timestamp: String,
+        cancellation: ToolCallCancellation?
+    ) throws {
+        try cancellation?.checkCancellation()
+        try withStatementUnlocked(
+            """
+            INSERT INTO context_handoffs(
+                id, created_at, updated_at, source, resume_ready, packet_json, client_id, write_sequence
+            )
+            SELECT ?, ?, ?, ?, ?, ?, ?, COALESCE(MAX(write_sequence), 0) + 1
+            FROM context_handoffs
+            WHERE true
+            ON CONFLICT(id) DO UPDATE SET
+                updated_at=excluded.updated_at,
+                source=excluded.source,
+                resume_ready=excluded.resume_ready,
+                packet_json=excluded.packet_json,
+                client_id=excluded.client_id,
+                write_sequence=excluded.write_sequence
+            """
+        ) { statement in
+            bind(statement, 1, packet.id)
+            bind(statement, 2, packet.createdAt)
+            bind(statement, 3, packet.updatedAt)
+            bind(statement, 4, packet.source.rawValue)
+            sqlite3_bind_int(statement, 5, packet.resumeReady ? 1 : 0)
+            bind(statement, 6, json)
+            bind(statement, 7, packet.clientID)
+            try stepDone(statement)
+        }
+        if try handoffRequiresAuthorizationUnlocked(packet.id) {
+            // A task-owned packet remains in the compatibility table for trusted
+            // migration/manager reads, but cannot become a global memory pointer.
+            // Reconcile also removes a pointer published before this ID acquired
+            // immutable ownership, without reading the owned packet's content.
+            try repairLegacyContinuityPointersUnlocked(timestamp: timestamp)
+            return
+        }
+        try memorySetUnlocked(
+            key: "continuity/latest", body: packet.id,
+            tags: ["continuity", "latest"], timestamp: timestamp
+        )
+        if packet.resumeReady {
+            try cancellation?.checkCancellation()
+            try memorySetUnlocked(
+                key: "continuity/resume_ready", body: packet.id,
+                tags: ["continuity", "resume"], timestamp: timestamp
+            )
+        }
+    }
+
+    // MARK: - Immutable authorized handoff ingress
+
+    /// Commits the authoritative legacy-compatible packet, its immutable authorized
+    /// revision and (when eligible) the delivery intent in one source transaction.
+    /// It does not contact a manager/provider or infer authority from packet content.
+    public func handoffCommit(
+        _ packet: HandoffPacket,
+        authorization: ContinuityIngressAuthorization,
+        automaticHandoffEnabled: Bool,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuityHandoffCommit {
+        try cancellation?.checkCancellation()
+        try authorization.validate()
+        try Self.validateIngressPacketBounds(packet)
+        guard ContinuityIngressLimits.validHandoffID(packet.id),
+              let decodedPacket = HandoffPacket.fromDictionary(packet.asDictionary()) else {
+            throw ContinuityIngressError.invalidRequest("handoff_packet")
+        }
+        let packetBytes = try ForgeJSONCanonicalizationV1.data(from: packet.asDictionary())
+        guard packetBytes.count <= ContinuityIngressLimits.maximumPacketBytes else {
+            throw ContinuityIngressError.capacityExceeded("packet bytes")
+        }
+        guard try ForgeJSONCanonicalizationV1.data(from: decodedPacket.asDictionary()) == packetBytes else {
+            throw ContinuityIngressError.invalidRequest("handoff_packet_roundtrip")
+        }
+        let packetSHA256 = JSONSupport.sha256Hex(packetBytes)
+        let authorityBytes = try authorization.encodedJSON()
+        let timestamp = try ingressTimestamp()
+        return try withLockedSQLiteOperation(cancellation: cancellation) {
+            try ingressTransactionUnlocked(cancellation: cancellation) {
+                try requireIngressAuthorityUnlocked(authorization, continuityID: packet.id)
+                let revision: ContinuityHandoffRevision
+                if let existing = try ingressRevisionForDigestUnlocked(
+                    continuityID: packet.id, packetSHA256: packetSHA256
+                ) {
+                    // A repeated old commit must not rewind the mutable compatibility
+                    // projection after another writer has committed a newer packet.
+                    guard existing.authorization == authorization,
+                          existing.canonicalPacketJSON == packetBytes else {
+                        throw ContinuityIngressError.authorityMismatch
+                    }
+                    revision = existing
+                } else {
+                    guard (try queryIntUnlocked("SELECT COUNT(*) FROM continuity_ingress_revisions")
+                        ?? 0) < ContinuityIngressLimits.maximumRevisions else {
+                        throw ContinuityIngressError.capacityExceeded("retained revisions")
+                    }
+                    let nextRevision = try withStatementUnlocked(
+                        "SELECT COALESCE(MAX(revision),0) FROM continuity_ingress_revisions WHERE continuity_id=?"
+                    ) { statement -> Int64 in
+                        bind(statement, 1, packet.id)
+                        guard sqlite3_step(statement) == SQLITE_ROW else {
+                            throw ContinuityIngressError.integrityFailure("revision allocation failed")
+                        }
+                        let previous = sqlite3_column_int64(statement, 0)
+                        let next = previous.addingReportingOverflow(1)
+                        guard !next.overflow, next.partialValue > 0 else {
+                            throw ContinuityIngressError.capacityExceeded("revision sequence")
+                        }
+                        return next.partialValue
+                    }
+                    let identity = try ContinuityHandoffIdentity(
+                        continuityID: packet.id, revision: nextRevision, packetSHA256: packetSHA256
+                    )
+                    try withStatementUnlocked(
+                        """
+                        INSERT INTO continuity_ingress_revisions(
+                            continuity_id,revision,project_id,project_generation,task_id,
+                            authorization_json,authorization_sha256,packet_json,packet_sha256,
+                            resume_ready,committed_at
+                        ) VALUES(?,?,?,?,?,?,?,?,?,?,?)
+                        """
+                    ) { statement in
+                        bind(statement, 1, packet.id)
+                        sqlite3_bind_int64(statement, 2, nextRevision)
+                        bind(statement, 3, authorization.projectID.description)
+                        sqlite3_bind_int64(statement, 4, Int64(authorization.projectGeneration.rawValue))
+                        bind(statement, 5, authorization.taskID.uuidString.lowercased())
+                        bindIngressBytes(statement, 6, authorityBytes)
+                        bind(statement, 7, JSONSupport.sha256Hex(authorityBytes))
+                        bindIngressBytes(statement, 8, packetBytes)
+                        bind(statement, 9, packetSHA256)
+                        sqlite3_bind_int(statement, 10, packet.resumeReady ? 1 : 0)
+                        bind(statement, 11, timestamp)
+                        try stepDone(statement)
+                    }
+                    try handoffUpsertUnlocked(
+                        packet,
+                        json: String(decoding: packetBytes, as: UTF8.self),
+                        timestamp: timestamp,
+                        cancellation: cancellation
+                    )
+                    revision = ContinuityHandoffRevision(
+                        identity: identity, authorization: authorization,
+                        canonicalPacketJSON: packetBytes,
+                        resumeReady: packet.resumeReady, committedAt: timestamp
+                    )
+                }
+                let delivery: ContinuityHandoffDelivery?
+                if automaticHandoffEnabled && revision.resumeReady {
+                    delivery = try enqueueIngressUnlocked(
+                        revision, explicitlyRequested: false, timestamp: timestamp
+                    )
+                } else {
+                    // Disabling automatic delivery never modifies an existing explicit
+                    // submission or turns a soft checkpoint into a provider action.
+                    delivery = try ingressDeliveryForRevisionUnlocked(revision.identity)
+                }
+                return ContinuityHandoffCommit(revision: revision, delivery: delivery)
+            }
+        }
+    }
+
+    /// Explicit and automatic submissions use this same immutable operation key.
+    /// The caller has already checked current policy and assignment authority.
+    public func enqueueContinuityHandoff(
+        identity: ContinuityHandoffIdentity,
+        authorization: ContinuityIngressAuthorization,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuityHandoffDelivery {
+        try authorization.validate()
+        let timestamp = try ingressTimestamp()
+        return try withLockedSQLiteOperation(cancellation: cancellation) {
+            try ingressTransactionUnlocked(cancellation: cancellation) {
+                try requireIngressAuthorityUnlocked(authorization, continuityID: identity.continuityID)
+                let revision = try requiredIngressRevisionUnlocked(identity)
+                guard revision.authorization == authorization else {
+                    throw ContinuityIngressError.authorityMismatch
+                }
+                guard revision.resumeReady else {
+                    throw ContinuityIngressError.invalidRequest("handoff_is_not_resume_ready")
+                }
+                return try enqueueIngressUnlocked(
+                    revision, explicitlyRequested: true, timestamp: timestamp
+                )
+            }
+        }
+    }
+
+    public func continuityHandoffRevision(
+        identity: ContinuityHandoffIdentity,
+        authorization: ContinuityIngressAuthorization,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuityHandoffRevision {
+        try authorization.validate()
+        return try withLockedSQLiteOperation(cancellation: cancellation, checkAfterSuccess: true) {
+            try requireIngressAuthorityUnlocked(authorization, continuityID: identity.continuityID)
+            let revision = try requiredIngressRevisionUnlocked(identity)
+            guard revision.authorization == authorization else {
+                throw ContinuityIngressError.authorityMismatch
+            }
+            return revision
+        }
+    }
+
+    /// Resolves only this exact source ID after checking its immutable task scope.
+    /// It never consults the global mutable handoff or compatibility pointer notes.
+    public func continuityLatestRevision(
+        continuityID: String,
+        authorization: ContinuityIngressAuthorization,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuityHandoffRevision? {
+        guard ContinuityIngressLimits.validHandoffID(continuityID) else {
+            throw ContinuityIngressError.invalidRequest("continuity_id")
+        }
+        try authorization.validate()
+        return try withLockedSQLiteOperation(cancellation: cancellation, checkAfterSuccess: true) {
+            try requireIngressAuthorityUnlocked(authorization, continuityID: continuityID)
+            return try withStatementUnlocked(
+                Self.ingressRevisionSelect + " WHERE continuity_id=? ORDER BY revision DESC LIMIT 1"
+            ) { statement in
+                bind(statement, 1, continuityID)
+                let result = sqlite3_step(statement)
+                if result == SQLITE_DONE { return nil }
+                guard result == SQLITE_ROW else { throw sqliteStepError(result) }
+                return try decodeIngressRevision(statement)
+            }
+        }
+    }
+
+    /// Metadata-only compatibility guard; it never reads or returns packet data.
+    public func continuityHandoffRequiresAuthorization(
+        continuityID: String,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> Bool {
+        guard ContinuityIngressLimits.validHandoffID(continuityID) else {
+            throw ContinuityIngressError.invalidRequest("continuity_id")
+        }
+        return try withLockedSQLiteOperation(cancellation: cancellation, checkAfterSuccess: true) {
+            try handoffRequiresAuthorizationUnlocked(continuityID)
+        }
+    }
+
+    /// Bounded internal-manager queue inventory. Public status must authorize the
+    /// caller before reading/returning an operation from this persistence boundary.
+    public func pendingContinuityHandoffs(
+        limit: Int = ContinuityIngressLimits.maximumQueryRows,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> [ContinuityHandoffDelivery] {
+        guard (1...ContinuityIngressLimits.maximumQueryRows).contains(limit) else {
+            throw ContinuityIngressError.invalidRequest("query_limit")
+        }
+        let timestamp = try ingressTimestamp()
+        return try withLockedSQLiteOperation(cancellation: cancellation, checkAfterSuccess: true) {
+            let identifiers = try withStatementUnlocked(
+                """
+                SELECT operation_id FROM continuity_ingress_outbox
+                WHERE (state='pending' AND next_attempt_at<=?)
+                   OR (state='claimed' AND lease_expires_at<=?)
+                ORDER BY next_attempt_at,operation_id LIMIT ?
+                """
+            ) { statement -> [UUID] in
+                bind(statement, 1, timestamp)
+                bind(statement, 2, timestamp)
+                sqlite3_bind_int(statement, 3, Int32(limit))
+                var values: [UUID] = []
+                while true {
+                    try cancellation?.checkCancellation()
+                    let result = sqlite3_step(statement)
+                    if result == SQLITE_DONE { break }
+                    guard result == SQLITE_ROW else { throw sqliteStepError(result) }
+                    guard values.count < limit,
+                          let id = try ingressText(statement, 0, maximumBytes: 36)
+                            .flatMap(UUID.init(uuidString:)) else {
+                        throw ContinuityIngressError.integrityFailure("invalid delivery identifier")
+                    }
+                    values.append(id)
+                }
+                return values
+            }
+            return try identifiers.map { try requiredIngressDeliveryUnlocked($0) }
+        }
+    }
+
+    public func continuityDelivery(
+        operationID: UUID,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuityHandoffDelivery? {
+        try withLockedSQLiteOperation(cancellation: cancellation, checkAfterSuccess: true) {
+            try ingressDeliveryUnlocked(operationID)
+        }
+    }
+
+    /// Manager-only metadata pagination. A corrupt payload cannot prevent IDs for
+    /// independent due operations from being returned. Callers retain one cursor,
+    /// decode each delivery separately and wrap after an empty page.
+    func pendingContinuityHandoffIDs(
+        limit: Int,
+        afterOperationID: UUID? = nil,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> [UUID] {
+        guard (1...ContinuityIngressLimits.maximumQueryRows).contains(limit) else {
+            throw ContinuityIngressError.invalidRequest("query_limit")
+        }
+        let timestamp = try ingressTimestamp()
+        let cursorPredicate = afterOperationID == nil ? "" : " AND operation_id>?"
+        return try withControlledStatement(
+            """
+            SELECT operation_id FROM continuity_ingress_outbox
+            WHERE ((state='pending' AND next_attempt_at<=?)
+                OR (state='claimed' AND lease_expires_at<=?))
+            """ + cursorPredicate + " ORDER BY operation_id LIMIT ?",
+            cancellation: cancellation
+        ) { statement in
+            bind(statement, 1, timestamp)
+            bind(statement, 2, timestamp)
+            if let afterOperationID {
+                bind(statement, 3, afterOperationID.uuidString.lowercased())
+                sqlite3_bind_int(statement, 4, Int32(limit))
+            } else {
+                sqlite3_bind_int(statement, 3, Int32(limit))
+            }
+            var identifiers: [UUID] = []
+            while true {
                 try cancellation?.checkCancellation()
+                let result = sqlite3_step(statement)
+                if result == SQLITE_DONE { break }
+                guard result == SQLITE_ROW else { throw sqliteStepError(result) }
+                guard identifiers.count < limit,
+                      let value = try ingressText(statement, 0, maximumBytes: 36),
+                      let id = UUID(uuidString: value), value == id.uuidString.lowercased() else {
+                    throw ContinuityIngressError.integrityFailure("invalid delivery identifier")
+                }
+                identifiers.append(id)
+            }
+            return identifiers
+        }
+    }
+
+    /// Isolates one malformed eligible source row without granting a caller the
+    /// ability to quarantine valid work or an operation owned by a live lease.
+    @discardableResult
+    func quarantineMalformedContinuityDelivery(
+        operationID: UUID,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> Bool {
+        let timestamp = try ingressTimestamp()
+        return try withLockedSQLiteOperation(cancellation: cancellation) {
+            try ingressTransactionUnlocked(cancellation: cancellation) {
+                let eligible = try withStatementUnlocked(
+                    """
+                    SELECT 1 FROM continuity_ingress_outbox WHERE operation_id=? AND (
+                        (state='pending' AND next_attempt_at<=?)
+                        OR (state='claimed' AND lease_expires_at<=?))
+                    """
+                ) { statement -> Bool in
+                    bind(statement, 1, operationID.uuidString.lowercased())
+                    bind(statement, 2, timestamp)
+                    bind(statement, 3, timestamp)
+                    let result = sqlite3_step(statement)
+                    guard result == SQLITE_ROW || result == SQLITE_DONE else { throw sqliteStepError(result) }
+                    return result == SQLITE_ROW
+                }
+                guard eligible else { return false }
+                do {
+                    _ = try requiredIngressDeliveryUnlocked(operationID)
+                    return false
+                } catch ContinuityIngressError.integrityFailure(_) {
+                    // Keep the corrupted source snapshot intact for diagnostics;
+                    // block only its queue row and revoke an already expired claim.
+                    try withStatementUnlocked(
+                        """
+                        UPDATE continuity_ingress_outbox SET state='blocked',
+                            last_error_code='source_integrity_failure',
+                            lease_owner=NULL,lease_token=NULL,lease_expires_at=NULL
+                        WHERE operation_id=?
+                        """
+                    ) { statement in
+                        bind(statement, 1, operationID.uuidString.lowercased())
+                        try stepDone(statement)
+                    }
+                    return changesUnlocked() == 1
+                }
+            }
+        }
+    }
+
+    public func claimContinuityHandoff(
+        operationID: UUID,
+        owner: String,
+        leaseSeconds: TimeInterval = 30,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuityDeliveryClaim? {
+        guard Self.validIngressLabel(owner), leaseSeconds.isFinite,
+              (1...ContinuityIngressLimits.maximumLeaseSeconds).contains(leaseSeconds) else {
+            throw ContinuityIngressError.invalidRequest("delivery_lease")
+        }
+        let now = clock.now()
+        let timestamp = try ingressTimestamp(now)
+        let expiry = try ingressTimestamp(now.addingTimeInterval(leaseSeconds))
+        return try withLockedSQLiteOperation(cancellation: cancellation) {
+            try ingressTransactionUnlocked(cancellation: cancellation) {
+                guard let current = try ingressDeliveryUnlocked(operationID) else { return nil }
+                try requireIngressAuthorityUnlocked(
+                    current.handoff.authorization, continuityID: current.handoff.identity.continuityID
+                )
+                guard (current.state == .pending && current.nextAttemptAt <= timestamp)
+                    || (current.state == .claimed && (current.leaseExpiresAt ?? "~") <= timestamp) else {
+                    return nil
+                }
+                if current.attempts >= ContinuityIngressLimits.maximumAttempts {
+                    try withStatementUnlocked(
+                        """
+                        UPDATE continuity_ingress_outbox SET state='blocked',last_error_code='delivery_attempt_limit',
+                            lease_owner=NULL,lease_token=NULL,lease_expires_at=NULL WHERE operation_id=?
+                        """
+                    ) { statement in
+                        bind(statement, 1, operationID.uuidString.lowercased())
+                        try stepDone(statement)
+                    }
+                    return nil
+                }
+                let token = UUID()
                 try withStatementUnlocked(
                     """
-                    INSERT INTO context_handoffs(
-                        id, created_at, updated_at, source, resume_ready, packet_json, client_id, write_sequence
-                    )
-                    SELECT ?, ?, ?, ?, ?, ?, ?, COALESCE(MAX(write_sequence), 0) + 1
-                    FROM context_handoffs
-                    WHERE true
-                    ON CONFLICT(id) DO UPDATE SET
-                        updated_at=excluded.updated_at,
-                        source=excluded.source,
-                        resume_ready=excluded.resume_ready,
-                        packet_json=excluded.packet_json,
-                        client_id=excluded.client_id,
-                        write_sequence=excluded.write_sequence
+                    UPDATE continuity_ingress_outbox SET state='claimed',attempts=attempts+1,
+                        lease_owner=?,lease_token=?,lease_expires_at=? WHERE operation_id=?
                     """
-                ) { stmt in
-                    bind(stmt, 1, packet.id)
-                    bind(stmt, 2, packet.createdAt)
-                    bind(stmt, 3, packet.updatedAt)
-                    bind(stmt, 4, packet.source.rawValue)
-                    sqlite3_bind_int(stmt, 5, packet.resumeReady ? 1 : 0)
-                    bind(stmt, 6, json)
-                    bind(stmt, 7, packet.clientID)
-                    try stepDone(stmt)
+                ) { statement in
+                    bind(statement, 1, owner)
+                    bind(statement, 2, token.uuidString.lowercased())
+                    bind(statement, 3, expiry)
+                    bind(statement, 4, operationID.uuidString.lowercased())
+                    try stepDone(statement)
                 }
-                try memorySetUnlocked(
-                    key: "continuity/latest",
-                    body: packet.id,
-                    tags: ["continuity", "latest"],
-                    timestamp: noteTimestamp
+                return ContinuityDeliveryClaim(
+                    delivery: try requiredIngressDeliveryUnlocked(operationID), owner: owner, token: token
                 )
-                if packet.resumeReady {
-                    try cancellation?.checkCancellation()
-                    try memorySetUnlocked(
-                        key: "continuity/resume_ready",
-                        body: packet.id,
-                        tags: ["continuity", "resume"],
-                        timestamp: noteTimestamp
-                    )
+            }
+        }
+    }
+
+    /// Revalidates source ownership and the live claim using the source clock.
+    /// The manager calls this before attempting control-plane acceptance.
+    func validateContinuityHandoffClaim(
+        claim: ContinuityDeliveryClaim,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuityHandoffDelivery {
+        try withLockedSQLiteOperation(cancellation: cancellation, checkAfterSuccess: true) {
+            try requireIngressClaimUnlocked(claim, timestamp: ingressTimestamp())
+        }
+    }
+
+    /// Records an exact control-plane acceptance receipt after its durable commit.
+    /// A repeated acknowledgment with the same claim and receipt is idempotent.
+    public func acknowledgeContinuityHandoff(
+        claim: ContinuityDeliveryClaim,
+        acceptanceReceiptSHA256: String,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuityHandoffDelivery {
+        guard ContinuityIngressLimits.validSHA256(acceptanceReceiptSHA256) else {
+            throw ContinuityIngressError.invalidRequest("acceptance_receipt_sha256")
+        }
+        let timestamp = try ingressTimestamp()
+        return try withLockedSQLiteOperation(cancellation: cancellation) {
+            try ingressTransactionUnlocked(cancellation: cancellation) {
+                let current = try requireIngressClaimUnlocked(claim, timestamp: timestamp, allowAcknowledged: true)
+                if current.state == .acknowledged {
+                    guard current.acceptanceReceiptSHA256 == acceptanceReceiptSHA256 else {
+                        throw ContinuityIngressError.deliveryConflict
+                    }
+                    return current
                 }
+                try withStatementUnlocked(
+                    """
+                    UPDATE continuity_ingress_outbox SET state='acknowledged',
+                        acceptance_receipt_sha256=?,acknowledged_at=?,last_error_code=NULL
+                    WHERE operation_id=?
+                    """
+                ) { statement in
+                    bind(statement, 1, acceptanceReceiptSHA256)
+                    bind(statement, 2, timestamp)
+                    bind(statement, 3, current.operationID.uuidString.lowercased())
+                    try stepDone(statement)
+                }
+                return try requiredIngressDeliveryUnlocked(current.operationID)
+            }
+        }
+    }
+
+    public func retryContinuityHandoff(
+        claim: ContinuityDeliveryClaim,
+        errorCode: String,
+        retryDelaySeconds: TimeInterval,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuityHandoffDelivery {
+        guard Self.validIngressLabel(errorCode), retryDelaySeconds.isFinite,
+              (1...ContinuityIngressLimits.maximumRetryDelaySeconds).contains(retryDelaySeconds) else {
+            throw ContinuityIngressError.invalidRequest("retry_policy")
+        }
+        let now = clock.now()
+        let timestamp = try ingressTimestamp(now)
+        let retryAt = try ingressTimestamp(now.addingTimeInterval(retryDelaySeconds))
+        return try withLockedSQLiteOperation(cancellation: cancellation) {
+            try ingressTransactionUnlocked(cancellation: cancellation) {
+                let current = try requireIngressClaimUnlocked(claim, timestamp: timestamp)
+                let state: ContinuityDeliveryState = current.attempts >= ContinuityIngressLimits.maximumAttempts
+                    ? .blocked : .pending
+                try withStatementUnlocked(
+                    """
+                    UPDATE continuity_ingress_outbox SET state=?,next_attempt_at=?,last_error_code=?,
+                        lease_owner=NULL,lease_token=NULL,lease_expires_at=NULL WHERE operation_id=?
+                    """
+                ) { statement in
+                    bind(statement, 1, state.rawValue)
+                    bind(statement, 2, retryAt)
+                    bind(statement, 3, errorCode)
+                    bind(statement, 4, current.operationID.uuidString.lowercased())
+                    try stepDone(statement)
+                }
+                return try requiredIngressDeliveryUnlocked(current.operationID)
+            }
+        }
+    }
+
+    /// Exact read for an already authenticated operation-status callback. Source
+    /// metadata is matched before its packet or outbox receipt is materialized.
+    func continuityOperationProgressSource(acceptance: ContinuityIngressAcceptanceReceipt,
+        cancellation: ToolCallCancellation? = nil) throws -> ContinuityOperationProgressEvidence {
+        try withLockedSQLiteOperation(cancellation: cancellation, checkAfterSuccess: true) {
+            try validateContinuityOperationSourceMetadataUnlocked(acceptance)
+            let source = try requiredIngressRevisionUnlocked(acceptance.sourceIdentity, allowInvalidated: true)
+            let delivery = try ingressDeliveryUnlocked(acceptance.operationID)
+            guard source == acceptance.source,
+                  delivery == nil || delivery?.handoff == source else { throw ContinuityIngressError.authorityMismatch }
+            return ContinuityOperationProgressEvidence(source: source, delivery: delivery, canonical: nil)
+        }
+    }
+
+    private func validateContinuityOperationSourceMetadataUnlocked(_ acceptance: ContinuityIngressAcceptanceReceipt) throws {
+        let authority = acceptance.authorization
+        let authoritySHA = JSONSupport.sha256Hex(try authority.encodedJSON())
+        try withStatementUnlocked("""
+            SELECT project_id,project_generation,task_id,authorization_sha256,packet_sha256
+            FROM continuity_ingress_revisions WHERE continuity_id=? AND revision=? LIMIT 1
+            """) { statement in
+            bind(statement, 1, acceptance.sourceIdentity.continuityID)
+            sqlite3_bind_int64(statement, 2, acceptance.sourceIdentity.revision)
+            let result = sqlite3_step(statement)
+            guard result == SQLITE_ROW || result == SQLITE_DONE else { throw sqliteStepError(result) }
+            guard result == SQLITE_ROW,
+                  try ingressText(statement, 0, maximumBytes: 36) == authority.projectID.description,
+                  sqlite3_column_int64(statement, 1) == Int64(authority.projectGeneration.rawValue),
+                  try ingressText(statement, 2, maximumBytes: 36) == authority.taskID.uuidString.lowercased(),
+                  try ingressText(statement, 3, maximumBytes: 64) == authoritySHA,
+                  try ingressText(statement, 4, maximumBytes: 64) == acceptance.sourceIdentity.packetSHA256 else {
+                throw ContinuityIngressError.authorityMismatch
+            }
+        }
+    }
+
+    /// Invoked only inside the control plane's exact cancellation claim guard.
+    /// Retains acknowledged acceptance evidence and invalidates only this frozen
+    /// revision; neither the task nor another revision is revoked here.
+    func cancelContinuitySourceDelivery(request: ContinuityOperationCancellationRequest,
+        acceptance: ContinuityIngressAcceptanceReceipt, cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuityOperationCancellationMarker {
+        guard request.operationID == acceptance.operationID, request.runID == acceptance.runID,
+              request.authorization == acceptance.authorization, request.sourceIdentity == acceptance.sourceIdentity,
+              request.acceptanceReceiptSHA256 == acceptance.receiptSHA256,
+              try ContinuityOperationCancellationRequest.storedSnapshot(from: request.canonicalRequestJSON,
+                acceptance: acceptance) == request else {
+            throw ContinuityIngressError.authorityMismatch
+        }
+        let authoritySHA = JSONSupport.sha256Hex(try request.authorization.encodedJSON())
+        let cancellationCode = "operation_cancelled:\(request.requestSHA256)"
+        return try withLockedSQLiteOperation(cancellation: cancellation) {
+            try ingressTransactionUnlocked(cancellation: cancellation) {
+                try validateContinuityOperationSourceMetadataUnlocked(acceptance)
+                let prior = try requiredIngressDeliveryUnlocked(request.operationID)
+                guard prior.handoff.authorization == acceptance.authorization,
+                      prior.handoff.identity == acceptance.sourceIdentity,
+                      prior.handoff.canonicalPacketJSON == acceptance.source.canonicalPacketJSON,
+                      prior.acceptanceReceiptSHA256 == nil || prior.acceptanceReceiptSHA256 == acceptance.receiptSHA256 else {
+                    throw ContinuityIngressError.authorityMismatch
+                }
+                if prior.lastErrorCode != cancellationCode {
+                    guard prior.lastErrorCode?.hasPrefix("operation_cancelled:") != true else {
+                        throw ContinuityIngressError.deliveryConflict
+                    }
+                    let timestamp = try ingressTimestamp()
+                    try withStatementUnlocked("""
+                        UPDATE continuity_ingress_revisions SET invalidated=1
+                        WHERE continuity_id=? AND revision=? AND packet_sha256=? AND authorization_sha256=?
+                        """) { statement in
+                        bind(statement, 1, request.sourceIdentity.continuityID)
+                        sqlite3_bind_int64(statement, 2, request.sourceIdentity.revision)
+                        bind(statement, 3, request.sourceIdentity.packetSHA256); bind(statement, 4, authoritySHA)
+                        try stepDone(statement)
+                    }
+                    guard changesUnlocked() == 1 else { throw ContinuityIngressError.deliveryConflict }
+                    // An acknowledged row retains its original claim and receipt.
+                    // Other rows lose only their now-invalid delivery claim.
+                    try withStatementUnlocked("""
+                        UPDATE continuity_ingress_outbox SET last_error_code=?,next_attempt_at=?,
+                            state=CASE WHEN state='acknowledged' THEN state ELSE 'invalidated' END,
+                            lease_owner=CASE WHEN state='acknowledged' THEN lease_owner ELSE NULL END,
+                            lease_token=CASE WHEN state='acknowledged' THEN lease_token ELSE NULL END,
+                            lease_expires_at=CASE WHEN state='acknowledged' THEN lease_expires_at ELSE NULL END
+                        WHERE operation_id=? AND continuity_id=? AND revision=? AND packet_sha256=?
+                        """) { statement in
+                        bind(statement, 1, cancellationCode); bind(statement, 2, timestamp)
+                        bind(statement, 3, request.operationID.uuidString.lowercased())
+                        bind(statement, 4, request.sourceIdentity.continuityID)
+                        sqlite3_bind_int64(statement, 5, request.sourceIdentity.revision)
+                        bind(statement, 6, request.sourceIdentity.packetSHA256)
+                        try stepDone(statement)
+                    }
+                    guard changesUnlocked() == 1 else { throw ContinuityIngressError.deliveryConflict }
+                }
+                let retained = try requiredIngressDeliveryUnlocked(request.operationID)
+                let invalidated = try withStatementUnlocked("""
+                    SELECT invalidated FROM continuity_ingress_revisions WHERE continuity_id=? AND revision=?
+                    """) { statement -> Bool in
+                    bind(statement, 1, request.sourceIdentity.continuityID)
+                    sqlite3_bind_int64(statement, 2, request.sourceIdentity.revision)
+                    return sqlite3_step(statement) == SQLITE_ROW && sqlite3_column_int64(statement, 0) == 1
+                }
+                guard invalidated, retained.lastErrorCode == cancellationCode,
+                      retained.state == .invalidated || retained.state == .acknowledged else {
+                    throw ContinuityIngressError.integrityFailure("source cancellation marker differs")
+                }
+                let evidence = try ForgeJSONCanonicalizationV1.data(from: [
+                    "schema_version": 1, "request_sha256": request.requestSHA256,
+                    "operation_id": retained.operationID.uuidString.lowercased(),
+                    "continuity_id": retained.handoff.identity.continuityID,
+                    "revision": retained.handoff.identity.revision,
+                    "packet_sha256": retained.handoff.identity.packetSHA256,
+                    "authorization_sha256": authoritySHA, "invalidated": invalidated,
+                    "delivery_state": retained.state.rawValue, "attempts": retained.attempts,
+                    "last_error_code": retained.lastErrorCode as Any? ?? NSNull(),
+                    "recorded_at": retained.nextAttemptAt,
+                    "acceptance_receipt_sha256": retained.acceptanceReceiptSHA256 as Any? ?? NSNull(),
+                    "acknowledged_at": retained.acknowledgedAt as Any? ?? NSNull(),
+                    "lease_owner": retained.leaseOwner as Any? ?? NSNull(),
+                    "lease_token": retained.leaseToken?.uuidString.lowercased() as Any? ?? NSNull(),
+                    "lease_expires_at": retained.leaseExpiresAt as Any? ?? NSNull(),
+                    "explicitly_requested": retained.explicitlyRequested,
+                ])
+                return try ContinuityOperationCancellationMarker(request: request, store: .sourceOutbox,
+                    evidenceSHA256: JSONSupport.sha256Hex(evidence), recordedAt: retained.nextAttemptAt)
+            }
+        }
+    }
+
+    /// Manager-only cancellation of this claim before any control-plane submission.
+    /// The caller must have re-read native policy and must not call this after an
+    /// acceptance attempt. This primitive proves neither policy nor task permission.
+    /// A concurrent explicit start wins without losing its claim or attempt.
+    @discardableResult
+    func deferUnsubmittedContinuityHandoff(
+        claim: ContinuityDeliveryClaim,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> Bool {
+        let timestamp = try ingressTimestamp()
+        return try withLockedSQLiteOperation(cancellation: cancellation) {
+            try ingressTransactionUnlocked(cancellation: cancellation) {
+                let current = try requireIngressClaimUnlocked(claim, timestamp: timestamp)
+                guard current.nextAttemptAt <= timestamp, current.attempts > 0 else {
+                    throw ContinuityIngressError.deliveryConflict
+                }
+                guard !current.explicitlyRequested else { return false }
+                let restoredAttempts = current.attempts.subtractingReportingOverflow(1)
+                guard !restoredAttempts.overflow, restoredAttempts.partialValue >= 0 else {
+                    throw ContinuityIngressError.integrityFailure("unsubmitted delivery attempt is invalid")
+                }
+                try withStatementUnlocked(
+                    """
+                    UPDATE continuity_ingress_outbox SET state='pending',attempts=?,
+                        lease_owner=NULL,lease_token=NULL,lease_expires_at=NULL,
+                        last_error_code='automatic_delivery_disabled'
+                    WHERE operation_id=? AND state='claimed' AND lease_owner=? AND lease_token=?
+                        AND explicitly_requested=0 AND acceptance_receipt_sha256 IS NULL
+                    """
+                ) { statement in
+                    sqlite3_bind_int64(statement, 1, Int64(restoredAttempts.partialValue))
+                    bind(statement, 2, current.operationID.uuidString.lowercased())
+                    bind(statement, 3, claim.owner)
+                    bind(statement, 4, claim.token.uuidString.lowercased())
+                    try stepDone(statement)
+                    guard changesUnlocked() == 1 else { throw ContinuityIngressError.deliveryConflict }
+                }
+                return true
+            }
+        }
+    }
+
+    /// Maintains a durable generation high-water mark. Nil task invalidates the
+    /// entire project through this generation; an exact task leaves peers intact.
+    @discardableResult
+    public func invalidateContinuityIngress(
+        projectID: ProjectID,
+        throughGeneration: ProjectGeneration,
+        taskID: UUID? = nil,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> Int {
+        guard throughGeneration.rawValue > 0,
+              throughGeneration.rawValue <= UInt64(Int64.max) else {
+            throw ContinuityIngressError.invalidRequest("project_generation")
+        }
+        let task = taskID?.uuidString.lowercased() ?? ""
+        let timestamp = try ingressTimestamp()
+        return try withLockedSQLiteOperation(cancellation: cancellation) {
+            try ingressTransactionUnlocked(cancellation: cancellation) {
+                let existing = try withStatementUnlocked(
+                    "SELECT through_generation FROM continuity_ingress_invalidations WHERE project_id=? AND task_id=?"
+                ) { statement -> Bool in
+                    bind(statement, 1, projectID.description)
+                    bind(statement, 2, task)
+                    let result = sqlite3_step(statement)
+                    guard result == SQLITE_ROW || result == SQLITE_DONE else { throw sqliteStepError(result) }
+                    return result == SQLITE_ROW
+                }
+                if !existing {
+                    guard (try queryIntUnlocked("SELECT COUNT(*) FROM continuity_ingress_invalidations")
+                        ?? 0) < ContinuityIngressLimits.maximumInvalidations else {
+                        throw ContinuityIngressError.capacityExceeded("invalidation tombstones")
+                    }
+                }
+                try withStatementUnlocked(
+                    """
+                    INSERT INTO continuity_ingress_invalidations(project_id,task_id,through_generation,invalidated_at)
+                    VALUES(?,?,?,?) ON CONFLICT(project_id,task_id) DO UPDATE SET
+                        through_generation=MAX(through_generation,excluded.through_generation),
+                        invalidated_at=excluded.invalidated_at
+                    """
+                ) { statement in
+                    bind(statement, 1, projectID.description)
+                    bind(statement, 2, task)
+                    sqlite3_bind_int64(statement, 3, Int64(throughGeneration.rawValue))
+                    bind(statement, 4, timestamp)
+                    try stepDone(statement)
+                }
+                try withStatementUnlocked(
+                    """
+                    UPDATE continuity_ingress_revisions SET invalidated=1
+                    WHERE project_id=? AND project_generation<=? AND (?='' OR task_id=?)
+                    """
+                ) { statement in
+                    bind(statement, 1, projectID.description)
+                    sqlite3_bind_int64(statement, 2, Int64(throughGeneration.rawValue))
+                    bind(statement, 3, task)
+                    bind(statement, 4, task)
+                    try stepDone(statement)
+                }
+                try withStatementUnlocked(
+                    """
+                    UPDATE continuity_ingress_outbox SET state='invalidated',last_error_code='authority_invalidated',
+                        lease_owner=NULL,lease_token=NULL,lease_expires_at=NULL
+                    WHERE state NOT IN ('acknowledged','invalidated') AND EXISTS (
+                        SELECT 1 FROM continuity_ingress_revisions r
+                        WHERE r.continuity_id=continuity_ingress_outbox.continuity_id
+                            AND r.revision=continuity_ingress_outbox.revision AND r.invalidated=1
+                    )
+                    """
+                ) { statement in try stepDone(statement) }
+                return changesUnlocked()
             }
         }
     }
@@ -697,6 +1486,69 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
             return try handoffPacketFromFirstRow(stmt, cancellation: cancellation)
         }
     }
+
+    /// Legacy compatibility readers exclude every source ID that has ever gained
+    /// immutable task ownership. The SQL predicate runs before packet bytes are
+    /// selected; invalidation or a later legacy overwrite cannot remove ownership.
+    public func handoffLegacyGet(
+        id: String,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> HandoffPacket? {
+        try withControlledStatement(
+            "SELECT id,packet_json FROM context_handoffs WHERE id=? AND "
+                + Self.legacyHandoffPredicate,
+            cancellation: cancellation
+        ) { statement in
+            bind(statement, 1, id)
+            return try handoffPacketFromFirstRow(statement, cancellation: cancellation)
+        }
+    }
+
+    public func handoffLegacyLatest(
+        resumeReadyOnly: Bool = false,
+        clientID: String? = nil,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> HandoffPacket? {
+        var predicates = [Self.legacyHandoffPredicate]
+        if resumeReadyOnly { predicates.append("resume_ready=1") }
+        if clientID != nil { predicates.append("client_id=?") }
+        let sql = "SELECT id,packet_json FROM context_handoffs WHERE "
+            + predicates.joined(separator: " AND ") + " ORDER BY write_sequence DESC LIMIT 1"
+        return try withControlledStatement(sql, cancellation: cancellation) { statement in
+            if let clientID { bind(statement, 1, clientID) }
+            return try handoffPacketFromFirstRow(statement, cancellation: cancellation)
+        }
+    }
+
+    public func handoffLegacyList(
+        limit: Int = 20,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> [HandoffPacket] {
+        let boundedLimit = max(1, min(limit, 100))
+        return try handoffList(
+            sql: "SELECT id,packet_json FROM context_handoffs WHERE "
+                + Self.legacyHandoffPredicate + " ORDER BY write_sequence DESC LIMIT \(boundedLimit)",
+            cancellation: cancellation
+        )
+    }
+
+    public func handoffLegacyListAll(
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> [HandoffPacket] {
+        try handoffList(
+            sql: "SELECT id,packet_json FROM context_handoffs WHERE "
+                + Self.legacyHandoffPredicate
+                + " ORDER BY write_sequence DESC LIMIT \(Self.maximumHandoffQueryRows)",
+            cancellation: cancellation
+        )
+    }
+
+    private static let legacyHandoffPredicate = """
+        NOT EXISTS (
+            SELECT 1 FROM continuity_ingress_revisions owned
+            WHERE owned.continuity_id=context_handoffs.id
+        )
+        """
 
     public func handoffLatest(
         resumeReadyOnly: Bool = false,
@@ -764,20 +1616,7 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
         try withLockedSQLiteOperation(cancellation: cancellation) {
             try transactionUnlocked(cancellation: cancellation, mutationKind: .handoff) {
                 try cancellation?.checkCancellation()
-                let latestID = try handoffIDUnlocked(resumeReadyOnly: false)
-                let resumeID = try handoffIDUnlocked(resumeReadyOnly: true)
-                try replaceContinuityPointerUnlocked(
-                    key: "continuity/latest",
-                    id: latestID,
-                    tags: ["continuity", "latest"],
-                    timestamp: timestamp
-                )
-                try replaceContinuityPointerUnlocked(
-                    key: "continuity/resume_ready",
-                    id: resumeID,
-                    tags: ["continuity", "resume"],
-                    timestamp: timestamp
-                )
+                try repairLegacyContinuityPointersUnlocked(timestamp: timestamp)
             }
         }
     }
@@ -801,7 +1640,8 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
     }
 
     private func handoffIDUnlocked(resumeReadyOnly: Bool) throws -> String? {
-        let predicate = resumeReadyOnly ? " WHERE resume_ready = 1" : ""
+        let predicate = " WHERE " + Self.legacyHandoffPredicate
+            + (resumeReadyOnly ? " AND resume_ready=1" : "")
         return try withStatementUnlocked(
             "SELECT id FROM context_handoffs\(predicate) ORDER BY write_sequence DESC LIMIT 1"
         ) { statement in
@@ -810,6 +1650,30 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
             guard result == SQLITE_ROW else { throw sqliteStepError(result) }
             return textCol(statement, 0)
         }
+    }
+
+    private func handoffRequiresAuthorizationUnlocked(_ continuityID: String) throws -> Bool {
+        try withStatementUnlocked(
+            "SELECT 1 FROM continuity_ingress_revisions WHERE continuity_id=? LIMIT 1"
+        ) { statement in
+            bind(statement, 1, continuityID)
+            let result = sqlite3_step(statement)
+            guard result == SQLITE_ROW || result == SQLITE_DONE else { throw sqliteStepError(result) }
+            return result == SQLITE_ROW
+        }
+    }
+
+    private func repairLegacyContinuityPointersUnlocked(timestamp: String) throws {
+        let latestID = try handoffIDUnlocked(resumeReadyOnly: false)
+        let resumeID = try handoffIDUnlocked(resumeReadyOnly: true)
+        try replaceContinuityPointerUnlocked(
+            key: "continuity/latest", id: latestID,
+            tags: ["continuity", "latest"], timestamp: timestamp
+        )
+        try replaceContinuityPointerUnlocked(
+            key: "continuity/resume_ready", id: resumeID,
+            tags: ["continuity", "resume"], timestamp: timestamp
+        )
     }
 
     private func replaceContinuityPointerUnlocked(
@@ -1953,6 +2817,413 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
                 return staleClientIDs.count
             }
         }
+    }
+
+    // MARK: - Continuity ingress storage helpers
+
+    private static let ingressRevisionSelect = """
+        SELECT continuity_id,revision,project_id,project_generation,task_id,
+            authorization_json,authorization_sha256,packet_json,packet_sha256,
+            resume_ready,committed_at,invalidated FROM continuity_ingress_revisions
+        """
+
+    private func ingressTimestamp(_ date: Date? = nil) throws -> String {
+        let value = date ?? clock.now()
+        guard value.timeIntervalSince1970.isFinite,
+              (0...253_402_300_799).contains(value.timeIntervalSince1970) else {
+            throw ContinuityIngressError.invalidRequest("clock")
+        }
+        return ISO8601.string(from: value)
+    }
+
+    private static func validIngressLabel(_ value: String) -> Bool {
+        !value.isEmpty && value.utf8.count <= 128
+            && value == value.trimmingCharacters(in: .whitespacesAndNewlines)
+            && !value.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains)
+    }
+
+    static func validateIngressPacketBounds(_ packet: HandoffPacket) throws {
+        let lists = [packet.blockers, packet.nextActions, packet.keyFiles, packet.decisions]
+        guard lists.allSatisfy({ $0.count <= 128 }), packet.agents.count <= 128 else {
+            throw ContinuityIngressError.capacityExceeded("packet fields")
+        }
+        var bytes = 0
+        func add(_ value: String?) throws {
+            guard let value else { return }
+            let sum = bytes.addingReportingOverflow(value.utf8.count)
+            guard !sum.overflow, sum.partialValue <= ContinuityIngressLimits.maximumPacketBytes else {
+                throw ContinuityIngressError.capacityExceeded("packet bytes")
+            }
+            bytes = sum.partialValue
+        }
+        for value in [packet.id, packet.createdAt, packet.updatedAt, packet.chatLabel,
+                      packet.clientID, packet.goal, packet.status, packet.projectSlug,
+                      packet.cwd, packet.narrative, packet.resumeSeed] {
+            try add(value)
+        }
+        for values in lists { for value in values { try add(value) } }
+        for agent in packet.agents {
+            for value in [agent.sessionID, agent.agentID, agent.goal, agent.cwd,
+                          agent.status, agent.updatedAt, agent.resumeHint] {
+                try add(value)
+            }
+        }
+    }
+
+    /// Keep the existing transaction/cancellation observers, while asking SQLite
+    /// to flush this source handoff/outbox commit before acknowledging durability.
+    private func ingressTransactionUnlocked<Value>(
+        cancellation: ToolCallCancellation?,
+        _ body: () throws -> Value
+    ) throws -> Value {
+        let previous = try queryIntUnlocked("PRAGMA synchronous;") ?? 1
+        guard (0...3).contains(previous) else {
+            throw ContinuityIngressError.integrityFailure("invalid SQLite synchronous mode")
+        }
+        try execUnlocked("PRAGMA synchronous=FULL;")
+        defer { try? execUnlocked("PRAGMA synchronous=\(previous);") }
+        return try transactionUnlocked(cancellation: cancellation, mutationKind: .handoff, body)
+    }
+
+    private func requireIngressAuthorityUnlocked(
+        _ authorization: ContinuityIngressAuthorization,
+        continuityID: String
+    ) throws {
+        let invalidated = try withStatementUnlocked(
+            """
+            SELECT 1 FROM continuity_ingress_invalidations
+            WHERE project_id=? AND (task_id='' OR task_id=?) AND through_generation>=? LIMIT 1
+            """
+        ) { statement -> Bool in
+            bind(statement, 1, authorization.projectID.description)
+            bind(statement, 2, authorization.taskID.uuidString.lowercased())
+            sqlite3_bind_int64(statement, 3, Int64(authorization.projectGeneration.rawValue))
+            let result = sqlite3_step(statement)
+            guard result == SQLITE_ROW || result == SQLITE_DONE else { throw sqliteStepError(result) }
+            return result == SQLITE_ROW
+        }
+        guard !invalidated else { throw ContinuityIngressError.invalidated }
+        try withStatementUnlocked(
+            "SELECT authorization_json FROM continuity_ingress_revisions WHERE continuity_id=? LIMIT 1"
+        ) { statement in
+            bind(statement, 1, continuityID)
+            let result = sqlite3_step(statement)
+            if result == SQLITE_DONE { return }
+            guard result == SQLITE_ROW else { throw sqliteStepError(result) }
+            let stored = try ContinuityIngressAuthorization.storedSnapshot(from:
+                ingressBytes(statement, 0, maximumBytes: ContinuityIngressLimits.maximumAuthorizationBytes)
+            )
+            guard stored == authorization else { throw ContinuityIngressError.authorityMismatch }
+        }
+    }
+
+    private func ingressRevisionForDigestUnlocked(
+        continuityID: String,
+        packetSHA256: String
+    ) throws -> ContinuityHandoffRevision? {
+        try withStatementUnlocked(
+            Self.ingressRevisionSelect + " WHERE continuity_id=? AND packet_sha256=?"
+        ) { statement in
+            bind(statement, 1, continuityID)
+            bind(statement, 2, packetSHA256)
+            let result = sqlite3_step(statement)
+            if result == SQLITE_DONE { return nil }
+            guard result == SQLITE_ROW else { throw sqliteStepError(result) }
+            return try decodeIngressRevision(statement)
+        }
+    }
+
+    private func requiredIngressRevisionUnlocked(
+        _ identity: ContinuityHandoffIdentity,
+        allowInvalidated: Bool = false
+    ) throws -> ContinuityHandoffRevision {
+        try withStatementUnlocked(
+            Self.ingressRevisionSelect + " WHERE continuity_id=? AND revision=?"
+        ) { statement in
+            bind(statement, 1, identity.continuityID)
+            sqlite3_bind_int64(statement, 2, identity.revision)
+            let result = sqlite3_step(statement)
+            if result == SQLITE_DONE { throw ContinuityIngressError.notFound }
+            guard result == SQLITE_ROW else { throw sqliteStepError(result) }
+            let revision = try decodeIngressRevision(statement, allowInvalidated: allowInvalidated)
+            guard revision.identity == identity else {
+                throw ContinuityIngressError.integrityFailure("exact handoff digest changed")
+            }
+            return revision
+        }
+    }
+
+    private func decodeIngressRevision(
+        _ statement: OpaquePointer,
+        allowInvalidated: Bool = false
+    ) throws -> ContinuityHandoffRevision {
+        guard let continuityID = try ingressText(statement, 0, maximumBytes: 128),
+              sqlite3_column_type(statement, 1) == SQLITE_INTEGER,
+              let project = try ingressText(statement, 2, maximumBytes: 36),
+              sqlite3_column_type(statement, 3) == SQLITE_INTEGER,
+              let task = try ingressText(statement, 4, maximumBytes: 36),
+              let authoritySHA = try ingressText(statement, 6, maximumBytes: 64),
+              let packetSHA = try ingressText(statement, 8, maximumBytes: 64),
+              sqlite3_column_type(statement, 9) == SQLITE_INTEGER,
+              let timestamp = try ingressText(statement, 10, maximumBytes: 32),
+              ISO8601.date(from: timestamp) != nil,
+              sqlite3_column_type(statement, 11) == SQLITE_INTEGER else {
+            throw ContinuityIngressError.integrityFailure("malformed handoff revision")
+        }
+        let invalidated = sqlite3_column_int(statement, 11)
+        guard invalidated == 0 || invalidated == 1 else {
+            throw ContinuityIngressError.integrityFailure("invalid revision lifecycle")
+        }
+        guard allowInvalidated || invalidated == 0 else { throw ContinuityIngressError.invalidated }
+        let authorityBytes = try ingressBytes(
+            statement, 5, maximumBytes: ContinuityIngressLimits.maximumAuthorizationBytes
+        )
+        guard JSONSupport.sha256Hex(authorityBytes) == authoritySHA else {
+            throw ContinuityIngressError.integrityFailure("stored authorization digest changed")
+        }
+        let authority = try ContinuityIngressAuthorization.storedSnapshot(from: authorityBytes)
+        let packetBytes = try ingressBytes(
+            statement, 7, maximumBytes: ContinuityIngressLimits.maximumPacketBytes
+        )
+        let ready = sqlite3_column_int(statement, 9)
+        guard authority.projectID.description == project,
+              Int64(authority.projectGeneration.rawValue) == sqlite3_column_int64(statement, 3),
+              authority.taskID.uuidString.lowercased() == task,
+              ready == 0 || ready == 1,
+              JSONSupport.sha256Hex(packetBytes) == packetSHA,
+              let object = try JSONSerialization.jsonObject(with: packetBytes) as? [String: Any],
+              let packet = HandoffPacket.fromDictionary(object),
+              packet.id == continuityID, packet.resumeReady == (ready == 1),
+              try ForgeJSONCanonicalizationV1.data(from: packet.asDictionary()) == packetBytes else {
+            throw ContinuityIngressError.integrityFailure("immutable handoff content or scope changed")
+        }
+        return ContinuityHandoffRevision(
+            identity: try ContinuityHandoffIdentity(
+                continuityID: continuityID, revision: sqlite3_column_int64(statement, 1),
+                packetSHA256: packetSHA
+            ),
+            authorization: authority, canonicalPacketJSON: packetBytes,
+            resumeReady: ready == 1, committedAt: timestamp
+        )
+    }
+
+    private func enqueueIngressUnlocked(
+        _ revision: ContinuityHandoffRevision,
+        explicitlyRequested: Bool,
+        timestamp: String
+    ) throws -> ContinuityHandoffDelivery {
+        guard revision.resumeReady else {
+            throw ContinuityIngressError.invalidRequest("handoff_is_not_resume_ready")
+        }
+        let key = try ContinuityIngressOperationIdentity(revision: revision)
+        if let existing = try ingressDeliveryUnlocked(key.operationID) {
+            guard existing.handoff == revision else { throw ContinuityIngressError.authorityMismatch }
+            guard existing.state != .invalidated else { throw ContinuityIngressError.invalidated }
+            if explicitlyRequested && !existing.explicitlyRequested {
+                // Provenance may become explicit after a later authorized start,
+                // but this must not revive a terminal row or reset retry/lease state.
+                try withStatementUnlocked(
+                    "UPDATE continuity_ingress_outbox SET explicitly_requested=1 WHERE operation_id=?"
+                ) { statement in
+                    bind(statement, 1, key.operationID.uuidString.lowercased())
+                    try stepDone(statement)
+                }
+                return try requiredIngressDeliveryUnlocked(key.operationID)
+            }
+            return existing
+        }
+        guard (try queryIntUnlocked(
+            "SELECT COUNT(*) FROM continuity_ingress_outbox WHERE state IN ('pending','claimed','blocked')"
+        ) ?? 0) < ContinuityIngressLimits.maximumPendingDeliveries else {
+            throw ContinuityIngressError.capacityExceeded("pending deliveries")
+        }
+        try withStatementUnlocked(
+            """
+            INSERT INTO continuity_ingress_outbox(
+                operation_id,continuity_id,revision,packet_sha256,operation_key_sha256,
+                explicitly_requested,state,next_attempt_at
+            ) VALUES(?,?,?,?,?,?,'pending',?)
+            """
+        ) { statement in
+            bind(statement, 1, key.operationID.uuidString.lowercased())
+            bind(statement, 2, revision.identity.continuityID)
+            sqlite3_bind_int64(statement, 3, revision.identity.revision)
+            bind(statement, 4, revision.identity.packetSHA256)
+            bind(statement, 5, key.keySHA256)
+            sqlite3_bind_int(statement, 6, explicitlyRequested ? 1 : 0)
+            bind(statement, 7, timestamp)
+            try stepDone(statement)
+        }
+        return try requiredIngressDeliveryUnlocked(key.operationID)
+    }
+
+    private func ingressDeliveryForRevisionUnlocked(
+        _ identity: ContinuityHandoffIdentity
+    ) throws -> ContinuityHandoffDelivery? {
+        let operationID = try withStatementUnlocked(
+            "SELECT operation_id FROM continuity_ingress_outbox WHERE continuity_id=? AND revision=?"
+        ) { statement -> UUID? in
+            bind(statement, 1, identity.continuityID)
+            sqlite3_bind_int64(statement, 2, identity.revision)
+            let result = sqlite3_step(statement)
+            if result == SQLITE_DONE { return nil }
+            guard result == SQLITE_ROW,
+                  let id = try ingressText(statement, 0, maximumBytes: 36).flatMap(UUID.init(uuidString:)) else {
+                throw ContinuityIngressError.integrityFailure("malformed delivery identifier")
+            }
+            return id
+        }
+        return try operationID.map { try requiredIngressDeliveryUnlocked($0) }
+    }
+
+    private func requiredIngressDeliveryUnlocked(_ operationID: UUID) throws -> ContinuityHandoffDelivery {
+        guard let value = try ingressDeliveryUnlocked(operationID) else { throw ContinuityIngressError.notFound }
+        return value
+    }
+
+    private func ingressDeliveryUnlocked(_ operationID: UUID) throws -> ContinuityHandoffDelivery? {
+        do {
+            return try withStatementUnlocked(
+                """
+                SELECT continuity_id,revision,packet_sha256,operation_key_sha256,state,attempts,
+                    next_attempt_at,lease_owner,lease_token,lease_expires_at,last_error_code,
+                    acceptance_receipt_sha256,acknowledged_at,explicitly_requested
+                FROM continuity_ingress_outbox WHERE operation_id=?
+                """
+            ) { statement in
+                bind(statement, 1, operationID.uuidString.lowercased())
+                let result = sqlite3_step(statement)
+                if result == SQLITE_DONE { return nil }
+                guard result == SQLITE_ROW else { throw sqliteStepError(result) }
+                guard let continuityID = try ingressText(statement, 0, maximumBytes: 128),
+                      sqlite3_column_type(statement, 1) == SQLITE_INTEGER,
+                      let packetSHA = try ingressText(statement, 2, maximumBytes: 64),
+                      let keySHA = try ingressText(statement, 3, maximumBytes: 64),
+                      let state = try ingressText(statement, 4, maximumBytes: 16)
+                        .flatMap(ContinuityDeliveryState.init(rawValue:)),
+                      sqlite3_column_type(statement, 5) == SQLITE_INTEGER,
+                      let nextAt = try ingressText(statement, 6, maximumBytes: 32),
+                      ISO8601.date(from: nextAt) != nil,
+                      sqlite3_column_type(statement, 13) == SQLITE_INTEGER else {
+                    throw ContinuityIngressError.integrityFailure("malformed delivery row")
+                }
+                let attempts = sqlite3_column_int64(statement, 5)
+                let owner = try ingressText(statement, 7, maximumBytes: 128)
+                let tokenText = try ingressText(statement, 8, maximumBytes: 36)
+                let token = tokenText.flatMap(UUID.init(uuidString:))
+                let expiry = try ingressText(statement, 9, maximumBytes: 32)
+                let error = try ingressText(statement, 10, maximumBytes: 128)
+                let receipt = try ingressText(statement, 11, maximumBytes: 64)
+                let acknowledgedAt = try ingressText(statement, 12, maximumBytes: 32)
+                let explicit = sqlite3_column_int64(statement, 13)
+                guard (0...Int64(ContinuityIngressLimits.maximumAttempts)).contains(attempts),
+                      explicit == 0 || explicit == 1,
+                      owner.map(Self.validIngressLabel) ?? true,
+                      tokenText == nil || token != nil,
+                      expiry.map({ ISO8601.date(from: $0) != nil }) ?? true,
+                      error.map(Self.validIngressLabel) ?? true,
+                      receipt.map(ContinuityIngressLimits.validSHA256) ?? true,
+                      acknowledgedAt.map({ ISO8601.date(from: $0) != nil }) ?? true else {
+                    throw ContinuityIngressError.integrityFailure("invalid delivery state fields")
+                }
+                if state == .claimed || state == .acknowledged {
+                    guard owner != nil, token != nil, expiry != nil, attempts > 0 else {
+                        throw ContinuityIngressError.integrityFailure("delivery lacks claim correlation")
+                    }
+                } else if owner != nil || token != nil || expiry != nil {
+                    throw ContinuityIngressError.integrityFailure("unclaimed delivery has a lease")
+                }
+                guard (state == .acknowledged) == (receipt != nil && acknowledgedAt != nil),
+                      state == .acknowledged || (receipt == nil && acknowledgedAt == nil) else {
+                    throw ContinuityIngressError.integrityFailure("delivery acknowledgment is incomplete")
+                }
+                let revision = try requiredIngressRevisionUnlocked(
+                    ContinuityHandoffIdentity(
+                        continuityID: continuityID, revision: sqlite3_column_int64(statement, 1),
+                        packetSHA256: packetSHA
+                    ),
+                    allowInvalidated: true
+                )
+                let expected = try ContinuityIngressOperationIdentity(revision: revision)
+                guard expected.operationID == operationID, expected.keySHA256 == keySHA, revision.resumeReady else {
+                    throw ContinuityIngressError.integrityFailure("delivery operation identity changed")
+                }
+                return ContinuityHandoffDelivery(
+                    operationID: operationID, handoff: revision, explicitlyRequested: explicit == 1,
+                    state: state, attempts: Int(attempts),
+                    nextAttemptAt: nextAt, leaseOwner: owner, leaseToken: token,
+                    leaseExpiresAt: expiry, lastErrorCode: error,
+                    acceptanceReceiptSHA256: receipt, acknowledgedAt: acknowledgedAt
+                )
+            }
+        } catch let error as ContinuityIngressError {
+            switch error {
+            case .invalidRequest(let field), .capacityExceeded(let field):
+                throw ContinuityIngressError.integrityFailure("stored delivery field is invalid: \(field)")
+            default:
+                throw error
+            }
+        } catch let error as NSError where error.domain == NSCocoaErrorDomain && error.code == 3_840 {
+            throw ContinuityIngressError.integrityFailure("stored delivery JSON is malformed")
+        }
+    }
+
+    private func requireIngressClaimUnlocked(
+        _ claim: ContinuityDeliveryClaim,
+        timestamp: String,
+        allowAcknowledged: Bool = false
+    ) throws -> ContinuityHandoffDelivery {
+        let current = try requiredIngressDeliveryUnlocked(claim.delivery.operationID)
+        try requireIngressAuthorityUnlocked(
+            claim.delivery.handoff.authorization,
+            continuityID: claim.delivery.handoff.identity.continuityID
+        )
+        guard current.handoff == claim.delivery.handoff,
+              current.leaseOwner == claim.owner, current.leaseToken == claim.token,
+              (current.state == .claimed && (current.leaseExpiresAt ?? "") > timestamp)
+                || (allowAcknowledged && current.state == .acknowledged) else {
+            throw ContinuityIngressError.deliveryConflict
+        }
+        return current
+    }
+
+    private func bindIngressBytes(_ statement: OpaquePointer, _ index: Int32, _ data: Data) {
+        data.withUnsafeBytes { buffer in
+            _ = sqlite3_bind_blob(statement, index, buffer.baseAddress, Int32(buffer.count), Self.sqliteTransient)
+        }
+    }
+
+    private func ingressBytes(
+        _ statement: OpaquePointer,
+        _ column: Int32,
+        maximumBytes: Int
+    ) throws -> Data {
+        guard sqlite3_column_type(statement, column) == SQLITE_BLOB else {
+            throw ContinuityIngressError.integrityFailure("expected a binary canonical snapshot")
+        }
+        let count = Int(sqlite3_column_bytes(statement, column))
+        guard count > 0, count <= maximumBytes, let pointer = sqlite3_column_blob(statement, column) else {
+            throw ContinuityIngressError.integrityFailure("stored snapshot exceeds its byte boundary")
+        }
+        return Data(bytes: pointer, count: count)
+    }
+
+    private func ingressText(
+        _ statement: OpaquePointer,
+        _ column: Int32,
+        maximumBytes: Int
+    ) throws -> String? {
+        if sqlite3_column_type(statement, column) == SQLITE_NULL { return nil }
+        guard sqlite3_column_type(statement, column) == SQLITE_TEXT else {
+            throw ContinuityIngressError.integrityFailure("expected a text field")
+        }
+        let count = Int(sqlite3_column_bytes(statement, column))
+        guard count <= maximumBytes, let pointer = sqlite3_column_text(statement, column),
+              let value = String(data: Data(bytes: pointer, count: count), encoding: .utf8),
+              !value.contains("\0") else {
+            throw ContinuityIngressError.integrityFailure("stored text exceeds its byte boundary")
+        }
+        return value
     }
 
     // MARK: - SQLite helpers

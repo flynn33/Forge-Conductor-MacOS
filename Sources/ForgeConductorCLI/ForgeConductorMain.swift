@@ -373,6 +373,8 @@ enum ForgeConductorMain {
             try managerRestart(rest)
         case "status":
             try managerStatus(rest)
+        case "task":
+            try managerTask(rest)
         case "install-login":
             try managerInstallLogin(rest)
         case "uninstall-login":
@@ -390,6 +392,7 @@ enum ForgeConductorMain {
               stop [--home PATH]            SIGTERM running manager
               restart [--open]              stop + start
               status [--home PATH]          JSON status
+              task <command>                Prepare, reconcile, rotate, or revoke a native source task
               cleanup-stale                 Remove legacy com.forge.* (bash/python3) login agents
               install-login [--keep-stale] [--open]
                                              Install Forge Conductor.app + LaunchAgent
@@ -405,6 +408,33 @@ enum ForgeConductorMain {
                 exit(2)
             }
         }
+    }
+
+    static func managerTask(_ args: [String]) throws {
+        if args.isEmpty || args == ["--help"] || args == ["help"] {
+            print(NativeTaskOperatorCommandLine.usage)
+            return
+        }
+        final class TaskCommandResult: @unchecked Sendable {
+            private let lock = NSLock()
+            private var result: Result<Data, Error>?
+            func put(_ result: Result<Data, Error>) { lock.lock(); self.result = result; lock.unlock() }
+            func take() -> Result<Data, Error>? { lock.lock(); defer { lock.unlock() }; return result }
+        }
+        let box = TaskCommandResult(), semaphore = DispatchSemaphore(value: 0)
+        let operation = Task {
+            do { box.put(.success(try await NativeTaskOperatorCommandLine.run(arguments: args))) }
+            catch { box.put(.failure(error)) }
+            semaphore.signal()
+        }
+        guard semaphore.wait(timeout: .now() + 45) == .success else {
+            operation.cancel()
+            throw NativeTaskOperatorError.reconciliationRequired
+        }
+        guard let result = box.take() else { throw NativeTaskOperatorError.invalidResponse }
+        let data = try result.get()
+        guard let text = String(data: data, encoding: .utf8) else { throw NativeTaskOperatorError.invalidResponse }
+        print(text)
     }
 
     static func managerInstallLogin(_ args: [String]) throws {

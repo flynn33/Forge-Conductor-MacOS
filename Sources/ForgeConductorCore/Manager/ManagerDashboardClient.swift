@@ -364,3 +364,133 @@ public final class ManagerDashboardClient: @unchecked Sendable {
         ].contains(code)
     }
 }
+
+extension ManagerDashboardClient: NativeTaskOperatorTransport {
+    /// The operator bearer is read from this client's installation only. Neither redirects nor
+    /// response caches may transfer or retain this request, and both attempts use identical bytes.
+    public func submitNativeTaskCommand(action: String, body: Data) async throws -> NativeTaskCapabilityCommandResult {
+        let command = try NativeTaskOperatorCommand(action: action, data: body)
+        var components = URLComponents()
+        components.scheme = "http"; components.host = host; components.port = port; components.path = "/mcp/continuity"
+        guard let endpoint = components.url else { throw NativeTaskOperatorError.invalidRequest("manager_endpoint") }
+        try NativeTaskOperatorEndpoint.validate(endpoint)
+        components.path = "/api/manager/continuity/tasks/" + command.action
+        guard let url = components.url else { throw NativeTaskOperatorError.invalidRequest("manager_endpoint") }
+        let authorization = "Bearer \(try credentials.bearerToken())"
+        let configuration = session.configuration
+        configuration.urlCache = nil; configuration.httpCookieStorage = nil; configuration.urlCredentialStorage = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.timeoutIntervalForRequest = 18; configuration.timeoutIntervalForResource = 20
+        let boundedSession = URLSession(configuration: configuration)
+        defer { boundedSession.invalidateAndCancel() }
+        let redirectGuard = NativeTaskOperatorRedirectGuard()
+        for attempt in 0..<2 {
+            do {
+                try Task.checkCancellation()
+                var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 18)
+                request.httpMethod = "POST"; request.httpBody = body; request.httpShouldHandleCookies = false
+                request.setValue(authorization, forHTTPHeaderField: "Authorization")
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                request.setValue("application/json", forHTTPHeaderField: "Accept")
+                request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+                let (bytes, response) = try await boundedSession.bytes(for: request, delegate: redirectGuard)
+                defer { bytes.task.cancel() }
+                guard let http = response as? HTTPURLResponse, http.url == url else { throw NativeTaskOperatorError.invalidResponse }
+                guard response.expectedContentLength <= Int64(NativeTaskOperatorResponse.maximumBytes) else { throw NativeTaskOperatorError.responseTooLarge }
+                var data = Data(); data.reserveCapacity(min(NativeTaskOperatorResponse.maximumBytes, 8_192))
+                for try await byte in bytes {
+                    guard data.count < NativeTaskOperatorResponse.maximumBytes else { throw NativeTaskOperatorError.responseTooLarge }
+                    data.append(byte)
+                }
+                guard http.statusCode == 200 else {
+                    // Never reflect server bodies, arbitrary messages, or authorization values into native errors.
+                    throw NativeTaskOperatorError.rejected(status: http.statusCode, code: "native_task_command_rejected")
+                }
+                let result = try NativeTaskOperatorResponse.decode(data)
+                try command.validate(result)
+                return result
+            } catch {
+                guard attempt == 0, Self.isAmbiguousTransportFailure(error), !Task.isCancelled else { throw error }
+                try await Task.sleep(for: .milliseconds(200))
+            }
+        }
+        throw NativeTaskOperatorError.reconciliationRequired
+    }
+
+    public func prepareNativeContinuityTask(_ request: NativeContinuityTaskPreparationRequest) async throws -> NativeTaskCapabilityCommandResult {
+        try await submitNativeTaskCommand(action: request.action, body: request.canonicalRequestJSON)
+    }
+    public func rotateNativeContinuityTask(_ request: NativeContinuityTaskRotationRequest) async throws -> NativeTaskCapabilityCommandResult {
+        try await submitNativeTaskCommand(action: request.action, body: request.canonicalRequestJSON)
+    }
+    public func revokeNativeContinuityTask(_ request: NativeContinuityTaskRevocationRequest) async throws -> NativeTaskCapabilityCommandResult {
+        try await submitNativeTaskCommand(action: request.action, body: request.canonicalRequestJSON)
+    }
+}
+
+extension ManagerDashboardClient: NativeSourceOperatorTransport {
+    /// Exact retries retain the caller's task, request and input; redirects are refused.
+    public func submitNativeSourceCommand(action: String, body: Data) async throws -> Data {
+        let taskID: UUID, requestID: UUID
+        switch action {
+        case "send":
+            let value = try NativeSourceSendRequest(data: body); taskID = value.taskID; requestID = value.requestID
+        case "status":
+            let value = try NativeSourceStatusRequest(data: body); taskID = value.taskID; requestID = value.requestID
+        case "cancel":
+            let value = try NativeSourceCancelRequest(data: body); taskID = value.taskID; requestID = value.requestID
+        default: throw NativeSourceOperatorError.invalidRequest("action")
+        }
+        var components = URLComponents()
+        components.scheme = "http"; components.host = host; components.port = port; components.path = MCPTaskHTTPService.path
+        guard let endpoint = components.url else { throw NativeSourceOperatorError.unavailable }
+        try NativeTaskOperatorEndpoint.validate(endpoint)
+        components.path = "/api/manager/continuity/source/" + action
+        guard let url = components.url else { throw NativeSourceOperatorError.unavailable }
+        let authorization = "Bearer \(try credentials.bearerToken())"
+        let configuration = session.configuration
+        configuration.urlCache = nil; configuration.httpCookieStorage = nil; configuration.urlCredentialStorage = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.timeoutIntervalForRequest = 18; configuration.timeoutIntervalForResource = 20
+        let boundedSession = URLSession(configuration: configuration)
+        defer { boundedSession.invalidateAndCancel() }
+        let redirectGuard = NativeTaskOperatorRedirectGuard()
+        for attempt in 0..<2 {
+            do {
+                try Task.checkCancellation()
+                var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 18)
+                request.httpMethod = "POST"; request.httpBody = body; request.httpShouldHandleCookies = false
+                request.setValue(authorization, forHTTPHeaderField: "Authorization")
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                request.setValue("application/json", forHTTPHeaderField: "Accept")
+                request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+                let (bytes, response) = try await boundedSession.bytes(for: request, delegate: redirectGuard)
+                defer { bytes.task.cancel() }
+                guard let http = response as? HTTPURLResponse, http.url == url,
+                      response.expectedContentLength <= Int64(NativeSourceOperatorResponse.maximumBytes) else {
+                    throw NativeSourceOperatorError.invalidResponse
+                }
+                var data = Data(); data.reserveCapacity(8_192)
+                for try await byte in bytes {
+                    guard data.count < NativeSourceOperatorResponse.maximumBytes else { throw NativeSourceOperatorError.invalidResponse }
+                    data.append(byte)
+                }
+                guard http.statusCode == 200 || http.statusCode == 202 else { throw NativeSourceOperatorError.unavailable }
+                let decoded = try NativeSourceOperatorResponse(data: data)
+                guard decoded.taskID == taskID, decoded.requestID == requestID else { throw NativeSourceOperatorError.invalidResponse }
+                return decoded.canonicalJSON
+            } catch {
+                guard attempt == 0, Self.isAmbiguousTransportFailure(error), !Task.isCancelled else { throw error }
+                try await Task.sleep(for: .milliseconds(200))
+            }
+        }
+        throw NativeSourceOperatorError.unavailable
+    }
+}
+
+private final class NativeTaskOperatorRedirectGuard: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+        completionHandler(nil)
+    }
+}

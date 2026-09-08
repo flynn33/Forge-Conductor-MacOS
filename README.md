@@ -31,6 +31,10 @@ Missing policy blocks completion; model-supplied hashes cannot approve a gate.
 CLU correction implementation and its separate live API/desktop qualification
 remain in progress.
 
+The [native source attachment](docs/CONTINUITY-INGRESS.md#authenticated-native-source-attachment)
+supports explicitly approved read-only tasks through the existing manager, with
+protected credentials and checkpoint, handoff, and CLU controls.
+
 ### How LM Studio connects
 
 LM Studio is the MCP **host**. It spawns a Forge **stdio** server:

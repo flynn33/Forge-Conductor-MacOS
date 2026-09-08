@@ -925,7 +925,7 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
                     try await runtime.tick()
                 case .waitingProvider, .waitingResource, .retryWait, .failedRecoverable,
                      .blockedConfiguration, .validatingCompletion, .completed, .cancelRequested,
-                     .cancelled, .failedTerminal, .paused:
+                     .cancelled, .failedTerminal, .paused, .awaitingBootstrap:
                     throw LiveQualificationError.unexpectedRunState(run.state)
                 case .created, .validating, .ready, .starting:
                     break
@@ -973,7 +973,7 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
                 case .created, .validating, .ready, .starting:
                     break
                 case .blockedConfiguration, .validatingCompletion, .completed, .cancelRequested,
-                     .cancelled, .failedTerminal, .paused:
+                     .cancelled, .failedTerminal, .paused, .awaitingBootstrap:
                     throw LiveQualificationError.unexpectedRunState(run.state)
                 }
             }

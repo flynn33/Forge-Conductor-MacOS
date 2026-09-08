@@ -41,6 +41,72 @@ public final class ContinuityStateEngine: @unchecked Sendable {
 
     public init(memory: ProjectMemoryService) { self.memory = memory }
 
+    /// The manager supplies live authority while holding its task admission fence.
+    /// This only prepares canonical state; it cannot create or authorize a provider.
+    func prepareSourceBootstrap(
+        acceptance: ContinuityIngressAcceptanceReceipt,
+        authorization: ContinuityIngressAuthorization,
+        bootstrapNonce: UUID,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuitySourceBootstrapOperation {
+        try authorization.validate()
+        guard acceptance.authorization == authorization else { throw ContinuityIngressError.authorityMismatch }
+        return try memory.repositoryForProject(authorization.projectID.description, cancellation: cancellation)
+            .continuityPrepareSourceBootstrap(acceptance: acceptance, authorization: authorization,
+                bootstrapNonce: bootstrapNonce, cancellation: cancellation)
+    }
+
+    func sourceBootstrap(operationID: UUID, authorization: ContinuityIngressAuthorization,
+                         cancellation: ToolCallCancellation? = nil) throws -> ContinuitySourceBootstrapOperation? {
+        try authorization.validate()
+        return try memory.repositoryForProject(authorization.projectID.description, cancellation: cancellation)
+            .continuitySourceBootstrap(operationID: operationID, authorization: authorization, cancellation: cancellation)
+    }
+
+    func transitionSourceBootstrap(
+        operationID: UUID, authorization: ContinuityIngressAuthorization,
+        expectedState: ContinuityState, expectedChecksum: String, to next: ContinuityState,
+        candidateID: UUID, providerResponseID: String? = nil,
+        retrievalProofSHA256: String? = nil, acknowledgementProofSHA256: String? = nil,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuitySourceBootstrapOperation {
+        try authorization.validate()
+        return try memory.repositoryForProject(authorization.projectID.description, cancellation: cancellation)
+            .continuityTransitionSourceBootstrap(operationID: operationID, authorization: authorization,
+                expectedState: expectedState, expectedChecksum: expectedChecksum, to: next, candidateID: candidateID,
+                providerResponseID: providerResponseID, retrievalProofSHA256: retrievalProofSHA256,
+                acknowledgementProofSHA256: acknowledgementProofSHA256, cancellation: cancellation)
+    }
+
+    /// Called by the control plane while it validates the durable winner receipt
+    /// and live lease. Canonical sealing itself does not release execution hold.
+    func sealSourceBootstrap(operationID: UUID, authorization: ContinuityIngressAuthorization,
+                             expectedChecksum: String, acceptanceReceipt: ContinuitySourceActivationReceipt,
+                             cancellation: ToolCallCancellation? = nil) throws -> ContinuitySourceBootstrapOperation {
+        try authorization.validate()
+        return try memory.repositoryForProject(authorization.projectID.description, cancellation: cancellation)
+            .continuitySealSourceBootstrap(operationID: operationID, authorization: authorization,
+                expectedChecksum: expectedChecksum, acceptanceReceipt: acceptanceReceipt, cancellation: cancellation)
+    }
+
+    func markSourceBootstrapResumed(operationID: UUID, authorization: ContinuityIngressAuthorization,
+        expectedChecksum: String, continuationReceipt: ContinuitySourceResumptionReceipt,
+        cancellation: ToolCallCancellation? = nil) throws -> ContinuitySourceBootstrapOperation {
+        try authorization.validate()
+        return try memory.repositoryForProject(authorization.projectID.description, cancellation: cancellation)
+            .continuityMarkSourceBootstrapResumed(operationID: operationID, authorization: authorization,
+                expectedChecksum: expectedChecksum, continuationReceipt: continuationReceipt, cancellation: cancellation)
+    }
+
+    /// Executes only inside the control plane's exact cancellation claim guard.
+    func cancelSourceBootstrap(request: ContinuityOperationCancellationRequest,
+        acceptance: ContinuityIngressAcceptanceReceipt, cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuityOperationCancellationMarker {
+        try request.authorization.validate()
+        return try memory.repositoryForProject(request.authorization.projectID.description, cancellation: cancellation)
+            .continuityCancelSourceBootstrap(request: request, acceptance: acceptance, cancellation: cancellation)
+    }
+
     public func prepare(
         handoff: ContinuityHandoff,
         predecessorSessionID: String,

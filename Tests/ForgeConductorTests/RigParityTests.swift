@@ -34,12 +34,37 @@ final class RigParityTests: XCTestCase {
             managerServiceStopped: false,
             serveCount: 0,
             mcpProcessCount: 0,
-            configuredRoleCount: 2
+            configuredRoleCount: 3
         ))
 
         XCTAssertEqual(decision.health, .config)
         XCTAssertEqual(decision.label, "MCP IDLE")
         XCTAssertEqual(decision.mode, "lm-studio")
+    }
+
+    func testLegacyPairIsPartialWhenIdleAndStillOperationalWhenActive() {
+        var evidence = OrchestrationEvidence(
+            lmStudioUp: true,
+            managerAlive: true,
+            managerServiceReady: true,
+            managerServiceStopped: false,
+            serveCount: 0,
+            mcpProcessCount: 0,
+            configuredRoleCount: 2
+        )
+        // Primary/fallback without CLU is an incomplete current deployment.
+        // Existing connected service remains observable independently of that
+        // installation gap; process presence does not assert CLU readiness.
+        let idle = OrchestrationHealthPolicy.decide(from: evidence)
+        XCTAssertEqual(idle.health, .warn)
+        XCTAssertEqual(idle.label, "MCP PARTIAL")
+        XCTAssertEqual(idle.mode, "lm-studio")
+
+        evidence.mcpProcessCount = 1
+        let active = OrchestrationHealthPolicy.decide(from: evidence)
+        XCTAssertEqual(active.health, .ok)
+        XCTAssertEqual(active.label, "LM STUDIO + MCP")
+        XCTAssertEqual(active.mode, "lm-studio")
     }
 
     func testOrchestrationPolicyStillWarnsWhenLMStudioIsNotConfigured() {
@@ -91,7 +116,7 @@ final class RigParityTests: XCTestCase {
                 managerServiceStopped: false,
                 serveCount: 0,
                 mcpProcessCount: 0,
-                configuredRoleCount: 2
+                configuredRoleCount: 3
             )
         )
         XCTAssertEqual(unavailableState.health, .warn)

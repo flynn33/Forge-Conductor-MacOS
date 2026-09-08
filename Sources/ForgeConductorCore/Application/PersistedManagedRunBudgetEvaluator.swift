@@ -2,7 +2,7 @@
 
 import Foundation
 
-public actor PersistedManagedRunBudgetEvaluator: ManagedRunBudgetEvaluating {
+public actor PersistedManagedRunBudgetEvaluator: ManagedRunToolResultBudgetEvaluating {
     public static let maximumCachedSessions = 128
     public typealias PolicyResolver = @Sendable (BudgetPolicyScope) throws -> BudgetPolicySelection
 
@@ -34,7 +34,8 @@ public actor PersistedManagedRunBudgetEvaluator: ManagedRunBudgetEvaluating {
         let supervisor = try await supervisor(
             run: run,
             sessionID: sessionID,
-            capabilities: capabilities
+            capabilities: capabilities,
+            requiresProviderPreflight: true
         )
         let snapshot = await supervisor.snapshot()
         let measurement: ContextBudgetMeasurement
@@ -61,7 +62,8 @@ public actor PersistedManagedRunBudgetEvaluator: ManagedRunBudgetEvaluating {
         guard accounting.inputBytes >= 0, accounting.toolSchemaBytes >= 0 else {
             throw ContextBudgetError.invalidObservation("negative request accounting")
         }
-        let supervisor = try await supervisor(run: run, sessionID: sessionID, capabilities: capabilities)
+        let supervisor = try await supervisor(run: run, sessionID: sessionID, capabilities: capabilities,
+            providerPreflight: accounting.providerPreflight, requiresProviderPreflight: true)
         let snapshot = await supervisor.snapshot()
         let latest = snapshot.state.latestObservation
         let measurement: ContextBudgetMeasurement
@@ -134,7 +136,7 @@ public actor PersistedManagedRunBudgetEvaluator: ManagedRunBudgetEvaluating {
                 ))
                 : .serializedIncrement(bytes: bytes)
         }
-        let receipt = try await supervisor.evaluate(ContextBudgetEvaluationRequest(
+        let request = ContextBudgetEvaluationRequest(
             triggerPoint: .afterProviderTurn,
             providerResponseID: turn.responseID,
             measurement: measurement,
@@ -144,8 +146,93 @@ public actor PersistedManagedRunBudgetEvaluator: ManagedRunBudgetEvaluating {
             ),
             rawProviderUsage: turn.usage,
             accountingCut: "retained_input_after_response"
-        ))
-        return receipt.observation.action
+        )
+        if await supervisor.snapshot().state.configuration.resolvedPolicy?.inheritedSourceBudget != nil {
+            guard turn.providerID == capabilities.providerID, turn.providerVersion == capabilities.providerVersion,
+                  turn.modelKey == capabilities.modelKey, turn.providerInstanceID == capabilities.providerInstanceID else {
+                throw ContextBudgetError.configurationMismatch
+            }
+            return try await supervisor.observeSourceProviderTurn(turn, request: request)
+        }
+        return try await supervisor.evaluate(request).observation.action
+    }
+
+    public func evaluateBeforeToolResult(
+        run: AutonomousRunRecord, sessionID: String, capabilities: ProviderCapabilities,
+        projection: ManagedToolResultProjection
+    ) async throws -> ContextBudgetAction {
+        let supervisor = try await supervisor(run: run, sessionID: sessionID, capabilities: capabilities,
+            providerPreflight: projection.continuationPreflight, requiresProviderPreflight: true)
+        guard let carryover = try await repository.nativeSourceBudgetCarryover(runID: run.runID) else {
+            throw ContextBudgetError.invalidPolicy
+        }
+        let context = try await repository.invocationContext(
+            for: ProjectBindingOwner(kind: .providerSession, id: sessionID))
+        guard context.runID == run.runID, context.projectID == run.projectID,
+              context.projectGeneration == run.projectGeneration else {
+            throw ContextBudgetError.configurationMismatch
+        }
+        // Reserve the complete originally approved result, even when a current
+        // output policy is tighter. The completion guard enforces that current
+        // policy; a settings race must never become implicit truncation here.
+        let fullBound = min(65_536, context.authorizationScope.maximumInlineOutputBytes,
+                            carryover.ceilings.tools.maxResultBytes)
+        guard projection.maximumToolResultBytes == fullBound else {
+            throw ContextBudgetError.invalidObservation("tool projection changed the approved result ceiling")
+        }
+        return try await supervisor.projectToolResult(projection)
+    }
+
+    /// Seed the fresh managed session from its actual canonical bootstrap ACK.
+    /// The caller obtains the ACK and retained byte bound under the CP lease;
+    /// cumulative source-conversation usage is never accepted as this input.
+    public func seedSourceProviderTurn(
+        run: AutonomousRunRecord, sessionID: String, capabilities: ProviderCapabilities,
+        turn: ProviderTurn, retainedContextSerializedBytes: Int
+    ) async throws -> ContextBudgetAction {
+        let supervisor = try await supervisor(run: run, sessionID: sessionID, capabilities: capabilities)
+        let snapshot = await supervisor.snapshot()
+        guard snapshot.state.configuration.resolvedPolicy?.inheritedSourceBudget != nil,
+              turn.providerID == capabilities.providerID, turn.providerVersion == capabilities.providerVersion,
+              turn.modelKey == capabilities.modelKey, turn.providerInstanceID == capabilities.providerInstanceID,
+              retainedContextSerializedBytes > 0 else {
+            throw ContextBudgetError.configurationMismatch
+        }
+        let request = try Self.sourceSeedRequest(turn: turn, retainedContextSerializedBytes: retainedContextSerializedBytes,
+                                                policy: snapshot.state.configuration.policy)
+        return try await supervisor.observeSourceProviderTurn(turn, request: request,
+            seedRetainedContextSerializedBytes: retainedContextSerializedBytes)
+    }
+
+    static func sourceSeedRequest(turn: ProviderTurn, retainedContextSerializedBytes: Int,
+                                  policy: ContextBudgetPolicy) throws -> ContextBudgetEvaluationRequest {
+        guard retainedContextSerializedBytes > 0 else { throw ContextBudgetError.serializedInputTooLarge }
+        let estimate = try ContextBudgetMath.estimateTokens(serializedBytes: retainedContextSerializedBytes, policy: policy)
+        let measurement: ContextBudgetMeasurement
+        if let usage = turn.usage {
+            switch usage.source {
+            case .providerExact: measurement = .providerExact(usedTokens: try retainedTokensAfterResponse(usage))
+            case .tokenizerExact: measurement = .tokenizerExact(usedTokens: try retainedTokensAfterResponse(usage))
+            case .serializedEstimate:
+                measurement = .estimatedTokens(usedTokens: max(estimate, try retainedTokensAfterResponse(usage)),
+                                                confidence: usage.confidence)
+            case .providerOverflow: measurement = .providerOverflow(lastKnownUsedTokens: usage.inputTokens)
+            }
+        } else {
+            measurement = .serializedEstimate(.init(messageBytes: retainedContextSerializedBytes))
+        }
+        return ContextBudgetEvaluationRequest(triggerPoint: .afterProviderTurn, providerResponseID: turn.responseID,
+            measurement: measurement,
+            growth: .init(assistantOutputTokens: turn.usage?.outputTokens, projectedNextTurnTokens: turn.usage?.outputTokens),
+            rawProviderUsage: turn.usage, accountingCut: "retained_input_after_response")
+    }
+
+    public func observeToolResultPrefix(
+        run: AutonomousRunRecord, sessionID: String, capabilities: ProviderCapabilities,
+        prefix: ManagedToolResultPrefix
+    ) async throws -> ContextBudgetAction {
+        let supervisor = try await supervisor(run: run, sessionID: sessionID, capabilities: capabilities)
+        return try await supervisor.observeToolResultPrefix(prefix)
     }
 
     public func observeToolResult(
@@ -189,7 +276,9 @@ public actor PersistedManagedRunBudgetEvaluator: ManagedRunBudgetEvaluating {
     private func supervisor(
         run: AutonomousRunRecord,
         sessionID: String,
-        capabilities: ProviderCapabilities
+        capabilities: ProviderCapabilities,
+        providerPreflight: ProviderRequestPreflight? = nil,
+        requiresProviderPreflight: Bool = false
     ) async throws -> ContextBudgetSupervisor {
         let identity = ContextBudgetIdentity(
             runID: run.runID,
@@ -205,8 +294,20 @@ public actor PersistedManagedRunBudgetEvaluator: ManagedRunBudgetEvaluating {
             kind: .projectOverride, projectID: run.projectID.description,
             projectGeneration: policyGeneration
         ))
+        // The source receipt is independently revalidated even for a cached
+        // supervisor. Cumulative source usage is audit evidence, not retained
+        // context in this fresh managed session.
+        let carryover = try await repository.nativeSourceBudgetCarryover(runID: run.runID)
+        let inheritance = try carryover.map { try InheritedSourceContextBudget(carryover: $0) }
+        guard inheritance == nil || inheritance?.runID == run.runID else {
+            throw ContextBudgetError.configurationMismatch
+        }
+        guard inheritance == nil || !requiresProviderPreflight || providerPreflight != nil else {
+            throw ContextBudgetError.invalidPolicy
+        }
         let configuration = try Self.configuration(capabilities: capabilities, policyOverride: policyOverride,
-                                                   selection: selection)
+                                                   selection: selection, inheritance: inheritance,
+                                                   providerPreflight: providerPreflight)
         if let existing = supervisors[key] {
             // Re-resolve even a cached session: settings edits and provider/model
             // reconnects become effective at this controlled boundary.
@@ -248,22 +349,43 @@ public actor PersistedManagedRunBudgetEvaluator: ManagedRunBudgetEvaluating {
     static func configuration(
         capabilities: ProviderCapabilities,
         policyOverride: ContextBudgetPolicy? = nil,
-        selection: BudgetPolicySelection? = nil
+        selection: BudgetPolicySelection? = nil,
+        inheritance: InheritedSourceContextBudget? = nil,
+        providerPreflight: ProviderRequestPreflight? = nil
     ) throws -> ContextBudgetConfiguration {
+        _ = try inheritance?.validated()
+        guard inheritance == nil || selection != nil else { throw ContextBudgetError.invalidPolicy }
         let loadedCapacity = capabilities.contextLength
         let context = try selection?.policy.validated().context
-        let capacity = context?.mode == .manual
+        let selectedCapacity = context?.mode == .manual
             ? min(context!.maxContextTokens, loadedCapacity) : loadedCapacity
+        let capacity = min(selectedCapacity, inheritance?.effectiveContextTokens ?? selectedCapacity)
+        if let providerPreflight {
+            guard providerPreflight.modelKey == capabilities.modelKey else {
+                throw ContextBudgetError.configurationMismatch
+            }
+            guard providerPreflight.limits.maximumOutputTokens <= capacity,
+                  providerPreflight.limits.maximumOutputTokens <= (inheritance?.maximumOutputTokens ?? capacity) else {
+                throw ContextBudgetError.insufficientUsableCapacity
+            }
+        }
         let minimumUsable = min(1_024, max(128, capacity / 4))
+        let floors = inheritance?.reserves
         let reserves = ContextBudgetReserves(
-            outputTokens: context?.responseReserveTokens ?? min(4_096, max(128, capacity / 16)),
+            outputTokens: max(context?.responseReserveTokens ?? min(4_096, max(128, capacity / 16)),
+                              floors?.outputTokens ?? 0, inheritance?.maximumOutputTokens ?? 0,
+                              providerPreflight?.limits.maximumOutputTokens ?? 0),
             // Native managed requests include their schemas in retained input.
             // Preserve the legacy reserve only for legacy configurations.
-            schemaTokens: selection == nil ? min(4_096, max(64, capacity / 32)) : 0,
-            handoffTokens: context?.handoffReserveTokens ?? min(8_192, max(128, capacity / 16)),
-            recoveryTokens: context?.recoveryReserveTokens ?? min(4_096, max(64, capacity / 32)),
-            futureToolTokens: selection == nil ? 0 : (context?.futureToolReserveTokens ?? min(4_096, max(64, capacity / 32))),
-            safetyTokens: context?.safetyReserveTokens ?? 0
+            schemaTokens: max(selection == nil ? min(4_096, max(64, capacity / 32)) : 0,
+                              floors?.schemaTokens ?? 0),
+            handoffTokens: max(context?.handoffReserveTokens ?? min(8_192, max(128, capacity / 16)),
+                               floors?.handoffTokens ?? 0),
+            recoveryTokens: max(context?.recoveryReserveTokens ?? min(4_096, max(64, capacity / 32)),
+                                floors?.recoveryTokens ?? 0),
+            futureToolTokens: max(selection == nil ? 0 : (context?.futureToolReserveTokens ?? min(4_096, max(64, capacity / 32))),
+                                  floors?.futureToolTokens ?? 0),
+            safetyTokens: max(context?.safetyReserveTokens ?? 0, floors?.safetyTokens ?? 0)
         )
         let resolution = ContextCapacityResolution(
             providerID: capabilities.providerID,
@@ -297,7 +419,8 @@ public actor PersistedManagedRunBudgetEvaluator: ManagedRunBudgetEvaluating {
             ),
             resolvedPolicy: try selection.map {
                 try ResolvedContextBudgetPolicy(selection: $0, verifiedLoadedContextTokens: loadedCapacity,
-                                                effectiveContextTokens: capacity, qualificationPolicy: policyOverride).validated()
+                                                effectiveContextTokens: capacity, qualificationPolicy: policyOverride,
+                                                inheritedSourceBudget: inheritance).validated()
             }
         ).validated()
     }

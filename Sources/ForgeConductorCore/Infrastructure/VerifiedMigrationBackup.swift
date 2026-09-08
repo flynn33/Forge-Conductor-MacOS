@@ -35,6 +35,14 @@ public enum VerifiedMigrationStorageKind: String, Codable, Sendable {
     case sqlite
 }
 
+/// Independent schema owners may share one database while retaining separate
+/// version lineages. This closed set never changes the actual source identity,
+/// backup validation or database-wide migration lock.
+public enum VerifiedMigrationManifestScope: Sendable {
+    case standard
+    case continuityIngress
+}
+
 public enum VerifiedMigrationManifestState: String, Codable, Sendable {
     case prepared
     case completed
@@ -461,8 +469,16 @@ public enum VerifiedMigrationBackup {
         }
     }
 
-    public static func activeManifestURL(for sourceURL: URL) -> URL {
-        sourceURL.appendingPathExtension("migration-manifest.json")
+    public static func activeManifestURL(
+        for sourceURL: URL,
+        scope: VerifiedMigrationManifestScope = .standard
+    ) -> URL {
+        switch scope {
+        case .standard:
+            sourceURL.appendingPathExtension("migration-manifest.json")
+        case .continuityIngress:
+            sourceURL.appendingPathExtension("control-plane-ingress.migration-manifest.json")
+        }
     }
 
     public static func archivedManifestURL(
@@ -601,7 +617,8 @@ public enum VerifiedMigrationBackup {
         targetVersion: Int,
         storageKind: VerifiedMigrationStorageKind,
         targetArtifact: VerifiedMigrationBackupMetadata? = nil,
-        preparedAt: Date = Date()
+        preparedAt: Date = Date(),
+        scope: VerifiedMigrationManifestScope = .standard
     ) throws -> VerifiedMigrationBackupManifest {
         guard sourceVersion >= 0,
               targetVersion > sourceVersion,
@@ -695,7 +712,8 @@ public enum VerifiedMigrationBackup {
         if let existing = try reconcileMigrationManifest(
             sourceURL: sourceURL,
             observedVersion: sourceVersion,
-            allowCompletedFileLineageRestart: storageKind == .file
+            allowCompletedFileLineageRestart: storageKind == .file,
+            scope: scope
         ) {
             if existing.state == .prepared {
                 guard hasSameMigrationIdentity(existing, desired) else {
@@ -730,7 +748,7 @@ public enum VerifiedMigrationBackup {
             }
         }
 
-        let activeURL = activeManifestURL(for: sourceURL)
+        let activeURL = activeManifestURL(for: sourceURL, scope: scope)
         try writeManifestReplacing(desired, to: activeURL)
         let installed = try requireManifest(at: activeURL)
         guard installed == desired else {
@@ -750,9 +768,10 @@ public enum VerifiedMigrationBackup {
         observedVersion: Int,
         targetMetadata: VerifiedMigrationBackupMetadata? = nil,
         completedAt: Date = Date(),
-        allowCompletedFileLineageRestart: Bool = false
+        allowCompletedFileLineageRestart: Bool = false,
+        scope: VerifiedMigrationManifestScope = .standard
     ) throws -> VerifiedMigrationBackupManifest? {
-        let activeURL = activeManifestURL(for: sourceURL)
+        let activeURL = activeManifestURL(for: sourceURL, scope: scope)
         guard let manifest = try readManifestIfPresent(at: activeURL) else { return nil }
         try validateManifestArtifacts(manifest, sourceURL: sourceURL)
 
@@ -787,7 +806,8 @@ public enum VerifiedMigrationBackup {
                     preparedManifest: manifest,
                     observedVersion: observedVersion,
                     targetMetadata: verifiedTarget,
-                    completedAt: completedAt
+                    completedAt: completedAt,
+                    scope: scope
                 )
             }
         case .completed:
@@ -824,14 +844,15 @@ public enum VerifiedMigrationBackup {
         preparedManifest: VerifiedMigrationBackupManifest,
         observedVersion: Int,
         targetMetadata: VerifiedMigrationBackupMetadata,
-        completedAt: Date = Date()
+        completedAt: Date = Date(),
+        scope: VerifiedMigrationManifestScope = .standard
     ) throws -> VerifiedMigrationBackupManifest {
         guard observedVersion == preparedManifest.targetVersion else {
             throw VerifiedMigrationBackupError.reconciliationFailed(
                 "migration completion requires the exact target schema version"
             )
         }
-        let activeURL = activeManifestURL(for: sourceURL)
+        let activeURL = activeManifestURL(for: sourceURL, scope: scope)
         let current = try requireManifest(at: activeURL)
         guard hasSameMigrationIdentity(current, preparedManifest) else {
             throw VerifiedMigrationBackupError.reconciliationFailed(
@@ -960,7 +981,8 @@ public enum VerifiedMigrationBackup {
         backupURL: URL,
         sourceVersion: Int,
         targetVersion: Int,
-        versionQuery: String
+        versionQuery: String,
+        scope: VerifiedMigrationManifestScope = .standard
     ) throws -> VerifiedMigrationBackupManifest {
         guard sqlite3_get_autocommit(database) == 0 else {
             throw VerifiedMigrationBackupError.reconciliationFailed(
@@ -1019,7 +1041,8 @@ public enum VerifiedMigrationBackup {
             backup: backup,
             sourceVersion: sourceVersion,
             targetVersion: targetVersion,
-            storageKind: .sqlite
+            storageKind: .sqlite,
+            scope: scope
         )
     }
 
@@ -1139,14 +1162,16 @@ public enum VerifiedMigrationBackup {
     static func requireSQLiteMigrationReceipt(
         database: OpaquePointer,
         sourceURL: URL,
-        manifest: VerifiedMigrationBackupManifest
+        manifest: VerifiedMigrationBackupManifest,
+        scope: VerifiedMigrationManifestScope = .standard
     ) throws -> VerifiedMigrationBackupManifest {
         try requireSQLiteMigrationReceipt(
             database: database,
             sourceURL: sourceURL,
             manifest: manifest,
             validateArtifacts: true,
-            reconcileArchivedCompletion: true
+            reconcileArchivedCompletion: true,
+            scope: scope
         )
     }
 
@@ -2252,7 +2277,8 @@ public enum VerifiedMigrationBackup {
 
     private static func promoteArchivedSQLiteCompletionIfPresent(
         _ manifest: VerifiedMigrationBackupManifest,
-        sourceURL: URL
+        sourceURL: URL,
+        scope: VerifiedMigrationManifestScope
     ) throws -> VerifiedMigrationBackupManifest {
         guard manifest.state == .prepared else { return manifest }
         let backupURL = sourceURL.deletingLastPathComponent().appendingPathComponent(
@@ -2276,7 +2302,7 @@ public enum VerifiedMigrationBackup {
                 "archived SQLite completion conflicts with the prepared lineage"
             )
         }
-        let activeURL = activeManifestURL(for: sourceURL)
+        let activeURL = activeManifestURL(for: sourceURL, scope: scope)
         let active = try requireManifest(at: activeURL)
         if active == archived { return archived }
         guard active.state == .prepared,
@@ -2746,7 +2772,8 @@ public enum VerifiedMigrationBackup {
         sourceURL: URL,
         manifest: VerifiedMigrationBackupManifest,
         validateArtifacts: Bool,
-        reconcileArchivedCompletion: Bool
+        reconcileArchivedCompletion: Bool,
+        scope: VerifiedMigrationManifestScope = .standard
     ) throws -> VerifiedMigrationBackupManifest {
         guard manifest.storageKind == .sqlite,
               manifest.state == .prepared || manifest.state == .completed else {
@@ -2784,7 +2811,8 @@ public enum VerifiedMigrationBackup {
         guard reconcileArchivedCompletion else { return manifest }
         return try promoteArchivedSQLiteCompletionIfPresent(
             manifest,
-            sourceURL: sourceURL
+            sourceURL: sourceURL,
+            scope: scope
         )
     }
 

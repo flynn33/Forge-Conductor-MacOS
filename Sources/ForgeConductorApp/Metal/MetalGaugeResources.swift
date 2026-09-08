@@ -159,12 +159,21 @@ final class MetalVertexBuffer<Vertex> {
 @MainActor
 final class GaugeSurfaceLifetime {
     private var attached = false
+    // A scope observes only its owner's surfaces; shared diagnostics still
+    // receive every event. Keep the scope fixed through attachment and release.
+    private let scope: RuntimeDiagnostics?
+
+    init(scope: RuntimeDiagnostics? = nil) {
+        self.scope = scope === RuntimeDiagnostics.shared ? nil : scope
+    }
 
     func attach() {
         guard !attached else { return }
         attached = true
         RuntimeDiagnostics.shared.adjust(.gaugeActiveSurfaces, by: 1)
         RuntimeDiagnostics.shared.adjust(.gaugeVisibleSurfaces, by: 1)
+        scope?.adjust(.gaugeActiveSurfaces, by: 1)
+        scope?.adjust(.gaugeVisibleSurfaces, by: 1)
     }
 
     func detach() {
@@ -172,12 +181,16 @@ final class GaugeSurfaceLifetime {
         attached = false
         RuntimeDiagnostics.shared.adjust(.gaugeActiveSurfaces, by: -1)
         RuntimeDiagnostics.shared.adjust(.gaugeVisibleSurfaces, by: -1)
+        scope?.adjust(.gaugeActiveSurfaces, by: -1)
+        scope?.adjust(.gaugeVisibleSurfaces, by: -1)
     }
 
     deinit {
         if attached {
             RuntimeDiagnostics.shared.adjust(.gaugeActiveSurfaces, by: -1)
             RuntimeDiagnostics.shared.adjust(.gaugeVisibleSurfaces, by: -1)
+            scope?.adjust(.gaugeActiveSurfaces, by: -1)
+            scope?.adjust(.gaugeVisibleSurfaces, by: -1)
         }
     }
 }

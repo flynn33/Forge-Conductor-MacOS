@@ -133,28 +133,39 @@ final class G1G10AcceptanceTests: XCTestCase {
 
         let result = try deploy.deploy(preferredBinary: binary)
         XCTAssertTrue(result.ok, result.message)
-        XCTAssertEqual(result.pluginsWritten.sorted(), ["forge-conductor", "forge-conductor-fallback"])
+        XCTAssertEqual(result.pluginsWritten.sorted(), ["forge-conductor", "forge-conductor-clu", "forge-conductor-fallback"])
 
-        // G2: both plugins + mcp.json
+        // G2: all three current roles + mcp.json; the original pair is preserved.
         let primaryCfg = lmHome
             .appendingPathComponent("extensions/plugins/mcp/forge-conductor/mcp-bridge-config.json")
         let fallbackCfg = lmHome
             .appendingPathComponent("extensions/plugins/mcp/forge-conductor-fallback/mcp-bridge-config.json")
+        let continuityCfg = lmHome
+            .appendingPathComponent("extensions/plugins/mcp/forge-conductor-clu/mcp-bridge-config.json")
         XCTAssertTrue(FileManager.default.fileExists(atPath: primaryCfg.path))
         XCTAssertTrue(FileManager.default.fileExists(atPath: fallbackCfg.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: continuityCfg.path))
 
         let primary = try JSONSerialization.jsonObject(with: Data(contentsOf: primaryCfg)) as? [String: Any]
         let fallback = try JSONSerialization.jsonObject(with: Data(contentsOf: fallbackCfg)) as? [String: Any]
+        let continuity = try JSONSerialization.jsonObject(with: Data(contentsOf: continuityCfg)) as? [String: Any]
         XCTAssertEqual(primary?["command"] as? String, binary.path)
         XCTAssertEqual(primary?["args"] as? [String], ["serve"])
         XCTAssertEqual((primary?["env"] as? [String: String])?["FORGE_MCP_ROLE"], "primary")
         XCTAssertEqual(fallback?["command"] as? String, binary.path)
         XCTAssertEqual((fallback?["env"] as? [String: String])?["FORGE_MCP_ROLE"], "fallback")
+        XCTAssertEqual(continuity?["command"] as? String, binary.path)
+        XCTAssertEqual(continuity?["args"] as? [String], ["serve"])
+        XCTAssertEqual((continuity?["env"] as? [String: String])?["FORGE_MCP_ROLE"], "clu")
 
         let mcpRoot = try JSONSerialization.jsonObject(with: Data(contentsOf: lmHome.appendingPathComponent("mcp.json"))) as? [String: Any]
         let servers = mcpRoot?["mcpServers"] as? [String: Any]
         XCTAssertNotNil(servers?["forge-conductor"])
         XCTAssertNotNil(servers?["forge-conductor-fallback"])
+        let registeredContinuity = try XCTUnwrap(servers?["forge-conductor-clu"] as? [String: Any])
+        XCTAssertEqual(registeredContinuity["command"] as? String, binary.path)
+        XCTAssertEqual(registeredContinuity["args"] as? [String], ["serve"])
+        XCTAssertEqual((registeredContinuity["env"] as? [String: String])?["FORGE_MCP_ROLE"], "clu")
 
         // G7: process-level smoke already ran inside deploy; re-verify + tool call in-process
         let smoke = try MCPServeVerifier.verify(binary: binary, home: forgeHome, role: "primary")
@@ -162,6 +173,14 @@ final class G1G10AcceptanceTests: XCTestCase {
         XCTAssertEqual(smoke.protocolVersion, "2025-11-25")
         XCTAssertGreaterThanOrEqual(smoke.toolCount, 20)
         XCTAssertTrue(MCPServeVerifier.requiredProductTools.isSubset(of: Set(smoke.toolNames)))
+        let continuitySmoke = try MCPServeVerifier.verify(binary: binary, home: forgeHome, role: "clu")
+        XCTAssertTrue(continuitySmoke.ok, continuitySmoke.detail)
+        XCTAssertEqual(continuitySmoke.protocolVersion, "2025-11-25")
+        XCTAssertEqual(continuitySmoke.serverName, "forge-conductor-clu")
+        XCTAssertEqual(continuitySmoke.toolCount, 4)
+        XCTAssertEqual(Set(continuitySmoke.toolNames), [
+            "clu_capabilities", "clu_start_handoff", "clu_status", "clu_cancel",
+        ])
 
         let app = try ForgeApp.bootstrap(home: forgeHome)
         defer { app.shutdown() }

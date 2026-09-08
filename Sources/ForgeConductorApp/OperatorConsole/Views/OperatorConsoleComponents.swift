@@ -88,7 +88,7 @@ struct OperatorStateBadge: View {
         switch state {
         case "completed", "active", "running", "healthy", "ready", "sealed": .green
         case "failed_terminal", "cancelled", "failed", "quarantined_stale": .red
-        case "waiting_provider", "waiting_resource", "retry_wait", "paused", "blocked_configuration": .orange
+        case "waiting_provider", "waiting_resource", "awaiting_bootstrap", "retry_wait", "paused", "blocked_configuration": .orange
         default: .secondary
         }
     }

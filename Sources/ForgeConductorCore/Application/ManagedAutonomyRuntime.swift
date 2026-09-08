@@ -311,10 +311,22 @@ public actor ManagedAutonomyRuntime {
     private let runtimeJobs: RuntimeJobSubsystem
     private let installedCompletionRegistry: InstalledNativeGateRegistry?
     private let supervisor: AutonomySupervisor
+    /// Shared with the manager's source owner; this adds no capacity to the run limit.
+    nonisolated let providerWorkAdmission: NativeProviderWorkAdmission
     private let clock: any Clock
+    private let sourceCancellationWorker: ManagedContinuityWorker
+    private let sourceContinuity: ContextContinuityService
+    private let sourceCancellationManagerID: String
+    private let diagnostics: DiagnosticLog
+    private var sourceCancellationCursor: Int64?
+    private var sourceCancellationCleanup: ToolCallCancellation?
     private var started = false
+    private var starting = false
+    private var shutdownRequested = false
     private var startupReport: AutonomyStartupReport?
     private var tickInProgress = false
+    private var controlledRuns: Set<RunID> = []
+    private var servicesClosing = false
 
     public init(
         app: ForgeApp,
@@ -348,45 +360,92 @@ public actor ManagedAutonomyRuntime {
         let resolvedManagerID = managerID
             ?? "manager:\(ProcessInfo.processInfo.processIdentifier):\(UUID().uuidString.lowercased())"
         let concurrentRuns = maximumConcurrentRuns ?? Self.recommendedConcurrency()
-        let resolvedContinuityFactory: ContinuityFactory = continuityFactory ?? { _ in
-            ManagedContinuityWorker(
-                repository: repository,
-                memory: app.projectMemory,
-                adapterResolver: { adapterID in
-                    let storage = providerRoot.appendingPathComponent(
-                        Self.storageComponent(adapterID),
-                        isDirectory: true
-                    )
-                    try FileManager.default.createDirectory(
-                        at: storage,
-                        withIntermediateDirectories: true,
-                        attributes: [.posixPermissions: 0o700]
-                    )
-                    let adapter = try registry.adapter(
-                        identifier: adapterID,
-                        storageDirectory: storage
-                    )
-                    guard let adapterV2 = adapter as? any SessionHostAdapterV2 else {
-                        throw ContinuityRunError.hostCapabilityUnavailable
-                    }
-                    return adapterV2
-                }
-            )
+        let providerWorkAdmission = try NativeProviderWorkAdmission(limit: concurrentRuns)
+        self.providerWorkAdmission = providerWorkAdmission
+        let adapterResolver: ManagedContinuityWorker.AdapterResolver = { adapterID in
+            let storage = providerRoot.appendingPathComponent(Self.storageComponent(adapterID), isDirectory: true)
+            try FileManager.default.createDirectory(at: storage, withIntermediateDirectories: true,
+                                                   attributes: [.posixPermissions: 0o700])
+            let adapter = try registry.adapter(identifier: adapterID, storageDirectory: storage)
+            guard let adapterV2 = adapter as? any SessionHostAdapterV2 else {
+                throw ContinuityRunError.hostCapabilityUnavailable
+            }
+            return adapterV2
         }
+        let resolvedContinuityFactory: ContinuityFactory = continuityFactory ?? { _ in
+            ManagedContinuityWorker(repository: repository, memory: app.projectMemory,
+                                    adapterResolver: adapterResolver)
+        }
+        let policyResolver: PersistedManagedRunBudgetEvaluator.PolicyResolver = { scope in
+            try app.config.budgetPolicySelection(scope: scope)
+        }
+        let sourcePolicyResolver: @Sendable (ToolInvocationContext) throws -> BudgetPolicySelection = { context in
+            guard let generation = Int(exactly: context.projectGeneration.rawValue) else {
+                throw ProjectContextError.invalidGeneration(context.projectGeneration.rawValue)
+            }
+            return try policyResolver(.init(kind: .projectOverride,
+                projectID: context.projectID.description, projectGeneration: generation))
+        }
+        let sourceBootstrap = SourceBootstrapScheduling(
+            discover: { cursor, limit in
+                try await repository.pendingContinuityBootstrapRecoveries(afterRowID: cursor, limit: limit)
+            },
+            admit: { reference in
+                guard let generation = Int(exactly: reference.projectGeneration.rawValue) else {
+                    throw ContinuityBootstrapRecoveryError.invalidRequest
+                }
+                let policy = try policyResolver(BudgetPolicyScope(kind: .projectOverride,
+                    projectID: reference.projectID.description,
+                    projectGeneration: generation))
+                return try await repository.validateContinuityBootstrapRecovery(reference: reference, policy: policy)
+            },
+            makeCoordinator: { reference in
+                let worker = ManagedContinuityWorker(repository: repository, memory: app.projectMemory,
+                                                    adapterResolver: adapterResolver)
+                let broker = ToolInvocationBroker(repository: repository, executor: app.tools,
+                    classifier: classifier, reconciler: reconciler, sourcePolicyResolver: sourcePolicyResolver)
+                let engine = ContinuityStateEngine(memory: app.projectMemory)
+                return try ManagedSourceBootstrapCoordinator(reference: reference, repository: repository,
+                    managerID: resolvedManagerID, clock: clock, policyResolver: policyResolver,
+                    bootstrap: { acceptance, lease in
+                        try await worker.executeSourceBootstrap(acceptance: acceptance, lease: lease,
+                            broker: broker, continuity: app.continuity, policyResolver: policyResolver)
+                    },
+                    cancelBootstrap: { operationID in await worker.cancelSourceBootstrap(operationID: operationID) },
+                    readCanonical: { acceptance in
+                        guard let operation = try engine.sourceBootstrap(operationID: acceptance.operationID,
+                            authorization: acceptance.authorization) else {
+                            throw ContinuityIngressError.integrityFailure("canonical source bootstrap is missing")
+                        }
+                        return operation
+                    },
+                    activateSource: { acceptance, lease in
+                        try await worker.activateSourceBootstrap(acceptance: acceptance, lease: lease,
+                            policyResolver: policyResolver)
+                    })
+            })
 
         self.repository = repository
         self.runtimeJobs = app.runtimeJobs
         self.clock = clock
+        self.sourceCancellationWorker = ManagedContinuityWorker(repository: repository, memory: app.projectMemory,
+            adapterResolver: adapterResolver)
+        self.sourceContinuity = app.continuity
+        self.sourceCancellationManagerID = resolvedManagerID + ":source-cancel"
+        self.diagnostics = app.diagnostics
         self.supervisor = try AutonomySupervisor(
             repository: repository,
             maximumConcurrentRuns: concurrentRuns,
-            clock: clock
+            clock: clock,
+            sourceBootstrap: sourceBootstrap,
+            providerWorkAdmission: providerWorkAdmission
         ) { runID in
             let broker = ToolInvocationBroker(
                 repository: repository,
                 executor: app.tools,
                 classifier: classifier,
-                reconciler: reconciler
+                reconciler: reconciler,
+                sourcePolicyResolver: sourcePolicyResolver
             )
             let budget = PersistedManagedRunBudgetEvaluator(
                 repository: repository,
@@ -394,6 +453,8 @@ public actor ManagedAutonomyRuntime {
                 policyOverride: validatedBudgetPolicy,
                 policyResolver: { scope in try app.config.budgetPolicySelection(scope: scope) }
             )
+            let sourceCompletion = ManagedContinuityWorker(repository: repository, memory: app.projectMemory,
+                adapterResolver: adapterResolver)
             let stepExecutor = try ManagedProjectRunStepExecutor(
                 repository: repository,
                 providerResolver: { adapterID in
@@ -423,7 +484,11 @@ public actor ManagedAutonomyRuntime {
                     repository: repository,
                     delegate: try resolvedContinuityFactory(runID),
                     clock: clock
-                )
+                ),
+                sourceResumption: { run, lease in
+                    try await sourceCompletion.reconcileSourceResumption(run: run, lease: lease,
+                        policyResolver: policyResolver)
+                }
             )
             return try ProjectRunCoordinator(
                 runID: runID,
@@ -439,28 +504,117 @@ public actor ManagedAutonomyRuntime {
 
     @discardableResult
     public func start() async throws -> AutonomyStartupReport {
+        guard !shutdownRequested else { throw AutonomyError.shutdown }
         guard !started else {
             if let startupReport { return startupReport }
             throw AutonomyError.invalidRequest("managed autonomy startup is already in progress")
         }
-        try await runtimeJobs.start()
+        guard !starting else { throw AutonomyError.invalidRequest("managed autonomy startup is already in progress") }
+        starting = true
+        defer { starting = false }
         do {
+            try await runtimeJobs.start()
+            try Task.checkCancellation()
+            guard !shutdownRequested else { throw AutonomyError.shutdown }
+            try await processSourceCancellations()
+            guard !shutdownRequested else { throw AutonomyError.shutdown }
             let report = try await supervisor.recoverOnManagerStart()
+            try Task.checkCancellation()
+            guard !shutdownRequested else { throw AutonomyError.shutdown }
             startupReport = report
             started = true
             return report
         } catch {
-            await runtimeJobs.shutdown()
+            shutdownRequested = true
+            providerWorkAdmission.close()
+            await supervisor.shutdown()
+            await closeServicesAfterProviderWorkDrains()
             throw error
         }
     }
 
     public func tick() async throws {
         guard started else { throw AutonomyError.shutdown }
-        guard !tickInProgress else { return }
+        guard !tickInProgress, controlledRuns.isEmpty else { return }
         tickInProgress = true
         defer { tickInProgress = false }
+        try await processSourceCancellations()
+        guard !shutdownRequested else { throw AutonomyError.shutdown }
         try await supervisor.tick()
+    }
+
+    /// Uses the existing watchdog and operator-control ownership. The durable
+    /// exact-operation fence is checked before stopping an in-memory run; an old
+    /// completed source operation can never select a later run activation here.
+    private func processSourceCancellations() async throws {
+        let page = try await repository.pendingContinuityOperationCancellations(
+            afterRowID: sourceCancellationCursor, limit: 4)
+        sourceCancellationCursor = page.nextRowID
+        for reference in page.references {
+            try Task.checkCancellation()
+            guard !shutdownRequested else { throw AutonomyError.shutdown }
+            guard controlledRuns.count < 16, controlledRuns.insert(reference.runID).inserted else { continue }
+            defer { controlledRuns.remove(reference.runID) }
+            var lease: RunLease?
+            do {
+                guard try await repository.validateContinuityOperationCancellation(reference: reference) else { continue }
+                try await supervisor.quiesce(runID: reference.runID)
+                try Task.checkCancellation()
+                guard !shutdownRequested else { throw AutonomyError.shutdown }
+                let acquired = try await repository.acquireContinuityOperationCancellationLease(
+                    reference: reference, ownerID: sourceCancellationManagerID, policy: .init())
+                lease = acquired
+                let claim = try await repository.claimContinuityOperationCancellation(reference: reference, lease: acquired)
+                try Task.checkCancellation()
+                guard !shutdownRequested else { throw AutonomyError.shutdown }
+                let cancellation = ToolCallCancellation(timeoutSeconds: 8)
+                sourceCancellationCleanup = cancellation
+                let worker = sourceCancellationWorker, continuity = sourceContinuity
+                _ = try await withTaskCancellationHandler {
+                    try await RunLeaseProtection.withRenewal(acquired, repository: repository,
+                        policy: .init(), sleeper: SystemAutonomySleeper()) {
+                        try await worker.completeSourceCancellation(claim: claim, lease: acquired,
+                            continuity: continuity, cancellation: cancellation)
+                    }
+                } onCancel: {
+                    cancellation.cancel()
+                }
+            } catch {
+                // Reconciliation uncertainty has already committed its durable
+                // not-before fence in the completion transaction.
+                if let lease, error as? ContinuityOperationControlError != .reconciliationRequired {
+                    let failure: ContinuityOperationCancellationFailure
+                    let retryAfter: TimeInterval?
+                    if error as? ContinuityOperationControlError == .integrityFailure
+                                || (error as? ContinuityIngressError).map({
+                                    if case .integrityFailure = $0 { return true }; return false
+                                }) == true {
+                        failure = .integrityFailure; retryAfter = nil
+                    } else if error is CancellationError || shutdownRequested {
+                        failure = .interrupted; retryAfter = nil
+                    } else {
+                        failure = .storeUnavailable; retryAfter = nil
+                    }
+                    do {
+                        try await repository.recordContinuityOperationCancellationFailure(reference: reference,
+                            lease: lease, failure: failure, retryAfter: retryAfter)
+                    } catch {
+                        diagnostics.warn("continuity_cancellation_retry_not_recorded", [
+                            "code": "authority_or_store_unavailable",
+                        ], category: .general)
+                    }
+                }
+                diagnostics.warn("continuity_operation_cancellation_deferred", [
+                    "code": "durable_request_retained",
+                ], category: .general)
+            }
+            sourceCancellationCleanup = nil
+            if let lease {
+                // Owner and epoch remain in the deletion predicate even after a
+                // failed cleanup or a replacement manager's successful retry.
+                _ = try? await repository.releaseRunLease(lease)
+            }
+        }
     }
 
     @discardableResult
@@ -486,6 +640,15 @@ public actor ManagedAutonomyRuntime {
         action: ManagedAutonomyControlAction
     ) async throws -> AutonomousRunRecord {
         guard started else { throw AutonomyError.shutdown }
+        guard controlledRuns.count < 16, controlledRuns.insert(runID).inserted else {
+            throw AutonomyError.invalidRequest("an operator control is already active or the control limit was reached")
+        }
+        // Keep the watchdog from rediscovering a quiesced run while the operator
+        // transaction is awaiting its lease. The supervisor fences older scans.
+        defer { controlledRuns.remove(runID) }
+        if action != .cancel {
+            _ = try await repository.validateAutonomousRunExecutionAdmission(runID)
+        }
         if action == .checkpoint || action == .rollover {
             return try await requestOperatorContinuity(runID, action: action)
         }
@@ -761,11 +924,35 @@ public actor ManagedAutonomyRuntime {
     }
 
     public func shutdown() async {
-        guard started || startupReport != nil else { return }
+        shutdownRequested = true
+        providerWorkAdmission.close()
         started = false
+        sourceCancellationCleanup?.cancel()
         await supervisor.shutdown()
+        await closeServicesAfterProviderWorkDrains()
+    }
+
+    private func closeServicesAfterProviderWorkDrains() async {
+        guard !servicesClosing else { return }
+        servicesClosing = true
+        defer { servicesClosing = false }
+        let activeRuns = await supervisor.snapshot().activeRunIDs
+        guard !starting, !tickInProgress, controlledRuns.isEmpty,
+              sourceCancellationCleanup == nil else { return }
+        guard providerWorkAdmission.activeCount == 0,
+              activeRuns.isEmpty else { return }
         await installedCompletionRegistry?.shutdown()
         await runtimeJobs.shutdown()
+    }
+
+    /// Includes entrypoints suspended before coordinator acquisition. The manager
+    /// must retain this runtime and its stores until all of these owners settle.
+    func hasRetainedWork() async -> Bool {
+        let activeRuns = await supervisor.snapshot().activeRunIDs
+        // Sample actor state after the await so reentrant entrypoints are visible.
+        return starting || tickInProgress || !controlledRuns.isEmpty
+            || sourceCancellationCleanup != nil || servicesClosing
+            || providerWorkAdmission.activeCount > 0 || !activeRuns.isEmpty
     }
 
     private static func recommendedConcurrency() -> Int {

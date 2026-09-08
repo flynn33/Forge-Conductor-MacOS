@@ -189,7 +189,7 @@ final class AutonomyViewModel: ObservableObject {
         switch action {
         case .pause:
             return ![
-                "paused", "cancel_requested", "completed", "cancelled", "failed_terminal",
+                "paused", "awaiting_bootstrap", "cancel_requested", "completed", "cancelled", "failed_terminal",
             ].contains(run.state)
         case .resume:
             return run.state == "paused"

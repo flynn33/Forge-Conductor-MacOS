@@ -90,6 +90,10 @@ public enum ProductionToolReplayCatalog {
         "session_handoff": .reconciled,
         "context_get": .idempotent,
         "context_list": .readOnly,
+        "clu_capabilities": .readOnly,
+        "clu_start_handoff": .reconciled,
+        "clu_status": .readOnly,
+        "clu_cancel": .reconciled,
 
         "fs_read": .readOnly,
         "fs_write": .idempotent,
@@ -1085,17 +1089,102 @@ public actor ToolInvocationBroker {
     private let executor: any ToolExecuting
     private let classifier: any ToolReplayClassifying
     private let reconciler: any ToolInvocationReconciling
+    private let sourcePolicyResolver: (@Sendable (ToolInvocationContext) throws -> BudgetPolicySelection)?
 
     public init(
         repository: ProjectControlPlaneRepository,
         executor: any ToolExecuting,
         classifier: any ToolReplayClassifying,
-        reconciler: any ToolInvocationReconciling = NoToolInvocationReconciler()
+        reconciler: any ToolInvocationReconciling = NoToolInvocationReconciler(),
+        sourcePolicyResolver: (@Sendable (ToolInvocationContext) throws -> BudgetPolicySelection)? = nil
     ) {
         self.repository = repository
         self.executor = executor
         self.classifier = classifier
         self.reconciler = reconciler
+        self.sourcePolicyResolver = sourcePolicyResolver
+    }
+
+    /// Recovery authority is supplied by the manager, never decoded from a model
+    /// context. The same broker owns intent, actual exact read and durable result.
+    /// The control plane checks the provisional provider turn before disclosure.
+    func invokeProvisionalContextGet(
+        _ call: BrokeredToolCall,
+        turnID: UUID,
+        grant: ContinuityBootstrapGrant,
+        lease: RunLease,
+        policySelection: BudgetPolicySelection,
+        continuity: ContextContinuityService,
+        cancellation: ToolCallCancellation? = nil
+    ) async throws -> ContinuityBootstrapRetrievalProof {
+        try cancellation?.checkCancellation()
+        guard call.toolName == "context_get", lease.runID == grant.envelope.runID,
+              !call.providerCallID.isEmpty, call.providerCallID.utf8.count <= 512 else {
+            throw ContinuityIngressError.authorityMismatch
+        }
+        // Freeze the actual provider arguments before crossing the repository
+        // actor; a mutable dictionary cannot change the recorded request later.
+        let argumentsJSON = try ForgeJSONCanonicalizationV1.data(from: call.arguments)
+        guard argumentsJSON.count <= min(grant.maximumOutputBytes, Self.maximumDurableResultBytes) else {
+            throw AutonomyError.resultTooLarge
+        }
+        let sessionID = grant.candidateID.uuidString.lowercased()
+        let digest = try ForgeJSONCanonicalizationV1.sha256Hex(of: [
+            "kind": "bootstrap_context_get", "candidate_id": sessionID, "provider_call_id": call.providerCallID,
+        ])
+        let value = String(digest.prefix(32))
+        let identifier = "\(value.prefix(8))-\(value.dropFirst(8).prefix(4))-\(value.dropFirst(12).prefix(4))-\(value.dropFirst(16).prefix(4))-\(value.dropFirst(20))"
+        guard let invocationID = UUID(uuidString: identifier) else {
+            throw ContinuityIngressError.integrityFailure("bootstrap invocation identifier")
+        }
+        let intent = ToolInvocationIntent(
+            invocationID: invocationID, turnID: turnID,
+            runID: grant.envelope.runID, sessionID: sessionID,
+            projectID: grant.envelope.authorization.projectID,
+            projectGeneration: grant.envelope.authorization.projectGeneration,
+            providerCallID: call.providerCallID, toolName: "context_get", replayClass: .readOnly,
+            idempotencyKey: nil, argumentsSHA256: JSONSupport.sha256Hex(argumentsJSON),
+            reconciliationDescriptor: nil
+        )
+        var record = try await repository.persistToolInvocationIntent(intent, lease: lease,
+            bootstrapGrant: grant, bootstrapPolicy: policySelection)
+        if record.state == .executing {
+            record = try await repository.transitionToolInvocation(invocationID: record.invocationID,
+                expected: .executing, to: .ambiguous, lease: lease,
+                errorCode: "bootstrap_read_interrupted", errorSummary: "Exact context read was interrupted",
+                bootstrapGrant: grant)
+        }
+        if record.state != .completed {
+            guard [.intent, .ambiguous, .failed].contains(record.state) else {
+                throw AutonomyError.replayBlocked(.readOnly)
+            }
+            record = try await repository.transitionToolInvocation(invocationID: record.invocationID,
+                expected: record.state, to: .executing, lease: lease, bootstrapGrant: grant)
+        }
+        do {
+            return try await repository.executeContinuityBootstrapRetrieval(
+                grant: grant, invocationID: record.invocationID, lease: lease,
+                cancellation: cancellation
+            ) { source in
+                let arguments = try JSONSerialization.jsonObject(with: argumentsJSON) as? [String: Any] ?? [:]
+                let result = try ContinuityToolPack.provisionalContextGet(
+                    arguments: arguments, identity: source.identity, authorization: source.authorization,
+                    continuity: continuity, cancellation: cancellation
+                )
+                return try ContinuityBootstrapReadResult(canonicalToolResultJSON:
+                    ForgeJSONCanonicalizationV1.data(from: [
+                        "ok": result.ok, "is_error": result.isError, "payload": result.payload,
+                    ]))
+            }
+        } catch {
+            if record.state != .completed {
+                _ = try? await repository.transitionToolInvocation(invocationID: record.invocationID,
+                    expected: .executing, to: .failed, lease: lease,
+                    errorCode: "bootstrap_context_read_failed", errorSummary: "Exact context restoration failed",
+                    bootstrapGrant: grant)
+            }
+            throw error
+        }
     }
 
     /// The invocation row is committed before the tool executor is entered. A provider
@@ -1107,6 +1196,9 @@ public actor ToolInvocationBroker {
         context: ToolInvocationContext,
         lease: RunLease
     ) async throws -> ToolResult {
+        guard !ToolDefinitionCatalog.controlPlaneOnlyToolNames.contains(incomingCall.toolName) else {
+            throw AutonomyError.invalidToolConfiguration([incomingCall.toolName])
+        }
         guard let runID = context.runID, runID == lease.runID,
               let sessionID = context.providerSessionID, !sessionID.isEmpty else {
             throw ProjectContextError.projectScopeMismatch
@@ -1156,7 +1248,15 @@ public actor ToolInvocationBroker {
             argumentsSHA256: argumentsSHA,
             reconciliationDescriptor: reconciliationDescriptor
         )
-        var record = try await repository.persistToolInvocationIntent(intent, lease: lease)
+        var record: ToolInvocationRecord
+        if let sourcePolicyResolver {
+            record = try await repository.persistToolInvocationIntent(intent, lease: lease,
+                sourcePolicy: sourcePolicyResolver(context))
+        } else {
+            // The repository rejects a native-source run without its current
+            // policy; this legacy path remains available for other run origins.
+            record = try await repository.persistToolInvocationIntent(intent, lease: lease)
+        }
 
         if record.state == .completed {
             return try Self.decodeResult(record.resultSummary)
@@ -1231,12 +1331,14 @@ public actor ToolInvocationBroker {
         }
 
         let expectedState = record.state
-        record = try await repository.transitionToolInvocation(
-            invocationID: record.invocationID,
-            expected: expectedState,
-            to: .executing,
-            lease: lease
-        )
+        if let sourcePolicyResolver {
+            record = try await repository.transitionToolInvocation(
+                invocationID: record.invocationID, expected: expectedState, to: .executing,
+                lease: lease, sourcePolicy: sourcePolicyResolver(context))
+        } else {
+            record = try await repository.transitionToolInvocation(
+                invocationID: record.invocationID, expected: expectedState, to: .executing, lease: lease)
+        }
         do {
             let result = try executor.call(
                 name: call.toolName,
@@ -1287,14 +1389,16 @@ public actor ToolInvocationBroker {
             )
             throw AutonomyError.resultTooLarge
         }
-        _ = try await repository.transitionToolInvocation(
-            invocationID: record.invocationID,
-            expected: expectedState,
-            to: .completed,
-            lease: lease,
-            resultSHA256: JSONSupport.sha256Hex(encoded),
-            resultSummary: encoded
-        )
+        if let sourcePolicyResolver {
+            _ = try await repository.transitionToolInvocation(
+                invocationID: record.invocationID, expected: expectedState, to: .completed,
+                lease: lease, resultSHA256: JSONSupport.sha256Hex(encoded), resultSummary: encoded,
+                sourcePolicy: sourcePolicyResolver(context))
+        } else {
+            _ = try await repository.transitionToolInvocation(
+                invocationID: record.invocationID, expected: expectedState, to: .completed,
+                lease: lease, resultSHA256: JSONSupport.sha256Hex(encoded), resultSummary: encoded)
+        }
         return result
     }
 

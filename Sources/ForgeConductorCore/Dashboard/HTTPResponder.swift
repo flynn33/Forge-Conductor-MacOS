@@ -18,6 +18,27 @@ public final class HTTPResponder: @unchecked Sendable {
 
     public init() {}
 
+    /// MCP responses are already encoded and bounded before this boundary. The
+    /// write owns a finite deadline even if the peer never drains its socket.
+    func respondMCP(_ connection: NWConnection, response: MCPHTTPResponse) {
+        guard response.body.count <= MCPTaskHTTPService.maximumResponseBytes else {
+            connection.cancel(); return
+        }
+        let reason = response.status == 202 ? "Accepted" : response.status == 200 ? "OK" : "Error"
+        var header = "HTTP/1.1 \(response.status) \(reason)\r\n"
+        header += "Content-Type: application/json\r\nContent-Length: \(response.body.count)\r\n"
+        header += "Connection: close\r\nCache-Control: no-store\r\n" + securityHeaders
+        for (name, value) in response.headers.sorted(by: { $0.key < $1.key }) {
+            guard ["Mcp-Session-Id", "Allow"].contains(name),
+                  !value.contains("\r"), !value.contains("\n") else { connection.cancel(); return }
+            header += "\(name): \(value)\r\n"
+        }
+        var data = Data((header + "\r\n").utf8)
+        data.append(response.body)
+        let write = MCPBoundedHTTPWrite(connection: connection)
+        write.send(data)
+    }
+
     private func reserveStreamCapacity() -> Bool {
         streamLock.lock()
         defer { streamLock.unlock() }
@@ -159,6 +180,26 @@ public final class HTTPResponder: @unchecked Sendable {
         )
         retainStream(session)
         return session
+    }
+}
+
+private final class MCPBoundedHTTPWrite: @unchecked Sendable {
+    private let connection: NWConnection
+    private let lock = NSLock()
+    private var timer: DispatchSourceTimer?
+    init(connection: NWConnection) { self.connection = connection }
+    func send(_ data: Data) {
+        let deadline = DispatchSource.makeTimerSource(queue: .global(qos: .utility))
+        deadline.schedule(deadline: .now() + MCPServer.defaultResponseWriteTimeoutSeconds)
+        deadline.setEventHandler { [weak self] in self?.close() }
+        lock.lock(); timer = deadline; lock.unlock()
+        deadline.resume()
+        connection.send(content: data, completion: .contentProcessed { [self] _ in close() })
+    }
+    private func close() {
+        lock.lock(); let old = timer; timer = nil; lock.unlock()
+        old?.setEventHandler {}; old?.cancel()
+        connection.cancel()
     }
 }
 

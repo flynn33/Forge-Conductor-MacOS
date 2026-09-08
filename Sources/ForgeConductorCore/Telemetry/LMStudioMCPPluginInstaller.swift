@@ -1,7 +1,7 @@
 // LMStudioMCPPluginInstaller.swift
-// What: Implements transactional installation of both LM Studio MCP bridge roles.
+// What: Implements transactional installation of the LM Studio MCP bridge roles.
 // How: It validates existing JSON, stages role-specific plugins/configuration, verifies
-// staged content, commits fallback then primary, atomically replaces mcp.json, and can roll back.
+// staged content, commits fallback, CLU and primary, atomically replaces mcp.json, and can roll back.
 // Why: Connector installation must never leave the host with half a failover pair.
 
 import Foundation
@@ -29,9 +29,13 @@ public enum LMStudioMCPPluginInstaller {
         public var mcpConfigPath: String
         public var deploymentID: String?
         public var detail: String
+        /// Nil preserves older callers that report only primary/fallback health.
+        /// The current installer always supplies an observed CLU bridge result.
+        public var continuityPluginInstalled: Bool? = nil
 
         public var isFullyInstalled: Bool {
             primaryPluginInstalled && fallbackPluginInstalled && mcpJSONRegistered && binaryExecutable
+                && continuityPluginInstalled != false
         }
     }
 
@@ -79,6 +83,10 @@ public enum LMStudioMCPPluginInstaller {
 
     public static var fallbackPluginDirectory: URL {
         pluginDirectory(name: LMStudioEnvironment.fallbackServerID)
+    }
+
+    public static var continuityPluginDirectory: URL {
+        pluginDirectory(name: LMStudioEnvironment.continuityServerID)
     }
 
     /// Preferred executable for LM Studio to spawn with argv `serve`.
@@ -135,7 +143,19 @@ public enum LMStudioMCPPluginInstaller {
             expectedBinary: binary,
             expectedDeploymentID: deploymentID
         )
+        let continuityOK = isPluginInstalled(
+            name: LMStudioEnvironment.continuityServerID,
+            expectedBinary: binary,
+            expectedDeploymentID: deploymentID
+        )
         let mcp = LMStudioEnvironment.registrationHealth(expectedBinary: binary)
+        let continuityRegistration = LMStudioEnvironment.configuredMCPServers().first {
+            $0.id == LMStudioEnvironment.continuityServerID
+        }
+        let continuityRegistrationOK = continuityRegistration.map {
+            LMStudioEnvironment.isSwiftServeRegistration($0, expectedBinary: binary, expectedRole: .clu)
+                && deploymentID != nil && $0.environment["FORGE_DEPLOYMENT_ID"] == deploymentID
+        } ?? false
 
         var parts: [String] = []
         if !LMStudioEnvironment.isAppInstalled {
@@ -146,15 +166,17 @@ public enum LMStudioMCPPluginInstaller {
         }
         if !primaryOK { parts.append("primary mcpBridge plugin not installed") }
         if !fallbackOK { parts.append("fallback mcpBridge plugin not installed") }
+        if !continuityOK { parts.append("CLU mcpBridge plugin not installed") }
         if !mcp.ok { parts.append("mcp.json: \(mcp.detail)") }
+        if !continuityRegistrationOK { parts.append("CLU registration lacks the matching deployment revision") }
         if parts.isEmpty {
-            parts.append("LM Studio mcpBridge plugin ready (primary+fallback)")
+            parts.append("LM Studio mcpBridge plugins ready (primary+fallback+CLU)")
         }
 
         return PluginStatus(
             primaryPluginInstalled: primaryOK,
             fallbackPluginInstalled: fallbackOK,
-            mcpJSONRegistered: mcp.ok,
+            mcpJSONRegistered: mcp.ok && continuityRegistrationOK,
             binaryPath: binary.path,
             binaryExecutable: binOK,
             lmStudioPresent: LMStudioEnvironment.isAppInstalled,
@@ -162,7 +184,8 @@ public enum LMStudioMCPPluginInstaller {
             fallbackPluginPath: fallbackPluginDirectory.path,
             mcpConfigPath: LMStudioEnvironment.mcpConfigURL.path,
             deploymentID: deploymentID,
-            detail: parts.joined(separator: "; ")
+            detail: parts.joined(separator: "; "),
+            continuityPluginInstalled: continuityOK
         )
     }
 
@@ -172,9 +195,9 @@ public enum LMStudioMCPPluginInstaller {
         expectedDeploymentID: String? = nil
     ) -> Bool {
         let dir = pluginDirectory(name: name)
-        let role = name == LMStudioEnvironment.fallbackServerID
-            ? LMStudioConnectorRole.fallback
-            : LMStudioConnectorRole.primary
+        guard let role = LMStudioConnectorRole.allCases.first(where: { $0.serverID == name }) else {
+            return false
+        }
         return isPluginInstalled(
             at: dir,
             expectedBinary: expectedBinary,
@@ -230,10 +253,10 @@ public enum LMStudioMCPPluginInstaller {
             return InstallResult(
                 ok: true,
                 binaryPath: binary.path,
-                pluginsWritten: [LMStudioEnvironment.primaryServerID, LMStudioEnvironment.fallbackServerID],
+                pluginsWritten: LMStudioConnectorRole.allCases.map(\.serverID),
                 mcpConfigPath: LMStudioEnvironment.mcpConfigURL.path,
                 deploymentID: st.deploymentID ?? "",
-                message: "LM Studio connection already correct (mcp.json + mcpBridge primary/fallback)"
+                message: "LM Studio connection already correct (mcp.json + mcpBridge primary/fallback/CLU)"
             )
         }
         return try install(preferredBinary: binary)
@@ -311,7 +334,7 @@ public enum LMStudioMCPPluginInstaller {
         do {
             // Commit fallback first. The previous primary remains available until
             // a verified standby is installed, minimizing the upgrade outage.
-            for role in [LMStudioConnectorRole.fallback, .primary] {
+            for role in [LMStudioConnectorRole.fallback, .clu, .primary] {
                 let target = pluginDirectory(name: role.serverID)
                 let backup = backupRoot.appendingPathComponent(role.serverID, isDirectory: true)
                 let staged = stagedRoot.appendingPathComponent(role.serverID, isDirectory: true)
@@ -344,7 +367,7 @@ public enum LMStudioMCPPluginInstaller {
             )
             throw InstallError.commitFailed("post-commit validation failed: \(st.detail)")
         }
-        // Legacy wrappers are removed only after both new roles and mcp.json
+        // Legacy wrappers are removed only after all new roles and mcp.json
         // have committed and passed final validation.
         _ = LMStudioEnvironment.removeLegacyLaunchers(in: binary.deletingLastPathComponent())
         return InstallResult(
@@ -354,7 +377,7 @@ public enum LMStudioMCPPluginInstaller {
             mcpConfigPath: LMStudioEnvironment.mcpConfigURL.path,
             deploymentID: deploymentID,
             message: st.isFullyInstalled
-                ? "Committed LM Studio configuration revision \(deploymentID): primary + failover → \(binary.path) serve."
+                ? "Committed LM Studio configuration revision \(deploymentID): primary + failover + CLU → \(binary.path) serve."
                 : "Partial deploy: \(st.detail)"
         )
     }
@@ -364,7 +387,7 @@ public enum LMStudioMCPPluginInstaller {
     public static func uninstall() throws -> [String] {
         let fm = FileManager.default
         var removed: [String] = []
-        for name in [LMStudioEnvironment.primaryServerID, LMStudioEnvironment.fallbackServerID] {
+        for name in LMStudioConnectorRole.allCases.map(\.serverID) {
             let dir = pluginDirectory(name: name)
             if fm.fileExists(atPath: dir.path) {
                 try fm.removeItem(at: dir)
@@ -374,8 +397,7 @@ public enum LMStudioMCPPluginInstaller {
         // Strip our mcp.json entries only.
         if var root = try? readMCPRootMutable(),
            var servers = root["mcpServers"] as? [String: Any] {
-            servers.removeValue(forKey: LMStudioEnvironment.primaryServerID)
-            servers.removeValue(forKey: LMStudioEnvironment.fallbackServerID)
+            for role in LMStudioConnectorRole.allCases { servers.removeValue(forKey: role.serverID) }
             root["mcpServers"] = servers
             let data = try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys])
             try data.write(to: LMStudioEnvironment.mcpConfigURL, options: .atomic)

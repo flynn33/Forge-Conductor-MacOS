@@ -42,6 +42,7 @@ public final class DashboardServer: @unchecked Sendable {
 
     private struct ActiveConnection {
         let connection: NWConnection
+        let taskListenerEpoch: UUID
         var incompleteRequestDeadlineUptimeNanoseconds: UInt64?
     }
 
@@ -74,6 +75,9 @@ public final class DashboardServer: @unchecked Sendable {
 
     /// Optional supervisor; when set, manager control APIs are available.
     public weak var manager: ManagerNode?
+    /// Manager supplies this owner before start and drains it before store close.
+    var taskHTTPService: MCPTaskHTTPService?
+    private var taskListenerEpoch = UUID()
 
     public var boundHost: String { host }
     public var boundPort: UInt16 { port }
@@ -159,11 +163,10 @@ public final class DashboardServer: @unchecked Sendable {
         let params = NWParameters.tcp
         // Do NOT reuse address for product dashboard — second instance must fail clearly.
         params.allowLocalEndpointReuse = false
-        if host == "127.0.0.1" || host == "localhost" {
-            params.requiredInterfaceType = .loopback
-        }
+        params.requiredInterfaceType = .loopback
 
         let listener = try NWListener(using: params, on: NWEndpoint.Port(rawValue: port)!)
+        let listenerEpoch = UUID()
         let incompleteRequestTimer = DispatchSource.makeTimerSource(queue: queue)
         incompleteRequestTimer.schedule(deadline: .distantFuture)
         incompleteRequestTimer.setEventHandler { [weak self] in
@@ -173,7 +176,7 @@ public final class DashboardServer: @unchecked Sendable {
         let gate = DispatchSemaphore(value: 0)
         let bindResult = DashboardBindResult()
         listener.newConnectionHandler = { [weak self] conn in
-            self?.handle(connection: conn)
+            self?.handle(connection: conn, listenerEpoch: listenerEpoch)
         }
         listener.stateUpdateHandler = { [weak self] state in
             switch state {
@@ -208,10 +211,12 @@ public final class DashboardServer: @unchecked Sendable {
             return
         }
         self.listener = listener
+        taskListenerEpoch = listenerEpoch
         self.incompleteRequestTimer = incompleteRequestTimer
         acceptingConnections = true
         lock.unlock()
 
+        taskHTTPService?.listenerStarted(epoch: listenerEpoch)
         listener.start(queue: queue)
         let wait = gate.wait(timeout: .now() + Self.bindTimeoutSeconds)
         if wait == .timedOut {
@@ -236,6 +241,7 @@ public final class DashboardServer: @unchecked Sendable {
 
     public func stop() {
         lock.lock()
+        let invalidatedEpoch = taskListenerEpoch
         acceptingConnections = false
         let activeListener = listener
         let activeIncompleteRequestTimer = incompleteRequestTimer
@@ -250,6 +256,7 @@ public final class DashboardServer: @unchecked Sendable {
         activeConnections.removeAll(keepingCapacity: false)
         lock.unlock()
 
+        taskHTTPService?.listenerInvalidated(epoch: invalidatedEpoch)
         activeListener?.newConnectionHandler = nil
         activeListener?.cancel()
         activeIncompleteRequestTimer?.cancel()
@@ -273,6 +280,7 @@ public final class DashboardServer: @unchecked Sendable {
         )
 
         lock.lock()
+        let invalidatedEpoch = taskListenerEpoch
         acceptingConnections = false
         let activeListener = listener
         let activeIncompleteRequestTimer = incompleteRequestTimer
@@ -305,6 +313,7 @@ public final class DashboardServer: @unchecked Sendable {
         }
         lock.unlock()
 
+        taskHTTPService?.listenerInvalidated(epoch: invalidatedEpoch)
         activeListener?.newConnectionHandler = nil
         activeListener?.cancel()
         activeIncompleteRequestTimer?.cancel()
@@ -336,13 +345,14 @@ public final class DashboardServer: @unchecked Sendable {
 
     // MARK: - Connection
 
-    private func handle(connection: NWConnection) {
+    private func handle(connection: NWConnection, listenerEpoch: UUID) {
         let identifier = ObjectIdentifier(connection)
         let timeoutNanoseconds = UInt64((incompleteRequestTimeout * 1_000_000_000).rounded(.up))
         let deadline = DispatchTime.now().uptimeNanoseconds + timeoutNanoseconds
 
         lock.lock()
-        guard acceptingConnections, activeConnections.count < activeConnectionLimit else {
+        guard acceptingConnections, taskListenerEpoch == listenerEpoch,
+              activeConnections.count < activeConnectionLimit else {
             let activeCount = activeConnections.count
             lock.unlock()
             app.diagnostics.warn("dashboard_connection_capacity_rejected", [
@@ -354,6 +364,7 @@ public final class DashboardServer: @unchecked Sendable {
         }
         activeConnections[identifier] = ActiveConnection(
             connection: connection,
+            taskListenerEpoch: listenerEpoch,
             incompleteRequestDeadlineUptimeNanoseconds: deadline
         )
         scheduleNextIncompleteRequestDeadlineLocked()
@@ -410,7 +421,8 @@ public final class DashboardServer: @unchecked Sendable {
                     connection.cancel()
                     return
                 }
-                if let rejection = DashboardRequestPolicy.rejection(for: request, serverPort: self.port) {
+                if request.target != MCPTaskHTTPService.path,
+                   let rejection = DashboardRequestPolicy.rejection(for: request, serverPort: self.port) {
                     self.http.respond(
                         connection,
                         status: rejection.status,
@@ -521,12 +533,34 @@ public final class DashboardServer: @unchecked Sendable {
         }
     }
 
+    private func taskConnectionContext(_ connection: NWConnection) -> MCPHTTPConnectionContext? {
+        lock.lock()
+        let epoch = activeConnections[ObjectIdentifier(connection)]?.taskListenerEpoch
+        lock.unlock()
+        guard let epoch else { return nil }
+        return MCPHTTPConnectionContext.verified(connection: connection, listenerEpoch: epoch,
+            serverPort: port, requiresLoopback: DashboardRequestPolicy.isConfiguredLoopbackHost(host))
+    }
+
     private func route(request: DashboardHTTPRequest, connection: NWConnection) {
         let rawPath = request.target
         let pathOnly = rawPath.split(separator: "?", maxSplits: 1).first.map(String.init) ?? rawPath
         let path = pathOnly.hasPrefix("/") ? pathOnly : "/" + pathOnly
         let m = request.method
         let body = request.body
+
+        if path == MCPTaskHTTPService.path {
+            guard rawPath == MCPTaskHTTPService.path,
+                  let service = taskHTTPService,
+                  let context = taskConnectionContext(connection) else {
+                http.respondMCP(connection, response: .failure(503, "attachment_unavailable"))
+                return
+            }
+            service.receive(request, connection: context) { [http] response in
+                http.respondMCP(connection, response: response)
+            }
+            return
+        }
 
         do {
             if path.hasPrefix("/api/manager") {

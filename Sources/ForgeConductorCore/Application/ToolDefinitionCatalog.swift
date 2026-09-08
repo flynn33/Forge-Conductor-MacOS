@@ -81,6 +81,7 @@ public struct CanonicalToolDefinition: Sendable, Equatable {
 
 public struct ToolDefinitionCatalog: Sendable, Equatable {
     public static let maximumDefinitions = 512
+    static let controlPlaneOnlyToolNames = Set(ContinuityControlToolName.allCases.map(\.rawValue))
 
     public let definitions: [CanonicalToolDefinition]
     public let canonicalJSON: Data
@@ -129,7 +130,8 @@ public struct ToolDefinitionCatalog: Sendable, Equatable {
             return try CanonicalToolDefinition(
                 name: name,
                 description: description,
-                inputSchema: schemaWithSharedInvocationControls(schema)
+                inputSchema: ContinuityControlToolName(rawValue: name) == nil
+                    ? schemaWithSharedInvocationControls(schema) : schema
             )
         }
         return try ToolDefinitionCatalog(toolNames: toolNames, definitions: definitions)
@@ -163,7 +165,13 @@ public struct ToolDefinitionCatalog: Sendable, Equatable {
     public func providerToolDefinitions(
         allowedToolNames: Set<String>
     ) throws -> [Data] {
-        try definitions(allowedToolNames: allowedToolNames).map {
+        let controls = allowedToolNames.intersection(Self.controlPlaneOnlyToolNames).sorted()
+        guard controls.isEmpty else {
+            throw ToolDefinitionCatalogError.controlPlaneOnlyTools(controls)
+        }
+        return try definitions(allowedToolNames: allowedToolNames).filter {
+            !Self.controlPlaneOnlyToolNames.contains($0.name)
+        }.map {
             try $0.providerDefinitionJSON()
         }
     }
@@ -204,6 +212,7 @@ public enum ToolDefinitionCatalogError: Error, LocalizedError, Sendable, Equatab
     case missingDefinitions([String])
     case staleDefinitions([String])
     case unregisteredAllowedTools([String])
+    case controlPlaneOnlyTools([String])
 
     public var errorDescription: String? {
         switch self {
@@ -223,20 +232,24 @@ public enum ToolDefinitionCatalogError: Error, LocalizedError, Sendable, Equatab
             "Canonical definitions name unregistered tools: \(names.joined(separator: ","))"
         case .unregisteredAllowedTools(let names):
             "Allowed tool set contains unregistered tools: \(names.joined(separator: ","))"
+        case .controlPlaneOnlyTools(let names):
+            "Native task controls cannot be granted to managed provider work: \(names.joined(separator: ","))"
         }
     }
 }
 
 private enum ProductionToolDefinitionSource {
     static func description(for name: String) -> String? {
-        ProjectMemoryToolPack.description(for: name)
+        ContinuityControlToolName(rawValue: name)?.description
+            ?? ProjectMemoryToolPack.description(for: name)
             ?? ContinuityLifecycleToolPack.description(for: name)
             ?? RuntimeJobToolPack.description(for: name)
             ?? baseDescriptions[name]
     }
 
     static func schema(for name: String) -> [String: Any]? {
-        ProjectMemoryToolPack.schema(for: name)
+        ContinuityControlToolName(rawValue: name)?.inputSchema
+            ?? ProjectMemoryToolPack.schema(for: name)
             ?? ContinuityLifecycleToolPack.schema(for: name)
             ?? RuntimeJobToolPack.schema(for: name)
             ?? baseSchema(for: name)
