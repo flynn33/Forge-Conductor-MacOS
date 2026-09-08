@@ -6,6 +6,139 @@ import ForgeNativeSessionHostPlugin
 #endif
 
 final class NativeSourcePressureJournalTests: XCTestCase {
+    func testCheckpointOutputPressureUsesActualPreparedResponseWithoutCommitting() async throws {
+        try await withFixture { f in
+            let app = try ForgeApp.bootstrap(home: f.database.deletingLastPathComponent().appendingPathComponent("checkpoint-preview"))
+            defer { app.shutdown() }
+            let source = ContextContinuityService(paths: app.paths, store: app.store, sessions: app.sessions,
+                diagnostics: app.diagnostics, clock: f.clock)
+            let prepared = try await f.prepare(), approval = try await f.approval(prepared)
+            guard case .dispatch(let post) = try await f.begin(prepared, approval) else { return XCTFail("Missing dispatch") }
+            let tokens = Int(ceil(262_144 * f.policy.policy.context.rolloverRatio)) - approval.budget.futureReserveTokens - 50
+            let pending = try ProviderToolCall(callID: "checkpoint", name: "session_checkpoint",
+                argumentsJSON: ForgeJSONCanonicalizationV1.data(from: ["goal":"Preserve exact pending work", "narrative":"Actual checkpoint preview"]))
+            let accepted = try await f.repository.acceptNativeSourceProviderTurn(claim: post,
+                turn: f.turn(prepared, calls: [pending], inputTokens: tokens), credential: f.credential, lease: f.lease)
+            let result = try await f.repository.evaluateNativeSourceToolOutput(reference: accepted.calls[0],
+                credential: f.credential, lease: f.lease, policySelection: f.policy,
+                measureContinuation: { try await f.measureContinuation($0) }, prepareCheckpoint: { call in
+                    let packet = try source.prepareAuthorizedSourceCommit(arguments: JSONSupport.object(from: call.canonicalArgumentsJSON),
+                        clientID: call.attachment.context.clientID, source: .model, finalize: false,
+                        authorization: call.attachment.setup.record.authorization)
+                    let preview = try source.nativeSourcePreparedToolResult(packet)
+                    return (packet, try ForgeJSONCanonicalizationV1.data(from: ["ok":preview.ok,"is_error":preview.isError,"payload":preview.payload]))
+                })
+            guard case .pressure(let claim) = result else { return XCTFail("Checkpoint output pressure was not retained") }
+            let stored = try await f.repository.nativeSourcePressureDisposition(claim: claim, credential: f.credential)
+            guard case .pressure(let pressure) = stored.metadata else { return XCTFail("Missing pressure") }
+            let requirement = try XCTUnwrap(pressure.observation.fields.prospective?.outputRequirement)
+            XCTAssertEqual(requirement.kind, .preparedCheckpoint)
+            XCTAssertNotNil(requirement.preparedPacketSHA256)
+            XCTAssertNotNil(requirement.canonicalPayloadSHA256)
+            XCTAssertTrue(try app.store.handoffListAll().isEmpty)
+            XCTAssertTrue(try app.store.pendingContinuityHandoffs().isEmpty)
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT COUNT(*) FROM native_source_requests"), "0")
+        }
+    }
+
+    func testReadyHandoffOutputRequiresNoContinuationMeasurement() async throws {
+        try await withFixture { f in
+            let prepared = try await f.prepare(), approval = try await f.approval(prepared)
+            guard case .dispatch(let post) = try await f.begin(prepared, approval) else { return XCTFail("Missing dispatch") }
+            let pending = try ProviderToolCall(callID: "handoff", name: "session_handoff",
+                argumentsJSON: ForgeJSONCanonicalizationV1.data(from: ["goal":"Continue approved work"]))
+            let accepted = try await f.repository.acceptNativeSourceProviderTurn(claim: post,
+                turn: f.turn(prepared, calls: [pending], inputTokens: 250_000), credential: f.credential, lease: f.lease)
+            let before = try PressureSQL.snapshot(f.database)
+            let result = try await f.repository.evaluateNativeSourceToolOutput(reference: accepted.calls[0],
+                credential: f.credential, lease: f.lease, policySelection: f.policy,
+                measureContinuation: { _ in throw PressureFixtureError.interrupted })
+            guard case .admitted(_, let checkpoint) = result else { return XCTFail("Ready handoff required unused continuation headroom") }
+            XCTAssertNil(checkpoint)
+            XCTAssertEqual(try PressureSQL.snapshot(f.database), before)
+        }
+    }
+
+    func testToolOutputPressureMeasuresRetainedPrefixBeforeAnyPendingRead() async throws {
+        try await withFixture(priorReads: 2) { f in
+            let prepared = try await f.prepare(), approval = try await f.approval(prepared)
+            guard case .dispatch(let post) = try await f.begin(prepared, approval) else { return XCTFail("Missing dispatch") }
+            let tokens = Int(ceil(262_144 * f.policy.policy.context.rolloverRatio)) - approval.budget.futureReserveTokens - 1_000
+            let accepted = try await f.repository.acceptNativeSourceProviderTurn(claim: post,
+                turn: f.turn(prepared, calls: [f.call(id: "finished"), f.call(id: "pending"), f.call(id: "untouched")], inputTokens: tokens),
+                credential: f.credential, lease: f.lease)
+            try await f.finishRead(accepted.calls[0], approval)
+            let measured = PressureCallbackObservation()
+            let result = try await f.repository.evaluateNativeSourceToolOutput(reference: accepted.calls[1],
+                credential: f.credential, lease: f.lease, policySelection: f.policy, measureContinuation: { request in
+                    let input = try XCTUnwrap(JSONSerialization.jsonObject(with: request.input) as? [[String: Any]])
+                    XCTAssertEqual(input.count, 2)
+                    XCTAssertEqual(input[0]["call_id"] as? String, "finished")
+                    XCTAssertTrue((input[0]["output"] as? String)?.contains("retained read output") == true)
+                    XCTAssertEqual(input[1]["call_id"] as? String, "pending")
+                    XCTAssertEqual(input[1]["output"] as? String, "0")
+                    XCTAssertEqual(request.previousResponseID, accepted.turn.responseID)
+                    measured.record()
+                    return try await f.measureContinuation(request)
+                })
+            guard case .pressure(let claim) = result else { return XCTFail("Full pending output did not create pressure") }
+            XCTAssertTrue(measured.called)
+            let stored = try await f.repository.nativeSourcePressureDisposition(claim: claim, credential: f.credential)
+            XCTAssertEqual(stored.binding.boundary, .beforeToolOutput)
+            XCTAssertEqual(stored.binding.completedOutputCount, 1)
+            XCTAssertEqual(stored.binding.pendingCall?.ordinal, 1)
+            XCTAssertEqual(stored.binding.sourceReadCallsBeforeEnrollment, 2)
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT COUNT(*) FROM native_source_requests"), "3")
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT COUNT(*) FROM native_source_provider_calls WHERE reservation_id IS NULL"), "2")
+            guard case .commit(let handoff) = try await f.repository.prepareNativeSourceBudgetHandoff(claim: claim,
+                credential: f.credential, policySelection: f.policy, responsePreflight: { try PressureFixture.responsePreflight($0) }) else {
+                return XCTFail("Pressure handoff was not prepared")
+            }
+            let packet = String(decoding: handoff.prepared.canonicalPacketJSON, as: UTF8.self)
+            XCTAssertTrue(packet.contains("retained read output"))
+            XCTAssertTrue(packet.contains("pending")); XCTAssertTrue(packet.contains("untouched"))
+        }
+    }
+
+    func testToolOutputMeasurementRevalidatesCancellationBeforePersistence() async throws {
+        try await withFixture { f in
+            let prepared = try await f.prepare(), approval = try await f.approval(prepared)
+            guard case .dispatch(let post) = try await f.begin(prepared, approval) else { return XCTFail("Missing dispatch") }
+            let accepted = try await f.repository.acceptNativeSourceProviderTurn(claim: post,
+                turn: f.turn(prepared, calls: [f.call(id: "pending")]), credential: f.credential, lease: f.lease)
+            do {
+                _ = try await f.repository.evaluateNativeSourceToolOutput(reference: accepted.calls[0],
+                    credential: f.credential, lease: f.lease, policySelection: f.policy, measureContinuation: { request in
+                        // This succeeds only if measurement holds no CP transaction.
+                        _ = try await f.repository.requestNativeSourceConversationCancellation(conversationID: prepared.conversationID,
+                            requestID: prepared.requestID, cancelRequestID: UUID(), credential: f.credential)
+                        return try await f.measureContinuation(request)
+                    })
+                XCTFail("Cancelled output measurement was admitted")
+            } catch { XCTAssertEqual(error as? NativeSourceConversationError, .cancelled) }
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT COUNT(*) FROM native_source_provider_turns WHERE pressure_decision_json IS NOT NULL"), "0")
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT COUNT(*) FROM native_source_requests"), "0")
+        }
+    }
+
+    func testToolOutputAdmissionPreservesFullReadAllowanceWithoutDebiting() async throws {
+        try await withFixture { f in
+            let prepared = try await f.prepare(), approval = try await f.approval(prepared)
+            guard case .dispatch(let post) = try await f.begin(prepared, approval) else { return XCTFail("Missing dispatch") }
+            let accepted = try await f.repository.acceptNativeSourceProviderTurn(claim: post,
+                turn: f.turn(prepared, calls: [f.call(id: "pending")]), credential: f.credential, lease: f.lease)
+            let before = try PressureSQL.snapshot(f.database)
+            let result = try await f.repository.evaluateNativeSourceToolOutput(reference: accepted.calls[0],
+                credential: f.credential, lease: f.lease, policySelection: f.policy,
+                measureContinuation: { try await f.measureContinuation($0) })
+            guard case .admitted(let budget, let checkpoint) = result else { return XCTFail("Ordinary full read was not admitted") }
+            XCTAssertNil(checkpoint)
+            XCTAssertEqual(budget.maximumCanonicalToolResultBytes, 65_536)
+            XCTAssertEqual(budget.maximumEscapedPayloadBytes, 131_072)
+            XCTAssertEqual(try PressureSQL.snapshot(f.database), before)
+        }
+    }
+
     func testReceiptCleanupChecksLineageBeforeDecodingRetainedPacket() async throws {
         try await withFixture { f in
             let (claim, admission) = try await f.preparedPressure()
@@ -1249,14 +1382,19 @@ private struct PressureFixture {
     func call(id: String) throws -> ProviderToolCall {
         try .init(callID: id, name: "fs_read", argumentsJSON: ForgeJSONCanonicalizationV1.data(from: ["path":"fixture.txt"]))
     }
-    func turn(_ prepared: NativeSourcePreparedTurn, calls: [ProviderToolCall]) throws -> ProviderTurn {
+    func measureContinuation(_ request: ProviderContinuationRequest) async throws -> ProviderRequestPreflight {
+        let provider = LMStudioManagedModelProvider(transport: try LMStudioManagedSessionTransport(configuration:
+            .init(baseURL: URL(string: "http://127.0.0.1:1")!, modelKey: "fixture/native", maximumOutputTokens: 64)))
+        return try await provider.preflightContinuation(request)
+    }
+    func turn(_ prepared: NativeSourcePreparedTurn, calls: [ProviderToolCall], inputTokens: Int = 1_000) throws -> ProviderTurn {
         let parent: String?
         switch prepared.request { case .root: parent = nil; case .continuation(let r): parent = r.previousResponseID }
         return try .init(requestID: prepared.stageID.uuidString.lowercased(), responseID: "response-" + prepared.stageID.uuidString.lowercased(),
             previousResponseID: parent, providerID: capabilities.providerID, providerVersion: capabilities.providerVersion,
             modelKey: capabilities.modelKey, providerInstanceID: capabilities.providerInstanceID,
             messages: calls.isEmpty ? ["completed actual fixture turn"] : [], toolCalls: calls,
-            usage: .init(capacity: 262_144, inputTokens: 1_000, outputTokens: 20, source: .providerExact, confidence: 1),
+            usage: .init(capacity: 262_144, inputTokens: inputTokens, outputTokens: 20, source: .providerExact, confidence: 1),
             completed: true, finishReason: calls.isEmpty ? .stop : .toolCalls)
     }
 }

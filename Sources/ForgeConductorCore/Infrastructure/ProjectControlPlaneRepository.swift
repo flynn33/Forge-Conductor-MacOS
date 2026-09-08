@@ -59,6 +59,16 @@ struct NativeSourcePressureClaim: Sendable {
 struct NativeSourcePressureRecoveryReference: Sendable {
     let conversationID: UUID, stageID: UUID, taskID: UUID, capabilityID: UUID, reservationID: UUID
 }
+struct NativeSourceToolOutputPressureProof: Sendable {
+    fileprivate let binding: NativeSourceBudgetBinding
+    fileprivate let preflight: ProviderRequestPreflight?
+    fileprivate let requirement: NativeSourceToolOutputRequirement
+}
+enum NativeSourceToolOutputEvaluation: Sendable {
+    case admitted(NativeSourceProviderOutputBudget, checkpoint: PreparedContinuitySourceCommit?)
+    case pressure(NativeSourcePressureClaim)
+    case blocked(NativeSourceStoredBudgetDisposition)
+}
 struct NativeSourcePressureReceiptClaim: Sendable {
     fileprivate let reference: NativeSourcePressureRecoveryReference
     fileprivate let managerID: UUID
@@ -2074,12 +2084,116 @@ public actor ProjectControlPlaneRepository {
         }
     }
 
+    private func nativeOutputPressureContextUnlocked(reference: NativeSourceProviderCallReference,
+        credential: NativeTaskCapabilityCredential, lease: NativeSourceConversationLease,
+        connection: ControlPlaneSQLiteConnection) throws -> (call: ResolvedNativeSourceProviderCall,
+            binding: NativeSourceBudgetBinding, accepted: NativeSourceAcceptedProviderTurn, outputs: [NativeSourceProviderCallOutput]) {
+        let call = try nativeResolveCallUnlocked(reference: reference, credential: credential, lease: lease, connection: connection)
+        try requireSourceMutationAdmissionUnlocked(call.attachment.setup.record.authorization, connection: connection)
+        let c = try nativeConversationUnlocked(reference.conversationID, attachment: call.attachment, connection: connection)
+        let stage = try nativeStageUnlocked(reference.stageID, conversation: c, connection: connection)
+        let binding = try nativeBudgetBindingUnlocked(stage: stage, conversation: c, boundary: .beforeToolOutput,
+            pendingCallOrdinal: reference.ordinal, connection: connection)
+        let accepted = try nativeAcceptedUnlocked(stage, conversation: c, connection: connection)
+        var outputs: [NativeSourceProviderCallOutput] = []
+        for prior in accepted.calls.prefix(reference.ordinal) {
+            guard let output = try nativeOutputUnlocked(reference: prior, stage: stage, conversation: c, connection: connection),
+                  !output.readyHandoffCommitted else { throw NativeSourceConversationError.integrityFailure }
+            outputs.append(output)
+        }
+        return (call, binding, accepted, outputs)
+    }
+
+    /// The caller supplies local transport serialization, never an unbound byte
+    /// count. No database transaction is held across the async measurement. The
+    /// second transaction revalidates the exact pending call and output prefix.
+    func evaluateNativeSourceToolOutput(reference: NativeSourceProviderCallReference,
+        credential: NativeTaskCapabilityCredential, lease: NativeSourceConversationLease,
+        policySelection: BudgetPolicySelection,
+        measureContinuation: @Sendable (ProviderContinuationRequest) async throws -> ProviderRequestPreflight,
+        prepareCheckpoint: (@Sendable (ResolvedNativeSourceProviderCall) throws -> (prepared: PreparedContinuitySourceCommit, resultJSON: Data))? = nil,
+        cancellation: ToolCallCancellation? = nil) async throws -> NativeSourceToolOutputEvaluation {
+        let initial = try controlledTransaction(cancellation: cancellation) { connection in
+            try nativeOutputPressureContextUnlocked(reference: reference, credential: credential, lease: lease, connection: connection)
+        }
+        let call = initial.call
+        let requirement: NativeSourceToolOutputRequirement
+        let checkpoint: PreparedContinuitySourceCommit?
+        switch call.toolName {
+        case "fs_read":
+            let full = min(65_536, call.attachment.sourceLimits.maximumResultBytes,
+                call.attachment.setup.record.authorization.authorizationScope.maximumInlineOutputBytes,
+                policySelection.policy.tools.maxResultBytes, call.prepared.frozenCeilings?.tools.maxResultBytes ?? Int.max)
+            requirement = try .readCeiling(full)
+            checkpoint = nil
+        case "session_checkpoint":
+            guard let prepareCheckpoint else { throw NativeSourceConversationError.invalidRequest("checkpoint_preview_required") }
+            let preview = try prepareCheckpoint(call)
+            guard !preview.prepared.finalize, preview.resultJSON.count <= 1_048_576,
+                  let result = try JSONSerialization.jsonObject(with: preview.resultJSON) as? [String: Any],
+                  try ForgeJSONCanonicalizationV1.data(from: result) == preview.resultJSON,
+                  Set(result.keys) == ["ok", "is_error", "payload"], result["ok"] as? Bool == true,
+                  result["is_error"] as? Bool == false, let payload = result["payload"] as? [String: Any],
+                  payload["packet_sha256"] as? String == preview.prepared.packetSHA256,
+                  let packet = payload["packet"],
+                  try ForgeJSONCanonicalizationV1.data(from: packet) == preview.prepared.canonicalPacketJSON else {
+                throw NativeSourceConversationError.integrityFailure
+            }
+            _ = try preview.prepared.packet()
+            let payloadBytes = try ForgeJSONCanonicalizationV1.data(from: payload)
+            requirement = try .init(kind: .preparedCheckpoint, encoding: .exactPreparedPayloadV1,
+                maximumFullToolResultBytes: preview.resultJSON.count,
+                additionalEscapedPayloadBytes: JSONEncoder().encode(String(decoding: payloadBytes, as: UTF8.self)).count - 2,
+                resultTokenEstimate: ContextBudgetMath.estimateTokens(serializedBytes: preview.resultJSON.count, policy: ContextBudgetPolicy()),
+                preparedPacketSHA256: preview.prepared.packetSHA256,
+                canonicalToolResultSHA256: JSONSupport.sha256Hex(preview.resultJSON),
+                canonicalPayloadSHA256: JSONSupport.sha256Hex(payloadBytes)).validated()
+            checkpoint = preview.prepared
+        case "session_handoff":
+            requirement = try .init(kind: .readyHandoff, encoding: .noContinuationV1,
+                maximumFullToolResultBytes: 1_048_576, additionalEscapedPayloadBytes: 0,
+                resultTokenEstimate: nil, preparedPacketSHA256: nil, canonicalToolResultSHA256: nil,
+                canonicalPayloadSHA256: nil).validated()
+            checkpoint = nil
+        default: throw NativeSourceConversationError.invalidRequest("tool")
+        }
+        try cancellation?.checkCancellation()
+        let preflight: ProviderRequestPreflight?
+        if call.toolName == "session_handoff" { preflight = nil }
+        else {
+            preflight = try await measureContinuation(NativeSourceConversationService.emptyOutputRequest(
+                accepted: initial.accepted, outputs: initial.outputs, callID: call.callID))
+        }
+        try cancellation?.checkCancellation()
+        try Task.checkCancellation()
+        let proof = NativeSourceToolOutputPressureProof(binding: initial.binding, preflight: preflight, requirement: requirement)
+        let decision = try controlledTransaction(cancellation: cancellation) { connection in
+            let current = try nativeOutputPressureContextUnlocked(reference: reference, credential: credential, lease: lease, connection: connection)
+            guard current.binding == proof.binding, let capabilities = current.call.prepared.retainedCapabilities else {
+                throw NativeSourceConversationError.conflict
+            }
+            return NativeSourceBudgetEvaluator.outputDecision(call: current.call, priorOutputs: current.outputs,
+                emptyOutputPreflight: proof.preflight, requirement: proof.requirement, capabilities: capabilities,
+                policySelection: policySelection, binding: current.binding)
+        }
+        switch decision {
+        case .admitted(let budget): return .admitted(budget, checkpoint: checkpoint)
+        case .pressure, .blocked:
+            switch try recordNativeSourceBudgetDisposition(metadata: nativeBudgetMetadata(decision), credential: credential,
+                lease: lease, policySelection: policySelection, outputProof: proof, cancellation: cancellation) {
+            case .pressure(let claim): return .pressure(claim)
+            case .blocked(let stored): return .blocked(stored)
+            }
+        }
+    }
+
     /// The full numerical decision is recomputed from CP-retained observations.
     /// This transaction fences inference but never submits a provider request or
     /// creates a ready source packet. Storage receives its own once-fixed deadline.
     func recordNativeSourceBudgetDisposition(metadata: NativeSourceBudgetMetadata,
         credential: NativeTaskCapabilityCredential, lease: NativeSourceConversationLease,
-        policySelection: BudgetPolicySelection, cancellation: ToolCallCancellation? = nil
+        policySelection: BudgetPolicySelection, outputProof: NativeSourceToolOutputPressureProof? = nil,
+        cancellation: ToolCallCancellation? = nil
     ) throws -> NativeSourceBudgetDispositionResult {
         let binding: NativeSourceBudgetBinding
         switch metadata {
@@ -2091,7 +2205,7 @@ public actor ProjectControlPlaneRepository {
             let (a, c) = try self.nativeLeaseUnlocked(lease, credential: credential, allowFenced: true, connection: connection)
             try self.requireSourceMutationAdmissionUnlocked(a.setup.record.authorization, connection: connection)
             let stage = try self.nativeStageUnlocked(binding.stageID, conversation: c, connection: connection)
-            if binding.boundary == .beforeProviderPost {
+            if binding.boundary == .beforeProviderPost || binding.boundary == .beforeToolOutput {
                 guard stage.body.deadline > ISO8601.string(from: self.clock.now()) else {
                     throw NativeSourceConversationError.deadlineExceeded
                 }
@@ -2145,9 +2259,18 @@ public actor ProjectControlPlaneRepository {
                     context: .init(binding: actualBinding, accepted: accepted, retainedContextSerializedBytes: bytes),
                     policySelection: policySelection))
             case .beforeToolOutput:
-                // Output admission needs the exact continuation-envelope proof;
-                // no caller-supplied projection may substitute for that future seam.
-                throw NativeSourceConversationError.invalidRequest("pressure_output_boundary_not_connected")
+                guard let proof = outputProof, proof.binding == actualBinding, let pending = binding.pendingCall else {
+                    throw NativeSourceConversationError.invalidRequest("pressure_output_proof_required")
+                }
+                let current = try nativeOutputPressureContextUnlocked(reference: .init(conversationID: binding.conversationID,
+                    stageID: binding.stageID, ordinal: pending.ordinal, checksum: pending.callSHA256),
+                    credential: credential, lease: lease, connection: connection)
+                guard let capabilities = current.call.prepared.retainedCapabilities else {
+                    throw NativeSourceConversationError.unsupportedProvider
+                }
+                recomputed = try nativeBudgetMetadata(NativeSourceBudgetEvaluator.outputDecision(call: current.call,
+                    priorOutputs: current.outputs, emptyOutputPreflight: proof.preflight, requirement: proof.requirement,
+                    capabilities: capabilities, policySelection: policySelection, binding: actualBinding))
             }
             guard try recomputed.canonicalJSON() == supplied else { throw NativeSourceConversationError.conflict }
             let timestamp = ISO8601.string(from: clock.now())
