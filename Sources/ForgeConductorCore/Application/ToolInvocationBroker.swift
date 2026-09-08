@@ -1089,17 +1089,20 @@ public actor ToolInvocationBroker {
     private let executor: any ToolExecuting
     private let classifier: any ToolReplayClassifying
     private let reconciler: any ToolInvocationReconciling
+    private let sourcePolicyResolver: (@Sendable (ToolInvocationContext) throws -> BudgetPolicySelection)?
 
     public init(
         repository: ProjectControlPlaneRepository,
         executor: any ToolExecuting,
         classifier: any ToolReplayClassifying,
-        reconciler: any ToolInvocationReconciling = NoToolInvocationReconciler()
+        reconciler: any ToolInvocationReconciling = NoToolInvocationReconciler(),
+        sourcePolicyResolver: (@Sendable (ToolInvocationContext) throws -> BudgetPolicySelection)? = nil
     ) {
         self.repository = repository
         self.executor = executor
         self.classifier = classifier
         self.reconciler = reconciler
+        self.sourcePolicyResolver = sourcePolicyResolver
     }
 
     /// Recovery authority is supplied by the manager, never decoded from a model
@@ -1245,7 +1248,15 @@ public actor ToolInvocationBroker {
             argumentsSHA256: argumentsSHA,
             reconciliationDescriptor: reconciliationDescriptor
         )
-        var record = try await repository.persistToolInvocationIntent(intent, lease: lease)
+        var record: ToolInvocationRecord
+        if let sourcePolicyResolver {
+            record = try await repository.persistToolInvocationIntent(intent, lease: lease,
+                sourcePolicy: sourcePolicyResolver(context))
+        } else {
+            // The repository rejects a native-source run without its current
+            // policy; this legacy path remains available for other run origins.
+            record = try await repository.persistToolInvocationIntent(intent, lease: lease)
+        }
 
         if record.state == .completed {
             return try Self.decodeResult(record.resultSummary)
@@ -1320,12 +1331,14 @@ public actor ToolInvocationBroker {
         }
 
         let expectedState = record.state
-        record = try await repository.transitionToolInvocation(
-            invocationID: record.invocationID,
-            expected: expectedState,
-            to: .executing,
-            lease: lease
-        )
+        if let sourcePolicyResolver {
+            record = try await repository.transitionToolInvocation(
+                invocationID: record.invocationID, expected: expectedState, to: .executing,
+                lease: lease, sourcePolicy: sourcePolicyResolver(context))
+        } else {
+            record = try await repository.transitionToolInvocation(
+                invocationID: record.invocationID, expected: expectedState, to: .executing, lease: lease)
+        }
         do {
             let result = try executor.call(
                 name: call.toolName,
@@ -1376,14 +1389,16 @@ public actor ToolInvocationBroker {
             )
             throw AutonomyError.resultTooLarge
         }
-        _ = try await repository.transitionToolInvocation(
-            invocationID: record.invocationID,
-            expected: expectedState,
-            to: .completed,
-            lease: lease,
-            resultSHA256: JSONSupport.sha256Hex(encoded),
-            resultSummary: encoded
-        )
+        if let sourcePolicyResolver {
+            _ = try await repository.transitionToolInvocation(
+                invocationID: record.invocationID, expected: expectedState, to: .completed,
+                lease: lease, resultSHA256: JSONSupport.sha256Hex(encoded), resultSummary: encoded,
+                sourcePolicy: sourcePolicyResolver(context))
+        } else {
+            _ = try await repository.transitionToolInvocation(
+                invocationID: record.invocationID, expected: expectedState, to: .completed,
+                lease: lease, resultSHA256: JSONSupport.sha256Hex(encoded), resultSummary: encoded)
+        }
         return result
     }
 

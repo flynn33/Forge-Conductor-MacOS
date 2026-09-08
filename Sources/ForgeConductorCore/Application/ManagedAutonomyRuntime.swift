@@ -374,6 +374,13 @@ public actor ManagedAutonomyRuntime {
         let policyResolver: PersistedManagedRunBudgetEvaluator.PolicyResolver = { scope in
             try app.config.budgetPolicySelection(scope: scope)
         }
+        let sourcePolicyResolver: @Sendable (ToolInvocationContext) throws -> BudgetPolicySelection = { context in
+            guard let generation = Int(exactly: context.projectGeneration.rawValue) else {
+                throw ProjectContextError.invalidGeneration(context.projectGeneration.rawValue)
+            }
+            return try policyResolver(.init(kind: .projectOverride,
+                projectID: context.projectID.description, projectGeneration: generation))
+        }
         let sourceBootstrap = SourceBootstrapScheduling(
             discover: { cursor, limit in
                 try await repository.pendingContinuityBootstrapRecoveries(afterRowID: cursor, limit: limit)
@@ -391,7 +398,7 @@ public actor ManagedAutonomyRuntime {
                 let worker = ManagedContinuityWorker(repository: repository, memory: app.projectMemory,
                                                     adapterResolver: adapterResolver)
                 let broker = ToolInvocationBroker(repository: repository, executor: app.tools,
-                    classifier: classifier, reconciler: reconciler)
+                    classifier: classifier, reconciler: reconciler, sourcePolicyResolver: sourcePolicyResolver)
                 let engine = ContinuityStateEngine(memory: app.projectMemory)
                 return try ManagedSourceBootstrapCoordinator(reference: reference, repository: repository,
                     managerID: resolvedManagerID, clock: clock, policyResolver: policyResolver,
@@ -431,7 +438,8 @@ public actor ManagedAutonomyRuntime {
                 repository: repository,
                 executor: app.tools,
                 classifier: classifier,
-                reconciler: reconciler
+                reconciler: reconciler,
+                sourcePolicyResolver: sourcePolicyResolver
             )
             let budget = PersistedManagedRunBudgetEvaluator(
                 repository: repository,

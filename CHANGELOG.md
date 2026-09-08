@@ -22,6 +22,11 @@ installed-stack and production-feature acceptance remain separate gates.
 
 ### Authorized handoff storage and admission
 
+- Added native task prepare, reconcile, rotate and revoke commands plus an
+  authenticated loopback MCP source endpoint. The initial profile supports
+  explicitly approved file reads, checkpoint/handoff commits and CLU controls.
+- Source requests retain bounded debits and exact frozen commit intents;
+  recovery preserves packet identity and carries source usage into accepted runs.
 - Added exact CLU control schemas, native task dispatch and operation-scoped
   cancellation recovery. The CLU connector exposes only its four controls;
   installation now includes that role in commit, rollback and removal.

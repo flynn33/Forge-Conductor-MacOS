@@ -186,9 +186,11 @@ struct VerifiedContinuityTaskCorrelation: Sendable {
     let callerOwner: ProjectBindingOwner
     let callerContext: ToolInvocationContext
     let authorizationSHA256: String
+    let nativeCredential: NativeTaskCapabilityCredential?
 
     private init(record: ContinuityTaskAuthorizationRecord, caller: ProjectContextBinding,
-                 context: ToolInvocationContext) throws {
+                 context: ToolInvocationContext, nativeCredential: NativeTaskCapabilityCredential? = nil) throws {
+        self.nativeCredential = nativeCredential
         taskID = record.authorization.taskID
         projectID = record.authorization.projectID
         projectGeneration = record.authorization.projectGeneration
@@ -201,6 +203,11 @@ struct VerifiedContinuityTaskCorrelation: Sendable {
 
     /// Called only after the repository's authenticated native setup transaction
     /// has validated its live task and caller rows. There is no wire decoder.
+    static func nativeCapabilityResult(record: ContinuityTaskAuthorizationRecord, caller: ProjectContextBinding,
+        context: ToolInvocationContext, credential: NativeTaskCapabilityCredential) throws -> Self {
+        try Self(record: record, caller: caller, context: context, nativeCredential: credential)
+    }
+
     static func nativeSetupResult(record: ContinuityTaskAuthorizationRecord, caller: ProjectContextBinding,
                                   context: ToolInvocationContext) throws -> Self {
         try Self(record: record, caller: caller, context: context)

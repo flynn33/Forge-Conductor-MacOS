@@ -308,6 +308,18 @@ public final class ManagerRoutes: @unchecked Sendable {
             return
         }
         switch (method, target.path) {
+        case ("POST", "/api/manager/continuity/tasks/prepare"),
+             ("POST", "/api/manager/continuity/tasks/rotate"),
+             ("POST", "/api/manager/continuity/tasks/revoke"):
+            guard target.queryItems.isEmpty else {
+                http.respondJSON(connection, status: 400, object: [
+                    "ok": false, "code": "invalid_native_task_request",
+                    "message": "Native task commands do not accept query parameters",
+                ])
+                return
+            }
+            dispatchNativeTaskCommand(action: String(target.path.split(separator: "/").last ?? ""),
+                body: body, connection: connection)
         case ("GET", "/api/manager/provider/configuration"),
              ("PUT", "/api/manager/provider/configuration"),
              ("GET", "/api/manager/provider/models"):
@@ -826,6 +838,64 @@ public final class ManagerRoutes: @unchecked Sendable {
             }
         default:
             http.respond(connection, status: 404, body: "Not Found", contentType: "text/plain")
+        }
+    }
+
+    private func dispatchNativeTaskCommand(action: String, body: Data, connection: NWConnection) {
+        let maximum = action == "prepare" ? NativeContinuityTaskPreparationRequest.maximumBodyBytes
+            : NativeContinuityTaskRotationRequest.maximumBodyBytes
+        guard !body.isEmpty, body.count <= maximum else {
+            http.respondJSON(connection, status: body.isEmpty ? 400 : 413, object: [
+                "ok": false, "code": "invalid_native_task_request",
+                "message": "Native task commands require one bounded request object",
+            ])
+            return
+        }
+        let http = self.http
+        let admitted = manager.dispatchNativeTaskCommand(action: action, body: body) { result in
+            switch result {
+            case .success(let command):
+                http.respondJSON(connection, status: 200, object: [
+                    "schema_version": 1, "ok": true,
+                    "disposition": command.replayed ? "replayed" : "committed",
+                    "receipt": command.receipt.wireObject, "current": command.current.wireObject,
+                ])
+            case .failure(let error):
+                let status: Int
+                let code: String
+                switch error {
+                case is NativeTaskOperatorError:
+                    status = 400; code = "invalid_native_task_request"
+                case let failure as NativeTaskCapabilityError:
+                    switch failure {
+                    case .invalidRequest, .unsupportedProfile: status = 400; code = "invalid_native_task_request"
+                    case .credentialRejected: status = 403; code = "native_task_credential_rejected"
+                    case .requestConflict, .epochConflict, .capabilityRevoked, .sourceFenced:
+                        status = 409; code = "native_task_command_conflict"
+                    case .capacityExceeded, .operationBusy: status = 503; code = "native_task_command_busy"
+                    case .integrityFailure, .resultExpired, .budgetExceeded:
+                        status = 409; code = "native_task_command_unavailable"
+                    }
+                case is ProjectContextError, is ContinuityTaskAuthorizationError:
+                    status = 409; code = "native_task_authority_unavailable"
+                case is CancellationError:
+                    status = 503; code = "native_task_command_interrupted"
+                default:
+                    status = 503; code = "native_task_command_unavailable"
+                }
+                // Neither approval text, credentials nor arbitrary storage errors
+                // are a diagnostic channel. Exact retries reconcile lost replies.
+                http.respondJSON(connection, status: status, object: [
+                    "ok": false, "code": code,
+                    "message": "The native task command did not return a receipt; reconcile the exact request before retrying",
+                ])
+            }
+        }
+        if !admitted {
+            http.respondJSON(connection, status: 503, object: [
+                "ok": false, "code": "native_task_command_busy",
+                "message": "Native task command admission is closed or full",
+            ])
         }
     }
 

@@ -199,3 +199,70 @@ Native task dispatch does not establish authenticated attachment to an existing
 LM Studio desktop conversation. Deployment, provider readiness, visible desktop
 rollover, GUI-closed recovery and later rollover require matching observations;
 the capabilities response does not infer these from native assignment metadata.
+
+## Authenticated native source attachment
+
+The native operator can prepare one approved task through the existing manager:
+
+```text
+forge-conductor manager task prepare --request /absolute/approval.json
+forge-conductor manager task reconcile --task UUID
+forge-conductor manager task rotate --task UUID --expected-epoch N --expires-at UTC
+forge-conductor manager task revoke --task UUID --expected-epoch N
+```
+
+Preparation accepts the registered project ID and generation, exact assignment
+bytes and scope, provider selection, completion gates, explicit source limits and
+absolute expiry. The manager checks current folder authorization. Preparation
+creates no run and does not contact a provider. The first source profile,
+`forge.native-task-source` version 1, supports approved `fs_read` work with a
+read-only filesystem scope and no network access. Unsupported work scope is
+rejected. Source calls are capped at 64 per task, results at 64 KiB and deadlines
+at 60 seconds; the approved limits and current policy can lower those ceilings.
+
+Operator commands use manager authentication. A separate task credential stays
+in the protected native task store; printed receipts omit its bearer value.
+Commands retain their exact pending request before transmission. If a response
+is lost, `reconcile` resends that request and verifies its retained receipt.
+Rotation changes the credential epoch and revocation is permanent. Neither a
+task ID nor an MCP session ID grants access. Credentials have explicit expiry,
+at most seven days, with no automatic renewal.
+
+The existing manager listener serves `/mcp/continuity` using MCP `2025-11-25`.
+Attachment requires a verified loopback listener and peer, valid Host and Origin
+headers, task authentication, initialization and a matching protocol session.
+The endpoint advertises `fs_read`, `session_checkpoint`, `session_handoff` and the
+four CLU controls. Source calls also require a canonical UUID in the static
+`Forge-Source-Session-ID` header. The native client retains this namespace and the
+exact JSON-RPC request ID when retrying after reconnect; those values identify a
+request but grant no authority. Reusing an ID with different arguments conflicts.
+A new logical source namespace uses a new UUID. Host retries that regenerate
+request IDs still require separate qualification.
+
+The endpoint bounds authentication and execution admission separately
+at eight requests each and retains at most 32 protocol sessions. Cancellation is
+isolated to the authenticated session and epoch. Stopping operational service
+retains authenticated discovery, status and cancellation; source work and starts
+are unavailable. Listener replacement invalidates old sessions, and process
+shutdown closes admission and drains owned requests before closing storage.
+
+Control-plane capability 7 retains task credentials as verifiers, command
+receipts, source call debits and frozen source commit intents. A source read is
+charged before dispatch; an uncertain read cannot refund its debit. Acceptance
+carries that debit once into the run, where restoration, ordinary broker calls
+and later rollovers retain the same accounting. Exact completed read requests
+replay retained results only after current authority and source fences are
+rechecked.
+
+A checkpoint or handoff freezes its canonical packet before any source write.
+The durable intent binds the request, authority, packet bytes, ID and timestamp.
+A ready handoff intent immediately fences new source work. The source commit
+uses those frozen bytes, allowing an interrupted request to recover the same
+revision and outbox identity. The existing watchdog reconciles at most four
+pending intents per pass under current authority and bounded retry rules.
+Response size is checked with the actual MCP encoding before the intent, so an
+oversized packet cannot commit and then be reported as a size rejection.
+
+This attachment is an explicit native API path. Existing desktop conversation
+association, writable source transfer, repeated live-provider rollover and the
+full crash qualification remain separate requirements.

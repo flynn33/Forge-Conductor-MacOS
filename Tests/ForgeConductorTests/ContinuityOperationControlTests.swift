@@ -146,15 +146,22 @@ final class ContinuityOperationControlTests: XCTestCase {
     func testCapabilityFiveMigrationRetainsAcceptanceAndVerifiedLineage() async throws {
         try await withFixture { fixture in
             await fixture.repository.close()
-            try ControlSQLite.execute(fixture.database, "DROP TABLE continuity_operation_cancellations")
+            for table in ["native_source_run_offsets", "native_source_requests", "native_task_commands",
+                          "native_task_capabilities", "continuity_operation_cancellations"] {
+                try ControlSQLite.execute(fixture.database, "DROP TABLE \(table)")
+            }
             let upgraded = try ProjectControlPlaneRepository(databaseURL: fixture.database)
             let status = try await fixture.replacing(repository: upgraded).status()
             XCTAssertEqual(status.acceptance, fixture.task.acceptance)
             XCTAssertEqual(try ControlSQLite.text(fixture.database, "SELECT state FROM continuity_ingress_holds"), "awaiting_bootstrap")
             let manifestURL = VerifiedMigrationBackup.activeManifestURL(for: fixture.database, scope: .continuityIngress)
             let manifest = try JSONSerialization.jsonObject(with: Data(contentsOf: manifestURL)) as? [String: Any]
-            XCTAssertEqual(manifest?["source_version"] as? Int, 5)
-            XCTAssertEqual(manifest?["target_version"] as? Int, 6)
+            XCTAssertEqual(manifest?["source_version"] as? Int, 6)
+            XCTAssertEqual(manifest?["target_version"] as? Int, 7)
+            XCTAssertEqual(try ControlSQLite.text(fixture.database,
+                "SELECT COUNT(*) FROM forge_migration_receipts WHERE source_version=5 AND target_version=6"), "1")
+            XCTAssertEqual(try ControlSQLite.text(fixture.database,
+                "SELECT COUNT(*) FROM forge_migration_receipts WHERE source_version=6 AND target_version=7"), "1")
             XCTAssertEqual(try ControlSQLite.text(fixture.database, "SELECT COUNT(*) FROM continuity_operation_cancellations"), "0")
             await upgraded.close()
             let reopened = try ProjectControlPlaneRepository(databaseURL: fixture.database)

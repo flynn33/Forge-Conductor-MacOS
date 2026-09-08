@@ -235,8 +235,8 @@ final class ContinuityBootstrapAuthorityTests: XCTestCase {
                     "SELECT pk FROM pragma_table_info('continuity_ingress_holds') WHERE name='operation_id'"), 1)
                 let manifest = try JSONDecoder().decode(VerifiedMigrationBackupManifest.self,
                     from: Data(contentsOf: VerifiedMigrationBackup.activeManifestURL(for: fixture.database, scope: .continuityIngress)))
-                XCTAssertEqual(manifest.sourceVersion, 5)
-                XCTAssertEqual(manifest.targetVersion, 6)
+                XCTAssertEqual(manifest.sourceVersion, 6)
+                XCTAssertEqual(manifest.targetVersion, 7)
                 XCTAssertEqual(manifest.state, .completed)
                 let backup = fixture.database.deletingLastPathComponent().appendingPathComponent(manifest.backupFilename)
                 let priorHoldBackup = fixture.database.deletingPathExtension().appendingPathExtension("pre-ingress-capability-v2.sqlite3")
@@ -411,6 +411,10 @@ private enum BootstrapSQLite {
             BEGIN IMMEDIATE;
             DROP TRIGGER IF EXISTS trg_continuity_source_origin_binding_update;
             DROP TRIGGER IF EXISTS trg_continuity_source_origin_binding_delete;
+            DROP TABLE IF EXISTS native_source_run_offsets;
+            DROP TABLE IF EXISTS native_source_requests;
+            DROP TABLE IF EXISTS native_task_commands;
+            DROP TABLE IF EXISTS native_task_capabilities;
             DROP TABLE IF EXISTS continuity_operation_cancellations;
             DROP TABLE IF EXISTS continuity_source_dispatch_origins;
             DROP TABLE IF EXISTS continuity_source_task_fences;

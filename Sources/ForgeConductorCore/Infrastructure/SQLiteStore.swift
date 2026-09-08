@@ -2842,7 +2842,7 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
             && !value.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains)
     }
 
-    private static func validateIngressPacketBounds(_ packet: HandoffPacket) throws {
+    static func validateIngressPacketBounds(_ packet: HandoffPacket) throws {
         let lists = [packet.blockers, packet.nextActions, packet.keyFiles, packet.decisions]
         guard lists.allSatisfy({ $0.count <= 128 }), packet.agents.count <= 128 else {
             throw ContinuityIngressError.capacityExceeded("packet fields")

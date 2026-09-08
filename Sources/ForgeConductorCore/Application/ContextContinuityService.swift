@@ -42,6 +42,52 @@ public final class ContextContinuityService: @unchecked Sendable {
 
     // MARK: - Public tool operations
 
+    /// Performs only exact authorized source reads and packet construction. The
+    /// control-plane owner persists the resulting bytes in its request intent
+    /// before calling commitPreparedAuthorizedSourceCommit. Retries never build
+    /// a new random identity or timestamp from a changed mutable checkpoint.
+    func prepareAuthorizedSourceCommit(
+        arguments: [String: Any], clientID: ClientID, source: HandoffSource,
+        finalize: Bool, authorization: ContinuityIngressAuthorization,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> PreparedContinuitySourceCommit {
+        try authorization.validate()
+        try lockContinuityMutex(lock, operation: "prepare native source commit", cancellation: cancellation)
+        defer { lock.unlock() }
+        return try withPersistenceFileLock(cancellation: cancellation) {
+            var packet = try buildPacket(arguments: arguments, clientID: clientID, source: source,
+                finalize: finalize, authorization: authorization, cancellation: cancellation)
+            packet.resumeReady = finalize
+            let prepared = try PreparedContinuitySourceCommit.preparing(packet)
+            try requireNativeSourceResponseBudget(prepared)
+            try cancellation?.checkCancellation()
+            return prepared
+        }
+    }
+
+    /// Commits the already frozen packet through the existing immutable revision
+    /// and outbox transaction. The enclosing live CP guard is still required.
+    /// If CP receipt persistence was interrupted, source digest dedup returns the
+    /// original revision and delivery rather than manufacturing another packet.
+    func commitPreparedAuthorizedSourceCommit(
+        _ prepared: PreparedContinuitySourceCommit,
+        authorization: ContinuityIngressAuthorization,
+        automaticHandoffEnabled: Bool,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuityHandoffCommit {
+        try authorization.validate()
+        let packet = try prepared.packet()
+        try requireNativeSourceResponseBudget(prepared)
+        let persisted = try mutateAndPersist(authorization: authorization,
+            automaticHandoffEnabled: automaticHandoffEnabled, cancellation: cancellation) { packet }
+        guard let commit = persisted.ingressCommit,
+              commit.revision.canonicalPacketJSON == prepared.canonicalPacketJSON,
+              commit.revision.identity.packetSHA256 == prepared.packetSHA256 else {
+            throw ContinuityIngressError.integrityFailure("prepared source commit differs")
+        }
+        return commit
+    }
+
     /// The manager invokes this inside its live task-authorization transaction.
     /// Packet text remains task data; the supplied native authorization fixes the
     /// project, assignment and scope independently of that text. Both model and
@@ -90,17 +136,39 @@ public final class ContextContinuityService: @unchecked Sendable {
               try ForgeJSONCanonicalizationV1.data(from: packet.asDictionary()) == revision.canonicalPacketJSON else {
             throw ContinuityIngressError.integrityFailure("native source commit payload differs")
         }
+        return nativeSourceCommitPayload(packet: packet, finalize: finalize,
+            revision: revision.identity.revision, packetSHA256: revision.identity.packetSHA256,
+            operationID: commit.delivery?.operationID.uuidString.lowercased())
+    }
+
+    private func nativeSourceCommitPayload(packet: HandoffPacket, finalize: Bool,
+        revision: Int64, packetSHA256: String, operationID: String?
+    ) -> [String: Any] {
         var payload = successPayload(packet, action: finalize ? "handoff" : "checkpoint")
         payload["paths"] = [:] as [String: Any]
         payload["projection_ok"] = false
         payload["projection_repair_pending"] = false
         payload["projection_excluded"] = true
         payload["canonical_location"] = "task_scoped_sqlite"
-        payload["continuity_id"] = revision.identity.continuityID
-        payload["revision"] = revision.identity.revision
-        payload["packet_sha256"] = revision.identity.packetSHA256
-        payload["operation_id"] = commit.delivery?.operationID.uuidString.lowercased() as Any? ?? NSNull()
+        payload["continuity_id"] = packet.id
+        payload["revision"] = revision
+        payload["packet_sha256"] = packetSHA256
+        payload["operation_id"] = operationID as Any? ?? NSNull()
         return payload
+    }
+
+    /// Worst-size identity fields are used only to measure serialization; this
+    /// preflight object is never stored, disclosed, or treated as a receipt.
+    /// NUL maximizes JSON escaping for any permitted 256-byte request ID.
+    func requireNativeSourceResponseBudget(_ prepared: PreparedContinuitySourceCommit) throws {
+        let payload = nativeSourceCommitPayload(packet: try prepared.packet(), finalize: prepared.finalize,
+            revision: Int64.max, packetSHA256: prepared.packetSHA256,
+            operationID: "ffffffff-ffff-ffff-ffff-ffffffffffff")
+        let encoded = try MCPToolResponse.data(
+            id: String(repeating: "\u{0}", count: 256), result: .success(payload))
+        guard encoded.count <= 1_048_576 else {
+            throw ContinuityIngressError.capacityExceeded("native source response bytes")
+        }
     }
 
     /// Exact immutable retrieval for an already authorized caller or provisional

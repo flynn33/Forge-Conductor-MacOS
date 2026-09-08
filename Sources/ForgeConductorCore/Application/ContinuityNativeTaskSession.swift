@@ -18,6 +18,13 @@ final class ContinuityNativeTaskSession: Sendable {
         clientID = context.clientID
     }
 
+    /// An authenticated transport supplies the exact capability-backed setup.
+    /// Every control operation still revalidates its live repository authority.
+    static func authenticated(app: ForgeApp,
+                              attachment: AuthenticatedContinuityTaskAttachment) -> ContinuityNativeTaskSession {
+        Self(app: app, setup: attachment.setup, context: attachment.context, owner: attachment.owner)
+    }
+
     /// Called from authenticated native assignment setup, never a model request.
     static func enroll(app: ForgeApp, taskID: UUID = UUID(),
         approvedAssignment: ContinuityTaskAssignment, callerContext: ToolInvocationContext,

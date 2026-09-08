@@ -113,6 +113,12 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     private var activeProviderProbeID: UUID?
     private var managedAutonomy: ManagedAutonomyRuntime?
     private var continuityIngress: ContinuityIngressDeliveryService?
+    private let taskHTTPService: MCPTaskHTTPService
+    private let nativeTaskOperatorAdmission = MCPRequestAdmission(maximumActiveRequests: 8)
+    private let nativeTaskOperatorNamespace = UUID()
+    private var nativeSourceRecoveryCursor: Int64?
+    private var nativeSourceRecoveryCancellation: ToolCallCancellation?
+    private var nativeTaskAttachmentClosing = false
 
     public convenience init(
         app: ForgeApp,
@@ -230,6 +236,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         ) throws -> Void
     ) {
         self.app = app
+        self.taskHTTPService = MCPTaskHTTPService(app: app)
         self.managedAutonomyFactory = managedAutonomyFactory
         self.hostAdapterRegistry = hostAdapterRegistry
         self.providerProbeTimeoutSeconds = min(
@@ -242,6 +249,9 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     }
 
     deinit {
+        nativeTaskOperatorAdmission.setOpen(false)
+        taskHTTPService.closeAdmission()
+        nativeSourceRecoveryCancellation?.cancel()
         stopWatchdog()
         stopSignalHandlers()
         tearDownDashboard()
@@ -517,6 +527,8 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
 
     private func stopServiceSerialized() -> ManagerStatus {
         lock.lock()
+        taskHTTPService.setOperational(false)
+        nativeSourceRecoveryCancellation?.cancel()
         runtime.desiredRunning = false
         runtime.state = .stopping
         runtime.markStopped()
@@ -1803,6 +1815,94 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         return try autonomousRunDictionary(run)
     }
 
+    /// Operator admission is claimed before retaining a body in an async worker.
+    /// The same owner keeps cancellation and shutdown accounting until it exits.
+    @discardableResult
+    func dispatchNativeTaskCommand(action: String, body: Data,
+        completion: @escaping @Sendable (Result<NativeTaskCapabilityCommandResult, Error>) -> Void
+    ) -> Bool {
+        guard body.count <= NativeContinuityTaskPreparationRequest.maximumBodyBytes else { return false }
+        let key = MCPRequestAdmission.Key(sessionID: nativeTaskOperatorNamespace,
+            id: .string(UUID().uuidString.lowercased()))
+        let cancellation = ToolCallCancellation(timeoutSeconds: 15)
+        guard case .accepted = nativeTaskOperatorAdmission.reserve(key, cancellation: cancellation) else { return false }
+        let task = Task.detached(priority: .userInitiated) {
+            defer { self.nativeTaskOperatorAdmission.finish(key, cancellation: cancellation) }
+            do {
+                try cancellation.checkCancellation()
+                let result: NativeTaskCapabilityCommandResult
+                switch action {
+                case "prepare":
+                    result = try await self.prepareNativeContinuityTask(
+                        NativeContinuityTaskPreparationRequest(data: body), cancellation: cancellation)
+                case "rotate":
+                    result = try await self.app.projectContexts.repository.rotateNativeContinuityTask(
+                        request: NativeContinuityTaskRotationRequest(data: body), cancellation: cancellation)
+                case "revoke":
+                    result = try await self.app.projectContexts.repository.revokeNativeContinuityTask(
+                        request: NativeContinuityTaskRevocationRequest(data: body), cancellation: cancellation)
+                default: throw NativeTaskOperatorError.invalidRequest("action")
+                }
+                completion(.success(result))
+            } catch {
+                completion(.failure(error))
+            }
+        }
+        nativeTaskOperatorAdmission.bindTask(key, cancellation: cancellation) { task.cancel() }
+        return true
+    }
+
+    func prepareNativeContinuityTask(_ request: NativeContinuityTaskPreparationRequest,
+        cancellation: ToolCallCancellation? = nil
+    ) async throws -> NativeTaskCapabilityCommandResult {
+        try cancellation?.checkCancellation()
+        guard let project = try await app.projectContexts.repository.project(request.projectID,
+            cancellation: cancellation) else { throw ProjectContextError.projectNotFound(request.projectID) }
+        guard project.generation == request.projectGeneration else {
+            throw ProjectContextError.staleProjectGeneration(expected: request.projectGeneration, actual: project.generation)
+        }
+        guard project.lifecycleState == .active else { throw ProjectContextError.projectNotActive(project.lifecycleState) }
+        let root = try authorizedProjectRoot(project.canonicalRoot)
+        let approval = request.approval
+        guard approval.filesystemAccess == "read_only", !approval.networkAllowed,
+              Set(approval.allowedTools) == ["fs_read"] else { throw NativeTaskCapabilityError.unsupportedProfile }
+        let assignment = try ContinuityTaskAssignment(
+            assignmentID: approval.assignmentID, assignmentBytes: approval.assignmentBytes,
+            mission: approval.mission, providerID: approval.providerID, adapterID: approval.adapterID,
+            modelKey: approval.modelKey,
+            specification: AutonomousRunSpecification(allowedTools: approval.allowedTools,
+                completionGates: approval.completionGates, resourceProfile: approval.resourceProfile),
+            authorizationScope: ToolAuthorizationScope(canonicalRoots: [root], writableRoots: [],
+                allowedTools: Set(approval.allowedTools), networkAllowed: false,
+                maximumInlineOutputBytes: approval.maximumInlineOutputBytes))
+        return try await app.projectContexts.repository.prepareNativeContinuityTask(request: request,
+            approvedAssignment: assignment, cancellation: cancellation)
+    }
+
+    /// Must settle before the application closes either durable store. A false
+    /// result retains an explicit incomplete-shutdown outcome at the caller.
+    @discardableResult
+    func shutdownNativeTaskAttachment() -> Bool {
+        lock.lock()
+        nativeTaskAttachmentClosing = true
+        nativeSourceRecoveryCancellation?.cancel()
+        lock.unlock()
+        nativeTaskOperatorAdmission.setOpen(false)
+        taskHTTPService.closeAdmission()
+        do {
+            return try Self.waitForAsync(timeoutSeconds: 20) {
+                async let transportDrained = self.taskHTTPService.shutdown()
+                let deadline = DispatchTime.now().uptimeNanoseconds + 15_000_000_000
+                while (self.nativeTaskOperatorAdmission.activeCount > 0 || !self.nativeSourceRecoveryIsSettled),
+                      DispatchTime.now().uptimeNanoseconds < deadline {
+                    try await Task.sleep(for: .milliseconds(10))
+                }
+                let drained = await transportDrained
+                return drained && self.nativeTaskOperatorAdmission.activeCount == 0 && self.nativeSourceRecoveryIsSettled
+            }
+        } catch { return false }
+    }
+
     private func authorizedProjectRoot(_ projectRoot: URL) throws -> URL {
         guard let authorized = ManagerSettingsNormalizer.authorizedProjectRoot(
             projectRoot,
@@ -2542,6 +2642,9 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     public func requestShutdown(delayMs: Int = 300) {
         lock.lock()
         runtime.requestShutdown()
+        taskHTTPService.closeAdmission()
+        nativeTaskOperatorAdmission.setOpen(false)
+        nativeSourceRecoveryCancellation?.cancel()
         lock.unlock()
         app.diagnostics.info("manager_shutdown_requested", [:])
         runtime.queue.asyncAfter(deadline: .now() + .milliseconds(delayMs)) { [weak self] in
@@ -2597,6 +2700,17 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         stopWatchdog()
         stopSignalHandlers()
         tearDownDashboard()
+        guard shutdownNativeTaskAttachment() else {
+            let error = RuntimeJobError.storageFailure("manager shutdown retained native task request ownership")
+            lock.lock()
+            runtime.markFailed(error)
+            lock.unlock()
+            persistState()
+            ManagerPIDFile.remove(paths: app.paths)
+            runtime.runLock.signal()
+            fputs("forge-conductor manager shutdown incomplete: native task requests remain active\n", stderr)
+            exit(1)
+        }
         shutdownManagedAutonomy()
         let shutdownReport = app.shutdown()
         guard shutdownReport.completed else {
@@ -2665,6 +2779,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
 
         let server = DashboardServer(app: app, host: host, port: port)
         server.manager = self
+        server.taskHTTPService = taskHTTPService
         try server.start()
 
         lock.lock()
@@ -2674,6 +2789,8 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
 
     private func tearDownDashboard(allowingCompletedResponses: Bool = false) {
         lock.lock()
+        taskHTTPService.setOperational(false)
+        nativeSourceRecoveryCancellation?.cancel()
         let server = runtime.dashboard
         runtime.dashboard = nil
         lock.unlock()
@@ -2953,6 +3070,15 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         runtime.autonomyTickTask = Task { [weak self, autonomy, ingress] in
             defer { self?.markAutonomyTickComplete(tickID) }
             do {
+                try await self?.reconcileNativeSourceCommitsOnce()
+            } catch {
+                if !Task.isCancelled {
+                    self?.app.diagnostics.warn("manager_native_source_recovery_failed",
+                        ["error_code": "bounded_source_recovery_failed"], category: .manager)
+                }
+            }
+            guard !Task.isCancelled else { return }
+            do {
                 _ = try await ingress.drainOnce()
             } catch {
                 if !Task.isCancelled {
@@ -2982,6 +3108,58 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             runtime.autonomyTickTask = nil
         }
         lock.unlock()
+    }
+
+    private func beginNativeSourceRecovery() -> (ToolCallCancellation, Int64?)? {
+        lock.lock(); defer { lock.unlock() }
+        guard runtime.state == .running, runtime.isHTTPUp, !runtime.shutdownRequested, !nativeTaskAttachmentClosing,
+              nativeSourceRecoveryCancellation == nil else { return nil }
+        let token = ToolCallCancellation(timeoutSeconds: 15)
+        nativeSourceRecoveryCancellation = token
+        return (token, nativeSourceRecoveryCursor)
+    }
+
+    private var nativeSourceRecoveryIsSettled: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return nativeSourceRecoveryCancellation == nil
+    }
+
+    private func finishNativeSourceRecovery(_ token: ToolCallCancellation, cursor: Int64?) {
+        lock.lock(); defer { lock.unlock() }
+        if nativeSourceRecoveryCancellation === token {
+            nativeSourceRecoveryCancellation = nil
+            nativeSourceRecoveryCursor = cursor
+        }
+    }
+
+    /// Uses the existing watchdog's single owned tick. A retained FULL intent is
+    /// reconciled with its exact packet and authority; no new source request is issued.
+    func reconcileNativeSourceCommitsOnce() async throws {
+        guard let (cancellation, initialCursor) = beginNativeSourceRecovery() else { return }
+        var cursor = initialCursor
+        defer { finishNativeSourceRecovery(cancellation, cursor: cursor) }
+        let repository = app.projectContexts.repository
+        let source = app.continuity
+        try await withTaskCancellationHandler {
+            let pending = try await repository.pendingNativeSourceCommits(afterRowID: cursor,
+                limit: 4, cancellation: cancellation)
+            if pending.isEmpty { cursor = nil; return }
+            for reference in pending {
+                try cancellation.checkCancellation()
+                cursor = reference.rowID
+                do {
+                    _ = try await repository.reconcileNativeSourceCommit(reference: reference,
+                        commit: { prepared, authorization, automatic in
+                            try source.commitPreparedAuthorizedSourceCommit(prepared,
+                                authorization: authorization, automaticHandoffEnabled: automatic,
+                                cancellation: cancellation)
+                        }, cancellation: cancellation)
+                } catch {
+                    try cancellation.checkCancellation()
+                    try await repository.deferNativeSourceCommit(reference: reference, cancellation: cancellation)
+                }
+            }
+        } onCancel: { cancellation.cancel() }
     }
 
     /// Runs the same bounded delivery pass used by the manager watchdog. A GUI
@@ -3104,6 +3282,9 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     }
 
     private func persistState() {
+        lock.lock()
+        taskHTTPService.setOperational(runtime.state == .running && runtime.isHTTPUp && !runtime.shutdownRequested)
+        lock.unlock()
         let snap = status()
         if let data = try? JSONSupport.data(from: snap) {
             try? data.write(to: app.paths.managerState, options: .atomic)

@@ -1177,6 +1177,772 @@ public actor ProjectControlPlaneRepository {
         return result
     }
 
+    // MARK: - Native task capabilities
+
+    func prepareNativeContinuityTask(request: NativeContinuityTaskPreparationRequest,
+        approvedAssignment: ContinuityTaskAssignment, cancellation: ToolCallCancellation? = nil
+    ) throws -> NativeTaskCapabilityCommandResult {
+        try controlledTransaction(cancellation: cancellation, fullDurability: true) { connection in
+            let project = try requiredActiveProjectUnlocked(request.projectID, generation: request.projectGeneration, connection: connection)
+            let a = request.approval, scope = approvedAssignment.authorizationScope
+            guard request.profileID == "forge.native-task-source", request.profileVersion == 1,
+                  scope.canonicalRoots == [project.canonicalRoot], scope.writableRoots.isEmpty,
+                  !scope.networkAllowed, scope.allowedTools == ["fs_read"],
+                  scope.maximumInlineOutputBytes == a.maximumInlineOutputBytes,
+                  approvedAssignment.assignmentID == a.assignmentID, approvedAssignment.assignmentBytes == a.assignmentBytes,
+                  approvedAssignment.mission == a.mission, approvedAssignment.providerID == a.providerID,
+                  approvedAssignment.adapterID == a.adapterID, approvedAssignment.modelKey == a.modelKey,
+                  approvedAssignment.specification.allowedTools == a.allowedTools.sorted(),
+                  approvedAssignment.specification.completionGates == a.completionGates,
+                  approvedAssignment.specification.resourceProfile == a.resourceProfile,
+                  approvedAssignment.specification.work == AutonomousRunWork() else { throw NativeTaskCapabilityError.unsupportedProfile }
+            if let stored = try nativeCapabilityUnlocked(request.capabilityID, connection: connection) {
+                let (task, _) = try validateNativeCapabilityOwnerUnlocked(stored, taskID: request.taskID,
+                    projectID: request.projectID, generation: request.projectGeneration, connection: connection)
+                guard task.assignment == approvedAssignment, stored.limits == a.sourceLimits else { throw NativeTaskCapabilityError.requestConflict }
+                guard let replay = try nativeCommandReplayUnlocked(requestID: request.requestID, requestSHA256: request.requestSHA256,
+                    capability: stored, connection: connection) else { throw NativeTaskCapabilityError.requestConflict }
+                return replay
+            }
+            guard try connection.scalarInt("SELECT COUNT(*) FROM native_task_capabilities") < 1_024,
+                  try connection.scalarInt("SELECT COUNT(*) FROM native_task_commands") < 4_096 else { throw NativeTaskCapabilityError.capacityExceeded }
+            guard try connection.scalarInt("SELECT COUNT(*) FROM native_task_commands WHERE request_id=?", bindings: [.text(request.requestID.uuidString.lowercased())]) == 0,
+                  try connection.scalarInt("SELECT COUNT(*) FROM continuity_task_authorizations WHERE task_id=?", bindings: [.text(request.taskID.uuidString.lowercased())]) == 0 else {
+                throw NativeTaskCapabilityError.requestConflict
+            }
+            try validateNativeExpiry(request.expiresAt)
+            let timestamp = ISO8601.string(from: clock.now()), callerID = UUID()
+            let owner = ProjectBindingOwner(kind: .mcpClient, id: "native-task:" + UUID().uuidString.lowercased())
+            try connection.execute("""
+                INSERT INTO project_bindings(binding_id,owner_kind,owner_id,project_id,project_generation,
+                    run_id,authorization_scope_json,active,created_at,updated_at) VALUES(?,'mcp_client',?,?,?,NULL,?,1,?,?)
+                """, bindings: [.text(callerID.uuidString.lowercased()), .text(owner.id), .text(request.projectID.description),
+                    .int64(try Self.sqliteGeneration(request.projectGeneration)), .text(try Self.scopeJSON(scope)), .text(timestamp), .text(timestamp)])
+            let context = ToolInvocationContext(projectID: request.projectID, projectGeneration: request.projectGeneration,
+                clientID: ClientID(owner.id), authorizationScope: scope)
+            let setup = try authorizeContinuityTaskUnlocked(taskID: request.taskID, projectID: request.projectID,
+                expectedGeneration: request.projectGeneration, approvedAssignment: approvedAssignment,
+                callerContext: context, callerOwner: owner, connection: connection)
+            let scopeSHA = JSONSupport.sha256Hex(Data(try Self.scopeJSON(scope).utf8))
+            try connection.execute("""
+                INSERT INTO native_task_capabilities(capability_id,task_id,project_id,project_generation,epoch,state,verifier_sha256,
+                    caller_binding_id,source_binding_id,approval_sha256,scope_sha256,authorization_sha256,document_sha256,
+                    source_limits_json,expires_at,issued_at,revoked_at) VALUES(?,?,?,?,1,'active',?,?,?,?,?,?,?,?,?,?,NULL)
+                """, bindings: [.text(request.capabilityID.uuidString.lowercased()), .text(request.taskID.uuidString.lowercased()),
+                    .text(request.projectID.description), .int64(try Self.sqliteGeneration(request.projectGeneration)), .text(request.verifierSHA256),
+                    .text(callerID.uuidString.lowercased()), .text(setup.record.authorization.sourceBindingID.uuidString.lowercased()),
+                    .text(approvedAssignment.assignmentSHA256), .text(scopeSHA), .text(setup.correlation.authorizationSHA256),
+                    .text(approvedAssignment.documentSHA256), .text(String(decoding: try ForgeJSONCanonicalizationV1.data(from: a.sourceLimits.wireObject), as: UTF8.self)),
+                    .text(request.expiresAt), .text(timestamp)])
+            guard let current = try nativeCapabilityUnlocked(request.capabilityID, connection: connection) else { throw NativeTaskCapabilityError.integrityFailure }
+            let receipt = try NativeTaskCapabilityCommandReceipt(requestID: request.requestID, action: request.action,
+                requestSHA256: request.requestSHA256, descriptor: current.descriptor(now: clock.now()), priorEpoch: nil,
+                documentSHA256: current.documentSHA256, verifierSHA256: current.verifierSHA256, recordedAt: timestamp)
+            try storeNativeCommandUnlocked(receipt, connection: connection)
+            return .init(receipt: receipt, current: try current.descriptor(now: clock.now()), replayed: false)
+        }
+    }
+
+    func rotateNativeContinuityTask(request: NativeContinuityTaskRotationRequest,
+        cancellation: ToolCallCancellation? = nil) throws -> NativeTaskCapabilityCommandResult {
+        try mutateNativeCapability(requestID: request.requestID, action: request.action, requestSHA256: request.requestSHA256,
+            taskID: request.taskID, capabilityID: request.capabilityID, projectID: request.projectID,
+            generation: request.projectGeneration, expectedEpoch: request.expectedEpoch,
+            verifierSHA256: request.verifierSHA256, expiresAt: request.expiresAt, cancellation: cancellation)
+    }
+
+    func revokeNativeContinuityTask(request: NativeContinuityTaskRevocationRequest,
+        cancellation: ToolCallCancellation? = nil) throws -> NativeTaskCapabilityCommandResult {
+        try mutateNativeCapability(requestID: request.requestID, action: request.action, requestSHA256: request.requestSHA256,
+            taskID: request.taskID, capabilityID: request.capabilityID, projectID: request.projectID,
+            generation: request.projectGeneration, expectedEpoch: request.expectedEpoch,
+            verifierSHA256: nil, expiresAt: nil, cancellation: cancellation)
+    }
+
+    private func mutateNativeCapability(requestID: UUID, action: String, requestSHA256: String, taskID: UUID,
+        capabilityID: UUID, projectID: ProjectID, generation: ProjectGeneration, expectedEpoch: Int64,
+        verifierSHA256: String?, expiresAt: String?, cancellation: ToolCallCancellation?) throws -> NativeTaskCapabilityCommandResult {
+        try controlledTransaction(cancellation: cancellation, fullDurability: true) { connection in
+            guard let stored = try nativeCapabilityUnlocked(capabilityID, connection: connection) else { throw NativeTaskCapabilityError.credentialRejected }
+            _ = try validateNativeCapabilityOwnerUnlocked(stored, taskID: taskID, projectID: projectID, generation: generation, connection: connection)
+            if let replay = try nativeCommandReplayUnlocked(requestID: requestID, requestSHA256: requestSHA256,
+                capability: stored, connection: connection) { return replay }
+            guard stored.state == "active" else { throw NativeTaskCapabilityError.capabilityRevoked }
+            guard stored.epoch == expectedEpoch, expectedEpoch < Int64.max else { throw NativeTaskCapabilityError.epochConflict }
+            try requireNativeCommandCapacityUnlocked(capabilityID, connection: connection)
+            if let expiresAt { try validateNativeExpiry(expiresAt) }
+            let timestamp = ISO8601.string(from: clock.now())
+            try connection.execute("""
+                UPDATE native_task_capabilities SET epoch=epoch+1,state=?,verifier_sha256=?,expires_at=?,issued_at=?,revoked_at=?
+                WHERE capability_id=? AND epoch=? AND state='active'
+                """, bindings: [.text(action == "revoke" ? "revoked" : "active"), .optionalText(verifierSHA256),
+                    .text(expiresAt ?? stored.expiresAt), .text(timestamp), .optionalText(action == "revoke" ? timestamp : nil),
+                    .text(capabilityID.uuidString.lowercased()), .int64(expectedEpoch)])
+            guard let current = try nativeCapabilityUnlocked(capabilityID, connection: connection) else { throw NativeTaskCapabilityError.integrityFailure }
+            let receipt = try NativeTaskCapabilityCommandReceipt(requestID: requestID, action: action, requestSHA256: requestSHA256,
+                descriptor: current.descriptor(now: clock.now()), priorEpoch: expectedEpoch,
+                documentSHA256: current.documentSHA256, verifierSHA256: current.verifierSHA256, recordedAt: timestamp)
+            try storeNativeCommandUnlocked(receipt, connection: connection)
+            return .init(receipt: receipt, current: try current.descriptor(now: clock.now()), replayed: false)
+        }
+    }
+
+    func authenticateNativeTaskCapability(credential: NativeTaskCapabilityCredential,
+        cancellation: ToolCallCancellation? = nil) throws -> AuthenticatedContinuityTaskAttachment {
+        try controlledTransaction(cancellation: cancellation) { connection in
+            try authenticateNativeTaskCapabilityUnlocked(credential, connection: connection)
+        }
+    }
+
+    private struct StoredNativeCapability {
+        let capabilityID: UUID, taskID: UUID, projectID: ProjectID, generation: ProjectGeneration
+        let epoch: Int64, state: String, verifierSHA256: String?
+        let callerBindingID: UUID, sourceBindingID: UUID
+        let approvalSHA256: String, scopeSHA256: String, authorizationSHA256: String, documentSHA256: String
+        let limits: NativeTaskSourceLimits, expiresAt: String, issuedAt: String, revokedAt: String?
+        func descriptor(now: Date) throws -> NativeTaskCapabilityDescriptor {
+            try .init(arguments: ["task_id": taskID.uuidString.lowercased(), "capability_id": capabilityID.uuidString.lowercased(),
+                "project_id": projectID.description, "project_generation": generation.rawValue, "epoch": epoch,
+                "state": state == "revoked" ? "revoked" : (expiresAt <= ISO8601.string(from: now) ? "expired" : "active"),
+                "profile_id": "forge.native-task-source", "profile_version": 1, "approval_sha256": approvalSHA256,
+                "scope_sha256": scopeSHA256, "original_caller_binding_id": callerBindingID.uuidString.lowercased(),
+                "source_binding_id": sourceBindingID.uuidString.lowercased(), "expires_at": expiresAt, "issued_at": issuedAt,
+                "revoked_at": revokedAt as Any? ?? NSNull()])
+        }
+    }
+
+    private func nativeCapabilityUnlocked(_ id: UUID, connection: ControlPlaneSQLiteConnection) throws -> StoredNativeCapability? {
+        try connection.first("""
+            SELECT capability_id,task_id,project_id,project_generation,epoch,state,verifier_sha256,caller_binding_id,source_binding_id,
+                approval_sha256,scope_sha256,authorization_sha256,document_sha256,source_limits_json,expires_at,issued_at,revoked_at
+            FROM native_task_capabilities WHERE capability_id=?
+            """, bindings: [.text(id.uuidString.lowercased())]) { row in
+                guard row.int64(3) > 0, row.int64(4) > 0,
+                      let state = try row.strictText(5, maximumBytes: 16), ["active","revoked"].contains(state),
+                      let limitsJSON = try row.strictText(13, maximumBytes: 512) else { throw NativeTaskCapabilityError.integrityFailure }
+                let limits = try JSONDecoder().decode(NativeTaskSourceLimits.self, from: Data(limitsJSON.utf8))
+                guard try ForgeJSONCanonicalizationV1.data(from: limits.wireObject) == Data(limitsJSON.utf8) else { throw NativeTaskCapabilityError.integrityFailure }
+                let verifier = try row.strictText(6, maximumBytes: 64), revoked = try row.strictText(16, maximumBytes: 20)
+                guard (state == "active") == (verifier != nil), (state == "revoked") == (revoked != nil) else { throw NativeTaskCapabilityError.integrityFailure }
+                if let verifier { _ = try NativeTaskValue.sha(verifier) }; if let revoked { _ = try NativeTaskValue.date(revoked) }
+                return .init(capabilityID: try NativeTaskValue.uuid(row.strictText(0, maximumBytes: 36)),
+                    taskID: try NativeTaskValue.uuid(row.strictText(1, maximumBytes: 36)),
+                    projectID: ProjectID(try NativeTaskValue.uuid(row.strictText(2, maximumBytes: 36))), generation: .init(UInt64(row.int64(3))),
+                    epoch: row.int64(4), state: state, verifierSHA256: verifier,
+                    callerBindingID: try NativeTaskValue.uuid(row.strictText(7, maximumBytes: 36)),
+                    sourceBindingID: try NativeTaskValue.uuid(row.strictText(8, maximumBytes: 36)),
+                    approvalSHA256: try NativeTaskValue.sha(row.strictText(9, maximumBytes: 64)),
+                    scopeSHA256: try NativeTaskValue.sha(row.strictText(10, maximumBytes: 64)),
+                    authorizationSHA256: try NativeTaskValue.sha(row.strictText(11, maximumBytes: 64)),
+                    documentSHA256: try NativeTaskValue.sha(row.strictText(12, maximumBytes: 64)), limits: limits,
+                    expiresAt: try NativeTaskValue.date(row.strictText(14, maximumBytes: 20)),
+                    issuedAt: try NativeTaskValue.date(row.strictText(15, maximumBytes: 20)), revokedAt: revoked)
+            }
+    }
+
+    private func authenticateNativeTaskCapabilityUnlocked(_ credential: NativeTaskCapabilityCredential,
+        connection: ControlPlaneSQLiteConnection) throws -> AuthenticatedContinuityTaskAttachment {
+        // Authenticate only bounded verifier metadata before decoding any task or capability body.
+        let metadata = try connection.first("SELECT epoch,state,verifier_sha256 FROM native_task_capabilities WHERE capability_id=?",
+            bindings: [.text(credential.capabilityID.uuidString.lowercased())]) {
+                ($0.int64(0), try? $0.strictText(1, maximumBytes: 16), try? $0.strictText(2, maximumBytes: 64))
+            }
+        let expected = Array((metadata?.2 ?? String(repeating: "0", count: 64)).utf8)
+        let actual = Array(credential.verifier.sha256.utf8)
+        var difference: UInt8 = 0
+        for index in 0..<64 { difference |= actual[index] ^ (index < expected.count ? expected[index] : 0) }
+        guard difference == 0, expected.count == 64, metadata?.0 == credential.epoch, metadata?.1 == "active",
+              let stored = try nativeCapabilityUnlocked(credential.capabilityID, connection: connection),
+              stored.expiresAt > ISO8601.string(from: clock.now()) else { throw NativeTaskCapabilityError.credentialRejected }
+        let (task, caller) = try validateNativeCapabilityOwnerUnlocked(stored, taskID: stored.taskID,
+            projectID: stored.projectID, generation: stored.generation, connection: connection)
+        let context = caller.invocationContext(clientID: ClientID(caller.owner.id))
+        let correlation = try VerifiedContinuityTaskCorrelation.nativeCapabilityResult(record: task, caller: caller,
+            context: context, credential: credential)
+        return .init(descriptor: try stored.descriptor(now: clock.now()), setup: .init(record: task, correlation: correlation), sourceLimits: stored.limits)
+    }
+
+    private func validateNativeCapabilityOwnerUnlocked(_ c: StoredNativeCapability, taskID: UUID, projectID: ProjectID,
+        generation: ProjectGeneration, connection: ControlPlaneSQLiteConnection) throws -> (ContinuityTaskAuthorizationRecord, ProjectContextBinding) {
+        guard c.taskID == taskID, c.projectID == projectID, c.generation == generation else { throw NativeTaskCapabilityError.credentialRejected }
+        _ = try requiredActiveProjectUnlocked(projectID, generation: generation, connection: connection)
+        guard let origin = try connection.first("""
+            SELECT caller_binding_id,owner_kind,owner_id,scope_sha256,invalidated
+            FROM continuity_source_dispatch_origins WHERE task_id=?
+            """, bindings: [.text(taskID.uuidString.lowercased())], map: {
+                (try $0.strictText(0, maximumBytes: 36), try $0.strictText(1, maximumBytes: 32),
+                 try $0.strictText(2, maximumBytes: 512), try $0.strictText(3, maximumBytes: 64), $0.int64(4))
+            }), origin.0 == c.callerBindingID.uuidString.lowercased(), origin.1 == "mcp_client", origin.3 == c.scopeSHA256,
+            origin.4 == 0, let ownerID = origin.2,
+            let caller = try bindingUnlocked(owner: .init(kind: .mcpClient, id: ownerID), includeInactive: false, connection: connection),
+            caller.bindingID == c.callerBindingID, caller.projectID == projectID, caller.projectGeneration == generation, caller.runID == nil,
+            JSONSupport.sha256Hex(Data(try Self.scopeJSON(caller.authorizationScope).utf8)) == c.scopeSHA256,
+            caller.authorizationScope.allowedTools == ["fs_read"], caller.authorizationScope.writableRoots.isEmpty,
+            !caller.authorizationScope.networkAllowed,
+            try connection.scalarInt("""
+                SELECT COUNT(*) FROM continuity_task_authorizations WHERE task_id=? AND project_id=? AND project_generation=?
+                    AND source_binding_id=? AND assignment_sha256=? AND authorization_sha256=?
+                """, bindings: [.text(taskID.uuidString.lowercased()), .text(projectID.description), .int64(try Self.sqliteGeneration(generation)),
+                    .text(c.sourceBindingID.uuidString.lowercased()), .text(c.approvalSHA256), .text(c.authorizationSHA256)]) == 1 else {
+            throw NativeTaskCapabilityError.credentialRejected
+        }
+        guard let task = try continuityTaskUnlocked(taskID, connection: connection) else { throw NativeTaskCapabilityError.credentialRejected }
+        let current = try validatedContinuityTaskUnlocked(task.authorization, allowTerminalRun: true, connection: connection)
+        guard current.assignment.documentSHA256 == c.documentSHA256, current.authorization.authorizationScope == caller.authorizationScope else {
+            throw NativeTaskCapabilityError.integrityFailure
+        }
+        return (current, caller)
+    }
+
+    private func requireNativeCorrelationUnlocked(_ correlation: VerifiedContinuityTaskCorrelation,
+        connection: ControlPlaneSQLiteConnection) throws {
+        guard let credential = correlation.nativeCredential else { return }
+        let live = try authenticateNativeTaskCapabilityUnlocked(credential, connection: connection).setup.correlation
+        guard live.taskID == correlation.taskID, live.callerBindingID == correlation.callerBindingID,
+              live.callerOwner == correlation.callerOwner, live.callerContext == correlation.callerContext,
+              live.sourceBindingID == correlation.sourceBindingID, live.authorizationSHA256 == correlation.authorizationSHA256 else {
+            throw NativeTaskCapabilityError.credentialRejected
+        }
+    }
+
+    private func validateNativeExpiry(_ expiry: String) throws {
+        _ = try NativeTaskValue.date(expiry)
+        guard let date = ISO8601DateFormatter().date(from: expiry), date > clock.now(), date.timeIntervalSince(clock.now()) <= 604_800 else {
+            throw NativeTaskCapabilityError.invalidRequest("expires_at")
+        }
+    }
+
+    private func requireNativeCommandCapacityUnlocked(_ id: UUID, connection: ControlPlaneSQLiteConnection) throws {
+        guard try connection.scalarInt("SELECT COUNT(*) FROM native_task_commands") < 4_096,
+              try connection.scalarInt("SELECT COUNT(*) FROM native_task_commands WHERE capability_id=?", bindings: [.text(id.uuidString.lowercased())]) < 64 else {
+            throw NativeTaskCapabilityError.capacityExceeded
+        }
+    }
+    private func storeNativeCommandUnlocked(_ receipt: NativeTaskCapabilityCommandReceipt, connection: ControlPlaneSQLiteConnection) throws {
+        try requireNativeCommandCapacityUnlocked(receipt.capabilityID, connection: connection)
+        try connection.execute("INSERT INTO native_task_commands(request_id,capability_id,request_sha256,receipt_json,receipt_sha256) VALUES(?,?,?,?,?)",
+            bindings: [.text(receipt.requestID.uuidString.lowercased()), .text(receipt.capabilityID.uuidString.lowercased()),
+                .text(receipt.requestSHA256), .text(String(decoding: receipt.canonicalReceiptJSON, as: UTF8.self)), .text(receipt.receiptSHA256)])
+    }
+    private func nativeCommandReplayUnlocked(requestID: UUID, requestSHA256: String, capability: StoredNativeCapability,
+        connection: ControlPlaneSQLiteConnection) throws -> NativeTaskCapabilityCommandResult? {
+        guard let metadata = try connection.first("SELECT capability_id,request_sha256 FROM native_task_commands WHERE request_id=?",
+            bindings: [.text(requestID.uuidString.lowercased())], map: { (try $0.strictText(0, maximumBytes: 36), try $0.strictText(1, maximumBytes: 64)) }) else { return nil }
+        guard metadata.0 == capability.capabilityID.uuidString.lowercased(), metadata.1 == requestSHA256 else { throw NativeTaskCapabilityError.requestConflict }
+        guard let receipt = try connection.first("SELECT receipt_json,receipt_sha256 FROM native_task_commands WHERE request_id=?",
+            bindings: [.text(requestID.uuidString.lowercased())], map: { row -> NativeTaskCapabilityCommandReceipt in
+                guard let json = try row.strictText(0, maximumBytes: NativeTaskCapabilityCommandReceipt.maximumStoredBytes),
+                      let object = try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any] else { throw NativeTaskCapabilityError.integrityFailure }
+                let receipt = try NativeTaskCapabilityCommandReceipt(arguments: object)
+                guard receipt.canonicalReceiptJSON == Data(json.utf8), receipt.receiptSHA256 == (try row.strictText(1, maximumBytes: 64)),
+                      receipt.requestID == requestID, receipt.requestSHA256 == requestSHA256, receipt.capabilityID == capability.capabilityID,
+                      receipt.taskID == capability.taskID, receipt.approvalSHA256 == capability.approvalSHA256,
+                      receipt.scopeSHA256 == capability.scopeSHA256 else { throw NativeTaskCapabilityError.integrityFailure }
+                return receipt
+            }) else { throw NativeTaskCapabilityError.integrityFailure }
+        return .init(receipt: receipt, current: try capability.descriptor(now: clock.now()), replayed: true)
+    }
+
+    // MARK: - Bounded native source requests
+
+    func admitContinuitySourceRead(request: NativeSourceReadRequest, correlation: VerifiedContinuityTaskCorrelation,
+        context: ToolInvocationContext, owner: ProjectBindingOwner, policySelection: BudgetPolicySelection,
+        cancellation: ToolCallCancellation? = nil) throws -> NativeSourceReadAdmissionResult {
+        try controlledTransaction(cancellation: cancellation, fullDurability: true) { connection in
+            let attachment = try nativeSourceAttachmentUnlocked(correlation, context: context, owner: owner, connection: connection)
+            let authorization = attachment.setup.record.authorization
+            try requireSourceMutationAdmissionUnlocked(authorization, connection: connection)
+            try ContinuityIngressAcceptanceReceipt.validatePolicy(policySelection, authorization: authorization)
+            let currentTime = ISO8601.string(from: clock.now())
+            if let row = try nativeSourceRowUnlocked(key: request.key, connection: connection) {
+                try validateNativeSourceRow(row, attachment: attachment, method: request.toolName, argumentSHA: request.argumentsSHA256)
+                if row.state == "completed" {
+                    return .completed(try nativeReadReceiptUnlocked(row, limits: attachment.sourceLimits,
+                        authorization: authorization, policy: policySelection, connection: connection))
+                }
+                guard row.deadline > currentTime else { throw NativeTaskCapabilityError.resultExpired }
+                // Only insertion issues an execution owner. A manager may have
+                // multiple live HTTP sessions sharing this durable request key.
+                guard ["admitted","executing"].contains(row.state) else { throw NativeTaskCapabilityError.resultExpired }
+                return .inProgress(deadline: row.deadline)
+            }
+            try nativeSourceCapacityUnlocked(taskID: correlation.taskID, connection: connection)
+            try expireNativeReadPayloadsUnlocked(connection: connection)
+            let charged = try connection.scalarInt("SELECT COUNT(*) FROM native_source_requests WHERE task_id=? AND method='fs_read'",
+                bindings: [.text(correlation.taskID.uuidString.lowercased())])
+            let policy = policySelection.policy.tools
+            guard charged < min(attachment.sourceLimits.maximumCalls, policy.callsPerRun, policy.callsPerSession),
+                  try connection.scalarInt("SELECT COUNT(*) FROM native_source_requests WHERE method='fs_read' AND state IN ('admitted','executing') AND deadline>?",
+                    bindings: [.text(currentTime)]) < 8,
+                  try connection.scalarInt("SELECT COUNT(*) FROM native_source_requests WHERE task_id=? AND method='fs_read' AND state IN ('admitted','executing') AND deadline>?",
+                    bindings: [.text(correlation.taskID.uuidString.lowercased()), .text(currentTime)]) < min(2, policy.maxInFlight) else {
+                throw NativeTaskCapabilityError.budgetExceeded
+            }
+            let expires = try NativeTaskValue.date(attachment.descriptor.expiresAt)
+            let milliseconds = request.effectiveDeadlineMilliseconds(limits: attachment.sourceLimits)
+            try cancellation?.tightenDeadline(milliseconds: milliseconds)
+            let duration = min(TimeInterval(milliseconds) / 1_000, cancellation?.remainingTimeInterval ?? .infinity)
+            let deadline = min(expires, ISO8601.string(from: clock.now().addingTimeInterval(duration)))
+            guard deadline > currentTime else { throw ToolCallDeadlineExceeded() }
+            let id = UUID()
+            try insertNativeSourceRequestUnlocked(id: id, key: request.key, method: request.toolName, argumentsSHA: request.argumentsSHA256,
+                managerID: request.managerInstanceID, attachment: attachment, policy: policySelection, deadline: deadline,
+                chargedCalls: charged + 1, prepared: nil, connection: connection)
+            return .execute(.init(reservationID: id, request: request, correlation: correlation, deadline: deadline, chargedCalls: charged + 1))
+        }
+    }
+
+    func beginContinuitySourceRead(admission: NativeSourceReadAdmission, policySelection: BudgetPolicySelection,
+        cancellation: ToolCallCancellation? = nil) throws {
+        try controlledTransaction(cancellation: cancellation, fullDurability: true) { connection in
+            let attachment = try nativeSourceAttachmentUnlocked(admission.correlation, context: admission.correlation.callerContext,
+                owner: admission.correlation.callerOwner, connection: connection)
+            try requireSourceMutationAdmissionUnlocked(attachment.setup.record.authorization, connection: connection)
+            try ContinuityIngressAcceptanceReceipt.validatePolicy(policySelection, authorization: attachment.setup.record.authorization)
+            let row = try requireNativeReadAdmissionUnlocked(admission, attachment: attachment, connection: connection)
+            let timestamp = ISO8601.string(from: clock.now())
+            guard row.state == "admitted", row.deadline > timestamp,
+                  row.chargedCalls <= min(attachment.sourceLimits.maximumCalls, policySelection.policy.tools.callsPerRun,
+                    policySelection.policy.tools.callsPerSession) else { throw NativeTaskCapabilityError.budgetExceeded }
+            // A lowered policy gates the next dispatch without revoking an
+            // already executing read. Unstarted reservations are not executions;
+            // expired crash records remain charged but cannot consume a live slot.
+            guard try connection.scalarInt("""
+                SELECT COUNT(*) FROM native_source_requests
+                WHERE method='fs_read' AND state='executing' AND deadline>?
+                """, bindings: [.text(timestamp)]) < 8,
+                try connection.scalarInt("""
+                SELECT COUNT(*) FROM native_source_requests
+                WHERE task_id=? AND method='fs_read' AND state='executing' AND deadline>?
+                """, bindings: [.text(row.taskID.uuidString.lowercased()), .text(timestamp)])
+                    < min(2, policySelection.policy.tools.maxInFlight) else {
+                throw NativeTaskCapabilityError.budgetExceeded
+            }
+            guard try connection.execute("UPDATE native_source_requests SET state='executing' WHERE reservation_id=? AND state='admitted'",
+                bindings: [.text(row.id.uuidString.lowercased())]) == 1 else { throw NativeTaskCapabilityError.operationBusy }
+        }
+    }
+
+    func completeContinuitySourceRead(admission: NativeSourceReadAdmission, canonicalToolResultJSON: Data,
+        policySelection: BudgetPolicySelection, cancellation: ToolCallCancellation? = nil) throws -> NativeSourceReadReceipt {
+        // Bound input before parsing or entering the durable transaction.
+        guard !canonicalToolResultJSON.isEmpty, canonicalToolResultJSON.count <= 65_536 else { throw NativeTaskCapabilityError.budgetExceeded }
+        return try controlledTransaction(cancellation: cancellation, fullDurability: true) { connection in
+            let attachment = try nativeSourceAttachmentUnlocked(admission.correlation, context: admission.correlation.callerContext,
+                owner: admission.correlation.callerOwner, connection: connection)
+            try requireSourceMutationAdmissionUnlocked(attachment.setup.record.authorization, connection: connection)
+            let row = try requireNativeReadAdmissionUnlocked(admission, attachment: attachment, connection: connection)
+            let tokens = try nativeReadResultBounds(canonicalToolResultJSON, limits: attachment.sourceLimits,
+                authorization: attachment.setup.record.authorization, policy: policySelection)
+            if row.state == "completed" {
+                let retained = try nativeReadReceiptUnlocked(row, limits: attachment.sourceLimits,
+                    authorization: attachment.setup.record.authorization, policy: policySelection, connection: connection)
+                guard retained.canonicalToolResultJSON == canonicalToolResultJSON else { throw NativeTaskCapabilityError.requestConflict }
+                return retained
+            }
+            guard row.state == "executing", row.deadline > ISO8601.string(from: clock.now()) else { throw NativeTaskCapabilityError.resultExpired }
+            try expireNativeReadPayloadsUnlocked(connection: connection)
+            let bytes = canonicalToolResultJSON.count
+            guard try connection.scalarInt("SELECT COALESCE(SUM(length(CAST(result_json AS BLOB))),0) FROM native_source_requests WHERE method='fs_read'") <= 67_108_864 - bytes,
+                  try connection.scalarInt("SELECT COALESCE(SUM(length(CAST(result_json AS BLOB))),0) FROM native_source_requests WHERE method='fs_read' AND task_id=?",
+                    bindings: [.text(row.taskID.uuidString.lowercased())]) <= 4_194_304 - bytes else { throw NativeTaskCapabilityError.capacityExceeded }
+            let timestamp = ISO8601.string(from: clock.now()), digest = JSONSupport.sha256Hex(canonicalToolResultJSON)
+            try connection.execute("""
+                UPDATE native_source_requests SET state='completed',result_json=?,result_sha256=?,result_tokens=?,completed_at=?,result_expires_at=?
+                WHERE reservation_id=? AND state='executing'
+                """, bindings: [.text(String(decoding: canonicalToolResultJSON, as: UTF8.self)), .text(digest), .int64(Int64(tokens)), .text(timestamp),
+                    .text(ISO8601.string(from: clock.now().addingTimeInterval(3_600))), .text(row.id.uuidString.lowercased())])
+            return .init(reservationID: row.id, key: admission.request.key, taskID: row.taskID, resultSHA256: digest,
+                canonicalToolResultJSON: canonicalToolResultJSON, estimatedResultTokens: tokens, chargedCalls: row.chargedCalls, completedAt: timestamp)
+        }
+    }
+
+    /// Only the opaque existing reservation may be withheld after authority loss.
+    /// This cleanup stores no result and never refunds its durable debit.
+    func finishContinuitySourceReadWithoutDisclosure(admission: NativeSourceReadAdmission,
+        outcome: NativeSourceReadUndisclosedOutcome, cancellation: ToolCallCancellation? = nil) throws {
+        try controlledTransaction(cancellation: cancellation, fullDurability: true) { connection in
+            guard let row = try nativeSourceRowUnlocked(key: admission.request.key, connection: connection),
+                  row.id == admission.reservationID, row.taskID == admission.taskID,
+                  row.managerID == admission.request.managerInstanceID, row.argumentsSHA == admission.request.argumentsSHA256,
+                  row.epoch == admission.correlation.nativeCredential?.epoch,
+                  row.capabilityID == admission.correlation.nativeCredential?.capabilityID else { throw NativeTaskCapabilityError.requestConflict }
+            try connection.execute("UPDATE native_source_requests SET state=? WHERE reservation_id=? AND state IN ('admitted','executing')",
+                bindings: [.text(outcome.rawValue), .text(row.id.uuidString.lowercased())])
+        }
+    }
+
+    func prepareContinuitySourceCommit(request: NativeSourceCommitRequest, correlation: VerifiedContinuityTaskCorrelation,
+        context: ToolInvocationContext, owner: ProjectBindingOwner, policySelection: BudgetPolicySelection,
+        prepare: @Sendable (ContinuityIngressAuthorization) throws -> PreparedContinuitySourceCommit,
+        cancellation: ToolCallCancellation? = nil) throws -> NativeSourceCommitAdmissionResult {
+        try controlledTransaction(cancellation: cancellation, fullDurability: true) { connection in
+            let attachment = try nativeSourceAttachmentUnlocked(correlation, context: context, owner: owner, connection: connection)
+            let authorization = attachment.setup.record.authorization
+            try ContinuityIngressAcceptanceReceipt.validatePolicy(policySelection, authorization: authorization)
+            if let row = try nativeSourceRowUnlocked(key: request.key, connection: connection) {
+                try validateNativeSourceRow(row, attachment: attachment, method: request.method, argumentSHA: request.argumentsSHA256)
+                let (packet, automatic) = try nativePreparedCommitUnlocked(row, authorization: authorization, connection: connection)
+                if row.state == "completed" { return .completed(try nativeCommitResultUnlocked(row, prepared: packet, authorization: authorization, connection: connection)) }
+                guard row.state == "pending" else { throw NativeTaskCapabilityError.requestConflict }
+                return .commit(.init(reservationID: row.id, request: request, correlation: correlation, prepared: packet,
+                    authorization: authorization, automaticHandoffEnabled: automatic))
+            }
+            try requireSourceMutationAdmissionUnlocked(authorization, connection: connection)
+            try nativeSourceCapacityUnlocked(taskID: correlation.taskID, connection: connection)
+            guard try connection.scalarInt("SELECT COUNT(*) FROM native_source_requests WHERE task_id=? AND state='pending'",
+                bindings: [.text(correlation.taskID.uuidString.lowercased())]) == 0 else { throw NativeTaskCapabilityError.operationBusy }
+            guard try connection.scalarInt("SELECT COUNT(*) FROM native_source_requests WHERE method!='fs_read'") < 1_024,
+                  try connection.scalarInt("SELECT COUNT(*) FROM native_source_requests WHERE task_id=? AND method!='fs_read'",
+                    bindings: [.text(correlation.taskID.uuidString.lowercased())]) < 64 else { throw NativeTaskCapabilityError.capacityExceeded }
+            let prepared = try prepare(authorization)
+            guard prepared.finalize == request.finalize else { throw NativeTaskCapabilityError.requestConflict }
+            _ = try PreparedContinuitySourceCommit.storedSnapshot(from: prepared.canonicalPacketJSON)
+            guard try connection.scalarInt("SELECT COALESCE(SUM(length(CAST(prepared_packet_json AS BLOB))),0) FROM native_source_requests")
+                    <= 67_108_864 - prepared.canonicalPacketJSON.count,
+                  try connection.scalarInt("SELECT COALESCE(SUM(length(CAST(prepared_packet_json AS BLOB))),0) FROM native_source_requests WHERE task_id=?",
+                    bindings: [.text(correlation.taskID.uuidString.lowercased())]) <= 4_194_304 - prepared.canonicalPacketJSON.count else {
+                throw NativeTaskCapabilityError.capacityExceeded
+            }
+            try cancellation?.checkCancellation()
+            try requireNativeCorrelationUnlocked(correlation, connection: connection)
+            let id = UUID()
+            try insertNativeSourceRequestUnlocked(id: id, key: request.key, method: request.method, argumentsSHA: request.argumentsSHA256,
+                managerID: request.managerInstanceID, attachment: attachment, policy: policySelection,
+                deadline: attachment.descriptor.expiresAt, chargedCalls: 0, prepared: prepared, connection: connection)
+            return .commit(.init(reservationID: id, request: request, correlation: correlation, prepared: prepared,
+                authorization: authorization, automaticHandoffEnabled: policySelection.policy.automaticHandoffEnabled))
+        }
+    }
+
+    func commitContinuitySourceRequest(admission: NativeSourceCommitAdmission,
+        commit: @Sendable (PreparedContinuitySourceCommit, ContinuityIngressAuthorization, Bool) throws -> ContinuityHandoffCommit,
+        cancellation: ToolCallCancellation? = nil) throws -> ContinuityHandoffCommit {
+        try controlledTransaction(cancellation: cancellation, checkCancellationBeforeCommit: false, fullDurability: true) { connection in
+            let attachment = try nativeSourceAttachmentUnlocked(admission.correlation, context: admission.correlation.callerContext,
+                owner: admission.correlation.callerOwner, connection: connection)
+            guard let row = try nativeSourceRowUnlocked(key: admission.request.key, connection: connection), row.id == admission.reservationID else {
+                throw NativeTaskCapabilityError.requestConflict
+            }
+            try validateNativeSourceRow(row, attachment: attachment, method: admission.request.method, argumentSHA: admission.request.argumentsSHA256)
+            let authorization = attachment.setup.record.authorization
+            let (prepared, automatic) = try nativePreparedCommitUnlocked(row, authorization: authorization, connection: connection)
+            guard admission.authorization == authorization, admission.prepared == prepared, admission.automaticHandoffEnabled == automatic else {
+                throw NativeTaskCapabilityError.requestConflict
+            }
+            if row.state == "completed" { return try nativeCommitResultUnlocked(row, prepared: prepared, authorization: authorization, connection: connection) }
+            guard row.state == "pending" else { throw NativeTaskCapabilityError.requestConflict }
+            // Only this frozen request may pass its own quiescing intent. A
+            // separately accepted source must match these exact immutable bytes.
+            if let fenceOperation = try connection.first("SELECT operation_id FROM continuity_source_task_fences WHERE task_id=?",
+                bindings: [.text(row.taskID.uuidString.lowercased())], map: { try $0.strictText(0, maximumBytes: 36) }) ?? nil {
+                guard let id = UUID(uuidString: fenceOperation), let receipt = try acceptanceForOperationUnlocked(id, connection: connection),
+                      receipt.authorization == authorization, receipt.source.canonicalPacketJSON == prepared.canonicalPacketJSON else {
+                    throw NativeTaskCapabilityError.sourceFenced
+                }
+                try requireContinuityOperationNotCancelledUnlocked(id, connection: connection)
+            }
+            try cancellation?.checkCancellation()
+            let actual = try commit(prepared, authorization, automatic)
+            guard actual.revision.authorization == authorization, actual.revision.canonicalPacketJSON == prepared.canonicalPacketJSON,
+                  actual.revision.identity.packetSHA256 == prepared.packetSHA256, actual.revision.resumeReady == prepared.finalize else {
+                throw NativeTaskCapabilityError.integrityFailure
+            }
+            let bytes = try NativeSourceCommitEvidence.encode(actual)
+            _ = try NativeSourceCommitEvidence.decode(bytes, prepared: prepared, authorization: authorization)
+            // The source store has committed. Finish the CP receipt despite a
+            // late transport cancellation; failed CP COMMIT retains exact intent.
+            connection.finishRequestCancellationWindow()
+            try connection.execute("""
+                UPDATE native_source_requests SET state='completed',result_json=?,result_sha256=?,completed_at=?
+                WHERE reservation_id=? AND state='pending'
+                """, bindings: [.text(String(decoding: bytes, as: UTF8.self)), .text(JSONSupport.sha256Hex(bytes)),
+                    .text(ISO8601.string(from: clock.now())), .text(row.id.uuidString.lowercased())])
+            return actual
+        }
+    }
+
+    func pendingNativeSourceCommits(afterRowID: Int64? = nil, limit: Int = 16,
+        cancellation: ToolCallCancellation? = nil) throws -> [NativePendingSourceCommitReference] {
+        guard (1...32).contains(limit), (afterRowID ?? 0) >= 0 else { throw NativeTaskCapabilityError.invalidRequest("cursor") }
+        return try controlledTransaction(cancellation: cancellation) { connection in
+            let rows = try connection.all("""
+                SELECT rowid,reservation_id,task_id,capability_id FROM native_source_requests WHERE rowid>? AND state='pending'
+                    AND recovery_attempts<8 AND quarantined=0 AND deadline>? AND (retry_at IS NULL OR retry_at<=?) ORDER BY rowid LIMIT ?
+                """, bindings: [.int64(afterRowID ?? 0), .text(ISO8601.string(from: clock.now())),
+                    .text(ISO8601.string(from: clock.now())), .int64(Int64(limit))]) { row -> (Int64, NativePendingSourceCommitReference?) in
+                    let reference = try? NativePendingSourceCommitReference(rowID: row.int64(0),
+                        reservationID: NativeTaskValue.uuid(row.strictText(1, maximumBytes: 36)),
+                        taskID: NativeTaskValue.uuid(row.strictText(2, maximumBytes: 36)),
+                        capabilityID: NativeTaskValue.uuid(row.strictText(3, maximumBytes: 36)))
+                    return (row.int64(0), reference)
+                }
+            for (id, reference) in rows where reference == nil {
+                try connection.execute("UPDATE native_source_requests SET quarantined=1,error_code='invalid_metadata' WHERE rowid=?", bindings: [.int64(id)])
+            }
+            return rows.compactMap(\.1)
+        }
+    }
+
+    func reconcileNativeSourceCommit(reference: NativePendingSourceCommitReference,
+        commit: @Sendable (PreparedContinuitySourceCommit, ContinuityIngressAuthorization, Bool) throws -> ContinuityHandoffCommit,
+        cancellation: ToolCallCancellation? = nil) throws -> ContinuityHandoffCommit? {
+        try controlledTransaction(cancellation: cancellation, checkCancellationBeforeCommit: false, fullDurability: true) { connection in
+            guard let key = try nativePendingCommitKeyUnlocked(reference, connection: connection),
+                  let row = try nativeSourceRowUnlocked(key: key, connection: connection) else { return nil }
+            guard row.state == "pending", row.id == reference.reservationID, row.taskID == reference.taskID,
+                  row.capabilityID == reference.capabilityID, row.deadline > ISO8601.string(from: clock.now()),
+                  let capability = try nativeCapabilityUnlocked(row.capabilityID, connection: connection),
+                  capability.epoch == row.epoch, capability.state == "active", capability.expiresAt > ISO8601.string(from: clock.now()) else {
+                throw NativeTaskCapabilityError.credentialRejected
+            }
+            let (task, _) = try validateNativeCapabilityOwnerUnlocked(capability, taskID: row.taskID, projectID: capability.projectID,
+                generation: capability.generation, connection: connection)
+            let (prepared, automatic) = try nativePreparedCommitUnlocked(row, authorization: task.authorization, connection: connection)
+            if let idText = try connection.first("SELECT operation_id FROM continuity_source_task_fences WHERE task_id=?",
+                bindings: [.text(row.taskID.uuidString.lowercased())], map: { try $0.strictText(0, maximumBytes: 36) }) ?? nil {
+                guard let operationID = UUID(uuidString: idText), let receipt = try acceptanceForOperationUnlocked(operationID, connection: connection),
+                      receipt.authorization == task.authorization, receipt.source.canonicalPacketJSON == prepared.canonicalPacketJSON else {
+                    throw NativeTaskCapabilityError.sourceFenced
+                }
+                try requireContinuityOperationNotCancelledUnlocked(operationID, connection: connection)
+            }
+            try cancellation?.checkCancellation()
+            let actual = try commit(prepared, task.authorization, automatic)
+            guard actual.revision.authorization == task.authorization, actual.revision.canonicalPacketJSON == prepared.canonicalPacketJSON,
+                  actual.revision.identity.packetSHA256 == prepared.packetSHA256, actual.revision.resumeReady == prepared.finalize else {
+                throw NativeTaskCapabilityError.integrityFailure
+            }
+            let data = try NativeSourceCommitEvidence.encode(actual)
+            _ = try NativeSourceCommitEvidence.decode(data, prepared: prepared, authorization: task.authorization)
+            connection.finishRequestCancellationWindow()
+            try connection.execute("""
+                UPDATE native_source_requests SET state='completed',result_json=?,result_sha256=?,completed_at=?,retry_at=NULL,error_code=NULL
+                WHERE reservation_id=? AND state='pending'
+                """, bindings: [.text(String(decoding: data, as: UTF8.self)), .text(JSONSupport.sha256Hex(data)),
+                    .text(ISO8601.string(from: clock.now())), .text(row.id.uuidString.lowercased())])
+            return actual
+        }
+    }
+
+    func deferNativeSourceCommit(reference: NativePendingSourceCommitReference, cancellation: ToolCallCancellation? = nil) throws {
+        try controlledTransaction(cancellation: cancellation, fullDurability: true) { connection in
+            guard try nativePendingCommitKeyUnlocked(reference, connection: connection) != nil,
+                  let attempts = try connection.first("SELECT recovery_attempts FROM native_source_requests WHERE reservation_id=? AND state='pending'",
+                    bindings: [.text(reference.reservationID.uuidString.lowercased())], map: { $0.int64(0) }), (0..<8).contains(attempts) else { return }
+            let next = attempts + 1, delay = min(300, 5 * (1 << Int(attempts)))
+            try connection.execute("""
+                UPDATE native_source_requests SET recovery_attempts=?,retry_at=?,error_code='reconciliation_required',quarantined=?
+                WHERE reservation_id=? AND state='pending' AND recovery_attempts=?
+                """, bindings: [.int64(next), .text(ISO8601.string(from: clock.now().addingTimeInterval(TimeInterval(delay)))),
+                    .int64(next == 8 ? 1 : 0), .text(reference.reservationID.uuidString.lowercased()), .int64(attempts)])
+        }
+    }
+
+    private func nativePendingCommitKeyUnlocked(_ reference: NativePendingSourceCommitReference,
+        connection: ControlPlaneSQLiteConnection) throws -> NativeSourceRequestKey? {
+        try connection.first("""
+            SELECT session_id,request_id_sha256 FROM native_source_requests
+            WHERE rowid=? AND reservation_id=? AND task_id=? AND capability_id=? AND method IN ('session_checkpoint','session_handoff')
+                AND state='pending' AND quarantined=0 AND recovery_attempts<8 AND (retry_at IS NULL OR retry_at<=?)
+            """, bindings: [.int64(reference.rowID), .text(reference.reservationID.uuidString.lowercased()),
+                .text(reference.taskID.uuidString.lowercased()), .text(reference.capabilityID.uuidString.lowercased()),
+                .text(ISO8601.string(from: clock.now()))]) { row in
+                try .init(sessionID: NativeTaskValue.uuid(row.strictText(0, maximumBytes: 36)),
+                    requestIDSHA256: NativeTaskValue.sha(row.strictText(1, maximumBytes: 64)))
+            }
+    }
+
+    private func bindNativeSourceOffsetUnlocked(receipt: ContinuityIngressAcceptanceReceipt,
+        connection: ControlPlaneSQLiteConnection) throws {
+        let taskID = receipt.authorization.taskID.uuidString.lowercased()
+        guard try connection.scalarInt("SELECT COUNT(*) FROM native_task_capabilities WHERE task_id=?", bindings: [.text(taskID)]) == 1 else { return }
+        let charged = try connection.scalarInt("SELECT COUNT(*) FROM native_source_requests WHERE task_id=? AND method='fs_read'", bindings: [.text(taskID)])
+        if let prior = try nativeRunSourceOffsetUnlocked(receipt.runID, allowMissing: true, connection: connection) {
+            guard prior == charged else { throw NativeTaskCapabilityError.integrityFailure }; return
+        }
+        try connection.execute("""
+            INSERT INTO native_source_run_offsets(task_id,run_id,source_binding_id,operation_id,receipt_sha256,charged_calls,recorded_at)
+            VALUES(?,?,?,?,?,?,?)
+            """, bindings: [.text(taskID), .text(receipt.runID.description), .text(receipt.authorization.sourceBindingID.uuidString.lowercased()),
+                .text(receipt.operationID.uuidString.lowercased()), .text(receipt.receiptSHA256), .int64(Int64(charged)), .text(receipt.acceptedAt)])
+    }
+
+    private func nativeRunSourceOffsetUnlocked(_ runID: RunID, allowMissing: Bool = false, connection: ControlPlaneSQLiteConnection) throws -> Int? {
+        guard let offset = try connection.first("SELECT task_id,source_binding_id,operation_id,receipt_sha256,charged_calls FROM native_source_run_offsets WHERE run_id=?",
+            bindings: [.text(runID.description)], map: {
+                (try $0.strictText(0, maximumBytes: 36), try $0.strictText(1, maximumBytes: 36),
+                 try $0.strictText(2, maximumBytes: 36), try $0.strictText(3, maximumBytes: 64), $0.int64(4))
+            }) else {
+            guard try allowMissing || (connection.scalarInt("""
+                SELECT COUNT(*) FROM continuity_task_authorizations t JOIN native_task_capabilities c ON c.task_id=t.task_id
+                WHERE t.run_id=?
+                """, bindings: [.text(runID.description)])) == 0 else { throw NativeTaskCapabilityError.integrityFailure }
+            return nil
+        }
+        guard let task = offset.0, let operation = offset.2.flatMap(UUID.init(uuidString:)), (0...64).contains(offset.4),
+              let receipt = try acceptanceForOperationUnlocked(operation, connection: connection), receipt.runID == runID,
+              receipt.authorization.taskID.uuidString.lowercased() == task,
+              receipt.authorization.sourceBindingID.uuidString.lowercased() == offset.1, receipt.receiptSHA256 == offset.3,
+              try connection.scalarInt("SELECT COUNT(*) FROM native_source_requests WHERE task_id=? AND method='fs_read'", bindings: [.text(task)]) == Int(offset.4) else {
+            throw NativeTaskCapabilityError.integrityFailure
+        }
+        return Int(offset.4)
+    }
+
+    private func requireNativeManagedToolQuotaUnlocked(intent: ToolInvocationIntent, offset: Int, policy: BudgetToolPolicy,
+        alreadyReserved: Bool = false,
+        connection: ControlPlaneSQLiteConnection) throws {
+        let checks: [(String, [ControlPlaneSQLiteBinding], Int)] = [
+            ("SELECT COUNT(*) FROM tool_invocations WHERE run_id=?", [.text(intent.runID.description)], max(0, policy.callsPerRun - offset)),
+            ("SELECT COUNT(*) FROM tool_invocations WHERE session_id=?", [.text(intent.sessionID)], policy.callsPerSession),
+            ("SELECT COUNT(*) FROM tool_invocations WHERE turn_id=?", [.text(intent.turnID.uuidString.lowercased())], policy.callsPerTurn),
+            ("SELECT COUNT(*) FROM tool_invocations WHERE run_id=? AND state IN ('intent','executing','ambiguous')", [.text(intent.runID.description)], policy.maxInFlight),
+        ]
+        for (sql, bindings, maximum) in checks {
+            let count = try connection.scalarInt(sql, bindings: bindings)
+            guard alreadyReserved ? count <= maximum : count < maximum else { throw NativeTaskCapabilityError.budgetExceeded }
+        }
+    }
+
+    private static func nativeRetainedToolIntent(_ invocation: ToolInvocationRecord) -> ToolInvocationIntent {
+        .init(invocationID: invocation.invocationID, turnID: invocation.turnID, runID: invocation.runID,
+            sessionID: invocation.sessionID, projectID: invocation.projectID, projectGeneration: invocation.projectGeneration,
+            providerCallID: invocation.providerCallID, toolName: invocation.toolName, replayClass: invocation.replayClass,
+            idempotencyKey: invocation.idempotencyKey, argumentsSHA256: invocation.argumentsSHA256,
+            reconciliationDescriptor: invocation.reconciliationDescriptor)
+    }
+
+    private func nativeManagedResultBounds(_ data: Data, policy: BudgetToolPolicy) throws {
+        guard !data.isEmpty, data.count <= min(65_536, policy.maxResultBytes),
+              try ContextBudgetMath.estimateTokens(serializedBytes: data.count, policy: ContextBudgetPolicy()) <= policy.maxRetainedResultTokens else {
+            throw NativeTaskCapabilityError.budgetExceeded
+        }
+    }
+
+    private struct NativeSourceRow {
+        let id: UUID, taskID: UUID, capabilityID: UUID, epoch: Int64, key: NativeSourceRequestKey
+        let method: String, argumentsSHA: String, managerID: UUID, state: String, deadline: String, chargedCalls: Int
+    }
+    private func nativeSourceRowUnlocked(key: NativeSourceRequestKey, connection: ControlPlaneSQLiteConnection) throws -> NativeSourceRow? {
+        try connection.first("""
+            SELECT reservation_id,task_id,capability_id,epoch,method,arguments_sha256,manager_instance_id,state,deadline,charged_calls
+            FROM native_source_requests WHERE session_id=? AND request_id_sha256=?
+            """, bindings: [.text(key.sessionID.uuidString.lowercased()), .text(key.requestIDSHA256)]) { row in
+                guard row.int64(3) > 0, let method = try row.strictText(4, maximumBytes: 32),
+                      let state = try row.strictText(7, maximumBytes: 32), (0...64).contains(row.int64(9)) else { throw NativeTaskCapabilityError.integrityFailure }
+                return .init(id: try NativeTaskValue.uuid(row.strictText(0, maximumBytes: 36)), taskID: try NativeTaskValue.uuid(row.strictText(1, maximumBytes: 36)),
+                    capabilityID: try NativeTaskValue.uuid(row.strictText(2, maximumBytes: 36)), epoch: row.int64(3), key: key, method: method,
+                    argumentsSHA: try NativeTaskValue.sha(row.strictText(5, maximumBytes: 64)), managerID: try NativeTaskValue.uuid(row.strictText(6, maximumBytes: 36)),
+                    state: state, deadline: try NativeTaskValue.date(row.strictText(8, maximumBytes: 20)), chargedCalls: Int(row.int64(9)))
+            }
+    }
+    private func validateNativeSourceRow(_ row: NativeSourceRow, attachment: AuthenticatedContinuityTaskAttachment,
+        method: String, argumentSHA: String) throws {
+        guard row.taskID == attachment.descriptor.taskID, row.capabilityID == attachment.descriptor.capabilityID,
+              row.epoch == attachment.descriptor.epoch, row.method == method, row.argumentsSHA == argumentSHA else {
+            throw NativeTaskCapabilityError.requestConflict
+        }
+    }
+    private func nativeSourceAttachmentUnlocked(_ correlation: VerifiedContinuityTaskCorrelation,
+        context: ToolInvocationContext, owner: ProjectBindingOwner, connection: ControlPlaneSQLiteConnection) throws -> AuthenticatedContinuityTaskAttachment {
+        guard let credential = correlation.nativeCredential, correlation.callerContext == context, correlation.callerOwner == owner else {
+            throw NativeTaskCapabilityError.credentialRejected
+        }
+        let attachment = try authenticateNativeTaskCapabilityUnlocked(credential, connection: connection)
+        let live = attachment.setup.correlation
+        guard live.taskID == correlation.taskID, live.callerBindingID == correlation.callerBindingID,
+              live.authorizationSHA256 == correlation.authorizationSHA256, live.sourceBindingID == correlation.sourceBindingID,
+              attachment.context == context, attachment.owner == owner else { throw NativeTaskCapabilityError.credentialRejected }
+        return attachment
+    }
+    private func nativeSourceCapacityUnlocked(taskID: UUID, connection: ControlPlaneSQLiteConnection) throws {
+        guard try connection.scalarInt("SELECT COUNT(*) FROM native_source_requests") < 16_384,
+              try connection.scalarInt("SELECT COUNT(*) FROM native_source_requests WHERE task_id=?", bindings: [.text(taskID.uuidString.lowercased())]) < 512 else {
+            throw NativeTaskCapabilityError.capacityExceeded
+        }
+    }
+    private func insertNativeSourceRequestUnlocked(id: UUID, key: NativeSourceRequestKey, method: String, argumentsSHA: String,
+        managerID: UUID, attachment: AuthenticatedContinuityTaskAttachment, policy: BudgetPolicySelection,
+        deadline: String, chargedCalls: Int, prepared: PreparedContinuitySourceCommit?, connection: ControlPlaneSQLiteConnection) throws {
+        let policyData = try ForgeJSONCanonicalizationV1.data(from: JSONSerialization.jsonObject(with: JSONEncoder().encode(policy)))
+        try connection.execute("""
+            INSERT INTO native_source_requests(reservation_id,task_id,capability_id,epoch,session_id,request_id_sha256,method,arguments_sha256,
+                manager_instance_id,state,admitted_at,deadline,charged_calls,policy_json,prepared_packet_json,packet_sha256,authorization_json,automatic_enabled)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """, bindings: [.text(id.uuidString.lowercased()), .text(attachment.descriptor.taskID.uuidString.lowercased()),
+                .text(attachment.descriptor.capabilityID.uuidString.lowercased()), .int64(attachment.descriptor.epoch),
+                .text(key.sessionID.uuidString.lowercased()), .text(key.requestIDSHA256), .text(method), .text(argumentsSHA), .text(managerID.uuidString.lowercased()),
+                .text(prepared == nil ? "admitted" : "pending"), .text(ISO8601.string(from: clock.now())), .text(deadline), .int64(Int64(chargedCalls)),
+                .text(String(decoding: policyData, as: UTF8.self)), .optionalText(prepared.map { String(decoding: $0.canonicalPacketJSON, as: UTF8.self) }),
+                .optionalText(prepared?.packetSHA256), .optionalText(try prepared.map { _ in String(decoding: try attachment.setup.record.authorization.encodedJSON(), as: UTF8.self) }),
+                prepared == nil ? .optionalInt64(nil) : .int64(policy.policy.automaticHandoffEnabled ? 1 : 0)])
+    }
+    private func requireNativeReadAdmissionUnlocked(_ admission: NativeSourceReadAdmission, attachment: AuthenticatedContinuityTaskAttachment,
+        connection: ControlPlaneSQLiteConnection) throws -> NativeSourceRow {
+        guard let row = try nativeSourceRowUnlocked(key: admission.request.key, connection: connection),
+              row.id == admission.reservationID, row.managerID == admission.request.managerInstanceID,
+              row.deadline == admission.deadline, row.chargedCalls == admission.chargedCalls else { throw NativeTaskCapabilityError.requestConflict }
+        try validateNativeSourceRow(row, attachment: attachment, method: "fs_read", argumentSHA: admission.request.argumentsSHA256)
+        return row
+    }
+    private func nativeReadResultBounds(_ bytes: Data, limits: NativeTaskSourceLimits,
+        authorization: ContinuityIngressAuthorization, policy: BudgetPolicySelection) throws -> Int {
+        try ContinuityIngressAcceptanceReceipt.validatePolicy(policy, authorization: authorization)
+        guard bytes.count <= min(65_536, limits.maximumResultBytes, authorization.authorizationScope.maximumInlineOutputBytes, policy.policy.tools.maxResultBytes),
+              let o = try JSONSerialization.jsonObject(with: bytes) as? [String: Any], Set(o.keys) == ["ok","is_error","payload"],
+              let ok = o["ok"] as? Bool, let error = o["is_error"] as? Bool, ok != error,
+              o["payload"] is [String: Any], try ForgeJSONCanonicalizationV1.data(from: o) == bytes else { throw NativeTaskCapabilityError.budgetExceeded }
+        let tokens = try ContextBudgetMath.estimateTokens(serializedBytes: bytes.count, policy: ContextBudgetPolicy())
+        guard tokens <= policy.policy.tools.maxRetainedResultTokens else { throw NativeTaskCapabilityError.budgetExceeded }
+        return tokens
+    }
+    private func nativeReadReceiptUnlocked(_ row: NativeSourceRow, limits: NativeTaskSourceLimits,
+        authorization: ContinuityIngressAuthorization, policy: BudgetPolicySelection, connection: ControlPlaneSQLiteConnection) throws -> NativeSourceReadReceipt {
+        guard let receipt = try connection.first("SELECT result_json,result_sha256,result_tokens,completed_at,result_expires_at FROM native_source_requests WHERE reservation_id=?",
+            bindings: [.text(row.id.uuidString.lowercased())], map: { r -> NativeSourceReadReceipt in
+                guard let expiry = try r.strictText(4, maximumBytes: 20), expiry > ISO8601.string(from: clock.now()),
+                      let json = try r.strictText(0, maximumBytes: 65_536) else { throw NativeTaskCapabilityError.resultExpired }
+                let data = Data(json.utf8), tokens = try nativeReadResultBounds(Data(json.utf8), limits: limits, authorization: authorization, policy: policy)
+                guard JSONSupport.sha256Hex(data) == (try r.strictText(1, maximumBytes: 64)), Int64(tokens) == r.int64(2) else { throw NativeTaskCapabilityError.integrityFailure }
+                return .init(reservationID: row.id, key: row.key, taskID: row.taskID, resultSHA256: JSONSupport.sha256Hex(data), canonicalToolResultJSON: data,
+                    estimatedResultTokens: tokens, chargedCalls: row.chargedCalls, completedAt: try NativeTaskValue.date(r.strictText(3, maximumBytes: 20)))
+            }) else { throw NativeTaskCapabilityError.integrityFailure }
+        return receipt
+    }
+    private func expireNativeReadPayloadsUnlocked(connection: ControlPlaneSQLiteConnection) throws {
+        try connection.execute("""
+            UPDATE native_source_requests SET result_json=NULL WHERE rowid IN
+                (SELECT rowid FROM native_source_requests WHERE method='fs_read' AND result_json IS NOT NULL AND result_expires_at<=? LIMIT 32)
+            """, bindings: [.text(ISO8601.string(from: clock.now()))])
+    }
+    private func nativePreparedCommitUnlocked(_ row: NativeSourceRow, authorization: ContinuityIngressAuthorization,
+        connection: ControlPlaneSQLiteConnection) throws -> (PreparedContinuitySourceCommit, Bool) {
+        guard let value = try connection.first("SELECT prepared_packet_json,packet_sha256,authorization_json,automatic_enabled,policy_json FROM native_source_requests WHERE reservation_id=?",
+            bindings: [.text(row.id.uuidString.lowercased())], map: { r -> (PreparedContinuitySourceCommit, Bool) in
+                guard let json = try r.strictText(0, maximumBytes: 262_144),
+                      let authority = try r.strictText(2, maximumBytes: 32_768), Data(authority.utf8) == (try authorization.encodedJSON()),
+                      let policyJSON = try r.strictText(4, maximumBytes: 32_768), (0...1).contains(r.int64(3)) else { throw NativeTaskCapabilityError.integrityFailure }
+                let policy = try JSONDecoder().decode(BudgetPolicySelection.self, from: Data(policyJSON.utf8))
+                try ContinuityIngressAcceptanceReceipt.validatePolicy(policy, authorization: authorization)
+                guard policy.policy.automaticHandoffEnabled == (r.int64(3) == 1) else { throw NativeTaskCapabilityError.integrityFailure }
+                let packet = try PreparedContinuitySourceCommit.storedSnapshot(from: Data(json.utf8))
+                guard packet.packetSHA256 == (try r.strictText(1, maximumBytes: 64)), packet.finalize == (row.method == "session_handoff") else { throw NativeTaskCapabilityError.integrityFailure }
+                return (packet, r.int64(3) == 1)
+            }) else { throw NativeTaskCapabilityError.integrityFailure }
+        return value
+    }
+    private func nativeCommitResultUnlocked(_ row: NativeSourceRow, prepared: PreparedContinuitySourceCommit,
+        authorization: ContinuityIngressAuthorization, connection: ControlPlaneSQLiteConnection) throws -> ContinuityHandoffCommit {
+        guard let result = try connection.first("SELECT result_json,result_sha256 FROM native_source_requests WHERE reservation_id=?",
+            bindings: [.text(row.id.uuidString.lowercased())], map: { r -> ContinuityHandoffCommit in
+                guard let json = try r.strictText(0, maximumBytes: NativeSourceCommitEvidence.maximumBytes),
+                      JSONSupport.sha256Hex(Data(json.utf8)) == (try r.strictText(1, maximumBytes: 64)) else { throw NativeTaskCapabilityError.integrityFailure }
+                return try NativeSourceCommitEvidence.decode(Data(json.utf8), prepared: prepared, authorization: authorization)
+            }) else { throw NativeTaskCapabilityError.integrityFailure }
+        return result
+    }
+
     // MARK: - Native-approved continuity task authority
 
     /// Native authenticated setup only. A model's goal, assignment identifier,
@@ -1189,9 +1955,17 @@ public actor ProjectControlPlaneRepository {
         callerContext: ToolInvocationContext, callerOwner: ProjectBindingOwner,
         cancellation: ToolCallCancellation? = nil
     ) throws -> AuthorizedContinuityTaskSetup {
+        try controlledTransaction(cancellation: cancellation) { connection in
+            try authorizeContinuityTaskUnlocked(taskID: taskID, projectID: projectID, expectedGeneration: expectedGeneration,
+                approvedAssignment: approvedAssignment, callerContext: callerContext, callerOwner: callerOwner, connection: connection)
+        }
+    }
+
+    private func authorizeContinuityTaskUnlocked(taskID: UUID, projectID: ProjectID, expectedGeneration: ProjectGeneration,
+        approvedAssignment: ContinuityTaskAssignment, callerContext: ToolInvocationContext, callerOwner: ProjectBindingOwner,
+        connection: ControlPlaneSQLiteConnection) throws -> AuthorizedContinuityTaskSetup {
         let assignmentData = try approvedAssignment.storedJSON()
         let timestamp = ISO8601.string(from: clock.now())
-        return try controlledTransaction(cancellation: cancellation) { connection in
             let project = try requiredActiveProjectUnlocked(projectID, generation: expectedGeneration, connection: connection)
             let caller = try validatedContinuityCallerUnlocked(context: callerContext, owner: callerOwner, connection: connection)
             guard caller.projectID == projectID, caller.projectGeneration == expectedGeneration,
@@ -1256,7 +2030,6 @@ public actor ProjectControlPlaneRepository {
             try retainSourceDispatchOriginUnlocked(taskID: taskID, caller: caller, timestamp: timestamp, connection: connection)
             return AuthorizedContinuityTaskSetup(record: record,
                 correlation: try .nativeSetupResult(record: record, caller: caller, context: callerContext))
-        }
     }
 
     /// Reattaches an explicitly selected native task after process restart.
@@ -1312,6 +2085,7 @@ public actor ProjectControlPlaneRepository {
                   correlation.callerContext == context else {
                 throw ContinuityTaskAuthorizationError.authorityMismatch
             }
+            try requireNativeCorrelationUnlocked(correlation, connection: connection)
             let caller = try validatedContinuityCallerUnlocked(context: context, owner: owner, connection: connection)
             guard let stored = try continuityTaskUnlocked(taskID, connection: connection) else {
                 throw ContinuityTaskAuthorizationError.authorityMismatch
@@ -1598,6 +2372,7 @@ public actor ProjectControlPlaneRepository {
             guard correlation.taskID == taskID, correlation.callerOwner == owner, correlation.callerContext == context else {
                 throw ContinuityTaskAuthorizationError.authorityMismatch
             }
+            try requireNativeCorrelationUnlocked(correlation, connection: connection)
             let caller = try validatedContinuityCallerUnlocked(context: context, owner: owner, connection: connection)
             guard let stored = try continuityTaskUnlocked(taskID, connection: connection) else {
                 throw ContinuityTaskAuthorizationError.authorityMismatch
@@ -1763,6 +2538,7 @@ public actor ProjectControlPlaneRepository {
         try connection.execute(
             "INSERT INTO continuity_ingress_holds(run_id,operation_id,state,created_at,updated_at) VALUES(?,?,'awaiting_bootstrap',?,?)",
             bindings: [.text(runID.description), .text(operationID.uuidString.lowercased()), .text(timestamp), .text(timestamp)])
+        try bindNativeSourceOffsetUnlocked(receipt: receipt, connection: connection)
         try installSourceTransferFenceUnlocked(receipt: receipt, timestamp: timestamp, connection: connection)
         try appendAutonomyEventUnlocked(runID: runID, projectID: source.authorization.projectID,
             eventType: "continuity_ingress_accepted", severity: .info,
@@ -1802,13 +2578,14 @@ public actor ProjectControlPlaneRepository {
                                        lease: RunLease, cancellation: ToolCallCancellation? = nil) throws -> ContinuityBootstrapGrant {
         try controlledTransaction(cancellation: cancellation, fullDurability: true) { connection in
             try validateBootstrapAcceptanceUnlocked(envelope, lease: lease, connection: connection)
+            try requireBootstrapRecoveryScopeUnlocked(envelope, connection: connection)
             let limit = min(65_536, envelope.authorization.authorizationScope.maximumInlineOutputBytes)
             let packet = try JSONSerialization.jsonObject(with: envelope.acceptance.source.canonicalPacketJSON)
             let result = try ForgeJSONCanonicalizationV1.data(from: ["ok": true, "is_error": false, "payload": [
                 "ok": true, "found": true, "packet": packet, "continuity_id": envelope.sourceIdentity.continuityID,
                 "revision": envelope.sourceIdentity.revision, "packet_sha256": envelope.sourceIdentity.packetSHA256]])
-            guard result.count <= limit, envelope.authorization.authorizationScope.allowedTools.contains("context_get") else {
-                throw ContinuityIngressError.capacityExceeded("exact bootstrap result or recovery tool scope")
+            guard result.count <= limit else {
+                throw ContinuityIngressError.capacityExceeded("exact bootstrap result")
             }
             let previous = try bootstrapGrantUnlocked(candidateID: candidateID, envelope: envelope, connection: connection)
             if previous == nil {
@@ -1957,6 +2734,10 @@ public actor ProjectControlPlaneRepository {
                     }
                     // The real provider call already owns this reservation.
                     // Retrying its read consumes no second logical tool call.
+                    if let offset = try nativeRunSourceOffsetUnlocked(grant.envelope.runID, connection: connection) {
+                        try requireNativeManagedToolQuotaUnlocked(intent: Self.nativeRetainedToolIntent(invocation), offset: offset,
+                            policy: policy.policy.tools, alreadyReserved: true, connection: connection)
+                    }
                     return
                 }
             }
@@ -5059,7 +5840,7 @@ public actor ProjectControlPlaneRepository {
         _ intent: ToolInvocationIntent,
         lease: RunLease
     ) throws -> ToolInvocationRecord {
-        return try persistToolInvocationIntentScoped(intent, lease: lease, bootstrapGrant: nil, bootstrapPolicy: nil)
+        return try persistToolInvocationIntentScoped(intent, lease: lease, bootstrapGrant: nil, bootstrapPolicy: nil, sourcePolicy: nil)
     }
 
     func persistToolInvocationIntent(
@@ -5068,14 +5849,21 @@ public actor ProjectControlPlaneRepository {
         bootstrapGrant: ContinuityBootstrapGrant,
         bootstrapPolicy: BudgetPolicySelection
     ) throws -> ToolInvocationRecord {
-        return try persistToolInvocationIntentScoped(intent, lease: lease, bootstrapGrant: bootstrapGrant, bootstrapPolicy: bootstrapPolicy)
+        return try persistToolInvocationIntentScoped(intent, lease: lease, bootstrapGrant: bootstrapGrant, bootstrapPolicy: bootstrapPolicy, sourcePolicy: nil)
+    }
+
+    func persistToolInvocationIntent(_ intent: ToolInvocationIntent, lease: RunLease,
+        sourcePolicy: BudgetPolicySelection, cancellation: ToolCallCancellation? = nil) throws -> ToolInvocationRecord {
+        try cancellation?.checkCancellation()
+        return try persistToolInvocationIntentScoped(intent, lease: lease, bootstrapGrant: nil, bootstrapPolicy: nil, sourcePolicy: sourcePolicy)
     }
 
     private func persistToolInvocationIntentScoped(
         _ intent: ToolInvocationIntent,
         lease: RunLease,
         bootstrapGrant: ContinuityBootstrapGrant?,
-        bootstrapPolicy: BudgetPolicySelection?
+        bootstrapPolicy: BudgetPolicySelection?,
+        sourcePolicy: BudgetPolicySelection?
     ) throws -> ToolInvocationRecord {
         try Self.validate(intent)
         let connection = try requiredConnection()
@@ -5116,6 +5904,13 @@ public actor ProjectControlPlaneRepository {
                 generation: intent.projectGeneration,
                 connection: connection
             )
+            let sourceOffset = try nativeRunSourceOffsetUnlocked(intent.runID, connection: connection)
+            if sourceOffset != nil, bootstrapGrant == nil {
+                guard let sourcePolicy else { throw NativeTaskCapabilityError.budgetExceeded }
+                _ = try sourcePolicy.policy.validated(); _ = try sourcePolicy.scope.validated()
+                guard sourcePolicy.scope.kind == .globalDefault || (sourcePolicy.scope.projectID == intent.projectID.description
+                    && sourcePolicy.scope.projectGeneration == Int(intent.projectGeneration.rawValue)) else { throw NativeTaskCapabilityError.budgetExceeded }
+            }
             if let existing = try toolInvocationByProviderCallUnlocked(
                 sessionID: intent.sessionID,
                 providerCallID: intent.providerCallID,
@@ -5124,12 +5919,28 @@ public actor ProjectControlPlaneRepository {
                 guard Self.toolInvocation(existing, matches: intent) else {
                     throw AutonomyError.intentConflict
                 }
+                if let offset = sourceOffset, let currentPolicy = bootstrapPolicy ?? sourcePolicy {
+                    if existing.state == .completed {
+                        guard let json = existing.resultSummary, JSONSupport.sha256Hex(json) == existing.resultSHA256 else {
+                            throw NativeTaskCapabilityError.integrityFailure
+                        }
+                        try nativeManagedResultBounds(Data(json.utf8), policy: currentPolicy.policy.tools)
+                    } else if [.intent, .executing, .ambiguous, .failed].contains(existing.state) {
+                        // The retained row already consumes one call. Fresh
+                        // policy must still cover it and all source debits.
+                        try requireNativeManagedToolQuotaUnlocked(intent: intent, offset: offset,
+                            policy: currentPolicy.policy.tools, alreadyReserved: true, connection: connection)
+                    }
+                }
                 return existing
             }
             if let bootstrapGrant, let bootstrapPolicy {
                 try requireBootstrapToolQuotaUnlocked(runID: intent.runID, sessionID: intent.sessionID,
                     turnID: intent.turnID, operationID: bootstrapGrant.envelope.operationID,
                     policy: bootstrapPolicy.policy.tools, connection: connection)
+            }
+            if let offset = sourceOffset, bootstrapGrant == nil, let sourcePolicy {
+                try requireNativeManagedToolQuotaUnlocked(intent: intent, offset: offset, policy: sourcePolicy.policy.tools, connection: connection)
             }
             try connection.execute(
                 """
@@ -5182,7 +5993,7 @@ public actor ProjectControlPlaneRepository {
         errorCode: String? = nil,
         errorSummary: String? = nil
     ) throws -> ToolInvocationRecord {
-        return try transitionToolInvocationScoped(invocationID: invocationID, expected: expected, to: next, lease: lease, resultSHA256: resultSHA256, resultSummary: resultSummary, errorCode: errorCode, errorSummary: errorSummary, bootstrapGrant: nil)
+        return try transitionToolInvocationScoped(invocationID: invocationID, expected: expected, to: next, lease: lease, resultSHA256: resultSHA256, resultSummary: resultSummary, errorCode: errorCode, errorSummary: errorSummary, bootstrapGrant: nil, sourcePolicy: nil)
     }
 
     func transitionToolInvocation(
@@ -5196,7 +6007,15 @@ public actor ProjectControlPlaneRepository {
         errorSummary: String? = nil,
         bootstrapGrant: ContinuityBootstrapGrant
     ) throws -> ToolInvocationRecord {
-        return try transitionToolInvocationScoped(invocationID: invocationID, expected: expected, to: next, lease: lease, resultSHA256: resultSHA256, resultSummary: resultSummary, errorCode: errorCode, errorSummary: errorSummary, bootstrapGrant: bootstrapGrant)
+        return try transitionToolInvocationScoped(invocationID: invocationID, expected: expected, to: next, lease: lease, resultSHA256: resultSHA256, resultSummary: resultSummary, errorCode: errorCode, errorSummary: errorSummary, bootstrapGrant: bootstrapGrant, sourcePolicy: nil)
+    }
+
+    func transitionToolInvocation(invocationID: UUID, expected: ToolInvocationState, to next: ToolInvocationState,
+        lease: RunLease, resultSHA256: String? = nil, resultSummary: String? = nil, errorCode: String? = nil,
+        errorSummary: String? = nil, sourcePolicy: BudgetPolicySelection) throws -> ToolInvocationRecord {
+        try transitionToolInvocationScoped(invocationID: invocationID, expected: expected, to: next, lease: lease,
+            resultSHA256: resultSHA256, resultSummary: resultSummary, errorCode: errorCode, errorSummary: errorSummary,
+            bootstrapGrant: nil, sourcePolicy: sourcePolicy)
     }
 
     private func transitionToolInvocationScoped(
@@ -5208,7 +6027,8 @@ public actor ProjectControlPlaneRepository {
         resultSummary: String? = nil,
         errorCode: String? = nil,
         errorSummary: String? = nil,
-        bootstrapGrant: ContinuityBootstrapGrant?
+        bootstrapGrant: ContinuityBootstrapGrant?,
+        sourcePolicy: BudgetPolicySelection?
     ) throws -> ToolInvocationRecord {
         guard Self.validToolInvocationTransitions[expected]?.contains(next) == true else {
             throw AutonomyError.invalidRequest("invalid tool invocation transition \(expected.rawValue) -> \(next.rawValue)")
@@ -5244,6 +6064,24 @@ public actor ProjectControlPlaneRepository {
                 generation: current.projectGeneration,
                 connection: connection
             )
+            if bootstrapGrant == nil, [.executing, .completed].contains(next),
+               let offset = try nativeRunSourceOffsetUnlocked(current.runID, connection: connection) {
+                guard let sourcePolicy else { throw NativeTaskCapabilityError.budgetExceeded }
+                _ = try sourcePolicy.policy.validated(); _ = try sourcePolicy.scope.validated()
+                guard sourcePolicy.scope.kind == .globalDefault || (sourcePolicy.scope.projectID == current.projectID.description
+                    && sourcePolicy.scope.projectGeneration == Int(current.projectGeneration.rawValue)) else {
+                    throw NativeTaskCapabilityError.budgetExceeded
+                }
+                try requireNoContinuityIngressHoldUnlocked(current.runID, connection: connection)
+                try requireNativeManagedToolQuotaUnlocked(intent: Self.nativeRetainedToolIntent(current), offset: offset,
+                    policy: sourcePolicy.policy.tools, alreadyReserved: true, connection: connection)
+                if next == .completed {
+                    guard let boundedResult, let resultSHA256, JSONSupport.sha256Hex(boundedResult) == resultSHA256 else {
+                        throw NativeTaskCapabilityError.integrityFailure
+                    }
+                    try nativeManagedResultBounds(Data(boundedResult.utf8), policy: sourcePolicy.policy.tools)
+                }
+            }
             let changed = try connection.execute(
                 """
                 UPDATE tool_invocations SET state=?,result_sha256=COALESCE(?,result_sha256),
@@ -5445,6 +6283,7 @@ public actor ProjectControlPlaneRepository {
         guard correlation.taskID == taskID, correlation.callerContext == context, correlation.callerOwner == owner else {
             throw ContinuityTaskAuthorizationError.authorityMismatch
         }
+        try requireNativeCorrelationUnlocked(correlation, connection: connection)
         let caller = try validatedContinuityCallerUnlocked(context: context, owner: owner, connection: connection)
         guard let retained = try continuityTaskUnlocked(taskID, connection: connection) else { throw ContinuityTaskAuthorizationError.authorityMismatch }
         let task = try validatedContinuityTaskUnlocked(retained.authorization, allowTerminalRun: true, connection: connection)
@@ -6111,6 +6950,8 @@ public actor ProjectControlPlaneRepository {
 
     private func requireSourceMutationAdmissionUnlocked(_ authorization: ContinuityIngressAuthorization,
         connection: ControlPlaneSQLiteConnection) throws {
+        guard try connection.scalarInt("SELECT COUNT(*) FROM native_source_requests WHERE task_id=? AND method='session_handoff'",
+            bindings: [.text(authorization.taskID.uuidString.lowercased())]) == 0 else { throw NativeTaskCapabilityError.sourceFenced }
         guard try connection.scalarInt("SELECT COUNT(*) FROM continuity_source_task_fences WHERE source_binding_id=? OR task_id=?",
             bindings: [.text(authorization.sourceBindingID.uuidString.lowercased()), .text(authorization.taskID.uuidString.lowercased())]) == 0 else {
             throw ContinuitySourceActivationError.sourceFenced
@@ -6279,6 +7120,7 @@ public actor ProjectControlPlaneRepository {
     private func validateBootstrapGrantUnlocked(_ grant: ContinuityBootstrapGrant, lease: RunLease,
                                                  connection: ControlPlaneSQLiteConnection) throws {
         try validateBootstrapAcceptanceUnlocked(grant.envelope, lease: lease, connection: connection)
+        try requireBootstrapRecoveryScopeUnlocked(grant.envelope, connection: connection)
         guard try bootstrapGrantUnlocked(candidateID: grant.candidateID, envelope: grant.envelope, connection: connection) == grant,
               grant.leaseOwnerID == lease.ownerID, grant.leaseEpoch == lease.epoch,
               (ISO8601.date(from: grant.expiresAt) ?? .distantPast) > clock.now() else {
@@ -6296,6 +7138,28 @@ public actor ProjectControlPlaneRepository {
                   candidate.adapterID == task.assignment.adapterID, candidate.modelKey == task.assignment.modelKey else {
                 throw ContinuityIngressError.authorityMismatch
             }
+        }
+    }
+
+    /// The native source profile grants one manager-owned exact handoff read as
+    /// part of recovery. Its approved work scope stays fs_read-only; ordinary
+    /// context_get and reads of another source never receive this authority.
+    private func requireBootstrapRecoveryScopeUnlocked(_ envelope: ContinuitySourceBootstrapEnvelope,
+        connection: ControlPlaneSQLiteConnection) throws {
+        if envelope.authorization.authorizationScope.allowedTools.contains("context_get") { return }
+        guard let id = try connection.first("SELECT capability_id FROM native_task_capabilities WHERE task_id=?",
+            bindings: [.text(envelope.authorization.taskID.uuidString.lowercased())], map: {
+                try NativeTaskValue.uuid($0.strictText(0, maximumBytes: 36))
+            }), let capability = try nativeCapabilityUnlocked(id, connection: connection) else {
+            throw ContinuityIngressError.authorityMismatch
+        }
+        let (task, _) = try validateNativeCapabilityOwnerUnlocked(capability, taskID: envelope.authorization.taskID,
+            projectID: envelope.authorization.projectID, generation: envelope.authorization.projectGeneration,
+            connection: connection)
+        guard task.authorization == envelope.authorization, task.runID == envelope.runID,
+              task.assignment.specification.allowedTools == ["fs_read"],
+              try nativeRunSourceOffsetUnlocked(envelope.runID, connection: connection) != nil else {
+            throw ContinuityIngressError.authorityMismatch
         }
     }
 
@@ -6417,8 +7281,9 @@ public actor ProjectControlPlaneRepository {
     private func requireBootstrapToolQuotaUnlocked(runID: RunID, sessionID: String, turnID: UUID,
         operationID: UUID, policy: BudgetToolPolicy, connection: ControlPlaneSQLiteConnection) throws {
         let run = runID.description
+        let sourceOffset = try nativeRunSourceOffsetUnlocked(runID, connection: connection) ?? 0
         let checks: [(String, [ControlPlaneSQLiteBinding], Int)] = [
-            ("SELECT COUNT(*) FROM tool_invocations WHERE run_id=?", [.text(run)], policy.callsPerRun),
+            ("SELECT COUNT(*) FROM tool_invocations WHERE run_id=?", [.text(run)], max(0, policy.callsPerRun - sourceOffset)),
             ("SELECT COUNT(*) FROM tool_invocations WHERE session_id=?", [.text(sessionID)], policy.callsPerSession),
             ("SELECT COUNT(*) FROM tool_invocations WHERE turn_id=?", [.text(turnID.uuidString.lowercased())], policy.callsPerTurn),
             ("SELECT COUNT(*) FROM tool_invocations WHERE run_id=? AND state IN ('intent','executing','ambiguous')",
@@ -9135,6 +10000,14 @@ private final class ControlPlaneSQLiteOperationControl {
         recordCommit()
     }
 
+    /// Observation still applies when an already committed external effect
+    /// requires finishing its receipt despite late request cancellation.
+    func performCommitWithoutCancellation(_ commit: () throws -> Void) throws {
+        try beforeCommitObserver?()
+        try commit()
+        recordCommit()
+    }
+
     func recordCommit() {
         committed = true
         didCommitObserver?()
@@ -9203,6 +10076,7 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
     static let ingressSchemaCapabilityVersionQuery = """
     SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='autonomous_runs') THEN 0
         WHEN (SELECT instr(sql,'''awaiting_bootstrap''') FROM sqlite_master WHERE type='table' AND name='autonomous_runs')=0 THEN 1
+        WHEN EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='native_task_capabilities') THEN 7
         WHEN EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='continuity_operation_cancellations') THEN 6
         WHEN EXISTS(SELECT 1 FROM pragma_table_info('continuity_ingress_holds') WHERE name='finalization_attempts') THEN 5
         WHEN EXISTS(SELECT 1 FROM pragma_table_info('continuity_ingress_holds') WHERE name='recovery_attempts') THEN 4
@@ -9379,8 +10253,11 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
                         try commit()
                     }
                 } else {
-                    try commit()
-                    activeControl?.recordCommit()
+                    if let activeControl {
+                        try activeControl.performCommitWithoutCancellation(commit)
+                    } else {
+                        try commit()
+                    }
                 }
                 return value
             } catch {
@@ -9486,6 +10363,11 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
     private func migrate(timestamp: String, priorVersion: Int, databaseURL: URL) throws {
         let handle = try requiredDatabase()
         let capability = try scalarInt(Self.ingressSchemaCapabilityVersionQuery)
+        if capability == 7 {
+            guard try scalarInt("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('native_task_capabilities','native_task_commands','native_source_requests','native_source_run_offsets')") == 4 else {
+                throw ProjectContextError.integrityFailure("incomplete native task capability schema")
+            }
+        }
         var manifest = try VerifiedMigrationBackup.reconcileMigrationManifest(sourceURL: databaseURL,
             observedVersion: capability, scope: .continuityIngress)
         // Finish a committed older capability before preparing the next verified
@@ -9501,8 +10383,8 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
                     preparedManifest: prepared, observedVersion: capability, targetMetadata: target, scope: .continuityIngress)
             }
         }
-        let upgrading = priorVersion == 2 && (1...5).contains(capability)
-        let targetCapability = upgrading ? capability + 1 : 6
+        let upgrading = priorVersion == 2 && (1...6).contains(capability)
+        let targetCapability = upgrading ? capability + 1 : 7
         if upgrading { try executeStatic("PRAGMA synchronous=FULL;") }
         defer { if upgrading { try? executeStatic("PRAGMA synchronous=NORMAL;") } }
         try transaction {
@@ -9517,7 +10399,7 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
             if capability == 3 { try addContinuityIngressRecoveryMetadata() }
             if capability == 4 { try addContinuitySourceActivationMetadata() }
             let schema = capability == 1 ? Self.schemaForLegacyIngressMigration
-                : (capability == 2 ? Self.schemaForHoldHistoryMigration : (capability == 3 ? Self.schemaForRecoveryMigration : (capability == 4 ? Self.schemaForActivationMigration : Self.schemaV2)))
+                : (capability == 2 ? Self.schemaForHoldHistoryMigration : (capability == 3 ? Self.schemaForRecoveryMigration : (capability == 4 ? Self.schemaForActivationMigration : (capability == 5 ? Self.schemaForCancellationMigration : Self.schemaV2))))
             try executeStatic(schema)
             if capability == 4 { try populateSourceTaskFencesForMigration(timestamp: timestamp) }
             if capability == 1 { try rebuildAutonomousRunStateConstraint() }
@@ -9551,7 +10433,7 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
             _ = try VerifiedMigrationBackup.completeMigrationManifest(sourceURL: databaseURL, preparedManifest: manifest,
                 observedVersion: targetCapability, targetMetadata: target, scope: .continuityIngress)
         }
-        if (1...4).contains(capability) {
+        if (1...5).contains(capability) {
             try migrate(timestamp: timestamp, priorVersion: priorVersion, databaseURL: databaseURL)
         }
     }
@@ -9862,8 +10744,11 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
         "finalization_retry_at TEXT CHECK (length(CAST(finalization_retry_at AS BLOB))<=128)",
         "recovery_claim_phase TEXT CHECK (recovery_claim_phase IN ('bootstrap','activation'))",
     ]
+    private static var schemaForCancellationMigration: String {
+        schemaV2.replacingOccurrences(of: nativeTaskCapabilitySchema, with: "")
+    }
     private static var schemaForActivationMigration: String {
-        schemaV2.replacingOccurrences(of: operationCancellationSchema, with: "")
+        schemaForCancellationMigration.replacingOccurrences(of: operationCancellationSchema, with: "")
     }
     private static var schemaForRecoveryMigration: String {
         schemaForActivationMigration.replacingOccurrences(of: ingressActivationHoldSchema, with: ingressRecoverySchema)
@@ -9906,7 +10791,66 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
     CREATE INDEX IF NOT EXISTS idx_continuity_operation_cancellation_run ON continuity_operation_cancellations(run_id,operation_id);
     """
 
+    private static let nativeTaskCapabilitySchema = """
+    CREATE TABLE IF NOT EXISTS native_task_capabilities (
+        capability_id TEXT PRIMARY KEY NOT NULL CHECK(length(capability_id)=36),
+        task_id TEXT NOT NULL UNIQUE REFERENCES continuity_task_authorizations(task_id) CHECK(length(task_id)=36),
+        project_id TEXT NOT NULL CHECK(length(project_id)=36), project_generation INTEGER NOT NULL CHECK(project_generation>=1),
+        epoch INTEGER NOT NULL CHECK(epoch>=1), state TEXT NOT NULL CHECK(state IN ('active','revoked')),
+        verifier_sha256 TEXT CHECK(length(verifier_sha256)=64),
+        caller_binding_id TEXT NOT NULL CHECK(length(caller_binding_id)=36), source_binding_id TEXT NOT NULL CHECK(length(source_binding_id)=36),
+        approval_sha256 TEXT NOT NULL CHECK(length(approval_sha256)=64), scope_sha256 TEXT NOT NULL CHECK(length(scope_sha256)=64),
+        authorization_sha256 TEXT NOT NULL CHECK(length(authorization_sha256)=64), document_sha256 TEXT NOT NULL CHECK(length(document_sha256)=64),
+        source_limits_json TEXT NOT NULL CHECK(length(CAST(source_limits_json AS BLOB)) BETWEEN 1 AND 512),
+        expires_at TEXT NOT NULL CHECK(length(expires_at)=20), issued_at TEXT NOT NULL CHECK(length(issued_at)=20),
+        revoked_at TEXT CHECK(length(revoked_at)=20), CHECK((state='revoked')=(revoked_at IS NOT NULL)),
+        CHECK((state='active')=(verifier_sha256 IS NOT NULL))
+    );
+    CREATE TABLE IF NOT EXISTS native_task_commands (
+        request_id TEXT PRIMARY KEY NOT NULL CHECK(length(request_id)=36),
+        capability_id TEXT NOT NULL REFERENCES native_task_capabilities(capability_id),
+        request_sha256 TEXT NOT NULL CHECK(length(request_sha256)=64),
+        receipt_json TEXT NOT NULL CHECK(length(CAST(receipt_json AS BLOB)) BETWEEN 1 AND 8192),
+        receipt_sha256 TEXT NOT NULL CHECK(length(receipt_sha256)=64)
+    );
+    CREATE INDEX IF NOT EXISTS idx_native_commands_capability ON native_task_commands(capability_id);
+    CREATE TABLE IF NOT EXISTS native_source_requests (
+        reservation_id TEXT PRIMARY KEY NOT NULL CHECK(length(reservation_id)=36),
+        task_id TEXT NOT NULL REFERENCES continuity_task_authorizations(task_id), capability_id TEXT NOT NULL REFERENCES native_task_capabilities(capability_id),
+        epoch INTEGER NOT NULL CHECK(epoch>=1), session_id TEXT NOT NULL CHECK(length(session_id)=36),
+        request_id_sha256 TEXT NOT NULL CHECK(length(request_id_sha256)=64),
+        method TEXT NOT NULL CHECK(method IN ('fs_read','session_checkpoint','session_handoff')),
+        arguments_sha256 TEXT NOT NULL CHECK(length(arguments_sha256)=64), manager_instance_id TEXT NOT NULL CHECK(length(manager_instance_id)=36),
+        state TEXT NOT NULL CHECK(state IN ('admitted','executing','completed','cancelled','failed','withheld','pending')),
+        admitted_at TEXT NOT NULL CHECK(length(admitted_at)=20), deadline TEXT NOT NULL CHECK(length(deadline)=20),
+        charged_calls INTEGER NOT NULL CHECK(charged_calls BETWEEN 0 AND 64),
+        policy_json TEXT NOT NULL CHECK(length(CAST(policy_json AS BLOB)) BETWEEN 1 AND 32768),
+        prepared_packet_json TEXT CHECK(length(CAST(prepared_packet_json AS BLOB)) BETWEEN 1 AND 262144),
+        packet_sha256 TEXT CHECK(length(packet_sha256)=64),
+        authorization_json TEXT CHECK(length(CAST(authorization_json AS BLOB)) BETWEEN 1 AND 32768),
+        automatic_enabled INTEGER CHECK(automatic_enabled IN (0,1)),
+        result_json TEXT CHECK(length(CAST(result_json AS BLOB)) BETWEEN 1 AND 393216),
+        result_sha256 TEXT CHECK(length(result_sha256)=64), result_tokens INTEGER CHECK(result_tokens>=0),
+        completed_at TEXT CHECK(length(completed_at)=20), result_expires_at TEXT CHECK(length(result_expires_at)=20),
+        recovery_attempts INTEGER NOT NULL DEFAULT 0 CHECK(recovery_attempts BETWEEN 0 AND 8),
+        retry_at TEXT CHECK(length(retry_at)=20), error_code TEXT CHECK(length(error_code)<=64),
+        quarantined INTEGER NOT NULL DEFAULT 0 CHECK(quarantined IN (0,1)),
+        UNIQUE(session_id,request_id_sha256),
+        CHECK((method='fs_read')=(prepared_packet_json IS NULL)),
+        CHECK((method='fs_read')=(packet_sha256 IS NULL)), CHECK((method='fs_read')=(authorization_json IS NULL)),
+        CHECK((method='fs_read')=(automatic_enabled IS NULL))
+    );
+    CREATE INDEX IF NOT EXISTS idx_native_source_task ON native_source_requests(task_id,method,state);
+    CREATE TABLE IF NOT EXISTS native_source_run_offsets (
+        task_id TEXT PRIMARY KEY NOT NULL REFERENCES continuity_task_authorizations(task_id),
+        run_id TEXT NOT NULL UNIQUE REFERENCES autonomous_runs(run_id), source_binding_id TEXT NOT NULL CHECK(length(source_binding_id)=36),
+        operation_id TEXT NOT NULL CHECK(length(operation_id)=36), receipt_sha256 TEXT NOT NULL CHECK(length(receipt_sha256)=64),
+        charged_calls INTEGER NOT NULL CHECK(charged_calls BETWEEN 0 AND 64), recorded_at TEXT NOT NULL CHECK(length(recorded_at)=20)
+    );
+    """
+
     private static let schemaV2 = """
+    \(nativeTaskCapabilitySchema)
     \(operationCancellationSchema)
     CREATE TABLE IF NOT EXISTS control_schema_version (
         singleton INTEGER PRIMARY KEY CHECK (singleton = 1),

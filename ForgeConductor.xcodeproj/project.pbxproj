@@ -7,6 +7,23 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		BD11229D19779E3F0FA5554A /* NativeTaskCapabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97197342DCB47F8B6AB73D18 /* NativeTaskCapabilityTests.swift */; };
+		EE5EB272FC58B7EA8198B878 /* NativeTaskOperatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB2622999610147C0F61A75C /* NativeTaskOperatorTests.swift */; };
+		90FE12B41208F77A8A7864CB /* NativePreparedSourceCommitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C16AA5321595C87DE3DAF6E /* NativePreparedSourceCommitTests.swift */; };
+		A38C1D60A02CC1E25BD6C7B1 /* ManagerNativeTaskAttachmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2F7766412EFCDCB1AEB044D /* ManagerNativeTaskAttachmentTests.swift */; };
+		E480F54836F8CEF7BB84325E /* MCPTaskHTTPTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8C5C25388C97914375A3FBB /* MCPTaskHTTPTests.swift */; };
+		88A0582C2C88DBE004EA1692 /* MCPNativeTaskSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 826E1CA6CF754C01919A13D8 /* MCPNativeTaskSourceTests.swift */; };
+		AD9916A5861393625EF36330 /* Manager/NativeTaskOperatorCommandLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B69FA2615DDB4C2B3449731F /* Manager/NativeTaskOperatorCommandLine.swift */; };
+		804779169DE2BA68C4DF4109 /* Manager/NativeTaskOperatorClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEB5D478D9BCD65CF890A48A /* Manager/NativeTaskOperatorClient.swift */; };
+		78786FB37D142DF2BE71B24B /* MCP/MCPToolResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DAF26C7623DF495C4A98D1F /* MCP/MCPToolResponse.swift */; };
+		5FB132951F18EBF73E608C72 /* MCP/MCPTaskHTTPService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2461B0860C7DAEE7E4BA5935 /* MCP/MCPTaskHTTPService.swift */; };
+		5AAC8C82D10219DE01504C56 /* MCP/MCPRequestAdmission.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88D80B8A76A384899C4EF1CE /* MCP/MCPRequestAdmission.swift */; };
+		89A88B9E6DF5FD2AF6CCD7DB /* MCP/MCPNativeTaskSourceDispatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 623E882ECBF2A87024D4C895 /* MCP/MCPNativeTaskSourceDispatcher.swift */; };
+		B9DA427C487F421ED55F9E1B /* Infrastructure/NativeTaskCredentialFileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD75EB47DD4D1C36805FCC91 /* Infrastructure/NativeTaskCredentialFileStore.swift */; };
+		4788C9393F0016D821E0405B /* Domain/PreparedContinuitySourceCommit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BF759A8B647D34C980D38CE /* Domain/PreparedContinuitySourceCommit.swift */; };
+		8CCC767800AEECDA90A45B4E /* Domain/NativeTaskCapabilityModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 465E7995C452BFA1125518BB /* Domain/NativeTaskCapabilityModels.swift */; };
+		9CD1D70D4FDC5B35A274E2AE /* Domain/NativeContinuityTaskOperatorModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4205D2FC851685086AF79728 /* Domain/NativeContinuityTaskOperatorModels.swift */; };
+		7F818AD1A8B32EC45756CD17 /* Domain/NativeContinuitySourceModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A42DFDE9DBABDC4C5BB05379 /* Domain/NativeContinuitySourceModels.swift */; };
 		257DA2C303FEA3D866003F30 /* ContinuityTaskReattachmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF522F60819916968FA0A283 /* ContinuityTaskReattachmentTests.swift */; };
 		001774C6E9F20520035EF582 /* ContinuityOperationControlTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4D47CF181E6BFB758EEA5F3 /* ContinuityOperationControlTests.swift */; };
 		0F1AF7F059B4A1109A7F2925 /* ContinuityOperationCancellationRuntimeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DD7BD26DA7D0602221D1D16 /* ContinuityOperationCancellationRuntimeTests.swift */; };
@@ -521,6 +538,23 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		97197342DCB47F8B6AB73D18 /* NativeTaskCapabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeTaskCapabilityTests.swift; sourceTree = "<group>"; };
+		CB2622999610147C0F61A75C /* NativeTaskOperatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeTaskOperatorTests.swift; sourceTree = "<group>"; };
+		4C16AA5321595C87DE3DAF6E /* NativePreparedSourceCommitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativePreparedSourceCommitTests.swift; sourceTree = "<group>"; };
+		C2F7766412EFCDCB1AEB044D /* ManagerNativeTaskAttachmentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagerNativeTaskAttachmentTests.swift; sourceTree = "<group>"; };
+		E8C5C25388C97914375A3FBB /* MCPTaskHTTPTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPTaskHTTPTests.swift; sourceTree = "<group>"; };
+		826E1CA6CF754C01919A13D8 /* MCPNativeTaskSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPNativeTaskSourceTests.swift; sourceTree = "<group>"; };
+		B69FA2615DDB4C2B3449731F /* Manager/NativeTaskOperatorCommandLine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Manager/NativeTaskOperatorCommandLine.swift; sourceTree = "<group>"; };
+		FEB5D478D9BCD65CF890A48A /* Manager/NativeTaskOperatorClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Manager/NativeTaskOperatorClient.swift; sourceTree = "<group>"; };
+		6DAF26C7623DF495C4A98D1F /* MCP/MCPToolResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCP/MCPToolResponse.swift; sourceTree = "<group>"; };
+		2461B0860C7DAEE7E4BA5935 /* MCP/MCPTaskHTTPService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCP/MCPTaskHTTPService.swift; sourceTree = "<group>"; };
+		88D80B8A76A384899C4EF1CE /* MCP/MCPRequestAdmission.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCP/MCPRequestAdmission.swift; sourceTree = "<group>"; };
+		623E882ECBF2A87024D4C895 /* MCP/MCPNativeTaskSourceDispatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCP/MCPNativeTaskSourceDispatcher.swift; sourceTree = "<group>"; };
+		CD75EB47DD4D1C36805FCC91 /* Infrastructure/NativeTaskCredentialFileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Infrastructure/NativeTaskCredentialFileStore.swift; sourceTree = "<group>"; };
+		7BF759A8B647D34C980D38CE /* Domain/PreparedContinuitySourceCommit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/PreparedContinuitySourceCommit.swift; sourceTree = "<group>"; };
+		465E7995C452BFA1125518BB /* Domain/NativeTaskCapabilityModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/NativeTaskCapabilityModels.swift; sourceTree = "<group>"; };
+		4205D2FC851685086AF79728 /* Domain/NativeContinuityTaskOperatorModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/NativeContinuityTaskOperatorModels.swift; sourceTree = "<group>"; };
+		A42DFDE9DBABDC4C5BB05379 /* Domain/NativeContinuitySourceModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/NativeContinuitySourceModels.swift; sourceTree = "<group>"; };
 		BF522F60819916968FA0A283 /* ContinuityTaskReattachmentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContinuityTaskReattachmentTests.swift; sourceTree = "<group>"; };
 		E4D47CF181E6BFB758EEA5F3 /* ContinuityOperationControlTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContinuityOperationControlTests.swift; sourceTree = "<group>"; };
 		4DD7BD26DA7D0602221D1D16 /* ContinuityOperationCancellationRuntimeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContinuityOperationCancellationRuntimeTests.swift; sourceTree = "<group>"; };
@@ -1015,6 +1049,12 @@
 				F09400000000000000000014 /* ContinuityBootstrapAuthorityTests.swift */,
 				F09400000000000000000005 /* ContinuityTaskAuthorizationTests.swift */,
 				BF522F60819916968FA0A283 /* ContinuityTaskReattachmentTests.swift */,
+				97197342DCB47F8B6AB73D18 /* NativeTaskCapabilityTests.swift */,
+				CB2622999610147C0F61A75C /* NativeTaskOperatorTests.swift */,
+				4C16AA5321595C87DE3DAF6E /* NativePreparedSourceCommitTests.swift */,
+				C2F7766412EFCDCB1AEB044D /* ManagerNativeTaskAttachmentTests.swift */,
+				E8C5C25388C97914375A3FBB /* MCPTaskHTTPTests.swift */,
+				826E1CA6CF754C01919A13D8 /* MCPNativeTaskSourceTests.swift */,
 				F09300000000000000000002 /* BudgetRawJSONTests.swift */,
 				0F3DAC4CB0444F49BDF1EA12 /* DashboardTests.swift */,
 				8E7DF2B1B43643A9B3438CCB /* HTTPTestHelpers.swift */,
@@ -1221,6 +1261,17 @@
 				F09400000000000000000007 /* Application/ContinuityIngressDeliveryService.swift */,
 				F09400000000000000000006 /* Domain/ContinuityIngressAcceptanceModels.swift */,
 				F09400000000000000000004 /* Domain/ContinuityTaskAuthorizationModels.swift */,
+				B69FA2615DDB4C2B3449731F /* Manager/NativeTaskOperatorCommandLine.swift */,
+				FEB5D478D9BCD65CF890A48A /* Manager/NativeTaskOperatorClient.swift */,
+				6DAF26C7623DF495C4A98D1F /* MCP/MCPToolResponse.swift */,
+				2461B0860C7DAEE7E4BA5935 /* MCP/MCPTaskHTTPService.swift */,
+				88D80B8A76A384899C4EF1CE /* MCP/MCPRequestAdmission.swift */,
+				623E882ECBF2A87024D4C895 /* MCP/MCPNativeTaskSourceDispatcher.swift */,
+				CD75EB47DD4D1C36805FCC91 /* Infrastructure/NativeTaskCredentialFileStore.swift */,
+				7BF759A8B647D34C980D38CE /* Domain/PreparedContinuitySourceCommit.swift */,
+				465E7995C452BFA1125518BB /* Domain/NativeTaskCapabilityModels.swift */,
+				4205D2FC851685086AF79728 /* Domain/NativeContinuityTaskOperatorModels.swift */,
+				A42DFDE9DBABDC4C5BB05379 /* Domain/NativeContinuitySourceModels.swift */,
 				F09300000000000000000001 /* Domain/BudgetPolicyModels.swift */,
 				A26F00000000000000000016 /* Domain/ContinuityV2Models.swift */,
 				A26F00000000000000000017 /* Domain/ManagedModelProvider.swift */,
@@ -1792,6 +1843,12 @@
 				B09400000000000000000014 /* ContinuityBootstrapAuthorityTests.swift in Sources */,
 				B09400000000000000000005 /* ContinuityTaskAuthorizationTests.swift in Sources */,
 				257DA2C303FEA3D866003F30 /* ContinuityTaskReattachmentTests.swift in Sources */,
+				BD11229D19779E3F0FA5554A /* NativeTaskCapabilityTests.swift in Sources */,
+				EE5EB272FC58B7EA8198B878 /* NativeTaskOperatorTests.swift in Sources */,
+				90FE12B41208F77A8A7864CB /* NativePreparedSourceCommitTests.swift in Sources */,
+				A38C1D60A02CC1E25BD6C7B1 /* ManagerNativeTaskAttachmentTests.swift in Sources */,
+				E480F54836F8CEF7BB84325E /* MCPTaskHTTPTests.swift in Sources */,
+				88A0582C2C88DBE004EA1692 /* MCPNativeTaskSourceTests.swift in Sources */,
 				B09300000000000000000002 /* BudgetRawJSONTests.swift in Sources */,
 				DD727970A2024C819CED8EC6 /* DashboardTests.swift in Sources */,
 				B33B078C0E124751B724B3A2 /* HTTPTestHelpers.swift in Sources */,
@@ -1906,6 +1963,17 @@
 				B09400000000000000000007 /* Application/ContinuityIngressDeliveryService.swift in Sources */,
 				B09400000000000000000006 /* Domain/ContinuityIngressAcceptanceModels.swift in Sources */,
 				B09400000000000000000004 /* Domain/ContinuityTaskAuthorizationModels.swift in Sources */,
+				AD9916A5861393625EF36330 /* Manager/NativeTaskOperatorCommandLine.swift in Sources */,
+				804779169DE2BA68C4DF4109 /* Manager/NativeTaskOperatorClient.swift in Sources */,
+				78786FB37D142DF2BE71B24B /* MCP/MCPToolResponse.swift in Sources */,
+				5FB132951F18EBF73E608C72 /* MCP/MCPTaskHTTPService.swift in Sources */,
+				5AAC8C82D10219DE01504C56 /* MCP/MCPRequestAdmission.swift in Sources */,
+				89A88B9E6DF5FD2AF6CCD7DB /* MCP/MCPNativeTaskSourceDispatcher.swift in Sources */,
+				B9DA427C487F421ED55F9E1B /* Infrastructure/NativeTaskCredentialFileStore.swift in Sources */,
+				4788C9393F0016D821E0405B /* Domain/PreparedContinuitySourceCommit.swift in Sources */,
+				8CCC767800AEECDA90A45B4E /* Domain/NativeTaskCapabilityModels.swift in Sources */,
+				9CD1D70D4FDC5B35A274E2AE /* Domain/NativeContinuityTaskOperatorModels.swift in Sources */,
+				7F818AD1A8B32EC45756CD17 /* Domain/NativeContinuitySourceModels.swift in Sources */,
 				B09300000000000000000001 /* Domain/BudgetPolicyModels.swift in Sources */,
 				A26B00000000000000000016 /* Domain/ContinuityV2Models.swift in Sources */,
 				A26B00000000000000000017 /* Domain/ManagedModelProvider.swift in Sources */,

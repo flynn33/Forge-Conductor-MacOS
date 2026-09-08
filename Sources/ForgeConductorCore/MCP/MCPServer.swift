@@ -15,11 +15,7 @@ public final class MCPServer: @unchecked Sendable {
     public static let defaultRequestTimeoutSeconds = ToolRouter.defaultCallTimeoutSeconds
     public static let defaultResponseWriteTimeoutSeconds: TimeInterval = 2
 
-    private enum RequestKey: Hashable {
-        case string(String)
-        case number(String)
-    }
-
+    private typealias RequestKey = MCPRequestAdmission.Identifier
     private enum RequestRegistration {
         case accepted(ToolCallCancellation)
         case duplicate
@@ -45,7 +41,8 @@ public final class MCPServer: @unchecked Sendable {
     private let cancellationLock = NSLock()
     private let didCloseResponseDeliveryObserver: (@Sendable () -> Void)?
     private var responseDeliveryOpen = false
-    private var activeRequests: [RequestKey: ToolCallCancellation] = [:]
+    private let admission: MCPRequestAdmission
+    private let admissionNamespace = UUID()
     private var initialized = false
     private var nativeTaskSession: ContinuityNativeTaskSession?
 
@@ -65,6 +62,7 @@ public final class MCPServer: @unchecked Sendable {
         self.clientID = clientID
         self.role = role
         self.maximumConcurrentRequests = max(1, min(maximumConcurrentRequests, 64))
+        self.admission = MCPRequestAdmission(maximumActiveRequests: maximumConcurrentRequests)
         self.shutdownWaitSeconds = max(0.1, min(shutdownWaitSeconds, 30))
         self.requestTimeoutSeconds = requestTimeoutSeconds.isFinite
             ? max(0.001, requestTimeoutSeconds)
@@ -451,41 +449,23 @@ public final class MCPServer: @unchecked Sendable {
         cancellationLock.lock()
         defer { cancellationLock.unlock() }
         guard responseDeliveryOpen else { return .deliveryClosed }
-        if activeRequests[requestID] != nil { return .duplicate }
-        guard activeRequests.count < maximumConcurrentRequests else { return .capacityExceeded }
-        activeRequests[requestID] = cancellation
-        return .accepted(cancellation)
+        switch admission.reserve(.init(sessionID: admissionNamespace, id: requestID), cancellation: cancellation) {
+        case .accepted: return .accepted(cancellation)
+        case .duplicate: return .duplicate
+        case .capacityExceeded: return .capacityExceeded
+        case .closed: return .deliveryClosed
+        }
     }
 
-    private func finishRequest(
-        _ requestID: RequestKey,
-        cancellation: ToolCallCancellation
-    ) {
-        cancellationLock.lock()
-        if activeRequests[requestID] === cancellation {
-            activeRequests.removeValue(forKey: requestID)
-        }
-        cancellationLock.unlock()
+    private func finishRequest(_ requestID: RequestKey, cancellation: ToolCallCancellation) {
+        admission.finish(.init(sessionID: admissionNamespace, id: requestID), cancellation: cancellation)
     }
 
     private func cancelRequest(_ requestID: RequestKey) {
-        cancellationLock.lock()
-        if let active = activeRequests[requestID] {
-            cancellationLock.unlock()
-            active.cancel()
-            return
-        }
-        cancellationLock.unlock()
+        admission.cancel(.init(sessionID: admissionNamespace, id: requestID))
     }
 
-    private func cancelActiveRequests() {
-        cancellationLock.lock()
-        let active = Array(activeRequests.values)
-        cancellationLock.unlock()
-        for cancellation in active {
-            cancellation.cancel()
-        }
-    }
+    private func cancelActiveRequests() { admission.cancel() }
 
 
     /// Protocol versions we implement (tools list/call). Prefer the client's request when known.
@@ -539,14 +519,7 @@ public final class MCPServer: @unchecked Sendable {
     }
 
     private func toolCallResponse(id: Any?, result: ToolResult) -> [String: Any] {
-        let text = (try? JSONSupport.string(from: result.payload)) ?? "{\"ok\":false}"
-        return ok(id: id, result: [
-            "content": [
-                ["type": "text", "text": text] as [String: Any],
-            ],
-            "isError": result.isError || !result.ok,
-            "structuredContent": result.payload,
-        ])
+        MCPToolResponse.object(id: id, result: result)
     }
 
     private func ok(id: Any?, result: [String: Any]) -> [String: Any] {
@@ -587,11 +560,8 @@ public final class MCPServer: @unchecked Sendable {
         cancellationLock.lock()
         let didClose = responseDeliveryOpen && !open
         responseDeliveryOpen = open
-        let active = open ? [] : Array(activeRequests.values)
         cancellationLock.unlock()
-        for cancellation in active {
-            cancellation.cancel()
-        }
+        admission.setOpen(open)
         if didClose {
             didCloseResponseDeliveryObserver?()
         }
