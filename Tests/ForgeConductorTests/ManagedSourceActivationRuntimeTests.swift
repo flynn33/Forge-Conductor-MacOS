@@ -577,7 +577,7 @@ private struct SourceActivationRuntimeFixture: Sendable {
     }
 }
 
-private actor SourceActivationRuntimeTransport: LMStudioManagedTransporting {
+private actor SourceActivationRuntimeTransport: LMStudioManagedTransportObservedDispatching {
     private let file: URL
     private let marker: String
     private var roots: [LMStudioRootRequest] = []
@@ -594,7 +594,26 @@ private actor SourceActivationRuntimeTransport: LMStudioManagedTransporting {
             contractProbeResponseID: "source-activation-probe")
     }
 
+    func createRoot(_ request: LMStudioRootRequest, observedFingerprint: String) async throws -> LMStudioResponseTurn {
+        guard observedFingerprint == String(repeating: "a", count: 64) else {
+            throw ManagedModelProviderContractError.invalidValue("fixture observation differs")
+        }
+        return try await createRoot(request)
+    }
+    func continueSession(_ request: LMStudioContinuationRequest, observedFingerprint: String) async throws -> LMStudioResponseTurn {
+        guard observedFingerprint == String(repeating: "a", count: 64) else {
+            throw ManagedModelProviderContractError.invalidValue("fixture observation differs")
+        }
+        return try await continueSession(request)
+    }
+    func preflightRoot(_ request: LMStudioRootRequest) async throws -> ProviderRequestPreflight {
+        try await SourceBootstrapFixtureWire.root(request)
+    }
+    func preflightContinuation(_ request: LMStudioContinuationRequest) async throws -> ProviderRequestPreflight {
+        try await SourceBootstrapFixtureWire.continuation(request)
+    }
     func createRoot(_ request: LMStudioRootRequest) async throws -> LMStudioResponseTurn {
+        _ = try await preflightRoot(request)
         guard roots.count < 4 else { throw ContinuityIngressError.capacityExceeded("fixture root requests") }
         roots.append(request)
         let identity = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(request.userInput.utf8)) as? [String: Any])
@@ -604,6 +623,7 @@ private actor SourceActivationRuntimeTransport: LMStudioManagedTransporting {
     }
 
     func continueSession(_ request: LMStudioContinuationRequest) async throws -> LMStudioResponseTurn {
+        _ = try await preflightContinuation(request)
         guard followups.count < 8 else { throw ContinuityIngressError.capacityExceeded("fixture continuation requests") }
         followups.append(request)
         switch request.previousResponseID {

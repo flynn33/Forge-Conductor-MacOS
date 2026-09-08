@@ -428,6 +428,66 @@ extension ManagerDashboardClient: NativeTaskOperatorTransport {
     }
 }
 
+extension ManagerDashboardClient: NativeSourceOperatorTransport {
+    /// Exact retries retain the caller's task, request and input; redirects are refused.
+    public func submitNativeSourceCommand(action: String, body: Data) async throws -> Data {
+        let taskID: UUID, requestID: UUID
+        switch action {
+        case "send":
+            let value = try NativeSourceSendRequest(data: body); taskID = value.taskID; requestID = value.requestID
+        case "status":
+            let value = try NativeSourceStatusRequest(data: body); taskID = value.taskID; requestID = value.requestID
+        case "cancel":
+            let value = try NativeSourceCancelRequest(data: body); taskID = value.taskID; requestID = value.requestID
+        default: throw NativeSourceOperatorError.invalidRequest("action")
+        }
+        var components = URLComponents()
+        components.scheme = "http"; components.host = host; components.port = port; components.path = MCPTaskHTTPService.path
+        guard let endpoint = components.url else { throw NativeSourceOperatorError.unavailable }
+        try NativeTaskOperatorEndpoint.validate(endpoint)
+        components.path = "/api/manager/continuity/source/" + action
+        guard let url = components.url else { throw NativeSourceOperatorError.unavailable }
+        let authorization = "Bearer \(try credentials.bearerToken())"
+        let configuration = session.configuration
+        configuration.urlCache = nil; configuration.httpCookieStorage = nil; configuration.urlCredentialStorage = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.timeoutIntervalForRequest = 18; configuration.timeoutIntervalForResource = 20
+        let boundedSession = URLSession(configuration: configuration)
+        defer { boundedSession.invalidateAndCancel() }
+        let redirectGuard = NativeTaskOperatorRedirectGuard()
+        for attempt in 0..<2 {
+            do {
+                try Task.checkCancellation()
+                var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 18)
+                request.httpMethod = "POST"; request.httpBody = body; request.httpShouldHandleCookies = false
+                request.setValue(authorization, forHTTPHeaderField: "Authorization")
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                request.setValue("application/json", forHTTPHeaderField: "Accept")
+                request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+                let (bytes, response) = try await boundedSession.bytes(for: request, delegate: redirectGuard)
+                defer { bytes.task.cancel() }
+                guard let http = response as? HTTPURLResponse, http.url == url,
+                      response.expectedContentLength <= Int64(NativeSourceOperatorResponse.maximumBytes) else {
+                    throw NativeSourceOperatorError.invalidResponse
+                }
+                var data = Data(); data.reserveCapacity(8_192)
+                for try await byte in bytes {
+                    guard data.count < NativeSourceOperatorResponse.maximumBytes else { throw NativeSourceOperatorError.invalidResponse }
+                    data.append(byte)
+                }
+                guard http.statusCode == 200 || http.statusCode == 202 else { throw NativeSourceOperatorError.unavailable }
+                let decoded = try NativeSourceOperatorResponse(data: data)
+                guard decoded.taskID == taskID, decoded.requestID == requestID else { throw NativeSourceOperatorError.invalidResponse }
+                return decoded.canonicalJSON
+            } catch {
+                guard attempt == 0, Self.isAmbiguousTransportFailure(error), !Task.isCancelled else { throw error }
+                try await Task.sleep(for: .milliseconds(200))
+            }
+        }
+        throw NativeSourceOperatorError.unavailable
+    }
+}
+
 private final class NativeTaskOperatorRedirectGuard: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
                     newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {

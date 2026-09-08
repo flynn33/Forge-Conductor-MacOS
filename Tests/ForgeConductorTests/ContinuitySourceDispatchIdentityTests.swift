@@ -281,6 +281,13 @@ private enum SourceDispatchSQLite {
             BEGIN IMMEDIATE;
             DROP TRIGGER trg_continuity_source_origin_binding_update;
             DROP TRIGGER trg_continuity_source_origin_binding_delete;
+            ALTER TABLE provider_turns DROP COLUMN source_preflight_sha256;
+            ALTER TABLE provider_turns DROP COLUMN source_preflight_json;
+            DROP TABLE IF EXISTS native_source_provider_run_offsets;
+            DROP TABLE IF EXISTS native_source_provider_calls;
+            DROP TABLE IF EXISTS native_source_capability_checks;
+            DROP TABLE IF EXISTS native_source_provider_turns;
+            DROP TABLE IF EXISTS native_source_conversations;
             DROP TABLE IF EXISTS native_source_run_offsets;
             DROP TABLE IF EXISTS native_source_requests;
             DROP TABLE IF EXISTS native_task_commands;

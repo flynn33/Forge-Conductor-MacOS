@@ -1819,16 +1819,18 @@ public actor RuntimeJobRepository {
             && requiredTableCount == controlPlaneV2RequiredSurfaces.count else {
             return false
         }
+        guard let providerTurnColumns = try exactCoResidentProviderTurnColumns(integer: { try candidate.integer($0) }) else { return false }
         for surface in controlPlaneV2RequiredSurfaces {
-            let columnList = surface.columns.map { "'\($0)'" }.joined(separator: ",")
+            let columns = surface.name == "provider_turns" ? providerTurnColumns : surface.columns
+            let columnList = columns.map { "'\($0)'" }.joined(separator: ",")
             let totalCount = try candidate.integer(
                 "SELECT COUNT(*) FROM pragma_table_info('\(surface.name)')"
             ) ?? 0
             let matchedCount = try candidate.integer(
                 "SELECT COUNT(*) FROM pragma_table_info('\(surface.name)') WHERE name IN (\(columnList))"
             ) ?? 0
-            guard totalCount == surface.columns.count,
-                  matchedCount == surface.columns.count else {
+            guard totalCount == columns.count,
+                  matchedCount == columns.count else {
                 return false
             }
         }
@@ -1862,8 +1864,10 @@ public actor RuntimeJobRepository {
             && requiredTableCount == controlPlaneV2RequiredSurfaces.count else {
             return false
         }
+        guard let providerTurnColumns = try exactCoResidentProviderTurnColumns(integer: { try rawScalarInt($0, database: database) }) else { return false }
         for surface in controlPlaneV2RequiredSurfaces {
-            let columnList = surface.columns.map { "'\($0)'" }.joined(separator: ",")
+            let columns = surface.name == "provider_turns" ? providerTurnColumns : surface.columns
+            let columnList = columns.map { "'\($0)'" }.joined(separator: ",")
             let totalCount = try rawScalarInt(
                 "SELECT COUNT(*) FROM pragma_table_info('\(surface.name)')",
                 database: database
@@ -1872,12 +1876,42 @@ public actor RuntimeJobRepository {
                 "SELECT COUNT(*) FROM pragma_table_info('\(surface.name)') WHERE name IN (\(columnList))",
                 database: database
             ) ?? 0
-            guard totalCount == surface.columns.count,
-                  matchedCount == surface.columns.count else {
+            guard totalCount == columns.count,
+                  matchedCount == columns.count else {
                 return false
             }
         }
         return true
+    }
+
+    /// Only the known pre-journal and capability-eight provider ledgers are
+    /// valid co-residents of a version-zero runtime job database. Unknown extra
+    /// columns still cannot turn an arbitrary nonempty database into a baseline.
+    private static func exactCoResidentProviderTurnColumns(integer: (String) throws -> Int?) throws -> [String]? {
+        guard let legacy = controlPlaneV2RequiredSurfaces.first(where: { $0.name == "provider_turns" })?.columns else { return nil }
+        let journalTables = try integer("""
+            SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN
+                ('native_source_conversations','native_source_provider_turns','native_source_provider_calls',
+                 'native_source_capability_checks','native_source_provider_run_offsets')
+            """) ?? 0
+        let receiptColumns = try integer("""
+            SELECT COUNT(*) FROM pragma_table_xinfo('provider_turns')
+            WHERE name IN('source_preflight_json','source_preflight_sha256')
+            """) ?? 0
+        if journalTables == 0 && receiptColumns == 0 { return legacy }
+        guard journalTables == 5, receiptColumns == 2,
+              try integer("SELECT COUNT(*) FROM pragma_table_xinfo('provider_turns') WHERE hidden<>0") == 0,
+              try integer("""
+                  SELECT COUNT(*) FROM pragma_table_xinfo('provider_turns') WHERE type='TEXT' AND "notnull"=0
+                      AND dflt_value IS NULL AND ((cid=23 AND name='source_preflight_json')
+                          OR (cid=24 AND name='source_preflight_sha256'))
+                  """) == 2,
+              try integer("""
+                  SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='provider_turns'
+                    AND instr(sql,'source_preflight_json TEXT CHECK (source_preflight_json IS NULL OR length(CAST(source_preflight_json AS BLOB)) BETWEEN 1 AND 32768)')>0
+                    AND instr(sql,'source_preflight_sha256 TEXT CHECK ((source_preflight_json IS NULL AND source_preflight_sha256 IS NULL) OR (source_preflight_json IS NOT NULL AND source_preflight_sha256 IS NOT NULL AND length(source_preflight_sha256)=64))')>0
+                  """) == 1 else { return nil }
+        return legacy + ["source_preflight_json", "source_preflight_sha256"]
     }
 
     @discardableResult

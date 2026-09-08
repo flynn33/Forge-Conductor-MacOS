@@ -266,3 +266,51 @@ oversized packet cannot commit and then be reported as a size rejection.
 This attachment is an explicit native API path. Existing desktop conversation
 association, writable source transfer, repeated live-provider rollover and the
 full crash qualification remain separate requirements.
+
+
+## Manager-owned source conversations
+
+An approved native task can now send work through the manager's existing native
+Responses provider. The manager owns this conversation and its bounded provider
+permit. The operator uses stable request IDs to reconcile the same logical input:
+
+```sh
+forge-conductor manager task send --task UUID --request-id UUID --input-file /absolute/input.txt
+forge-conductor manager task status --task UUID --request-id UUID
+forge-conductor manager task cancel --task UUID --request-id UUID --cancel-request-id UUID
+```
+
+The input is a protected UTF-8 file of at most 16 KiB. The task's original
+assignment, project generation, approved tool scope and credential remain the
+authority. Reusing a request ID with different input is rejected. Status reports
+bounded metadata; credentials and complete provider transcripts are not returned.
+
+Control-plane capability 8 adds a bounded conversation journal. Each provider
+request freezes its exact local preflight, capability observation and identity
+before a single submission. The same transport encoder checks request bytes and
+output limits. An uncertain submission stays eligible only for recorded-receipt
+lookup, including after restart; elapsed time cannot authorize another POST.
+Provider configuration remains pinned while source or managed work owns it.
+
+Actual provider call IDs enter the existing authenticated source dispatcher.
+Reads and checkpoint/handoff commits retain exact results and debits. Before a
+read or result continuation, admission reserves the full approved result bound,
+including JSON escaping. A ready handoff fences the source and enters the existing
+outbox, acceptance, exact restoration, acknowledgement and sealing sequence.
+
+The successor inherits original context/output ceilings, reserve floors and tool
+allowances while applying tighter current policy. Its retained context begins
+with the actual bootstrap acknowledgement, without importing the old source
+conversation's cumulative usage. Missing usage uses conservative serialized
+history. Ordered tool-output prefixes are charged once; completed response-chain
+recovery verifies the original provider and broker receipts before replaying
+work. Equivalent stored usage JSON formatting remains compatible, while changed
+values, response identities and expired ownership are rejected.
+
+Automatic handoff caused by source context pressure, writable source work,
+association with an existing external desktop conversation, repeated real-provider
+rollover and complete native/process qualification remain open. A default large
+result allowance can exceed available headroom before a read; source pressure
+currently defers that work without a qualified automatic transfer. The current
+implementation and deterministic fixtures do not close G04 or establish release
+readiness.

@@ -14,6 +14,16 @@ private actor PreflightAuthorization: LMStudioAuthorizationProviding {
     var count: Int { resolutions }
 }
 
+private final class PreflightCapabilityClock: @unchecked Sendable {
+    private let lock = NSLock()
+    private var instant = ContinuousClock.now
+    func now() -> ContinuousClock.Instant { lock.lock(); defer { lock.unlock() }; return instant }
+    func advance(seconds: Double) {
+        lock.lock(); defer { lock.unlock() }
+        instant = instant.advanced(by: .seconds(seconds))
+    }
+}
+
 private final class PreflightCapture: @unchecked Sendable {
     struct Request: Sendable {
         let method: String
@@ -23,6 +33,12 @@ private final class PreflightCapture: @unchecked Sendable {
     }
     private let lock = NSLock()
     private var requests: [Request] = []
+    private var replacementModels: Data?
+    func replaceModels(_ data: Data) throws {
+        guard data.count <= 8_192 else { throw URLError(.dataLengthExceedsMaximum) }
+        lock.lock(); defer { lock.unlock() }; replacementModels = data
+    }
+    var models: Data? { lock.lock(); defer { lock.unlock() }; return replacementModels }
     func record(_ request: Request) throws {
         lock.lock(); defer { lock.unlock() }
         guard requests.count < 16, request.body.count <= 1_048_576 else {
@@ -69,7 +85,7 @@ private final class PreflightRecordingProtocol: URLProtocol, @unchecked Sendable
             if request.httpMethod == "GET", url.path == "/api/v1/models" {
                 let fixture = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
                     .appendingPathComponent("Fixtures/LMStudio/models-loaded.json")
-                data = try Data(contentsOf: fixture)
+                data = try capture.models ?? Data(contentsOf: fixture)
                 contentType = "application/json"
             } else if request.httpMethod == "POST", url.path == "/v1/responses" {
                 let value = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
@@ -211,6 +227,8 @@ final class ManagedModelProviderPreflightTests: XCTestCase {
         let body = try XCTUnwrap(JSONSerialization.jsonObject(with: actual.body) as? [String: Any])
         XCTAssertEqual(body["max_output_tokens"] as? Int, 321)
         XCTAssertNil(body["previous_response_id"])
+        let encodedInput = try JSONSerialization.data(withJSONObject: XCTUnwrap(body["input"]), options: [.sortedKeys])
+        XCTAssertEqual(preflight.serializedInputByteCount, encodedInput.count)
 
         let next = try continuation(previous: turn.responseID)
         let countBefore = f.capture.snapshot.count
@@ -229,6 +247,123 @@ final class ManagedModelProviderPreflightTests: XCTestCase {
         XCTAssertEqual(nextBody["previous_response_id"] as? String, turn.responseID)
         let outputs = try XCTUnwrap(nextBody["input"] as? [[String: Any]])
         XCTAssertEqual(outputs.first?["call_id"] as? String, "call_original/雪")
+        let encodedNextInput = try JSONSerialization.data(withJSONObject: outputs, options: [.sortedKeys])
+        XCTAssertEqual(nextPreflight.serializedInputByteCount, encodedNextInput.count)
+        XCTAssertGreaterThan(encodedNextInput.count, next.input.count,
+            "The actual encoder's slash escaping must appear in input accounting")
+    }
+
+    func testObservedDispatchUsesOnlyRecordedProbeAndExactRequestBodies() async throws {
+        let f = try fixture(); defer { f.close() }
+        let capabilities = try await f.provider.probe()
+        XCTAssertEqual(f.capture.snapshot.count, 2) // inventory plus the fixed contract request
+        let request = try root()
+        let preflight = try await f.provider.preflightRoot(request)
+        let rootTurn = try await f.provider.createRoot(request, observedCapabilities: capabilities)
+        XCTAssertEqual(f.capture.snapshot.count, 3)
+        let actualRoot = try XCTUnwrap(f.capture.snapshot.last)
+        XCTAssertEqual(JSONSupport.sha256Hex(actualRoot.body), preflight.bodySHA256)
+        let next = try continuation(previous: rootTurn.responseID)
+        let nextPreflight = try await f.provider.preflightContinuation(next)
+        _ = try await f.provider.continueSession(next, observedCapabilities: capabilities)
+        XCTAssertEqual(f.capture.snapshot.count, 4)
+        XCTAssertEqual(JSONSupport.sha256Hex(try XCTUnwrap(f.capture.snapshot.last).body), nextPreflight.bodySHA256)
+        let recorded = try await f.provider.lookupRecorded(idempotencyKey: request.idempotencyKey)
+        XCTAssertEqual(recorded?.requestID, request.operationID.uuidString.lowercased())
+        XCTAssertEqual(recorded?.responseID, rootTurn.responseID)
+        XCTAssertEqual(f.capture.snapshot.count, 4)
+    }
+
+    func testExpiredObservationRejectsRootAndContinuationWithoutHiddenProbe() async throws {
+        let f = try fixture(); defer { f.close() }
+        let clock = PreflightCapabilityClock()
+        let client = try LMStudioRESTClient(configuration: f.configuration,
+            sessionConfiguration: f.session, authorization: f.authorization, capabilityClock: { clock.now() })
+        let provider = LMStudioManagedModelProvider(transport: LMStudioManagedSessionTransport(client: client))
+        let capabilities = try await provider.probe()
+        XCTAssertEqual(f.capture.snapshot.count, 2)
+        clock.advance(seconds: LMStudioRESTClient.capabilityCacheSeconds + 1)
+        do {
+            _ = try await provider.createRoot(root(), observedCapabilities: capabilities)
+            XCTFail("Expired observations must not cause an implicit probe or assignment POST")
+        } catch let error as LMStudioProviderError {
+            guard case .invalidConfiguration = error else { return XCTFail("Unexpected error: \(error)") }
+        }
+        do {
+            _ = try await provider.continueSession(continuation(), observedCapabilities: capabilities)
+            XCTFail("Continuation dispatch must also reject an expired observation")
+        } catch let error as LMStudioProviderError {
+            guard case .invalidConfiguration = error else { return XCTFail("Unexpected error: \(error)") }
+        }
+        XCTAssertEqual(f.capture.snapshot.count, 2)
+        let authorizationCalls = await f.authorization.count
+        XCTAssertEqual(authorizationCalls, 2)
+        _ = try await provider.probe() // Only this explicit observation may refresh the contract.
+        XCTAssertEqual(f.capture.snapshot.count, 4)
+    }
+
+    func testForeignObservationAndReceiptLookupNeverDiscoverCapabilities() async throws {
+        let f = try fixture(); defer { f.close() }
+        let capabilities = try await f.provider.probe()
+        let fresh = try f.provider(configuration: f.configuration)
+        do {
+            _ = try await fresh.createRoot(root(), observedCapabilities: capabilities)
+            XCTFail("A copied capability value cannot replace this owner's explicit observation")
+        } catch let error as ManagedModelProviderContractError {
+            XCTAssertEqual(error, .invalidValue("capabilities were not observed by this provider"))
+        }
+        let absent = try await fresh.lookupRecorded(idempotencyKey: "unknown-original-request")
+        XCTAssertNil(absent)
+        XCTAssertEqual(f.capture.snapshot.count, 2)
+        let unsupported = UnsupportedPreflightTransport()
+        let unrefined = LMStudioManagedModelProvider(transport: unsupported)
+        do {
+            _ = try await unrefined.createRoot(root(), observedCapabilities: capabilities)
+            XCTFail("Unrefined transports must not silently fall back to implicit probing")
+        } catch let error as ManagedModelProviderContractError {
+            XCTAssertEqual(error, .unsupportedCapability("observed request dispatch"))
+        }
+        let effects = await unsupported.effectCount
+        XCTAssertEqual(effects, 0)
+    }
+
+    func testRecordedLookupPreservesOriginalCapabilitiesAfterLaterProbe() async throws {
+        let f = try fixture(); defer { f.close() }
+        let clock = PreflightCapabilityClock()
+        let client = try LMStudioRESTClient(configuration: f.configuration,
+            sessionConfiguration: f.session, authorization: f.authorization, capabilityClock: { clock.now() })
+        let provider = LMStudioManagedModelProvider(transport: LMStudioManagedSessionTransport(client: client))
+        let original = try await provider.probe()
+        let request = try root()
+        let turn = try await provider.createRoot(request, observedCapabilities: original)
+        let fixtureURL = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .appendingPathComponent("Fixtures/LMStudio/models-loaded.json")
+        let fixture = try String(contentsOf: fixtureURL, encoding: .utf8)
+        let changed = fixture.replacingOccurrences(of: "fixture/tool-model@32768", with: "fixture/tool-model@65536")
+            .replacingOccurrences(of: "\"context_length\": 32768", with: "\"context_length\": 65536")
+        try f.capture.replaceModels(Data(changed.utf8))
+        clock.advance(seconds: LMStudioRESTClient.capabilityCacheSeconds + 1)
+        let newer = try await provider.probe()
+        XCTAssertNotEqual(newer.providerInstanceID, original.providerInstanceID)
+        XCTAssertNotEqual(newer.contextLength, original.contextLength)
+        let before = f.capture.snapshot.count
+        let recovered = try await provider.lookupRecorded(idempotencyKey: request.idempotencyKey)
+        XCTAssertEqual(recovered, turn)
+        XCTAssertEqual(recovered?.usage?.capacity, original.contextLength)
+        XCTAssertEqual(recovered?.providerInstanceID, original.providerInstanceID)
+        XCTAssertEqual(f.capture.snapshot.count, before)
+    }
+
+    func testSourceOutputReservationPlaceholderUsesExactSerializedInputCount() async throws {
+        let f = try fixture(); defer { f.close() }
+        let pending = try continuation(output: "0")
+        let preflight = try await f.provider.preflightContinuation(pending)
+        let measured = try XCTUnwrap(preflight.serializedInputByteCount)
+        let input = try XCTUnwrap(JSONSerialization.jsonObject(with: pending.input) as? [[String: Any]])
+        let actualEncoding = try JSONSerialization.data(withJSONObject: input, options: [.sortedKeys])
+        XCTAssertEqual(measured, actualEncoding.count)
+        XCTAssertGreaterThan(measured, pending.input.count)
+        XCTAssertEqual(f.capture.snapshot.count, 0)
     }
 
     func testConfigurationSnapshotIsImmutableAndFingerprintChangesWithLimits() async throws {

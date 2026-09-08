@@ -7,6 +7,9 @@ public enum NativeTaskOperatorCommandLine {
     forge-conductor manager task reconcile --task UUID [--home PATH]
     forge-conductor manager task rotate --task UUID --expected-epoch N --expires-at UTC [--home PATH]
     forge-conductor manager task revoke --task UUID --expected-epoch N [--reason TEXT] [--home PATH]
+    forge-conductor manager task send --task UUID --request-id UUID --input-file PATH [--home PATH]
+    forge-conductor manager task status --task UUID --request-id UUID [--home PATH]
+    forge-conductor manager task cancel --task UUID --request-id UUID --cancel-request-id UUID [--reason TEXT] [--home PATH]
     Credentials remain in the installation's protected native task store. Output contains only safe task receipts and paths.
     """
 
@@ -31,6 +34,22 @@ public enum NativeTaskOperatorCommandLine {
     }
 
     static func execute(_ options: Options, client: NativeTaskOperatorClient) async throws -> Data {
+        switch options.action {
+        case "send":
+            let data = try OwnerOnlyAtomicFile.read(from: URL(fileURLWithPath: options.values["--input-file"]!),
+                maximumBytes: NativeSourceSendRequest.maximumInputBytes)
+            guard let input = String(data: data, encoding: .utf8) else { throw NativeSourceOperatorError.invalidRequest("input") }
+            return try await client.sendSource(NativeSourceSendRequest(taskID: options.taskID!,
+                requestID: options.requestID!, input: input)).canonicalJSON
+        case "status":
+            return try await client.sourceStatus(NativeSourceStatusRequest(taskID: options.taskID!,
+                requestID: options.requestID!)).canonicalJSON
+        case "cancel":
+            return try await client.cancelSource(NativeSourceCancelRequest(taskID: options.taskID!,
+                requestID: options.requestID!, cancelRequestID: options.cancelRequestID!,
+                reason: options.values["--reason"])).canonicalJSON
+        default: break
+        }
         do {
             let result: NativeTaskCredentialSnapshot
             switch options.action {
@@ -58,9 +77,11 @@ public enum NativeTaskOperatorCommandLine {
         let values: [String: String]
         let taskID: UUID?
         let epoch: Int64?
+        let requestID: UUID?
+        let cancelRequestID: UUID?
         var home: URL? { values["--home"].map { URL(fileURLWithPath: $0, isDirectory: true) } }
         init(_ arguments: [String]) throws {
-            guard let action = arguments.first, ["prepare", "reconcile", "rotate", "revoke"].contains(action),
+            guard let action = arguments.first, ["prepare", "reconcile", "rotate", "revoke", "send", "status", "cancel"].contains(action),
                   arguments.count <= 13, arguments.count % 2 == 1 else { throw NativeTaskOperatorError.invalidRequest("command") }
             self.action = action
             let required: Set<String>
@@ -68,9 +89,12 @@ public enum NativeTaskOperatorCommandLine {
             case "prepare": required = ["--request"]
             case "reconcile": required = ["--task"]
             case "rotate": required = ["--task", "--expected-epoch", "--expires-at"]
+            case "send": required = ["--task", "--request-id", "--input-file"]
+            case "status": required = ["--task", "--request-id"]
+            case "cancel": required = ["--task", "--request-id", "--cancel-request-id"]
             default: required = ["--task", "--expected-epoch"]
             }
-            let allowed = required.union(["--home"]).union(action == "revoke" ? ["--reason"] : [])
+            let allowed = required.union(["--home"]).union(["revoke", "cancel"].contains(action) ? ["--reason"] : [])
             var values: [String: String] = [:]
             for index in stride(from: 1, to: arguments.count, by: 2) {
                 let key = arguments[index], value = arguments[index + 1]
@@ -79,19 +103,27 @@ public enum NativeTaskOperatorCommandLine {
                 values[key] = value
             }
             guard required.isSubset(of: Set(values.keys)) else { throw NativeTaskOperatorError.invalidRequest("options") }
-            for key in ["--request", "--home"] {
+            for key in ["--request", "--input-file", "--home"] {
                 if let value = values[key], !(value as NSString).isAbsolutePath { throw NativeTaskOperatorError.invalidRequest("path") }
             }
             if let value = values["--task"] {
                 guard let id = UUID(uuidString: value), id.uuidString.lowercased() == value else { throw NativeTaskOperatorError.invalidRequest("task") }
                 taskID = id
             } else { taskID = nil }
+            if let value = values["--request-id"] {
+                requestID = try NativeSourceOperatorWire.uuid(["request_id": value], "request_id")
+            } else { requestID = nil }
+            if let value = values["--cancel-request-id"] {
+                cancelRequestID = try NativeSourceOperatorWire.uuid(["cancel_request_id": value], "cancel_request_id")
+            } else { cancelRequestID = nil }
             if let value = values["--expected-epoch"] {
                 guard let epoch = Int64(value), epoch > 0, epoch < Int64.max, String(epoch) == value else { throw NativeTaskOperatorError.invalidRequest("expected_epoch") }
                 self.epoch = epoch
             } else { epoch = nil }
             if let value = values["--expires-at"] { _ = try NativeTaskOperatorWire.date(["expires_at": value], "expires_at") }
-            if let value = values["--reason"] { _ = try NativeTaskOperatorWire.string(["reason": value], "reason", maximum: 512) }
+            if let value = values["--reason"] {
+                _ = try NativeTaskOperatorWire.string(["reason": value], "reason", maximum: action == "cancel" ? 256 : 512)
+            }
             self.values = values
         }
     }

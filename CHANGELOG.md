@@ -22,6 +22,15 @@ installed-stack and production-feature acceptance remain separate gates.
 
 ### Authorized handoff storage and admission
 
+- Approved native tasks now accept source messages through the manager, with
+  bounded provider ownership, durable response/call identities and authenticated
+  send, status and cancellation commands.
+- Source bootstrap and successor requests retain exact local preflight receipts.
+  Unknown submissions remain lookup-only, and current limits cannot exceed the
+  original context, output and tool allowances.
+- Successor budgets begin with the actual bootstrap acknowledgement. Actual
+  tool-output prefixes and completed response chains survive replay without
+  duplicate effects or repeated context charges.
 - Native Responses requests can now be checked locally against the transport's
   exact encoded bytes and configured limits before dispatch. This preflight
   performs no inference or credential lookup and does not certify cached receipts.

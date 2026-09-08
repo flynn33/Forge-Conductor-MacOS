@@ -355,6 +355,80 @@ public struct ContextBudgetReserves: Codable, Sendable, Equatable {
     }
 }
 
+/// A persisted context ceiling from the accepted source conversation. This is
+/// budget provenance, not an execution grant; production obtains it from the
+/// control plane's independently verified carryover receipt at every boundary.
+public struct InheritedSourceContextBudget: Codable, Sendable, Equatable {
+    public let version: String
+    public let runID: RunID
+    public let taskID: UUID
+    public let conversationID: UUID
+    public let acceptanceSHA256: String
+    public let journalSHA256: String
+    public let effectiveContextTokens: Int
+    public let maximumOutputTokens: Int
+    public let reserves: ContextBudgetReserves
+    public let checkpointRatio: Double
+    public let rolloverRatio: Double
+    public let emergencyRatio: Double
+
+    init(carryover: NativeSourceBudgetCarryover) throws {
+        let ceilings = try carryover.ceilings.validated()
+        version = "native_source_context_v1"
+        runID = carryover.runID
+        taskID = carryover.taskID
+        conversationID = carryover.conversationID
+        acceptanceSHA256 = carryover.acceptanceSHA256
+        journalSHA256 = carryover.journalSHA256
+        effectiveContextTokens = ceilings.effectiveContextTokens
+        maximumOutputTokens = ceilings.maximumOutputTokens
+        reserves = ceilings.reserves
+        checkpointRatio = ceilings.checkpointRatio
+        rolloverRatio = ceilings.rolloverRatio
+        emergencyRatio = ceilings.emergencyRatio
+        _ = try validated()
+    }
+
+    public func validated() throws -> Self {
+        func validDigest(_ value: String) -> Bool {
+            value.utf8.count == 64 && value.utf8.allSatisfy { (48...57).contains($0) || (97...102).contains($0) }
+        }
+        guard version == "native_source_context_v1",
+              validDigest(acceptanceSHA256), validDigest(journalSHA256),
+              (1...ContextCapacityResolver.maximumSupportedCapacity).contains(effectiveContextTokens),
+              (1...effectiveContextTokens).contains(maximumOutputTokens),
+              checkpointRatio.isFinite, rolloverRatio.isFinite, emergencyRatio.isFinite,
+              checkpointRatio > 0, checkpointRatio < rolloverRatio,
+              rolloverRatio < emergencyRatio, emergencyRatio <= 1,
+              try reserves.fixedTotal() < effectiveContextTokens else {
+            throw ContextBudgetError.invalidPolicy
+        }
+        return self
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case version, runID, taskID, conversationID, acceptanceSHA256, journalSHA256
+        case effectiveContextTokens, maximumOutputTokens, reserves, checkpointRatio, rolloverRatio, emergencyRatio
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        version = try c.decode(String.self, forKey: .version)
+        runID = try c.decode(RunID.self, forKey: .runID)
+        taskID = try c.decode(UUID.self, forKey: .taskID)
+        conversationID = try c.decode(UUID.self, forKey: .conversationID)
+        acceptanceSHA256 = try c.decode(String.self, forKey: .acceptanceSHA256)
+        journalSHA256 = try c.decode(String.self, forKey: .journalSHA256)
+        effectiveContextTokens = try c.decode(Int.self, forKey: .effectiveContextTokens)
+        maximumOutputTokens = try c.decode(Int.self, forKey: .maximumOutputTokens)
+        reserves = try c.decode(ContextBudgetReserves.self, forKey: .reserves)
+        checkpointRatio = try c.decode(Double.self, forKey: .checkpointRatio)
+        rolloverRatio = try c.decode(Double.self, forKey: .rolloverRatio)
+        emergencyRatio = try c.decode(Double.self, forKey: .emergencyRatio)
+        _ = try validated()
+    }
+}
+
 /// The saved operator values remain intact when the loaded instance imposes a
 /// smaller execution ceiling. This value is committed with every applied boundary.
 public struct ResolvedContextBudgetPolicy: Codable, Sendable, Equatable {
@@ -365,21 +439,27 @@ public struct ResolvedContextBudgetPolicy: Codable, Sendable, Equatable {
     public let effectiveCheckpointRatio: Double
     public let effectiveRolloverRatio: Double
     public let effectiveEmergencyRatio: Double
+    public let inheritedSourceBudget: InheritedSourceContextBudget?
 
     public init(selection: BudgetPolicySelection, verifiedLoadedContextTokens: Int,
                 effectiveContextTokens: Int, thresholdContract: String = "admitted_total_v2",
-                qualificationPolicy: ContextBudgetPolicy? = nil) {
+                qualificationPolicy: ContextBudgetPolicy? = nil,
+                inheritedSourceBudget: InheritedSourceContextBudget? = nil) {
 
         self.selection = selection
         self.verifiedLoadedContextTokens = verifiedLoadedContextTokens
         self.effectiveContextTokens = effectiveContextTokens
         self.thresholdContract = thresholdContract
+        self.inheritedSourceBudget = inheritedSourceBudget
         effectiveCheckpointRatio = min(selection.policy.context.checkpointRatio,
-                                       qualificationPolicy.map { 1 - $0.checkpointFraction } ?? 1)
+                                       qualificationPolicy.map { 1 - $0.checkpointFraction } ?? 1,
+                                       inheritedSourceBudget?.checkpointRatio ?? 1)
         effectiveRolloverRatio = min(selection.policy.context.rolloverRatio,
-                                     qualificationPolicy.map { 1 - $0.rolloverFraction } ?? 1)
+                                     qualificationPolicy.map { 1 - $0.rolloverFraction } ?? 1,
+                                     inheritedSourceBudget?.rolloverRatio ?? 1)
         effectiveEmergencyRatio = min(selection.policy.context.emergencyRatio,
-                                      qualificationPolicy.map { 1 - $0.emergencyFraction } ?? 1)
+                                      qualificationPolicy.map { 1 - $0.emergencyFraction } ?? 1,
+                                      inheritedSourceBudget?.emergencyRatio ?? 1)
     }
 
     public var requestedContextTokens: Int { selection.policy.context.maxContextTokens }
@@ -390,22 +470,45 @@ public struct ResolvedContextBudgetPolicy: Codable, Sendable, Equatable {
     public func validated() throws -> Self {
         _ = try selection.scope.validated()
         _ = try selection.policy.validated()
+        _ = try inheritedSourceBudget?.validated()
+        let selectedCapacity = selection.policy.context.mode == .auto
+            ? verifiedLoadedContextTokens : min(requestedContextTokens, verifiedLoadedContextTokens)
         guard selection.revision >= 0, selection.globalRevision > 0,
               verifiedLoadedContextTokens > 0,
               verifiedLoadedContextTokens <= ContextCapacityResolver.maximumSupportedCapacity,
               effectiveContextTokens > 0,
-              effectiveContextTokens == (selection.policy.context.mode == .auto
-                  ? verifiedLoadedContextTokens : min(requestedContextTokens, verifiedLoadedContextTokens)),
+              effectiveContextTokens == min(selectedCapacity, inheritedSourceBudget?.effectiveContextTokens ?? selectedCapacity),
               thresholdContract == "admitted_total_v2",
               effectiveCheckpointRatio.isFinite, effectiveRolloverRatio.isFinite, effectiveEmergencyRatio.isFinite,
               effectiveCheckpointRatio > 0, effectiveCheckpointRatio < effectiveRolloverRatio,
               effectiveRolloverRatio < effectiveEmergencyRatio,
               effectiveCheckpointRatio <= selection.policy.context.checkpointRatio,
               effectiveRolloverRatio <= selection.policy.context.rolloverRatio,
-              effectiveEmergencyRatio <= selection.policy.context.emergencyRatio else {
+              effectiveEmergencyRatio <= selection.policy.context.emergencyRatio,
+              effectiveCheckpointRatio <= (inheritedSourceBudget?.checkpointRatio ?? 1),
+              effectiveRolloverRatio <= (inheritedSourceBudget?.rolloverRatio ?? 1),
+              effectiveEmergencyRatio <= (inheritedSourceBudget?.emergencyRatio ?? 1) else {
             throw ContextBudgetError.invalidPolicy
         }
         return self
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case selection, verifiedLoadedContextTokens, effectiveContextTokens, thresholdContract
+        case effectiveCheckpointRatio, effectiveRolloverRatio, effectiveEmergencyRatio, inheritedSourceBudget
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        selection = try c.decode(BudgetPolicySelection.self, forKey: .selection)
+        verifiedLoadedContextTokens = try c.decode(Int.self, forKey: .verifiedLoadedContextTokens)
+        effectiveContextTokens = try c.decode(Int.self, forKey: .effectiveContextTokens)
+        thresholdContract = try c.decode(String.self, forKey: .thresholdContract)
+        effectiveCheckpointRatio = try c.decode(Double.self, forKey: .effectiveCheckpointRatio)
+        effectiveRolloverRatio = try c.decode(Double.self, forKey: .effectiveRolloverRatio)
+        effectiveEmergencyRatio = try c.decode(Double.self, forKey: .effectiveEmergencyRatio)
+        inheritedSourceBudget = try c.decodeIfPresent(InheritedSourceContextBudget.self, forKey: .inheritedSourceBudget)
+        _ = try validated()
     }
 }
 
@@ -421,10 +524,12 @@ public struct ContextBudgetAccounting: Codable, Sendable, Equatable {
     public let resolvedPolicy: ResolvedContextBudgetPolicy?
     public let toolSchemaSHA256: String?
     public let pendingInputID: String?
+    public let toolResultAccounting: ManagedToolResultAccounting?
 
     public init(version: String, cut: String, retainedInputTokens: Int?, futureReserveTokens: Int,
                 rawProviderUsage: ProviderUsage? = nil, resolvedPolicy: ResolvedContextBudgetPolicy? = nil,
-                toolSchemaSHA256: String? = nil, pendingInputID: String? = nil) throws {
+                toolSchemaSHA256: String? = nil, pendingInputID: String? = nil,
+                toolResultAccounting: ManagedToolResultAccounting? = nil) throws {
         guard futureReserveTokens >= 0, retainedInputTokens.map({ $0 >= 0 }) ?? true else {
             throw ContextBudgetError.invalidObservation("negative normalized accounting")
         }
@@ -434,6 +539,7 @@ public struct ContextBudgetAccounting: Codable, Sendable, Equatable {
         self.futureReserveTokens = futureReserveTokens; self.admittedTotalTokens = sum?.partialValue
         self.rawProviderUsage = rawProviderUsage; self.resolvedPolicy = resolvedPolicy
         self.toolSchemaSHA256 = toolSchemaSHA256; self.pendingInputID = pendingInputID
+        self.toolResultAccounting = toolResultAccounting
         _ = try validated()
     }
 
@@ -467,6 +573,12 @@ public struct ContextBudgetAccounting: Codable, Sendable, Equatable {
             }
         }
         _ = try resolvedPolicy?.validated()
+        if let toolResultAccounting {
+            _ = try toolResultAccounting.validated()
+            guard resolvedPolicy?.inheritedSourceBudget != nil else {
+                throw ContextBudgetError.invalidObservation("tool output accounting has no inherited source")
+            }
+        }
         guard (version == "admitted_total_v2") == (resolvedPolicy != nil) else {
             throw ContextBudgetError.invalidObservation("accounting policy version mismatch")
         }
@@ -582,6 +694,17 @@ public struct ContextBudgetConfiguration: Codable, Sendable, Equatable {
             _ = try resolvedPolicy.validated()
             guard capacity.capacity == resolvedPolicy.effectiveContextTokens else {
                 throw ContextBudgetError.configurationMismatch
+            }
+            if let inherited = resolvedPolicy.inheritedSourceBudget {
+                let floors = inherited.reserves
+                guard reserves.outputTokens >= max(floors.outputTokens, inherited.maximumOutputTokens),
+                      reserves.schemaTokens >= floors.schemaTokens,
+                      reserves.handoffTokens >= floors.handoffTokens,
+                      reserves.recoveryTokens >= floors.recoveryTokens,
+                      reserves.futureToolTokens >= floors.futureToolTokens,
+                      reserves.safetyTokens >= floors.safetyTokens else {
+                    throw ContextBudgetError.invalidReserve
+                }
             }
         }
         try capacity.validateForExecution(
@@ -1005,6 +1128,10 @@ public struct PersistedContextBudgetState: Codable, Sendable, Equatable {
         _ = try identity.validated()
         _ = try configuration.validated()
         _ = try ewma.validated()
+        if let inherited = configuration.resolvedPolicy?.inheritedSourceBudget,
+           inherited.runID != identity.runID {
+            throw ContextBudgetError.invalidPersistedState
+        }
         guard revision <= UInt64(Int64.max),
               observationCount <= UInt64(Int64.max),
               actionEpoch <= UInt64(Int64.max),
@@ -1019,6 +1146,13 @@ public struct PersistedContextBudgetState: Codable, Sendable, Equatable {
             throw ContextBudgetError.invalidPersistedState
         }
         if let latestObservation {
+            _ = try latestObservation.accounting?.validated()
+            if let outputs = latestObservation.accounting?.toolResultAccounting {
+                guard outputs.providerResponseID == latestObservation.providerResponseID,
+                      latestObservation.accounting?.resolvedPolicy == configuration.resolvedPolicy else {
+                    throw ContextBudgetError.invalidPersistedState
+                }
+            }
             guard latestObservation.identity == identity,
                   latestObservation.action == action,
                   latestObservation.actionEpoch == actionEpoch,

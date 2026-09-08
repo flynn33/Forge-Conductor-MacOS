@@ -236,9 +236,120 @@ public actor ContextBudgetSupervisor {
         ))
     }
 
+    /// Preserve the observed response and its charged outputs when the durable
+    /// provider receipt is replayed. A later response begins a new bounded batch.
+    func observeSourceProviderTurn(
+        _ turn: ProviderTurn, request: ContextBudgetEvaluationRequest,
+        seedRetainedContextSerializedBytes: Int? = nil
+    ) async throws -> ContextBudgetAction {
+        guard state.configuration.resolvedPolicy?.inheritedSourceBudget != nil,
+              request.triggerPoint == .afterProviderTurn,
+              request.providerResponseID == turn.responseID,
+              request.rawProviderUsage == turn.usage,
+              turn.toolCalls.allSatisfy({ ManagedToolResultBudgetValidation.identifier($0.callID, maximum: 512) }) else {
+            throw ContextBudgetError.invalidObservation("source provider observation is not bound")
+        }
+        let digest = try ManagedToolResultBudgetValidation.turnSHA256(turn)
+        if let retained = state.latestObservation?.accounting?.toolResultAccounting {
+            _ = try retained.validated()
+            if retained.providerResponseID == turn.responseID {
+                guard retained.providerTurnSHA256 == digest,
+                      state.latestObservation?.accounting?.rawProviderUsage == turn.usage,
+                      seedRetainedContextSerializedBytes == nil
+                        || retained.seedRetainedContextSerializedBytes == seedRetainedContextSerializedBytes else {
+                    throw ContextBudgetError.invalidObservation("replayed provider response differs")
+                }
+                return state.action
+            }
+            guard turn.previousResponseID == retained.providerResponseID else {
+                throw ContextBudgetError.invalidObservation("provider response does not extend retained history")
+            }
+        }
+        guard seedRetainedContextSerializedBytes == nil || state.latestObservation == nil else {
+            throw ContextBudgetError.invalidObservation("bootstrap budget seed would replace an existing observation")
+        }
+        let accounting = try ManagedToolResultAccounting(providerResponseID: turn.responseID,
+            providerTurnSHA256: digest,
+            expectedCallSHA256: turn.toolCalls.map { JSONSupport.sha256Hex(Data($0.callID.utf8)) },
+            seedRetainedContextSerializedBytes: seedRetainedContextSerializedBytes)
+        return try await evaluate(request, replacingConfiguration: nil,
+            replacingToolResultAccounting: accounting, replaceRawProviderUsage: true).observation.action
+    }
+
+    /// Check prospective output without retaining speculative bytes, changing
+    /// the observed usage, or scheduling a continuity operation.
+    func projectToolResult(_ projection: ManagedToolResultProjection) throws -> ContextBudgetAction {
+        guard let latest = state.latestObservation,
+              let retained = latest.accounting?.toolResultAccounting,
+              state.configuration.resolvedPolicy?.inheritedSourceBudget != nil,
+              latest.providerResponseID == retained.providerResponseID,
+              latest.accounting?.toolSchemaSHA256 == projection.toolSchemaSHA256 else {
+            throw ContextBudgetError.invalidObservation("tool projection has no matching observed response")
+        }
+        try retained.validate(projection.priorPrefix)
+        let ordinal = projection.priorPrefix.outputCount
+        guard ordinal < retained.expectedCallSHA256.count,
+              retained.expectedCallSHA256[ordinal] == JSONSupport.sha256Hex(Data(projection.providerCallID.utf8)) else {
+            throw ContextBudgetError.invalidObservation("tool projection call order differs")
+        }
+        // A completed call is recovered through its original broker receipt.
+        // Its actual prefix has already been charged, including later prefixes.
+        if ordinal < retained.prefixes.count { return state.action }
+        let preflight = projection.continuationPreflight
+        guard preflight.modelKey == state.configuration.capacity.modelKey,
+              let inputBytes = preflight.serializedInputByteCount else {
+            throw ContextBudgetError.configurationMismatch
+        }
+        let escaped = projection.maximumToolResultBytes.multipliedReportingOverflow(by: 6)
+        let body = preflight.bodyByteCount.addingReportingOverflow(escaped.partialValue)
+        let input = inputBytes.addingReportingOverflow(escaped.partialValue)
+        guard !escaped.overflow, !body.overflow, !input.overflow,
+              body.partialValue <= preflight.limits.maximumRequestBytes,
+              input.partialValue <= ManagedModelProviderContract.maximumContinuationInputBytes else {
+            throw ContextBudgetError.serializedInputTooLarge
+        }
+        let deltaBytes = input.partialValue - projection.priorPrefix.serializedInputByteCount
+        let delta = try ContextBudgetMath.estimateTokens(serializedBytes: deltaBytes,
+                                                        policy: state.configuration.policy)
+        let used = latest.used.addingReportingOverflow(delta)
+        guard !used.overflow else { throw ContextBudgetError.arithmeticOverflow }
+        if latest.source == .providerOverflow { return .emergency }
+        let remaining = state.configuration.capacity.capacity
+            - (try state.configuration.reserves.fixedTotal()) - used.partialValue
+        let thresholds = try ContextBudgetMath.thresholds(configuration: state.configuration,
+            projectedNextTurn: state.ewma.projectedNextTurn(default: state.configuration.policy.initialProjectedNextTurnTokens))
+        return Self.applyHysteresis(rawAction: Self.rawAction(remaining: remaining, thresholds: thresholds),
+            priorAction: state.action, remaining: remaining, thresholds: thresholds)
+    }
+
+    /// Charge only the new bytes of the actual transport input array. Every
+    /// retained ordinal is checked on replay, not only the latest ordinal.
+    func observeToolResultPrefix(_ prefix: ManagedToolResultPrefix) async throws -> ContextBudgetAction {
+        guard let latest = state.latestObservation,
+              let retained = latest.accounting?.toolResultAccounting,
+              latest.providerResponseID == retained.providerResponseID,
+              state.configuration.resolvedPolicy?.inheritedSourceBudget != nil else {
+            throw ContextBudgetError.invalidObservation("tool output has no observed source response")
+        }
+        if prefix.outputCount <= retained.prefixes.count {
+            try retained.validate(prefix)
+            return state.action
+        }
+        let updated = try retained.appending(prefix)
+        let delta = prefix.serializedInputByteCount - (retained.prefixes.last?.inputBytes ?? 0)
+        let tokens = try ContextBudgetMath.estimateTokens(serializedBytes: delta,
+                                                         policy: state.configuration.policy)
+        return try await evaluate(ContextBudgetEvaluationRequest(triggerPoint: .afterToolResult,
+            providerResponseID: prefix.providerResponseID, measurement: .serializedIncrement(bytes: delta),
+            growth: .init(toolResultTokens: tokens, projectedNextTurnTokens: tokens)),
+            replacingConfiguration: nil, replacingToolResultAccounting: updated).observation.action
+    }
+
     private func evaluate(
         _ request: ContextBudgetEvaluationRequest,
-        replacingConfiguration: ContextBudgetConfiguration?
+        replacingConfiguration: ContextBudgetConfiguration?,
+        replacingToolResultAccounting: ManagedToolResultAccounting? = nil,
+        replaceRawProviderUsage: Bool = false
     ) async throws -> ContextBudgetCommitReceipt {
         var proposed = state
         if let replacingConfiguration {
@@ -350,11 +461,14 @@ public actor ContextBudgetSupervisor {
                 cut: request.accountingCut,
                 retainedInputTokens: measurement.countKnown ? measurement.used : nil,
                 futureReserveTokens: fixed,
-                rawProviderUsage: request.rawProviderUsage ?? proposed.latestObservation?.accounting?.rawProviderUsage,
+                rawProviderUsage: replaceRawProviderUsage ? request.rawProviderUsage
+                    : request.rawProviderUsage ?? proposed.latestObservation?.accounting?.rawProviderUsage,
                 resolvedPolicy: configuration.resolvedPolicy,
                 toolSchemaSHA256: request.toolSchemaSHA256 ?? proposed.latestObservation?.accounting?.toolSchemaSHA256,
                 pendingInputID: request.triggerPoint == .afterProviderTurn ? nil
-                    : request.pendingInputID ?? proposed.latestObservation?.accounting?.pendingInputID
+                    : request.pendingInputID ?? proposed.latestObservation?.accounting?.pendingInputID,
+                toolResultAccounting: replacingToolResultAccounting
+                    ?? proposed.latestObservation?.accounting?.toolResultAccounting
             )
         )
         proposed.latestObservation = observation

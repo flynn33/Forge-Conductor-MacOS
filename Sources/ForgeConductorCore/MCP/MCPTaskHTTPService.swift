@@ -21,6 +21,25 @@ protocol MCPTaskHTTPDispatching: Sendable {
               cancellation: ToolCallCancellation) async throws -> ToolResult
 }
 
+/// Native calls are resolved from a durable accepted provider turn. Ordinary
+/// HTTP dispatchers need not implement this additive manager-owned entry point.
+protocol MCPNativeSourceDispatching: MCPTaskHTTPDispatching {
+    func nativeProviderTools(credential: NativeTaskCapabilityCredential,
+        lease: NativeSourceConversationLease, cancellation: ToolCallCancellation) async throws -> [Data]
+    func resolveNativeProviderCall(reference: NativeSourceProviderCallReference,
+        credential: NativeTaskCapabilityCredential, lease: NativeSourceConversationLease,
+        cancellation: ToolCallCancellation) async throws -> ResolvedNativeSourceProviderCall
+    func submitNativeCall(resolved: ResolvedNativeSourceProviderCall,
+        credential: NativeTaskCapabilityCredential, lease: NativeSourceConversationLease,
+        outputBudget: NativeSourceProviderOutputBudget,
+        cancellation: ToolCallCancellation) async throws -> NativeSourceProviderCallOutput
+}
+
+enum MCPNativeSourceBridgeError: Error, Sendable, Equatable {
+    case unavailable, stopped, authenticationCapacity, executionCapacity
+    case duplicateActiveRequest, unsupportedDispatcher, deliveryUnavailable
+}
+
 struct MCPHTTPResponse: Sendable {
     let status: Int
     let headers: [String: String]
@@ -82,6 +101,7 @@ final class MCPTaskHTTPService: @unchecked Sendable {
         let token: ToolCallCancellation
         let handle: MCPHTTPTaskHandle
         let startedAt: UInt64
+        var nativeSource = false
     }
     private let authenticate: Authenticate
     private let clock: any Clock
@@ -93,6 +113,9 @@ final class MCPTaskHTTPService: @unchecked Sendable {
     private var sessions: [UUID: Session] = [:]
     private var authentications: [UUID: Authentication] = [:]
     private var operationalRequests: Set<MCPRequestAdmission.Key> = []
+    // A projection of admitted native work, retained until its exact Task exits.
+    // It does not create a second execution pool or protocol-session registry.
+    private var nativeExecutionEpochs: [MCPRequestAdmission.Key: UUID] = [:]
 
     init(clock: any Clock = SystemClock(), authenticate: @escaping Authenticate) {
         self.clock = clock; self.authenticate = authenticate
@@ -102,8 +125,10 @@ final class MCPTaskHTTPService: @unchecked Sendable {
     func setOperational(_ value: Bool) {
         lock.lock(); operational = value
         let cancel = value ? [] : Array(operationalRequests)
+        let cancelAuth = value ? [] : authentications.values.filter(\.nativeSource)
         lock.unlock()
         for key in cancel { admission.cancel(key) }
+        for auth in cancelAuth { auth.token.cancel(); auth.handle.cancel() }
     }
 
     /// Called before the native listener accepts. Rebinding retires every old
@@ -115,8 +140,10 @@ final class MCPTaskHTTPService: @unchecked Sendable {
         let oldSessions = Array(sessions.keys)
         sessions.removeAll()
         let oldAuth = authentications.values.filter { $0.listenerEpoch == previous }
+        let native = nativeExecutionEpochs.filter { $0.value != epoch }.map(\.key)
         lock.unlock()
         for id in oldSessions { admission.cancel(sessionID: id) }
+        for key in native { admission.cancel(key) }
         for auth in oldAuth { auth.token.cancel(); auth.handle.cancel() }
     }
 
@@ -126,8 +153,10 @@ final class MCPTaskHTTPService: @unchecked Sendable {
         let oldSessions = sessions.values.filter { $0.listenerEpoch == epoch }.map(\.id)
         for id in oldSessions { sessions.removeValue(forKey: id) }
         let oldAuth = authentications.values.filter { $0.listenerEpoch == epoch }
+        let native = nativeExecutionEpochs.filter { $0.value == epoch }.map(\.key)
         lock.unlock()
         for id in oldSessions { admission.cancel(sessionID: id) }
+        for key in native { admission.cancel(key) }
         for auth in oldAuth { auth.token.cancel(); auth.handle.cancel() }
     }
 
@@ -153,6 +182,149 @@ final class MCPTaskHTTPService: @unchecked Sendable {
     var retainedWorkCount: Int {
         lock.lock(); let count = authentications.count; lock.unlock()
         return count + admission.activeCount
+    }
+
+    func nativeProviderTools(credential: NativeTaskCapabilityCredential,
+        lease: NativeSourceConversationLease, cancellation: ToolCallCancellation) async throws -> [Data] {
+        let requestID = UUID()
+        return try await performNative(credential: credential, cancellation: cancellation, prepare: { dispatcher, token in
+            let tools = try await dispatcher.nativeProviderTools(credential: credential, lease: lease, cancellation: token)
+            guard let expiry = ISO8601.date(from: lease.expiresAt) else { throw NativeSourceConversationError.integrityFailure }
+            return NativePrepared(key: .nativeProviderCatalog(conversationID: lease.conversationID, requestID: requestID),
+                expiresAt: expiry, value: tools)
+        }, execute: { _, tools, _ in tools })
+    }
+
+    func submitNativeCall(credential: NativeTaskCapabilityCredential,
+        reference: NativeSourceProviderCallReference, lease: NativeSourceConversationLease,
+        outputBudget: NativeSourceProviderOutputBudget,
+        cancellation: ToolCallCancellation) async throws -> NativeSourceProviderCallOutput {
+        try await performNative(credential: credential, cancellation: cancellation, prepare: { dispatcher, token in
+            let resolved = try await dispatcher.resolveNativeProviderCall(reference: reference,
+                credential: credential, lease: lease, cancellation: token)
+            guard MCPNativeTaskSourceProfile.sourceToolNames.contains(resolved.toolName),
+                  !resolved.callID.isEmpty, resolved.callID.utf8.count <= 512,
+                  !resolved.callID.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains),
+                  let expiry = ISO8601.date(from: lease.expiresAt) else { throw NativeSourceConversationError.integrityFailure }
+            let digest = try ForgeJSONCanonicalizationV1.sha256Hex(of: [
+                "stage_id": resolved.reference.stageID.uuidString.lowercased(), "ordinal": resolved.reference.ordinal,
+                "response_id": resolved.responseID, "call_id": resolved.callID,
+            ])
+            return NativePrepared(key: .nativeProviderCall(conversationID: resolved.reference.conversationID,
+                referenceSHA256: digest), expiresAt: expiry, value: resolved)
+        }, execute: { dispatcher, resolved, token in
+            try await dispatcher.submitNativeCall(resolved: resolved, credential: credential,
+                lease: lease, outputBudget: outputBudget, cancellation: token)
+        })
+    }
+
+    private struct NativePrepared<Value: Sendable>: Sendable {
+        let key: MCPRequestAdmission.Key
+        let expiresAt: Date
+        let value: Value
+    }
+    private struct NativeWork {
+        let key: MCPRequestAdmission.Key
+        let epoch: UUID
+        let cancellation: ToolCallCancellation
+    }
+
+    /// Each call owns its token. A source exchange never lends this slot to a
+    /// provider POST; authentication and execution share the HTTP service pools.
+    private func performNative<Value: Sendable, Output: Sendable>(
+        credential: NativeTaskCapabilityCredential, cancellation: ToolCallCancellation,
+        prepare: @escaping @Sendable (any MCPNativeSourceDispatching, ToolCallCancellation) async throws -> NativePrepared<Value>,
+        execute: @escaping @Sendable (any MCPNativeSourceDispatching, Value, ToolCallCancellation) async throws -> Output
+    ) async throws -> Output {
+        let authenticationID = UUID()
+        let authenticationToken = ToolCallCancellation(timeoutSeconds: min(3, cancellation.remainingTimeInterval ?? 3))
+        let handle = MCPHTTPTaskHandle()
+        return try await withTaskCancellationHandler {
+            try Task.checkCancellation(); try cancellation.checkCancellation()
+            return try await withCheckedThrowingContinuation { continuation in
+                do {
+                    try reserveNativeAuthentication(id: authenticationID, token: authenticationToken, handle: handle)
+                } catch { continuation.resume(throwing: error); return }
+                let task = Task { [self] in
+                    var work: NativeWork?
+                    defer {
+                        if let work { finishNativeWork(work) }
+                        finishAuthentication(authenticationID)
+                        handle.finish()
+                    }
+                    do {
+                        try Task.checkCancellation(); try cancellation.checkCancellation()
+                        try authenticationToken.checkCancellation()
+                        let authenticated = try await authenticate(credential, authenticationToken)
+                        guard let dispatcher = authenticated as? any MCPNativeSourceDispatching else {
+                            throw MCPNativeSourceBridgeError.unsupportedDispatcher
+                        }
+                        try cancellation.checkCancellation(); try authenticationToken.checkCancellation()
+                        let prepared = try await prepare(dispatcher, authenticationToken)
+                        try Task.checkCancellation(); try cancellation.checkCancellation()
+                        try authenticationToken.checkCancellation()
+                        let admitted = try exchangeNativeAuthentication(id: authenticationID, prepared: prepared,
+                            dispatcher: dispatcher, cancellation: cancellation)
+                        work = admitted
+                        try Task.checkCancellation(); try cancellation.checkCancellation()
+                        let value = try await execute(dispatcher, prepared.value, cancellation)
+                        guard canDeliverNative(epoch: admitted.epoch) else { throw MCPNativeSourceBridgeError.deliveryUnavailable }
+                        continuation.resume(returning: value)
+                    } catch { continuation.resume(throwing: error) }
+                }
+                handle.bind(task)
+            }
+        } onCancel: {
+            authenticationToken.cancel(); cancellation.cancel(); handle.cancel()
+        }
+    }
+
+    private func reserveNativeAuthentication(id: UUID, token: ToolCallCancellation, handle: MCPHTTPTaskHandle) throws {
+        lock.lock(); defer { lock.unlock() }
+        guard open, let epoch = listenerEpoch else { throw MCPNativeSourceBridgeError.unavailable }
+        guard operational else { throw MCPNativeSourceBridgeError.stopped }
+        guard authentications.count < 8 else { throw MCPNativeSourceBridgeError.authenticationCapacity }
+        try token.checkCancellation()
+        authentications[id] = .init(listenerEpoch: epoch, token: token, handle: handle,
+            startedAt: DispatchTime.now().uptimeNanoseconds, nativeSource: true)
+    }
+
+    private func exchangeNativeAuthentication<Value: Sendable>(id: UUID, prepared: NativePrepared<Value>,
+        dispatcher: any MCPNativeSourceDispatching, cancellation: ToolCallCancellation) throws -> NativeWork {
+        lock.lock(); defer { lock.unlock() }
+        guard let authentication = authentications[id], open, listenerEpoch == authentication.listenerEpoch else {
+            throw MCPNativeSourceBridgeError.unavailable
+        }
+        guard operational else { throw MCPNativeSourceBridgeError.stopped }
+        let now = clock.now()
+        let elapsed = Double(DispatchTime.now().uptimeNanoseconds - authentication.startedAt) / 1_000_000_000
+        let remaining = min(300 - elapsed, min(dispatcher.expiresAt, prepared.expiresAt).timeIntervalSince(now))
+        guard remaining > 0 else { throw ToolCallDeadlineExceeded() }
+        try cancellation.tightenDeadline(milliseconds: Int(remaining * 1_000))
+        switch admission.reserve(prepared.key, cancellation: cancellation) {
+        case .accepted: break
+        case .duplicate: throw MCPNativeSourceBridgeError.duplicateActiveRequest
+        case .capacityExceeded: throw MCPNativeSourceBridgeError.executionCapacity
+        case .closed: throw MCPNativeSourceBridgeError.unavailable
+        }
+        authentications.removeValue(forKey: id)
+        operationalRequests.insert(prepared.key)
+        nativeExecutionEpochs[prepared.key] = authentication.listenerEpoch
+        admission.bindTask(prepared.key, cancellation: cancellation) { authentication.handle.cancel() }
+        return .init(key: prepared.key, epoch: authentication.listenerEpoch, cancellation: cancellation)
+    }
+
+    private func finishNativeWork(_ work: NativeWork) {
+        lock.lock()
+        operationalRequests.remove(work.key)
+        nativeExecutionEpochs.removeValue(forKey: work.key)
+        lock.unlock()
+        admission.finish(work.key, cancellation: work.cancellation)
+    }
+
+    private func canDeliverNative(epoch: UUID) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        return open && operational && listenerEpoch == epoch
     }
 
     @discardableResult
@@ -241,6 +413,8 @@ final class MCPTaskHTTPService: @unchecked Sendable {
 
     private struct Work: Sendable {
         let key: MCPRequestAdmission.Key
+        let sessionID: UUID
+        let requestIDSHA256: String
         let cancellation: ToolCallCancellation
         let idJSON: Data
         let method: String
@@ -359,7 +533,8 @@ final class MCPTaskHTTPService: @unchecked Sendable {
                 binding: dispatcher.sessionBindingSHA256,
                 expiresAt: min(dispatcher.expiresAt, now.addingTimeInterval(3600)), lastUsed: now)
         }
-        return .execute(.init(key: key, cancellation: token, idJSON: idJSON, method: method,
+        return .execute(.init(key: key, sessionID: sessionID, requestIDSHA256: id.sha256,
+                              cancellation: token, idJSON: idJSON, method: method,
                               name: name, argumentsJSON: arguments, initialization: initializing,
                               durableSourceSessionID: durableSourceSessionID))
     }
@@ -379,7 +554,7 @@ final class MCPTaskHTTPService: @unchecked Sendable {
             body = try JSONSupport.data(from: ["jsonrpc": "2.0", "id": id, "result": ["tools": tools]])
         case "tools/call":
             let result = try await dispatcher.call(name: work.name!, argumentsJSON: work.argumentsJSON,
-                identity: .init(sessionID: work.key.sessionID, requestIDSHA256: work.key.id.sha256,
+                identity: .init(sessionID: work.sessionID, requestIDSHA256: work.requestIDSHA256,
                                 durableSourceSessionID: work.durableSourceSessionID),
                 cancellation: work.cancellation)
             body = try MCPToolResponse.data(id: id, result: result)
@@ -387,7 +562,7 @@ final class MCPTaskHTTPService: @unchecked Sendable {
         }
         guard body.count <= Self.maximumResponseBytes else { throw MCPTaskHTTPError.responseTooLarge }
         return .init(status: 200,
-            headers: work.initialization ? ["Mcp-Session-Id": work.key.sessionID.uuidString.lowercased()] : [:], body: body)
+            headers: work.initialization ? ["Mcp-Session-Id": work.sessionID.uuidString.lowercased()] : [:], body: body)
     }
 
     private static func rpcError(id: Data, code: Int, message: String) -> MCPHTTPResponse {
@@ -419,6 +594,16 @@ enum MCPNativeTaskSourceProfile {
     static let toolNames: Set<String> = ["fs_read", "session_checkpoint", "session_handoff",
         "clu_capabilities", "clu_start_handoff", "clu_status", "clu_cancel"]
     static let stoppedToolNames: Set<String> = ["clu_capabilities", "clu_status", "clu_cancel"]
+
+    /// Pure catalog conversion for local request preflight. The admitted method
+    /// above additionally verifies the live task lease before exposing tools.
+    static func providerToolDefinitions(catalog: ToolDefinitionCatalog) throws -> [Data] {
+        let definitions = try catalog.providerToolDefinitions(allowedToolNames: sourceToolNames)
+        let names = try definitions.map { try JSONSupport.object(from: $0)["name"] as? String }
+        guard definitions.count == sourceToolNames.count,
+              Set(names.compactMap { $0 }) == sourceToolNames else { throw NativeTaskCapabilityError.unsupportedProfile }
+        return definitions
+    }
 }
 
 /// Binding may race a very fast worker or cancellation. This small owner retains

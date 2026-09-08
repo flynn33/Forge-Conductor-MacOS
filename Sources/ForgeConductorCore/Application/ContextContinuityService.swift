@@ -161,14 +161,19 @@ public final class ContextContinuityService: @unchecked Sendable {
     /// preflight object is never stored, disclosed, or treated as a receipt.
     /// NUL maximizes JSON escaping for any permitted 256-byte request ID.
     func requireNativeSourceResponseBudget(_ prepared: PreparedContinuitySourceCommit) throws {
-        let payload = nativeSourceCommitPayload(packet: try prepared.packet(), finalize: prepared.finalize,
-            revision: Int64.max, packetSHA256: prepared.packetSHA256,
-            operationID: "ffffffff-ffff-ffff-ffff-ffffffffffff")
         let encoded = try MCPToolResponse.data(
-            id: String(repeating: "\u{0}", count: 256), result: .success(payload))
+            id: String(repeating: "\u{0}", count: 256), result: nativeSourcePreparedToolResult(prepared))
         guard encoded.count <= 1_048_576 else {
             throw ContinuityIngressError.capacityExceeded("native source response bytes")
         }
+    }
+
+    /// Serialization-only upper bound for a prepared immutable packet. The
+    /// actual receipt still comes exclusively from commitPreparedAuthorizedSourceCommit.
+    func nativeSourcePreparedToolResult(_ prepared: PreparedContinuitySourceCommit) throws -> ToolResult {
+        .success(nativeSourceCommitPayload(packet: try prepared.packet(), finalize: prepared.finalize,
+            revision: Int64.max, packetSHA256: prepared.packetSHA256,
+            operationID: "ffffffff-ffff-ffff-ffff-ffffffffffff"))
     }
 
     /// Exact immutable retrieval for an already authorized caller or provisional

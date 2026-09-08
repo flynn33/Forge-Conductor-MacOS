@@ -582,6 +582,8 @@ public struct ProviderRequestPreflight: Sendable, Equatable {
     public let limits: ProviderExecutionLimits
     public let bodySHA256: String
     public let bodyByteCount: Int
+    /// Exact input-array bytes from the transport encoder; nil means not supplied.
+    public let serializedInputByteCount: Int?
 
     public init(
         kind: Kind,
@@ -590,14 +592,16 @@ public struct ProviderRequestPreflight: Sendable, Equatable {
         configurationFingerprintSHA256: String,
         limits: ProviderExecutionLimits,
         bodySHA256: String,
-        bodyByteCount: Int
+        bodyByteCount: Int,
+        serializedInputByteCount: Int? = nil
     ) throws {
         try ManagedModelProviderContract.validateString(modelKey, field: "model key",
             maximumBytes: ManagedModelProviderContract.maximumModelKeyBytes)
         try ManagedModelProviderContract.validateIdentifier(configurationRevision, field: "configuration revision")
         let hashes = [configurationFingerprintSHA256, bodySHA256]
         guard hashes.allSatisfy({ $0.utf8.count == 64 && $0.allSatisfy { "0123456789abcdef".contains($0) } }),
-              (1...limits.maximumRequestBytes).contains(bodyByteCount) else {
+              (1...limits.maximumRequestBytes).contains(bodyByteCount),
+              serializedInputByteCount.map({ (1...bodyByteCount).contains($0) }) ?? true else {
             throw ManagedModelProviderContractError.invalidValue("request preflight is invalid")
         }
         self.kind = kind
@@ -607,6 +611,7 @@ public struct ProviderRequestPreflight: Sendable, Equatable {
         self.limits = limits
         self.bodySHA256 = bodySHA256
         self.bodyByteCount = bodyByteCount
+        self.serializedInputByteCount = serializedInputByteCount
     }
 }
 
@@ -615,4 +620,12 @@ public struct ProviderRequestPreflight: Sendable, Equatable {
 public protocol ManagedModelProviderRequestPreflighting: ManagedModelProvider {
     func preflightRoot(_ request: ProviderRootRequest) async throws -> ProviderRequestPreflight
     func preflightContinuation(_ request: ProviderContinuationRequest) async throws -> ProviderRequestPreflight
+}
+
+/// Source owners record capability checks separately from assignment requests.
+/// This refinement never performs an implicit probe during dispatch or receipt lookup.
+public protocol ManagedModelProviderObservedDispatching: ManagedModelProviderRequestPreflighting {
+    func createRoot(_ request: ProviderRootRequest, observedCapabilities: ProviderCapabilities) async throws -> ProviderTurn
+    func continueSession(_ request: ProviderContinuationRequest, observedCapabilities: ProviderCapabilities) async throws -> ProviderTurn
+    func lookupRecorded(idempotencyKey: String) async throws -> ProviderTurn?
 }

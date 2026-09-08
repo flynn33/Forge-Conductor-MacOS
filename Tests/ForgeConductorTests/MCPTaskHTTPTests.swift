@@ -33,6 +33,35 @@ final class MCPTaskHTTPTests: XCTestCase, @unchecked Sendable {
         XCTAssertNil(MCPRequestAdmission.Identifier(NSNumber(value: UInt64.max), strict: true))
     }
 
+    func testNativeAndProtocolChannelsShareEightSlotsWithoutCancellationAliasing() throws {
+        let admission = MCPRequestAdmission(maximumActiveRequests: 8)
+        let identity = UUID()
+        let keys: [MCPRequestAdmission.Key] = (0..<4).map { .init(sessionID: identity, id: .number(String($0))) }
+            + (0..<4).map { .nativeProviderCall(conversationID: identity, referenceSHA256: String(repeating: String($0), count: 64)) }
+        let tokens = keys.map { _ in ToolCallCancellation(timeoutSeconds: 5) }
+        for (key, token) in zip(keys, tokens) {
+            guard case .accepted = admission.reserve(key, cancellation: token) else { return XCTFail("Shared slot refused") }
+        }
+        XCTAssertEqual(admission.activeCount, 8)
+        XCTAssertEqual(admission.activeCount(sessionID: identity), 4)
+        let waiter = ToolCallCancellation(timeoutSeconds: 5)
+        guard case .duplicate = admission.reserve(keys[4], cancellation: waiter),
+              case .capacityExceeded = admission.reserve(.nativeProviderCatalog(conversationID: identity, requestID: UUID()), cancellation: waiter) else {
+            return XCTFail("Native work escaped the shared capacity or duplicate owner")
+        }
+        waiter.cancel()
+        admission.finish(keys[4], cancellation: waiter)
+        XCTAssertEqual(admission.activeCount, 8)
+        admission.cancel(sessionID: identity)
+        for token in tokens.prefix(4) { XCTAssertThrowsError(try token.checkCancellation()) }
+        for token in tokens.suffix(4) { XCTAssertNoThrow(try token.checkCancellation()) }
+        XCTAssertEqual(admission.activeCount, 8, "Cancellation retains work until its actual owner exits")
+        admission.setOpen(false)
+        for token in tokens { XCTAssertThrowsError(try token.checkCancellation()) }
+        for (key, token) in zip(keys, tokens) { admission.finish(key, cancellation: token) }
+        XCTAssertEqual(admission.activeCount, 0)
+    }
+
     func testRealLoopbackInitializationClosedProfileAndAuthenticatedMethods() async throws {
         let fixture = try MCPHTTPFixture()
         defer { fixture.stop() }

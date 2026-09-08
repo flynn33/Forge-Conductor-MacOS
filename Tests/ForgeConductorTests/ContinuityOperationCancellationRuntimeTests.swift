@@ -268,7 +268,7 @@ final class ContinuityOperationCancellationRuntimeTests: XCTestCase {
 
 private enum SourceCancellationFixtureError: Error, Equatable { case adapterResolved, database }
 
-private actor SourceCancellationBlockedTransport: LMStudioManagedTransporting {
+private actor SourceCancellationBlockedTransport: LMStudioManagedTransportObservedDispatching {
     private var roots = 0, followups = 0, cancelledTasks = 0
     private var cancelledRequests: [String] = []
     func probe() async throws -> LMStudioProviderCapabilities {
@@ -277,13 +277,33 @@ private actor SourceCancellationBlockedTransport: LMStudioManagedTransporting {
             trainedForToolUse: true, streamingVerified: true, functionToolContractVerified: true, usageReportingVerified: true,
             capabilityFingerprintSHA256: String(repeating: "a", count: 64), contractProbeResponseID: "cancellation-probe")
     }
+    func preflightRoot(_ request: LMStudioRootRequest) async throws -> ProviderRequestPreflight {
+        try await SourceBootstrapFixtureWire.root(request)
+    }
+    func preflightContinuation(_ request: LMStudioContinuationRequest) async throws -> ProviderRequestPreflight {
+        try await SourceBootstrapFixtureWire.continuation(request)
+    }
+    func createRoot(_ request: LMStudioRootRequest, observedFingerprint: String) async throws -> LMStudioResponseTurn {
+        guard observedFingerprint == String(repeating: "a", count: 64) else {
+            throw ManagedModelProviderContractError.invalidValue("fixture observation differs")
+        }
+        return try await createRoot(request)
+    }
+    func continueSession(_ request: LMStudioContinuationRequest, observedFingerprint: String) async throws -> LMStudioResponseTurn {
+        guard observedFingerprint == String(repeating: "a", count: 64) else {
+            throw ManagedModelProviderContractError.invalidValue("fixture observation differs")
+        }
+        return try await continueSession(request)
+    }
     func createRoot(_ request: LMStudioRootRequest) async throws -> LMStudioResponseTurn {
+        _ = try await preflightRoot(request)
         roots += 1
         do { try await Task.sleep(for: .seconds(20)) }
         catch { cancelledTasks += 1; throw error }
         throw SourceCancellationFixtureError.adapterResolved
     }
     func continueSession(_ request: LMStudioContinuationRequest) async throws -> LMStudioResponseTurn {
+        _ = try await preflightContinuation(request)
         followups += 1
         throw SourceCancellationFixtureError.adapterResolved
     }

@@ -394,7 +394,7 @@ private struct ManagedSourceIntegrationFixture: Sendable {
 
 /// Only the transport is replaced. The native request ledger, normalized driver,
 /// Core executor, broker, immutable source resolver and canonical journal are real.
-private actor ManagedSourceFixtureTransport: LMStudioManagedTransporting {
+private actor ManagedSourceFixtureTransport: LMStudioManagedTransportObservedDispatching {
     enum Mode: Sendable { case normal, wrongAcknowledgement, disabledPolicy, smallCapacity }
     private let mode: Mode
     private let rootDelay: Duration?
@@ -410,7 +410,26 @@ private actor ManagedSourceFixtureTransport: LMStudioManagedTransporting {
             usageReportingVerified: true, capabilityFingerprintSHA256: String(repeating: "a", count: 64),
             contractProbeResponseID: "integration-capability-probe")
     }
+    func createRoot(_ request: LMStudioRootRequest, observedFingerprint: String) async throws -> LMStudioResponseTurn {
+        guard observedFingerprint == String(repeating: "a", count: 64) else {
+            throw ManagedModelProviderContractError.invalidValue("fixture observation differs")
+        }
+        return try await createRoot(request)
+    }
+    func continueSession(_ request: LMStudioContinuationRequest, observedFingerprint: String) async throws -> LMStudioResponseTurn {
+        guard observedFingerprint == String(repeating: "a", count: 64) else {
+            throw ManagedModelProviderContractError.invalidValue("fixture observation differs")
+        }
+        return try await continueSession(request)
+    }
+    func preflightRoot(_ request: LMStudioRootRequest) async throws -> ProviderRequestPreflight {
+        try await SourceBootstrapFixtureWire.root(request)
+    }
+    func preflightContinuation(_ request: LMStudioContinuationRequest) async throws -> ProviderRequestPreflight {
+        try await SourceBootstrapFixtureWire.continuation(request)
+    }
     func createRoot(_ request: LMStudioRootRequest) async throws -> LMStudioResponseTurn {
+        _ = try await preflightRoot(request)
         roots.append(request)
         if let rootDelay { try await Task.sleep(for: rootDelay) }
         let identity = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(request.userInput.utf8)) as? [String: Any])
@@ -423,6 +442,7 @@ private actor ManagedSourceFixtureTransport: LMStudioManagedTransporting {
             usage: LMStudioUsage(inputTokens: 600, outputTokens: 50, totalTokens: 650))
     }
     func continueSession(_ request: LMStudioContinuationRequest) async throws -> LMStudioResponseTurn {
+        _ = try await preflightContinuation(request)
         followups.append(request)
         let tool = try XCTUnwrap(request.tools.first)
         let definition = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(tool)) as? [String: Any])

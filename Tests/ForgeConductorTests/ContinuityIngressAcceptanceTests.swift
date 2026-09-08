@@ -297,12 +297,12 @@ final class ContinuityIngressAcceptanceTests: XCTestCase {
             XCTAssertEqual(restoredLease, lease)
             XCTAssertEqual(try AcceptanceSQLite.text(fixture.database, "SELECT current_work_json FROM autonomous_runs"), oldRunJSON)
             XCTAssertEqual(try AcceptanceSQLite.integer(fixture.database, "SELECT COUNT(*) FROM pragma_foreign_key_check"), 0)
-            XCTAssertEqual(try AcceptanceSQLite.integer(fixture.database, "SELECT COUNT(*) FROM forge_migration_receipts"), 6)
+            XCTAssertEqual(try AcceptanceSQLite.integer(fixture.database, "SELECT COUNT(*) FROM forge_migration_receipts"), 7)
             let manifestURL = VerifiedMigrationBackup.activeManifestURL(for: fixture.database, scope: .continuityIngress)
             let manifest = try JSONDecoder().decode(VerifiedMigrationBackupManifest.self, from: Data(contentsOf: manifestURL))
             XCTAssertEqual(manifest.state, .completed)
-            XCTAssertEqual(manifest.sourceVersion, 6)
-            XCTAssertEqual(manifest.targetVersion, 7)
+            XCTAssertEqual(manifest.sourceVersion, 7)
+            XCTAssertEqual(manifest.targetVersion, 8)
             let backup = fixture.database.deletingLastPathComponent().appendingPathComponent(manifest.backupFilename)
             XCTAssertEqual(JSONSupport.sha256Hex(try Data(contentsOf: backup)), manifest.backupSHA256)
             let originalBackup = fixture.database.deletingPathExtension().appendingPathExtension("pre-ingress-capability-v1.sqlite3")
@@ -372,9 +372,9 @@ final class ContinuityIngressAcceptanceTests: XCTestCase {
         XCTAssertNotEqual(standardURL, ingressURL)
         let ingress = try JSONDecoder().decode(VerifiedMigrationBackupManifest.self, from: Data(contentsOf: ingressURL))
         XCTAssertEqual(ingress.state, .completed)
-        XCTAssertEqual(ingress.sourceVersion, 6)
-        XCTAssertEqual(ingress.targetVersion, 7)
-        XCTAssertEqual(try AcceptanceSQLite.integer(database, "SELECT COUNT(*) FROM forge_migration_receipts"), 7)
+        XCTAssertEqual(ingress.sourceVersion, 7)
+        XCTAssertEqual(ingress.targetVersion, 8)
+        XCTAssertEqual(try AcceptanceSQLite.integer(database, "SELECT COUNT(*) FROM forge_migration_receipts"), 8)
         XCTAssertTrue(upgraded.shutdown().completed)
         activeApp = nil
 
@@ -572,6 +572,13 @@ private enum AcceptanceSQLite {
             BEGIN IMMEDIATE;
             DROP TRIGGER IF EXISTS trg_continuity_source_origin_binding_update;
             DROP TRIGGER IF EXISTS trg_continuity_source_origin_binding_delete;
+            ALTER TABLE provider_turns DROP COLUMN source_preflight_sha256;
+            ALTER TABLE provider_turns DROP COLUMN source_preflight_json;
+            DROP TABLE IF EXISTS native_source_provider_run_offsets;
+            DROP TABLE IF EXISTS native_source_provider_calls;
+            DROP TABLE IF EXISTS native_source_capability_checks;
+            DROP TABLE IF EXISTS native_source_provider_turns;
+            DROP TABLE IF EXISTS native_source_conversations;
             DROP TABLE IF EXISTS native_source_run_offsets;
             DROP TABLE IF EXISTS native_source_requests;
             DROP TABLE IF EXISTS native_task_commands;

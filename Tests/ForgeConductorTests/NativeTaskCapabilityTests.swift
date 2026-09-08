@@ -361,7 +361,7 @@ final class NativeTaskCapabilityTests: XCTestCase {
         try await withFixture { f in
             let assignment = try NativeAuthoritySQL.value(f.database, "SELECT assignment_json FROM continuity_task_authorizations")
             await f.repository.close()
-            try NativeAuthoritySQL.execute(f.database, "DROP TABLE native_source_run_offsets; DROP TABLE native_source_requests; DROP TABLE native_task_commands; DROP TABLE native_task_capabilities;")
+            try NativeAuthoritySQL.execute(f.database, "ALTER TABLE provider_turns DROP COLUMN source_preflight_sha256; ALTER TABLE provider_turns DROP COLUMN source_preflight_json; DROP TABLE native_source_provider_run_offsets; DROP TABLE native_source_provider_calls; DROP TABLE native_source_capability_checks; DROP TABLE native_source_provider_turns; DROP TABLE native_source_conversations; DROP TABLE native_source_run_offsets; DROP TABLE native_source_requests; DROP TABLE native_task_commands; DROP TABLE native_task_capabilities;")
             let reopened = try ProjectControlPlaneRepository(databaseURL: f.database, clock: f.clock)
             do {
                 XCTAssertEqual(try NativeAuthoritySQL.value(f.database, "SELECT assignment_json FROM continuity_task_authorizations"), assignment)
@@ -369,7 +369,7 @@ final class NativeTaskCapabilityTests: XCTestCase {
                 XCTAssertEqual(try NativeAuthoritySQL.value(f.database, "SELECT COUNT(*) FROM continuity_source_dispatch_origins"), "1")
                 let manifest = try Data(contentsOf: VerifiedMigrationBackup.activeManifestURL(for: f.database, scope: .continuityIngress))
                 let object = try XCTUnwrap(JSONSerialization.jsonObject(with: manifest) as? [String: Any])
-                XCTAssertEqual(object["source_version"] as? Int, 6); XCTAssertEqual(object["target_version"] as? Int, 7)
+                XCTAssertEqual(object["source_version"] as? Int, 7); XCTAssertEqual(object["target_version"] as? Int, 8)
                 await expect(.requestConflict) { _ = try await reopened.prepareNativeContinuityTask(request: f.request, approvedAssignment: f.assignment) }
                 await reopened.close()
             } catch { await reopened.close(); throw error }

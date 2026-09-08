@@ -30,8 +30,9 @@ public struct SourceBootstrapRequest: Sendable, Equatable {
     init(envelope: ContinuitySourceBootstrapEnvelope, candidateID: UUID, grantID: UUID,
          modelKey: String, idempotencyKey: String) throws {
         let verified = try ContinuitySourceBootstrapEnvelope.storedSnapshot(from: envelope.canonicalEnvelopeJSON)
-        guard verified == envelope, idempotencyKey.utf8.count <= 768,
-              envelope.authorization.authorizationScope.allowedTools.contains("context_get") else {
+        // context_get is authorized by the exact manager-issued bootstrap grant.
+        // It is not added to the assignment's ordinary work-tool scope.
+        guard verified == envelope, idempotencyKey.utf8.count <= 768 else {
             throw ContinuityIngressError.invalidRequest("source bootstrap request")
         }
         try ManagedModelProviderContract.validateIdempotencyKey(idempotencyKey)
@@ -132,6 +133,31 @@ public protocol SourceBootstrapExecuting: Sendable {
     func retrieveContext(rootIntent: ProviderTurnIntent, rootTurn: ProviderTurn) async throws -> SourceBootstrapContextResult
     /// Persists the actual acknowledgement turn; activation remains manager-owned.
     func recordAcknowledgement(intent: ProviderTurnIntent, turn: ProviderTurn) async throws
+}
+
+/// A durable decision for one exact provider intent. A lookup-only decision
+/// never permits another POST, including after an unknown response or restart.
+public enum SourceBootstrapProviderAdmission: Sendable, Equatable {
+    case dispatch
+    case recorded(ProviderTurn)
+    case lookupOnly
+}
+
+/// Additive native transport seam. The preflight describes the same immutable
+/// request that is dispatched after the manager commits its admission decision.
+public protocol SourceBootstrapPreflightExecuting: SourceBootstrapExecuting {
+    /// Restores an already submitted exact intent without a fresh capability
+    /// probe. Nil permits preparation; a retained decision permits only lookup.
+    func recoverProviderTurn(intent: ProviderTurnIntent, input: Data, tools: [Data])
+        async throws -> SourceBootstrapProviderAdmission?
+    func prepareProviderTurn(intent: ProviderTurnIntent, input: Data, tools: [Data],
+        capabilities: ProviderCapabilities, totalBootstrapInputBytes: Int,
+        preflight: ProviderRequestPreflight) async throws -> SourceBootstrapProviderAdmission
+}
+
+extension SourceBootstrapPreflightExecuting {
+    public func recoverProviderTurn(intent: ProviderTurnIntent, input: Data, tools: [Data])
+        async throws -> SourceBootstrapProviderAdmission? { nil }
 }
 
 public protocol SourceBootstrapHostAdapter: Sendable {

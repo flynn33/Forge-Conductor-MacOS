@@ -96,19 +96,39 @@ extension LMStudioManagedSessionHostAdapterV2 {
         }
         let rootIntent = try sourceIntent(request, turnID: rootID, stage: "context_get",
             previousResponseID: nil, input: rootInput, tools: rootTools)
-        try Task.checkCancellation()
-        let rootCapabilities = try await provider.probe()
-        try validateSourceCapabilities(rootCapabilities, request: request)
+        let rootRequest = try ProviderRootRequest(operationID: rootID,
+            idempotencyKey: rootIntent.idempotencyKey, modelKey: request.modelKey,
+            input: String(decoding: rootInput, as: UTF8.self), tools: rootTools)
         try Task.checkCancellation()
         let root: ProviderTurn
-        if let recovered = try await executor.prepareProviderTurn(intent: rootIntent, input: rootInput, tools: rootTools,
-            capabilities: rootCapabilities, totalBootstrapInputBytes: totalBootstrapInputBytes) {
-            root = recovered
+        if let exactExecutor = executor as? any SourceBootstrapPreflightExecuting {
+            if let recovery = try await exactExecutor.recoverProviderTurn(intent: rootIntent,
+                input: rootInput, tools: rootTools) {
+                root = try await recoveredSourceTurn(recovery, provider: provider, intent: rootIntent)
+            } else {
+                let capabilities = try await provider.probe()
+                try validateSourceCapabilities(capabilities, request: request)
+                let preflight = try await provider.preflightRoot(rootRequest)
+                let admission = try await exactExecutor.prepareProviderTurn(intent: rootIntent,
+                    input: rootInput, tools: rootTools, capabilities: capabilities,
+                    totalBootstrapInputBytes: totalBootstrapInputBytes, preflight: preflight)
+                try Task.checkCancellation()
+                if admission == .dispatch {
+                    root = try await provider.createRoot(rootRequest, observedCapabilities: capabilities)
+                } else {
+                    root = try await recoveredSourceTurn(admission, provider: provider, intent: rootIntent)
+                }
+            }
         } else {
-            try Task.checkCancellation()
-            root = try await provider.createRoot(ProviderRootRequest(operationID: rootID,
-                idempotencyKey: rootIntent.idempotencyKey, modelKey: request.modelKey,
-                input: String(decoding: rootInput, as: UTF8.self), tools: rootTools))
+            let capabilities = try await provider.probe()
+            try validateSourceCapabilities(capabilities, request: request)
+            if let recovered = try await executor.prepareProviderTurn(intent: rootIntent, input: rootInput,
+                tools: rootTools, capabilities: capabilities, totalBootstrapInputBytes: totalBootstrapInputBytes) {
+                root = recovered
+            } else {
+                try Task.checkCancellation()
+                root = try await provider.createRoot(rootRequest)
+            }
         }
         try Task.checkCancellation()
         try validateSourceTurn(root, intent: rootIntent, request: request)
@@ -136,20 +156,44 @@ extension LMStudioManagedSessionHostAdapterV2 {
         }
         let acknowledgementIntent = try sourceIntent(request, turnID: acknowledgementID, stage: "ack",
             previousResponseID: root.responseID, input: acknowledgementInput, tools: acknowledgementTools)
-        let acknowledgementCapabilities = try await provider.probe()
-        try validateSourceCapabilities(acknowledgementCapabilities, request: request)
+        let acknowledgementRequest = try ProviderContinuationRequest(
+            operationID: acknowledgementID, idempotencyKey: acknowledgementIntent.idempotencyKey,
+            modelKey: request.modelKey, previousResponseID: root.responseID,
+            input: acknowledgementInput, tools: acknowledgementTools)
         try Task.checkCancellation()
         let acknowledgementTurn: ProviderTurn
-        if let recovered = try await executor.prepareProviderTurn(intent: acknowledgementIntent,
-            input: acknowledgementInput, tools: acknowledgementTools, capabilities: acknowledgementCapabilities,
-            totalBootstrapInputBytes: totalBootstrapInputBytes) {
-            acknowledgementTurn = recovered
+        if let exactExecutor = executor as? any SourceBootstrapPreflightExecuting {
+            if let recovery = try await exactExecutor.recoverProviderTurn(intent: acknowledgementIntent,
+                input: acknowledgementInput, tools: acknowledgementTools) {
+                acknowledgementTurn = try await recoveredSourceTurn(recovery, provider: provider,
+                    intent: acknowledgementIntent)
+            } else {
+                let capabilities = try await provider.probe()
+                try validateSourceCapabilities(capabilities, request: request)
+                let preflight = try await provider.preflightContinuation(acknowledgementRequest)
+                let admission = try await exactExecutor.prepareProviderTurn(intent: acknowledgementIntent,
+                    input: acknowledgementInput, tools: acknowledgementTools, capabilities: capabilities,
+                    totalBootstrapInputBytes: totalBootstrapInputBytes, preflight: preflight)
+                try Task.checkCancellation()
+                if admission == .dispatch {
+                    acknowledgementTurn = try await provider.continueSession(acknowledgementRequest,
+                        observedCapabilities: capabilities)
+                } else {
+                    acknowledgementTurn = try await recoveredSourceTurn(admission, provider: provider,
+                        intent: acknowledgementIntent)
+                }
+            }
         } else {
-            try Task.checkCancellation()
-            acknowledgementTurn = try await provider.continueSession(ProviderContinuationRequest(
-                operationID: acknowledgementID, idempotencyKey: acknowledgementIntent.idempotencyKey,
-                modelKey: request.modelKey, previousResponseID: root.responseID,
-                input: acknowledgementInput, tools: acknowledgementTools))
+            let capabilities = try await provider.probe()
+            try validateSourceCapabilities(capabilities, request: request)
+            if let recovered = try await executor.prepareProviderTurn(intent: acknowledgementIntent,
+                input: acknowledgementInput, tools: acknowledgementTools, capabilities: capabilities,
+                totalBootstrapInputBytes: totalBootstrapInputBytes) {
+                acknowledgementTurn = recovered
+            } else {
+                try Task.checkCancellation()
+                acknowledgementTurn = try await provider.continueSession(acknowledgementRequest)
+            }
         }
         try Task.checkCancellation()
         try validateSourceTurn(acknowledgementTurn, intent: acknowledgementIntent, request: request)
@@ -176,6 +220,21 @@ extension LMStudioManagedSessionHostAdapterV2 {
             internalSessionID: request.sessionID, providerResponseID: acknowledgementTurn.responseID,
             modelKey: request.modelKey, adapterID: adapterID, usage: usage), retrieval: retrieval,
             rootTurn: root, acknowledgementTurn: acknowledgementTurn)
+    }
+
+    private static func recoveredSourceTurn(_ admission: SourceBootstrapProviderAdmission,
+        provider: LMStudioManagedModelProvider, intent: ProviderTurnIntent) async throws -> ProviderTurn {
+        try Task.checkCancellation()
+        switch admission {
+        case .recorded(let turn): return turn
+        case .lookupOnly:
+            guard let turn = try await provider.lookupRecorded(idempotencyKey: intent.idempotencyKey) else {
+                throw LMStudioProviderError.conflict
+            }
+            return turn
+        case .dispatch:
+            throw SessionHostAdapterV2Error.invalidRequest("recovery cannot authorize provider dispatch")
+        }
     }
 
     private static func validateSourceTurn(_ turn: ProviderTurn, intent: ProviderTurnIntent,
@@ -1644,6 +1703,7 @@ public actor LMStudioRESTClient {
     private let configurationFingerprintSHA256: String
     private let sessionConfiguration: URLSessionConfiguration
     private let authorization: any LMStudioAuthorizationProviding
+    private let capabilityClock: @Sendable () -> ContinuousClock.Instant
     private var cachedCapabilities: (
         value: LMStudioProviderCapabilities, expiresAt: ContinuousClock.Instant
     )?
@@ -1651,7 +1711,8 @@ public actor LMStudioRESTClient {
     public init(
         configuration: LMStudioProviderConfiguration,
         sessionConfiguration: URLSessionConfiguration = .ephemeral,
-        authorization: any LMStudioAuthorizationProviding = LMStudioNoAuthorization()
+        authorization: any LMStudioAuthorizationProviding = LMStudioNoAuthorization(),
+        capabilityClock: @escaping @Sendable () -> ContinuousClock.Instant = { ContinuousClock.now }
     ) throws {
         let checked = try configuration.validated()
         let networkSafetyTimeout = min(checked.totalTimeoutSeconds + 5, 1_200)
@@ -1683,6 +1744,7 @@ public actor LMStudioRESTClient {
         )
         self.sessionConfiguration = sessionConfiguration
         self.authorization = authorization
+        self.capabilityClock = capabilityClock
     }
 
     public func listModels() async throws -> [LMStudioModel] {
@@ -1718,7 +1780,7 @@ public actor LMStudioRESTClient {
     }
 
     public func probe() async throws -> LMStudioProviderCapabilities {
-        if let cachedCapabilities, ContinuousClock.now < cachedCapabilities.expiresAt {
+        if let cachedCapabilities, capabilityClock() < cachedCapabilities.expiresAt {
             return cachedCapabilities.value
         }
         let inventory = try await modelInventory()
@@ -1844,7 +1906,7 @@ public actor LMStudioRESTClient {
         )
         cachedCapabilities = (
             capabilities,
-            ContinuousClock.now.advanced(by: .seconds(Self.capabilityCacheSeconds))
+            capabilityClock().advanced(by: .seconds(Self.capabilityCacheSeconds))
         )
         return capabilities
     }
@@ -1887,6 +1949,40 @@ public actor LMStudioRESTClient {
             throw LMStudioProviderError.malformedResponse("fresh root unexpectedly references a predecessor")
         }
         return turn
+    }
+
+    /// Uses only an already observed capability value. Expiry never triggers a POST.
+    public func createRoot(_ request: LMStudioRootRequest,
+                           observedFingerprint: String) async throws -> LMStudioResponseTurn {
+        let model = try observedModel(request.modelKey, fingerprint: observedFingerprint)
+        let turn = try await performResponse(model: model, previousResponseID: nil,
+            input: rootInput(request), tools: request.tools, idempotencyKey: request.idempotencyKey,
+            providerRequestID: request.providerRequestID)
+        guard turn.previousResponseID == nil else {
+            throw LMStudioProviderError.malformedResponse("fresh root unexpectedly references a predecessor")
+        }
+        return turn
+    }
+
+    public func continueSession(_ request: LMStudioContinuationRequest,
+                                observedFingerprint: String) async throws -> LMStudioResponseTurn {
+        let model = try observedModel(request.modelKey, fingerprint: observedFingerprint)
+        let turn = try await performResponse(model: model, previousResponseID: request.previousResponseID,
+            input: continuationInput(request), tools: request.tools, idempotencyKey: request.idempotencyKey,
+            providerRequestID: nil)
+        guard turn.previousResponseID == request.previousResponseID else {
+            throw LMStudioProviderError.malformedResponse("continuation authority does not match the requested predecessor")
+        }
+        return turn
+    }
+
+    private func observedModel(_ requested: String?, fingerprint: String) throws -> String {
+        guard let observed = cachedCapabilities, capabilityClock() < observed.expiresAt,
+              observed.value.capabilityFingerprintSHA256 == fingerprint,
+              requested == observed.value.modelKey else {
+            throw LMStudioProviderError.invalidConfiguration("recorded capability observation is missing, stale or mismatched")
+        }
+        return observed.value.modelKey
     }
 
     private func rootInput(_ request: LMStudioRootRequest) throws -> [LMStudioEncodedInput] {
@@ -1948,21 +2044,23 @@ public actor LMStudioRESTClient {
     /// The selected model is a serialization pin, not a loaded-model attestation.
     public func preflightRoot(_ request: LMStudioRootRequest) throws -> ProviderRequestPreflight {
         let model = try serializationModel(request.modelKey)
+        let input = try rootInput(request)
         let body = try encodeResponse(
-            model: model, previousResponseID: nil, input: rootInput(request),
+            model: model, previousResponseID: nil, input: input,
             tools: request.tools, idempotencyKey: request.idempotencyKey,
             providerRequestID: request.providerRequestID
         )
-        return try preflight(kind: .root, model: model, body: body)
+        return try preflight(kind: .root, model: model, body: body, input: input)
     }
 
     public func preflightContinuation(_ request: LMStudioContinuationRequest) throws -> ProviderRequestPreflight {
         let model = try serializationModel(request.modelKey)
+        let input = try continuationInput(request)
         let body = try encodeResponse(
-            model: model, previousResponseID: request.previousResponseID, input: continuationInput(request),
+            model: model, previousResponseID: request.previousResponseID, input: input,
             tools: request.tools, idempotencyKey: request.idempotencyKey, providerRequestID: nil
         )
-        return try preflight(kind: .continuation, model: model, body: body)
+        return try preflight(kind: .continuation, model: model, body: body, input: input)
     }
 
     private func serializationModel(_ requested: String?) throws -> String {
@@ -1976,11 +2074,13 @@ public actor LMStudioRESTClient {
         return model
     }
 
-    private func preflight(kind: ProviderRequestPreflight.Kind, model: String, body: Data) throws -> ProviderRequestPreflight {
+    private func preflight(kind: ProviderRequestPreflight.Kind, model: String, body: Data,
+                           input: [LMStudioEncodedInput]) throws -> ProviderRequestPreflight {
         try ProviderRequestPreflight(kind: kind, modelKey: model,
             configurationRevision: configuration.revision,
             configurationFingerprintSHA256: configurationFingerprintSHA256,
-            limits: executionLimits, bodySHA256: JSONSupport.sha256Hex(body), bodyByteCount: body.count)
+            limits: executionLimits, bodySHA256: JSONSupport.sha256Hex(body), bodyByteCount: body.count,
+            serializedInputByteCount: Self.responseEncoder().encode(input).count)
     }
 
     private func resolvedModel(_ requested: String?) async throws -> String {
@@ -2029,13 +2129,17 @@ public actor LMStudioRESTClient {
             input: input,
             tools: tools
         )
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
-        let body = try encoder.encode(payload)
+        let body = try Self.responseEncoder().encode(payload)
         guard body.count <= configuration.maximumRequestBytes else {
             throw LMStudioProviderError.limitExceeded("request body")
         }
         return body
+    }
+
+    private static func responseEncoder() -> JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        return encoder
     }
 
     private func performResponse(
@@ -2116,7 +2220,12 @@ public protocol LMStudioManagedTransportRequestPreflighting: LMStudioManagedTran
     func preflightContinuation(_ request: LMStudioContinuationRequest) async throws -> ProviderRequestPreflight
 }
 
-public actor LMStudioManagedSessionTransport: LMStudioManagedTransportRequestPreflighting {
+public protocol LMStudioManagedTransportObservedDispatching: LMStudioManagedTransportRequestPreflighting {
+    func createRoot(_ request: LMStudioRootRequest, observedFingerprint: String) async throws -> LMStudioResponseTurn
+    func continueSession(_ request: LMStudioContinuationRequest, observedFingerprint: String) async throws -> LMStudioResponseTurn
+}
+
+public actor LMStudioManagedSessionTransport: LMStudioManagedTransportObservedDispatching {
     public static let maximumInFlightOperations = 16
     public static let maximumReceipts = 32
 
@@ -2169,6 +2278,20 @@ public actor LMStudioManagedSessionTransport: LMStudioManagedTransportRequestPre
             idempotencyKey: request.idempotencyKey
         ) { [client] in
             try await client.continueSession(request)
+        }
+    }
+
+    public func createRoot(_ request: LMStudioRootRequest,
+                           observedFingerprint: String) async throws -> LMStudioResponseTurn {
+        try await execute(operationID: request.operationID, idempotencyKey: request.idempotencyKey) { [client] in
+            try await client.createRoot(request, observedFingerprint: observedFingerprint)
+        }
+    }
+
+    public func continueSession(_ request: LMStudioContinuationRequest,
+                                observedFingerprint: String) async throws -> LMStudioResponseTurn {
+        try await execute(operationID: request.operationID, idempotencyKey: request.idempotencyKey) { [client] in
+            try await client.continueSession(request, observedFingerprint: observedFingerprint)
         }
     }
 
@@ -2576,14 +2699,16 @@ private struct LMStudioManagedProviderReceiptStore: Sendable {
     }
 }
 
-public actor LMStudioManagedModelProvider: ManagedModelProviderRequestPreflighting {
+public actor LMStudioManagedModelProvider: ManagedModelProviderObservedDispatching {
     public static let maximumRememberedRequestIDs = 32
     public nonisolated let providerID = "lmstudio"
 
     public nonisolated let transport: any LMStudioManagedTransporting
     private let receiptStore: LMStudioManagedProviderReceiptStore?
     private var latestCapabilities: ProviderCapabilities?
+    private var latestObservedCapabilities: ProviderCapabilities?
     private var requestIDsByIdempotencyKey: [String: String] = [:]
+    private var requestCapabilitiesByIdempotencyKey: [String: ProviderCapabilities] = [:]
     private var requestIDOrder: [String] = []
 
     public init(transport: any LMStudioManagedTransporting) {
@@ -2621,6 +2746,7 @@ public actor LMStudioManagedModelProvider: ManagedModelProviderRequestPreflighti
             capabilityFingerprintSHA256: capabilities.capabilityFingerprintSHA256
         )
         latestCapabilities = normalized
+        latestObservedCapabilities = normalized
         return normalized
     }
 
@@ -2655,6 +2781,17 @@ public actor LMStudioManagedModelProvider: ManagedModelProviderRequestPreflighti
     }
 
     public func createRoot(_ request: ProviderRootRequest) async throws -> ProviderTurn {
+        try await executeRoot(request, observedCapabilities: nil)
+    }
+
+    public func createRoot(_ request: ProviderRootRequest,
+                           observedCapabilities: ProviderCapabilities) async throws -> ProviderTurn {
+        try requireObservedCapabilities(observedCapabilities)
+        return try await executeRoot(request, observedCapabilities: observedCapabilities)
+    }
+
+    private func executeRoot(_ request: ProviderRootRequest,
+                             observedCapabilities: ProviderCapabilities?) async throws -> ProviderTurn {
         let request = try request.validated()
         guard request.structuredOutputSchema == nil else {
             throw ManagedModelProviderContractError.unsupportedCapability(
@@ -2676,7 +2813,9 @@ public actor LMStudioManagedModelProvider: ManagedModelProviderRequestPreflighti
         ) {
             return recovered
         }
-        let capabilities = try await probe()
+        let capabilities: ProviderCapabilities
+        if let observedCapabilities { capabilities = observedCapabilities }
+        else { capabilities = try await probe() }
         guard request.modelKey == capabilities.modelKey else {
             throw ManagedModelProviderContractError.invalidValue(
                 "request model does not match the probed model"
@@ -2700,9 +2839,9 @@ public actor LMStudioManagedModelProvider: ManagedModelProviderRequestPreflighti
                 throw LMStudioProviderError.conflict
             }
         }
-        remember(requestID: requestID, forIdempotencyKey: request.idempotencyKey)
+        remember(requestID: requestID, forIdempotencyKey: request.idempotencyKey, capabilities: capabilities)
         do {
-            let turn = try await transport.createRoot(LMStudioRootRequest(
+            let transportRequest = LMStudioRootRequest(
                 operationID: requestID,
                 providerRequestID: requestID,
                 modelKey: request.modelKey,
@@ -2710,7 +2849,15 @@ public actor LMStudioManagedModelProvider: ManagedModelProviderRequestPreflighti
                 userInput: request.input,
                 tools: tools,
                 idempotencyKey: request.idempotencyKey
-            ))
+            )
+            let turn: LMStudioResponseTurn
+            if let observedCapabilities {
+                guard let observedTransport = transport as? any LMStudioManagedTransportObservedDispatching else {
+                    throw ManagedModelProviderContractError.unsupportedCapability("observed request dispatch")
+                }
+                turn = try await observedTransport.createRoot(transportRequest,
+                    observedFingerprint: observedCapabilities.capabilityFingerprintSHA256)
+            } else { turn = try await transport.createRoot(transportRequest) }
             guard turn.previousResponseID == nil else {
                 throw ManagedModelProviderContractError.invalidValue(
                     "root response unexpectedly references a predecessor"
@@ -2738,9 +2885,18 @@ public actor LMStudioManagedModelProvider: ManagedModelProviderRequestPreflighti
         }
     }
 
-    public func continueSession(
-        _ request: ProviderContinuationRequest
-    ) async throws -> ProviderTurn {
+    public func continueSession(_ request: ProviderContinuationRequest) async throws -> ProviderTurn {
+        try await executeContinuation(request, observedCapabilities: nil)
+    }
+
+    public func continueSession(_ request: ProviderContinuationRequest,
+                                observedCapabilities: ProviderCapabilities) async throws -> ProviderTurn {
+        try requireObservedCapabilities(observedCapabilities)
+        return try await executeContinuation(request, observedCapabilities: observedCapabilities)
+    }
+
+    private func executeContinuation(_ request: ProviderContinuationRequest,
+                                     observedCapabilities: ProviderCapabilities?) async throws -> ProviderTurn {
         let request = try request.validated()
         let requestID = request.operationID.uuidString.lowercased()
         let fingerprint = try Self.requestFingerprint(
@@ -2757,7 +2913,9 @@ public actor LMStudioManagedModelProvider: ManagedModelProviderRequestPreflighti
         ) {
             return recovered
         }
-        let capabilities = try await probe()
+        let capabilities: ProviderCapabilities
+        if let observedCapabilities { capabilities = observedCapabilities }
+        else { capabilities = try await probe() }
         guard request.modelKey == capabilities.modelKey else {
             throw ManagedModelProviderContractError.invalidValue(
                 "request model does not match the probed model"
@@ -2782,16 +2940,24 @@ public actor LMStudioManagedModelProvider: ManagedModelProviderRequestPreflighti
                 throw LMStudioProviderError.conflict
             }
         }
-        remember(requestID: requestID, forIdempotencyKey: request.idempotencyKey)
+        remember(requestID: requestID, forIdempotencyKey: request.idempotencyKey, capabilities: capabilities)
         do {
-            let turn = try await transport.continueSession(LMStudioContinuationRequest(
+            let transportRequest = LMStudioContinuationRequest(
                 operationID: requestID,
                 modelKey: request.modelKey,
                 previousResponseID: request.previousResponseID,
                 input: input,
                 tools: tools,
                 idempotencyKey: request.idempotencyKey
-            ))
+            )
+            let turn: LMStudioResponseTurn
+            if let observedCapabilities {
+                guard let observedTransport = transport as? any LMStudioManagedTransportObservedDispatching else {
+                    throw ManagedModelProviderContractError.unsupportedCapability("observed request dispatch")
+                }
+                turn = try await observedTransport.continueSession(transportRequest,
+                    observedFingerprint: observedCapabilities.capabilityFingerprintSHA256)
+            } else { turn = try await transport.continueSession(transportRequest) }
             guard turn.previousResponseID == request.previousResponseID else {
                 throw ManagedModelProviderContractError.invalidValue(
                     "continuation response does not reference the requested predecessor"
@@ -2817,6 +2983,32 @@ public actor LMStudioManagedModelProvider: ManagedModelProviderRequestPreflighti
             )
             throw error
         }
+    }
+
+    private func requireObservedCapabilities(_ capabilities: ProviderCapabilities) throws {
+        guard transport is any LMStudioManagedTransportObservedDispatching else {
+            throw ManagedModelProviderContractError.unsupportedCapability("observed request dispatch")
+        }
+        guard latestObservedCapabilities == capabilities else {
+            throw ManagedModelProviderContractError.invalidValue("capabilities were not observed by this provider")
+        }
+    }
+
+    /// Recovery is receipt-only. It never probes or manufactures a missing request identity.
+    public func lookupRecorded(idempotencyKey: String) async throws -> ProviderTurn? {
+        try ManagedModelProviderContract.validateIdempotencyKey(idempotencyKey)
+        if let record = try receiptStore?.record(forIdempotencyKey: idempotencyKey) {
+            if let turn = record.turn { return turn }
+            guard let transportTurn = await transport.receipt(forIdempotencyKey: idempotencyKey) else { return nil }
+            let normalized = try normalize(transportTurn, requestID: record.requestID, capabilities: record.capabilities)
+            try receiptStore?.accept(idempotencyKey: idempotencyKey,
+                requestFingerprint: record.requestFingerprintSHA256, turn: normalized, capabilities: record.capabilities)
+            return normalized
+        }
+        guard let capabilities = requestCapabilitiesByIdempotencyKey[idempotencyKey],
+              let requestID = requestIDsByIdempotencyKey[idempotencyKey],
+              let turn = await transport.receipt(forIdempotencyKey: idempotencyKey) else { return nil }
+        return try normalize(turn, requestID: requestID, capabilities: capabilities)
     }
 
     public func lookup(idempotencyKey: String) async throws -> ProviderTurn? {
@@ -2933,11 +3125,14 @@ public actor LMStudioManagedModelProvider: ManagedModelProviderRequestPreflighti
         return JSONSupport.sha256Hex(try JSONSupport.data(from: object))
     }
 
-    private func remember(requestID: String, forIdempotencyKey key: String) {
+    private func remember(requestID: String, forIdempotencyKey key: String, capabilities: ProviderCapabilities) {
         if requestIDsByIdempotencyKey[key] == nil { requestIDOrder.append(key) }
         requestIDsByIdempotencyKey[key] = requestID
+        requestCapabilitiesByIdempotencyKey[key] = capabilities
         while requestIDOrder.count > Self.maximumRememberedRequestIDs {
-            requestIDsByIdempotencyKey.removeValue(forKey: requestIDOrder.removeFirst())
+            let expiredKey = requestIDOrder.removeFirst()
+            requestIDsByIdempotencyKey.removeValue(forKey: expiredKey)
+            requestCapabilitiesByIdempotencyKey.removeValue(forKey: expiredKey)
         }
     }
 

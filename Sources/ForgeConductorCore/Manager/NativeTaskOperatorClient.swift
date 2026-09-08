@@ -5,6 +5,10 @@ public protocol NativeTaskOperatorTransport: Sendable {
     func submitNativeTaskCommand(action: String, body: Data) async throws -> NativeTaskCapabilityCommandResult
 }
 
+public protocol NativeSourceOperatorTransport: Sendable {
+    func submitNativeSourceCommand(action: String, body: Data) async throws -> Data
+}
+
 /// A native operator input file contains approval, never credentials or model-provided authority.
 public struct NativeContinuityTaskPreparationInput: Sendable {
     public let projectID: ProjectID
@@ -41,9 +45,36 @@ public actor NativeTaskOperatorClient {
     private let store: NativeTaskCredentialFileStore
     private let transport: any NativeTaskOperatorTransport
     private let endpoint: URL
-    public init(store: NativeTaskCredentialFileStore, transport: any NativeTaskOperatorTransport, endpoint: URL) throws {
+    private let sourceTransport: (any NativeSourceOperatorTransport)?
+    public init(store: NativeTaskCredentialFileStore, transport: any NativeTaskOperatorTransport, endpoint: URL,
+                sourceTransport: (any NativeSourceOperatorTransport)? = nil) throws {
         try NativeTaskOperatorEndpoint.validate(endpoint)
         self.store = store; self.transport = transport; self.endpoint = endpoint
+        self.sourceTransport = sourceTransport ?? (transport as? any NativeSourceOperatorTransport)
+    }
+
+    public func sendSource(_ request: NativeSourceSendRequest) async throws -> NativeSourceOperatorResponse {
+        try await sourceCommand(action: "send", body: request.canonicalRequestJSON,
+            taskID: request.taskID, requestID: request.requestID)
+    }
+
+    public func sourceStatus(_ request: NativeSourceStatusRequest) async throws -> NativeSourceOperatorResponse {
+        try await sourceCommand(action: "status", body: request.canonicalRequestJSON,
+            taskID: request.taskID, requestID: request.requestID)
+    }
+
+    public func cancelSource(_ request: NativeSourceCancelRequest) async throws -> NativeSourceOperatorResponse {
+        try await sourceCommand(action: "cancel", body: request.canonicalRequestJSON,
+            taskID: request.taskID, requestID: request.requestID)
+    }
+
+    private func sourceCommand(action: String, body: Data, taskID: UUID, requestID: UUID) async throws -> NativeSourceOperatorResponse {
+        guard let sourceTransport else { throw NativeSourceOperatorError.unavailable }
+        try Task.checkCancellation()
+        let data = try await sourceTransport.submitNativeSourceCommand(action: action, body: body)
+        let result = try NativeSourceOperatorResponse(data: data)
+        guard result.taskID == taskID, result.requestID == requestID else { throw NativeSourceOperatorError.invalidResponse }
+        return result
     }
 
     public func prepare(_ input: NativeContinuityTaskPreparationInput) async throws -> NativeTaskCredentialSnapshot {

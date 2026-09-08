@@ -4,7 +4,7 @@ import Foundation
 
 /// A single worker-owned exchange, with no scheduling loop or tool dispatcher.
 /// Candidate authority never permits ordinary mission execution or activation.
-actor ManagedSourceBootstrapExecutor: SourceBootstrapExecuting {
+actor ManagedSourceBootstrapExecutor: SourceBootstrapPreflightExecuting {
     private let repository: ProjectControlPlaneRepository
     private let engine: ContinuityStateEngine
     private let broker: ToolInvocationBroker
@@ -16,6 +16,7 @@ actor ManagedSourceBootstrapExecutor: SourceBootstrapExecuting {
     private var retrieval: SourceBootstrapContextResult?
     private var rootResult: ProviderTurn?
     private var admittedCapabilities: [UUID: ProviderCapabilities] = [:]
+    private var admittedPreflights: [UUID: ProviderRequestPreflight] = [:]
 
     init(repository: ProjectControlPlaneRepository, engine: ContinuityStateEngine,
          broker: ToolInvocationBroker, continuity: ContextContinuityService,
@@ -34,6 +35,66 @@ actor ManagedSourceBootstrapExecutor: SourceBootstrapExecuting {
     func prepareProviderTurn(intent: ProviderTurnIntent, input: Data, tools: [Data],
         capabilities: ProviderCapabilities, totalBootstrapInputBytes: Int
     ) async throws -> ProviderTurn? {
+        // Legacy adapters have no transport receipt. They cannot submit a run
+        // whose native source conversation retained immutable execution limits.
+        guard try await repository.nativeSourceBudgetCarryover(runID: request.runID) == nil else {
+            throw ManagedModelProviderContractError.unsupportedCapability("source bootstrap request preflight")
+        }
+        switch try await prepare(intent: intent, input: input, tools: tools,
+            capabilities: capabilities, totalBootstrapInputBytes: totalBootstrapInputBytes, preflight: nil) {
+        case .recorded(let turn): return turn
+        case .dispatch, .lookupOnly: return nil
+        }
+    }
+
+    func prepareProviderTurn(intent: ProviderTurnIntent, input: Data, tools: [Data],
+        capabilities: ProviderCapabilities, totalBootstrapInputBytes: Int,
+        preflight: ProviderRequestPreflight
+    ) async throws -> SourceBootstrapProviderAdmission {
+        try await prepare(intent: intent, input: input, tools: tools, capabilities: capabilities,
+            totalBootstrapInputBytes: totalBootstrapInputBytes, preflight: preflight)
+    }
+
+    func recoverProviderTurn(intent: ProviderTurnIntent, input: Data, tools: [Data])
+        async throws -> SourceBootstrapProviderAdmission? {
+        let selection = try await refreshAuthority()
+        guard intent.runID == request.runID, intent.projectID == request.projectID,
+              intent.projectGeneration == request.projectGeneration,
+              intent.operationID == request.operationID, intent.sessionID == request.sessionID,
+              intent.kind == .bootstrap, intent.inputSHA256 == JSONSupport.sha256Hex(input) else {
+            throw ContinuityIngressError.authorityMismatch
+        }
+        let schemas = try ForgeJSONCanonicalizationV1.data(from:
+            tools.map { try JSONSerialization.jsonObject(with: $0) })
+        guard intent.toolSchemaSHA256 == JSONSupport.sha256Hex(schemas) else {
+            throw ContinuityIngressError.authorityMismatch
+        }
+        let retained: SourceDerivedProviderTurnPreflightReceipt?
+        do {
+            retained = try await repository.sourceDerivedProviderTurnPreflight(
+                turnID: intent.turnID, lease: lease, bootstrapGrant: grant)
+        } catch AutonomyError.providerTurnNotFound(let turnID) where turnID == intent.turnID {
+            return nil
+        }
+        guard let receipt = retained else { return nil }
+        guard receipt.intent == intent, receipt.preflight.modelKey == request.modelKey,
+              receipt.capabilities.modelKey == request.modelKey else {
+            throw ContinuityIngressError.authorityMismatch
+        }
+        let carryover = try await repository.nativeSourceBudgetCarryover(runID: request.runID)
+        _ = try PersistedManagedRunBudgetEvaluator.configuration(capabilities: receipt.capabilities,
+            selection: selection, inheritance: try carryover.map { try InheritedSourceContextBudget(carryover: $0) },
+            providerPreflight: receipt.preflight)
+        try rememberAdmission(intent: intent, capabilities: receipt.capabilities, preflight: receipt.preflight)
+        if let result = try await repository.continuityBootstrapProviderResult(
+            grant: grant, turnID: intent.turnID, lease: lease) { return .recorded(result) }
+        return .lookupOnly
+    }
+
+    private func prepare(intent: ProviderTurnIntent, input: Data, tools: [Data],
+        capabilities: ProviderCapabilities, totalBootstrapInputBytes: Int,
+        preflight: ProviderRequestPreflight?
+    ) async throws -> SourceBootstrapProviderAdmission {
         try Task.checkCancellation()
         let selection = try await refreshAuthority()
         guard let run = try await repository.autonomousRun(request.runID),
@@ -56,18 +117,34 @@ actor ManagedSourceBootstrapExecutor: SourceBootstrapExecuting {
         }
         // This is a conservative request preflight against the actual loaded
         // model. It is not fabricated provider usage or a predecessor budget.
+        let carryover = try await repository.nativeSourceBudgetCarryover(runID: request.runID)
+        let inheritance = try carryover.map { try InheritedSourceContextBudget(carryover: $0) }
+        if let preflight {
+            guard preflight.modelKey == request.modelKey,
+                  preflight.kind == (intent.previousResponseID == nil ? .root : .continuation) else {
+                throw ContinuityIngressError.authorityMismatch
+            }
+        } else if inheritance != nil {
+            throw ManagedModelProviderContractError.unsupportedCapability("source bootstrap request preflight")
+        }
         let configuration = try PersistedManagedRunBudgetEvaluator.configuration(
-            capabilities: capabilities, selection: selection)
+            capabilities: capabilities, selection: selection, inheritance: inheritance,
+            providerPreflight: preflight)
         let currentBytes = input.count.addingReportingOverflow(schemas.count)
         guard !currentBytes.overflow, totalBootstrapInputBytes >= currentBytes.partialValue else {
             throw ContextBudgetError.serializedInputTooLarge
         }
+        // Include the real wire body in the whole-bootstrap bound. The extra
+        // compact-input allowance also reserves the later exact retrieval output.
+        let wireBytes = preflight?.bodyByteCount ?? currentBytes.partialValue
+        let wholeBytes = totalBootstrapInputBytes.addingReportingOverflow(max(0, wireBytes - currentBytes.partialValue))
+        guard !wholeBytes.overflow else { throw ContextBudgetError.arithmeticOverflow }
         let estimated = try ContextBudgetMath.estimateTokens(
-            serializedBytes: totalBootstrapInputBytes, policy: configuration.policy)
-        // The existing native transport caps each response at 4,096 tokens.
-        // A smaller policy reserve cannot hide that possible wire output.
-        // Fixed reserves already contain one policy response reserve.
-        let responseBound = max(4_096, configuration.reserves.outputTokens)
+            serializedBytes: wholeBytes.partialValue, policy: configuration.policy)
+        // The exact transport cap controls possible output. Fixed reserves
+        // already contain one policy response reserve.
+        let responseBound = max(preflight?.limits.maximumOutputTokens ?? 4_096,
+            configuration.reserves.outputTokens)
         let responses = responseBound.multipliedReportingOverflow(by: 2)
         guard !responses.overflow else { throw ContextBudgetError.arithmeticOverflow }
         let additionalOutput = responses.partialValue - configuration.reserves.outputTokens
@@ -83,7 +160,7 @@ actor ManagedSourceBootstrapExecutor: SourceBootstrapExecuting {
                 throw ContinuityIngressError.authorityMismatch
             }
             let retained = try PersistedManagedRunBudgetEvaluator.retainedTokensAfterResponse(usage)
-            let added = try ContextBudgetMath.estimateTokens(serializedBytes: currentBytes.partialValue,
+            let added = try ContextBudgetMath.estimateTokens(serializedBytes: wireBytes,
                 policy: configuration.policy)
             let projected = retained.addingReportingOverflow(added)
             guard !projected.overflow else { throw ContextBudgetError.arithmeticOverflow }
@@ -107,13 +184,21 @@ actor ManagedSourceBootstrapExecutor: SourceBootstrapExecuting {
             try await repository.preflightContinuityBootstrapRetrieval(
                 grant: grant, rootTurnID: intent.turnID, lease: lease, policy: selection)
         }
-        guard admittedCapabilities[intent.turnID] != nil || admittedCapabilities.count < 2 else {
-            throw ContinuityIngressError.capacityExceeded("bootstrap admitted turns")
+        try rememberAdmission(intent: intent, capabilities: capabilities, preflight: preflight)
+        if let preflight {
+            let admission = try await repository.beginSourceDerivedProviderTurn(intent: intent,
+                preflight: preflight, capabilities: capabilities, lease: lease, bootstrapGrant: grant)
+            switch admission {
+            case .dispatch: return .dispatch
+            case .lookupOnly, .completed:
+                if let completed = try await repository.continuityBootstrapProviderResult(
+                    grant: grant, turnID: intent.turnID, lease: lease) { return .recorded(completed) }
+                return .lookupOnly
+            }
         }
-        admittedCapabilities[intent.turnID] = capabilities
         if let completed = try await repository.continuityBootstrapProviderResult(
             grant: grant, turnID: intent.turnID, lease: lease) {
-            return completed
+            return .recorded(completed)
         }
         switch persisted.state {
         case .intent, .ambiguous, .retryWait:
@@ -127,7 +212,22 @@ actor ManagedSourceBootstrapExecutor: SourceBootstrapExecuting {
         case .failed, .cancelled:
             throw ContinuityIngressError.deliveryConflict
         }
-        return nil
+        return .dispatch
+    }
+
+    private func rememberAdmission(intent: ProviderTurnIntent, capabilities: ProviderCapabilities,
+        preflight: ProviderRequestPreflight?) throws {
+        guard admittedCapabilities[intent.turnID] != nil || admittedCapabilities.count < 2 else {
+            throw ContinuityIngressError.capacityExceeded("bootstrap admitted turns")
+        }
+        if let existing = admittedCapabilities[intent.turnID], existing != capabilities {
+            throw ContinuityIngressError.authorityMismatch
+        }
+        if let existing = admittedPreflights[intent.turnID], existing != preflight {
+            throw ContinuityIngressError.authorityMismatch
+        }
+        admittedCapabilities[intent.turnID] = capabilities
+        if let preflight { admittedPreflights[intent.turnID] = preflight }
     }
 
     func retrieveContext(rootIntent: ProviderTurnIntent, rootTurn: ProviderTurn) async throws -> SourceBootstrapContextResult {
@@ -197,6 +297,11 @@ actor ManagedSourceBootstrapExecutor: SourceBootstrapExecuting {
               result.requestID == intent.turnID.uuidString.lowercased(),
               result.modelKey == request.modelKey, result.previousResponseID == intent.previousResponseID else {
             throw ContinuityIngressError.authorityMismatch
+        }
+        if let preflight = admittedPreflights[intent.turnID] {
+            guard let usage = result.usage, usage.outputTokens <= preflight.limits.maximumOutputTokens else {
+                throw ContextBudgetError.insufficientUsableCapacity
+            }
         }
         // Re-persisting the exact intent validates the current grant before any
         // receipt lookup or transition, including completed-result replay.

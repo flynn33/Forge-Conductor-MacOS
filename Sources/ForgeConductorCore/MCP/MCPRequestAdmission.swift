@@ -36,7 +36,18 @@ final class MCPRequestAdmission: @unchecked Sendable {
         }
     }
 
-    struct Key: Hashable, Sendable { let sessionID: UUID; let id: Identifier }
+    enum Key: Hashable, Sendable {
+        case protocolRequest(sessionID: UUID, id: Identifier)
+        case nativeProviderCall(conversationID: UUID, referenceSHA256: String)
+        case nativeProviderCatalog(conversationID: UUID, requestID: UUID)
+
+        init(sessionID: UUID, id: Identifier) { self = .protocolRequest(sessionID: sessionID, id: id) }
+
+        var protocolSessionID: UUID? {
+            guard case .protocolRequest(let sessionID, _) = self else { return nil }
+            return sessionID
+        }
+    }
     enum Registration { case accepted; case duplicate; case capacityExceeded; case closed }
     private struct Entry {
         let token: ToolCallCancellation
@@ -82,7 +93,7 @@ final class MCPRequestAdmission: @unchecked Sendable {
 
     func cancel(sessionID: UUID? = nil) {
         lock.lock()
-        let retained = entries.filter { sessionID == nil || $0.key.sessionID == sessionID }.map(\.value)
+        let retained = entries.filter { sessionID == nil || $0.key.protocolSessionID == sessionID }.map(\.value)
         lock.unlock()
         for entry in retained { entry.token.cancel(); entry.cancelTask?() }
     }
@@ -95,6 +106,6 @@ final class MCPRequestAdmission: @unchecked Sendable {
     var activeCount: Int { lock.lock(); defer { lock.unlock() }; return entries.count }
     func activeCount(sessionID: UUID) -> Int {
         lock.lock(); defer { lock.unlock() }
-        return entries.keys.filter { $0.sessionID == sessionID }.count
+        return entries.keys.filter { $0.protocolSessionID == sessionID }.count
     }
 }

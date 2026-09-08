@@ -3,6 +3,9 @@
 import XCTest
 import SQLite3
 @testable import ForgeConductorCore
+#if SWIFT_PACKAGE
+@testable import ForgeNativeSessionHostPlugin
+#endif
 
 final class ContinuityBootstrapAuthorityTests: XCTestCase {
     func testGrantIsRecoveryOnlyAndBindsCandidateNonceAndCurrentLease() async throws {
@@ -235,8 +238,8 @@ final class ContinuityBootstrapAuthorityTests: XCTestCase {
                     "SELECT pk FROM pragma_table_info('continuity_ingress_holds') WHERE name='operation_id'"), 1)
                 let manifest = try JSONDecoder().decode(VerifiedMigrationBackupManifest.self,
                     from: Data(contentsOf: VerifiedMigrationBackup.activeManifestURL(for: fixture.database, scope: .continuityIngress)))
-                XCTAssertEqual(manifest.sourceVersion, 6)
-                XCTAssertEqual(manifest.targetVersion, 7)
+                XCTAssertEqual(manifest.sourceVersion, 7)
+                XCTAssertEqual(manifest.targetVersion, 8)
                 XCTAssertEqual(manifest.state, .completed)
                 let backup = fixture.database.deletingLastPathComponent().appendingPathComponent(manifest.backupFilename)
                 let priorHoldBackup = fixture.database.deletingPathExtension().appendingPathExtension("pre-ingress-capability-v2.sqlite3")
@@ -276,6 +279,125 @@ final class ContinuityBootstrapAuthorityTests: XCTestCase {
                 FROM autonomous_runs;
                 """))
             await fails { _ = try await fixture.repository.validateAutonomousRunExecutionAdmission(fixture.receipt.runID) }
+        }
+    }
+
+    func testBootstrapBudgetObservationRequiresExactRunLeaseAndActualActivation() async throws {
+        try await withFixture { f in
+            let grant = try await f.issue()
+            _ = try await f.preparePreflight(grant)
+            let before = try BootstrapSQLite.integer(f.database, "SELECT COUNT(*) FROM provider_turns")
+            let absent = try await f.repository.sourceDerivedBootstrapAcknowledgement(runID: f.receipt.runID,
+                sessionID: grant.sessionID, previousResponseID: "unaccepted-response", lease: f.lease)
+            XCTAssertNil(absent, "A provisional candidate must not synthesize an accepted budget observation")
+            do {
+                _ = try await f.repository.sourceDerivedBootstrapAcknowledgement(runID: RunID(),
+                    sessionID: grant.sessionID, previousResponseID: "unaccepted-response", lease: f.lease)
+                XCTFail("A lease for another run disclosed bootstrap context")
+            } catch { XCTAssertEqual(error as? AutonomyError, .staleLease) }
+            XCTAssertEqual(try BootstrapSQLite.integer(f.database, "SELECT COUNT(*) FROM provider_turns"), before)
+            XCTAssertEqual(try BootstrapSQLite.integer(f.database, "SELECT COUNT(*) FROM continuity_source_activations"), 0)
+            XCTAssertEqual(try BootstrapSQLite.integer(f.database, "SELECT COUNT(*) FROM provider_turns WHERE state<>'intent'"), 0)
+        }
+    }
+
+    func testSourceBootstrapPreflightCommitIsAtomicAndSubmittedRecoveryNeverRedispatches() async throws {
+        try await withFixture { f in
+            let grant = try await f.issue(), request = try await f.preparePreflight(grant)
+            await f.repository.configureOperationObservers(beforeCommit: { throw SourcePreflightFixtureError.interrupted })
+            do {
+                _ = try await f.repository.beginSourceDerivedProviderTurn(intent: request.intent, preflight: request.preflight,
+                    capabilities: request.capabilities, lease: f.lease, bootstrapGrant: grant)
+                XCTFail("Interrupted FULL submission committed")
+            } catch { XCTAssertTrue(error is SourcePreflightFixtureError) }
+            await f.repository.configureOperationObservers()
+            let untouched = try await f.repository.providerTurn(request.intent.turnID)
+            XCTAssertEqual(untouched?.state, .intent); XCTAssertEqual(untouched?.attempt, 0)
+            XCTAssertEqual(try BootstrapSQLite.integer(f.database,
+                "SELECT COUNT(*) FROM provider_turns WHERE source_preflight_json IS NOT NULL"), 0)
+            guard case .dispatch = try await f.repository.beginSourceDerivedProviderTurn(intent: request.intent,
+                preflight: request.preflight, capabilities: request.capabilities, lease: f.lease, bootstrapGrant: grant) else {
+                return XCTFail("First exact durable request was not admitted")
+            }
+            let retained = try await f.repository.sourceDerivedProviderTurnPreflight(turnID: request.intent.turnID,
+                lease: f.lease, bootstrapGrant: grant)
+            XCTAssertEqual(retained?.intent, request.intent)
+            XCTAssertEqual(retained?.preflight, request.preflight)
+            XCTAssertEqual(retained?.capabilities, request.capabilities)
+            _ = try await f.repository.transitionProviderTurn(turnID: request.intent.turnID, expected: .submitted,
+                to: .ambiguous, lease: f.lease, retryAt: "2000-01-01T00:00:00.000Z", bootstrapGrant: grant)
+            guard case .lookupOnly(let unknown) = try await f.repository.beginSourceDerivedProviderTurn(intent: request.intent,
+                preflight: request.preflight, capabilities: request.capabilities, lease: f.lease, bootstrapGrant: grant) else {
+                return XCTFail("Unknown request became permission for another POST")
+            }
+            XCTAssertEqual(unknown.attempt, 1)
+            await fails { _ = try await f.repository.transitionProviderTurn(turnID: request.intent.turnID, expected: .ambiguous,
+                to: .submitted, lease: f.lease, bootstrapGrant: grant) }
+            await f.repository.close()
+            let reopened = try ProjectControlPlaneRepository(databaseURL: f.database)
+            do {
+                let restored = try await reopened.sourceDerivedProviderTurnPreflight(turnID: request.intent.turnID,
+                    lease: f.lease, bootstrapGrant: grant)
+                XCTAssertEqual(restored, retained)
+                guard case .lookupOnly = try await reopened.beginSourceDerivedProviderTurn(intent: request.intent,
+                    preflight: request.preflight, capabilities: request.capabilities, lease: f.lease, bootstrapGrant: grant) else {
+                    await reopened.close(); return XCTFail("Restart retried unknown POST")
+                }
+                await reopened.close()
+            } catch { await reopened.close(); throw error }
+        }
+    }
+
+    func testSourceBootstrapPreflightPinsWireAndCapabilityObservationBeforeReplay() async throws {
+        try await withFixture { f in
+            let grant = try await f.issue(), request = try await f.preparePreflight(grant)
+            _ = try await f.repository.beginSourceDerivedProviderTurn(intent: request.intent, preflight: request.preflight,
+                capabilities: request.capabilities, lease: f.lease, bootstrapGrant: grant)
+            let p = request.preflight
+            let changed = try ProviderRequestPreflight(kind: p.kind, modelKey: p.modelKey, configurationRevision: p.configurationRevision,
+                configurationFingerprintSHA256: p.configurationFingerprintSHA256, limits: p.limits,
+                bodySHA256: String(repeating: "f", count: 64), bodyByteCount: p.bodyByteCount,
+                serializedInputByteCount: p.serializedInputByteCount)
+            await fails { _ = try await f.repository.beginSourceDerivedProviderTurn(intent: request.intent,
+                preflight: changed, capabilities: request.capabilities, lease: f.lease, bootstrapGrant: grant) }
+            let c = request.capabilities
+            let replacement = try ProviderCapabilities(providerID: c.providerID, providerVersion: c.providerVersion,
+                modelKey: c.modelKey, providerInstanceID: "replacement-instance", contextLength: c.contextLength,
+                maximumContextLength: c.maximumContextLength, statefulResponses: c.statefulResponses,
+                streaming: c.streaming, customTools: c.customTools, mcp: c.mcp, structuredOutput: c.structuredOutput,
+                usageReporting: c.usageReporting, idempotencyLookup: c.idempotencyLookup,
+                capabilityFingerprintSHA256: c.capabilityFingerprintSHA256)
+            await fails { _ = try await f.repository.beginSourceDerivedProviderTurn(intent: request.intent,
+                preflight: p, capabilities: replacement, lease: f.lease, bootstrapGrant: grant) }
+            // Receipt admission for an external held source needs its exact grant;
+            // a plain run lease cannot stand in for source recovery authority.
+            await fails { _ = try await f.repository.sourceDerivedProviderTurnPreflight(turnID: request.intent.turnID, lease: f.lease) }
+            _ = try await f.repository.transitionProviderTurn(turnID: request.intent.turnID, expected: .submitted,
+                to: .completed, lease: f.lease, providerRequestID: "known-request", providerResponseID: "known-response", bootstrapGrant: grant)
+            guard case .completed(let known) = try await f.repository.beginSourceDerivedProviderTurn(intent: request.intent,
+                preflight: p, capabilities: request.capabilities, lease: f.lease, bootstrapGrant: grant) else {
+                return XCTFail("Completed request did not preserve exact recorded disposition")
+            }
+            XCTAssertEqual(known.providerResponseID, "known-response")
+            XCTAssertEqual(known.attempt, 1)
+        }
+    }
+
+    func testLegacySubmittedBootstrapWithoutPreflightStaysLookupOnly() async throws {
+        try await withFixture { f in
+            let grant = try await f.issue(), request = try await f.preparePreflight(grant)
+            _ = try await f.repository.transitionProviderTurn(turnID: request.intent.turnID, expected: .intent,
+                to: .submitted, lease: f.lease, bootstrapGrant: grant)
+            let missing = try await f.repository.sourceDerivedProviderTurnPreflight(turnID: request.intent.turnID,
+                lease: f.lease, bootstrapGrant: grant)
+            XCTAssertNil(missing)
+            guard case .lookupOnly(let record) = try await f.repository.beginSourceDerivedProviderTurn(intent: request.intent,
+                preflight: request.preflight, capabilities: request.capabilities, lease: f.lease, bootstrapGrant: grant) else {
+                return XCTFail("Legacy submitted request acquired replacement dispatch authority")
+            }
+            XCTAssertEqual(record.attempt, 1)
+            XCTAssertEqual(try BootstrapSQLite.integer(f.database,
+                "SELECT COUNT(*) FROM provider_turns WHERE source_preflight_json IS NOT NULL"), 0)
         }
     }
 
@@ -331,6 +453,27 @@ private struct BootstrapAuthorityFixture: Sendable {
     let envelope: ContinuitySourceBootstrapEnvelope
     let lease: RunLease
 
+    func preparePreflight(_ grant: ContinuityBootstrapGrant) async throws
+        -> (intent: ProviderTurnIntent, preflight: ProviderRequestPreflight, capabilities: ProviderCapabilities) {
+        try await repository.reserveProviderSession(session(grant), lease: lease, bootstrapGrant: grant)
+        let input = "Restore the exact approved handoff", names: Set<String> = ["context_get"]
+        let tools = try ToolDefinitionCatalog.production(toolNames: names.sorted()).providerToolDefinitions(allowedToolNames: names)
+        let intent = ProviderTurnIntent(runID: receipt.runID, sessionID: grant.sessionID, operationID: receipt.operationID,
+            projectID: receipt.authorization.projectID, projectGeneration: .initial, kind: .bootstrap,
+            idempotencyKey: "preflight-root", inputSHA256: JSONSupport.sha256Hex(input),
+            toolSchemaSHA256: try ForgeJSONCanonicalizationV1.sha256Hex(of: tools.map { try JSONSerialization.jsonObject(with: $0) }))
+        _ = try await repository.persistProviderTurnIntent(intent, lease: lease, bootstrapGrant: grant)
+        let provider = LMStudioManagedModelProvider(transport: try LMStudioManagedSessionTransport(configuration:
+            .init(baseURL: URL(string: "http://127.0.0.1:1")!, modelKey: "fixture/model", maximumOutputTokens: 64)))
+        let request = try ProviderRootRequest(operationID: intent.turnID, idempotencyKey: intent.idempotencyKey,
+            modelKey: "fixture/model", input: input, tools: tools)
+        let preflight = try await provider.preflightRoot(request)
+        let capabilities = try ProviderCapabilities(providerID: "lmstudio", providerVersion: "fixture", modelKey: "fixture/model",
+            providerInstanceID: "fixture-instance", contextLength: 262_144, maximumContextLength: 262_144,
+            statefulResponses: true, streaming: false, customTools: true, mcp: false, structuredOutput: false,
+            usageReporting: true, idempotencyLookup: true, capabilityFingerprintSHA256: String(repeating: "a", count: 64))
+        return (intent, preflight, capabilities)
+    }
     func issue() async throws -> ContinuityBootstrapGrant {
         try await repository.issueContinuityBootstrapGrant(envelope: envelope, candidateID: UUID(), lease: lease)
     }
@@ -411,6 +554,13 @@ private enum BootstrapSQLite {
             BEGIN IMMEDIATE;
             DROP TRIGGER IF EXISTS trg_continuity_source_origin_binding_update;
             DROP TRIGGER IF EXISTS trg_continuity_source_origin_binding_delete;
+            ALTER TABLE provider_turns DROP COLUMN source_preflight_sha256;
+            ALTER TABLE provider_turns DROP COLUMN source_preflight_json;
+            DROP TABLE IF EXISTS native_source_provider_run_offsets;
+            DROP TABLE IF EXISTS native_source_provider_calls;
+            DROP TABLE IF EXISTS native_source_capability_checks;
+            DROP TABLE IF EXISTS native_source_provider_turns;
+            DROP TABLE IF EXISTS native_source_conversations;
             DROP TABLE IF EXISTS native_source_run_offsets;
             DROP TABLE IF EXISTS native_source_requests;
             DROP TABLE IF EXISTS native_task_commands;
@@ -443,3 +593,5 @@ private final class BootstrapReadCounter: @unchecked Sendable {
     func increment() { lock.lock(); count += 1; lock.unlock() }
     var value: Int { lock.lock(); defer { lock.unlock() }; return count }
 }
+
+private enum SourcePreflightFixtureError: Error { case interrupted }
