@@ -20,6 +20,18 @@ Provider settings now have native and manager save controls. Four native product
 onboarding scenarios passed; disposable Keychain tests also executed. Complete
 installed-stack and production-feature acceptance remain separate gates.
 
+### Durable budget policy
+
+- Budget preferences now persist with global/project scope, revisions, inheritance
+  and conflict responses through the existing typed manager settings path.
+- Settings transactions preserve newer shell opt-outs and unrelated fields;
+  malformed stored policy remains recoverable with its original backup and error.
+- Runtime accounting applies requested policy at controlled boundaries, clamps to
+  verified loaded capacity, retains raw usage metadata and records effective
+  revisions. Retried input is counted once; overflow counts remain unknown.
+- [Budget policy](docs/BUDGET-POLICY.md) documents the settings contract and the
+  remaining tool-reservation, native controls and live continuity gates.
+
 ### Completion authority and protected validation
 
 - Manager settings reject nonfinite, fractional, boolean and overflowing numeric

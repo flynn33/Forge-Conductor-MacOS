@@ -54,6 +54,8 @@
 		6F2939D4C25B407F8C821D2C /* CoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3924BE1C7E0465FA1120AB1 /* CoreTests.swift */; };
 		71A49E56AB144E03AAAD1A04 /* Telemetry/Collectors/GPUCollector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 969D1C1E99534341BCE4CC33 /* Telemetry/Collectors/GPUCollector.swift */; };
 		71BC2A7CFC5A405C931B32CE /* AppConfigAndDoctorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC5B94490ED44827A946FAE1 /* AppConfigAndDoctorTests.swift */; };
+		B09300000000000000000003 /* BudgetPolicyIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F09300000000000000000003 /* BudgetPolicyIntegrationTests.swift */; };
+		B09300000000000000000002 /* BudgetRawJSONTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F09300000000000000000002 /* BudgetRawJSONTests.swift */; };
 		722B38C61EFD48EC80801090 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 139FFB6F60B646D7AFC14050 /* SwiftUI.framework */; };
 		7D7216581359443B8833A95D /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 157A552A13B74B8397E3430E /* MetalKit.framework */; };
 		7EF28E23F0754267A88628CC /* Manager/ManagerInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71B8394E645744CA95295445 /* Manager/ManagerInstaller.swift */; };
@@ -168,6 +170,7 @@
 		A26B00000000000000000013 /* Application/Tools/RuntimeJobToolPack.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000013 /* Application/Tools/RuntimeJobToolPack.swift */; };
 		A26B00000000000000000014 /* Domain/AutonomyModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000014 /* Domain/AutonomyModels.swift */; };
 		A26B00000000000000000015 /* Domain/ContextBudgetModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000015 /* Domain/ContextBudgetModels.swift */; };
+		B09300000000000000000001 /* Domain/BudgetPolicyModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F09300000000000000000001 /* Domain/BudgetPolicyModels.swift */; };
 		A26B00000000000000000016 /* Domain/ContinuityV2Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000016 /* Domain/ContinuityV2Models.swift */; };
 		A26B00000000000000000017 /* Domain/ManagedModelProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000017 /* Domain/ManagedModelProvider.swift */; };
 		A26B00000000000000000018 /* Domain/ProjectContextModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000018 /* Domain/ProjectContextModels.swift */; };
@@ -572,6 +575,8 @@
 		B675EB7EC65A4B04AEC791D6 /* Infrastructure/DiagnosticLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Infrastructure/DiagnosticLog.swift; sourceTree = "<group>"; };
 		B7F98A7D9399485B8508C67B /* Domain/Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/Models.swift; sourceTree = "<group>"; };
 		BC5B94490ED44827A946FAE1 /* AppConfigAndDoctorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfigAndDoctorTests.swift; sourceTree = "<group>"; };
+		F09300000000000000000003 /* BudgetPolicyIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetPolicyIntegrationTests.swift; sourceTree = "<group>"; };
+		F09300000000000000000002 /* BudgetRawJSONTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetRawJSONTests.swift; sourceTree = "<group>"; };
 		BEB01AEF03DC4E58828F710D /* Infrastructure/ResourceBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Infrastructure/ResourceBundle.swift; sourceTree = "<group>"; };
 		C04061BB23AF4A38A9CB5E37 /* Application/Tools/GitToolPack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/Tools/GitToolPack.swift; sourceTree = "<group>"; };
 		C07A00000000000000000001 /* Domain/HandoffPacket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/HandoffPacket.swift; sourceTree = "<group>"; };
@@ -643,6 +648,7 @@
 		A26F00000000000000000013 /* Application/Tools/RuntimeJobToolPack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/Tools/RuntimeJobToolPack.swift; sourceTree = "<group>"; };
 		A26F00000000000000000014 /* Domain/AutonomyModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/AutonomyModels.swift; sourceTree = "<group>"; };
 		A26F00000000000000000015 /* Domain/ContextBudgetModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/ContextBudgetModels.swift; sourceTree = "<group>"; };
+		F09300000000000000000001 /* Domain/BudgetPolicyModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/BudgetPolicyModels.swift; sourceTree = "<group>"; };
 		A26F00000000000000000016 /* Domain/ContinuityV2Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/ContinuityV2Models.swift; sourceTree = "<group>"; };
 		A26F00000000000000000017 /* Domain/ManagedModelProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/ManagedModelProvider.swift; sourceTree = "<group>"; };
 		A26F00000000000000000018 /* Domain/ProjectContextModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/ProjectContextModels.swift; sourceTree = "<group>"; };
@@ -912,6 +918,8 @@
 				C3D4E5F6478910ABCDEF0123 /* MemoryToolTests.swift */,
 				265D3B7C54284D4EA03907D6 /* NativeAppSmokeTests.swift */,
 				BC5B94490ED44827A946FAE1 /* AppConfigAndDoctorTests.swift */,
+				F09300000000000000000003 /* BudgetPolicyIntegrationTests.swift */,
+				F09300000000000000000002 /* BudgetRawJSONTests.swift */,
 				0F3DAC4CB0444F49BDF1EA12 /* DashboardTests.swift */,
 				8E7DF2B1B43643A9B3438CCB /* HTTPTestHelpers.swift */,
 				0979CF0B142F49538AE2E025 /* ManagerTests.swift */,
@@ -1099,6 +1107,7 @@
 				A26F00000000000000000013 /* Application/Tools/RuntimeJobToolPack.swift */,
 				A26F00000000000000000014 /* Domain/AutonomyModels.swift */,
 				A26F00000000000000000015 /* Domain/ContextBudgetModels.swift */,
+				F09300000000000000000001 /* Domain/BudgetPolicyModels.swift */,
 				A26F00000000000000000016 /* Domain/ContinuityV2Models.swift */,
 				A26F00000000000000000017 /* Domain/ManagedModelProvider.swift */,
 				B09F00000000000000000051 /* Domain/ProviderConfigurationService.swift */,
@@ -1648,6 +1657,8 @@
 				D4E5F6478910ABCDEF012345 /* MemoryToolTests.swift in Sources */,
 				6A671BB52B0442448386BF1D /* NativeAppSmokeTests.swift in Sources */,
 				71BC2A7CFC5A405C931B32CE /* AppConfigAndDoctorTests.swift in Sources */,
+				B09300000000000000000003 /* BudgetPolicyIntegrationTests.swift in Sources */,
+				B09300000000000000000002 /* BudgetRawJSONTests.swift in Sources */,
 				DD727970A2024C819CED8EC6 /* DashboardTests.swift in Sources */,
 				B33B078C0E124751B724B3A2 /* HTTPTestHelpers.swift in Sources */,
 				B881296BC1244D6685D5375E /* ManagerTests.swift in Sources */,
@@ -1743,6 +1754,7 @@
 				A26B00000000000000000013 /* Application/Tools/RuntimeJobToolPack.swift in Sources */,
 				A26B00000000000000000014 /* Domain/AutonomyModels.swift in Sources */,
 				A26B00000000000000000015 /* Domain/ContextBudgetModels.swift in Sources */,
+				B09300000000000000000001 /* Domain/BudgetPolicyModels.swift in Sources */,
 				A26B00000000000000000016 /* Domain/ContinuityV2Models.swift in Sources */,
 				A26B00000000000000000017 /* Domain/ManagedModelProvider.swift in Sources */,
 				B09B00000000000000000051 /* Domain/ProviderConfigurationService.swift in Sources */,

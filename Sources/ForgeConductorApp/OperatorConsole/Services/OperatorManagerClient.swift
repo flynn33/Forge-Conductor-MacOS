@@ -33,6 +33,10 @@ protocol OperatorManagerClientProtocol: Sendable {
 }
 
 extension OperatorManagerClientProtocol {
+    func budgetPolicy(scope: BudgetPolicyScope) async throws -> BudgetPolicySelection {
+        try await settings().resolvedBudgetPolicy(scope: scope)
+    }
+
     func snapshot(limit: Int) async throws -> OperatorSnapshot {
         try await snapshot(limit: limit, cursor: nil)
     }

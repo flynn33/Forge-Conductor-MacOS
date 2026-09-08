@@ -58,6 +58,7 @@ public actor ProjectControlPlaneRepository {
     public static let schemaVersion = 2
     public static let maximumQuarantineEventsPerProject = 128
     public static let maximumContextBudgetObservationsPerSession = 2_048
+    private static let maximumContextBudgetObservationBytes = 64 * 1_024
     public static let maximumContextBudgetActionRequestsPerRead = 256
     public static let maximumPublishedProjectTransitionAuthoritiesPerProject = 16
 
@@ -599,6 +600,29 @@ public actor ProjectControlPlaneRepository {
     ) throws -> ProjectControlRecord? {
         try controlledOperation(cancellation: cancellation) { connection in
             try projectUnlocked(projectID, connection: connection)
+        }
+    }
+
+    /// Holds the existing database writer fence while a bounded synchronous
+    /// operation applies settings for this exact active generation. The operation
+    /// must not call back into this repository or suspend; its own durable commit
+    /// is the authoritative result if a later database commit fails.
+    public func withActiveProjectGeneration<Value: Sendable>(
+        projectID: ProjectID,
+        expectedGeneration: ProjectGeneration,
+        operation: @Sendable () throws -> Value
+    ) throws -> Value {
+        try Self.validate(expectedGeneration)
+        try Task.checkCancellation()
+        let connection = try requiredConnection()
+        return try connection.transaction {
+            _ = try requiredActiveProjectUnlocked(
+                projectID,
+                generation: expectedGeneration,
+                connection: connection
+            )
+            try Task.checkCancellation()
+            return try operation()
         }
     }
 
@@ -1731,8 +1755,11 @@ public actor ProjectControlPlaneRepository {
         try validateContextBudgetCommit(commit)
         let connection = try requiredConnection()
         let stateData = try Self.sortedJSONEncoder.encode(commit.state)
+        let observationData = try Self.sortedJSONEncoder.encode(commit.observation)
         guard stateData.count <= 64 * 1_024,
-              let stateJSON = String(data: stateData, encoding: .utf8) else {
+              observationData.count <= Self.maximumContextBudgetObservationBytes,
+              let stateJSON = String(data: stateData, encoding: .utf8),
+              let observationJSON = String(data: observationData, encoding: .utf8) else {
             throw ContextBudgetError.invalidPersistedState
         }
         return try connection.transaction {
@@ -1826,6 +1853,17 @@ public actor ProjectControlPlaneRepository {
                 ]
             )
 
+            try connection.execute(
+                """
+                INSERT INTO context_budget_observation_metadata(observation_id,observation_json)
+                VALUES(?,?)
+                """,
+                bindings: [
+                    .text(observation.observationID.uuidString.lowercased()),
+                    .text(observationJSON),
+                ]
+            )
+
             let stateChanged: Int
             if let previous {
                 stateChanged = try connection.execute(
@@ -1878,6 +1916,32 @@ public actor ProjectControlPlaneRepository {
                 try upsertContextBudgetActionRequestUnlocked(
                     $0,
                     timestamp: observation.createdAt,
+                    connection: connection
+                )
+            }
+            if let resolved = commit.state.configuration.resolvedPolicy,
+               previous?.configuration.resolvedPolicy != resolved {
+                try appendAutonomyEventUnlocked(
+                    runID: identity.runID,
+                    projectID: identity.projectID,
+                    eventType: "budget_policy_effective",
+                    severity: .info,
+                    summary: "The saved budget policy became effective at a controlled boundary",
+                    metadata: [
+                        "observation_id": observation.observationID.uuidString.lowercased(),
+                        "observation_revision": String(commit.state.revision),
+                        "session_id": identity.sessionID,
+                        "project_generation": String(identity.projectGeneration.rawValue),
+                        "scope": resolved.selection.scope.kind.rawValue,
+                        "revision": String(resolved.selection.revision),
+                        "global_revision": String(resolved.selection.globalRevision),
+                        "policy_source": resolved.selection.policySource,
+                        "requested_context_tokens": String(resolved.requestedContextTokens),
+                        "effective_context_tokens": String(resolved.effectiveContextTokens),
+                        "verified_loaded_context_tokens": String(resolved.verifiedLoadedContextTokens),
+                        "threshold_contract": resolved.thresholdContract,
+                        "trigger_point": observation.triggerPoint.rawValue,
+                    ],
                     connection: connection
                 )
             }
@@ -4187,9 +4251,13 @@ public actor ProjectControlPlaneRepository {
            o.output_reserve,o.schema_reserve,o.handoff_reserve,o.recovery_reserve,o.remaining,
            o.projected_next_turn,o.source,o.confidence,o.estimator_version,o.action,o.created_at,
            d.project_id,d.project_generation,d.trigger_point,d.checkpoint_threshold,
-           d.rollover_threshold,d.emergency_floor,d.hysteresis,d.action_epoch
+           d.rollover_threshold,d.emergency_floor,d.hysteresis,d.action_epoch,
+           m.observation_id,
+           CASE WHEN length(CAST(m.observation_json AS BLOB)) <= 65536
+                THEN m.observation_json ELSE NULL END
     FROM context_budget_observations o
     INNER JOIN context_budget_observation_details d ON d.observation_id=o.observation_id
+    LEFT JOIN context_budget_observation_metadata m ON m.observation_id=o.observation_id
     """
 
     private func contextBudgetStateUnlocked(
@@ -4198,7 +4266,9 @@ public actor ProjectControlPlaneRepository {
     ) throws -> PersistedContextBudgetState? {
         try connection.first(
             """
-            SELECT project_id,project_generation,state_json,revision,latest_observation_id
+            SELECT project_id,project_generation,
+                   CASE WHEN length(CAST(state_json AS BLOB)) <= 65536 THEN state_json ELSE NULL END,
+                   revision,latest_observation_id
             FROM context_budget_supervisor_state WHERE run_id=? AND session_id=? LIMIT 1
             """,
             bindings: [.text(identity.runID.description), .text(identity.sessionID)]
@@ -4225,7 +4295,20 @@ public actor ProjectControlPlaneRepository {
                   state.latestObservation?.observationID.uuidString.lowercased() == row.text(4) else {
                 throw ProjectContextError.integrityFailure("context budget state identity is inconsistent")
             }
-            return try state.validated()
+            _ = try state.validated()
+            if let observation = state.latestObservation {
+                do {
+                    try Self.validateContextBudgetObservation(observation)
+                    guard observation.reserves == state.configuration.reserves,
+                          observation.accounting?.resolvedPolicy == state.configuration.resolvedPolicy,
+                          observation.createdAt == state.updatedAt else {
+                        throw ContextBudgetError.invalidPersistedState
+                    }
+                } catch {
+                    throw ProjectContextError.integrityFailure("persisted budget observation disagrees with its state")
+                }
+            }
+            return state
         }
     }
 
@@ -4255,7 +4338,7 @@ public actor ProjectControlPlaneRepository {
               row.int64(22) >= 0, row.int64(23) >= 0, row.int64(24) >= 0 else {
             throw ProjectContextError.integrityFailure("invalid context budget observation row")
         }
-        return ContextBudgetObservation(
+        let legacy = ContextBudgetObservation(
             observationID: observationID,
             identity: ContextBudgetIdentity(
                 runID: RunID(runUUID),
@@ -4288,6 +4371,85 @@ public actor ProjectControlPlaneRepository {
             actionEpoch: UInt64(row.int64(24)),
             createdAt: createdAt
         )
+        guard row.text(25) != nil else {
+            try validateContextBudgetObservation(legacy)
+            return legacy
+        }
+        guard let observationJSON = row.text(26),
+              observationJSON.utf8.count <= maximumContextBudgetObservationBytes else {
+            throw ProjectContextError.integrityFailure("context budget metadata exceeds its bound")
+        }
+        let observation: ContextBudgetObservation
+        do {
+            observation = try JSONDecoder().decode(
+                ContextBudgetObservation.self,
+                from: Data(observationJSON.utf8)
+            )
+        } catch {
+            throw ProjectContextError.integrityFailure("invalid context budget observation metadata")
+        }
+        // The fixed columns remain readable by older releases. Never accept a
+        // newer metadata record that changes their identity or measured values.
+        guard observation.observationID == legacy.observationID,
+              observation.identity == legacy.identity,
+              observation.providerResponseID == legacy.providerResponseID,
+              observation.capacity == legacy.capacity,
+              observation.used == legacy.used,
+              observation.reserves.outputTokens == legacy.reserves.outputTokens,
+              observation.reserves.schemaTokens == legacy.reserves.schemaTokens,
+              observation.reserves.handoffTokens == legacy.reserves.handoffTokens,
+              observation.reserves.recoveryTokens == legacy.reserves.recoveryTokens,
+              observation.remaining == legacy.remaining,
+              observation.projectedNextTurn == legacy.projectedNextTurn,
+              observation.source == legacy.source,
+              observation.confidence == legacy.confidence,
+              observation.estimatorVersion == legacy.estimatorVersion,
+              observation.action == legacy.action,
+              observation.triggerPoint == legacy.triggerPoint,
+              observation.thresholds == legacy.thresholds,
+              observation.actionEpoch == legacy.actionEpoch,
+              observation.createdAt == legacy.createdAt else {
+            throw ProjectContextError.integrityFailure("context budget metadata disagrees with stored columns")
+        }
+        try validateContextBudgetObservation(observation)
+        return observation
+    }
+
+    private static func validateContextBudgetObservation(_ observation: ContextBudgetObservation) throws {
+        _ = try observation.identity.validated()
+        let fixed = try observation.reserves.fixedTotal()
+        guard observation.projectedNextTurn >= 0,
+              observation.confidence.isFinite,
+              (0...1).contains(observation.confidence),
+              observation.estimatorVersion == ContextBudgetPolicy.estimatorVersion,
+              observation.actionEpoch <= UInt64(Int64.max),
+              ISO8601.date(from: observation.createdAt) != nil,
+              observation.capacity > 0,
+              observation.capacity <= ContextCapacityResolver.maximumSupportedCapacity,
+              fixed < observation.capacity,
+              observation.used >= 0,
+              observation.remaining == observation.capacity - fixed - observation.used,
+              observation.thresholds.checkpoint >= observation.thresholds.rollover,
+              observation.thresholds.rollover >= observation.thresholds.emergency,
+              observation.thresholds.emergency >= 0,
+              observation.thresholds.hysteresis >= 0 else {
+            throw ContextBudgetError.invalidObservation("derived budget values are inconsistent")
+        }
+        if let accounting = observation.accounting {
+            _ = try accounting.validated()
+            if let scope = accounting.resolvedPolicy?.selection.scope, scope.kind == .projectOverride {
+                guard scope.projectID == observation.identity.projectID.description,
+                      scope.projectGeneration == Int(observation.identity.projectGeneration.rawValue) else {
+                    throw ContextBudgetError.invalidObservation("effective policy belongs to another project generation")
+                }
+            }
+            guard accounting.futureReserveTokens == fixed,
+                  accounting.resolvedPolicy.map({ $0.effectiveContextTokens == observation.capacity }) ?? true,
+                  accounting.retainedInputTokens.map({ $0 == observation.used })
+                    ?? (observation.source == .providerOverflow && observation.confidence == 0 && observation.action == .emergency) else {
+                throw ContextBudgetError.invalidObservation("normalized accounting disagrees with observation")
+            }
+        }
     }
 
     private func validateContextBudgetCommit(
@@ -4312,12 +4474,9 @@ public actor ProjectControlPlaneRepository {
               observation.createdAt == commit.state.updatedAt else {
             throw ContextBudgetError.invalidPersistedState
         }
-        let fixed = try observation.reserves.fixedTotal()
-        guard observation.remaining == observation.capacity - fixed - observation.used,
-              observation.thresholds.checkpoint >= observation.thresholds.rollover,
-              observation.thresholds.rollover >= observation.thresholds.emergency,
-              observation.thresholds.hysteresis >= 0 else {
-            throw ContextBudgetError.invalidObservation("derived budget values are inconsistent")
+        try Self.validateContextBudgetObservation(observation)
+        guard observation.accounting?.resolvedPolicy == commit.state.configuration.resolvedPolicy else {
+            throw ContextBudgetError.invalidObservation("effective policy does not match committed configuration")
         }
         if let actionRequest = commit.actionRequest {
             try validateContextBudgetActionRequestIntent(actionRequest)
@@ -6910,6 +7069,11 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
     );
     CREATE INDEX IF NOT EXISTS idx_budget_details_project
         ON context_budget_observation_details(project_id, project_generation, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS context_budget_observation_metadata (
+        observation_id TEXT PRIMARY KEY REFERENCES context_budget_observations(observation_id) ON DELETE CASCADE,
+        observation_json TEXT NOT NULL CHECK (length(CAST(observation_json AS BLOB)) <= 65536)
+    );
 
     CREATE TABLE IF NOT EXISTS context_budget_supervisor_state (
         run_id TEXT NOT NULL REFERENCES autonomous_runs(run_id) ON DELETE CASCADE,

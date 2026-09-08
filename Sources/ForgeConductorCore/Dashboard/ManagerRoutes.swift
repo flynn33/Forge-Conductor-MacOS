@@ -355,11 +355,17 @@ public final class ManagerRoutes: @unchecked Sendable {
                 guard body.count <= 65_536 else {
                     throw ManagerSettingsValidationError(field: "settings", reason: "body_too_large")
                 }
-                guard let obj = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any] else {
+                let validatedBody = try BudgetPolicyUpdate.validateSettingsJSON(body)
+                guard let obj = (try? JSONSerialization.jsonObject(with: validatedBody)) as? [String: Any] else {
                     throw ManagerSettingsValidationError(field: "settings", reason: "expected_json_object")
                 }
                 if let settings = obj["settings"], !(settings is [String: Any]) {
                     throw ManagerSettingsValidationError(field: "settings", reason: "expected_object")
+                }
+                if obj["settings"] != nil {
+                    var envelope = obj
+                    envelope.removeValue(forKey: "settings")
+                    try ManagerSettingsNormalizer.validateLegacyBudgetKeys(envelope)
                 }
                 let apply = (obj["apply"] as? Bool) ?? true
                 let patch = obj["settings"] as? [String: Any] ?? obj
@@ -367,6 +373,11 @@ public final class ManagerRoutes: @unchecked Sendable {
                 http.respondJSON(connection, status: 200, object: result)
             } catch let error as ManagerSettingsValidationError {
                 http.respondJSON(connection, status: 400, object: error.asDictionary())
+            } catch let error as BudgetPolicyConflict {
+                http.respondJSON(connection, status: 409, object: [
+                    "ok": false, "code": "budget_policy_conflict", "message": error.localizedDescription,
+                    "current_policy": try JSONSupport.object(from: JSONEncoder().encode(error.current)),
+                ])
             }
         case ("POST", "/api/manager/projects/register"):
             guard body.count <= Self.maximumProjectRegistrationBodyBytes else {

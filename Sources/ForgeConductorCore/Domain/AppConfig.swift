@@ -21,6 +21,7 @@ public struct AppConfig: Sendable, Equatable, Codable {
     public var mcp: MCPConfig
     public var sessions: SessionsConfig
     public var coordinator: CoordinatorConfig
+    public var budgetPolicy: BudgetPolicyState?
 
     public struct ShellConfig: Sendable, Equatable, Codable {
         public var enabled: Bool
@@ -136,7 +137,8 @@ public struct AppConfig: Sendable, Equatable, Codable {
         manager: ManagerConfigSection = ManagerConfigSection(),
         mcp: MCPConfig = MCPConfig(),
         sessions: SessionsConfig = SessionsConfig(),
-        coordinator: CoordinatorConfig = CoordinatorConfig()
+        coordinator: CoordinatorConfig = CoordinatorConfig(),
+        budgetPolicy: BudgetPolicyState? = .default
     ) {
         self.configSchemaVersion = configSchemaVersion
         self.configMigrationID = configMigrationID
@@ -148,6 +150,7 @@ public struct AppConfig: Sendable, Equatable, Codable {
         self.mcp = mcp
         self.sessions = sessions
         self.coordinator = coordinator
+        self.budgetPolicy = budgetPolicy
     }
 
     enum CodingKeys: String, CodingKey {
@@ -156,6 +159,7 @@ public struct AppConfig: Sendable, Equatable, Codable {
         case logLevel = "log_level"
         case allowedRoots = "allowed_roots"
         case shell, dashboard, manager, mcp, sessions, coordinator
+        case budgetPolicy = "budget_policy"
     }
 
     /// Dictionary form for atomic JSON write / deep-merge edge.
@@ -192,11 +196,20 @@ public struct AppConfig: Sendable, Equatable, Codable {
         if let configMigrationID {
             dictionary["config_migration_id"] = configMigrationID
         }
+        if let budgetPolicy,
+           let data = try? JSONEncoder().encode(budgetPolicy),
+           let object = try? JSONSupport.object(from: data) {
+            dictionary["budget_policy"] = object
+        }
         return dictionary
     }
 
     public static func fromDictionary(_ dict: [String: Any]) -> AppConfig {
         var base = AppConfig.default
+        if let policy = dict["budget_policy"] {
+            base.budgetPolicy = (try? JSONSerialization.data(withJSONObject: policy))
+                .flatMap { try? JSONDecoder().decode(BudgetPolicyState.self, from: $0) }
+        }
         if let v = integer(dict["config_schema_version"]) { base.configSchemaVersion = v }
         if let v = dict["config_migration_id"] as? String { base.configMigrationID = v }
         if let v = dict["log_level"] as? String { base.logLevel = v }

@@ -283,6 +283,15 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     }
 
     public func settingsModel() -> ManagerSettings {
+        let policy: BudgetPolicyState?
+        let policyIssue: String?
+        do {
+            policy = try app.config.budgetPolicySnapshot()
+            policyIssue = nil
+        } catch {
+            policy = nil
+            policyIssue = error.localizedDescription
+        }
         let cfg = app.config.model
         let shell = app.config.shellPolicyStatus
         return ManagerSettings(
@@ -302,7 +311,9 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             shellRuntimeCapabilities: shell.runtimes,
             shellTimeoutSec: cfg.shell.defaultTimeoutSec,
             logLevel: cfg.logLevel,
-            allowedRoots: ManagerSettingsNormalizer.canonicalAllowedRoots(cfg.allowedRoots)
+            allowedRoots: ManagerSettingsNormalizer.canonicalAllowedRoots(cfg.allowedRoots),
+            budgetPolicy: policy,
+            budgetPolicyIssue: policyIssue
         )
     }
 
@@ -549,6 +560,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
 
     @discardableResult
     public func updateSettings(_ patch: ManagerSettingsPatch, apply: Bool = true) throws -> ManagerSettings {
+        _ = try patch.budgetPolicyUpdate?.validated()
         _ = try updateSettingsDictionary(patch.asConfigPatch(), apply: apply)
         return settingsModel()
     }
@@ -570,6 +582,49 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     ) throws -> [String: Any] {
         let before = app.config.model.dashboard
         let normalized = try ManagerSettingsNormalizer.validated(patch)
+        if let raw = normalized["budget_update"] as? [String: Any] {
+            let update = try BudgetPolicyUpdate.decode(dictionary: raw)
+            let selection: BudgetPolicySelection
+            if update.scope.kind == .projectOverride {
+                let scope = update.scope
+                guard let rawID = scope.projectID, let uuid = UUID(uuidString: rawID),
+                      let generation = scope.projectGeneration else {
+                    throw ManagerSettingsValidationError(field: "scope", reason: "project_generation_not_active")
+                }
+                let repository = app.projectContexts.repository
+                let config = app.config
+                do {
+                    // The repository writer transaction fences generation reset
+                    // until the config CAS returns. A separate preflight read
+                    // leaves a gap while the configuration file is contended.
+                    selection = try Self.waitForAsync(timeoutSeconds: 2 * ConfigStore.configurationLockTimeoutSeconds + 1) {
+                        try await repository.withActiveProjectGeneration(projectID: ProjectID(uuid),
+                            expectedGeneration: ProjectGeneration(UInt64(generation))) {
+                            try config.updateBudgetPolicy(update)
+                        }
+                    }
+                } catch let error as ProjectContextError {
+                    switch error {
+                    case .projectNotFound, .staleProjectGeneration, .projectNotActive:
+                        throw ManagerSettingsValidationError(field: "scope", reason: "project_generation_not_active")
+                    default: throw error
+                    }
+                }
+            } else {
+                selection = try app.config.updateBudgetPolicy(update)
+            }
+            app.diagnostics.info("budget_policy_requested", [
+                "scope": selection.scope.key,
+                "revision": String(selection.revision),
+                "global_revision": String(selection.globalRevision),
+                "policy_source": selection.policySource,
+                "effective_at": "next_controlled_boundary",
+            ])
+            var result = settings()
+            result["policy_effective_at"] = "next_controlled_boundary"
+            result["applied"] = false
+            return result
+        }
         _ = try app.config.update(normalized, save: true)
         let after = app.config.model.dashboard
         let bindChanged = before.host != after.host || before.port != after.port

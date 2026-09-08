@@ -178,6 +178,13 @@ rejected while the first is active. Edits made during a save remain visible and
 are explicitly marked unsaved when the earlier save completes. Diagnostics
 exports also run in the background and report their output paths on completion.
 
+The manager also persists versioned budget defaults and project overrides through
+its authenticated settings API. Conflicting edits return the current revision;
+a saved policy takes effect at the next controlled runtime boundary. Dedicated
+native budget controls and complete tool-call reservation enforcement remain
+separate implementation phases. See [Budget policy](docs/BUDGET-POLICY.md) for
+scope, units, persistence and requested/effective behavior.
+
 ## 5. Daily use with LM Studio
 
 1. Open Forge Conductor (dashboard) if you want live telemetry. Default: `http://127.0.0.1:7788/`.

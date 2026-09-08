@@ -1212,6 +1212,257 @@ final class ProjectControlPlaneRepositoryTests: XCTestCase {
         }
     }
 
+    func testBudgetObservationMetadataSurvivesRestartAndPolicyEventsFollowCommittedRevisions() async throws {
+        try await withRepository { repository, root in
+            let identity = try await budgetRepositoryIdentity(repository, root: root)
+            let first = try budgetRepositoryCommit(identity: identity, revision: 1, policyRevision: 1)
+            _ = try await repository.persistContextBudget(first)
+            let second = try budgetRepositoryCommit(identity: identity, revision: 2, policyRevision: 1)
+            _ = try await repository.persistContextBudget(second)
+            let third = try budgetRepositoryCommit(identity: identity, revision: 3, policyRevision: 2)
+            _ = try await repository.persistContextBudget(third)
+            do {
+                _ = try await repository.persistContextBudget(third)
+                XCTFail("Duplicate observation must fail its existing revision transaction")
+            } catch let error as ContextBudgetError {
+                XCTAssertEqual(error, .persistenceConflict)
+            }
+            let overflow = try budgetRepositoryCommit(
+                identity: identity, revision: 4, policyRevision: 2, unknownOverflow: true
+            )
+            _ = try await repository.persistContextBudget(overflow)
+            await repository.close()
+            let reopened = try ProjectControlPlaneRepository(databaseURL: root.appendingPathComponent("control-plane.sqlite3"))
+            do {
+                let observations = try await reopened.contextBudgetObservations(identity: identity)
+                XCTAssertEqual(Set(observations.map(\.observationID)), Set([first, second, third, overflow].map { $0.observation.observationID }))
+                for commit in [first, second, third, overflow] {
+                    XCTAssertEqual(observations.first { $0.observationID == commit.observation.observationID }, commit.observation)
+                }
+                let restored = try await reopened.contextBudgetState(identity: identity)
+                XCTAssertEqual(restored, overflow.state)
+                XCTAssertNil(restored?.latestObservation?.accounting?.retainedInputTokens)
+                XCTAssertNil(restored?.latestObservation?.accounting?.admittedTotalTokens)
+                XCTAssertEqual(restored?.latestObservation?.confidence, 0)
+                let events = try await reopened.autonomyEvents(runID: identity.runID).filter { $0.eventType == "budget_policy_effective" }
+                XCTAssertEqual(events.count, 2)
+                let metadata = try events.map { try XCTUnwrap(JSONSerialization.jsonObject(with: Data($0.metadataJSON.utf8)) as? [String: String]) }
+                XCTAssertEqual(Set(metadata.compactMap { $0["revision"] }), Set(["1", "2"]))
+                XCTAssertEqual(Set(metadata.compactMap { $0["observation_id"] }), Set([first, third].map { $0.observation.observationID.uuidString.lowercased() }))
+                XCTAssertTrue(metadata.allSatisfy { $0["session_id"] == identity.sessionID && $0["effective_context_tokens"] == "8192" && $0["verified_loaded_context_tokens"] == "16384" })
+            } catch {
+                await reopened.close()
+                throw error
+            }
+            await reopened.close()
+        }
+    }
+
+    func testLegacyBudgetRowsMigrateWithoutInventingAccountingMetadata() async throws {
+        try await withRepository { repository, root in
+            let identity = try await budgetRepositoryIdentity(repository, root: root)
+            let legacy = try budgetRepositoryCommit(identity: identity, revision: 1, policyRevision: nil)
+            _ = try await repository.persistContextBudget(legacy)
+            await repository.close()
+            let databaseURL = root.appendingPathComponent("control-plane.sqlite3")
+            try ControlPlaneTransitionFixtureDatabase.withTransaction(at: databaseURL) { database in
+                try database.execute("DROP TABLE context_budget_observation_metadata")
+                let stateJSON = try XCTUnwrap(database.scalarText("SELECT state_json FROM context_budget_supervisor_state"))
+                var state = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(stateJSON.utf8)) as? [String: Any])
+                for field in ["configuration", "latest_observation"] {
+                    var container = try XCTUnwrap(state[field] as? [String: Any])
+                    var reserves = try XCTUnwrap(container["reserves"] as? [String: Any])
+                    reserves.removeValue(forKey: "future_tool_tokens")
+                    reserves.removeValue(forKey: "safety_tokens")
+                    container["reserves"] = reserves
+                    state[field] = container
+                }
+                let oldJSON = String(decoding: try JSONSerialization.data(withJSONObject: state, options: [.sortedKeys]), as: UTF8.self)
+                try database.execute("UPDATE context_budget_supervisor_state SET state_json=?", bindings: [oldJSON])
+            }
+            let reopened = try ProjectControlPlaneRepository(databaseURL: databaseURL)
+            do {
+                let restored = try await reopened.contextBudgetState(identity: identity)
+                let observations = try await reopened.contextBudgetObservations(identity: identity)
+                XCTAssertEqual(restored, legacy.state)
+                XCTAssertEqual(observations, [legacy.observation])
+                XCTAssertNil(observations.first?.accounting)
+                XCTAssertEqual(observations.first?.reserves.futureToolTokens, 0)
+                XCTAssertEqual(observations.first?.reserves.safetyTokens, 0)
+                let receiptCount = try await reopened.migrationReceiptCount()
+                XCTAssertEqual(receiptCount, 1)
+                let next = try budgetRepositoryCommit(identity: identity, revision: 2, policyRevision: 1)
+                _ = try await reopened.persistContextBudget(next)
+                let events = try await reopened.autonomyEvents(runID: identity.runID).filter { $0.eventType == "budget_policy_effective" }
+                XCTAssertEqual(events.count, 1)
+            } catch {
+                await reopened.close()
+                throw error
+            }
+            await reopened.close()
+        }
+    }
+
+    func testBudgetMetadataCorruptionAndOversizedCommitCannotBecomeAuthoritative() async throws {
+        try await withRepository { repository, root in
+            let identity = try await budgetRepositoryIdentity(repository, root: root)
+            let first = try budgetRepositoryCommit(identity: identity, revision: 1, policyRevision: 1)
+            _ = try await repository.persistContextBudget(first)
+            let oversized = try budgetRepositoryCommit(identity: identity, revision: 2, policyRevision: 2, providerResponseID: String(repeating: "x", count: 65 * 1_024))
+            do {
+                _ = try await repository.persistContextBudget(oversized)
+                XCTFail("Oversized observation must not enter the transaction")
+            } catch let error as ContextBudgetError {
+                XCTAssertEqual(error, .invalidPersistedState)
+            }
+            let restored = try await repository.contextBudgetState(identity: identity)
+            let events = try await repository.autonomyEvents(runID: identity.runID).filter { $0.eventType == "budget_policy_effective" }
+            XCTAssertEqual(restored, first.state)
+            XCTAssertEqual(events.count, 1)
+            let databaseURL = root.appendingPathComponent("control-plane.sqlite3")
+            var validStateJSON = ""
+            try ControlPlaneTransitionFixtureDatabase.withTransaction(at: databaseURL) { database in
+                validStateJSON = try XCTUnwrap(database.scalarText("SELECT state_json FROM context_budget_supervisor_state"))
+            }
+            var corruptState = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(validStateJSON.utf8)) as? [String: Any])
+            var latest = try XCTUnwrap(corruptState["latest_observation"] as? [String: Any])
+            var accounting = try XCTUnwrap(latest["accounting"] as? [String: Any])
+            accounting["futureReserveTokens"] = 0
+            latest["accounting"] = accounting
+            corruptState["latest_observation"] = latest
+            let corruptJSON = String(decoding: try JSONSerialization.data(withJSONObject: corruptState), as: UTF8.self)
+            for invalidState in [corruptJSON, String(repeating: " ", count: 65_537)] {
+                try ControlPlaneTransitionFixtureDatabase.withTransaction(at: databaseURL) { database in
+                    try database.execute("UPDATE context_budget_supervisor_state SET state_json=?", bindings: [invalidState])
+                }
+                await assertContextError(code: "integrity_failure") {
+                    _ = try await repository.contextBudgetState(identity: identity)
+                }
+            }
+            try ControlPlaneTransitionFixtureDatabase.withTransaction(at: databaseURL) { database in
+                try database.execute("UPDATE context_budget_supervisor_state SET state_json=?", bindings: [validStateJSON])
+            }
+            try ControlPlaneTransitionFixtureDatabase.withTransaction(at: databaseURL) { database in
+                let json = try XCTUnwrap(database.scalarText("SELECT observation_json FROM context_budget_observation_metadata"))
+                var object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
+                object["used"] = 99
+                let modified = String(decoding: try JSONSerialization.data(withJSONObject: object), as: UTF8.self)
+                try database.execute("UPDATE context_budget_observation_metadata SET observation_json=?", bindings: [modified])
+            }
+            await assertContextError(code: "integrity_failure") {
+                _ = try await repository.contextBudgetObservations(identity: identity)
+            }
+        }
+    }
+
+    func testActiveGenerationFenceExcludesConcurrentResetAcrossRepositoryConnections() async throws {
+        try await withRepository { repository, root in
+            let projectID = ProjectID()
+            _ = try await repository.registerProjectUnchecked(projectID: projectID, displayName: "Budget scope", canonicalRoot: root.appendingPathComponent("project"))
+            let contender = try ProjectControlPlaneRepository(databaseURL: root.appendingPathComponent("control-plane.sqlite3"))
+            let entered = expectation(description: "Settings callback holds the project writer fence")
+            let contended = expectation(description: "Reset reaches the same SQLite writer fence")
+            let release = DispatchSemaphore(value: 0)
+            await contender.configureOperationObservers(busyRetry: { contended.fulfill() })
+            let saving = Task {
+                try await repository.withActiveProjectGeneration(projectID: projectID, expectedGeneration: .initial) {
+                    entered.fulfill()
+                    guard release.wait(timeout: .now() + 5) == .success else {
+                        throw ControlPlaneFixtureError.sqlite("settings fence test deadline")
+                    }
+                    return 42
+                }
+            }
+            await fulfillment(of: [entered], timeout: 2)
+            let resetting = Task { try await contender.beginReset(projectID: projectID, expectedGeneration: .initial) }
+            await fulfillment(of: [contended], timeout: 2)
+            release.signal()
+            do {
+                let value = try await saving.value
+                let reset = try await resetting.value
+                XCTAssertEqual(value, 42)
+                XCTAssertEqual(reset.lifecycleState, .resetting)
+                await assertContextError(code: "project_not_active") {
+                    _ = try await repository.withActiveProjectGeneration(projectID: projectID, expectedGeneration: .initial) {
+                        XCTFail("An inactive project's settings callback must not execute")
+                        return 0
+                    }
+                }
+                _ = try await contender.completeReset(projectID: projectID, expectedGeneration: .initial)
+                await assertContextError(code: "stale_project_generation") {
+                    _ = try await repository.withActiveProjectGeneration(projectID: projectID, expectedGeneration: .initial) {
+                        XCTFail("A stale generation's settings callback must not execute")
+                        return 0
+                    }
+                }
+            } catch {
+                await contender.close()
+                throw error
+            }
+            await contender.close()
+        }
+    }
+
+    private func budgetRepositoryIdentity(_ repository: ProjectControlPlaneRepository, root: URL) async throws -> ContextBudgetIdentity {
+        let projectID = ProjectID()
+        let projectRoot = root.appendingPathComponent("budget-project", isDirectory: true)
+        _ = try await repository.registerProjectUnchecked(projectID: projectID, displayName: "Budget metadata fixture", canonicalRoot: projectRoot)
+        let run = try await repository.createAutonomousRun(AutonomousRunRequest(
+            projectID: projectID, projectGeneration: .initial, mission: "Verify durable budget observation metadata",
+            providerID: "lmstudio", modelKey: "fixture/model",
+            specification: AutonomousRunSpecification(allowedTools: ["fixture.read"], completionGates: ["tests"]),
+            authorizationScope: scope(root: projectRoot, tools: ["fixture.read"])
+        ))
+        let lease = try await repository.acquireRunLease(runID: run.runID, ownerID: "budget-repository-test")
+        let sessionID = "budget-session-" + UUID().uuidString.lowercased()
+        try await repository.reserveProviderSession(ProviderSessionIntent(
+            sessionID: sessionID, runID: run.runID, projectID: projectID, projectGeneration: .initial,
+            providerID: "lmstudio", adapterID: "lmstudio-rest", modelKey: "fixture/model",
+            providerResponseID: "response-root", idempotencyKey: "budget-repository-session", contextCapacity: 16_384
+        ), lease: lease)
+        _ = try await repository.releaseRunLease(lease)
+        return ContextBudgetIdentity(runID: run.runID, projectID: projectID, projectGeneration: .initial, sessionID: sessionID)
+    }
+
+    private func budgetRepositoryCommit(identity: ContextBudgetIdentity, revision: UInt64, policyRevision: Int?, unknownOverflow: Bool = false, providerResponseID: String = "response-budget") throws -> ContextBudgetPersistenceCommit {
+        let reserves = ContextBudgetReserves(outputTokens: 256, schemaTokens: 0, handoffTokens: 256, recoveryTokens: 128, futureToolTokens: policyRevision == nil ? 0 : 384, safetyTokens: policyRevision == nil ? 0 : 128)
+        let selection = policyRevision.map { BudgetPolicySelection(scope: .globalDefault, revision: $0, globalRevision: $0, inherited: false, policy: BudgetPolicy(context: BudgetContextPolicy(mode: .manual, maxContextTokens: 8_192))) }
+        let resolved = selection.map { ResolvedContextBudgetPolicy(selection: $0, verifiedLoadedContextTokens: 16_384, effectiveContextTokens: 8_192) }
+        let configuration = ContextBudgetConfiguration(
+            capacity: ContextCapacityResolution(providerID: "lmstudio", providerVersionFingerprint: "fixture-v1", modelKey: "fixture/model", activeInstanceID: "fixture-instance", capacity: 8_192, maximumContextLength: 131_072, requiresModelLoad: false),
+            reserves: reserves, resolvedPolicy: resolved
+        )
+        let fixed = try reserves.fixedTotal()
+        let used = 1_000
+        let accounting = try resolved.map { try ContextBudgetAccounting(
+            version: "admitted_total_v2", cut: "retained_input_after_response",
+            retainedInputTokens: unknownOverflow ? nil : used, futureReserveTokens: fixed,
+            rawProviderUsage: unknownOverflow ? nil : ProviderUsage(capacity: 16_384, inputTokens: 900, outputTokens: 100, totalTokens: used, source: .providerExact, confidence: 1),
+            resolvedPolicy: $0
+        ) }
+        let createdAt = ISO8601.string(from: Date(timeIntervalSince1970: 1_000 + Double(revision)))
+        let observation = ContextBudgetObservation(
+            observationID: UUID(), identity: identity, providerResponseID: providerResponseID,
+            capacity: 8_192, used: used, reserves: reserves, remaining: 8_192 - fixed - used,
+            projectedNextTurn: 128, source: unknownOverflow ? .providerOverflow : .providerExact,
+            confidence: unknownOverflow ? 0 : 1, estimatorVersion: ContextBudgetPolicy.estimatorVersion,
+            action: unknownOverflow ? .emergency : .normal, triggerPoint: unknownOverflow ? .providerOverflow : .afterProviderTurn,
+            thresholds: ContextBudgetThresholds(checkpoint: 2_048, rollover: 1_024, emergency: 512, hysteresis: 128),
+            actionEpoch: unknownOverflow ? 1 : 0, createdAt: createdAt, accounting: accounting
+        )
+        let state = PersistedContextBudgetState(
+            identity: identity, configuration: configuration, latestObservation: observation,
+            action: observation.action, lastRequestedAction: unknownOverflow ? .emergency : nil,
+            actionEpoch: observation.actionEpoch, observationCount: revision, revision: revision, updatedAt: createdAt
+        )
+        let request = unknownOverflow ? ContextBudgetActionRequestIntent(
+            requestID: UUID(), continuityOperationID: UUID(), identity: identity,
+            observationID: observation.observationID, requestedAction: .emergency,
+            actionEpoch: 1, reason: "Provider overflow without reported usage"
+        ) : nil
+        return ContextBudgetPersistenceCommit(observation: observation, state: state, actionRequest: request)
+    }
+
     func testSchemaIntegrityPragmasAndMigrationReceiptAreIdempotent() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("forge-control-plane-\(UUID().uuidString)", isDirectory: true)

@@ -6,6 +6,211 @@ import XCTest
 @testable import ForgeConductorCore
 
 final class AppConfigAndDoctorTests: XCTestCase {
+    func testConcurrentLegacyEditorsPreserveNewOptOutAndStagedFields() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("settings-patches-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: home) }
+        let paths = AppPaths(home: home)
+        let first = ConfigStore(paths: paths)
+        let second = ConfigStore(paths: paths)
+        _ = try second.update(ManagerSettingsPatch(shellEnabled: false))
+        _ = try first.update(["log_level": "debug"])
+        var restarted = ConfigStore(paths: paths)
+        XCTAssertFalse(restarted.model.shell.enabled, "An unrelated stale editor must preserve the explicit opt-out")
+        XCTAssertTrue(restarted.model.shell.userDisabled)
+        XCTAssertEqual(restarted.model.logLevel, "debug")
+
+        _ = try first.update(["dashboard": ["port": 8123]], save: false)
+        let policy = try first.updateBudgetPolicy(.init(scope: .globalDefault, expectedRevision: 1,
+            expectedGlobalRevision: 1, operation: .set, policy: .init(automaticHandoffEnabled: true)))
+        XCTAssertEqual(first.model.dashboard.port, 8123, "Policy save must retain the staged legacy patch")
+        XCTAssertNotEqual(ConfigStore(paths: paths).model.dashboard.port, 8123, "Staged settings are not prematurely persisted")
+        _ = try second.update(["manager": ["auto_restart": false]])
+        try first.save()
+        restarted = ConfigStore(paths: paths)
+        XCTAssertEqual(restarted.model.dashboard.port, 8123)
+        XCTAssertFalse(restarted.model.manager.autoRestart)
+        XCTAssertFalse(restarted.model.shell.enabled)
+        XCTAssertEqual(try restarted.budgetPolicySelection(scope: .globalDefault), policy)
+    }
+
+    func testConfigStorePolicyUpdatesUseCASAndRejectSuccessfulNoOps() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("settings-policy-path-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: home) }
+        let paths = AppPaths(home: home)
+        let store = ConfigStore(paths: paths)
+        let update = BudgetPolicyUpdate(scope: .globalDefault, expectedRevision: 1,
+            expectedGlobalRevision: 1, operation: .set, policy: .init(automaticHandoffEnabled: true))
+        let patch = ManagerSettingsPatch(budgetPolicyUpdate: update)
+        XCTAssertThrowsError(try store.update(patch, save: false))
+        XCTAssertThrowsError(try store.update(ManagerSettingsPatch(logLevel: "debug", budgetPolicyUpdate: update)))
+        let saved = try store.update(patch)
+        XCTAssertEqual(saved.budgetPolicy?.globalRevision, 2)
+        XCTAssertEqual(saved.budgetPolicy?.globalPolicy.automaticHandoffEnabled, true)
+        let bytes = try Data(contentsOf: paths.configJSON)
+        XCTAssertThrowsError(try store.update(patch)) { XCTAssertTrue($0 is BudgetPolicyConflict) }
+        let reset = BudgetPolicyUpdate(scope: .globalDefault, expectedRevision: 2, expectedGlobalRevision: 2, operation: .reset)
+        _ = try store.update(["budget_update": reset.asDictionary()])
+        XCTAssertEqual(store.model.budgetPolicy?.globalRevision, 3)
+        XCTAssertEqual(store.model.budgetPolicy?.globalPolicy.automaticHandoffEnabled, false)
+        XCTAssertNotEqual(try Data(contentsOf: paths.configJSON), bytes)
+        let current = store.model
+        let currentBytes = try Data(contentsOf: paths.configJSON)
+        XCTAssertThrowsError(try store.update(["shell": ["default_timeout_sec": 0], "log_level": "trace"]))
+        XCTAssertEqual(store.model, current, "A rejected save must not change live settings")
+        XCTAssertEqual(try Data(contentsOf: paths.configJSON), currentBytes)
+    }
+
+    func testBudgetPolicyConcurrentEditorsConflictAndRestartPreservesInheritance() async throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("budget-cas-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: home) }
+        let paths = AppPaths(home: home)
+        let first = ConfigStore(paths: paths)
+        let second = ConfigStore(paths: paths)
+        let requests = [BudgetPolicy(automaticHandoffEnabled: true), BudgetPolicy(context: .init(mode: .manual, maxContextTokens: 8_192))]
+        let results = await withTaskGroup(of: String.self, returning: [String].self) { group in
+            for (store, policy) in zip([first, second], requests) {
+                group.addTask {
+                    do {
+                        _ = try store.updateBudgetPolicy(.init(scope: .globalDefault, expectedRevision: 1, expectedGlobalRevision: 1, operation: .set, policy: policy))
+                        return "saved"
+                    } catch is BudgetPolicyConflict { return "conflict" }
+                    catch { return "unexpected: \(error)" }
+                }
+            }
+            var values: [String] = []
+            for await value in group { values.append(value) }
+            return values
+        }
+        XCTAssertEqual(results.sorted(), ["conflict", "saved"])
+        let global = try second.budgetPolicySelection(scope: .globalDefault)
+        XCTAssertEqual(global.revision, 2)
+        let scope = BudgetPolicyScope(kind: .projectOverride, projectID: UUID().uuidString.lowercased(), projectGeneration: 1)
+        let project = try first.updateBudgetPolicy(.init(scope: scope, expectedRevision: 0, expectedGlobalRevision: 2, operation: .set, policy: .init(tools: .init(callsPerSession: 32))))
+        XCTAssertFalse(project.inherited)
+        let restarted = ConfigStore(paths: paths)
+        XCTAssertEqual(try restarted.budgetPolicySelection(scope: scope), project)
+        let reset = try restarted.updateBudgetPolicy(.init(scope: scope, expectedRevision: 1, expectedGlobalRevision: 2, operation: .reset))
+        XCTAssertTrue(reset.inherited)
+        XCTAssertEqual(reset.revision, 2)
+        XCTAssertEqual(reset.policy, global.policy)
+        XCTAssertThrowsError(try first.updateBudgetPolicy(.init(scope: scope, expectedRevision: 0, expectedGlobalRevision: 2, operation: .set, policy: .default)))
+        XCTAssertEqual(try ConfigStore(paths: paths).budgetPolicySelection(scope: scope), reset)
+    }
+
+    func testBudgetPolicyMigrationPreservesExplicitOptOutAndUnrelatedKeys() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("budget-migrate-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: home) }
+        let paths = AppPaths(home: home)
+        try paths.ensureLayout()
+        var object = AppConfig.default.asDictionary()
+        object.removeValue(forKey: "budget_policy")
+        object["custom_setting"] = ["preserve": true]
+        var shell = try XCTUnwrap(object["shell"] as? [String: Any])
+        shell["enabled"] = false; shell["user_disabled"] = true; shell["policy_origin"] = "user_disabled"
+        object["shell"] = shell
+        let original = try JSONSupport.data(from: object)
+        try original.write(to: paths.configJSON, options: .atomic)
+        let staleEditor = ConfigStore(paths: paths)
+        let freshEditor = ConfigStore(paths: paths)
+        XCTAssertFalse(staleEditor.model.shell.enabled)
+        XCTAssertTrue(staleEditor.model.shell.userDisabled)
+        let saved = try freshEditor.updateBudgetPolicy(.init(scope: .globalDefault, expectedRevision: 1, expectedGlobalRevision: 1, operation: .set, policy: .init(automaticHandoffEnabled: true)))
+        _ = try staleEditor.update(["log_level": "debug"])
+        let restarted = ConfigStore(paths: paths)
+        XCTAssertEqual(try restarted.budgetPolicySelection(scope: .globalDefault), saved)
+        XCTAssertFalse(restarted.model.shell.enabled)
+        XCTAssertEqual(restarted.model.logLevel, "debug")
+        let persisted = try JSONSupport.object(from: Data(contentsOf: paths.configJSON))
+        XCTAssertEqual((persisted["custom_setting"] as? [String: Any])?["preserve"] as? Bool, true)
+        let backup = paths.configMigrationsDir.appendingPathComponent("config.pre-budget-v1." + JSONSupport.sha256Hex(original) + ".json")
+        let backupData = try Data(contentsOf: backup)
+        XCTAssertEqual(backupData, original)
+        let persistedData = try Data(contentsOf: paths.configJSON)
+        try retainBudgetEffects(caseID: "T03-05", effects: [
+            "original_config_base64": original.base64EncodedString(), "original_config_sha256": JSONSupport.sha256Hex(original),
+            "backup_base64": backupData.base64EncodedString(), "backup_sha256": JSONSupport.sha256Hex(backupData),
+            "persisted_config_base64": persistedData.base64EncodedString(), "persisted_config_sha256": JSONSupport.sha256Hex(persistedData),
+            "shell_enabled": restarted.model.shell.enabled, "shell_user_disabled": restarted.model.shell.userDisabled,
+            "unrelated_setting": (persisted["custom_setting"] as? [String: Any]) ?? [:],
+            "saved_policy": try JSONSupport.object(from: JSONEncoder().encode(saved)),
+            "reloaded_policy": try JSONSupport.object(from: JSONEncoder().encode(restarted.budgetPolicySelection(scope: .globalDefault))),
+        ])
+    }
+
+    func testMalformedStoredBudgetRemainsRecoverableWithoutSilentDefaults() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("budget-invalid-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: home) }
+        let paths = AppPaths(home: home)
+        try paths.ensureLayout()
+        var object = AppConfig.default.asDictionary()
+        object["log_level"] = "debug"
+        object["budget_policy"] = ["schema_version": 999]
+        let original = try JSONSupport.data(from: object)
+        try original.write(to: paths.configJSON, options: .atomic)
+        let store = ConfigStore(paths: paths)
+        XCTAssertNotNil(store.budgetPolicyError)
+        XCTAssertNil(store.model.budgetPolicy)
+        XCTAssertEqual(store.model.logLevel, "debug")
+        XCTAssertThrowsError(try store.budgetPolicySelection(scope: .globalDefault))
+        XCTAssertEqual(try Data(contentsOf: paths.configJSON), original)
+        let backup = paths.configMigrationsDir.appendingPathComponent("config.pre-budget-v1." + JSONSupport.sha256Hex(original) + ".json")
+        XCTAssertEqual(try Data(contentsOf: backup), original)
+    }
+
+    func testStoredPolicyRejectsFractionsBeforeFoundationRounding() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("budget-raw-storage-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: home) }
+        let paths = AppPaths(home: home)
+        try paths.ensureLayout()
+        let raw = try JSONSupport.string(from: AppConfig.default.asDictionary())
+            .replacingOccurrences(of: "\"calls_per_turn\":8", with: "\"calls_per_turn\":8.0000000000000000000000000000000000000001")
+        let original = Data(raw.utf8)
+        try original.write(to: paths.configJSON, options: .atomic)
+        let store = ConfigStore(paths: paths)
+        XCTAssertNil(store.model.budgetPolicy)
+        XCTAssertEqual(store.budgetPolicyError?.reason, "expected_exact_integer")
+        XCTAssertThrowsError(try store.budgetPolicySnapshot())
+        XCTAssertThrowsError(try store.update(["log_level": "debug"]))
+        XCTAssertEqual(try Data(contentsOf: paths.configJSON), original)
+        let backup = paths.configMigrationsDir.appendingPathComponent("config.pre-budget-v1." + JSONSupport.sha256Hex(original) + ".json")
+        XCTAssertEqual(try Data(contentsOf: backup), original)
+    }
+
+    func testBudgetPolicyDecodingPreservesExactCountsAndRejectsUnknownFields() throws {
+        let data = try JSONEncoder().encode(BudgetPolicy.default)
+        XCTAssertEqual(try JSONDecoder().decode(BudgetPolicy.self, from: data), .default)
+        var object = try JSONSupport.object(from: data)
+        for invalid in ["true", "1.00000000000000001", "1e100", "9223372036854775808"] {
+            let text = String(data: data, encoding: .utf8)!
+            let malformed = text.replacingOccurrences(of: "\"calls_per_turn\":8", with: "\"calls_per_turn\":\(invalid)")
+            XCTAssertNotEqual(malformed, text)
+            XCTAssertThrowsError(try JSONDecoder().decode(BudgetPolicy.self, from: Data(malformed.utf8)), invalid)
+        }
+        var context = try XCTUnwrap(object["context"] as? [String: Any])
+        context["unrecognized_budget"] = 1
+        object["context"] = context
+        XCTAssertThrowsError(try JSONDecoder().decode(BudgetPolicy.self, from: JSONSupport.data(from: object))) { error in
+            XCTAssertEqual((error as? ManagerSettingsValidationError)?.field, "context.unrecognized_budget")
+        }
+        XCTAssertThrowsError(try BudgetPolicy(schemaVersion: 2).validated())
+    }
+
+    func testBudgetPolicyRelationshipsAndScopeAreValidated() throws {
+        XCTAssertThrowsError(try BudgetContextPolicy(mode: .manual, maxContextTokens: 512, responseReserveTokens: 512).validated())
+        XCTAssertThrowsError(try BudgetContextPolicy(checkpointRatio: 0.9, rolloverRatio: 0.8).validated())
+        XCTAssertThrowsError(try BudgetContextPolicy(emergencyRatio: .infinity).validated())
+        XCTAssertThrowsError(try BudgetToolPolicy(callsPerSession: 4).validated())
+        XCTAssertThrowsError(try BudgetToolPolicy(maxInFlight: 9).validated())
+        XCTAssertThrowsError(try BudgetPolicyScope(kind: .projectOverride).validated())
+        let scope = BudgetPolicyScope(kind: .projectOverride, projectID: UUID().uuidString.lowercased(), projectGeneration: 1)
+        let selection = try BudgetPolicyState.default.resolve(scope)
+        XCTAssertTrue(selection.inherited)
+        XCTAssertEqual(selection.revision, 0)
+        XCTAssertEqual(selection.globalRevision, 1)
+        XCTAssertEqual(selection.policySource, "global_default")
+        XCTAssertFalse(selection.policy.automaticHandoffEnabled)
+    }
+
     func testSettingsIntegerDecoderRejectsTrapsAndFoundationCoercion() {
         let invalid: [Any] = [
             Double.infinity, -Double.infinity, Double.nan, Double.greatestFiniteMagnitude,

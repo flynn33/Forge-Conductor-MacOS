@@ -66,7 +66,10 @@ public final class ManagerDashboardClient: @unchecked Sendable {
     }
 
     public func settings() async throws -> ManagerSettings {
-        try ManagerSettings(dictionary: try await request(method: "GET", path: "/api/manager/settings"))
+        try ManagerSettings(dictionary: try await request(
+            method: "GET", path: "/api/manager/settings",
+            timeoutInterval: ConfigStore.configurationLockTimeoutSeconds + Self.responseSchedulingAllowanceSeconds
+        ))
     }
 
     public func startService() async throws -> ManagerStatus {
@@ -92,6 +95,7 @@ public final class ManagerDashboardClient: @unchecked Sendable {
     }
 
     public func updateSettings(_ patch: ManagerSettingsPatch, apply: Bool = true) async throws -> ManagerSettings {
+        _ = try patch.budgetPolicyUpdate?.validated()
         let result = try await request(
             method: "POST",
             path: "/api/manager/settings",
@@ -99,6 +103,10 @@ public final class ManagerDashboardClient: @unchecked Sendable {
             timeoutInterval: Self.settingsMutationRequestTimeoutSeconds
         )
         return try ManagerSettings(dictionary: result)
+    }
+
+    public func budgetPolicy(scope: BudgetPolicyScope) async throws -> BudgetPolicySelection {
+        try await settings().resolvedBudgetPolicy(scope: scope)
     }
 
     /// Registers one exact request with at most one automatic replay when the
@@ -305,6 +313,12 @@ public final class ManagerDashboardClient: @unchecked Sendable {
         }
         let object = (try? JSONSupport.object(from: data)) ?? [:]
         guard (200...299).contains(http.statusCode) else {
+            if http.statusCode == 409, object["code"] as? String == "budget_policy_conflict",
+               let current = object["current_policy"] as? [String: Any] {
+                throw BudgetPolicyConflict(current: try JSONDecoder().decode(
+                    BudgetPolicySelection.self, from: JSONSupport.data(from: current)
+                ))
+            }
             if http.statusCode == 400, object["code"] as? String == "invalid_settings",
                let field = object["field"] as? String, let reason = object["reason"] as? String {
                 throw ManagerSettingsValidationError(

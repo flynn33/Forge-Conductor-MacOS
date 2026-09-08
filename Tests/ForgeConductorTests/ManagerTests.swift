@@ -1315,6 +1315,84 @@ final class ManagerTests: XCTestCase {
         XCTAssertTrue(try app.store.presenceRecords().isEmpty)
     }
 
+    func testNativeBudgetSettingsRouteReturnsRevisionConflictsAndProjectInheritance() async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        let port = try Self.availableLoopbackPort()
+        try app.config.update(["dashboard": ["port": port]], save: true)
+        let node = ManagerNode(app: app)
+        _ = try node.startService()
+        let credentials = ManagerControlCredentialStore(paths: app.paths)
+        let first = ManagerDashboardClient(host: "127.0.0.1", port: port, credentials: credentials)
+        let second = ManagerDashboardClient(host: "127.0.0.1", port: port, credentials: credentials)
+        let initial = try await first.budgetPolicy(scope: .globalDefault)
+        XCTAssertEqual(initial.revision, 1)
+        let update = BudgetPolicyUpdate(scope: .globalDefault, expectedRevision: 1, expectedGlobalRevision: 1,
+                                        operation: .set, policy: .init(automaticHandoffEnabled: true))
+        let saved = try await first.updateSettings(.init(budgetPolicyUpdate: update))
+        XCTAssertEqual(saved.budgetPolicy?.globalRevision, 2)
+        let bytes = try Data(contentsOf: app.paths.configJSON)
+        var typedConflict: BudgetPolicySelection?
+        do {
+            _ = try await second.updateSettings(.init(budgetPolicyUpdate: update))
+            XCTFail("A stale editor overwrote the policy")
+        } catch let error as BudgetPolicyConflict {
+            typedConflict = error.current
+            XCTAssertEqual(error.current.revision, 2)
+            XCTAssertTrue(error.current.policy.automaticHandoffEnabled)
+        }
+        XCTAssertEqual(try Data(contentsOf: app.paths.configJSON), bytes)
+        var staleRequest = URLRequest(url: URL(string: "http://127.0.0.1:\(port)/api/manager/settings")!)
+        staleRequest.httpMethod = "POST"
+        staleRequest.timeoutInterval = 5
+        staleRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        staleRequest.setValue("Bearer \(try credentials.bearerToken())", forHTTPHeaderField: "Authorization")
+        staleRequest.httpBody = try JSONSupport.data(from: ["settings": ["budget_update": update.asDictionary()]])
+        let (conflictData, conflictHTTP) = try await URLSession.shared.data(for: staleRequest)
+        let conflictResponse = try JSONSupport.object(from: conflictData)
+        XCTAssertEqual((conflictHTTP as? HTTPURLResponse)?.statusCode, 409)
+        XCTAssertEqual(conflictResponse["code"] as? String, "budget_policy_conflict")
+        XCTAssertEqual(try Data(contentsOf: app.paths.configJSON), bytes)
+        let projectID = ProjectID()
+        _ = try await app.projectContexts.repository.registerProjectUnchecked(projectID: projectID, displayName: "Budget fixture", canonicalRoot: home)
+        let scope = BudgetPolicyScope(kind: .projectOverride, projectID: projectID.description, projectGeneration: 1)
+        let projectUpdate = BudgetPolicyUpdate(scope: scope, expectedRevision: 0, expectedGlobalRevision: 2,
+                                               operation: .set, policy: .init(context: .init(mode: .manual, maxContextTokens: 8_192)))
+        let projectSaved = try await first.updateSettings(.init(budgetPolicyUpdate: projectUpdate))
+        XCTAssertEqual(try projectSaved.resolvedBudgetPolicy(scope: scope).policy.context.maxContextTokens, 8_192)
+        let reset = BudgetPolicyUpdate(scope: scope, expectedRevision: 1, expectedGlobalRevision: 2, operation: .inherit)
+        let inherited = try await first.updateSettings(.init(budgetPolicyUpdate: reset))
+        XCTAssertTrue(try inherited.resolvedBudgetPolicy(scope: scope).inherited)
+        XCTAssertEqual(try ConfigStore(paths: app.paths).budgetPolicySelection(scope: scope).revision, 2)
+        let invalidScope = BudgetPolicyScope(kind: .projectOverride, projectID: projectID.description, projectGeneration: 2)
+        do {
+            _ = try await first.updateSettings(.init(budgetPolicyUpdate: .init(scope: invalidScope, expectedRevision: 0, expectedGlobalRevision: 2, operation: .set, policy: .default)))
+            XCTFail("A stale project generation received a policy")
+        } catch let error as ManagerSettingsValidationError {
+            XCTAssertEqual(error.field, "scope")
+        }
+        XCTAssertTrue(app.diagnostics.recent(limit: 100).contains(where: { $0.event == "budget_policy_requested" }))
+        try retainBudgetEffects(caseID: "T03-03", effects: [
+            "expected_revision": initial.revision, "saved_global_revision": saved.budgetPolicy?.globalRevision ?? -1,
+            "typed_conflict": try JSONSupport.object(from: JSONEncoder().encode(XCTUnwrap(typedConflict))),
+            "conflict_status": (conflictHTTP as? HTTPURLResponse)?.statusCode ?? -1,
+            "conflict_response": conflictResponse, "config_after_global_save_sha256": JSONSupport.sha256Hex(bytes),
+            "project_override": try JSONSupport.object(from: JSONEncoder().encode(projectSaved.resolvedBudgetPolicy(scope: scope))),
+            "project_inherited": try JSONSupport.object(from: JSONEncoder().encode(inherited.resolvedBudgetPolicy(scope: scope))),
+        ])
+        _ = node
+    }
+
+    func testManagerRejectsUnknownBudgetKeysAndMixedTransactions() throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        let node = ManagerNode(app: app)
+        let before = try Data(contentsOf: app.paths.configJSON)
+        let update = try BudgetPolicyUpdate(scope: .globalDefault, expectedRevision: 1, expectedGlobalRevision: 1, operation: .set, policy: .default).asDictionary()
+        for patch in [["context_budget": 1] as [String: Any], ["budget_update": update, "log_level": "debug"]] {
+            XCTAssertThrowsError(try node.updateSettings(patch, apply: false))
+            XCTAssertEqual(try Data(contentsOf: app.paths.configJSON), before)
+        }
+    }
+
     func testManagerRejectsInvalidNumericSettingsWithoutMutation() throws {
         let app = try ForgeApp.bootstrap(home: home)
         let node = ManagerNode(app: app)
@@ -1344,7 +1422,8 @@ final class ManagerTests: XCTestCase {
         _ = try node.startService()
         let credential = ManagerControlCredentialStore(paths: app.paths)
         let original = try Data(contentsOf: app.paths.configJSON)
-        for numeric in ["true", "1.5", "1e100", "9223372036854775808", "-1", "601", "null"] {
+        var rejected: [[String: Any]] = []
+        for numeric in ["true", "1.5", "41.000000000000000000000000000000000000001", "1e100", "9223372036854775808", "-1", "601", "null"] {
             var request = URLRequest(url: URL(string: "http://127.0.0.1:\(port)/api/manager/settings")!)
             request.httpMethod = "POST"
             request.timeoutInterval = 5
@@ -1356,7 +1435,10 @@ final class ManagerTests: XCTestCase {
             let error = try JSONSupport.object(from: data)
             XCTAssertEqual(error["code"] as? String, "invalid_settings")
             XCTAssertEqual(error["field"] as? String, "shell.default_timeout_sec")
-            XCTAssertEqual(try Data(contentsOf: app.paths.configJSON), original)
+            let retained = try Data(contentsOf: app.paths.configJSON)
+            XCTAssertEqual(retained, original)
+            rejected.append(["token": numeric, "status": (response as? HTTPURLResponse)?.statusCode ?? -1,
+                             "response": error, "config_sha256": JSONSupport.sha256Hex(retained)])
         }
         let client = ManagerDashboardClient(host: "127.0.0.1", port: port, credentials: credential)
         do {
@@ -1370,6 +1452,11 @@ final class ManagerTests: XCTestCase {
         XCTAssertTrue(live.serviceActive)
         let saved = try await client.updateSettings(ManagerSettingsPatch(shellTimeoutSec: 41), apply: false)
         XCTAssertEqual(saved.shellTimeoutSec, 41)
+        try retainBudgetEffects(caseID: "T03-01", effects: [
+            "original_config_sha256": JSONSupport.sha256Hex(original), "rejected_requests": rejected,
+            "service_active_after_errors": live.serviceActive, "valid_save_timeout": saved.shellTimeoutSec,
+            "final_config_sha256": JSONSupport.sha256Hex(try Data(contentsOf: app.paths.configJSON)),
+        ])
         _ = node
     }
 

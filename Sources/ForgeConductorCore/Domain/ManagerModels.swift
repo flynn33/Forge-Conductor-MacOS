@@ -153,6 +153,8 @@ public struct ManagerSettings: Sendable, Equatable {
     public var shellTimeoutSec: Int
     public var logLevel: String
     public var allowedRoots: [String]
+    public var budgetPolicy: BudgetPolicyState?
+    public var budgetPolicyIssue: String?
 
     public init(
         dashboardHost: String,
@@ -171,7 +173,9 @@ public struct ManagerSettings: Sendable, Equatable {
         shellRuntimeCapabilities: ShellRuntimeCapabilities,
         shellTimeoutSec: Int,
         logLevel: String,
-        allowedRoots: [String] = []
+        allowedRoots: [String] = [],
+        budgetPolicy: BudgetPolicyState? = nil,
+        budgetPolicyIssue: String? = nil
     ) {
         self.dashboardHost = dashboardHost
         self.dashboardPort = dashboardPort
@@ -190,6 +194,8 @@ public struct ManagerSettings: Sendable, Equatable {
         self.shellTimeoutSec = shellTimeoutSec
         self.logLevel = logLevel
         self.allowedRoots = allowedRoots
+        self.budgetPolicy = budgetPolicy
+        self.budgetPolicyIssue = budgetPolicyIssue
     }
 
     public init(dictionary: [String: Any]) throws {
@@ -225,12 +231,16 @@ public struct ManagerSettings: Sendable, Equatable {
             ),
             shellTimeoutSec: ManagerJSONValue.int(shell["default_timeout_sec"]) ?? 30,
             logLevel: (dictionary["log_level"] as? String) ?? "info",
-            allowedRoots: dictionary["allowed_roots"] as? [String] ?? []
+            allowedRoots: dictionary["allowed_roots"] as? [String] ?? [],
+            budgetPolicy: try (dictionary["budget_policy"] as? [String: Any]).map {
+                try JSONDecoder().decode(BudgetPolicyState.self, from: JSONSupport.data(from: $0))
+            },
+            budgetPolicyIssue: dictionary["budget_policy_issue"] as? String
         )
     }
 
     public func asDictionary() -> [String: Any] {
-        [
+        var result: [String: Any] = [
             "ok": true,
             "dashboard": [
                 "host": dashboardHost,
@@ -260,6 +270,17 @@ public struct ManagerSettings: Sendable, Equatable {
             "log_level": logLevel,
             "allowed_roots": allowedRoots,
         ]
+        if let budgetPolicy, let data = try? JSONEncoder().encode(budgetPolicy),
+           let object = try? JSONSupport.object(from: data) { result["budget_policy"] = object }
+        if let budgetPolicyIssue { result["budget_policy_issue"] = budgetPolicyIssue }
+        return result
+    }
+
+    public func resolvedBudgetPolicy(scope: BudgetPolicyScope) throws -> BudgetPolicySelection {
+        guard let budgetPolicy else {
+            throw ManagerSettingsValidationError(field: "budget_policy", reason: budgetPolicyIssue ?? "configuration_unavailable")
+        }
+        return try budgetPolicy.resolve(scope)
     }
 
     private static func runtimePath(_ value: Any?) -> String? {
@@ -331,6 +352,7 @@ public struct ManagerSettingsPatch: Sendable, Equatable {
     public var shellTimeoutSec: Int?
     public var logLevel: String?
     public var allowedRoots: [String]?
+    public var budgetPolicyUpdate: BudgetPolicyUpdate?
 
     public init(
         dashboardHost: String? = nil,
@@ -343,7 +365,8 @@ public struct ManagerSettingsPatch: Sendable, Equatable {
         shellEnabled: Bool? = nil,
         shellTimeoutSec: Int? = nil,
         logLevel: String? = nil,
-        allowedRoots: [String]? = nil
+        allowedRoots: [String]? = nil,
+        budgetPolicyUpdate: BudgetPolicyUpdate? = nil
     ) {
         self.dashboardHost = dashboardHost
         self.dashboardPort = dashboardPort
@@ -356,6 +379,7 @@ public struct ManagerSettingsPatch: Sendable, Equatable {
         self.shellTimeoutSec = shellTimeoutSec
         self.logLevel = logLevel
         self.allowedRoots = allowedRoots
+        self.budgetPolicyUpdate = budgetPolicyUpdate
     }
 
     /// Edge adapter: config store still merges nested dict patches.
@@ -380,6 +404,11 @@ public struct ManagerSettingsPatch: Sendable, Equatable {
         if !shell.isEmpty { patch["shell"] = shell }
         if let logLevel { patch["log_level"] = logLevel }
         if let allowedRoots { patch["allowed_roots"] = allowedRoots }
+        if let budgetPolicyUpdate {
+            // Invalid typed values must reach the rejecting boundary rather
+            // than disappearing into an otherwise successful legacy patch.
+            patch["budget_update"] = (try? budgetPolicyUpdate.asDictionary()) ?? NSNull()
+        }
         return patch
     }
 }

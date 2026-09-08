@@ -860,6 +860,7 @@ private struct LMStudioResponseAccumulator {
         var completedArguments: String?
     }
 
+    private let maximumEventBytes: Int
     private let maximumTextBytes: Int
     private let maximumToolArgumentBytes: Int
     private var responseID: String?
@@ -874,7 +875,8 @@ private struct LMStudioResponseAccumulator {
     private var terminalSeen = false
     private var lastSequence = -1
 
-    init(maximumTextBytes: Int, maximumToolArgumentBytes: Int) {
+    init(maximumEventBytes: Int, maximumTextBytes: Int, maximumToolArgumentBytes: Int) {
+        self.maximumEventBytes = maximumEventBytes
         self.maximumTextBytes = maximumTextBytes
         self.maximumToolArgumentBytes = maximumToolArgumentBytes
     }
@@ -883,7 +885,15 @@ private struct LMStudioResponseAccumulator {
         if frame.isDone { return }
         let decoded: Any
         do {
-            decoded = try JSONSerialization.jsonObject(with: frame.data)
+            // Foundation may round long decimal tokens before an Int bridge.
+            // Validate the original bounded usage tokens before constructing it.
+            let checked = try JSONSupport.validatingIntegerFields(in: frame.data,
+                                                                  maximumBytes: maximumEventBytes) { path in
+                guard path.count == 3, path[0] == "response", path[1] == "usage",
+                      ["input_tokens", "output_tokens", "total_tokens"].contains(path[2]) else { return nil }
+                return .required
+            }
+            decoded = try JSONSerialization.jsonObject(with: checked)
         } catch {
             throw LMStudioProviderError.malformedResponse(
                 "SSE data is not a typed JSON event"
@@ -1005,12 +1015,28 @@ private struct LMStudioResponseAccumulator {
             throw signal
         }
         self.status = status
-        if let values = response["usage"] as? [String: Any] {
-            let input = values["input_tokens"] as? Int ?? 0
-            let output = values["output_tokens"] as? Int ?? 0
-            let total = values["total_tokens"] as? Int ?? input + output
-            guard input >= 0, output >= 0, total >= 0, total >= input, total >= output else {
-                throw LMStudioProviderError.malformedResponse("response usage is invalid")
+        if let rawUsage = response["usage"], !(rawUsage is NSNull) {
+            guard let values = rawUsage as? [String: Any],
+                  let input = JSONSupport.exactInteger(values["input_tokens"]),
+                  let output = JSONSupport.exactInteger(values["output_tokens"]) else {
+                throw LMStudioProviderError.malformedResponse("response usage counters are missing or invalid")
+            }
+            let total: Int
+            if let rawTotal = values["total_tokens"] {
+                guard let exact = JSONSupport.exactInteger(rawTotal) else {
+                    throw LMStudioProviderError.malformedResponse("response usage total is invalid")
+                }
+                total = exact
+            } else {
+                let sum = input.addingReportingOverflow(output)
+                guard !sum.overflow else {
+                    throw LMStudioProviderError.malformedResponse("response usage total overflow")
+                }
+                total = sum.partialValue
+            }
+            let maximum = ManagedModelProviderContract.maximumContextTokens * 2
+            guard input >= 0, output >= 0, total >= input, total >= output, total <= maximum else {
+                throw LMStudioProviderError.malformedResponse("response usage is outside supported bounds")
             }
             usage = LMStudioUsage(inputTokens: input, outputTokens: output, totalTokens: total)
             usageWasReported = true
@@ -1738,6 +1764,7 @@ public actor LMStudioRESTClient {
             maximumTotalBytes: configuration.maximumResponseBytes
         )
         let accumulator = LMStudioResponseAccumulator(
+            maximumEventBytes: configuration.maximumSSEEventBytes,
             maximumTextBytes: configuration.maximumTextBytes,
             maximumToolArgumentBytes: configuration.maximumToolArgumentBytes
         )

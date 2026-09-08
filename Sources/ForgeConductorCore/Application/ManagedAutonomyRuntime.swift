@@ -391,7 +391,8 @@ public actor ManagedAutonomyRuntime {
             let budget = PersistedManagedRunBudgetEvaluator(
                 repository: repository,
                 clock: clock,
-                policyOverride: validatedBudgetPolicy
+                policyOverride: validatedBudgetPolicy,
+                policyResolver: { scope in try app.config.budgetPolicySelection(scope: scope) }
             )
             let stepExecutor = try ManagedProjectRunStepExecutor(
                 repository: repository,
