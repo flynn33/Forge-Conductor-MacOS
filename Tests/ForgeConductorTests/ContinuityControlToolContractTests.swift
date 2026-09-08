@@ -146,14 +146,14 @@ final class ContinuityControlToolContractTests: XCTestCase {
     }
 
     func testFailureMappingUsesFixedTemplatesAndNeverReflectsPrivateDetails() throws {
-        let secret = "private-provider-token:/private/project"
+        let privateDetail = "private-provider-token:/private/project"
         let inputs: [(Error, ContinuityControlToolFailure.Code)] = [
             (ContinuityTaskAuthorizationError.taskCorrelationRequired, .taskIdentityUnavailable),
             (ContinuityTaskAuthorizationError.authorityMismatch, .authorityMismatch),
             (ContinuityTaskAuthorizationError.revoked, .revoked),
-            (ContinuityIngressError.invalidRequest(secret), .invalidRequest),
+            (ContinuityIngressError.invalidRequest(privateDetail), .invalidRequest),
             (ContinuityIngressError.invalidRequest("handoff_is_not_resume_ready"), .sourceNotReady),
-            (ContinuityIngressError.integrityFailure(secret), .integrityFailure),
+            (ContinuityIngressError.integrityFailure(privateDetail), .integrityFailure),
             (ContinuityOperationControlError.notFound, .notFound),
             (ContinuityOperationControlError.conflict, .conflict),
             (ContinuityOperationControlError.integrityFailure, .integrityFailure),
@@ -161,9 +161,9 @@ final class ContinuityControlToolContractTests: XCTestCase {
             (ContinuityOperationControlError.reconciliationRequired, .conflict),
             (ContinuityOperationControlError.invalidRequest, .invalidRequest),
             (ProjectContextError.databaseBusy, .operationBusy),
-            (ProjectContextError.databaseFailure(secret), .internalError),
+            (ProjectContextError.databaseFailure(privateDetail), .internalError),
             (CancellationError(), .cancelled),
-            (NSError(domain: secret, code: 1, userInfo: [NSLocalizedDescriptionKey: secret]), .internalError),
+            (NSError(domain: privateDetail, code: 1, userInfo: [NSLocalizedDescriptionKey: privateDetail]), .internalError),
         ]
         for (error, code) in inputs {
             let failure = ContinuityControlToolFailure.mapping(error)
@@ -171,7 +171,7 @@ final class ContinuityControlToolContractTests: XCTestCase {
             let result = try ContinuityControlToolResponse.failure(failure).toolResult()
             XCTAssertFalse(result.ok); XCTAssertTrue(result.isError)
             let text = try JSONSupport.string(from: result.payload)
-            XCTAssertFalse(text.contains(secret))
+            XCTAssertFalse(text.contains(privateDetail))
             XCTAssertEqual(Set(result.payload.keys), ["ok", "schema_version", "code", "field", "message", "retryable"])
         }
         for code in ContinuityControlToolFailure.Code.allCases {
@@ -251,13 +251,13 @@ final class ContinuityControlToolContractTests: XCTestCase {
     }
 
     func testStartResponseIncludesOnlyStableAcceptedHandleAndFrozenIdentity() throws {
-        let secret = "private-assignment-and-packet-contents"
+        let privatePayload = "private-assignment-and-packet-contents"
         let scope = ToolAuthorizationScope(canonicalRoots: [URL(fileURLWithPath: "/tmp/clu-contract")],
             writableRoots: [], allowedTools: ["fs_read"], networkAllowed: false, maximumInlineOutputBytes: 65_536)
         let authorization = try ContinuityIngressAuthorization(projectID: ProjectID(), projectGeneration: .initial,
-            sourceBindingID: UUID(), taskID: UUID(), assignmentID: secret, assignmentSHA256: digest, authorizationScope: scope)
+            sourceBindingID: UUID(), taskID: UUID(), assignmentID: privatePayload, assignmentSHA256: digest, authorizationScope: scope)
         let packet = HandoffPacket(id: "contract-source", source: .model, resumeReady: true,
-            clientID: "contract", goal: secret, narrative: secret)
+            clientID: "contract", goal: privatePayload, narrative: privatePayload)
         let bytes = try ForgeJSONCanonicalizationV1.data(from: packet.asDictionary())
         let source = try ContinuityHandoffRevision(identity: .init(continuityID: packet.id, revision: 1,
             packetSHA256: JSONSupport.sha256Hex(bytes)), authorization: authorization, canonicalPacketJSON: bytes,
@@ -274,7 +274,7 @@ final class ContinuityControlToolContractTests: XCTestCase {
         XCTAssertEqual(result.payload["submission"] as? String, "accepted")
         XCTAssertEqual(result.payload["operation_id"] as? String, identity.operationID.uuidString.lowercased())
         let text = try JSONSupport.string(from: result.payload)
-        XCTAssertFalse(text.contains(secret)); XCTAssertFalse(text.contains(permit.permitSHA256))
+        XCTAssertFalse(text.contains(privatePayload)); XCTAssertFalse(text.contains(permit.permitSHA256))
         XCTAssertEqual(try JSONSupport.data(from: result.payload),
             try JSONSupport.data(from: ContinuityControlToolResponse.started(receipt).toolResult().payload))
     }
