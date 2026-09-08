@@ -12,6 +12,18 @@ public enum ContextBudgetMath {
         guard projectedNextTurn >= 0 else {
             throw ContextBudgetError.invalidObservation("projected next turn is negative")
         }
+        if let resolved = configuration.resolvedPolicy {
+            // Operator ratios are defined on I + R over C. Convert once to the
+            // remaining-capacity comparison used by the state machine. Reserves
+            // are already in R; adaptive legacy reserves must not be added again.
+            let capacity = configuration.capacity.capacity
+            return ContextBudgetThresholds(
+                checkpoint: capacity - (try fractionTokens(capacity, resolved.effectiveCheckpointRatio)),
+                rollover: capacity - (try fractionTokens(capacity, resolved.effectiveRolloverRatio)),
+                emergency: capacity - (try fractionTokens(capacity, resolved.effectiveEmergencyRatio)),
+                hysteresis: try fractionTokens(capacity, configuration.policy.hysteresisFraction)
+            )
+        }
         let usable = configuration.usableCapacity
         let policy = configuration.policy
         let checkpointFraction = try fractionTokens(usable, policy.checkpointFraction)
@@ -53,18 +65,18 @@ public enum ContextBudgetMath {
             (Double(serializedBytes) / policy.serializedBytesPerToken)
                 * policy.estimateSafetyMultiplier
         )
-        guard estimate.isFinite, estimate >= 0, estimate <= Double(Int.max) else {
+        guard estimate.isFinite, estimate >= 0, let count = Int(exactly: estimate) else {
             throw ContextBudgetError.arithmeticOverflow
         }
-        return Int(estimate)
+        return count
     }
 
     private static func fractionTokens(_ total: Int, _ fraction: Double) throws -> Int {
         let value = ceil(Double(total) * fraction)
-        guard value.isFinite, value >= 0, value <= Double(Int.max) else {
+        guard value.isFinite, value >= 0, let count = Int(exactly: value) else {
             throw ContextBudgetError.arithmeticOverflow
         }
-        return Int(value)
+        return count
     }
 
     private static func added(_ lhs: Int, _ rhs: Int) throws -> Int {
@@ -233,6 +245,9 @@ public actor ContextBudgetSupervisor {
             proposed.configuration = replacingConfiguration
         }
         let configuration = try proposed.configuration.validated()
+        guard !request.accountingCut.isEmpty, request.accountingCut.utf8.count <= 128 else {
+            throw ContextBudgetError.invalidObservation("invalid accounting cut")
+        }
         if proposed.bootstrapState == .awaitingObservation,
            request.triggerPoint != .afterBootstrap {
             throw ContextBudgetError.bootstrapObservationRequired
@@ -329,7 +344,18 @@ public actor ContextBudgetSupervisor {
             triggerPoint: request.triggerPoint,
             thresholds: thresholds,
             actionEpoch: proposed.actionEpoch,
-            createdAt: proposed.updatedAt
+            createdAt: proposed.updatedAt,
+            accounting: try ContextBudgetAccounting(
+                version: configuration.resolvedPolicy == nil ? "legacy_remaining_v1" : "admitted_total_v2",
+                cut: request.accountingCut,
+                retainedInputTokens: measurement.countKnown ? measurement.used : nil,
+                futureReserveTokens: fixed,
+                rawProviderUsage: request.rawProviderUsage ?? proposed.latestObservation?.accounting?.rawProviderUsage,
+                resolvedPolicy: configuration.resolvedPolicy,
+                toolSchemaSHA256: request.toolSchemaSHA256 ?? proposed.latestObservation?.accounting?.toolSchemaSHA256,
+                pendingInputID: request.triggerPoint == .afterProviderTurn ? nil
+                    : request.pendingInputID ?? proposed.latestObservation?.accounting?.pendingInputID
+            )
         )
         proposed.latestObservation = observation
         _ = try proposed.validated()
@@ -373,9 +399,17 @@ public actor ContextBudgetSupervisor {
                 source: .serializedEstimate,
                 confidence: Self.serializedEstimateConfidence
             )
+        case .estimatedTokens(let usedTokens, let confidence):
+            return try validatedMeasurement(used: usedTokens, source: .serializedEstimate,
+                                            confidence: min(confidence, Self.serializedEstimateConfidence))
         case .serializedIncrement(let bytes):
             guard let latest = state.latestObservation else {
                 throw ContextBudgetError.currentObservationRequired
+            }
+            if latest.source == .providerOverflow {
+                // New local bytes do not resolve a provider overflow's unknown usage.
+                return try validatedMeasurement(used: latest.used, source: .providerOverflow,
+                                                confidence: 0, countKnown: false)
             }
             let delta = try ContextBudgetMath.estimateTokens(
                 serializedBytes: bytes,
@@ -395,17 +429,19 @@ public actor ContextBudgetSupervisor {
             return try validatedMeasurement(
                 used: latest.used,
                 source: latest.source,
-                confidence: latest.confidence
+                confidence: latest.confidence,
+                countKnown: latest.source != .providerOverflow
             )
         case .providerOverflow(let lastKnownUsedTokens):
-            let used = max(
-                state.configuration.capacity.capacity,
-                lastKnownUsedTokens ?? state.latestObservation?.used ?? 0
-            )
+            // An overflow proves admission failed, not that retained input equals
+            // the configured capacity. Keep a labeled last-known compatibility
+            // value and leave the normalized current count unknown.
+            let used = lastKnownUsedTokens ?? state.latestObservation?.used ?? 0
             return try validatedMeasurement(
                 used: used,
                 source: .providerOverflow,
-                confidence: 1
+                confidence: 0,
+                countKnown: false
             )
         }
     }
@@ -413,13 +449,14 @@ public actor ContextBudgetSupervisor {
     private func validatedMeasurement(
         used: Int,
         source: ContextBudgetUsageSource,
-        confidence: Double
+        confidence: Double,
+        countKnown: Bool = true
     ) throws -> ResolvedMeasurement {
         guard used >= 0, used <= Int(Int64.max),
               confidence.isFinite, (0...1).contains(confidence) else {
             throw ContextBudgetError.invalidObservation("usage or confidence is outside bounds")
         }
-        return ResolvedMeasurement(used: used, source: source, confidence: confidence)
+        return ResolvedMeasurement(used: used, source: source, confidence: confidence, countKnown: countKnown)
     }
 
     private func mergedGrowth(
@@ -562,4 +599,5 @@ private struct ResolvedMeasurement {
     let used: Int
     let source: ContextBudgetUsageSource
     let confidence: Double
+    let countKnown: Bool
 }

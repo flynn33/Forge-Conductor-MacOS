@@ -143,7 +143,9 @@ final class AppBootstrapOperation {
             shellMigrationState: shell.migration.state, shellMigrationReceiptValid: shell.migration.receiptValid,
             shellRuntimeCapabilities: shell.runtimes, shellTimeoutSec: config.shell.defaultTimeoutSec,
             logLevel: config.logLevel,
-            allowedRoots: ManagerSettingsNormalizer.canonicalAllowedRoots(config.allowedRoots)
+            allowedRoots: ManagerSettingsNormalizer.canonicalAllowedRoots(config.allowedRoots),
+            budgetPolicy: config.budgetPolicy,
+            budgetPolicyIssue: app.config.budgetPolicyError?.localizedDescription
         )
     }
 }

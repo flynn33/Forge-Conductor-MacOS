@@ -2,12 +2,34 @@
 
 import Foundation
 
+/// Bytes at the request cut. Tool-result envelopes already committed through
+/// observeToolResult are identified separately so a delivery retry is not usage.
+public struct ManagedBudgetInputAccounting: Sendable, Equatable {
+    public let inputBytes: Int
+    public let toolSchemaBytes: Int
+    public let toolSchemaSHA256: String
+    public let pendingInputID: String
+    public let inputAlreadyRetained: Bool
+
+    public init(inputBytes: Int, toolSchemaBytes: Int, toolSchemaSHA256: String,
+                pendingInputID: String, inputAlreadyRetained: Bool) {
+        self.inputBytes = inputBytes; self.toolSchemaBytes = toolSchemaBytes
+        self.toolSchemaSHA256 = toolSchemaSHA256; self.pendingInputID = pendingInputID
+        self.inputAlreadyRetained = inputAlreadyRetained
+    }
+}
+
 public protocol ManagedRunBudgetEvaluating: Sendable {
     func evaluateBeforeProviderTurn(
         run: AutonomousRunRecord,
         sessionID: String,
         capabilities: ProviderCapabilities,
         serializedInputBytes: Int
+    ) async throws -> ContextBudgetAction
+
+    func evaluateBeforeProviderTurn(
+        run: AutonomousRunRecord, sessionID: String, capabilities: ProviderCapabilities,
+        accounting: ManagedBudgetInputAccounting
     ) async throws -> ContextBudgetAction
 
     func observeProviderTurn(
@@ -30,6 +52,20 @@ public protocol ManagedRunBudgetEvaluating: Sendable {
         sessionID: String,
         capabilities: ProviderCapabilities
     ) async throws -> ContextBudgetAction
+}
+
+public extension ManagedRunBudgetEvaluating {
+    func evaluateBeforeProviderTurn(
+        run: AutonomousRunRecord, sessionID: String, capabilities: ProviderCapabilities,
+        accounting: ManagedBudgetInputAccounting
+    ) async throws -> ContextBudgetAction {
+        let sum = accounting.inputBytes.addingReportingOverflow(accounting.toolSchemaBytes)
+        guard accounting.inputBytes >= 0, accounting.toolSchemaBytes >= 0, !sum.overflow else {
+            throw ContextBudgetError.arithmeticOverflow
+        }
+        return try await evaluateBeforeProviderTurn(run: run, sessionID: sessionID,
+                                                   capabilities: capabilities, serializedInputBytes: sum.partialValue)
+    }
 }
 
 public struct NoManagedRunBudgetEvaluator: ManagedRunBudgetEvaluating, Sendable {
@@ -275,7 +311,13 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
                 run: run,
                 sessionID: sessionID,
                 capabilities: capabilities,
-                serializedInputBytes: input.count + tools.reduce(0) { $0 + $1.count }
+                accounting: ManagedBudgetInputAccounting(
+                    inputBytes: input.count,
+                    toolSchemaBytes: tools.reduce(0) { $0 + $1.count },
+                    toolSchemaSHA256: toolSchemaSHA256,
+                    pendingInputID: JSONSupport.sha256Hex("\(previousResponseID ?? "root"):\(JSONSupport.sha256Hex(input)):\(toolSchemaSHA256)"),
+                    inputAlreadyRetained: continuationInput != nil
+                )
             )
             strongestAction = Self.stronger(strongestAction, beforeAction)
             // A successor is not accepted until this exact turn is durably reserved.
@@ -417,7 +459,7 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
                     "output": output,
                 ])
                 let toolAction = try await budget.observeToolResult(
-                    serializedBytes: output.utf8.count,
+                    serializedBytes: try Self.canonicalData([outputs[outputs.count - 1]]).count,
                     providerResponseID: turn.responseID,
                     run: run,
                     sessionID: sessionID,

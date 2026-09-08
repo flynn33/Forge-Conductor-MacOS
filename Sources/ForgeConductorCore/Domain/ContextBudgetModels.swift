@@ -301,21 +301,27 @@ public struct ContextBudgetReserves: Codable, Sendable, Equatable {
     public let schemaTokens: Int
     public let handoffTokens: Int
     public let recoveryTokens: Int
+    public let futureToolTokens: Int
+    public let safetyTokens: Int
 
     public init(
         outputTokens: Int,
         schemaTokens: Int,
         handoffTokens: Int,
-        recoveryTokens: Int
+        recoveryTokens: Int,
+        futureToolTokens: Int = 0,
+        safetyTokens: Int = 0
     ) {
         self.outputTokens = outputTokens
         self.schemaTokens = schemaTokens
         self.handoffTokens = handoffTokens
         self.recoveryTokens = recoveryTokens
+        self.futureToolTokens = futureToolTokens
+        self.safetyTokens = safetyTokens
     }
 
     public func fixedTotal() throws -> Int {
-        let values = [outputTokens, schemaTokens, handoffTokens, recoveryTokens]
+        let values = [outputTokens, schemaTokens, handoffTokens, recoveryTokens, futureToolTokens, safetyTokens]
         guard values.allSatisfy({ $0 >= 0 }) else {
             throw ContextBudgetError.invalidReserve
         }
@@ -333,6 +339,138 @@ public struct ContextBudgetReserves: Codable, Sendable, Equatable {
         case schemaTokens = "schema_tokens"
         case handoffTokens = "handoff_tokens"
         case recoveryTokens = "recovery_tokens"
+        case futureToolTokens = "future_tool_tokens"
+        case safetyTokens = "safety_tokens"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(outputTokens: try c.decode(Int.self, forKey: .outputTokens),
+                  schemaTokens: try c.decode(Int.self, forKey: .schemaTokens),
+                  handoffTokens: try c.decode(Int.self, forKey: .handoffTokens),
+                  recoveryTokens: try c.decode(Int.self, forKey: .recoveryTokens),
+                  futureToolTokens: try c.decodeIfPresent(Int.self, forKey: .futureToolTokens) ?? 0,
+                  safetyTokens: try c.decodeIfPresent(Int.self, forKey: .safetyTokens) ?? 0)
+        _ = try fixedTotal()
+    }
+}
+
+/// The saved operator values remain intact when the loaded instance imposes a
+/// smaller execution ceiling. This value is committed with every applied boundary.
+public struct ResolvedContextBudgetPolicy: Codable, Sendable, Equatable {
+    public let selection: BudgetPolicySelection
+    public let verifiedLoadedContextTokens: Int
+    public let effectiveContextTokens: Int
+    public let thresholdContract: String
+    public let effectiveCheckpointRatio: Double
+    public let effectiveRolloverRatio: Double
+    public let effectiveEmergencyRatio: Double
+
+    public init(selection: BudgetPolicySelection, verifiedLoadedContextTokens: Int,
+                effectiveContextTokens: Int, thresholdContract: String = "admitted_total_v2",
+                qualificationPolicy: ContextBudgetPolicy? = nil) {
+
+        self.selection = selection
+        self.verifiedLoadedContextTokens = verifiedLoadedContextTokens
+        self.effectiveContextTokens = effectiveContextTokens
+        self.thresholdContract = thresholdContract
+        effectiveCheckpointRatio = min(selection.policy.context.checkpointRatio,
+                                       qualificationPolicy.map { 1 - $0.checkpointFraction } ?? 1)
+        effectiveRolloverRatio = min(selection.policy.context.rolloverRatio,
+                                     qualificationPolicy.map { 1 - $0.rolloverFraction } ?? 1)
+        effectiveEmergencyRatio = min(selection.policy.context.emergencyRatio,
+                                      qualificationPolicy.map { 1 - $0.emergencyFraction } ?? 1)
+    }
+
+    public var requestedContextTokens: Int { selection.policy.context.maxContextTokens }
+    public var isClamped: Bool {
+        selection.policy.context.mode == .manual && effectiveContextTokens < requestedContextTokens
+    }
+
+    public func validated() throws -> Self {
+        _ = try selection.scope.validated()
+        _ = try selection.policy.validated()
+        guard selection.revision >= 0, selection.globalRevision > 0,
+              verifiedLoadedContextTokens > 0,
+              verifiedLoadedContextTokens <= ContextCapacityResolver.maximumSupportedCapacity,
+              effectiveContextTokens > 0,
+              effectiveContextTokens == (selection.policy.context.mode == .auto
+                  ? verifiedLoadedContextTokens : min(requestedContextTokens, verifiedLoadedContextTokens)),
+              thresholdContract == "admitted_total_v2",
+              effectiveCheckpointRatio.isFinite, effectiveRolloverRatio.isFinite, effectiveEmergencyRatio.isFinite,
+              effectiveCheckpointRatio > 0, effectiveCheckpointRatio < effectiveRolloverRatio,
+              effectiveRolloverRatio < effectiveEmergencyRatio,
+              effectiveCheckpointRatio <= selection.policy.context.checkpointRatio,
+              effectiveRolloverRatio <= selection.policy.context.rolloverRatio,
+              effectiveEmergencyRatio <= selection.policy.context.emergencyRatio else {
+            throw ContextBudgetError.invalidPolicy
+        }
+        return self
+    }
+}
+
+/// `used` is retained for wire compatibility. This record defines what that
+/// number means; an overflow without usage has no known admitted-total count.
+public struct ContextBudgetAccounting: Codable, Sendable, Equatable {
+    public let version: String
+    public let cut: String
+    public let retainedInputTokens: Int?
+    public let futureReserveTokens: Int
+    public let admittedTotalTokens: Int?
+    public let rawProviderUsage: ProviderUsage?
+    public let resolvedPolicy: ResolvedContextBudgetPolicy?
+    public let toolSchemaSHA256: String?
+    public let pendingInputID: String?
+
+    public init(version: String, cut: String, retainedInputTokens: Int?, futureReserveTokens: Int,
+                rawProviderUsage: ProviderUsage? = nil, resolvedPolicy: ResolvedContextBudgetPolicy? = nil,
+                toolSchemaSHA256: String? = nil, pendingInputID: String? = nil) throws {
+        guard futureReserveTokens >= 0, retainedInputTokens.map({ $0 >= 0 }) ?? true else {
+            throw ContextBudgetError.invalidObservation("negative normalized accounting")
+        }
+        let sum = retainedInputTokens?.addingReportingOverflow(futureReserveTokens)
+        guard sum?.overflow != true else { throw ContextBudgetError.arithmeticOverflow }
+        self.version = version; self.cut = cut; self.retainedInputTokens = retainedInputTokens
+        self.futureReserveTokens = futureReserveTokens; self.admittedTotalTokens = sum?.partialValue
+        self.rawProviderUsage = rawProviderUsage; self.resolvedPolicy = resolvedPolicy
+        self.toolSchemaSHA256 = toolSchemaSHA256; self.pendingInputID = pendingInputID
+        _ = try validated()
+    }
+
+    public func validated() throws -> Self {
+        guard ["legacy_remaining_v1", "admitted_total_v2"].contains(version),
+              ["retained_input_before_next_operation", "retained_input_after_response"].contains(cut),
+              retainedInputTokens.map({ $0 >= 0 }) ?? true, futureReserveTokens >= 0,
+              (retainedInputTokens == nil) == (admittedTotalTokens == nil) else {
+            throw ContextBudgetError.invalidObservation("invalid accounting version, cut, or counts")
+        }
+        if let retainedInputTokens {
+            let sum = retainedInputTokens.addingReportingOverflow(futureReserveTokens)
+            guard !sum.overflow, sum.partialValue == admittedTotalTokens else {
+                throw ContextBudgetError.invalidObservation("admitted total differs from input plus reserves")
+            }
+        }
+        for fingerprint in [toolSchemaSHA256, pendingInputID].compactMap({ $0 }) {
+            guard fingerprint.count == 64, fingerprint.allSatisfy({ $0.isHexDigit }) else {
+                throw ContextBudgetError.invalidObservation("invalid accounting identity")
+            }
+        }
+        if let rawProviderUsage {
+            let maximum = ManagedModelProviderContract.maximumContextTokens
+            guard (1...maximum).contains(rawProviderUsage.capacity),
+                  rawProviderUsage.inputTokens >= 0, rawProviderUsage.outputTokens >= 0,
+                  rawProviderUsage.totalTokens >= rawProviderUsage.inputTokens,
+                  rawProviderUsage.totalTokens >= rawProviderUsage.outputTokens,
+                  rawProviderUsage.totalTokens <= maximum * 2,
+                  rawProviderUsage.confidence.isFinite, (0...1).contains(rawProviderUsage.confidence) else {
+                throw ContextBudgetError.invalidObservation("invalid raw provider usage")
+            }
+        }
+        _ = try resolvedPolicy?.validated()
+        guard (version == "admitted_total_v2") == (resolvedPolicy != nil) else {
+            throw ContextBudgetError.invalidObservation("accounting policy version mismatch")
+        }
+        return self
     }
 }
 
@@ -422,21 +560,30 @@ public struct ContextBudgetConfiguration: Codable, Sendable, Equatable {
     public let reserves: ContextBudgetReserves
     public let policy: ContextBudgetPolicy
     public let requiresBootstrapReset: Bool
+    public let resolvedPolicy: ResolvedContextBudgetPolicy?
 
     public init(
         capacity: ContextCapacityResolution,
         reserves: ContextBudgetReserves,
         policy: ContextBudgetPolicy = .init(),
-        requiresBootstrapReset: Bool = false
+        requiresBootstrapReset: Bool = false,
+        resolvedPolicy: ResolvedContextBudgetPolicy? = nil
     ) {
         self.capacity = capacity
         self.reserves = reserves
         self.policy = policy
         self.requiresBootstrapReset = requiresBootstrapReset
+        self.resolvedPolicy = resolvedPolicy
     }
 
     public func validated() throws -> ContextBudgetConfiguration {
         let validPolicy = try policy.validated()
+        if let resolvedPolicy {
+            _ = try resolvedPolicy.validated()
+            guard capacity.capacity == resolvedPolicy.effectiveContextTokens else {
+                throw ContextBudgetError.configurationMismatch
+            }
+        }
         try capacity.validateForExecution(
             reserves: reserves,
             minimumUsableTokens: validPolicy.minimumUsableTokens
@@ -452,6 +599,7 @@ public struct ContextBudgetConfiguration: Codable, Sendable, Equatable {
     private enum CodingKeys: String, CodingKey {
         case capacity, reserves, policy
         case requiresBootstrapReset = "requires_bootstrap_reset"
+        case resolvedPolicy = "resolved_policy"
     }
 }
 
@@ -563,6 +711,7 @@ public enum ContextBudgetMeasurement: Sendable, Equatable {
     case tokenizerExact(usedTokens: Int)
     case serializedEstimate(SerializedContextFootprint)
     case serializedIncrement(bytes: Int)
+    case estimatedTokens(usedTokens: Int, confidence: Double)
     case current
     case providerOverflow(lastKnownUsedTokens: Int?)
 }
@@ -609,19 +758,31 @@ public struct ContextBudgetEvaluationRequest: Sendable, Equatable {
     public let providerResponseID: String?
     public let measurement: ContextBudgetMeasurement
     public let growth: ContextBudgetGrowthSample?
+    public let rawProviderUsage: ProviderUsage?
+    public let accountingCut: String
+    public let toolSchemaSHA256: String?
+    public let pendingInputID: String?
 
     public init(
         observationID: UUID = UUID(),
         triggerPoint: ContextBudgetTriggerPoint,
         providerResponseID: String? = nil,
         measurement: ContextBudgetMeasurement,
-        growth: ContextBudgetGrowthSample? = nil
+        growth: ContextBudgetGrowthSample? = nil,
+        rawProviderUsage: ProviderUsage? = nil,
+        accountingCut: String = "retained_input_before_next_operation",
+        toolSchemaSHA256: String? = nil,
+        pendingInputID: String? = nil
     ) {
         self.observationID = observationID
         self.triggerPoint = triggerPoint
         self.providerResponseID = providerResponseID
         self.measurement = measurement
         self.growth = growth
+        self.rawProviderUsage = rawProviderUsage
+        self.accountingCut = accountingCut
+        self.toolSchemaSHA256 = toolSchemaSHA256
+        self.pendingInputID = pendingInputID
     }
 
     public static func selectingStrongest(
@@ -759,13 +920,29 @@ public struct ContextBudgetObservation: Codable, Sendable, Equatable {
     public let actionEpoch: UInt64
     public let createdAt: String
 
+    public let accounting: ContextBudgetAccounting?
+
+    public init(observationID: UUID, identity: ContextBudgetIdentity, providerResponseID: String?,
+                capacity: Int, used: Int, reserves: ContextBudgetReserves, remaining: Int,
+                projectedNextTurn: Int, source: ContextBudgetUsageSource, confidence: Double,
+                estimatorVersion: String, action: ContextBudgetAction, triggerPoint: ContextBudgetTriggerPoint,
+                thresholds: ContextBudgetThresholds, actionEpoch: UInt64, createdAt: String,
+                accounting: ContextBudgetAccounting? = nil) {
+        self.observationID = observationID; self.identity = identity; self.providerResponseID = providerResponseID
+        self.capacity = capacity; self.used = used; self.reserves = reserves; self.remaining = remaining
+        self.projectedNextTurn = projectedNextTurn; self.source = source; self.confidence = confidence
+        self.estimatorVersion = estimatorVersion; self.action = action; self.triggerPoint = triggerPoint
+        self.thresholds = thresholds; self.actionEpoch = actionEpoch; self.createdAt = createdAt
+        self.accounting = accounting
+    }
+
     public var fixedReserve: Int { (try? reserves.fixedTotal()) ?? 0 }
 
     private enum CodingKeys: String, CodingKey {
         case observationID = "observation_id"
         case identity
         case providerResponseID = "provider_response_id"
-        case capacity, used, reserves, remaining
+        case capacity, used, reserves, remaining, accounting
         case projectedNextTurn = "projected_next_turn"
         case source, confidence
         case estimatorVersion = "estimator_version"

@@ -152,6 +152,39 @@ final class LMStudioContractFixtureTests: XCTestCase {
         XCTAssertEqual(continuation.usage.totalTokens, 136)
     }
 
+    func testManagedTransportRejectsInexactOverflowedAndMissingUsageCounters() async throws {
+        let transport = try makeTransport()
+        for name in ["boolean", "boolean-false", "fraction", "string", "overflow", "beyond-int",
+                     "exponent-overflow", "negative", "missing-input", "missing-output", "null-input",
+                     "small-total", "duplicate-input", "wrong-shape", "empty"] {
+            let marker = "fixture-usage-" + name + ":"
+            do {
+                _ = try await transport.createRoot(LMStudioRootRequest(systemPrompt: marker, userInput: "bounded",
+                    tools: [], idempotencyKey: "usage-" + name))
+                XCTFail("\(name) must not be accepted as exact provider usage")
+            } catch LMStudioProviderError.malformedResponse { }
+            catch { XCTFail("\(name) returned unexpected error \(error)") }
+        }
+    }
+
+    func testManagedTransportNormalizesExactUsageAndKeepsUnreportedUsageUnknown() async throws {
+        let transport = try makeTransport()
+        for name in ["normal", "integer-exponent", "missing-total", "zero", "absent", "null"] {
+            let marker = "fixture-usage-" + name + ":"
+            let turn = try await transport.createRoot(LMStudioRootRequest(systemPrompt: marker, userInput: "bounded",
+                tools: [], idempotencyKey: "usage-" + name))
+            XCTAssertEqual(turn.status, "completed")
+            if name == "absent" || name == "null" {
+                XCTAssertFalse(turn.usageWasReported, "A missing count must use conservative downstream estimation")
+            } else {
+                XCTAssertTrue(turn.usageWasReported)
+                XCTAssertEqual(turn.usage.inputTokens, name == "zero" ? 0 : 512)
+                XCTAssertEqual(turn.usage.outputTokens, name == "zero" ? 0 : 32)
+                XCTAssertEqual(turn.usage.totalTokens, name == "zero" ? 0 : 544)
+            }
+        }
+    }
+
     func testManagedTransportSendsConfiguredOutputTokenBound() async throws {
         let transport = try makeTransport(maximumOutputTokens: 321)
         let turn = try await transport.createRoot(LMStudioRootRequest(

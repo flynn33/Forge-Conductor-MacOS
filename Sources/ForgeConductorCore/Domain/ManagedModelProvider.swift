@@ -144,7 +144,16 @@ public struct ProviderUsage: Codable, Sendable, Equatable {
         source: ProviderUsageSource,
         confidence: Double
     ) throws {
-        let resolvedTotal = totalTokens ?? inputTokens + outputTokens
+        let resolvedTotal: Int
+        if let totalTokens {
+            resolvedTotal = totalTokens
+        } else {
+            let sum = inputTokens.addingReportingOverflow(outputTokens)
+            guard !sum.overflow else {
+                throw ManagedModelProviderContractError.invalidValue("provider usage total overflow")
+            }
+            resolvedTotal = sum.partialValue
+        }
         guard (1...ManagedModelProviderContract.maximumContextTokens).contains(capacity),
               inputTokens >= 0,
               outputTokens >= 0,

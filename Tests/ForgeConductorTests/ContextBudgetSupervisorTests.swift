@@ -263,7 +263,9 @@ final class ContextBudgetSupervisorTests: XCTestCase {
                 measurement: .providerOverflow(lastKnownUsedTokens: 64_000)
             ))
             XCTAssertEqual(emergency.observation.source, .providerOverflow)
-            XCTAssertEqual(emergency.observation.confidence, 1)
+            XCTAssertEqual(emergency.observation.confidence, 0)
+            XCTAssertEqual(emergency.observation.used, 64_000)
+            XCTAssertNil(emergency.observation.accounting?.retainedInputTokens)
             XCTAssertEqual(emergency.observation.action, .emergency)
             XCTAssertEqual(emergency.actionRequest?.requestedAction, .emergency)
             let commandCount = try await fixture.repository.readyContinuityCommandCount()
@@ -522,6 +524,198 @@ final class ContextBudgetSupervisorTests: XCTestCase {
             )
             XCTAssertEqual(observationCount, 0)
         }
+    }
+
+    func testTypedPolicyUsesLoadedCeilingAndOneAdmittedTotalEquation() throws {
+        let policy = BudgetPolicy(context: BudgetContextPolicy(
+            mode: .manual, maxContextTokens: 16_384, responseReserveTokens: 512,
+            futureToolReserveTokens: 256, handoffReserveTokens: 256,
+            recoveryReserveTokens: 128, safetyReserveTokens: 128,
+            checkpointRatio: 0.70, rolloverRatio: 0.82, emergencyRatio: 0.94))
+        let selection = try BudgetPolicyState(globalRevision: 7, globalPolicy: policy).resolve(.globalDefault)
+        let configuration = try PersistedManagedRunBudgetEvaluator.configuration(
+            capabilities: runtimeCapabilities(8_192), selection: selection)
+        XCTAssertEqual(configuration.capacity.capacity, 8_192)
+        XCTAssertEqual(configuration.resolvedPolicy?.requestedContextTokens, 16_384)
+        XCTAssertEqual(configuration.resolvedPolicy?.verifiedLoadedContextTokens, 8_192)
+        XCTAssertEqual(configuration.resolvedPolicy?.isClamped, true)
+        XCTAssertEqual(configuration.reserves.schemaTokens, 0, "Serialized schemas belong to I")
+        XCTAssertEqual(try configuration.reserves.fixedTotal(), 1_280)
+        let thresholds = try ContextBudgetMath.thresholds(configuration: configuration, projectedNextTurn: 4_096)
+        XCTAssertEqual(thresholds.checkpoint, 2_457)
+        XCTAssertEqual(thresholds.rollover, 1_474)
+        XCTAssertEqual(thresholds.emergency, 491)
+        XCTAssertEqual(thresholds, try ContextBudgetMath.thresholds(configuration: configuration, projectedNextTurn: 0),
+                       "Typed admitted-total ratios must not add already reserved capacity through EWMA")
+
+        let increased = try PersistedManagedRunBudgetEvaluator.configuration(
+            capabilities: runtimeCapabilities(32_768), selection: selection)
+        XCTAssertEqual(increased.capacity.capacity, 16_384)
+        XCTAssertEqual(increased.resolvedPolicy?.isClamped, false)
+        XCTAssertEqual(increased.resolvedPolicy?.selection, selection)
+        let impossible = BudgetPolicy(context: BudgetContextPolicy(mode: .manual, maxContextTokens: 16_384,
+            responseReserveTokens: 8_000, handoffReserveTokens: 1_000))
+        XCTAssertThrowsError(try PersistedManagedRunBudgetEvaluator.configuration(capabilities: runtimeCapabilities(8_192),
+            selection: BudgetPolicyState(globalPolicy: impossible).resolve(.globalDefault)))
+    }
+
+    func testProviderUsageAggregationRejectsOverflowBeforeIntegerAdditionCanTrap() throws {
+        for pair in [(Int.max, 1), (Int.min, -1), (Int.max, Int.max)] {
+            XCTAssertThrowsError(try ProviderUsage(capacity: 8_192, inputTokens: pair.0,
+                outputTokens: pair.1, source: .providerExact, confidence: 1)) { error in
+                guard case ManagedModelProviderContractError.invalidValue = error else {
+                    return XCTFail("Expected typed provider usage error, got \(error)")
+                }
+            }
+        }
+        let valid = try ProviderUsage(capacity: 8_192, inputTokens: 1_000, outputTokens: 200,
+                                      source: .providerExact, confidence: 1)
+        XCTAssertEqual(valid.totalTokens, 1_200)
+    }
+
+    func testUnknownOrInvalidLoadedCapacityCannotBecomeAnExactOperatorLimit() throws {
+        let selection = try BudgetPolicyState(globalPolicy: BudgetPolicy(context:
+            BudgetContextPolicy(mode: .manual, maxContextTokens: 8_192))).resolve(.globalDefault)
+        let valid = try runtimeCapabilities(16_384)
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(valid)) as? [String: Any])
+        object["contextLength"] = 0
+        let unknown = try JSONDecoder().decode(ProviderCapabilities.self, from: JSONSerialization.data(withJSONObject: object))
+        XCTAssertThrowsError(try PersistedManagedRunBudgetEvaluator.configuration(capabilities: unknown, selection: selection))
+        object["contextLength"] = 262_144
+        let invalid = try JSONDecoder().decode(ProviderCapabilities.self, from: JSONSerialization.data(withJSONObject: object))
+        XCTAssertThrowsError(try PersistedManagedRunBudgetEvaluator.configuration(capabilities: invalid, selection: selection),
+                             "The manual clamp must not hide invalid provider capacity")
+    }
+
+    func testLegacyRemainingFractionsNormalizeWithoutRaisingOperatorThresholds() throws {
+        let selection = try BudgetPolicyState.default.resolve(.globalDefault)
+        let earlier = ContextBudgetPolicy(checkpointFraction: 0.96, rolloverFraction: 0.90, emergencyFraction: 0.05)
+        let configuration = try PersistedManagedRunBudgetEvaluator.configuration(capabilities: runtimeCapabilities(32_768),
+            policyOverride: earlier, selection: selection)
+        let resolved = try XCTUnwrap(configuration.resolvedPolicy)
+        XCTAssertEqual(resolved.effectiveCheckpointRatio, 0.04, accuracy: 0.000_001)
+        XCTAssertEqual(resolved.effectiveRolloverRatio, 0.10, accuracy: 0.000_001)
+        XCTAssertEqual(resolved.effectiveEmergencyRatio, 0.95, accuracy: 0.000_001)
+        XCTAssertEqual(resolved.selection.policy, selection.policy, "Requested values are preserved")
+    }
+
+    func testUnknownOverflowPersistsDecisionWithoutInventingInputTokens() async throws {
+        try await withFixture(capacity: 8_192) { fixture in
+            let supervisor = try await ContextBudgetSupervisor.open(repository: fixture.repository,
+                identity: fixture.identity, configuration: fixture.configuration)
+            let receipt = try await supervisor.evaluate(ContextBudgetEvaluationRequest(triggerPoint: .providerOverflow,
+                measurement: .providerOverflow(lastKnownUsedTokens: nil)))
+            XCTAssertEqual(receipt.observation.action, .emergency)
+            XCTAssertEqual(receipt.observation.used, 0, "Compatibility fallback is not a fabricated capacity count")
+            XCTAssertEqual(receipt.observation.confidence, 0)
+            XCTAssertNil(receipt.observation.accounting?.retainedInputTokens)
+            XCTAssertNil(receipt.observation.accounting?.admittedTotalTokens)
+            let restored = try await ContextBudgetSupervisor.restore(repository: fixture.repository, identity: fixture.identity)
+            let next = try await restored.observeToolResult(serializedBytes: 120, providerResponseID: "overflow-response")
+            XCTAssertEqual(next.observation.source, .providerOverflow)
+            XCTAssertNil(next.observation.accounting?.retainedInputTokens)
+            XCTAssertEqual(next.observation.action, .emergency)
+        }
+    }
+
+    func testPolicyResolutionChangesCachedSessionAndSurvivesEvaluatorRestart() async throws {
+        try await withFixture(capacity: 16_384) { fixture in
+            let home = FileManager.default.temporaryDirectory.appendingPathComponent("forge-runtime-policy-\(UUID().uuidString)")
+            defer { try? FileManager.default.removeItem(at: home) }
+            let store = ConfigStore(paths: AppPaths(home: home))
+            let evaluator = PersistedManagedRunBudgetEvaluator(repository: fixture.repository,
+                policyResolver: { try store.budgetPolicySelection(scope: $0) })
+            let runValue = try await fixture.repository.autonomousRun(fixture.identity.runID)
+            let run = try XCTUnwrap(runValue)
+            let capabilities = try runtimeCapabilities(16_384)
+            _ = try await evaluator.evaluateBeforeProviderTurn(run: run, sessionID: fixture.identity.sessionID,
+                capabilities: capabilities, serializedInputBytes: 10_000)
+            let beforeValue = try await fixture.repository.contextBudgetState(identity: fixture.identity)
+            let before = try XCTUnwrap(beforeValue)
+            XCTAssertEqual(before.configuration.resolvedPolicy?.selection.globalRevision, 1)
+            let scope = BudgetPolicyScope(kind: .projectOverride, projectID: fixture.identity.projectID.description,
+                                          projectGeneration: Int(exactly: fixture.identity.projectGeneration.rawValue))
+            _ = try store.updateBudgetPolicy(BudgetPolicyUpdate(scope: scope, expectedRevision: 0,
+                expectedGlobalRevision: 1, operation: .set,
+                policy: BudgetPolicy(context: BudgetContextPolicy(mode: .manual, maxContextTokens: 4_096))))
+            let action = try await evaluator.evaluateBeforeProviderTurn(run: run, sessionID: fixture.identity.sessionID,
+                capabilities: capabilities, serializedInputBytes: 10_000)
+            XCTAssertEqual(action, .emergency, "Tightening below consumed input pauses at this boundary")
+            let afterValue = try await fixture.repository.contextBudgetState(identity: fixture.identity)
+            let after = try XCTUnwrap(afterValue)
+            XCTAssertEqual(after.latestObservation?.used, before.latestObservation?.used)
+            XCTAssertEqual(after.configuration.capacity.capacity, 4_096)
+            XCTAssertEqual(after.configuration.resolvedPolicy?.selection.revision, 1)
+            XCTAssertEqual(after.configuration.resolvedPolicy?.selection.policySource, "project_override")
+            let restartedStore = ConfigStore(paths: AppPaths(home: home))
+            let restarted = PersistedManagedRunBudgetEvaluator(repository: fixture.repository,
+                policyResolver: { try restartedStore.budgetPolicySelection(scope: $0) })
+            _ = try await restarted.evaluateBeforeProviderTurn(run: run, sessionID: fixture.identity.sessionID,
+                capabilities: runtimeCapabilities(2_048), serializedInputBytes: 10_000)
+            let reconnectedValue = try await fixture.repository.contextBudgetState(identity: fixture.identity)
+            let reconnected = try XCTUnwrap(reconnectedValue)
+            XCTAssertEqual(reconnected.configuration.capacity.capacity, 2_048)
+            XCTAssertEqual(reconnected.configuration.resolvedPolicy?.requestedContextTokens, 4_096)
+            XCTAssertEqual(reconnected.configuration.resolvedPolicy?.selection.revision, 1)
+        }
+    }
+
+    func testProviderAndLocalAccountingAvoidsHistorySchemaAndToolDeliveryDoubleCounting() async throws {
+        try await withFixture(capacity: 65_536) { fixture in
+            let selection = try BudgetPolicyState.default.resolve(.globalDefault)
+            let evaluator = PersistedManagedRunBudgetEvaluator(repository: fixture.repository, policyResolver: { _ in selection })
+            let runValue = try await fixture.repository.autonomousRun(fixture.identity.runID)
+            let run = try XCTUnwrap(runValue)
+            let capabilities = try runtimeCapabilities(65_536)
+            let schema = String(repeating: "a", count: 64)
+            let first = ManagedBudgetInputAccounting(inputBytes: 600, toolSchemaBytes: 300,
+                toolSchemaSHA256: schema, pendingInputID: String(repeating: "b", count: 64), inputAlreadyRetained: false)
+            _ = try await evaluator.evaluateBeforeProviderTurn(run: run, sessionID: fixture.identity.sessionID,
+                capabilities: capabilities, accounting: first)
+            let firstStateValue = try await fixture.repository.contextBudgetState(identity: fixture.identity)
+            let firstState = try XCTUnwrap(firstStateValue)
+            XCTAssertEqual(firstState.latestObservation?.used, 375)
+            _ = try await evaluator.evaluateBeforeProviderTurn(run: run, sessionID: fixture.identity.sessionID,
+                capabilities: capabilities, accounting: first)
+            let retriedValue = try await fixture.repository.contextBudgetState(identity: fixture.identity)
+            let retried = try XCTUnwrap(retriedValue)
+            XCTAssertEqual(retried.latestObservation?.used, 375)
+            let usage = try ProviderUsage(capacity: 65_536, inputTokens: 500, outputTokens: 200,
+                totalTokens: 900, source: .providerExact, confidence: 1)
+            let turn = try ProviderTurn(requestID: "account-request", responseID: "account-response", providerID: "lmstudio",
+                providerVersion: "fixture", modelKey: "fixture/model", messages: ["response"], toolCalls: [],
+                usage: usage, completed: true, finishReason: .stop)
+            _ = try await evaluator.observeProviderTurn(turn, run: run, sessionID: fixture.identity.sessionID, capabilities: capabilities)
+            let providerValue = try await fixture.repository.contextBudgetState(identity: fixture.identity)
+            let provider = try XCTUnwrap(providerValue)
+            XCTAssertEqual(provider.latestObservation?.used, 700, "Use explicit retained input/output, not aggregate total or local history")
+            XCTAssertEqual(provider.latestObservation?.accounting?.rawProviderUsage?.totalTokens, 900)
+            _ = try await evaluator.observeToolResult(serializedBytes: 240, providerResponseID: "account-response", run: run,
+                sessionID: fixture.identity.sessionID, capabilities: capabilities)
+            let toolValue = try await fixture.repository.contextBudgetState(identity: fixture.identity)
+            let tool = try XCTUnwrap(toolValue)
+            XCTAssertEqual(tool.latestObservation?.used, 800)
+            let delivery = ManagedBudgetInputAccounting(inputBytes: 240, toolSchemaBytes: 300,
+                toolSchemaSHA256: schema, pendingInputID: String(repeating: "c", count: 64), inputAlreadyRetained: true)
+            _ = try await evaluator.evaluateBeforeProviderTurn(run: run, sessionID: fixture.identity.sessionID,
+                capabilities: capabilities, accounting: delivery)
+            let deliveredValue = try await fixture.repository.contextBudgetState(identity: fixture.identity)
+            let delivered = try XCTUnwrap(deliveredValue)
+            XCTAssertEqual(delivered.latestObservation?.used, 800)
+            let observation = try XCTUnwrap(delivered.latestObservation)
+            XCTAssertEqual(observation.accounting?.admittedTotalTokens, observation.used + observation.fixedReserve)
+            XCTAssertEqual(observation.reserves.schemaTokens, 0)
+            let history = try await fixture.repository.contextBudgetObservations(identity: fixture.identity)
+            XCTAssertEqual(history.first(where: { $0.observationID == observation.observationID }), observation)
+        }
+    }
+
+    private func runtimeCapabilities(_ tokens: Int) throws -> ProviderCapabilities {
+        try ProviderCapabilities(providerID: "lmstudio", providerVersion: "fixture", modelKey: "fixture/model",
+            providerInstanceID: "fixture-instance", contextLength: tokens, maximumContextLength: 131_072,
+            statefulResponses: true, streaming: true, customTools: true, mcp: false,
+            structuredOutput: true, usageReporting: true, idempotencyLookup: true,
+            capabilityFingerprintSHA256: String(repeating: "a", count: 64))
     }
 
     private var smallReserves: ContextBudgetReserves {

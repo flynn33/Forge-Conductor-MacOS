@@ -139,6 +139,7 @@ final class LMStudioContractFixtureServer: URLProtocol, @unchecked Sendable {
                 encoding: .utf8
             ) ?? ""
             let shouldSuspend = requestText.contains("fixture-suspend-bootstrap") && Self.suspension.isEnabled
+            if let usage = usageCounterFixture(requestText) { return usage }
             if requestText.contains("fixture-error-401") {
                 return errorRoute(status: 401, code: "invalid_api_token")
             }
@@ -244,6 +245,38 @@ final class LMStudioContractFixtureServer: URLProtocol, @unchecked Sendable {
         default:
             return errorRoute(status: 404, code: "fixture_route_not_found")
         }
+    }
+
+    /// These counter bytes intentionally bypass JSONSerialization so decimal
+    /// rounding cannot repair the malformed provider fixture before transport.
+    private static func usageCounterFixture(_ requestText: String) -> Route? {
+        let cases: [(String, String?)] = [
+            ("normal", #"{"input_tokens":512,"output_tokens":32,"total_tokens":544}"#),
+            ("integer-exponent", #"{"input_tokens":5.12e2,"output_tokens":32.0,"total_tokens":544}"#),
+            ("missing-total", #"{"input_tokens":512,"output_tokens":32}"#),
+            ("zero", #"{"input_tokens":0,"output_tokens":0,"total_tokens":0}"#),
+            ("boolean", #"{"input_tokens":true,"output_tokens":32,"total_tokens":544}"#),
+            ("boolean-false", #"{"input_tokens":0,"output_tokens":false,"total_tokens":0}"#),
+            ("fraction", #"{"input_tokens":512.00000000000000000000000000000000000000000000000001,"output_tokens":32,"total_tokens":544}"#),
+            ("string", #"{"input_tokens":"512","output_tokens":32,"total_tokens":544}"#),
+            ("overflow", #"{"input_tokens":9223372036854775807,"output_tokens":1}"#),
+            ("beyond-int", #"{"input_tokens":9223372036854775808,"output_tokens":0}"#),
+            ("exponent-overflow", #"{"input_tokens":1e9999,"output_tokens":0}"#),
+            ("negative", #"{"input_tokens":-1,"output_tokens":32,"total_tokens":544}"#),
+            ("missing-input", #"{"output_tokens":32,"total_tokens":544}"#),
+            ("missing-output", #"{"input_tokens":512,"total_tokens":544}"#),
+            ("null-input", #"{"input_tokens":null,"output_tokens":32,"total_tokens":544}"#),
+            ("small-total", #"{"input_tokens":512,"output_tokens":32,"total_tokens":12}"#),
+            ("duplicate-input", #"{"input_tokens":512,"\u0069nput_tokens":513,"output_tokens":32}"#),
+            ("wrong-shape", "[]"),
+            ("empty", "{}"),
+            ("absent", nil),
+            ("null", "null"),
+        ]
+        guard let fixture = cases.first(where: { requestText.contains("fixture-usage-" + $0.0 + ":") }) else { return nil }
+        let usage = fixture.1.map { ",\"usage\":\($0)" } ?? ""
+        let event = "{\"type\":\"response.completed\",\"sequence_number\":0,\"response\":{\"id\":\"resp_usage_fixture\",\"model\":\"fixture/tool-model\",\"status\":\"completed\",\"output\":[]\(usage)}}"
+        return Route(status: 200, contentType: "text/event-stream", body: Data("data: \(event)\n\ndata: [DONE]\n\n".utf8))
     }
 
     private static func fixture(_ name: String, extension value: String, contentType: String) throws -> Route {

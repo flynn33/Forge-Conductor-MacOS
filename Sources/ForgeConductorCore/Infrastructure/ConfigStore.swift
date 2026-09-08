@@ -14,8 +14,12 @@ public final class ConfigStore: ConfigurationProviding, @unchecked Sendable {
 
     private var _model: AppConfig
     private var _shellMigrationStatus: ShellPolicyMigrationStatus = .notChecked
+    private var _budgetPolicyError: ManagerSettingsValidationError?
     private let paths: AppPaths
     private let lock = NSLock()
+    private let mutationLock = NSLock()
+    // Guarded by mutationLock. Save flushes only explicitly requested fields.
+    private var pendingPatch: [String: Any] = [:]
 
     /// Thread-safe snapshot of the typed configuration.
     public var model: AppConfig {
@@ -31,6 +35,11 @@ public final class ConfigStore: ConfigurationProviding, @unchecked Sendable {
     public var shellMigrationStatus: ShellPolicyMigrationStatus {
         lock.lock(); defer { lock.unlock() }
         return _shellMigrationStatus
+    }
+
+    public var budgetPolicyError: ManagerSettingsValidationError? {
+        lock.lock(); defer { lock.unlock() }
+        return _budgetPolicyError
     }
 
     public var shellPolicyStatus: ShellPolicyStatus {
@@ -55,20 +64,45 @@ public final class ConfigStore: ConfigurationProviding, @unchecked Sendable {
     public static var defaults: [String: Any] { AppConfig.default.asDictionary() }
 
     public func reload() {
-        let loaded: (AppConfig, ShellPolicyMigrationStatus)
         do {
-            loaded = try loadAndMigrateIfNeeded()
+            try withConfigurationMutation { _ in
+                reloadSerialized()
+                pendingPatch = [:]
+            }
         } catch {
+            lock.lock()
+            _model.budgetPolicy = nil
+            _budgetPolicyError = ManagerSettingsValidationError(field: "budget_policy", reason: "configuration_unavailable")
+            lock.unlock()
+        }
+    }
+
+    private func reloadSerialized() {
+        let loaded: (AppConfig, ShellPolicyMigrationStatus)
+        var budgetError: ManagerSettingsValidationError?
+        var priorMigrationStatus: ShellPolicyMigrationStatus?
+        do {
+            let migrated = try loadAndMigrateIfNeeded()
+            priorMigrationStatus = migrated.1
+            loaded = (try loadBudgetConfiguration(), migrated.1)
+        } catch {
+            budgetError = (error as? ManagerSettingsValidationError)
+                ?? ManagerSettingsValidationError(field: "budget_policy", reason: "configuration_unavailable")
+            try? Self.withConfigFileLock(paths: paths) {
+                let data = try Self.readConfigurationBytes(paths: paths)
+                try Self.retainBudgetBackup(data, paths: paths)
+            }
             var fallback = AppConfig.default
             var sourceVersion = AppConfig.currentSchemaVersion
-            if let data = try? Data(contentsOf: paths.configJSON),
+            if let data = try? Self.readConfigurationBytes(paths: paths),
                let object = try? JSONSupport.object(from: data) {
                 sourceVersion = Self.integer(object["config_schema_version"]) ?? 1
                 fallback = AppConfig.fromDictionary(deepMerge(AppConfig.default.asDictionary(), object))
             }
+            fallback.budgetPolicy = nil
             loaded = (
                 fallback,
-                ShellPolicyMigrationStatus(
+                priorMigrationStatus ?? ShellPolicyMigrationStatus(
                     state: "failed",
                     sourceSchemaVersion: sourceVersion,
                     receiptValid: false,
@@ -80,6 +114,7 @@ public final class ConfigStore: ConfigurationProviding, @unchecked Sendable {
         defer { lock.unlock() }
         _model = loaded.0
         _shellMigrationStatus = loaded.1
+        _budgetPolicyError = budgetError
     }
 
     /// Marks the already-emitted migration diagnostic in the verified receipt.
@@ -89,8 +124,8 @@ public final class ConfigStore: ConfigurationProviding, @unchecked Sendable {
             guard FileManager.default.fileExists(atPath: paths.shellPolicyMigrationReceipt.path) else {
                 return
             }
-            let configData = try Data(contentsOf: paths.configJSON)
-            let configObject = try JSONSupport.object(from: configData)
+            let configData = try Self.readConfigurationBytes(paths: paths)
+            let configObject = try JSONSupport.object(from: BudgetPolicyState.validateConfigurationJSON(configData))
             let config = AppConfig.fromDictionary(
                 Self.deepMergeStatic(AppConfig.default.asDictionary(), configObject)
             )
@@ -118,69 +153,118 @@ public final class ConfigStore: ConfigurationProviding, @unchecked Sendable {
         lock.unlock()
     }
 
-    /// Persist full config atomically.
+    /// Flush staged settings against the authoritative file under one transaction.
     public func save() throws {
-        let snapshot = model
-        try Self.validateForPersistence(snapshot)
-        let dict = snapshot.asDictionary()
-        try paths.ensureLayout()
-        let data = try JSONSupport.data(from: dict)
-        try Self.withConfigFileLock(paths: paths) {
-            if snapshot.configMigrationID != nil,
-               FileManager.default.fileExists(atPath: paths.configJSON.path) {
-                let currentData = try Data(contentsOf: paths.configJSON)
-                let currentObject = try JSONSupport.object(from: currentData)
-                let currentConfig = AppConfig.fromDictionary(
-                    Self.deepMergeStatic(AppConfig.default.asDictionary(), currentObject)
-                )
-                _ = try Self.statusForCurrentConfig(
-                    configData: currentData,
-                    config: currentConfig,
-                    paths: paths
-                )
+        try withConfigurationMutation { deadline in
+            _ = try persistPatch([:], deadline: deadline)
+        }
+    }
+
+    /// Apply only the requested fields to the latest durable configuration.
+    @discardableResult
+    public func update(_ patch: [String: Any], save: Bool = true) throws -> [String: Any] {
+        try rejectDirectPolicyReplacement(patch)
+        if let raw = patch["budget_update"] {
+            guard patch.count == 1, let request = raw as? [String: Any] else {
+                throw ManagerSettingsValidationError(field: "budget_update", reason: "separate_policy_transaction_required")
             }
-            try Self.writeDurably(data, to: paths.configJSON)
-            guard try Data(contentsOf: paths.configJSON) == data else {
-                throw ConfigMigrationError.targetVerificationFailed
+            guard save else {
+                throw ManagerSettingsValidationError(field: "budget_update", reason: "durable_policy_update_required")
             }
-            if let migrationID = snapshot.configMigrationID {
-                try Self.updateReceiptLineage(
-                    migrationID: migrationID,
-                    currentConfigData: data,
-                    paths: paths
-                )
+            _ = try updateBudgetPolicy(BudgetPolicyUpdate.decode(dictionary: request))
+            return values
+        }
+        try ManagerSettingsNormalizer.validateLegacyBudgetKeys(patch)
+        return try withConfigurationMutation { deadline in
+            if save { return try persistPatch(patch, deadline: deadline).asDictionary() }
+            let proposed = model.applying(patch: patch)
+            try Self.validateForPersistence(proposed)
+            pendingPatch = Self.deepMergeStatic(pendingPatch, patch)
+            publish(proposed)
+            return proposed.asDictionary()
+        }
+    }
+
+    /// Typed settings use the same durable patch/CAS paths as dictionary callers.
+    @discardableResult
+    public func update(_ patch: ManagerSettingsPatch, save: Bool = true) throws -> AppConfig {
+        _ = try patch.budgetPolicyUpdate?.validated()
+        _ = try update(patch.asConfigPatch(), save: save)
+        return model
+    }
+
+    /// Replace explicitly changed settings; policy revisions still require CAS.
+    public func replace(_ config: AppConfig, save: Bool = true) throws {
+        try withConfigurationMutation { deadline in
+            let current = model
+            guard config.budgetPolicy == current.budgetPolicy else {
+                throw ManagerSettingsValidationError(field: "budget_policy", reason: "revision_checked_policy_update_required")
+            }
+            try Self.validateForPersistence(config)
+            var patch = Self.changedFields(from: current.asDictionary(), to: config.asDictionary())
+            patch.removeValue(forKey: "budget_policy")
+            if save {
+                _ = try persistPatch(patch, deadline: deadline)
+            } else {
+                pendingPatch = Self.deepMergeStatic(pendingPatch, patch)
+                publish(config)
             }
         }
     }
 
-    /// Deep-merge dictionary patch (HTTP / legacy) into live model.
-    @discardableResult
-    public func update(_ patch: [String: Any], save: Bool = true) throws -> [String: Any] {
-        lock.lock()
-        _model = _model.applying(patch: patch)
-        let out = _model.asDictionary()
-        lock.unlock()
-        if save { try self.save() }
-        return out
+    private func persistPatch(_ patch: [String: Any], deadline: Date) throws -> AppConfig {
+        let requested = Self.deepMergeStatic(pendingPatch, patch)
+        return try Self.withConfigFileLock(paths: paths, deadline: deadline) {
+            let source = try Self.readConfiguration(paths: paths)
+            let currentPolicy = try Self.decodeBudgetPolicy(source.object)
+            let current = AppConfig.fromDictionary(source.object)
+            _ = try Self.statusForCurrentConfig(configData: source.data, config: current, paths: paths)
+            var config = current.applying(patch: requested)
+            config.budgetPolicy = currentPolicy
+            try Self.validateForPersistence(config)
+            // Preserve unknown persisted keys and requested legacy extension keys.
+            // Re-encode known fields to retain derived shell opt-out metadata.
+            let object = Self.deepMergeStatic(Self.deepMergeStatic(source.object, requested), config.asDictionary())
+            try Self.commitConfiguration(object, config: config, paths: paths)
+            pendingPatch = [:]
+            publish(config)
+            return config
+        }
     }
 
-    /// Typed settings patch path.
-    @discardableResult
-    public func update(_ patch: ManagerSettingsPatch, save: Bool = true) throws -> AppConfig {
-        lock.lock()
-        _model = _model.applying(settings: patch)
-        let out = _model
-        lock.unlock()
-        if save { try self.save() }
-        return out
-    }
-
-    /// Replace entire typed model.
-    public func replace(_ config: AppConfig, save: Bool = true) throws {
+    private func publish(_ config: AppConfig) {
         lock.lock()
         _model = config
+        _budgetPolicyError = nil
         lock.unlock()
-        if save { try self.save() }
+    }
+
+    private func withConfigurationMutation<Value>(_ body: (Date) throws -> Value) throws -> Value {
+        let deadline = Date().addingTimeInterval(Self.configurationLockTimeoutSeconds)
+        guard mutationLock.lock(before: deadline) else { throw ConfigMigrationError.lockTimeout }
+        defer { mutationLock.unlock() }
+        return try body(deadline)
+    }
+
+    private func rejectDirectPolicyReplacement(_ patch: [String: Any]) throws {
+        guard patch["budget_policy"] == nil else {
+            throw ManagerSettingsValidationError(field: "budget_policy", reason: "revision_checked_policy_update_required")
+        }
+    }
+
+    private static func changedFields(from before: [String: Any], to after: [String: Any]) -> [String: Any] {
+        var changed: [String: Any] = [:]
+        for (key, value) in after {
+            if let old = before[key] as? [String: Any], let new = value as? [String: Any] {
+                let nested = changedFields(from: old, to: new)
+                if !nested.isEmpty { changed[key] = nested }
+            } else if let old = before[key], NSDictionary(dictionary: ["value": old]).isEqual(to: ["value": value]) {
+                continue
+            } else {
+                changed[key] = value
+            }
+        }
+        return changed
     }
 
     public func int(_ keys: String..., default def: Int) -> Int {
@@ -202,6 +286,172 @@ public final class ConfigStore: ConfigurationProviding, @unchecked Sendable {
 
     public var dashboard: AppConfig.DashboardConfig { model.dashboard }
     public var managerSection: AppConfig.ManagerConfigSection { model.manager }
+
+    /// Read the authoritative revision under the same interprocess lock used by
+    /// updates. A stale in-memory ConfigStore is never policy authority.
+    public func budgetPolicySnapshot() throws -> BudgetPolicyState {
+        try Self.withConfigFileLock(paths: paths) {
+            let source = try Self.readConfiguration(paths: paths)
+            let state = try Self.decodeBudgetPolicy(source.object)
+            let config = AppConfig.fromDictionary(source.object)
+            try Self.validateForPersistence(config)
+            _ = try Self.statusForCurrentConfig(configData: source.data, config: config, paths: paths)
+            lock.lock()
+            _model.budgetPolicy = state
+            _budgetPolicyError = nil
+            lock.unlock()
+            return state
+        }
+    }
+
+    public func budgetPolicySelection(scope: BudgetPolicyScope) throws -> BudgetPolicySelection {
+        try budgetPolicySnapshot().resolve(scope)
+    }
+
+    @discardableResult
+    public func updateBudgetPolicy(_ request: BudgetPolicyUpdate) throws -> BudgetPolicySelection {
+        _ = try request.validated()
+        return try withConfigurationMutation { deadline in
+            try updateBudgetPolicySerialized(request, deadline: deadline)
+        }
+    }
+
+    private func updateBudgetPolicySerialized(_ request: BudgetPolicyUpdate, deadline: Date) throws -> BudgetPolicySelection {
+        try Self.withConfigFileLock(paths: paths, deadline: deadline) {
+            try Task.checkCancellation()
+            let source = try Self.readConfiguration(paths: paths)
+            let current = try Self.decodeBudgetPolicy(source.object)
+            let selection = try current.resolve(request.scope)
+            guard request.expectedRevision == selection.revision,
+                  request.expectedGlobalRevision == current.globalRevision else {
+                throw BudgetPolicyConflict(current: selection)
+            }
+            guard selection.revision < Int.max - 1 else {
+                throw ManagerSettingsValidationError(field: "revision", reason: "revision_exhausted")
+            }
+            let next: BudgetPolicyState
+            if request.scope.kind == .globalDefault {
+                next = BudgetPolicyState(globalRevision: current.globalRevision + 1,
+                                         globalPolicy: request.policy ?? .default,
+                                         projectOverrides: current.projectOverrides)
+            } else {
+                var projects = current.projectOverrides
+                guard projects[request.scope.key] != nil || projects.count < BudgetPolicyState.maximumProjectOverrides else {
+                    throw ManagerSettingsValidationError(field: "scope", reason: "project_policy_capacity_reached")
+                }
+                // Reset at project scope returns to the current global default.
+                // Retaining the revision prevents reset/delete/recreate ABA.
+                projects[request.scope.key] = BudgetProjectPolicy(scope: request.scope, revision: selection.revision + 1, policy: request.policy)
+                next = BudgetPolicyState(globalRevision: current.globalRevision, globalPolicy: current.globalPolicy, projectOverrides: projects)
+            }
+            _ = try next.validated()
+            var object = source.object
+            object["budget_policy"] = try Self.policyObject(next)
+            let config = AppConfig.fromDictionary(object)
+            try Self.validateForPersistence(config)
+            _ = try Self.statusForCurrentConfig(configData: source.data, config: AppConfig.fromDictionary(source.object), paths: paths)
+            try Task.checkCancellation()
+            try Self.commitConfiguration(object, config: config, paths: paths)
+            // A durable policy change must not discard a staged legacy edit.
+            publish(config.applying(patch: pendingPatch))
+            return try next.resolve(request.scope)
+        }
+    }
+
+    private func loadBudgetConfiguration() throws -> AppConfig {
+        try paths.ensureLayout()
+        return try Self.withConfigFileLock(paths: paths) {
+            let source = try Self.readConfiguration(paths: paths)
+            let policy: BudgetPolicyState
+            do { policy = try Self.decodeBudgetPolicy(source.object) }
+            catch {
+                try Self.retainBudgetBackup(source.data, paths: paths)
+                throw error
+            }
+            var object = source.object
+            if object["budget_policy"] == nil {
+                try Self.retainBudgetBackup(source.data, paths: paths)
+                object["budget_policy"] = try Self.policyObject(policy)
+                let config = AppConfig.fromDictionary(object)
+                try Self.commitConfiguration(object, config: config, paths: paths)
+            }
+            return AppConfig.fromDictionary(object)
+        }
+    }
+
+    private static func decodeBudgetPolicy(_ object: [String: Any]) throws -> BudgetPolicyState {
+        guard let raw = object["budget_policy"] else { return .default }
+        do {
+            let data = try JSONSerialization.data(withJSONObject: raw)
+            return try BudgetPolicyState.decode(data: data).validated()
+        } catch let error as ManagerSettingsValidationError { throw error }
+        catch { throw ManagerSettingsValidationError(field: "budget_policy", reason: "malformed_stored_policy") }
+    }
+
+    private static func policyObject(_ state: BudgetPolicyState) throws -> [String: Any] {
+        try JSONSupport.object(from: JSONEncoder().encode(state.validated()))
+    }
+
+    private static func readConfigurationBytes(paths: AppPaths) throws -> Data {
+        try readBoundedConfigurationFile(paths.configJSON)
+    }
+
+    private static func readBoundedConfigurationFile(_ url: URL) throws -> Data {
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        let maximum = 2 * 1_048_576
+        let data = try handle.read(upToCount: maximum + 1) ?? Data()
+        guard data.count <= maximum else {
+            throw ManagerSettingsValidationError(field: "config", reason: "configuration_too_large")
+        }
+        return data
+    }
+
+    private static func readConfiguration(paths: AppPaths) throws -> (data: Data, object: [String: Any]) {
+        let data = try readConfigurationBytes(paths: paths)
+        let validated = try BudgetPolicyState.validateConfigurationJSON(data)
+        guard let object = (try? JSONSerialization.jsonObject(with: validated)) as? [String: Any] else {
+            throw ManagerSettingsValidationError(field: "config", reason: "expected_json_object")
+        }
+        return (data, object)
+    }
+
+    private static func retainBudgetBackup(_ data: Data, paths: AppPaths) throws {
+        let name = "config.pre-budget-v1." + JSONSupport.sha256Hex(data) + ".json"
+        let target = paths.configMigrationsDir.appendingPathComponent(name)
+        if FileManager.default.fileExists(atPath: target.path) {
+            guard try readBoundedConfigurationFile(target) == data else { throw ConfigMigrationError.backupVerificationFailed }
+            return
+        }
+        guard let entries = FileManager.default.enumerator(at: paths.configMigrationsDir,
+            includingPropertiesForKeys: nil, options: [.skipsSubdirectoryDescendants]) else {
+            throw ManagerSettingsValidationError(field: "config", reason: "budget_backup_directory_unavailable")
+        }
+        var scanned = 0
+        var backups = 0
+        while let entry = entries.nextObject() as? URL {
+            scanned += 1
+            if entry.lastPathComponent.hasPrefix("config.pre-budget-v1.") { backups += 1 }
+            guard scanned <= 1_024, backups < 32 else {
+                throw ManagerSettingsValidationError(field: "config", reason: "budget_backup_capacity_reached")
+            }
+        }
+        try writeDurably(data, to: target)
+        guard try readBoundedConfigurationFile(target) == data else { throw ConfigMigrationError.backupVerificationFailed }
+    }
+
+    private static func commitConfiguration(_ object: [String: Any], config: AppConfig, paths: AppPaths) throws {
+        try validateForPersistence(config)
+        let data = try JSONSupport.data(from: object)
+        guard data.count <= 2 * 1_048_576 else {
+            throw ManagerSettingsValidationError(field: "config", reason: "configuration_too_large")
+        }
+        try writeDurably(data, to: paths.configJSON)
+        guard try readConfigurationBytes(paths: paths) == data else { throw ConfigMigrationError.targetVerificationFailed }
+        if let migrationID = config.configMigrationID {
+            try updateReceiptLineage(migrationID: migrationID, currentConfigData: data, paths: paths)
+        }
+    }
 
     private func nested(_ path: [String], in values: [String: Any]) -> Any? {
         var cur: Any? = values
@@ -238,8 +488,10 @@ public final class ConfigStore: ConfigurationProviding, @unchecked Sendable {
         }
 
         return try Self.withConfigFileLock(paths: paths) {
-            let sourceData = try Data(contentsOf: paths.configJSON)
-            let source = try JSONSupport.object(from: sourceData)
+            let loaded = try Self.readConfiguration(paths: paths)
+            let sourceData = loaded.data
+            let source = loaded.object
+            _ = try Self.decodeBudgetPolicy(source)
             let sourceVersion = Self.integer(source["config_schema_version"]) ?? 1
             if sourceVersion > AppConfig.currentSchemaVersion {
                 throw ConfigMigrationError.unsupportedSchemaVersion(sourceVersion)
@@ -307,6 +559,9 @@ public final class ConfigStore: ConfigurationProviding, @unchecked Sendable {
             shell["default_timeout_sec"] = 30
         }
         target["shell"] = shell
+        if target["budget_policy"] == nil {
+            target["budget_policy"] = try policyObject(.default)
+        }
 
         let targetData = try JSONSupport.data(from: target)
         let targetSHA = JSONSupport.sha256Hex(targetData)
@@ -333,7 +588,7 @@ public final class ConfigStore: ConfigurationProviding, @unchecked Sendable {
         try writeDurably(try JSONSupport.data(from: receipt), to: paths.shellPolicyMigrationReceipt)
         try writeDurably(targetData, to: paths.configJSON)
 
-        let persistedData = try Data(contentsOf: paths.configJSON)
+        let persistedData = try Self.readConfigurationBytes(paths: paths)
         let persisted = try JSONSupport.object(from: persistedData)
         guard JSONSupport.sha256Hex(persistedData) == targetSHA,
               integer(persisted["config_schema_version"]) == AppConfig.currentSchemaVersion,
@@ -500,6 +755,10 @@ public final class ConfigStore: ConfigurationProviding, @unchecked Sendable {
     }
 
     private static func validateForPersistence(_ config: AppConfig) throws {
+        guard let policy = config.budgetPolicy else {
+            throw ManagerSettingsValidationError(field: "budget_policy", reason: "configuration_unavailable")
+        }
+        _ = try policy.validated()
         guard config.configSchemaVersion == AppConfig.currentSchemaVersion,
               config.shell.policyVersion == AppConfig.currentSchemaVersion,
               config.shell.enabled != config.shell.userDisabled,
@@ -509,14 +768,14 @@ public final class ConfigStore: ConfigurationProviding, @unchecked Sendable {
         }
     }
 
-    private static func withConfigFileLock<T>(paths: AppPaths, _ body: () throws -> T) throws -> T {
+    private static func withConfigFileLock<T>(paths: AppPaths, deadline requestedDeadline: Date? = nil, _ body: () throws -> T) throws -> T {
         try FileManager.default.createDirectory(
             at: paths.configMigrationsDir,
             withIntermediateDirectories: true,
             attributes: [.posixPermissions: 0o700]
         )
-        let processDeadline = Date().addingTimeInterval(configurationLockTimeoutSeconds)
-        guard processMigrationLock.lock(before: processDeadline) else {
+        let deadline = requestedDeadline ?? Date().addingTimeInterval(configurationLockTimeoutSeconds)
+        guard processMigrationLock.lock(before: deadline) else {
             throw ConfigMigrationError.lockTimeout
         }
         defer { processMigrationLock.unlock() }
@@ -529,7 +788,6 @@ public final class ConfigStore: ConfigurationProviding, @unchecked Sendable {
         }
         defer { _ = Darwin.close(descriptor) }
 
-        let deadline = Date().addingTimeInterval(configurationLockTimeoutSeconds)
         while Darwin.lockf(descriptor, F_TLOCK, 0) != 0 {
             let code = errno
             guard code == EACCES || code == EAGAIN else {

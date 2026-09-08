@@ -10,6 +10,13 @@ public enum ManagerSettingsNormalizer {
     /// The public mutation boundary rejects malformed values before normalizing
     /// or writing any part of the patch. The legacy pure adapter remains below.
     public static func validated(_ patch: [String: Any]) throws -> [String: Any] {
+        if let raw = patch["budget_update"] {
+            guard patch.count == 1, let object = raw as? [String: Any] else {
+                throw ManagerSettingsValidationError(field: "budget_update", reason: "policy_update_must_be_a_separate_transaction")
+            }
+            return ["budget_update": try BudgetPolicyUpdate.decode(dictionary: object).asDictionary()]
+        }
+        try validateLegacyBudgetKeys(patch)
         let fields: [(String, String, ClosedRange<Int>)] = [
             ("dashboard", "port", 1...65_535),
             ("dashboard", "refresh_interval_sec", 2...300),
@@ -32,6 +39,37 @@ public enum ManagerSettingsNormalizer {
             }
         }
         return normalize(patch)
+    }
+
+    /// Validate legacy config patches without normalizing or removing any of
+    /// their unrelated fields. Revision-bearing budget updates use the typed
+    /// CAS path and must be intercepted before calling this helper.
+    public static func validateLegacyBudgetKeys(_ patch: [String: Any]) throws {
+        var inspectedValues = 0
+        try rejectUnknownBudgetKeys(patch, path: [], inspectedValues: &inspectedValues)
+    }
+
+    private static func rejectUnknownBudgetKeys(_ value: Any, path: [String], inspectedValues: inout Int) throws {
+        inspectedValues += 1
+        guard path.count <= 64, inspectedValues <= 131_072 else {
+            throw ManagerSettingsValidationError(field: "settings", reason: "json_structure_too_large")
+        }
+        if let object = value as? [String: Any] {
+            for (key, child) in object {
+                guard key.utf8.count <= 1_024 else {
+                    throw ManagerSettingsValidationError(field: "settings", reason: "json_field_name_too_long")
+                }
+                let childPath = path + [key]
+                if key.lowercased().contains("budget") {
+                    throw ManagerSettingsValidationError(field: childPath.joined(separator: "."), reason: "unknown_budget_field")
+                }
+                try rejectUnknownBudgetKeys(child, path: childPath, inspectedValues: &inspectedValues)
+            }
+        } else if let values = value as? [Any] {
+            for (index, child) in values.enumerated() {
+                try rejectUnknownBudgetKeys(child, path: path + [String(index)], inspectedValues: &inspectedValues)
+            }
+        }
     }
 
     public static func normalize(_ patch: [String: Any]) -> [String: Any] {
