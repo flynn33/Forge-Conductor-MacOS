@@ -355,10 +355,29 @@ creating a revision, outbox row or write reservation. It can read an existing
 invalidated receipt for reconciliation; live ingress remains fenced. This helper
 still requires the control-plane recovery claim to be connected at its caller.
 
-The tool-output pressure boundary, durable pressure handoff writer and owner
-integration remain incomplete. These components do not enable automatic pressure
-handoff or qualify G04. Product identity remains 0.9.0 build 1; no user-visible
-control or deployment behavior changes in this component checkpoint.
+Under a live pressure claim, the control plane now builds the recovery packet
+from retained assignment, logical input, complete progress, verified outputs and
+untouched call arguments. Domain-separated identities bind the complete pressure
+disposition to one source reservation, charged as zero tool calls. The prepared
+packet and pressure link commit atomically; generic recovery excludes that row.
+
+Storage reads the exact existing source receipt before reserving an attempt and
+again before writing. Each of at most eight attempts is consumed durably before
+its possible source effect. A consumed attempt may recover a receipt but cannot
+invoke its writer twice. An interrupted control-plane receipt write is recovered
+from the actual source commit. Successful receipt retention fences the source
+conversation, including when the ready handoff has no automatic delivery.
+
+A current automatic opt-out can be frozen before writing only after exact
+readback proves no revision exists. Re-enabling the setting after a disabled
+source commit does not enqueue delivery during recovery. Actual existing receipts
+are preserved without policy rewriting; failed readback never means absence.
+
+Receipt-only cleanup after cancellation, revocation or expiry, the tool-output
+pressure boundary, pressure carryover acceptance and owner integration remain
+incomplete. These components do not enable automatic pressure handoff or qualify
+G04. Product identity remains 0.9.0 build 1; no user-visible control or deployment
+behavior changes in this component checkpoint.
 
 At the September 8 component checkpoint, signed native and selected Release
 suites each passed 293 tests, and the separate packet suite passed 13 tests,

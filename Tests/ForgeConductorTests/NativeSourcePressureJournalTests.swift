@@ -6,6 +6,294 @@ import ForgeNativeSessionHostPlugin
 #endif
 
 final class NativeSourcePressureJournalTests: XCTestCase {
+    func testPressureSourceCommitRetainsActualReceiptAfterLateCancellation() async throws {
+        try await withFixture { f in
+            let (claim, admission) = try await f.preparedPressure()
+            let store = try SQLiteStore(path: f.database.deletingLastPathComponent().appendingPathComponent("pressure-source.sqlite"), clock: f.clock)
+            defer { store.close() }
+            let cancellation = ToolCallCancellation()
+            guard case .commit(let attempt) = try await f.repository.beginNativeSourcePressureCommitAttempt(admission: admission,
+                claim: claim, credential: f.credential, policySelection: f.policy,
+                readExisting: { try store.readPreparedSourceCommitForReconciliation($0, authorization: $1) }) else {
+                return XCTFail("Missing source write attempt")
+            }
+            let committed = try await f.repository.commitNativeSourceBudgetHandoff(attempt: attempt, claim: claim,
+                credential: f.credential, policySelection: f.policy,
+                readExisting: { try store.readPreparedSourceCommitForReconciliation($0, authorization: $1) },
+                commit: { prepared, auth, automatic in
+                    let actual = try store.handoffCommit(prepared.packet(), authorization: auth, automaticHandoffEnabled: automatic)
+                    cancellation.cancel()
+                    return actual
+                }, cancellation: cancellation)
+            XCTAssertNotNil(committed.delivery)
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT state FROM native_source_requests"), "completed")
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT blocked_code FROM native_source_provider_turns"), "pressure_committed")
+            let replay = try await f.repository.commitNativeSourceBudgetHandoff(attempt: attempt, claim: claim,
+                credential: f.credential, policySelection: f.policy,
+                readExisting: { _, _ in throw PressureFixtureError.interrupted },
+                commit: { _, _, _ in throw PressureFixtureError.interrupted })
+            XCTAssertEqual(replay.revision.identity, committed.revision.identity)
+            XCTAssertEqual(try NativeSourceCommitEvidence.encode(replay), try NativeSourceCommitEvidence.encode(committed))
+        }
+    }
+
+    func testPressureReceiptReadbackClosesSourceCommitToControlPlaneCrashWindow() async throws {
+        try await withFixture { f in
+            let (claim, admission) = try await f.preparedPressure()
+            let store = try SQLiteStore(path: f.database.deletingLastPathComponent().appendingPathComponent("pressure-source.sqlite"), clock: f.clock)
+            defer { store.close() }
+            guard case .commit(let attempt) = try await f.repository.beginNativeSourcePressureCommitAttempt(admission: admission,
+                claim: claim, credential: f.credential, policySelection: f.policy,
+                readExisting: { try store.readPreparedSourceCommitForReconciliation($0, authorization: $1) }) else {
+                return XCTFail("Missing source write attempt")
+            }
+            let written = PressureCallbackObservation()
+            await f.repository.configureOperationObservers(beforeCommit: { if written.called { throw PressureFixtureError.interrupted } })
+            do {
+                _ = try await f.repository.commitNativeSourceBudgetHandoff(attempt: attempt, claim: claim,
+                    credential: f.credential, policySelection: f.policy,
+                    readExisting: { try store.readPreparedSourceCommitForReconciliation($0, authorization: $1) },
+                    commit: {
+                        let actual = try store.handoffCommit($0.packet(), authorization: $1, automaticHandoffEnabled: $2)
+                        written.record()
+                        return actual
+                    })
+                XCTFail("Expected CP commit interruption")
+            } catch { XCTAssertEqual(error as? PressureFixtureError, .interrupted) }
+            let actual = try XCTUnwrap(store.readPreparedSourceCommitForReconciliation(admission.prepared, authorization: admission.authorization))
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT state FROM native_source_requests"), "pending")
+            await f.repository.close()
+            let reopened = try ProjectControlPlaneRepository(databaseURL: f.database, clock: f.clock)
+            do {
+                guard case .completed(let recovered) = try await reopened.beginNativeSourcePressureCommitAttempt(admission: admission,
+                    claim: claim, credential: f.credential, policySelection: f.policy,
+                    readExisting: { try store.readPreparedSourceCommitForReconciliation($0, authorization: $1) }) else {
+                    throw PressureFixtureError.interrupted
+                }
+                XCTAssertEqual(try NativeSourceCommitEvidence.encode(recovered), try NativeSourceCommitEvidence.encode(actual))
+                XCTAssertEqual(try PressureSQL.value(f.database, "SELECT recovery_attempts FROM native_source_requests"), "1")
+                XCTAssertEqual(try PressureSQL.value(f.database, "SELECT state FROM native_source_requests"), "completed")
+                await reopened.close()
+            } catch { await reopened.close(); throw error }
+        }
+    }
+
+    func testPressureDeliveryOptOutIsFrozenBeforeWriteAndNeverReenabled() async throws {
+        try await withFixture { f in
+            let (claim, admission) = try await f.preparedPressure()
+            let store = try SQLiteStore(path: f.database.deletingLastPathComponent().appendingPathComponent("pressure-source.sqlite"), clock: f.clock)
+            defer { store.close() }
+            let disabled = try BudgetPolicyState(globalPolicy: .init(context: f.policy.policy.context,
+                tools: f.policy.policy.tools, automaticHandoffEnabled: false)).resolve(f.policy.scope)
+            guard case .commit(let attempt) = try await f.repository.beginNativeSourcePressureCommitAttempt(admission: admission,
+                claim: claim, credential: f.credential, policySelection: disabled,
+                readExisting: { try store.readPreparedSourceCommitForReconciliation($0, authorization: $1) }) else {
+                return XCTFail("Missing opted-out attempt")
+            }
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT automatic_enabled FROM native_source_requests"), "0")
+            let committed = try await f.repository.commitNativeSourceBudgetHandoff(attempt: attempt, claim: claim,
+                credential: f.credential, policySelection: f.policy,
+                readExisting: { try store.readPreparedSourceCommitForReconciliation($0, authorization: $1) },
+                commit: { try store.handoffCommit($0.packet(), authorization: $1, automaticHandoffEnabled: $2) })
+            XCTAssertTrue(committed.revision.resumeReady)
+            XCTAssertNil(committed.delivery)
+            XCTAssertEqual(committed.revision.canonicalPacketJSON, admission.prepared.canonicalPacketJSON)
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT automatic_enabled FROM native_source_requests"), "0")
+        }
+    }
+
+    func testPressureStorageAttemptsAreBoundedAndStaleAttemptCannotWrite() async throws {
+        try await withFixture { f in
+            let (claim, admission) = try await f.preparedPressure()
+            guard case .commit(let first) = try await f.repository.beginNativeSourcePressureCommitAttempt(admission: admission,
+                claim: claim, credential: f.credential, policySelection: f.policy, readExisting: { _, _ in nil }) else {
+                return XCTFail("Missing first attempt")
+            }
+            for _ in 2...8 {
+                _ = try await f.repository.beginNativeSourcePressureCommitAttempt(admission: admission,
+                    claim: claim, credential: f.credential, policySelection: f.policy, readExisting: { _, _ in nil })
+            }
+            do {
+                _ = try await f.repository.beginNativeSourcePressureCommitAttempt(admission: admission,
+                    claim: claim, credential: f.credential, policySelection: f.policy, readExisting: { _, _ in nil })
+                XCTFail("Pressure storage exceeded its durable attempt budget")
+            } catch { XCTAssertEqual(error as? NativeSourceConversationError, .capacityExceeded) }
+            let called = PressureCallbackObservation()
+            do {
+                _ = try await f.repository.commitNativeSourceBudgetHandoff(attempt: first, claim: claim,
+                    credential: f.credential, policySelection: f.policy, readExisting: { _, _ in nil },
+                    commit: { _, _, _ in called.record(); throw PressureFixtureError.interrupted })
+                XCTFail("Stale storage attempt reached its writer")
+            } catch { XCTAssertEqual(error as? NativeSourceConversationError, .conflict) }
+            XCTAssertFalse(called.called)
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT recovery_attempts FROM native_source_requests"), "8")
+        }
+    }
+
+    func testConsumedPressureAttemptCannotRepeatItsWriterAfterFailure() async throws {
+        try await withFixture { f in
+            let (claim, admission) = try await f.preparedPressure()
+            guard case .commit(let attempt) = try await f.repository.beginNativeSourcePressureCommitAttempt(admission: admission,
+                claim: claim, credential: f.credential, policySelection: f.policy, readExisting: { _, _ in nil }) else {
+                return XCTFail("Missing attempt")
+            }
+            do {
+                _ = try await f.repository.commitNativeSourceBudgetHandoff(attempt: attempt, claim: claim,
+                    credential: f.credential, policySelection: f.policy, readExisting: { _, _ in nil },
+                    commit: { _, _, _ in throw PressureFixtureError.interrupted })
+                XCTFail("Expected interrupted source writer")
+            } catch { XCTAssertEqual(error as? PressureFixtureError, .interrupted) }
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT error_code FROM native_source_requests"), "pressure_attempt_started")
+            let called = PressureCallbackObservation()
+            do {
+                _ = try await f.repository.commitNativeSourceBudgetHandoff(attempt: attempt, claim: claim,
+                    credential: f.credential, policySelection: f.policy, readExisting: { _, _ in nil },
+                    commit: { _, _, _ in called.record(); throw PressureFixtureError.interrupted })
+                XCTFail("Consumed attempt called its writer twice")
+            } catch { XCTAssertEqual(error as? NativeSourceConversationError, .conflict) }
+            XCTAssertFalse(called.called)
+        }
+    }
+
+    func testDisabledPressureCommitCrashThenEnablePreservesAbsentDelivery() async throws {
+        try await withFixture { f in
+            let (claim, admission) = try await f.preparedPressure()
+            let store = try SQLiteStore(path: f.database.deletingLastPathComponent().appendingPathComponent("pressure-source.sqlite"), clock: f.clock)
+            defer { store.close() }
+            let disabled = try BudgetPolicyState(globalPolicy: .init(context: f.policy.policy.context,
+                tools: f.policy.policy.tools, automaticHandoffEnabled: false)).resolve(f.policy.scope)
+            guard case .commit(let attempt) = try await f.repository.beginNativeSourcePressureCommitAttempt(admission: admission,
+                claim: claim, credential: f.credential, policySelection: disabled,
+                readExisting: { try store.readPreparedSourceCommitForReconciliation($0, authorization: $1) }) else {
+                return XCTFail("Missing disabled attempt")
+            }
+            let written = PressureCallbackObservation()
+            await f.repository.configureOperationObservers(beforeCommit: { if written.called { throw PressureFixtureError.interrupted } })
+            do {
+                _ = try await f.repository.commitNativeSourceBudgetHandoff(attempt: attempt, claim: claim,
+                    credential: f.credential, policySelection: disabled,
+                    readExisting: { try store.readPreparedSourceCommitForReconciliation($0, authorization: $1) },
+                    commit: {
+                        let actual = try store.handoffCommit($0.packet(), authorization: $1, automaticHandoffEnabled: $2)
+                        written.record()
+                        return actual
+                    })
+                XCTFail("Expected receipt commit interruption")
+            } catch { XCTAssertEqual(error as? PressureFixtureError, .interrupted) }
+            await f.repository.configureOperationObservers()
+            guard case .completed(let recovered) = try await f.repository.beginNativeSourcePressureCommitAttempt(admission: admission,
+                claim: claim, credential: f.credential, policySelection: f.policy,
+                readExisting: { try store.readPreparedSourceCommitForReconciliation($0, authorization: $1) }) else {
+                return XCTFail("Recovery attempted another source write")
+            }
+            XCTAssertNil(recovered.delivery)
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT automatic_enabled FROM native_source_requests"), "0")
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT recovery_attempts FROM native_source_requests"), "1")
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT state FROM native_source_conversations"), "source_fenced")
+        }
+    }
+
+    func testPressureReadbackFailureCannotAuthorizeWriteOrConsumeAttempt() async throws {
+        try await withFixture { f in
+            let (claim, admission) = try await f.preparedPressure()
+            do {
+                _ = try await f.repository.beginNativeSourcePressureCommitAttempt(admission: admission,
+                    claim: claim, credential: f.credential, policySelection: f.policy,
+                    readExisting: { _, _ in throw PressureFixtureError.interrupted })
+                XCTFail("Failed source lookup was treated as absence")
+            } catch { XCTAssertEqual(error as? PressureFixtureError, .interrupted) }
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT recovery_attempts FROM native_source_requests"), "0")
+        }
+    }
+
+    func testPressurePreparationFreezesOneExactUnchargedSourceIntent() async throws {
+        try await withFixture { f in
+            let context = try await f.pressureContext()
+            guard case .pressure(let claim) = try await f.repository.recordNativeSourceBudgetDisposition(
+                metadata: f.pressureMetadata(context), credential: f.credential, lease: f.lease, policySelection: f.policy) else {
+                return XCTFail("Missing pressure claim")
+            }
+            guard case .commit(let first) = try await f.repository.prepareNativeSourceBudgetHandoff(claim: claim,
+                credential: f.credential, policySelection: f.policy, responsePreflight: { try PressureFixture.responsePreflight($0) }) else {
+                return XCTFail("Missing frozen pressure handoff")
+            }
+            XCTAssertTrue(first.prepared.finalize)
+            XCTAssertTrue(first.automaticHandoffEnabled)
+            let packet = try first.prepared.packet()
+            XCTAssertTrue(packet.resumeSeed.contains("Retained source progress"))
+            XCTAssertTrue(packet.resumeSeed.contains("read fixture"))
+            XCTAssertTrue(packet.resumeSeed.contains("immutable document marker"))
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT COUNT(*) FROM native_source_requests"), "1")
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT SUM(charged_calls) FROM native_source_requests"), "0")
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT COUNT(*) FROM native_source_provider_calls"), "0")
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT pressure_reservation_id FROM native_source_provider_turns"), first.reservationID.uuidString.lowercased())
+            let pending = try await f.repository.pendingNativeSourceCommits()
+            XCTAssertTrue(pending.isEmpty, "Generic recovery must not acquire a pressure request")
+            let before = try PressureSQL.snapshot(f.database)
+            guard case .commit(let replay) = try await f.repository.prepareNativeSourceBudgetHandoff(claim: claim,
+                credential: f.credential, policySelection: f.policy, responsePreflight: { _ in throw PressureFixtureError.interrupted }) else {
+                return XCTFail("Missing exact preparation replay")
+            }
+            XCTAssertEqual(replay.prepared, first.prepared)
+            XCTAssertEqual(replay.reservationID, first.reservationID)
+            XCTAssertEqual(try PressureSQL.snapshot(f.database), before)
+            try await f.repository.releaseNativeSourceConversationLease(lease: f.lease)
+            _ = try await f.repository.nativeSourcePressureDisposition(claim: claim, credential: f.credential)
+        }
+    }
+
+    func testPressurePacketRetainsCompletedReadAndUntouchedCallWithoutRefundingEither() async throws {
+        try await withFixture(priorReads: 2) { f in
+            let prepared = try await f.prepare()
+            let approval = try await f.approval(prepared)
+            guard case .dispatch(let dispatch) = try await f.begin(prepared, approval) else { return XCTFail("Missing dispatch") }
+            let actual = try f.turn(prepared, calls: [f.call(id: "completed-read"), f.call(id: "untouched-read")])
+            let accepted = try await f.repository.acceptNativeSourceProviderTurn(claim: dispatch, turn: actual,
+                credential: f.credential, lease: f.lease)
+            try await f.finishRead(accepted.calls[0], approval)
+            let context = try await f.repository.nativeSourceAcceptedBudgetContext(stageID: prepared.stageID,
+                credential: f.credential, lease: f.lease)
+            let tightened = try BudgetPolicyState(globalPolicy: .init(context: .init(checkpointRatio: 0.001,
+                rolloverRatio: 0.002, emergencyRatio: 0.003), tools: f.policy.policy.tools,
+                automaticHandoffEnabled: true)).resolve(f.policy.scope)
+            guard case .pressure(let pressure) = NativeSourceBudgetEvaluator.acceptedDecision(context: context, policySelection: tightened),
+                  case .pressure(let claim) = try await f.repository.recordNativeSourceBudgetDisposition(metadata: .pressure(pressure),
+                    credential: f.credential, lease: f.lease, policySelection: tightened),
+                  case .commit(let admission) = try await f.repository.prepareNativeSourceBudgetHandoff(claim: claim,
+                    credential: f.credential, policySelection: tightened, responsePreflight: { try PressureFixture.responsePreflight($0) }) else {
+                return XCTFail("Completed-prefix pressure did not prepare a handoff")
+            }
+            let seed = try admission.prepared.packet().resumeSeed
+            XCTAssertTrue(seed.contains("completed-read"))
+            XCTAssertTrue(seed.contains("retained read output"))
+            XCTAssertTrue(seed.contains("untouched-read"))
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT COUNT(*) FROM native_source_requests WHERE method='fs_read'"), "3")
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT COUNT(*) FROM native_source_provider_calls"), "2")
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT COUNT(*) FROM native_source_provider_calls WHERE output_json IS NOT NULL"), "1")
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT COUNT(*) FROM native_source_provider_calls WHERE reservation_id IS NULL"), "1")
+        }
+    }
+
+    func testPressurePreparationCancellationAtCommitLeavesNoReservation() async throws {
+        try await withFixture { f in
+            let context = try await f.pressureContext()
+            guard case .pressure(let claim) = try await f.repository.recordNativeSourceBudgetDisposition(
+                metadata: f.pressureMetadata(context), credential: f.credential, lease: f.lease, policySelection: f.policy) else {
+                return XCTFail("Missing pressure claim")
+            }
+            let before = try PressureSQL.snapshot(f.database)
+            let cancellation = ToolCallCancellation()
+            await f.repository.configureOperationObservers(beforeCommit: { cancellation.cancel() })
+            do {
+                _ = try await f.repository.prepareNativeSourceBudgetHandoff(claim: claim, credential: f.credential,
+                    policySelection: f.policy, responsePreflight: { try PressureFixture.responsePreflight($0) }, cancellation: cancellation)
+                XCTFail("Cancelled preparation retained a source reservation")
+            } catch { XCTAssertTrue(error is CancellationError) }
+            await f.repository.configureOperationObservers()
+            XCTAssertEqual(try PressureSQL.snapshot(f.database), before)
+        }
+    }
+
     func testRecordedPressureRecomputesActualUsageAndFencesOrdinaryLease() async throws {
         try await withFixture { f in
             let context = try await f.pressureContext()
@@ -689,6 +977,21 @@ private struct PressureFixture {
     let database: URL, repository: ProjectControlPlaneRepository, clock: PressureClock
     let credential: NativeTaskCapabilityCredential, attachment: AuthenticatedContinuityTaskAttachment, policy: BudgetPolicySelection
     let taskID: UUID, lease: NativeSourceConversationLease, capabilities: ProviderCapabilities
+    func preparedPressure() async throws -> (NativeSourcePressureClaim, NativeSourcePressureCommitAdmission) {
+        let context = try await pressureContext()
+        guard case .pressure(let claim) = try await repository.recordNativeSourceBudgetDisposition(
+            metadata: pressureMetadata(context), credential: credential, lease: lease, policySelection: policy),
+              case .commit(let admission) = try await repository.prepareNativeSourceBudgetHandoff(claim: claim,
+                credential: credential, policySelection: policy, responsePreflight: { try Self.responsePreflight($0) }) else {
+            throw PressureFixtureError.interrupted
+        }
+        return (claim, admission)
+    }
+    static func responsePreflight(_ prepared: PreparedContinuitySourceCommit) throws -> Data {
+        try ForgeJSONCanonicalizationV1.data(from: ["jsonrpc":"2.0", "id":"pressure-test", "result":["structuredContent":[
+            "packet":JSONSerialization.jsonObject(with: prepared.canonicalPacketJSON),
+            "packet_sha256":prepared.packetSHA256, "continuity_id":prepared.continuityID]]])
+    }
     func pressureContext() async throws -> NativeSourceAcceptedBudgetContext {
         let prepared = try await prepare()
         let approval = try await approval(prepared)

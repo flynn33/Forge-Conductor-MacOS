@@ -34,6 +34,10 @@ installed-stack and production-feature acceptance remain separate gates.
   metadata and exact logical-input retention without rewriting older requests.
 - Source tool quotas include reads admitted before conversation enrollment once,
   including ready handoffs after current limits tighten.
+- Pressure storage now freezes one exact, uncharged handoff intent from retained
+  source facts. Bounded, durably consumed attempts read existing receipts before
+  writing and recover source commits after interrupted control-plane persistence.
+  Automatic opt-outs remain disabled across recovery and later re-enablement.
 - Retained pressure decisions now fence ordinary source work and issue bounded,
   recoverable checkpoint-storage claims. The control plane recomputes each decision
   from retained provider facts; cancellation and expired ownership roll back writes.
