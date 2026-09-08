@@ -311,6 +311,8 @@ public actor ManagedAutonomyRuntime {
     private let runtimeJobs: RuntimeJobSubsystem
     private let installedCompletionRegistry: InstalledNativeGateRegistry?
     private let supervisor: AutonomySupervisor
+    /// Shared with the manager's source owner; this adds no capacity to the run limit.
+    nonisolated let providerWorkAdmission: NativeProviderWorkAdmission
     private let clock: any Clock
     private let sourceCancellationWorker: ManagedContinuityWorker
     private let sourceContinuity: ContextContinuityService
@@ -324,6 +326,7 @@ public actor ManagedAutonomyRuntime {
     private var startupReport: AutonomyStartupReport?
     private var tickInProgress = false
     private var controlledRuns: Set<RunID> = []
+    private var servicesClosing = false
 
     public init(
         app: ForgeApp,
@@ -357,6 +360,8 @@ public actor ManagedAutonomyRuntime {
         let resolvedManagerID = managerID
             ?? "manager:\(ProcessInfo.processInfo.processIdentifier):\(UUID().uuidString.lowercased())"
         let concurrentRuns = maximumConcurrentRuns ?? Self.recommendedConcurrency()
+        let providerWorkAdmission = try NativeProviderWorkAdmission(limit: concurrentRuns)
+        self.providerWorkAdmission = providerWorkAdmission
         let adapterResolver: ManagedContinuityWorker.AdapterResolver = { adapterID in
             let storage = providerRoot.appendingPathComponent(Self.storageComponent(adapterID), isDirectory: true)
             try FileManager.default.createDirectory(at: storage, withIntermediateDirectories: true,
@@ -432,7 +437,8 @@ public actor ManagedAutonomyRuntime {
             repository: repository,
             maximumConcurrentRuns: concurrentRuns,
             clock: clock,
-            sourceBootstrap: sourceBootstrap
+            sourceBootstrap: sourceBootstrap,
+            providerWorkAdmission: providerWorkAdmission
         ) { runID in
             let broker = ToolInvocationBroker(
                 repository: repository,
@@ -519,8 +525,10 @@ public actor ManagedAutonomyRuntime {
             started = true
             return report
         } catch {
+            shutdownRequested = true
+            providerWorkAdmission.close()
             await supervisor.shutdown()
-            await runtimeJobs.shutdown()
+            await closeServicesAfterProviderWorkDrains()
             throw error
         }
     }
@@ -917,11 +925,34 @@ public actor ManagedAutonomyRuntime {
 
     public func shutdown() async {
         shutdownRequested = true
+        providerWorkAdmission.close()
         started = false
         sourceCancellationCleanup?.cancel()
         await supervisor.shutdown()
+        await closeServicesAfterProviderWorkDrains()
+    }
+
+    private func closeServicesAfterProviderWorkDrains() async {
+        guard !servicesClosing else { return }
+        servicesClosing = true
+        defer { servicesClosing = false }
+        let activeRuns = await supervisor.snapshot().activeRunIDs
+        guard !starting, !tickInProgress, controlledRuns.isEmpty,
+              sourceCancellationCleanup == nil else { return }
+        guard providerWorkAdmission.activeCount == 0,
+              activeRuns.isEmpty else { return }
         await installedCompletionRegistry?.shutdown()
         await runtimeJobs.shutdown()
+    }
+
+    /// Includes entrypoints suspended before coordinator acquisition. The manager
+    /// must retain this runtime and its stores until all of these owners settle.
+    func hasRetainedWork() async -> Bool {
+        let activeRuns = await supervisor.snapshot().activeRunIDs
+        // Sample actor state after the await so reentrant entrypoints are visible.
+        return starting || tickInProgress || !controlledRuns.isEmpty
+            || sourceCancellationCleanup != nil || servicesClosing
+            || providerWorkAdmission.activeCount > 0 || !activeRuns.isEmpty
     }
 
     private static func recommendedConcurrency() -> Int {

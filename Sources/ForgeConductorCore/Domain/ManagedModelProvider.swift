@@ -508,3 +508,111 @@ public protocol ManagedModelProvider: Sendable {
     func lookup(idempotencyKey: String) async throws -> ProviderTurn?
     func cancel(requestID: String) async
 }
+
+/// The immutable limits of the transport that will serialize and execute a request.
+/// These values describe local configuration, not verified remote capabilities.
+public struct ProviderExecutionLimits: Sendable, Equatable {
+    public let maximumOutputTokens: Int
+    public let maximumRequestBytes: Int
+    public let maximumResponseBytes: Int
+    public let maximumTextBytes: Int
+    public let maximumToolArgumentBytes: Int
+    public let maximumJSONBytes: Int
+    public let maximumSSELineBytes: Int
+    public let maximumSSEEventBytes: Int
+    public let connectTimeoutSeconds: Double
+    public let firstByteTimeoutSeconds: Double
+    public let idleTimeoutSeconds: Double
+    public let totalTimeoutSeconds: Double
+
+    public init(
+        maximumOutputTokens: Int,
+        maximumRequestBytes: Int,
+        maximumResponseBytes: Int,
+        maximumTextBytes: Int,
+        maximumToolArgumentBytes: Int,
+        maximumJSONBytes: Int,
+        maximumSSELineBytes: Int,
+        maximumSSEEventBytes: Int,
+        connectTimeoutSeconds: Double,
+        firstByteTimeoutSeconds: Double,
+        idleTimeoutSeconds: Double,
+        totalTimeoutSeconds: Double
+    ) throws {
+        let bytes = [maximumRequestBytes, maximumResponseBytes, maximumTextBytes,
+            maximumToolArgumentBytes, maximumJSONBytes, maximumSSELineBytes, maximumSSEEventBytes]
+        let deadlines = [connectTimeoutSeconds, firstByteTimeoutSeconds,
+            idleTimeoutSeconds, totalTimeoutSeconds]
+        guard (1...ManagedModelProviderContract.maximumContextTokens).contains(maximumOutputTokens),
+              bytes.allSatisfy({ (1_024...(16 * 1_024 * 1_024)).contains($0) }),
+              maximumSSELineBytes <= maximumSSEEventBytes,
+              maximumSSEEventBytes <= maximumResponseBytes,
+              maximumTextBytes <= maximumResponseBytes,
+              maximumToolArgumentBytes <= maximumResponseBytes,
+              deadlines.allSatisfy({ $0.isFinite && $0 > 0 && $0 <= 600 }),
+              totalTimeoutSeconds >= firstByteTimeoutSeconds else {
+            throw ManagedModelProviderContractError.invalidValue("execution limits are invalid")
+        }
+        self.maximumOutputTokens = maximumOutputTokens
+        self.maximumRequestBytes = maximumRequestBytes
+        self.maximumResponseBytes = maximumResponseBytes
+        self.maximumTextBytes = maximumTextBytes
+        self.maximumToolArgumentBytes = maximumToolArgumentBytes
+        self.maximumJSONBytes = maximumJSONBytes
+        self.maximumSSELineBytes = maximumSSELineBytes
+        self.maximumSSEEventBytes = maximumSSEEventBytes
+        self.connectTimeoutSeconds = connectTimeoutSeconds
+        self.firstByteTimeoutSeconds = firstByteTimeoutSeconds
+        self.idleTimeoutSeconds = idleTimeoutSeconds
+        self.totalTimeoutSeconds = totalTimeoutSeconds
+    }
+}
+
+/// A redacted receipt for exact local request serialization. The model key is a
+/// serialization pin; this receipt does not attest a loaded model or tool support.
+/// No request content, endpoint, authorization material or credential reference is retained.
+/// It describes an intended POST, not the provenance of an older cached provider receipt.
+/// Durable callers must bind this fingerprint to their original request/idempotency intent.
+public struct ProviderRequestPreflight: Sendable, Equatable {
+    public enum Kind: String, Sendable { case root, continuation }
+    public let kind: Kind
+    public let modelKey: String
+    public let configurationRevision: String
+    public let configurationFingerprintSHA256: String
+    public let limits: ProviderExecutionLimits
+    public let bodySHA256: String
+    public let bodyByteCount: Int
+
+    public init(
+        kind: Kind,
+        modelKey: String,
+        configurationRevision: String,
+        configurationFingerprintSHA256: String,
+        limits: ProviderExecutionLimits,
+        bodySHA256: String,
+        bodyByteCount: Int
+    ) throws {
+        try ManagedModelProviderContract.validateString(modelKey, field: "model key",
+            maximumBytes: ManagedModelProviderContract.maximumModelKeyBytes)
+        try ManagedModelProviderContract.validateIdentifier(configurationRevision, field: "configuration revision")
+        let hashes = [configurationFingerprintSHA256, bodySHA256]
+        guard hashes.allSatisfy({ $0.utf8.count == 64 && $0.allSatisfy { "0123456789abcdef".contains($0) } }),
+              (1...limits.maximumRequestBytes).contains(bodyByteCount) else {
+            throw ManagedModelProviderContractError.invalidValue("request preflight is invalid")
+        }
+        self.kind = kind
+        self.modelKey = modelKey
+        self.configurationRevision = configurationRevision
+        self.configurationFingerprintSHA256 = configurationFingerprintSHA256
+        self.limits = limits
+        self.bodySHA256 = bodySHA256
+        self.bodyByteCount = bodyByteCount
+    }
+}
+
+/// Optional refinement. Callers that require pre-effect serialization guarantees
+/// must reject providers without this capability instead of estimating another wire format.
+public protocol ManagedModelProviderRequestPreflighting: ManagedModelProvider {
+    func preflightRoot(_ request: ProviderRootRequest) async throws -> ProviderRequestPreflight
+    func preflightContinuation(_ request: ProviderContinuationRequest) async throws -> ProviderRequestPreflight
+}

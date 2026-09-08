@@ -15,6 +15,59 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
         try? FileManager.default.removeItem(at: home)
     }
 
+    func testSharedSourcePermitsKeepJobsOpenUntilRuntimeShutdownActuallyDrains() async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let runtime = try ManagedAutonomyRuntime(app: app, registry: HostAdapterRegistry(), maximumConcurrentRuns: 2)
+        let pool = runtime.providerWorkAdmission
+        XCTAssertEqual(pool.limit, 2)
+        let first = try XCTUnwrap(pool.tryAcquire(owner: .source(taskID: UUID(), requestID: UUID())))
+        let second = try XCTUnwrap(pool.tryAcquire(owner: .source(taskID: UUID(), requestID: UUID())))
+        defer { pool.release(first); pool.release(second) }
+        do {
+            _ = try await runtime.start()
+            await runtime.shutdown()
+            XCTAssertFalse(pool.isOpen)
+            XCTAssertEqual(pool.activeCount, 2)
+            let retained = await runtime.hasRetainedWork()
+            XCTAssertTrue(retained)
+            XCTAssertNil(pool.tryAcquire(owner: .managed(RunID())))
+            let retainedHealth = try await app.runtimeJobs.repository.health()
+            XCTAssertEqual(retainedHealth.integrity, "ok")
+            do { _ = try await runtime.start(); XCTFail("Shutdown runtime restarted") }
+            catch { XCTAssertEqual(error as? AutonomyError, .shutdown) }
+            XCTAssertTrue(pool.release(first))
+            await runtime.shutdown()
+            let stillRetained = try await app.runtimeJobs.repository.health()
+            XCTAssertEqual(stillRetained.integrity, "ok")
+            XCTAssertEqual(pool.activeCount, 1)
+            XCTAssertTrue(pool.release(second))
+            await runtime.shutdown()
+            do { _ = try await app.runtimeJobs.repository.health(); XCTFail("Drained runtime left jobs open") }
+            catch { XCTAssertFalse(pool.isOpen) }
+            XCTAssertEqual(pool.activeCount, 0)
+            let drained = await runtime.hasRetainedWork()
+            XCTAssertFalse(drained)
+        } catch {
+            pool.release(first); pool.release(second)
+            await runtime.shutdown()
+            throw error
+        }
+    }
+
+    func testFailedStartupClosesSourceAdmissionPermanently() async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let runtime = try ManagedAutonomyRuntime(app: app, registry: HostAdapterRegistry(), maximumConcurrentRuns: 1)
+        await app.runtimeJobs.repository.close()
+        do { _ = try await runtime.start(); XCTFail("Startup accepted closed job storage") }
+        catch { XCTAssertFalse(runtime.providerWorkAdmission.isOpen) }
+        XCTAssertNil(runtime.providerWorkAdmission.tryAcquire(owner: .source(taskID: UUID(), requestID: UUID())))
+        do { _ = try await runtime.start(); XCTFail("Failed startup reopened source admission") }
+        catch { XCTAssertEqual(error as? AutonomyError, .shutdown) }
+        await runtime.shutdown()
+    }
+
     func testShutdownDuringHeldSourceStartupPreventsLateRecoveryAndRestart() async throws {
         let app = try ForgeApp.bootstrap(home: home)
         defer { app.shutdown() }
@@ -54,6 +107,11 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
                 try await Task.sleep(for: .milliseconds(1))
             }
             XCTAssertTrue(supervisorStopped, "Shutdown must invalidate a startup still waiting on its metadata commit")
+            let retainedStartup = await runtime.hasRetainedWork()
+            XCTAssertTrue(retainedStartup, "Startup still owns its suspended control-plane operation")
+            let retainedJobs = try await app.runtimeJobs.repository.health()
+            XCTAssertEqual(retainedJobs.integrity, "ok", "Shutdown must not close jobs beneath suspended startup")
+            XCTAssertFalse(runtime.providerWorkAdmission.isOpen)
             gate.release()
             await stopping?.value
             do { _ = try await startup.value; XCTFail("Startup completed after shutdown") }

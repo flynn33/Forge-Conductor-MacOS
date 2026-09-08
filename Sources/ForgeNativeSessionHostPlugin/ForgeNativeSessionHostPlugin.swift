@@ -1640,6 +1640,8 @@ public actor LMStudioRESTClient {
     public static let capabilityProbeToolName = "forge_provider_contract_probe"
 
     private let configuration: LMStudioProviderConfiguration
+    private let executionLimits: ProviderExecutionLimits
+    private let configurationFingerprintSHA256: String
     private let sessionConfiguration: URLSessionConfiguration
     private let authorization: any LMStudioAuthorizationProviding
     private var cachedCapabilities: (
@@ -1659,6 +1661,26 @@ public actor LMStudioRESTClient {
         sessionConfiguration.urlCache = nil
         sessionConfiguration.httpCookieStorage = nil
         self.configuration = checked
+        self.executionLimits = try ProviderExecutionLimits(
+            maximumOutputTokens: checked.maximumOutputTokens,
+            maximumRequestBytes: checked.maximumRequestBytes,
+            maximumResponseBytes: checked.maximumResponseBytes,
+            maximumTextBytes: checked.maximumTextBytes,
+            maximumToolArgumentBytes: checked.maximumToolArgumentBytes,
+            maximumJSONBytes: checked.maximumJSONBytes,
+            maximumSSELineBytes: checked.maximumSSELineBytes,
+            maximumSSEEventBytes: checked.maximumSSEEventBytes,
+            connectTimeoutSeconds: checked.connectTimeoutSeconds,
+            firstByteTimeoutSeconds: checked.firstByteTimeoutSeconds,
+            idleTimeoutSeconds: checked.idleTimeoutSeconds,
+            totalTimeoutSeconds: checked.totalTimeoutSeconds
+        )
+        let fingerprintEncoder = JSONEncoder()
+        fingerprintEncoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        self.configurationFingerprintSHA256 = JSONSupport.sha256Hex(
+            Data("forge.lmstudio.execution-configuration.v1\0".utf8)
+                + (try fingerprintEncoder.encode(checked))
+        )
         self.sessionConfiguration = sessionConfiguration
         self.authorization = authorization
     }
@@ -1855,13 +1877,7 @@ public actor LMStudioRESTClient {
 
     public func createRoot(_ request: LMStudioRootRequest) async throws -> LMStudioResponseTurn {
         let model = try await resolvedModel(request.modelKey)
-        try validateRequestText(request.userInput, field: "user input")
-        var input: [LMStudioEncodedInput] = []
-        if !request.systemPrompt.isEmpty {
-            try validateRequestText(request.systemPrompt, field: "system prompt")
-            input.append(.message(role: "system", text: request.systemPrompt))
-        }
-        input.append(.message(role: "user", text: request.userInput))
+        let input = try rootInput(request)
         let turn = try await performResponse(
             model: model, previousResponseID: nil, input: input,
             tools: request.tools, idempotencyKey: request.idempotencyKey,
@@ -1873,11 +1889,36 @@ public actor LMStudioRESTClient {
         return turn
     }
 
+    private func rootInput(_ request: LMStudioRootRequest) throws -> [LMStudioEncodedInput] {
+        try validateRequestText(request.userInput, field: "user input")
+        var input: [LMStudioEncodedInput] = []
+        if !request.systemPrompt.isEmpty {
+            try validateRequestText(request.systemPrompt, field: "system prompt")
+            input.append(.message(role: "system", text: request.systemPrompt))
+        }
+        input.append(.message(role: "user", text: request.userInput))
+        return input
+    }
+
     public func continueSession(
         _ request: LMStudioContinuationRequest
     ) async throws -> LMStudioResponseTurn {
         try LMStudioProviderIdentifier.validate(request.previousResponseID)
         let model = try await resolvedModel(request.modelKey)
+        let input = try continuationInput(request)
+        let turn = try await performResponse(
+            model: model, previousResponseID: request.previousResponseID,
+            input: input, tools: request.tools, idempotencyKey: request.idempotencyKey,
+            providerRequestID: nil
+        )
+        guard turn.previousResponseID == request.previousResponseID else {
+            throw LMStudioProviderError.malformedResponse("continuation authority does not match the requested predecessor")
+        }
+        return turn
+    }
+
+    private func continuationInput(_ request: LMStudioContinuationRequest) throws -> [LMStudioEncodedInput] {
+        try LMStudioProviderIdentifier.validate(request.previousResponseID)
         let input = try request.input.map { value -> LMStudioEncodedInput in
             switch value {
             case .message(let role, let text):
@@ -1887,6 +1928,9 @@ public actor LMStudioRESTClient {
                 try validateRequestText(text, field: "continuation message")
                 return .message(role: role, text: text)
             case .functionCallOutput(let callID, let output):
+                guard callID.utf8.count <= 512 else {
+                    throw LMStudioProviderError.invalidConfiguration("invalid provider call ID")
+                }
                 try LMStudioProviderConfiguration.validateBoundedString(
                     callID, field: "provider call ID", maximumBytes: 512
                 )
@@ -1897,15 +1941,46 @@ public actor LMStudioRESTClient {
         guard !input.isEmpty, input.count <= 128 else {
             throw LMStudioProviderError.invalidConfiguration("continuation input count is invalid")
         }
-        let turn = try await performResponse(
-            model: model, previousResponseID: request.previousResponseID,
-            input: input, tools: request.tools, idempotencyKey: request.idempotencyKey,
-            providerRequestID: nil
+        return input
+    }
+
+    /// Purely local: no inventory, capability probe, authorization or request is performed.
+    /// The selected model is a serialization pin, not a loaded-model attestation.
+    public func preflightRoot(_ request: LMStudioRootRequest) throws -> ProviderRequestPreflight {
+        let model = try serializationModel(request.modelKey)
+        let body = try encodeResponse(
+            model: model, previousResponseID: nil, input: rootInput(request),
+            tools: request.tools, idempotencyKey: request.idempotencyKey,
+            providerRequestID: request.providerRequestID
         )
-        guard turn.previousResponseID == request.previousResponseID else {
-            throw LMStudioProviderError.malformedResponse("continuation authority does not match the requested predecessor")
+        return try preflight(kind: .root, model: model, body: body)
+    }
+
+    public func preflightContinuation(_ request: LMStudioContinuationRequest) throws -> ProviderRequestPreflight {
+        let model = try serializationModel(request.modelKey)
+        let body = try encodeResponse(
+            model: model, previousResponseID: request.previousResponseID, input: continuationInput(request),
+            tools: request.tools, idempotencyKey: request.idempotencyKey, providerRequestID: nil
+        )
+        return try preflight(kind: .continuation, model: model, body: body)
+    }
+
+    private func serializationModel(_ requested: String?) throws -> String {
+        guard let model = requested ?? configuration.modelKey else {
+            throw LMStudioProviderError.invalidConfiguration("request preflight requires an explicit model selection")
         }
-        return turn
+        try LMStudioProviderConfiguration.validateBoundedString(model, field: "model key", maximumBytes: 512)
+        if let configured = configuration.modelKey, model != configured {
+            throw LMStudioProviderError.invalidConfiguration("request model does not match the configured model")
+        }
+        return model
+    }
+
+    private func preflight(kind: ProviderRequestPreflight.Kind, model: String, body: Data) throws -> ProviderRequestPreflight {
+        try ProviderRequestPreflight(kind: kind, modelKey: model,
+            configurationRevision: configuration.revision,
+            configurationFingerprintSHA256: configurationFingerprintSHA256,
+            limits: executionLimits, bodySHA256: JSONSupport.sha256Hex(body), bodyByteCount: body.count)
     }
 
     private func resolvedModel(_ requested: String?) async throws -> String {
@@ -1923,11 +1998,11 @@ public actor LMStudioRESTClient {
         return capabilities.modelKey
     }
 
-    private func performResponse(
+    private func encodeResponse(
         model: String, previousResponseID: String?, input: [LMStudioEncodedInput],
         tools: [LMStudioFunctionTool], idempotencyKey: String,
         providerRequestID: String?
-    ) async throws -> LMStudioResponseTurn {
+    ) throws -> Data {
         guard tools.count <= 128 else {
             throw LMStudioProviderError.invalidConfiguration("tool count exceeds 128")
         }
@@ -1960,6 +2035,16 @@ public actor LMStudioRESTClient {
         guard body.count <= configuration.maximumRequestBytes else {
             throw LMStudioProviderError.limitExceeded("request body")
         }
+        return body
+    }
+
+    private func performResponse(
+        model: String, previousResponseID: String?, input: [LMStudioEncodedInput],
+        tools: [LMStudioFunctionTool], idempotencyKey: String,
+        providerRequestID: String?
+    ) async throws -> LMStudioResponseTurn {
+        let body = try encodeResponse(model: model, previousResponseID: previousResponseID,
+            input: input, tools: tools, idempotencyKey: idempotencyKey, providerRequestID: providerRequestID)
         var request = URLRequest(url: try configuration.endpoint("v1/responses"))
         request.httpMethod = "POST"
         request.httpBody = body
@@ -2026,7 +2111,12 @@ public protocol LMStudioManagedTransporting: Sendable {
     func cancel(operationID: String) async
 }
 
-public actor LMStudioManagedSessionTransport: LMStudioManagedTransporting {
+public protocol LMStudioManagedTransportRequestPreflighting: LMStudioManagedTransporting {
+    func preflightRoot(_ request: LMStudioRootRequest) async throws -> ProviderRequestPreflight
+    func preflightContinuation(_ request: LMStudioContinuationRequest) async throws -> ProviderRequestPreflight
+}
+
+public actor LMStudioManagedSessionTransport: LMStudioManagedTransportRequestPreflighting {
     public static let maximumInFlightOperations = 16
     public static let maximumReceipts = 32
 
@@ -2052,6 +2142,14 @@ public actor LMStudioManagedSessionTransport: LMStudioManagedTransporting {
 
     public func probe() async throws -> LMStudioProviderCapabilities {
         try await client.probe()
+    }
+
+    public func preflightRoot(_ request: LMStudioRootRequest) async throws -> ProviderRequestPreflight {
+        try await client.preflightRoot(request)
+    }
+
+    public func preflightContinuation(_ request: LMStudioContinuationRequest) async throws -> ProviderRequestPreflight {
+        try await client.preflightContinuation(request)
     }
 
     public func createRoot(_ request: LMStudioRootRequest) async throws -> LMStudioResponseTurn {
@@ -2478,7 +2576,7 @@ private struct LMStudioManagedProviderReceiptStore: Sendable {
     }
 }
 
-public actor LMStudioManagedModelProvider: ManagedModelProvider {
+public actor LMStudioManagedModelProvider: ManagedModelProviderRequestPreflighting {
     public static let maximumRememberedRequestIDs = 32
     public nonisolated let providerID = "lmstudio"
 
@@ -2524,6 +2622,36 @@ public actor LMStudioManagedModelProvider: ManagedModelProvider {
         )
         latestCapabilities = normalized
         return normalized
+    }
+
+    public func preflightRoot(_ request: ProviderRootRequest) async throws -> ProviderRequestPreflight {
+        let request = try request.validated()
+        guard request.structuredOutputSchema == nil else {
+            throw ManagedModelProviderContractError.unsupportedCapability(
+                "LM Studio structured response format is not enabled by this adapter"
+            )
+        }
+        guard let preflight = transport as? any LMStudioManagedTransportRequestPreflighting else {
+            throw ManagedModelProviderContractError.unsupportedCapability("request preflight")
+        }
+        let requestID = request.operationID.uuidString.lowercased()
+        return try await preflight.preflightRoot(LMStudioRootRequest(
+            operationID: requestID, providerRequestID: requestID, modelKey: request.modelKey,
+            systemPrompt: "", userInput: request.input, tools: request.tools.map(Self.functionTool),
+            idempotencyKey: request.idempotencyKey
+        ))
+    }
+
+    public func preflightContinuation(_ request: ProviderContinuationRequest) async throws -> ProviderRequestPreflight {
+        let request = try request.validated()
+        guard let preflight = transport as? any LMStudioManagedTransportRequestPreflighting else {
+            throw ManagedModelProviderContractError.unsupportedCapability("request preflight")
+        }
+        return try await preflight.preflightContinuation(LMStudioContinuationRequest(
+            operationID: request.operationID.uuidString.lowercased(), modelKey: request.modelKey,
+            previousResponseID: request.previousResponseID, input: Self.continuationInput(request.input),
+            tools: request.tools.map(Self.functionTool), idempotencyKey: request.idempotencyKey
+        ))
     }
 
     public func createRoot(_ request: ProviderRootRequest) async throws -> ProviderTurn {

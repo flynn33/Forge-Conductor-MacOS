@@ -36,11 +36,14 @@ public actor AutonomySupervisor {
     private let coordinatorFactory: CoordinatorFactory
     private let sourceBootstrap: SourceBootstrapScheduling?
     private let maximumConcurrentRuns: Int
+    private let providerWorkAdmission: NativeProviderWorkAdmission
+    private let shutdownDrainAttempts: Int
     private let clock: any Clock
 
     private var acceptingRuns = false
     private var coordinators: [RunID: any ProjectRunCoordinating] = [:]
     private var tasks: [RunID: Task<Void, Never>] = [:]
+    private var activationPermits: [RunID: NativeProviderWorkPermit] = [:]
     private enum DeferredActivation: Sendable, Equatable {
         case ordinary(RunID)
         case source(ContinuityBootstrapRecoveryReference)
@@ -75,23 +78,32 @@ public actor AutonomySupervisor {
         self.clock = clock
         self.coordinatorFactory = coordinatorFactory
         self.sourceBootstrap = nil
+        self.providerWorkAdmission = try NativeProviderWorkAdmission(limit: maximumConcurrentRuns)
+        self.shutdownDrainAttempts = 400
     }
 
     init(
         repository: ProjectControlPlaneRepository,
         maximumConcurrentRuns: Int,
         clock: any Clock = SystemClock(),
-        sourceBootstrap: SourceBootstrapScheduling,
+        sourceBootstrap: SourceBootstrapScheduling?,
+        providerWorkAdmission: NativeProviderWorkAdmission? = nil,
+        shutdownDrainAttempts: Int = 400,
         coordinatorFactory: @escaping CoordinatorFactory
     ) throws {
         guard (1...16).contains(maximumConcurrentRuns) else {
             throw AutonomyError.invalidRequest("active run limit must be between 1 and 16")
+        }
+        guard (1...400).contains(shutdownDrainAttempts) else {
+            throw AutonomyError.invalidRequest("shutdown drain attempts must be between 1 and 400")
         }
         self.repository = repository
         self.maximumConcurrentRuns = maximumConcurrentRuns
         self.clock = clock
         self.coordinatorFactory = coordinatorFactory
         self.sourceBootstrap = sourceBootstrap
+        self.providerWorkAdmission = try providerWorkAdmission ?? NativeProviderWorkAdmission(limit: maximumConcurrentRuns)
+        self.shutdownDrainAttempts = shutdownDrainAttempts
     }
 
     /// Manager-start seam: call immediately after opening/migrating the control-plane
@@ -170,9 +182,8 @@ public actor AutonomySupervisor {
         guard run.state != .awaitingBootstrap else { throw AutonomyError.bootstrapRequired(runID) }
         guard acceptingRuns, epoch == schedulingEpoch else { throw AutonomyError.shutdown }
         guard tasks[runID] == nil else { return }
-        if tasks.count < maximumConcurrentRuns {
-            try activateUnlocked(.ordinary(runID))
-        } else if !isDeferred(runID) {
+        if tasks.count < maximumConcurrentRuns, try activateUnlocked(.ordinary(runID)) { return }
+        if !isDeferred(runID) {
             guard deferred.count < Self.maximumRecoveredRuns else {
                 throw AutonomyError.invalidRequest("deferred run queue reached its bound")
             }
@@ -212,15 +223,15 @@ public actor AutonomySupervisor {
         acceptingRuns = false
         schedulingEpoch = UUID()
         deferred.removeAll(keepingCapacity: false)
-        let active = coordinators.values
+        let active = Array(coordinators.values)
         for coordinator in active { await coordinator.stop() }
         for task in tasks.values { task.cancel() }
-        for _ in 0..<400 {
+        for _ in 0..<shutdownDrainAttempts {
             if tasks.isEmpty { break }
             try? await Task.sleep(for: .milliseconds(25))
         }
-        tasks.removeAll(keepingCapacity: false)
-        coordinators.removeAll(keepingCapacity: false)
+        // A cancellation request or a drain deadline does not end provider work.
+        // Retain handles and capacity until each activation actually returns.
     }
 
     private func isReadyForActivation(_ run: AutonomousRunRecord) -> Bool {
@@ -233,9 +244,12 @@ public actor AutonomySupervisor {
         return true
     }
 
-    private func activateUnlocked(_ activation: DeferredActivation) throws {
+    private func activateUnlocked(_ activation: DeferredActivation) throws -> Bool {
         let runID = activation.runID
-        guard tasks[runID] == nil else { return }
+        guard tasks[runID] == nil else { return false }
+        guard let permit = providerWorkAdmission.tryAcquire(owner: .managed(runID)) else { return false }
+        var transferred = false
+        defer { if !transferred { providerWorkAdmission.release(permit) } }
         let coordinator: any ProjectRunCoordinating
         switch activation {
         case .ordinary: coordinator = try coordinatorFactory(runID)
@@ -246,6 +260,7 @@ public actor AutonomySupervisor {
         guard coordinator.runID == runID else { throw AutonomyError.invalidRequest("coordinator belongs to another run") }
         preferSource = !activation.isSource
         coordinators[runID] = coordinator
+        activationPermits[runID] = permit
         tasks[runID] = Task { [self, coordinator] in
             let result: Result<ProjectRunActivationResult, Error>
             do {
@@ -253,16 +268,25 @@ public actor AutonomySupervisor {
             } catch {
                 result = .failure(error)
             }
-            await self.activationFinished(runID: runID, result: result)
+            await self.activationFinished(runID: runID, permit: permit, result: result)
         }
+        transferred = true
+        return true
     }
 
     private func activationFinished(
         runID: RunID,
+        permit: NativeProviderWorkPermit,
         result: Result<ProjectRunActivationResult, Error>
     ) async {
+        guard activationPermits[runID] == permit else {
+            providerWorkAdmission.release(permit)
+            return
+        }
+        activationPermits.removeValue(forKey: runID)
         tasks.removeValue(forKey: runID)
         coordinators.removeValue(forKey: runID)
+        providerWorkAdmission.release(permit)
         if case .success(let value) = result {
             recentResults.append(value)
             if recentResults.count > Self.maximumRetainedResults {
@@ -309,7 +333,7 @@ public actor AutonomySupervisor {
                 deferred.removeAll { $0.runID == runID }
                 continue
             }
-            do { try activateUnlocked(activation) }
+            do { guard try activateUnlocked(activation) else { break } }
             catch where activation.isSource {
                 deferred.removeAll { $0 == activation }
                 continue

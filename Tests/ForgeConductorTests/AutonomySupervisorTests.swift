@@ -5,6 +5,159 @@ import XCTest
 @testable import ForgeConductorCore
 
 final class AutonomySupervisorTests: XCTestCase {
+    func testSourcePermitDefersOrdinaryActivationUntilTheSameCapacityIsReleased() async throws {
+        try await withRepository { repository, root in
+            let ordinary = try await makeRun(repository: repository, root: root)
+            let pool = try NativeProviderWorkAdmission(limit: 1)
+            let source = try XCTUnwrap(pool.tryAcquire(owner: .source(taskID: UUID(), requestID: UUID())))
+            defer { pool.release(source) }
+            let coordinator = DelayedStopCoordinator(runID: ordinary.run.runID)
+            let supervisor = try AutonomySupervisor(repository: repository, maximumConcurrentRuns: 1,
+                sourceBootstrap: nil, providerWorkAdmission: pool) { _ in coordinator }
+            do {
+                let report = try await supervisor.recoverOnManagerStart()
+                XCTAssertTrue(report.activatedRuns.isEmpty)
+                XCTAssertEqual(report.deferredRuns, [ordinary.run.runID])
+                try await supervisor.activate(runID: ordinary.run.runID)
+                let waiting = await supervisor.snapshot()
+                XCTAssertTrue(waiting.activeRunIDs.isEmpty)
+                XCTAssertEqual(waiting.deferredRunIDs, [ordinary.run.runID])
+                let started = await coordinator.hasStarted()
+                XCTAssertFalse(started)
+                XCTAssertEqual(pool.activeCount, 1)
+                XCTAssertTrue(pool.release(source))
+                try await supervisor.tick()
+                let running = await supervisor.snapshot()
+                XCTAssertEqual(running.activeRunIDs, [ordinary.run.runID])
+                XCTAssertTrue(running.deferredRunIDs.isEmpty)
+                XCTAssertEqual(pool.activeCount, 1)
+                XCTAssertNil(pool.tryAcquire(owner: .source(taskID: UUID(), requestID: UUID())))
+            } catch { await supervisor.shutdown(); throw error }
+            await supervisor.shutdown()
+            XCTAssertEqual(pool.activeCount, 0)
+            XCTAssertTrue(pool.isOpen, "A participant must not close another owner's shared pool")
+        }
+    }
+
+    func testSourceHandoffReleasesLimitOneForHeldBootstrapWithoutWeakeningTheHold() async throws {
+        try await withRepository { repository, root in
+            let held = try await makeBootstrapHeldApplicationRun(repository: repository, root: root)
+            let reference = sourceReference(held.run, rowID: 1)
+            let pool = try NativeProviderWorkAdmission(limit: 1)
+            let source = try XCTUnwrap(pool.tryAcquire(owner: .source(taskID: reference.taskID, requestID: UUID())))
+            defer { pool.release(source) }
+            let coordinator = DelayedStopCoordinator(runID: held.run.runID)
+            let supervisor = try AutonomySupervisor(repository: repository, maximumConcurrentRuns: 1,
+                sourceBootstrap: SourceBootstrapScheduling(discover: { _, _ in
+                    ContinuityBootstrapRecoveryPage(references: [reference], diagnostics: [], nextRowID: nil)
+                }, admit: { $0 == reference }, makeCoordinator: { _ in coordinator }),
+                providerWorkAdmission: pool) { _ in
+                    XCTFail("Held bootstrap entered the ordinary factory")
+                    return coordinator
+                }
+            do {
+                let report = try await supervisor.recoverOnManagerStart()
+                XCTAssertTrue(report.activatedRuns.isEmpty)
+                XCTAssertEqual(report.deferredRuns, [held.run.runID])
+                await assertAutonomyError(code: "autonomous_run_bootstrap_required") {
+                    try await supervisor.activate(runID: held.run.runID)
+                }
+                // Source completion releases first; it never waits for this successor.
+                XCTAssertTrue(pool.release(source))
+                try await supervisor.tick()
+                let running = await supervisor.snapshot()
+                XCTAssertEqual(running.activeRunIDs, [held.run.runID])
+                XCTAssertEqual(pool.activeCount, 1)
+                let stored = try await repository.autonomousRun(held.run.runID)
+                XCTAssertEqual(stored?.state, .awaitingBootstrap)
+                XCTAssertNil(stored?.activeSessionID)
+            } catch { await supervisor.shutdown(); throw error }
+            await supervisor.shutdown()
+            XCTAssertEqual(pool.activeCount, 0)
+        }
+    }
+
+    func testFactoryFailureAndWrongRunReturnTheirExactPermits() async throws {
+        for returnsWrongRun in [false, true] {
+            try await withRepository { repository, root in
+                _ = try await makeRun(repository: repository, root: root)
+                let pool = try NativeProviderWorkAdmission(limit: 1)
+                let foreignCoordinator = DelayedStopCoordinator(runID: RunID())
+                let supervisor = try AutonomySupervisor(repository: repository, maximumConcurrentRuns: 1,
+                    sourceBootstrap: nil, providerWorkAdmission: pool) { _ in
+                        if returnsWrongRun { return foreignCoordinator }
+                        throw CapacityFactoryFailure.failed
+                    }
+                do {
+                    _ = try await supervisor.recoverOnManagerStart()
+                    XCTFail("Invalid coordinator factory succeeded")
+                } catch {
+                    if returnsWrongRun {
+                        guard let error = error as? AutonomyError, case .invalidRequest = error else {
+                            XCTFail("Unexpected owner mismatch: \(error)"); await supervisor.shutdown(); throw error
+                        }
+                    } else { XCTAssertTrue(error is CapacityFactoryFailure) }
+                }
+                let snapshot = await supervisor.snapshot()
+                XCTAssertTrue(snapshot.activeRunIDs.isEmpty)
+                XCTAssertEqual(pool.activeCount, 0)
+                let source = try XCTUnwrap(pool.tryAcquire(owner: .source(taskID: UUID(), requestID: UUID())))
+                XCTAssertTrue(pool.release(source))
+                await supervisor.shutdown()
+            }
+        }
+    }
+
+    func testShutdownTimeoutRetainsCancellationInsensitiveOwnerUntilActualExit() async throws {
+        try await withRepository { repository, root in
+            let run = try await makeRun(repository: repository, root: root)
+            let pool = try NativeProviderWorkAdmission(limit: 1)
+            let coordinator = CapacityHeldCoordinator(runID: run.run.runID)
+            let supervisor = try AutonomySupervisor(repository: repository, maximumConcurrentRuns: 1,
+                sourceBootstrap: nil, providerWorkAdmission: pool, shutdownDrainAttempts: 2) { _ in coordinator }
+            do {
+                _ = try await supervisor.recoverOnManagerStart()
+                for _ in 0..<2_000 {
+                    if await coordinator.hasStarted() { break }
+                    try await Task.sleep(for: .milliseconds(1))
+                }
+                let started = await coordinator.hasStarted()
+                XCTAssertTrue(started)
+                await supervisor.shutdown()
+                let stopped = await supervisor.snapshot()
+                XCTAssertFalse(stopped.acceptingRuns)
+                XCTAssertEqual(stopped.activeRunIDs, [run.run.runID])
+                XCTAssertEqual(pool.activeCount, 1)
+                let requestedStop = await coordinator.wasStopped()
+                XCTAssertTrue(requestedStop)
+                XCTAssertNil(pool.tryAcquire(owner: .source(taskID: UUID(), requestID: UUID())))
+                do { _ = try await supervisor.recoverOnManagerStart(); XCTFail("Retained work allowed restart") }
+                catch {
+                    guard let error = error as? AutonomyError, case .invalidRequest = error else {
+                        XCTFail("Unexpected restart failure: \(error)"); throw error
+                    }
+                }
+                pool.close()
+                await coordinator.release()
+                for _ in 0..<2_000 {
+                    if (await supervisor.snapshot()).activeRunIDs.isEmpty { break }
+                    try await Task.sleep(for: .milliseconds(1))
+                }
+                let completed = await supervisor.snapshot()
+                XCTAssertTrue(completed.activeRunIDs.isEmpty)
+                XCTAssertEqual(completed.recentResults.count, 1)
+                XCTAssertEqual(pool.activeCount, 0)
+                XCTAssertFalse(pool.isOpen)
+                XCTAssertNil(pool.tryAcquire(owner: .managed(run.run.runID)))
+            } catch {
+                await coordinator.release()
+                await supervisor.shutdown()
+                throw error
+            }
+            await supervisor.shutdown()
+        }
+    }
+
     func testSourceRecoveryAlternatesWithOrdinaryWorkInTheSameCapacity() async throws {
         try await withRepository { repository, root in
             let ordinary = try await makeRun(repository: repository, root: root)
@@ -86,21 +239,24 @@ final class AutonomySupervisorTests: XCTestCase {
             let valid = sourceReference(held.run, rowID: 3)
             let discovery = SourceSchedulingFixture(references: [revoked, unavailable, valid], revokeAfterDiscovery: [1])
             let coordinator = DelayedStopCoordinator(runID: valid.runID)
+            let pool = try NativeProviderWorkAdmission(limit: 1)
             let supervisor = try AutonomySupervisor(repository: repository, maximumConcurrentRuns: 1,
                 sourceBootstrap: SourceBootstrapScheduling(discover: { try await discovery.discover($0, limit: $1) },
                     admit: { try await discovery.admit($0) }, makeCoordinator: { reference in
                         if reference == unavailable { throw ContinuityRunError.hostCapabilityUnavailable }
                         XCTAssertEqual(reference, valid)
                         return coordinator
-                    })) { _ in XCTFail("Held source reached ordinary factory"); return coordinator }
+                    }), providerWorkAdmission: pool) { _ in XCTFail("Held source reached ordinary factory"); return coordinator }
             do {
                 let report = try await supervisor.recoverOnManagerStart()
                 XCTAssertEqual(report.activatedRuns, [valid.runID])
                 XCTAssertTrue(report.deferredRuns.isEmpty)
+                XCTAssertEqual(pool.activeCount, 1, "Failed bootstrap factory must return capacity for the valid peer")
                 let rejectedAdmissions = await discovery.admissionCount(1)
                 XCTAssertEqual(rejectedAdmissions, 2)
             } catch { await supervisor.shutdown(); throw error }
             await supervisor.shutdown()
+            XCTAssertEqual(pool.activeCount, 0)
         }
     }
 
@@ -2589,5 +2745,34 @@ private actor DelayedStopCoordinator: ProjectRunCoordinating {
 
     func stop() async {
         stopped = true
+    }
+}
+
+private enum CapacityFactoryFailure: Error { case failed }
+
+private actor CapacityHeldCoordinator: ProjectRunCoordinating {
+    nonisolated let runID: RunID
+    private var started = false
+    private var stopped = false
+    private var released = false
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    init(runID: RunID) { self.runID = runID }
+    func hasStarted() -> Bool { started }
+    func wasStopped() -> Bool { stopped }
+
+    func runActivation() async throws -> ProjectRunActivationResult {
+        started = true
+        if !released { await withCheckedContinuation { continuation = $0 } }
+        return ProjectRunActivationResult(runID: runID, finalState: .running,
+            stepsExecuted: 0, yielded: true)
+    }
+
+    func stop() async { stopped = true }
+
+    func release() {
+        released = true
+        continuation?.resume()
+        continuation = nil
     }
 }

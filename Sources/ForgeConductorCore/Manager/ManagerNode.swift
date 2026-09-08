@@ -113,6 +113,9 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     private var activeProviderProbeID: UUID?
     private var managedAutonomy: ManagedAutonomyRuntime?
     private var continuityIngress: ContinuityIngressDeliveryService?
+    private var managedAutonomyStarting = false
+    private var managedAutonomyClosing = false
+    private var managedAutonomyShutdownID: UUID?
     private let taskHTTPService: MCPTaskHTTPService
     private let nativeTaskOperatorAdmission = MCPRequestAdmission(maximumActiveRequests: 8)
     private let nativeTaskOperatorNamespace = UUID()
@@ -1521,7 +1524,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         _ operation: @escaping @Sendable (any ProviderConfigurationServicing) async throws -> Value
     ) throws -> Value {
         lock.lock()
-        guard !providerConfigurationInProgress, !runtime.providerProbeInProgress,
+        guard !managedAutonomyClosing, !providerConfigurationInProgress, !runtime.providerProbeInProgress,
               providerRunOperations == 0 else {
             lock.unlock()
             throw ProviderConfigurationError.busy
@@ -1564,7 +1567,9 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
 
     private func beginProviderRunOperation() throws {
         lock.lock(); defer { lock.unlock() }
-        guard !providerConfigurationInProgress else { throw ProviderConfigurationError.busy }
+        guard !managedAutonomyClosing, !providerConfigurationInProgress else {
+            throw ProviderConfigurationError.busy
+        }
         providerRunOperations += 1
     }
 
@@ -1590,7 +1595,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         let startedAt = ISO8601.string(from: app.clock.now())
         let probeID = UUID()
         lock.lock()
-        guard !runtime.providerProbeInProgress, !providerConfigurationInProgress else {
+        guard !managedAutonomyClosing, !runtime.providerProbeInProgress, !providerConfigurationInProgress else {
             lock.unlock()
             throw ManagerProviderProbeError.probeInProgress
         }
@@ -2711,7 +2716,17 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             fputs("forge-conductor manager shutdown incomplete: native task requests remain active\n", stderr)
             exit(1)
         }
-        shutdownManagedAutonomy()
+        guard shutdownManagedAutonomy() else {
+            let error = RuntimeJobError.storageFailure("manager shutdown retained provider work ownership")
+            lock.lock()
+            runtime.markFailed(error)
+            lock.unlock()
+            persistState()
+            ManagerPIDFile.remove(paths: app.paths)
+            runtime.runLock.signal()
+            fputs("forge-conductor manager shutdown incomplete: provider work remains active\n", stderr)
+            exit(1)
+        }
         let shutdownReport = app.shutdown()
         guard shutdownReport.completed else {
             let unresolved = shutdownReport.unresolvedJobIDs
@@ -3025,23 +3040,40 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     @discardableResult
     public func recoverManagedAutonomy() throws -> AutonomyStartupReport? {
         lock.lock()
+        guard !managedAutonomyClosing, !managedAutonomyStarting else {
+            lock.unlock()
+            throw AutonomyError.shutdown
+        }
         if managedAutonomy != nil {
             lock.unlock()
             return nil
         }
+        managedAutonomyStarting = true
         lock.unlock()
+        var asyncStartupOwnsCompletion = false
+        defer { if !asyncStartupOwnsCompletion { finishManagedAutonomyStartup() } }
 
         let ingress = try ContinuityIngressDeliveryService(
             source: app.store, repository: app.projectContexts.repository, config: app.config
         )
         let value = try managedAutonomyFactory(app)
-        let report = try Self.waitForAsync(timeoutSeconds: 30) {
-            try await value.start()
-        }
+        // Publish ownership before awaiting startup. A timeout must not make a
+        // still-running provider owner invisible to manager shutdown.
         lock.lock()
         managedAutonomy = value
         continuityIngress = ingress
+        let closing = managedAutonomyClosing
         lock.unlock()
+        guard !closing else { throw AutonomyError.shutdown }
+        asyncStartupOwnsCompletion = true
+        let report = try Self.waitForAsync(timeoutSeconds: 30) {
+            defer { self.finishManagedAutonomyStartup() }
+            return try await value.start()
+        }
+        lock.lock()
+        let shutdownBegan = managedAutonomyClosing
+        lock.unlock()
+        guard !shutdownBegan else { throw AutonomyError.shutdown }
         app.diagnostics.info(
             "manager_autonomy_recovered",
             [
@@ -3055,10 +3087,15 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         return report
     }
 
+    private func finishManagedAutonomyStartup() {
+        lock.lock(); managedAutonomyStarting = false; lock.unlock()
+    }
+
     private func scheduleAutonomyTick() {
         lock.lock()
         guard let autonomy = managedAutonomy,
               let ingress = continuityIngress,
+              !managedAutonomyClosing,
               !runtime.autonomyTickPending,
               !runtime.shutdownRequested else {
             lock.unlock()
@@ -3171,31 +3208,38 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     private func requiredContinuityIngress() throws -> ContinuityIngressDeliveryService {
         lock.lock()
         defer { lock.unlock() }
-        guard managedAutonomy != nil, !runtime.shutdownRequested, let continuityIngress else {
+        guard managedAutonomy != nil, !managedAutonomyClosing, !runtime.shutdownRequested, let continuityIngress else {
             throw AutonomyError.shutdown
         }
         return continuityIngress
     }
 
-    public func shutdownManagedAutonomy() {
+    /// A deadline stops waiting; it never releases the provider owners or their stores.
+    @discardableResult
+    public func shutdownManagedAutonomy() -> Bool {
         lock.lock()
+        managedAutonomyClosing = true
+        managedAutonomy?.providerWorkAdmission.close()
+        guard !managedAutonomyStarting, managedAutonomyShutdownID == nil,
+              providerRunOperations == 0, !providerConfigurationInProgress,
+              !runtime.providerProbeInProgress, activeProviderProbeID == nil else {
+            lock.unlock()
+            return false
+        }
         let autonomy = managedAutonomy
         let ingress = continuityIngress
         let tick = runtime.autonomyTickTask
-        managedAutonomy = nil
-        continuityIngress = nil
-        runtime.autonomyTickPending = false
-        runtime.autonomyTickID = nil
-        runtime.autonomyTickTask = nil
+        let shutdownID = UUID()
+        managedAutonomyShutdownID = shutdownID
         tick?.cancel()
         lock.unlock()
-        guard autonomy != nil || ingress != nil || tick != nil else { return }
         do {
-            _ = try Self.waitForAsync(timeoutSeconds: 20) {
+            return try Self.waitForAsync(timeoutSeconds: 20) {
                 await ingress?.shutdown()
                 await tick?.value
                 await autonomy?.shutdown()
-                return true
+                let drained = !(await autonomy?.hasRetainedWork() ?? false)
+                return self.finishManagedAutonomyShutdown(shutdownID, drained: drained)
             }
         } catch {
             app.diagnostics.error(
@@ -3203,7 +3247,23 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 ["error": error.localizedDescription],
                 category: .manager
             )
+            return false
         }
+    }
+
+    private func finishManagedAutonomyShutdown(_ shutdownID: UUID, drained: Bool) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard managedAutonomyShutdownID == shutdownID else { return false }
+        managedAutonomyShutdownID = nil
+        guard drained, !managedAutonomyStarting, providerRunOperations == 0,
+              !providerConfigurationInProgress, !runtime.providerProbeInProgress,
+              activeProviderProbeID == nil else { return false }
+        managedAutonomy = nil
+        continuityIngress = nil
+        runtime.autonomyTickPending = false
+        runtime.autonomyTickID = nil
+        runtime.autonomyTickTask = nil
+        return true
     }
 
     private static func waitForAsync<Value: Sendable>(

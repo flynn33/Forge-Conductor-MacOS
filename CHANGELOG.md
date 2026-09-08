@@ -22,6 +22,12 @@ installed-stack and production-feature acceptance remain separate gates.
 
 ### Authorized handoff storage and admission
 
+- Native Responses requests can now be checked locally against the transport's
+  exact encoded bytes and configured limits before dispatch. This preflight
+  performs no inference or credential lookup and does not certify cached receipts.
+- Managed and bootstrap coordinators share one bounded provider capacity owner.
+  Cancellation and shutdown retain active owners until they settle; incomplete
+  manager shutdown preserves the stores and reports failure.
 - Added native task prepare, reconcile, rotate and revoke commands plus an
   authenticated loopback MCP source endpoint. The initial profile supports
   explicitly approved file reads, checkpoint/handoff commits and CLU controls.
