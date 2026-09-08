@@ -300,7 +300,7 @@ public actor ContextBudgetSupervisor {
               let inputBytes = preflight.serializedInputByteCount else {
             throw ContextBudgetError.configurationMismatch
         }
-        let escaped = projection.maximumToolResultBytes.multipliedReportingOverflow(by: 6)
+        let escaped = projection.maximumToolResultBytes.multipliedReportingOverflow(by: CanonicalToolResultOutputBounds.maximumStringExpansion)
         let body = preflight.bodyByteCount.addingReportingOverflow(escaped.partialValue)
         let input = inputBytes.addingReportingOverflow(escaped.partialValue)
         guard !escaped.overflow, !body.overflow, !input.overflow,

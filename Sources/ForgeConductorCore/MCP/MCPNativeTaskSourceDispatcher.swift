@@ -140,7 +140,7 @@ final class MCPNativeTaskSourceDispatcher: MCPNativeSourceDispatching {
         let ceiling = min(65_536, attachment.sourceLimits.maximumResultBytes,
             attachment.setup.record.assignment.authorizationScope.maximumInlineOutputBytes,
             policy.policy.tools.maxResultBytes, resolved.prepared.frozenCeilings?.tools.maxResultBytes ?? Int.max)
-        let escaped = ceiling.multipliedReportingOverflow(by: 6)
+        let escaped = ceiling.multipliedReportingOverflow(by: CanonicalToolResultOutputBounds.maximumStringExpansion)
         guard ceiling > 0, !escaped.overflow,
               ceiling <= outputBudget.maximumCanonicalToolResultBytes,
               escaped.partialValue <= outputBudget.maximumEscapedPayloadBytes else {

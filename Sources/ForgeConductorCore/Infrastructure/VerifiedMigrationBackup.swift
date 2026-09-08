@@ -116,6 +116,13 @@ struct SQLitePreflightDatabase {
         try VerifiedMigrationBackup.preflightSQLiteInt(sql, database: database)
     }
 
+    func text(_ sql: String, maximumBytes: Int = 32_768) throws -> String? {
+        guard (1...32_768).contains(maximumBytes), sql.utf8.count <= 8_192 else {
+            throw VerifiedMigrationBackupError.invalidSource("SQLite preflight text query bounds are invalid")
+        }
+        return try VerifiedMigrationBackup.preflightSQLiteText(sql, database: database, maximumBytes: maximumBytes)
+    }
+
     func requireEmptySchemaWhenUnversioned(reportedVersion: Int) throws {
         guard reportedVersion >= 0 else {
             throw VerifiedMigrationBackupError.invalidSource(
@@ -1597,9 +1604,10 @@ public enum VerifiedMigrationBackup {
         return Int(sqlite3_column_int64(statement, 0))
     }
 
-    private static func preflightSQLiteText(
+    fileprivate static func preflightSQLiteText(
         _ sql: String,
-        database: OpaquePointer
+        database: OpaquePointer,
+        maximumBytes: Int = 32_768
     ) throws -> String? {
         var statement: OpaquePointer?
         let prepareResult = sqlite3_prepare_v2(database, sql, -1, &statement, nil)
@@ -1620,7 +1628,14 @@ public enum VerifiedMigrationBackup {
                 database: database
             )
         }
-        return sqlite3_column_text(statement, 0).map { String(cString: $0) }
+        if sqlite3_column_type(statement, 0) == SQLITE_NULL { return nil }
+        guard sqlite3_column_type(statement, 0) == SQLITE_TEXT,
+              sqlite3_column_bytes(statement, 0) <= maximumBytes,
+              let bytes = sqlite3_column_text(statement, 0),
+              let result = String(data: Data(bytes: bytes, count: Int(sqlite3_column_bytes(statement, 0))), encoding: .utf8) else {
+            throw VerifiedMigrationBackupError.invalidSource("SQLite preflight text result has invalid type, encoding, or size")
+        }
+        return result
     }
 
     private static func preflightSQLiteError(

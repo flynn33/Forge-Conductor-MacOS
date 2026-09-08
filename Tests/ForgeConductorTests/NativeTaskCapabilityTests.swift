@@ -369,7 +369,7 @@ final class NativeTaskCapabilityTests: XCTestCase {
                 XCTAssertEqual(try NativeAuthoritySQL.value(f.database, "SELECT COUNT(*) FROM continuity_source_dispatch_origins"), "1")
                 let manifest = try Data(contentsOf: VerifiedMigrationBackup.activeManifestURL(for: f.database, scope: .continuityIngress))
                 let object = try XCTUnwrap(JSONSerialization.jsonObject(with: manifest) as? [String: Any])
-                XCTAssertEqual(object["source_version"] as? Int, 7); XCTAssertEqual(object["target_version"] as? Int, 8)
+                XCTAssertEqual(object["source_version"] as? Int, 8); XCTAssertEqual(object["target_version"] as? Int, 9)
                 await expect(.requestConflict) { _ = try await reopened.prepareNativeContinuityTask(request: f.request, approvedAssignment: f.assignment) }
                 await reopened.close()
             } catch { await reopened.close(); throw error }

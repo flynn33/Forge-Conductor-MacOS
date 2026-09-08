@@ -158,12 +158,16 @@ final class ContinuityOperationControlTests: XCTestCase {
             XCTAssertEqual(try ControlSQLite.text(fixture.database, "SELECT state FROM continuity_ingress_holds"), "awaiting_bootstrap")
             let manifestURL = VerifiedMigrationBackup.activeManifestURL(for: fixture.database, scope: .continuityIngress)
             let manifest = try JSONSerialization.jsonObject(with: Data(contentsOf: manifestURL)) as? [String: Any]
-            XCTAssertEqual(manifest?["source_version"] as? Int, 7)
-            XCTAssertEqual(manifest?["target_version"] as? Int, 8)
+            XCTAssertEqual(manifest?["source_version"] as? Int, 8)
+            XCTAssertEqual(manifest?["target_version"] as? Int, 9)
             XCTAssertEqual(try ControlSQLite.text(fixture.database,
                 "SELECT COUNT(*) FROM forge_migration_receipts WHERE source_version=5 AND target_version=6"), "1")
             XCTAssertEqual(try ControlSQLite.text(fixture.database,
                 "SELECT COUNT(*) FROM forge_migration_receipts WHERE source_version=6 AND target_version=7"), "1")
+            XCTAssertEqual(try ControlSQLite.text(fixture.database,
+                "SELECT COUNT(*) FROM forge_migration_receipts WHERE source_version=7 AND target_version=8"), "1")
+            XCTAssertEqual(try ControlSQLite.text(fixture.database,
+                "SELECT COUNT(*) FROM forge_migration_receipts WHERE source_version=8 AND target_version=9"), "1")
             XCTAssertEqual(try ControlSQLite.text(fixture.database, "SELECT COUNT(*) FROM continuity_operation_cancellations"), "0")
             await upgraded.close()
             let reopened = try ProjectControlPlaneRepository(databaseURL: fixture.database)

@@ -28,6 +28,16 @@ installed-stack and production-feature acceptance remain separate gates.
 - Source bootstrap and successor requests retain exact local preflight receipts.
   Unknown submissions remain lookup-only, and current limits cannot exceed the
   original context, output and tool allowances.
+- Canonical JSON tool results use a measured twofold string-escaping bound,
+  preserving the full approved read allowance while checking the actual request envelope.
+- Verified control-plane capability 8-to-9 migration adds bounded pressure
+  metadata and exact logical-input retention without rewriting older requests.
+- Source tool quotas include reads admitted before conversation enrollment once,
+  including ready handoffs after current limits tighten.
+- Added typed pressure evaluation and a deterministic recovery-packet builder.
+  Packets preserve full critical work and remaining budgets, bind compact pressure
+  facts to the complete decision digest, and enforce inherited retrieval limits.
+  The pressure owner and durable handoff writer are not enabled yet.
 - Successor budgets begin with the actual bootstrap acknowledgement. Actual
   tool-output prefixes and completed response chains survive replay without
   duplicate effects or repeated context charges.

@@ -219,10 +219,23 @@ struct NativeSourceStoredIntent: Codable, Sendable {
     let deadline: String
     let priorUsage: ProviderUsage?
     let logicalInputSHA: String
+    // Missing fields identify retained schema-eight bytes; synthesized Codable
+    // omits their nil values when checking the original canonical digest.
+    let logicalInputVersion: Int?
+    let logicalInput: String?
     func request() throws -> NativeSourceProviderRequest {
         let key = "source-provider:" + stageID.uuidString.lowercased()
         guard ordinal >= 1, ordinal <= 8, epoch > 0, ContinuityIngressLimits.validSHA256(assignmentSHA), ContinuityIngressLimits.validSHA256(logicalInputSHA),
               tools.count == 3, tools.allSatisfy({ $0.count <= 262_144 }), input.count <= 524_288 else {
+            throw NativeSourceConversationError.integrityFailure
+        }
+        if let logicalInputVersion, let logicalInput {
+            guard logicalInputVersion == 1, !logicalInput.isEmpty,
+                  logicalInput.utf8.count <= 16_384,
+                  JSONSupport.sha256Hex(Data(logicalInput.utf8)) == logicalInputSHA else {
+                throw NativeSourceConversationError.integrityFailure
+            }
+        } else if logicalInputVersion != nil || logicalInput != nil {
             throw NativeSourceConversationError.integrityFailure
         }
         _ = try NativeTaskValue.date(deadline)
@@ -247,6 +260,46 @@ struct NativeSourceStoredConversation: Codable, Sendable {
     let priorSourceReadCallsAtEnrollment: Int
     let sourceLimits: NativeTaskSourceLimits
     let createdAt: String
+}
+/// Retained budget evidence. Construction is not execution authority; CP owns
+/// its future write CAS and all claim issuance.
+struct NativeSourceStoredBudgetDisposition: Codable, Sendable {
+    let version: Int
+    let metadata: NativeSourceBudgetMetadata
+    let fenceRevision: Int64
+    let recordedAt: String
+    let storageDeadline: String?
+    enum CodingKeys: String, CodingKey {
+        case version, metadata
+        case fenceRevision = "fence_revision"
+        case recordedAt = "recorded_at"
+        case storageDeadline = "storage_deadline"
+    }
+    var binding: NativeSourceBudgetBinding {
+        switch metadata {
+        case .pressure(let value): value.observation.binding
+        case .blocked(let value): value.binding
+        }
+    }
+    func validated() throws -> Self {
+        let next = binding.conversationRevision.addingReportingOverflow(1)
+        guard version == 1, !next.overflow, fenceRevision == next.partialValue else {
+            throw NativeSourceConversationError.integrityFailure
+        }
+        _ = try NativeTaskValue.date(recordedAt)
+        switch metadata {
+        case .pressure:
+            guard let storageDeadline, let recorded = ISO8601.date(from: recordedAt),
+                  let deadline = ISO8601.date(from: try NativeTaskValue.date(storageDeadline)),
+                  deadline > recorded, deadline.timeIntervalSince(recorded) <= 300 else {
+                throw NativeSourceConversationError.integrityFailure
+            }
+        case .blocked:
+            guard storageDeadline == nil else { throw NativeSourceConversationError.integrityFailure }
+        }
+        _ = try NativeSourceJournalCoding.encode(self, maximum: NativeSourceBudgetMetadata.maximumStoredBytes)
+        return self
+    }
 }
 struct NativeSourceStoredPost: Codable, Sendable {
     let preflight: NativeSourceStoredPreflight

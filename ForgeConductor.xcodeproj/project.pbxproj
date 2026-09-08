@@ -21,6 +21,10 @@
 		A38C1D60A02CC1E25BD6C7B1 /* ManagerNativeTaskAttachmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2F7766412EFCDCB1AEB044D /* ManagerNativeTaskAttachmentTests.swift */; };
 		B7B90B27524E81EB0AD25192 /* SourceDerivedSuccessorPreflightTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 412855DBF6BBCBA7B8BFCE0D /* SourceDerivedSuccessorPreflightTests.swift */; };
 		D940A33C9AA81D2EC14E97FE /* SourceDerivedToolResultBudgetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07FA0BDDBC7AAEE2DEEE463D /* SourceDerivedToolResultBudgetTests.swift */; };
+		0136D5BD66A452D75D2DE7CA /* CanonicalToolOutputPreflightTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B4B61D4415545424119C86B /* CanonicalToolOutputPreflightTests.swift */; };
+		4F25952877997FDD48C3A968 /* NativeSourcePressurePacketBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF44778944F72119D41D44DB /* NativeSourcePressurePacketBuilderTests.swift */; };
+		2A57F85B755FC2AA2ABDA193 /* NativeSourcePressureDecisionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2F9953FEBF5B9DC93BB80E6 /* NativeSourcePressureDecisionTests.swift */; };
+		612EF713101EF2640E60E917 /* NativeSourcePressureJournalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01D901C4FF89B93FC118B0E5 /* NativeSourcePressureJournalTests.swift */; };
 		59B62205A027843459F378C8 /* SourceBootstrapPreflightTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC76D8EAF4DCDF267FAE6475 /* SourceBootstrapPreflightTests.swift */; };
 		09E0847DE5EBE36D9F45A213 /* NativeSourceInheritedBudgetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3956641CE5B0908F31D7FE60 /* NativeSourceInheritedBudgetTests.swift */; };
 		AEA6F261F070BE60D93FFE4F /* NativeSourceConversationJournalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4EBA06AC6DAF2D055B03DF9 /* NativeSourceConversationJournalTests.swift */; };
@@ -211,6 +215,9 @@
 		R1E2A3L4T5S6T7R80002 /* Tests/ForgeConductorTests/RealtimeStreamTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = R1E2A3L4T5S6T7R80001 /* Tests/ForgeConductorTests/RealtimeStreamTests.swift */; };
 		A26B00000000000000000001 /* Application/AutonomySupervisor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000001 /* Application/AutonomySupervisor.swift */; };
 		038AFAE89E2EEA823AA43236 /* ManagedToolResultBudgetModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDDC37BEB19860460723A98C /* ManagedToolResultBudgetModels.swift */; };
+		714E32FA78406ABA69D356FF /* NativeSourcePressurePacketBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96418EFEA54A0094DBD3A1FC /* NativeSourcePressurePacketBuilder.swift */; };
+		05CE12F33FCE8CE57482FDA2 /* NativeSourcePressurePacketModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A799AF5DE426AC97C395A18A /* NativeSourcePressurePacketModels.swift */; };
+		EB96195F0274D7DC2CB9639E /* NativeSourcePressureModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0860E34D44A742424A6E4A1 /* NativeSourcePressureModels.swift */; };
 		7940D6B4D8B6EE89663BAAD6 /* SourceDerivedProviderTurnModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB8F4F5493159DEF2EDCD5DD /* SourceDerivedProviderTurnModels.swift */; };
 		26D8FF2B726D5953D4D1271D /* Application/NativeProviderWorkAdmission.swift in Sources */ = {isa = PBXBuildFile; fileRef = 817AC16CBFCE5623C9F90767 /* Application/NativeProviderWorkAdmission.swift */; };
 		A26B00000000000000000002 /* Application/ContextBudgetSupervisor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000002 /* Application/ContextBudgetSupervisor.swift */; };
@@ -571,6 +578,10 @@
 		C2F7766412EFCDCB1AEB044D /* ManagerNativeTaskAttachmentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagerNativeTaskAttachmentTests.swift; sourceTree = "<group>"; };
 		412855DBF6BBCBA7B8BFCE0D /* SourceDerivedSuccessorPreflightTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Tests/ForgeConductorTests/SourceDerivedSuccessorPreflightTests.swift"; sourceTree = SOURCE_ROOT; };
 		07FA0BDDBC7AAEE2DEEE463D /* SourceDerivedToolResultBudgetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Tests/ForgeConductorTests/SourceDerivedToolResultBudgetTests.swift"; sourceTree = SOURCE_ROOT; };
+		1B4B61D4415545424119C86B /* CanonicalToolOutputPreflightTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Tests/ForgeConductorTests/CanonicalToolOutputPreflightTests.swift"; sourceTree = SOURCE_ROOT; };
+		CF44778944F72119D41D44DB /* NativeSourcePressurePacketBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Tests/ForgeConductorTests/NativeSourcePressurePacketBuilderTests.swift"; sourceTree = SOURCE_ROOT; };
+		F2F9953FEBF5B9DC93BB80E6 /* NativeSourcePressureDecisionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Tests/ForgeConductorTests/NativeSourcePressureDecisionTests.swift"; sourceTree = SOURCE_ROOT; };
+		01D901C4FF89B93FC118B0E5 /* NativeSourcePressureJournalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Tests/ForgeConductorTests/NativeSourcePressureJournalTests.swift"; sourceTree = SOURCE_ROOT; };
 		EC76D8EAF4DCDF267FAE6475 /* SourceBootstrapPreflightTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/ForgeConductorTests/SourceBootstrapPreflightTests.swift; sourceTree = SOURCE_ROOT; };
 		3956641CE5B0908F31D7FE60 /* NativeSourceInheritedBudgetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeSourceInheritedBudgetTests.swift; sourceTree = "<group>"; };
 		D4EBA06AC6DAF2D055B03DF9 /* NativeSourceConversationJournalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeSourceConversationJournalTests.swift; sourceTree = "<group>"; };
@@ -763,6 +774,9 @@
 		R1E2A3L4T5S6T7R80001 /* Tests/ForgeConductorTests/RealtimeStreamTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/ForgeConductorTests/RealtimeStreamTests.swift; sourceTree = SOURCE_ROOT; };
 		A26F00000000000000000001 /* Application/AutonomySupervisor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/AutonomySupervisor.swift; sourceTree = "<group>"; };
 		DDDC37BEB19860460723A98C /* ManagedToolResultBudgetModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/ForgeConductorCore/Domain/ManagedToolResultBudgetModels.swift"; sourceTree = SOURCE_ROOT; };
+		96418EFEA54A0094DBD3A1FC /* NativeSourcePressurePacketBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/ForgeConductorCore/Application/NativeSourcePressurePacketBuilder.swift"; sourceTree = SOURCE_ROOT; };
+		A799AF5DE426AC97C395A18A /* NativeSourcePressurePacketModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/ForgeConductorCore/Domain/NativeSourcePressurePacketModels.swift"; sourceTree = SOURCE_ROOT; };
+		D0860E34D44A742424A6E4A1 /* NativeSourcePressureModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/ForgeConductorCore/Domain/NativeSourcePressureModels.swift"; sourceTree = SOURCE_ROOT; };
 		CB8F4F5493159DEF2EDCD5DD /* SourceDerivedProviderTurnModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/ForgeConductorCore/Domain/SourceDerivedProviderTurnModels.swift; sourceTree = SOURCE_ROOT; };
 		817AC16CBFCE5623C9F90767 /* Application/NativeProviderWorkAdmission.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/NativeProviderWorkAdmission.swift; sourceTree = "<group>"; };
 		A26F00000000000000000002 /* Application/ContextBudgetSupervisor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/ContextBudgetSupervisor.swift; sourceTree = "<group>"; };
@@ -1093,6 +1107,10 @@
 				C2F7766412EFCDCB1AEB044D /* ManagerNativeTaskAttachmentTests.swift */,
 				412855DBF6BBCBA7B8BFCE0D /* SourceDerivedSuccessorPreflightTests.swift */,
 				07FA0BDDBC7AAEE2DEEE463D /* SourceDerivedToolResultBudgetTests.swift */,
+				1B4B61D4415545424119C86B /* CanonicalToolOutputPreflightTests.swift */,
+				CF44778944F72119D41D44DB /* NativeSourcePressurePacketBuilderTests.swift */,
+				F2F9953FEBF5B9DC93BB80E6 /* NativeSourcePressureDecisionTests.swift */,
+				01D901C4FF89B93FC118B0E5 /* NativeSourcePressureJournalTests.swift */,
 				EC76D8EAF4DCDF267FAE6475 /* SourceBootstrapPreflightTests.swift */,
 				3956641CE5B0908F31D7FE60 /* NativeSourceInheritedBudgetTests.swift */,
 				D4EBA06AC6DAF2D055B03DF9 /* NativeSourceConversationJournalTests.swift */,
@@ -1275,6 +1293,9 @@
 			children = (
 				A26F00000000000000000001 /* Application/AutonomySupervisor.swift */,
 				DDDC37BEB19860460723A98C /* ManagedToolResultBudgetModels.swift */,
+				96418EFEA54A0094DBD3A1FC /* NativeSourcePressurePacketBuilder.swift */,
+				A799AF5DE426AC97C395A18A /* NativeSourcePressurePacketModels.swift */,
+				D0860E34D44A742424A6E4A1 /* NativeSourcePressureModels.swift */,
 				CB8F4F5493159DEF2EDCD5DD /* SourceDerivedProviderTurnModels.swift */,
 				5FAA2A9FADD14F82A6C0D2D4 /* Application/NativeSourceBudgetEvaluator.swift */,
 				E0B5D87216674F5C70A22A24 /* Application/NativeSourceConversationService.swift */,
@@ -1906,6 +1927,10 @@
 				A38C1D60A02CC1E25BD6C7B1 /* ManagerNativeTaskAttachmentTests.swift in Sources */,
 				B7B90B27524E81EB0AD25192 /* SourceDerivedSuccessorPreflightTests.swift in Sources */,
 				D940A33C9AA81D2EC14E97FE /* SourceDerivedToolResultBudgetTests.swift in Sources */,
+				0136D5BD66A452D75D2DE7CA /* CanonicalToolOutputPreflightTests.swift in Sources */,
+				4F25952877997FDD48C3A968 /* NativeSourcePressurePacketBuilderTests.swift in Sources */,
+				2A57F85B755FC2AA2ABDA193 /* NativeSourcePressureDecisionTests.swift in Sources */,
+				612EF713101EF2640E60E917 /* NativeSourcePressureJournalTests.swift in Sources */,
 				59B62205A027843459F378C8 /* SourceBootstrapPreflightTests.swift in Sources */,
 				09E0847DE5EBE36D9F45A213 /* NativeSourceInheritedBudgetTests.swift in Sources */,
 				AEA6F261F070BE60D93FFE4F /* NativeSourceConversationJournalTests.swift in Sources */,
@@ -1996,6 +2021,9 @@
 				E2F500000000000000000052 /* Infrastructure/SecureFilesystemQualificationHealthSession.swift in Sources */,
 				A26B00000000000000000001 /* Application/AutonomySupervisor.swift in Sources */,
 				038AFAE89E2EEA823AA43236 /* ManagedToolResultBudgetModels.swift in Sources */,
+				714E32FA78406ABA69D356FF /* NativeSourcePressurePacketBuilder.swift in Sources */,
+				05CE12F33FCE8CE57482FDA2 /* NativeSourcePressurePacketModels.swift in Sources */,
+				EB96195F0274D7DC2CB9639E /* NativeSourcePressureModels.swift in Sources */,
 				7940D6B4D8B6EE89663BAAD6 /* SourceDerivedProviderTurnModels.swift in Sources */,
 				E9AE73421EAC4C00CF50B407 /* Application/NativeSourceBudgetEvaluator.swift in Sources */,
 				FEB8634E668A24AE6231F627 /* Application/NativeSourceConversationService.swift in Sources */,

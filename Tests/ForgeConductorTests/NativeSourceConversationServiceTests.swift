@@ -131,19 +131,46 @@ final class NativeSourceConversationServiceTests: XCTestCase, @unchecked Sendabl
         }
     }
 
-    func testFullApprovedReadIsDeniedBeforeEffectWhenContextCannotReserveItsEscapedOutput() async throws {
+    func testFullApprovedReadFitsCanonicalContinuationAt128K() async throws {
         try await withFixture(mode: .readThenAnswer, contextLength: 131_072) { f in
+            let service = f.service(); service.setOperational(true)
+            let request = try NativeSourceSendRequest(taskID: f.taskID, requestID: UUID(), input: "Read the full approved fixture and answer")
+            _ = try await service.send(request, cancellation: .init(timeoutSeconds: 5))
+            try await self.eventually { !(await service.hasRetainedWork()) }
+            let observation = f.budgetDiagnostics.snapshot()
+            XCTAssertEqual(observation.read?.approvedResultBytes, 65_536)
+            XCTAssertNil(observation.bridgeError, "A valid canonical payload reserves its complete approved ceiling")
+            XCTAssertEqual(try f.scalar("SELECT COUNT(*) FROM native_source_requests WHERE method='fs_read' AND state='completed'"), 1)
+            XCTAssertEqual(try f.scalar("SELECT COUNT(*) FROM native_source_provider_calls WHERE output_json IS NOT NULL"), 1)
+            let counts = await f.provider.counts()
+            XCTAssertEqual(counts.roots, 1); XCTAssertEqual(counts.continuations, 1)
+            let input = await f.provider.continuationInput()
+            XCTAssertNotNil(input, "The actual complete output must be consumed by a following provider request")
+            if let input {
+                let items = try XCTUnwrap(JSONSerialization.jsonObject(with: input) as? [[String: Any]])
+                let output = try XCTUnwrap(items.first?["output"] as? String)
+                XCTAssertEqual(try JSONSupport.object(from: Data(output.utf8))["content"] as? String, "actual source bytes")
+            }
+            let status = try await service.status(.init(taskID: f.taskID, requestID: request.requestID), cancellation: .init())
+            XCTAssertEqual(status.conversationState, "idle"); XCTAssertEqual(status.stageState, "accepted")
+            XCTAssertEqual(f.pool.activeCount, 0); XCTAssertEqual(f.operations.value, 0)
+            _ = await service.shutdown(deadline: Date().addingTimeInterval(1))
+        }
+    }
+
+    func testFullApprovedReadIsDeniedBeforeEffectWhenContextCannotReserveItsEscapedOutput() async throws {
+        try await withFixture(mode: .readThenAnswer, contextLength: 65_536) { f in
             let service = f.service(); service.setOperational(true)
             let request = try NativeSourceSendRequest(taskID: f.taskID, requestID: UUID(), input: "Read the approved file")
             _ = try await service.send(request, cancellation: .init(timeoutSeconds: 5))
             try await self.eventually { !(await service.hasRetainedWork()) }
             let observed = f.budgetDiagnostics.snapshot()
             let read = try XCTUnwrap(observed.read)
-            XCTAssertEqual(read.contextLength, 131_072)
+            XCTAssertEqual(read.contextLength, 65_536)
             XCTAssertEqual(read.approvedResultBytes, 65_536)
-            XCTAssertEqual(read.requiredEscapedBytes, 393_216)
+            XCTAssertEqual(read.requiredEscapedBytes, 131_072)
             XCTAssertEqual(try ContextBudgetMath.estimateTokens(serializedBytes: read.requiredEscapedBytes,
-                policy: ContextBudgetPolicy()), 163_840)
+                policy: ContextBudgetPolicy()), 54_614)
             XCTAssertLessThan(read.maximumCanonicalToolResultBytes, read.approvedResultBytes)
             XCTAssertLessThan(read.maximumEscapedPayloadBytes, read.requiredEscapedBytes)
             XCTAssertEqual(observed.bridgeError, .budgetExceeded)
@@ -443,7 +470,7 @@ private final class SourceOwnerFixture: @unchecked Sendable {
                         call.attachment.setup.record.assignment.authorizationScope.maximumInlineOutputBytes,
                         selection.policy.tools.maxResultBytes, call.prepared.frozenCeilings?.tools.maxResultBytes ?? Int.max)
                     budgetDiagnostics.record(read: .init(contextLength: capabilities.contextLength,
-                        approvedResultBytes: ceiling, requiredEscapedBytes: ceiling * 6,
+                        approvedResultBytes: ceiling, requiredEscapedBytes: ceiling * CanonicalToolResultOutputBounds.maximumStringExpansion,
                         maximumCanonicalToolResultBytes: budget.maximumCanonicalToolResultBytes,
                         maximumEscapedPayloadBytes: budget.maximumEscapedPayloadBytes))
                 }

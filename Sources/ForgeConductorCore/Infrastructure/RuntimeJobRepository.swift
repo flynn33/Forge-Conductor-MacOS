@@ -1819,7 +1819,8 @@ public actor RuntimeJobRepository {
             && requiredTableCount == controlPlaneV2RequiredSurfaces.count else {
             return false
         }
-        guard let providerTurnColumns = try exactCoResidentProviderTurnColumns(integer: { try candidate.integer($0) }) else { return false }
+        guard let providerTurnColumns = try exactCoResidentProviderTurnColumns(integer: { try candidate.integer($0) },
+            text: { try candidate.text($0) }) else { return false }
         for surface in controlPlaneV2RequiredSurfaces {
             let columns = surface.name == "provider_turns" ? providerTurnColumns : surface.columns
             let columnList = columns.map { "'\($0)'" }.joined(separator: ",")
@@ -1864,7 +1865,8 @@ public actor RuntimeJobRepository {
             && requiredTableCount == controlPlaneV2RequiredSurfaces.count else {
             return false
         }
-        guard let providerTurnColumns = try exactCoResidentProviderTurnColumns(integer: { try rawScalarInt($0, database: database) }) else { return false }
+        guard let providerTurnColumns = try exactCoResidentProviderTurnColumns(integer: { try rawScalarInt($0, database: database) },
+            text: { try rawScalarText($0, database: database, maximumBytes: 32_768) }) else { return false }
         for surface in controlPlaneV2RequiredSurfaces {
             let columns = surface.name == "provider_turns" ? providerTurnColumns : surface.columns
             let columnList = columns.map { "'\($0)'" }.joined(separator: ",")
@@ -1887,7 +1889,7 @@ public actor RuntimeJobRepository {
     /// Only the known pre-journal and capability-eight provider ledgers are
     /// valid co-residents of a version-zero runtime job database. Unknown extra
     /// columns still cannot turn an arbitrary nonempty database into a baseline.
-    private static func exactCoResidentProviderTurnColumns(integer: (String) throws -> Int?) throws -> [String]? {
+    private static func exactCoResidentProviderTurnColumns(integer: (String) throws -> Int?, text: (String) throws -> String?) throws -> [String]? {
         guard let legacy = controlPlaneV2RequiredSurfaces.first(where: { $0.name == "provider_turns" })?.columns else { return nil }
         let journalTables = try integer("""
             SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN
@@ -1911,6 +1913,9 @@ public actor RuntimeJobRepository {
                     AND instr(sql,'source_preflight_json TEXT CHECK (source_preflight_json IS NULL OR length(CAST(source_preflight_json AS BLOB)) BETWEEN 1 AND 32768)')>0
                     AND instr(sql,'source_preflight_sha256 TEXT CHECK ((source_preflight_json IS NULL AND source_preflight_sha256 IS NULL) OR (source_preflight_json IS NOT NULL AND source_preflight_sha256 IS NOT NULL AND length(source_preflight_sha256)=64))')>0
                   """) == 1 else { return nil }
+        let pressureColumns = try integer("SELECT COUNT(*) FROM pragma_table_xinfo('native_source_provider_turns') WHERE name IN('pressure_decision_json','pressure_decision_sha256','pressure_reservation_id')") ?? 0
+        guard (pressureColumns == 0 || pressureColumns == 3),
+              try NativeSourcePressureSchema.validate(hasColumns: pressureColumns == 3, integer: integer, text: text) else { return nil }
         return legacy + ["source_preflight_json", "source_preflight_sha256"]
     }
 
@@ -1961,7 +1966,7 @@ public actor RuntimeJobRepository {
         return Int(sqlite3_column_int64(statement, 0))
     }
 
-    private static func rawScalarText(_ sql: String, database: OpaquePointer) throws -> String? {
+    private static func rawScalarText(_ sql: String, database: OpaquePointer, maximumBytes: Int? = nil) throws -> String? {
         var statement: OpaquePointer?
         let prepare = sqlite3_prepare_v2(database, sql, -1, &statement, nil)
         guard prepare == SQLITE_OK, let statement else {
@@ -1972,6 +1977,15 @@ public actor RuntimeJobRepository {
         if step == SQLITE_DONE { return nil }
         guard step == SQLITE_ROW else {
             throw RuntimeJobError.storageFailure(String(cString: sqlite3_errmsg(database)))
+        }
+        if let maximumBytes, sqlite3_column_type(statement, 0) != SQLITE_NULL {
+            guard sqlite3_column_type(statement, 0) == SQLITE_TEXT,
+                  sqlite3_column_bytes(statement, 0) <= maximumBytes,
+                  let bytes = sqlite3_column_text(statement, 0),
+                  let result = String(data: Data(bytes: bytes, count: Int(sqlite3_column_bytes(statement, 0))), encoding: .utf8) else {
+                throw RuntimeJobError.storageFailure("Invalid bounded schema text")
+            }
+            return result
         }
         return optionalText(statement, column: 0)
     }
