@@ -43,6 +43,9 @@ installed-stack and production-feature acceptance remain separate gates.
   from retained provider facts; cancellation and expired ownership roll back writes.
 - Exact source-commit reconciliation reads immutable receipts without creating a
   revision, delivery row or write reservation, including retained invalidated data.
+- Pressure receipt recovery now works after cancellation, revocation or storage
+  expiry through a separate, short-lived audit claim. It preserves exact source
+  receipts without restoring execution authority or extending the storage deadline.
 - Added typed pressure evaluation and a deterministic recovery-packet builder.
   Packets preserve full critical work and remaining budgets, bind compact pressure
   facts to the complete decision digest, and enforce inherited retrieval limits.

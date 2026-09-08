@@ -6,6 +6,183 @@ import ForgeNativeSessionHostPlugin
 #endif
 
 final class NativeSourcePressureJournalTests: XCTestCase {
+    func testReceiptCleanupChecksLineageBeforeDecodingRetainedPacket() async throws {
+        try await withFixture { f in
+            let (claim, admission) = try await f.preparedPressure()
+            f.clock.advance(301)
+            let reference = NativeSourcePressureRecoveryReference(conversationID: claim.conversationID, stageID: claim.stageID,
+                taskID: claim.taskID, capabilityID: claim.capabilityID, reservationID: admission.reservationID)
+            try PressureSQL.execute(f.database, "UPDATE continuity_source_dispatch_origins SET scope_sha256='\(String(repeating: "0", count: 64))'")
+            try PressureSQL.execute(f.database, "UPDATE native_source_requests SET prepared_packet_json='corrupt'")
+            do {
+                _ = try await f.repository.acquireNativeSourcePressureReceiptClaim(reference: reference, managerInstanceID: UUID())
+                XCTFail("Mismatched dispatch lineage reached retained packet decoding")
+            } catch { XCTAssertEqual(error as? NativeSourceConversationError, .notFound) }
+        }
+    }
+
+    func testReceiptCleanupExpiryAtCommitRollsBackAndNewOwnerFencesOldClaim() async throws {
+        try await withFixture { f in
+            let (_, admission) = try await f.preparedPressure()
+            let store = try SQLiteStore(path: f.database.deletingLastPathComponent().appendingPathComponent("receipt-source.sqlite"), clock: f.clock)
+            defer { store.close() }
+            let actual = try store.handoffCommit(admission.prepared.packet(), authorization: admission.authorization, automaticHandoffEnabled: true)
+            f.clock.advance(301)
+            let references = try await f.repository.pendingNativeSourcePressureReceipts()
+            let reference = try XCTUnwrap(references.first)
+            let old = try await f.repository.acquireNativeSourcePressureReceiptClaim(reference: reference, managerInstanceID: UUID())
+            await f.repository.configureOperationObservers(beforeCommit: { f.clock.advance(31) })
+            do {
+                _ = try await f.repository.reconcileNativeSourcePressureReceipt(claim: old,
+                    readExisting: { try store.readPreparedSourceCommitForReconciliation($0, authorization: $1) })
+                XCTFail("Expired cleanup committed its audit update")
+            } catch { XCTAssertEqual(error as? NativeSourceConversationError, .leaseUnavailable) }
+            await f.repository.configureOperationObservers()
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT state FROM native_source_requests"), "pending")
+            let reopened = try ProjectControlPlaneRepository(databaseURL: f.database, clock: f.clock)
+            do {
+                let current = try await reopened.acquireNativeSourcePressureReceiptClaim(reference: reference, managerInstanceID: UUID())
+                let staleRelease = try await f.repository.releaseNativeSourcePressureReceiptClaim(old)
+                XCTAssertFalse(staleRelease)
+                let called = PressureCallbackObservation()
+                do {
+                    _ = try await f.repository.reconcileNativeSourcePressureReceipt(claim: old,
+                        readExisting: { _, _ in called.record(); return nil })
+                    XCTFail("Stale cleanup owner reached the source")
+                } catch { XCTAssertEqual(error as? NativeSourceConversationError, .leaseUnavailable) }
+                XCTAssertFalse(called.called)
+                let recovered = try await reopened.reconcileNativeSourcePressureReceipt(claim: current,
+                    readExisting: { try store.readPreparedSourceCommitForReconciliation($0, authorization: $1) })
+                XCTAssertEqual(recovered?.revision.identity, actual.revision.identity)
+                _ = try await reopened.releaseNativeSourcePressureReceiptClaim(current)
+                await reopened.close()
+            } catch { await reopened.close(); throw error }
+        }
+    }
+
+    func testReceiptCleanupAfterCancellationRetainsExistingSourceWithoutRestoringWork() async throws {
+        try await withFixture { f in
+            let (claim, admission) = try await f.preparedPressure()
+            let store = try SQLiteStore(path: f.database.deletingLastPathComponent().appendingPathComponent("receipt-source.sqlite"), clock: f.clock)
+            defer { store.close() }
+            let actual = try store.handoffCommit(admission.prepared.packet(), authorization: admission.authorization,
+                automaticHandoffEnabled: admission.automaticHandoffEnabled)
+            let requestID = try UUID(uuidString: PressureSQL.value(f.database, "SELECT request_id FROM native_source_provider_turns"))
+            _ = try await f.repository.requestNativeSourceConversationCancellation(conversationID: claim.conversationID,
+                requestID: XCTUnwrap(requestID), cancelRequestID: UUID(), credential: f.credential)
+            _ = try await f.repository.releaseNativeSourcePressureClaim(claim)
+            let references = try await f.repository.pendingNativeSourcePressureReceipts()
+            XCTAssertEqual(references.count, 1)
+            let cleanup = try await f.repository.acquireNativeSourcePressureReceiptClaim(reference: XCTUnwrap(references.first), managerInstanceID: UUID())
+            let recovered = try await f.repository.reconcileNativeSourcePressureReceipt(claim: cleanup,
+                readExisting: { try store.readPreparedSourceCommitForReconciliation($0, authorization: $1) })
+            XCTAssertEqual(recovered?.revision.identity, actual.revision.identity)
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT cancelled FROM native_source_conversations"), "1")
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT state FROM native_source_conversations"), "stopped")
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT state FROM native_source_provider_turns"), "accepted")
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT state FROM native_source_requests"), "completed")
+            let replay = try await f.repository.reconcileNativeSourcePressureReceipt(claim: cleanup,
+                readExisting: { _, _ in throw PressureFixtureError.interrupted })
+            XCTAssertEqual(try NativeSourceCommitEvidence.encode(XCTUnwrap(replay)), try NativeSourceCommitEvidence.encode(actual))
+            _ = try await f.repository.releaseNativeSourcePressureReceiptClaim(cleanup)
+            do {
+                _ = try await f.repository.acquireNativeSourcePressureClaim(conversationID: claim.conversationID,
+                    stageID: claim.stageID, credential: f.credential, managerInstanceID: UUID())
+                XCTFail("Receipt cleanup restored cancelled execution")
+            } catch { XCTAssertEqual(error as? NativeSourceConversationError, .cancelled) }
+        }
+    }
+
+    func testReceiptCleanupAfterStorageExpiryReadsInvalidatedRevisionAndPreservesDeadline() async throws {
+        try await withFixture { f in
+            let (_, admission) = try await f.preparedPressure()
+            let store = try SQLiteStore(path: f.database.deletingLastPathComponent().appendingPathComponent("receipt-source.sqlite"), clock: f.clock)
+            defer { store.close() }
+            _ = try store.handoffCommit(admission.prepared.packet(), authorization: admission.authorization,
+                automaticHandoffEnabled: true)
+            _ = try store.invalidateContinuityIngress(projectID: admission.authorization.projectID,
+                throughGeneration: admission.authorization.projectGeneration)
+            let deadline = try PressureSQL.value(f.database, "SELECT deadline FROM native_source_requests")
+            f.clock.advance(301)
+            let references = try await f.repository.pendingNativeSourcePressureReceipts()
+            let cleanup = try await f.repository.acquireNativeSourcePressureReceiptClaim(reference: XCTUnwrap(references.first), managerInstanceID: UUID())
+            let recovered = try await f.repository.reconcileNativeSourcePressureReceipt(claim: cleanup,
+                readExisting: { try store.readPreparedSourceCommitForReconciliation($0, authorization: $1) })
+            XCTAssertEqual(recovered?.revision.canonicalPacketJSON, admission.prepared.canonicalPacketJSON)
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT deadline FROM native_source_requests"), deadline)
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT state FROM native_source_conversations"), "stopped")
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT COUNT(*) FROM native_source_provider_calls"), "0")
+            _ = try await f.repository.releaseNativeSourcePressureReceiptClaim(cleanup)
+        }
+    }
+
+    func testReceiptCleanupAfterCapabilityRevocationUsesNoBearerGrant() async throws {
+        try await withFixture { f in
+            let (claim, admission) = try await f.preparedPressure()
+            let store = try SQLiteStore(path: f.database.deletingLastPathComponent().appendingPathComponent("receipt-source.sqlite"), clock: f.clock)
+            defer { store.close() }
+            let actual = try store.handoffCommit(admission.prepared.packet(), authorization: admission.authorization, automaticHandoffEnabled: true)
+            let revoke = try NativeContinuityTaskRevocationRequest(requestID: UUID(), taskID: f.taskID,
+                capabilityID: f.credential.capabilityID, projectID: admission.authorization.projectID,
+                projectGeneration: admission.authorization.projectGeneration, expectedEpoch: f.credential.epoch)
+            _ = try await f.repository.revokeNativeContinuityTask(request: revoke)
+            _ = try await f.repository.releaseNativeSourcePressureClaim(claim)
+            let references = try await f.repository.pendingNativeSourcePressureReceipts()
+            let cleanup = try await f.repository.acquireNativeSourcePressureReceiptClaim(reference: XCTUnwrap(references.first), managerInstanceID: UUID())
+            let recovered = try await f.repository.reconcileNativeSourcePressureReceipt(claim: cleanup,
+                readExisting: { try store.readPreparedSourceCommitForReconciliation($0, authorization: $1) })
+            XCTAssertEqual(recovered?.revision.identity, actual.revision.identity)
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT state FROM native_task_capabilities"), "revoked")
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT COUNT(*) FROM native_task_capabilities WHERE verifier_sha256 IS NOT NULL"), "0")
+            _ = try await f.repository.releaseNativeSourcePressureReceiptClaim(cleanup)
+        }
+    }
+
+    func testReceiptCleanupDistinguishesUnavailableStoreFromAbsentCommit() async throws {
+        try await withFixture { f in
+            let (_, admission) = try await f.preparedPressure()
+            f.clock.advance(301)
+            let refs = try await f.repository.pendingNativeSourcePressureReceipts()
+            let reference = try XCTUnwrap(refs.first)
+            let cleanup = try await f.repository.acquireNativeSourcePressureReceiptClaim(reference: reference, managerInstanceID: UUID())
+            do {
+                _ = try await f.repository.reconcileNativeSourcePressureReceipt(claim: cleanup,
+                    readExisting: { _, _ in throw PressureFixtureError.interrupted })
+                XCTFail("Unavailable source was treated as an absent revision")
+            } catch { XCTAssertEqual(error as? PressureFixtureError, .interrupted) }
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT quarantined FROM native_source_requests"), "0")
+            let missing = try await f.repository.reconcileNativeSourcePressureReceipt(claim: cleanup, readExisting: { _, _ in nil })
+            XCTAssertNil(missing)
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT quarantined FROM native_source_requests"), "1")
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT packet_sha256 FROM native_source_requests"), admission.prepared.packetSHA256)
+            _ = try await f.repository.releaseNativeSourcePressureReceiptClaim(cleanup)
+            let pending = try await f.repository.pendingNativeSourcePressureReceipts()
+            XCTAssertTrue(pending.isEmpty)
+        }
+    }
+
+    func testReceiptCleanupRejectsLiveWriterAndExpiredCleanupLease() async throws {
+        try await withFixture { f in
+            let (claim, admission) = try await f.preparedPressure()
+            let reference = NativeSourcePressureRecoveryReference(conversationID: claim.conversationID, stageID: claim.stageID,
+                taskID: claim.taskID, capabilityID: claim.capabilityID, reservationID: admission.reservationID)
+            do {
+                _ = try await f.repository.acquireNativeSourcePressureReceiptClaim(reference: reference, managerInstanceID: UUID())
+                XCTFail("Receipt cleanup acquired live write authority")
+            } catch { XCTAssertEqual(error as? NativeSourceConversationError, .conflict) }
+            f.clock.advance(301)
+            let cleanup = try await f.repository.acquireNativeSourcePressureReceiptClaim(reference: reference, managerInstanceID: UUID())
+            f.clock.advance(31)
+            let called = PressureCallbackObservation()
+            do {
+                _ = try await f.repository.reconcileNativeSourcePressureReceipt(claim: cleanup,
+                    readExisting: { _, _ in called.record(); return nil })
+                XCTFail("Expired cleanup lease reached the source")
+            } catch { XCTAssertEqual(error as? NativeSourceConversationError, .leaseUnavailable) }
+            XCTAssertFalse(called.called)
+        }
+    }
+
     func testPressureSourceCommitRetainsActualReceiptAfterLateCancellation() async throws {
         try await withFixture { f in
             let (claim, admission) = try await f.preparedPressure()
